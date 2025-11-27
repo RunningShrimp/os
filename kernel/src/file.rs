@@ -1,0 +1,549 @@
+//! File abstraction for xv6-rust
+//! Provides unified file interface for regular files, devices, and pipes
+
+extern crate alloc;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+use crate::sync::{Mutex, Sleeplock};
+use crate::process;
+use crate::posix;
+use crate::pipe::Pipe;
+
+/// Maximum open files per process
+pub const NOFILE: usize = 16;
+
+/// Maximum open files system-wide
+pub const NFILE: usize = 100;
+
+/// File types
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileType {
+    None,
+    Pipe,
+    Inode,
+    Device,
+    Vfs,
+    Socket,
+}
+
+impl Default for FileType {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+/// File structure
+pub struct File {
+    pub ftype: FileType,
+    pub ref_count: i32,
+    pub readable: bool,
+    pub writable: bool,
+    pub status_flags: i32,
+    
+    // For FD_INODE
+    pub inode: Option<u32>,  // Inode number
+    pub offset: usize,       // Current offset
+    
+    // For FD_PIPE
+    pub pipe: Option<Arc<Sleeplock<Pipe>>>,
+    
+    // For FD_DEVICE
+    pub major: i16,
+    pub minor: i16,
+    
+    // For VFS file
+    pub vfs_file: Option<crate::vfs::VfsFile>,
+    pub event_subs: Vec<usize>,
+}
+
+impl Default for File {
+    fn default() -> Self {
+        Self {
+            ftype: FileType::None,
+            ref_count: 0,
+            readable: false,
+            writable: false,
+            status_flags: 0,
+            inode: None,
+            offset: 0,
+            pipe: None,
+            major: 0,
+            minor: 0,
+            vfs_file: None,
+            event_subs: Vec::new(),
+        }
+    }
+}
+
+impl File {
+    pub const fn new() -> Self {
+        Self {
+            ftype: FileType::None,
+            ref_count: 0,
+            readable: false,
+            writable: false,
+            status_flags: 0,
+            inode: None,
+            offset: 0,
+            pipe: None,
+            major: 0,
+            minor: 0,
+            vfs_file: None,
+            event_subs: Vec::new(),
+        }
+    }
+
+    /// Check if file is valid
+    pub fn is_valid(&self) -> bool {
+        self.ftype != FileType::None && self.ref_count > 0
+    }
+
+    /// Read data from file
+    pub fn read(&mut self, buf: &mut [u8]) -> isize {
+        if !self.readable {
+            return -1;
+        }
+
+        match self.ftype {
+            FileType::Pipe => {
+                if let Some(ref pipe) = self.pipe {
+                    let chan_read = Arc::as_ptr(pipe) as usize | 0x01;
+                    if (self.status_flags & crate::posix::O_NONBLOCK) != 0 {
+                        let mut p = pipe.lock();
+                        if p.nread == p.nwrite {
+                            return crate::errno::errno_neg(crate::errno::EAGAIN);
+                        }
+                        match p.read(buf) {
+                            Ok(n) => {
+                                drop(p);
+                                process::wakeup(Arc::as_ptr(pipe) as usize | 0x02);
+                                process::wakeup(crate::syscall::POLL_WAKE_CHAN);
+                                {
+                                    let mut p = pipe.lock();
+                                    p.notify_read_ready();
+                                }
+                                return n as isize;
+                            }
+                            Err(_) => {
+                                return -1;
+                            }
+                        }
+                    }
+                    loop {
+                        let mut p = pipe.lock();
+                        // If buffer empty
+                        if p.nread == p.nwrite {
+                            if p.writeopen {
+                                drop(p);
+                                process::sleep(chan_read);
+                                continue;
+                            } else {
+                                // Writer closed: EOF
+                                return 0;
+                            }
+                        }
+                        match p.read(buf) {
+                            Ok(n) => {
+                                drop(p);
+                                process::wakeup(Arc::as_ptr(pipe) as usize | 0x02);
+                                return n as isize;
+                            }
+                            Err(_) => {
+                                return -1;
+                            }
+                        }
+                    }
+                } else {
+                    -1
+                }
+            }
+            FileType::Inode => {
+                // Simplified: return 0 (EOF) for now
+                0
+            }
+            FileType::Device => {
+                // Device read - simplified
+                -1
+            }
+            FileType::Vfs => {
+                if let Some(ref mut vfs_file) = self.vfs_file {
+                    let addr = buf.as_mut_ptr() as usize;
+                    let len = buf.len();
+                    match vfs_file.read(addr, len) {
+                        Ok(n) => n as isize,
+                        Err(_) => -1,
+                    }
+                } else {
+                    -1
+                }
+            }
+            FileType::None => -1,
+            FileType::Socket => -1,
+        }
+    }
+
+    /// Write to file
+    pub fn write(&mut self, buf: &[u8]) -> isize {
+        if !self.writable {
+            return -1;
+        }
+
+        match self.ftype {
+            FileType::Pipe => {
+                if let Some(ref pipe) = self.pipe {
+                    let chan_write = Arc::as_ptr(pipe) as usize | 0x02;
+                    if (self.status_flags & crate::posix::O_NONBLOCK) != 0 {
+                        let mut p = pipe.lock();
+                        if p.nwrite == p.nread + crate::pipe::PIPE_SIZE {
+                            if !p.readopen {
+                                let _ = crate::process::kill_proc(crate::process::getpid(), crate::signal::SIGPIPE);
+                                return crate::errno::errno_neg(crate::errno::EPIPE);
+                            }
+                            return crate::errno::errno_neg(crate::errno::EAGAIN);
+                        }
+                        match p.write(buf) {
+                            Ok(n) => {
+                                drop(p);
+                                process::wakeup(Arc::as_ptr(pipe) as usize | 0x01);
+                                process::wakeup(crate::syscall::POLL_WAKE_CHAN);
+                                {
+                                    let mut p = pipe.lock();
+                                    p.notify_write_ready();
+                                }
+                                return n as isize;
+                            }
+                            Err(_) => {
+                                return -1;
+                            }
+                        }
+                    }
+                    loop {
+                        let mut p = pipe.lock();
+                        // If buffer full
+                        if p.nwrite == p.nread + crate::pipe::PIPE_SIZE {
+                            if !p.readopen {
+                                // No readers: send SIGPIPE and return EPIPE
+                                let _ = crate::process::kill_proc(crate::process::getpid(), crate::signal::SIGPIPE);
+                                return crate::errno::errno_neg(crate::errno::EPIPE);
+                            }
+                            drop(p);
+                            process::sleep(chan_write);
+                            continue;
+                        }
+                        match p.write(buf) {
+                            Ok(n) => {
+                                drop(p);
+                                process::wakeup(Arc::as_ptr(pipe) as usize | 0x01);
+                                return n as isize;
+                            }
+                            Err(_) => {
+                                return -1;
+                            }
+                        }
+                    }
+                } else {
+                    -1
+                }
+            }
+            FileType::Inode => {
+                // TODO: Write to inode
+                if let Some(_inum) = self.inode {
+                    buf.len() as isize
+                } else {
+                    -1
+                }
+            }
+            FileType::Device => {
+                // Write to device
+                match self.major {
+                    1 => {
+                        // Console device
+                        crate::drivers::console_write(buf) as isize
+                    }
+                    _ => -1,
+                }
+            }
+            FileType::Vfs => {
+                if let Some(ref mut vfs_file) = self.vfs_file {
+                    // Convert buffer to address and length for VFS write
+                    let addr = buf.as_ptr() as usize;
+                    let len = buf.len();
+                    if (self.status_flags & crate::posix::O_APPEND) != 0 {
+                        // Seek to end before write
+                        if let Ok(attr) = vfs_file.stat() {
+                            let _ = vfs_file.seek(attr.size as usize);
+                        }
+                    }
+                    match vfs_file.write(addr, len) {
+                        Ok(n) => n as isize,
+                        Err(_) => -1,
+                    }
+                } else {
+                    -1
+                }
+            }
+            FileType::None => -1,
+            FileType::Socket => -1,
+        }
+    }
+
+    /// Seek to offset
+    pub fn seek(&mut self, offset: usize) -> isize {
+        match self.ftype {
+            FileType::Inode => {
+                self.offset = offset;
+                offset as isize
+            }
+            FileType::Vfs => {
+                if let Some(ref mut vfs_file) = self.vfs_file {
+                    vfs_file.seek(offset)
+                } else {
+                    -1
+                }
+            }
+            _ => -1,
+        }
+    }
+}
+
+/// Global file table
+pub struct FTable {
+    files: [File; NFILE],
+}
+
+impl FTable {
+    pub const fn new() -> Self {
+        Self {
+            files: [const { File::new() }; NFILE],
+        }
+    }
+
+    /// Allocate a file structure
+    pub fn alloc(&mut self) -> Option<usize> {
+        for (i, file) in self.files.iter_mut().enumerate() {
+            if file.ref_count == 0 {
+                file.ref_count = 1;
+                return Some(i);
+            }
+        }
+        None
+    }
+
+    /// Duplicate a file (increment reference count)
+    pub fn dup(&mut self, idx: usize) -> Option<usize> {
+        if idx >= NFILE || self.files[idx].ref_count == 0 {
+            return None;
+        }
+        self.files[idx].ref_count += 1;
+        Some(idx)
+    }
+
+    /// Close a file (decrement reference count)
+    pub fn close(&mut self, idx: usize) {
+        if idx >= NFILE {
+            return;
+        }
+        let file = &mut self.files[idx];
+        file.ref_count -= 1;
+        if file.ref_count == 0 {
+            // Clean up
+            if file.ftype == FileType::Pipe {
+                if let Some(ref pipe) = file.pipe {
+                    let mut p = pipe.lock();
+                    if file.readable {
+                        p.close_read();
+                        drop(p);
+                        process::wakeup(Arc::as_ptr(pipe) as usize | 0x02);
+                        process::wakeup(crate::syscall::POLL_WAKE_CHAN);
+                    } else if file.writable {
+                        p.close_write();
+                        drop(p);
+                        process::wakeup(Arc::as_ptr(pipe) as usize | 0x01);
+                        process::wakeup(crate::syscall::POLL_WAKE_CHAN);
+                    }
+                }
+            }
+            file.ftype = FileType::None;
+            file.pipe = None;
+            file.inode = None;
+        }
+    }
+
+    /// Get file reference
+    pub fn get(&self, idx: usize) -> Option<&File> {
+        if idx >= NFILE || self.files[idx].ref_count == 0 {
+            None
+        } else {
+            Some(&self.files[idx])
+        }
+    }
+
+    /// Get mutable file reference
+    pub fn get_mut(&mut self, idx: usize) -> Option<&mut File> {
+        if idx >= NFILE || self.files[idx].ref_count == 0 {
+            None
+        } else {
+            Some(&mut self.files[idx])
+        }
+    }
+}
+
+pub static FILE_TABLE: Mutex<FTable> = Mutex::new(FTable::new());
+
+/// Allocate a new file
+pub fn file_alloc() -> Option<usize> {
+    FILE_TABLE.lock().alloc()
+}
+
+/// Duplicate a file
+pub fn file_dup(idx: usize) -> Option<usize> {
+    FILE_TABLE.lock().dup(idx)
+}
+
+/// Close a file
+pub fn file_close(idx: usize) {
+    FILE_TABLE.lock().close(idx)
+}
+
+/// Read from file
+pub fn file_read(idx: usize, buf: &mut [u8]) -> isize {
+    match FILE_TABLE.lock().get_mut(idx) {
+        Some(f) => f.read(buf),
+        None => -1,
+    }
+}
+
+/// Write to file
+pub fn file_write(idx: usize, buf: &[u8]) -> isize {
+    match FILE_TABLE.lock().get_mut(idx) {
+        Some(f) => f.write(buf),
+        None => -1,
+    }
+}
+
+/// Get file status
+pub fn file_stat(idx: usize) -> Result<crate::posix::Stat, ()> {
+    match FILE_TABLE.lock().get(idx) {
+        Some(f) => {
+            match f.ftype {
+                FileType::Vfs => {
+                    if let Some(ref vfs_file) = f.vfs_file {
+                        match vfs_file.stat() {
+                            Ok(attr) => {
+                                let stat = crate::posix::Stat {
+                                    st_dev: 0,  // Simplified
+                                    st_ino: attr.ino as crate::posix::Ino,
+                                    st_mode: attr.mode.0 as crate::posix::Mode,
+                                    st_nlink: attr.nlink as crate::posix::Nlink,
+                                    st_uid: attr.uid as crate::posix::Uid,
+                                    st_gid: attr.gid as crate::posix::Gid,
+                                    st_rdev: attr.rdev as crate::posix::Dev,
+                                    st_size: attr.size as crate::posix::Off,
+                                    st_blksize: attr.blksize as crate::posix::Blksize,
+                                    st_blocks: attr.blocks as crate::posix::Blkcnt,
+                                    st_atime: attr.atime as crate::posix::Time,
+                                    st_atime_nsec: 0,
+                                    st_mtime: attr.mtime as crate::posix::Time,
+                                    st_mtime_nsec: 0,
+                                    st_ctime: attr.ctime as crate::posix::Time,
+                                    st_ctime_nsec: 0,
+                                };
+                                Ok(stat)
+                            },
+                            Err(_) => Err(()),
+                        }
+                    } else {
+                        Err(())
+                    }
+                },
+                _ => {
+                    // For other file types, return basic info
+                    let stat = crate::posix::Stat {
+                        st_dev: 0,
+                        st_ino: 0,
+                        st_mode: 0,
+                        st_nlink: 1,
+                        st_uid: 0,
+                        st_gid: 0,
+                        st_rdev: 0,
+                        st_size: 0,
+                        st_blksize: 0,
+                        st_blocks: 0,
+                        st_atime: 0,
+                        st_atime_nsec: 0,
+                        st_mtime: 0,
+                        st_mtime_nsec: 0,
+                        st_ctime: 0,
+                        st_ctime_nsec: 0,
+                    };
+                    Ok(stat)
+                }
+            }
+        },
+        None => Err(()),
+    }
+}
+
+pub fn file_subscribe(idx: usize, events: i16, chan: usize) {
+    let mut table = FILE_TABLE.lock();
+    if let Some(f) = table.get_mut(idx) {
+        match f.ftype {
+            FileType::Pipe => {
+                if let Some(ref pipe) = f.pipe {
+                    let mut p = pipe.lock();
+                    if (events & crate::posix::POLLIN) != 0 { p.subscribe_read(chan); }
+                    if (events & crate::posix::POLLOUT) != 0 { p.subscribe_write(chan); }
+                }
+            }
+            FileType::Device => {
+                crate::drivers::device_subscribe(f.major, f.minor, events, chan);
+            }
+            _ => {}
+        }
+    }
+}
+
+pub fn file_unsubscribe(idx: usize, chan: usize) {
+    let mut table = FILE_TABLE.lock();
+    if let Some(f) = table.get_mut(idx) {
+        match f.ftype {
+            FileType::Pipe => {
+                if let Some(ref pipe) = f.pipe {
+                    let mut p = pipe.lock();
+                    p.unsubscribe_read(chan);
+                    p.unsubscribe_write(chan);
+                }
+            }
+            FileType::Device => {
+                crate::drivers::device_unsubscribe(f.major, f.minor, chan);
+            }
+            _ => {}
+        }
+    }
+}
+
+pub fn file_poll(idx: usize) -> i16 {
+    let mut ev: i16 = 0;
+    let mut table = FILE_TABLE.lock();
+    let f = match table.get_mut(idx) { Some(x) => x, None => return posix::POLLERR };
+    match f.ftype {
+        FileType::Pipe => {
+            if let Some(ref pipe) = f.pipe {
+                let p = pipe.lock();
+                let readable = p.nread < p.nwrite;
+                let writable = p.nwrite < p.nread + crate::pipe::PIPE_SIZE;
+                if readable { ev |= posix::POLLIN; }
+                if writable { ev |= posix::POLLOUT; }
+                if !p.readopen { ev |= posix::POLLHUP; }
+            } else {
+                ev |= posix::POLLERR;
+            }
+        }
+        FileType::Device => {
+            ev |= crate::drivers::device_poll(f.major, f.minor);
+        }
+        FileType::Socket => { ev |= posix::POLLERR; }
+        _ => {}
+    }
+    ev
+}

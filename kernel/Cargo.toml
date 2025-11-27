@@ -1,0 +1,21 @@
+[package]
+name = "kernel"
+version = "0.1.0"
+edition = "2024"
+build = "build.rs"
+
+[dependencies]
+
+[features]
+baremetal = []
+kernel_tests = []
+
+# Features说明：
+# baremetal: 裸机启动与汇编路径（global_asm/trap/context switch等），用于真实目标板或无操作系统环境
+# kernel_tests: 开启内核自测入口与测试用例（run_tests/test_*），默认关闭以避免宿主编译干扰
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"

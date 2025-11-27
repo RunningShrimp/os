@@ -1,0 +1,10 @@
+[workspace]
+members = ["kernel", "xtask", "user"]
+default-members = ["kernel", "xtask"]
+resolver = "2"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"

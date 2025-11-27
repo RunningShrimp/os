@@ -1,0 +1,19 @@
+[target."targets/aarch64-nostd.json"]
+linker = "rust-lld"
+rustflags = ["-Clink-arg=-Tkernel/linker-aarch64.ld"]
+
+[alias]
+k-aarch64 = "run -p xtask -- kernel aarch64"
+k-riscv64 = "run -p xtask -- kernel riscv64"
+k-x86_64 = "run -p xtask -- kernel x86_64"
+u-aarch64 = "run -p xtask -- user aarch64"
+u-riscv64 = "run -p xtask -- user riscv64"
+u-x86_64 = "run -p xtask -- user x86_64"
+
+[target."targets/riscv64-nostd.json"]
+linker = "rust-lld"
+rustflags = ["-Clink-arg=-Tkernel/linker-riscv64.ld"]
+
+[target."targets/x86_64-nostd.json"]
+linker = "rust-lld"
+rustflags = ["-Clink-arg=-Tkernel/linker-x86_64.ld"]
