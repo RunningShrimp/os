@@ -94,7 +94,7 @@ impl VirtioBlk {
     /// Probe for VirtIO device
     pub fn probe(base: usize) -> bool {
         // Check magic number
-        let magic = unsafe { core::ptr::read_volatile(base as *const u32) };
+        let magic = crate::mm::mmio_read32(base as *const u32);
         magic == 0x74726976 // "virt"
     }
 }
@@ -239,7 +239,7 @@ pub fn console_write(buf: &[u8]) -> usize {
     buf.len()
 }
 
-pub fn device_poll(major: i16, minor: i16) -> i16 {
+pub fn device_poll(major: i16, _minor: i16) -> i16 {
     match major {
         1 => {
             let c = CONSOLE.lock();
@@ -284,7 +284,43 @@ pub fn init() {
     
     // TODO: Probe for other devices (VirtIO, etc.)
     
+    #[cfg(target_arch = "aarch64")]
+    {
+        if let Some((dist, redist)) = crate::platform::gicv3_bases() {
+            let gic = crate::gicv3::GicV3::new(dist, redist);
+            gic.enable();
+            crate::println!("drivers: gicv3 enabled dist={:#x} redist={:#x}", dist, redist);
+        } else if let Some((dist, cpu)) = crate::platform::gicv2_bases() {
+            let gic = crate::gic::GicV2::new(dist, cpu);
+            gic.enable();
+            crate::println!("drivers: gicv2 enabled dist={:#x} cpu={:#x}", dist, cpu);
+        } else {
+            crate::println!("drivers: gic not found in DTB; skipping init");
+        }
+    }
     crate::println!("drivers: initialized");
+}
+
+pub fn init_ap() {
+    #[cfg(target_arch = "aarch64")]
+    {
+        if let Some((dist, _)) = crate::platform::gicv3_bases() {
+            let mpidr: u64;
+            unsafe { core::arch::asm!("mrs {}, mpidr_el1", out(reg) mpidr); }
+            let redist = crate::platform::gicr_lookup(mpidr).or_else(|| crate::platform::gicr_default());
+            if let Some(r) = redist {
+                let gic = crate::gicv3::GicV3::new(dist, r);
+                gic.cpu_enable();
+                crate::println!("drivers: gicv3 cpu enabled redist={:#x}", r);
+            } else {
+                crate::println!("drivers: gicv3 cpu enable skipped (no redist)");
+            }
+        } else if let Some((dist, cpu)) = crate::platform::gicv2_bases() {
+            let gic = crate::gic::GicV2::new(dist, cpu);
+            gic.cpu_enable();
+            crate::println!("drivers: gicv2 cpu enabled");
+        }
+    }
 }
 extern crate alloc;
 use alloc::vec::Vec;

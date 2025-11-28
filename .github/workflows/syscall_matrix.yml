@@ -1,0 +1,32 @@
+name: Syscall Matrix CI
+on:
+  push:
+    paths:
+      - 'kernel/src/syscall.rs'
+      - 'kernel/src/syscalls.rs'
+      - 'xtask/**'
+      - '.github/workflows/syscall_matrix.yml'
+  workflow_dispatch:
+jobs:
+  generate-matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Generate Syscall Matrix
+        run: cargo run -p xtask --quiet -- syscalls
+      - name: Check for changes
+        run: |
+          git status --porcelain
+          if ! git diff --exit-code; then
+            echo "Syscall matrix is outdated. Please run 'cargo run -p xtask -- syscalls' and commit updates." >&2
+            exit 1
+          fi
+      - name: Upload Matrix Artifact
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: syscall-matrix
+          path: .trae/documents/Syscall 覆盖矩阵.md

@@ -8,10 +8,12 @@ extern crate alloc;
 use alloc::vec::Vec;
 use core::ptr;
 
-use crate::elf::{ElfLoader, ElfError};
+use crate::elf::{ElfLoader, ElfError, AuxEntry, AuxType};
 use crate::mm::{kalloc, kfree, PAGE_SIZE};
 use crate::process::{myproc, TrapFrame, PROC_TABLE};
 use crate::vm::arch::PageTable;
+use crate::vm::{activate, map_pages, flags, copyout};
+use alloc::string::String as AString;
 
 /// Maximum size of executable file (16 MB)
 pub const MAX_EXEC_SIZE: usize = 16 * 1024 * 1024;
@@ -61,7 +63,7 @@ impl From<ElfError> for ExecError {
 /// memory image with it. The `argv` array contains command line arguments.
 ///
 /// Returns the entry point on success, or an error.
-pub fn exec(elf_data: &[u8], argv: &[&[u8]]) -> Result<usize, ExecError> {
+pub fn exec(elf_data: &[u8], argv: &[&[u8]], envp: &[&[u8]], execfn: Option<&[u8]>) -> Result<usize, ExecError> {
     // Validate arguments
     if argv.len() > MAX_ARGS {
         return Err(ExecError::TooManyArgs);
@@ -87,49 +89,66 @@ pub fn exec(elf_data: &[u8], argv: &[&[u8]]) -> Result<usize, ExecError> {
     let new_pagetable = create_user_pagetable()?;
     
     // Load ELF using the ElfLoader API
-    let elf_info = loader.load(|vaddr, _readable, _writable, _executable| {
-        // Allocate a physical page
+    let elf_info = loader.load(|vaddr, readable, writable, executable| {
         let pa = kalloc();
-        if pa.is_null() {
-            return None;
-        }
-        
-        // Zero the page
+        if pa.is_null() { return None; }
         unsafe {
-            ptr::write_bytes(pa, 0, PAGE_SIZE);
-        }
-        
-        // Map the page in the page table
-        unsafe {
-            if map_page(new_pagetable, vaddr, pa as usize, true, true, true).is_err() {
+            let mut perm = flags::PTE_U;
+            if readable { perm |= flags::PTE_R; }
+            if writable { perm |= flags::PTE_W; }
+            if executable { perm |= flags::PTE_X; }
+            if map_pages(new_pagetable, vaddr, pa as usize, PAGE_SIZE, perm).is_err() {
                 kfree(pa);
                 return None;
             }
         }
-        
-        // Return pointer to the mapped page for ELF loader to copy data
         Some(pa)
     })?;
     
-    // Set up user stack
+    // Set up user stack pages
     let stack_bottom = USER_STACK_TOP - USER_STACK_SIZE;
     for offset in (0..USER_STACK_SIZE).step_by(PAGE_SIZE) {
         let pa = kalloc();
-        if pa.is_null() {
-            // TODO: Clean up allocated pages on failure
-            return Err(ExecError::OutOfMemory);
-        }
+        if pa.is_null() { return Err(ExecError::OutOfMemory); }
         unsafe {
             ptr::write_bytes(pa, 0, PAGE_SIZE);
-            if map_page(new_pagetable, stack_bottom + offset, pa as usize, true, true, false).is_err() {
+            let perm = flags::PTE_U | flags::PTE_R | flags::PTE_W;
+            if map_pages(new_pagetable, stack_bottom + offset, pa as usize, PAGE_SIZE, perm).is_err() {
                 kfree(pa);
                 return Err(ExecError::OutOfMemory);
             }
         }
     }
     
-    // Push arguments onto stack and get stack pointer
-    let (sp, argc, argv_ptr) = push_args_to_stack(argv)?;
+    // Build auxv with common entries
+    let hdr = loader.header();
+    // Map and write PHDR table into user VA
+    let phdr_addr = hdr.e_phoff as usize; // base assumed 0 for static
+    let phdr_size = hdr.e_phentsize as usize * hdr.e_phnum as usize;
+    if phdr_size > 0 {
+        unsafe { let _ = map_pages(new_pagetable, phdr_addr, 0, ((phdr_size + PAGE_SIZE -1)/PAGE_SIZE)*PAGE_SIZE, flags::PTE_U | flags::PTE_R); }
+        // Copy PHDR bytes
+        unsafe { copyout(new_pagetable, phdr_addr, elf_data.as_ptr().add(hdr.e_phoff as usize), phdr_size).map_err(|_| ExecError::OutOfMemory)?; }
+    }
+    let dynbase = if hdr.e_type as u16 == crate::elf::ET_DYN || elf_info.interp.is_some() { 0x400000usize } else { elf_info.base };
+    let mut auxv = [
+        AuxEntry::new(AuxType::Pagesz, PAGE_SIZE),
+        AuxEntry::new(AuxType::Entry, hdr.e_entry as usize),
+        AuxEntry::new(AuxType::Phnum, hdr.e_phnum as usize),
+        AuxEntry::new(AuxType::Phent, hdr.e_phentsize as usize),
+        AuxEntry::new(AuxType::Phdr, phdr_addr),
+        AuxEntry::new(AuxType::Base, dynbase),
+        AuxEntry::new(AuxType::Clktck, crate::time::TIMER_FREQ as usize),
+        AuxEntry::new(AuxType::Random, 0),
+        AuxEntry::new(AuxType::Platform, 0),
+        AuxEntry::new(AuxType::Hwcap, hwcap()),
+        AuxEntry::new(AuxType::Uid, 0),
+        AuxEntry::new(AuxType::Euid, 0),
+        AuxEntry::new(AuxType::Execfn, 0),
+        AuxEntry::null(),
+    ];
+    // Push arguments onto actual user stack memory
+    let (sp, argc, argv_ptr) = write_args_to_stack(new_pagetable, USER_STACK_TOP, argv, &mut auxv, envp, execfn, Some(platform_bytes()))?;
     
     let entry = elf_info.entry;
     
@@ -156,9 +175,7 @@ pub fn exec(elf_data: &[u8], argv: &[&[u8]]) -> Result<usize, ExecError> {
             }
             
             // Activate new page table
-            unsafe {
-                activate_pagetable(new_pagetable);
-            }
+            unsafe { activate(new_pagetable); }
         } else {
             // Process not found, clean up
             free_user_pagetable(new_pagetable);
@@ -205,7 +222,7 @@ fn create_user_pagetable() -> Result<*mut PageTable, ExecError> {
     let pagetable = pagetable as *mut PageTable;
     unsafe {
         ptr::write_bytes(pagetable as *mut u8, 0, PAGE_SIZE);
-        // TODO: Copy kernel mappings to user page table
+        // Kernel mappings would be shared via top-half or direct map; omitted in this minimal setup
     }
     Ok(pagetable)
 }
@@ -222,35 +239,10 @@ fn free_user_pagetable(pagetable: *mut PageTable) {
 }
 
 /// Map a page in the page table
-unsafe fn map_page(
-    _pagetable: *mut PageTable,
-    _va: usize,
-    _pa: usize,
-    _user: bool,
-    _write: bool,
-    _exec: bool,
-) -> Result<(), ()> {
-    // TODO: Implement proper page table mapping
-    Ok(())
-}
+// Use vm::map_pages instead
 
 /// Activate a page table (switch address space)
-unsafe fn activate_pagetable(_pagetable: *mut PageTable) {
-    #[cfg(target_arch = "riscv64")]
-    {
-        // Write satp register with Sv39 mode
-    }
-    
-    #[cfg(target_arch = "aarch64")]
-    {
-        // Write TTBR0_EL1 register
-    }
-    
-    #[cfg(target_arch = "x86_64")]
-    {
-        // Write CR3 register
-    }
-}
+// Use vm::activate instead
 
 /// Push arguments onto user stack
 fn push_args_to_stack(argv: &[&[u8]]) -> Result<(usize, usize, usize), ExecError> {
@@ -295,11 +287,74 @@ pub fn sys_exec(path: usize, argv: usize) -> isize {
     
     let arg_slices: Vec<&[u8]> = args.iter().map(|a| a.as_slice()).collect();
     
-    // TODO: Read ELF file from filesystem using path
-    let _ = path_slice;
-    let _ = arg_slices;
-    
-    -1 // File not found
+    // Read ELF from VFS and execute
+    let path_str = match alloc::string::String::from_utf8(path_slice) { Ok(s) => s, Err(_) => return -1 };
+    let abs_path = resolve_with_cwd(&path_str);
+    let vfs = crate::vfs::vfs();
+    let mut file = match vfs.open(&abs_path, crate::posix::O_RDONLY as u32) { Ok(f) => f, Err(_) => return crate::syscall::E_NOENT };
+    let mut buf = alloc::vec::Vec::new();
+    let mut tmp = [0u8; 512];
+    loop {
+        let n = match file.read(tmp.as_mut_ptr() as usize, tmp.len()) { Ok(n) => n, Err(_) => 0 };
+        if n == 0 { break; }
+        buf.extend_from_slice(&tmp[..n]);
+    }
+    match exec(&buf, &arg_slices, &[], Some(abs_path.as_bytes())) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+
+pub fn sys_execve(path: usize, argv: usize, envp: usize) -> isize {
+    let path_slice = match read_user_string(path) { Some(s) => s, None => return -1 };
+    let args = match read_user_argv(argv) { Some(a) => a, None => return -1 };
+    let envs = match read_user_argv(envp) { Some(a) => a, None => return -1 };
+    let arg_slices: Vec<&[u8]> = args.iter().map(|a| a.as_slice()).collect();
+    let env_slices: Vec<&[u8]> = envs.iter().map(|a| a.as_slice()).collect();
+    let path_str = match alloc::string::String::from_utf8(path_slice) { Ok(s) => s, Err(_) => return -1 };
+    let abs_path = resolve_with_cwd(&path_str);
+    let vfs = crate::vfs::vfs();
+    let mut file = match vfs.open(&abs_path, crate::posix::O_RDONLY as u32) { Ok(f) => f, Err(_) => return crate::syscall::E_NOENT };
+    let mut buf = alloc::vec::Vec::new();
+    let mut tmp = [0u8; 512];
+    loop {
+        let n = match file.read(tmp.as_mut_ptr() as usize, tmp.len()) { Ok(n) => n, Err(_) => 0 };
+        if n == 0 { break; }
+        buf.extend_from_slice(&tmp[..n]);
+    }
+    match exec(&buf, &arg_slices, &env_slices, Some(abs_path.as_bytes())) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+
+fn join_path(base: &str, rel: &str) -> AString {
+    let mut out: alloc::vec::Vec<AString> = alloc::vec::Vec::new();
+    let is_abs = rel.starts_with('/');
+    if !is_abs {
+        for p in base.split('/').filter(|s| !s.is_empty()) { out.push(AString::from(p)); }
+    }
+    for p in rel.split('/').filter(|s| !s.is_empty()) {
+        if p == "." { continue; }
+        if p == ".." { if !out.is_empty() { out.pop(); } continue; }
+        out.push(AString::from(p));
+    }
+    let mut s = AString::from("/");
+    for (i, seg) in out.iter().enumerate() {
+        if i > 0 { s.push('/'); }
+        s.push_str(seg);
+    }
+    s
+}
+
+fn resolve_with_cwd(in_path: &str) -> AString {
+    if in_path.starts_with('/') { return AString::from(in_path); }
+    let mut ptable = PROC_TABLE.lock();
+    let cur = match crate::process::myproc().and_then(|pid| ptable.find(pid).and_then(|p| p.cwd_path.clone())) {
+        Some(s) => s,
+        None => AString::from("/"),
+    };
+    join_path(&cur, in_path)
 }
 
 /// Read a null-terminated string from user space
@@ -359,4 +414,186 @@ fn read_user_argv(addr: usize) -> Option<Vec<Vec<u8>>> {
     }
     
     Some(args)
+}
+/// Write argv onto user stack
+fn write_args_to_stack(pagetable: *mut PageTable, stack_top: usize, argv: &[&[u8]], aux_entries: &mut [AuxEntry], envp: &[&[u8]], execfn: Option<&[u8]>, platform: Option<&[u8]>) -> Result<(usize, usize, usize), ExecError> {
+    let argc = argv.len();
+    let usize_sz = core::mem::size_of::<usize>();
+    let mut strings_size = 0usize;
+    for a in argv { strings_size += a.len() + 1; }
+    for e in envp { strings_size += e.len() + 1; }
+    if let Some(s) = execfn { strings_size += s.len() + 1; }
+    if let Some(p) = platform { strings_size += p.len() + 1; }
+    let ptrs_size = (argc + 1) * usize_sz;
+    let aux_size = aux_entries.len() * 2 * usize_sz;
+    let env_ptrs_size = (envp.len() + 1) * usize_sz;
+    let rand_size = 16;
+    let total = strings_size + ptrs_size + env_ptrs_size + aux_size + usize_sz + rand_size + 16;
+    let sp = (stack_top - total) & !0xF;
+    let mut cursor = sp;
+    let argv_ptr = cursor; cursor += ptrs_size;
+    let envp_ptr = cursor; cursor += env_ptrs_size;
+    let auxv_ptr = cursor; cursor += aux_size;
+    let strings_base = cursor;
+
+    let mut cur = strings_base;
+    let mut ptrs = alloc::vec::Vec::with_capacity(argc + 1);
+    for a in argv {
+        unsafe { copyout(pagetable, cur, a.as_ptr(), a.len()).map_err(|_| ExecError::OutOfMemory)?; }
+        let nul: [u8;1] = [0];
+        unsafe { copyout(pagetable, cur + a.len(), nul.as_ptr(), 1).map_err(|_| ExecError::OutOfMemory)?; }
+        ptrs.push(cur);
+        cur += a.len() + 1;
+    }
+    ptrs.push(0);
+
+    for (i, p) in ptrs.iter().enumerate() {
+        let bytes = (*p as usize).to_le_bytes();
+        unsafe { copyout(pagetable, argv_ptr + i * usize_sz, bytes.as_ptr(), usize_sz).map_err(|_| ExecError::OutOfMemory)?; }
+    }
+    // envp strings and pointers
+    let mut env_ptrs = alloc::vec::Vec::with_capacity(envp.len() + 1);
+    for e in envp {
+        unsafe { copyout(pagetable, cur, e.as_ptr(), e.len()).map_err(|_| ExecError::OutOfMemory)?; }
+        let nul: [u8;1] = [0];
+        unsafe { copyout(pagetable, cur + e.len(), nul.as_ptr(), 1).map_err(|_| ExecError::OutOfMemory)?; }
+        env_ptrs.push(cur);
+        cur += e.len() + 1;
+    }
+    env_ptrs.push(0);
+    for (i, p) in env_ptrs.iter().enumerate() {
+        let bytes = (*p as usize).to_le_bytes();
+        unsafe { copyout(pagetable, envp_ptr + i * usize_sz, bytes.as_ptr(), usize_sz).map_err(|_| ExecError::OutOfMemory)?; }
+    }
+
+    // AT_RANDOM: write 16 bytes and update auxv entry
+    let rand_ptr = cur;
+    let rnd = [0u8;16];
+    unsafe { copyout(pagetable, rand_ptr, rnd.as_ptr(), rnd.len()).map_err(|_| ExecError::OutOfMemory)?; }
+    for a in aux_entries.iter_mut() {
+        if a.a_type == AuxType::Random as usize { a.a_val = rand_ptr; }
+    }
+
+    if let Some(s) = execfn {
+        let base = cur;
+        unsafe { copyout(pagetable, base, s.as_ptr(), s.len()).map_err(|_| ExecError::OutOfMemory)?; }
+        let nul: [u8;1] = [0];
+        unsafe { copyout(pagetable, base + s.len(), nul.as_ptr(), 1).map_err(|_| ExecError::OutOfMemory)?; }
+        for a in aux_entries.iter_mut() {
+            if a.a_type == AuxType::Execfn as usize { a.a_val = base; }
+        }
+        cur += s.len() + 1;
+    }
+
+    if let Some(p) = platform {
+        let base = cur;
+        unsafe { copyout(pagetable, base, p.as_ptr(), p.len()).map_err(|_| ExecError::OutOfMemory)?; }
+        let nul: [u8;1] = [0];
+        unsafe { copyout(pagetable, base + p.len(), nul.as_ptr(), 1).map_err(|_| ExecError::OutOfMemory)?; }
+        for a in aux_entries.iter_mut() {
+            if a.a_type == AuxType::Platform as usize { a.a_val = base; }
+        }
+        cur += p.len() + 1;
+    }
+
+
+    for i in 0..aux_entries.len() {
+        let ty = aux_entries[i].a_type.to_le_bytes();
+        let val = aux_entries[i].a_val.to_le_bytes();
+        unsafe {
+            copyout(pagetable, auxv_ptr + i * 2 * usize_sz, ty.as_ptr(), usize_sz).map_err(|_| ExecError::OutOfMemory)?;
+            copyout(pagetable, auxv_ptr + i * 2 * usize_sz + usize_sz, val.as_ptr(), usize_sz).map_err(|_| ExecError::OutOfMemory)?;
+        }
+    }
+
+    Ok((sp, argc, argv_ptr))
+}
+#[inline]
+fn platform_bytes() -> &'static [u8] {
+    #[cfg(target_arch="riscv64")] { b"riscv64" }
+    #[cfg(target_arch="aarch64")] { b"aarch64" }
+    #[cfg(target_arch="x86_64")] { b"x86_64" }
+}
+
+#[inline]
+fn hwcap() -> usize {
+    #[cfg(target_arch="riscv64")] {
+        let mut misa: usize = 0;
+        unsafe { core::arch::asm!("csrr {}, misa", out(reg) misa); }
+        let mut h: usize = 0;
+        let has = |c: u8| -> bool { (misa & (1usize << (c as usize - b'A' as usize))) != 0 };
+        if has(b'I') { h |= 1 << 0; }
+        if has(b'M') { h |= 1 << 1; }
+        if has(b'A') { h |= 1 << 2; }
+        if has(b'F') { h |= 1 << 3; }
+        if has(b'D') { h |= 1 << 4; }
+        if has(b'C') { h |= 1 << 5; }
+        if has(b'V') { h |= 1 << 6; }
+        h
+    }
+    #[cfg(target_arch="aarch64")] {
+        let mut isar0: u64 = 0;
+        let mut pfr0: u64 = 0;
+        unsafe {
+            core::arch::asm!("mrs {}, id_aa64isar0_el1", out(reg) isar0);
+            core::arch::asm!("mrs {}, id_aa64pfr0_el1", out(reg) pfr0);
+        }
+        let mut h: usize = 0;
+        let advsimd = ((pfr0 >> 20) & 0xF) as u64;
+        let fp = ((pfr0 >> 16) & 0xF) as u64;
+        let aes = ((isar0 >> 4) & 0xF) as u64;
+        let sha1 = ((isar0 >> 8) & 0xF) as u64;
+        let sha2 = ((isar0 >> 12) & 0xF) as u64;
+        let crc32 = ((isar0 >> 16) & 0xF) as u64;
+        let atomics = ((isar0 >> 20) & 0xF) as u64;
+        let rdm = ((isar0 >> 28) & 0xF) as u64;
+        if fp != 0 { h |= 1 << 16; }
+        if advsimd != 0 { h |= 1 << 17; }
+        if crc32 != 0 { h |= 1 << 18; }
+        if aes != 0 { h |= 1 << 19; }
+        if sha1 != 0 { h |= 1 << 20; }
+        if sha2 != 0 { h |= 1 << 21; }
+        if atomics != 0 { h |= 1 << 22; }
+        if rdm != 0 { h |= 1 << 23; }
+        h
+    }
+    #[cfg(target_arch="x86_64")] {
+        let mut eax: u32 = 1;
+        let mut ebx: u32 = 0;
+        let mut ecx: u32 = 0;
+        let mut edx: u32 = 0;
+        unsafe {
+            core::arch::asm!(
+                "cpuid",
+                inlateout("eax") eax => eax,
+                out("ebx") ebx,
+                out("ecx") ecx,
+                out("edx") edx,
+            );
+        }
+        let mut h: usize = 0;
+        if (edx & (1<<25)) != 0 { h |= 1 << 32; }
+        if (edx & (1<<26)) != 0 { h |= 1 << 33; }
+        if (ecx & (1<<0)) != 0 { h |= 1 << 34; }
+        if (ecx & (1<<9)) != 0 { h |= 1 << 35; }
+        if (ecx & (1<<19)) != 0 { h |= 1 << 36; }
+        if (ecx & (1<<20)) != 0 { h |= 1 << 37; }
+        if (ecx & (1<<28)) != 0 { h |= 1 << 38; }
+        if (ecx & (1<<25)) != 0 { h |= 1 << 42; }
+        eax = 7; let mut ecx2: u32 = 0; let mut ebx2: u32 = 0; let mut edx2: u32 = 0;
+        unsafe {
+            core::arch::asm!(
+                "cpuid",
+                inlateout("eax") eax => eax,
+                inlateout("ecx") ecx2 => ecx2,
+                out("ebx") ebx2,
+                out("edx") edx2,
+            );
+        }
+        if (ebx2 & (1<<3)) != 0 { h |= 1 << 39; }
+        if (ebx2 & (1<<5)) != 0 { h |= 1 << 40; }
+        if (ebx2 & (1<<8)) != 0 { h |= 1 << 41; }
+        if (ebx2 & (1<<29)) != 0 { h |= 1 << 43; }
+        h
+    }
 }

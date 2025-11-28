@@ -9,6 +9,7 @@ extern crate alloc;
 
 use core::ptr;
 use crate::mm::{kalloc, kfree, PAGE_SIZE};
+use crate::platform;
 use crate::sync::Mutex;
 
 // ============================================================================
@@ -29,6 +30,9 @@ pub mod flags {
     // Software-defined flags (using reserved bits 8-9 for RISC-V)
     pub const PTE_COW: usize = 1 << 8;  // Copy-on-Write (software flag)
     pub const PTE_LAZY: usize = 1 << 9; // Lazy allocation (software flag)
+    pub const PTE_DEV: usize = 1 << 10; // Device memory (software flag)
+    pub const PTE_DEV_STRONG: usize = 1 << 11; // Strongly-ordered device
+    pub const PTE_DEV_WC: usize = 1 << 12; // Write-combining device (x86 only)
 }
 
 /// Number of page table entries per page
@@ -148,7 +152,21 @@ mod riscv64 {
             return Err(());
         }
         
-        *pte = pa_to_pte(pa) | perm | PTE_V;
+        let mut flags = perm | PTE_V;
+        
+        // Handle Svpbmt for Device memory
+        if perm & PTE_DEV != 0 {
+             // Svpbmt IO mode: Bit 62=1, Bit 61=0
+             // If hardware doesn't support Svpbmt, these bits are reserved (ignored) or cause fault?
+             // Usually ignored on non-Svpbmt hardware if 0.
+             // We assume Svpbmt support or that it's safe.
+             const PTE_PBMT_IO: usize = 1 << 62;
+             flags |= PTE_PBMT_IO;
+             
+             // Also ensure it's not cacheable in standard bits if relevant (RISC-V doesn't have separate C bit in standard Sv39)
+        }
+
+        *pte = pa_to_pte(pa) | flags;
         Ok(())
     }
     
@@ -178,7 +196,7 @@ mod riscv64 {
     }
     
     /// Activate a page table by writing to satp
-    pub unsafe fn activate(pagetable: *mut PageTable) {
+    pub unsafe fn activate_pt(pagetable: *mut PageTable) {
         let ppn = (pagetable as usize) >> 12;
         let satp = (8 << 60) | ppn; // Sv39 mode
         core::arch::asm!("csrw satp, {}", in(reg) satp);
@@ -266,20 +284,44 @@ mod aarch64 {
         if perm & PTE_X == 0 {
             flags |= DESC_UXN | DESC_PXN;
         }
+        // Device memory attribute index placeholder (requires MAIR setup): set AttrIndx=0 for normal, 1 for device
+        const DESC_ATTR_INDX_SHIFT: usize = 2;
+        const DESC_ATTR_DEV: usize = 1 << DESC_ATTR_INDX_SHIFT;
+        const DESC_ATTR_DEV_STRONG: usize = 2 << DESC_ATTR_INDX_SHIFT;
+        
+        if perm & super::flags::PTE_DEV_STRONG != 0 { flags |= DESC_ATTR_DEV_STRONG; }
+        else if perm & super::flags::PTE_DEV != 0 { flags |= DESC_ATTR_DEV; }
         
         *pte = (pa & !0xFFF) | flags;
         Ok(())
     }
     
-    /// Activate page table
-    pub unsafe fn activate(pagetable: *mut PageTable) {
-        unsafe {
-            core::arch::asm!("msr ttbr0_el1, {}", in(reg) pagetable);
-            core::arch::asm!("isb");
-            core::arch::asm!("tlbi vmalle1is");
-            core::arch::asm!("dsb ish");
-            core::arch::asm!("isb");
-        }
+    /// Setup MAIR_EL1 with memory attribute encodings
+    /// AttrIdx 0: Normal WB RA WA (0xFF)
+    /// AttrIdx 1: Device nGnRE (0x04)
+    /// AttrIdx 2: Device nGnRnE (0x00)
+    pub unsafe fn setup_mair() {
+        let mair: u64 = (0x00u64 << 16) | (0x04u64 << 8) | 0xFFu64;
+        core::arch::asm!("msr mair_el1, {}", in(reg) mair);
+        core::arch::asm!("isb");
+    }
+
+    /// Setup TCR_EL1 for 4KB pages, inner/outer WB WA, inner-shareable, 48-bit VA
+    pub unsafe fn setup_tcr() {
+        // TCR_EL1 fields for T0: T0SZ=16 (48-bit VA), TG0=00 (4KB), SH0=11 (inner shareable),
+        // IRGN0=01 (WB WA), ORGN0=01 (WB WA)
+        let tcr: u64 = (16u64) | (0b00u64 << 14) | (0b11u64 << 12) | (0b01u64 << 8) | (0b01u64 << 10);
+        core::arch::asm!("msr tcr_el1, {}", in(reg) tcr);
+        core::arch::asm!("isb");
+    }
+    
+    pub unsafe fn activate_pt(pagetable: *mut PageTable) {
+        let ttbr0 = pagetable as u64;
+        core::arch::asm!("msr ttbr0_el1, {}", in(reg) ttbr0);
+        core::arch::asm!("isb");
+        core::arch::asm!("tlbi vmalle1");
+        core::arch::asm!("dsb nsh");
+        core::arch::asm!("isb");
     }
 }
 
@@ -296,6 +338,8 @@ mod x86_64 {
     const PTE_P: usize = 1 << 0;    // Present
     const PTE_RW: usize = 1 << 1;   // Read/Write
     const PTE_US: usize = 1 << 2;   // User/Supervisor
+    const PTE_PWT: usize = 1 << 3;  // Write-Through
+    const PTE_PCD: usize = 1 << 4;  // Cache-Disable
     const PTE_NX: usize = 1 << 63;  // No Execute
     
     /// Extract index from virtual address
@@ -360,13 +404,173 @@ mod x86_64 {
             flags |= PTE_NX;
         }
         
+        // Handle Device Memory (PTE_DEV)
+        // If PAT is set up as: 0=WB, 1=WC, 2=UC
+        // UC: Index 2 -> PAT=0, PCD=1, PWT=0
+        // WC: Index 1 -> PAT=0, PCD=0, PWT=1
+        if perm & PTE_DEV_WC != 0 {
+            flags |= PTE_PWT;
+        } else if perm & PTE_DEV != 0 {
+            flags |= PTE_PCD;
+        }
+        
         *pte = (pa & !0xFFF) | flags;
         Ok(())
     }
     
     /// Activate page table
-    pub unsafe fn activate(pagetable: *mut PageTable) {
+    pub unsafe fn activate_pt(pagetable: *mut PageTable) {
         core::arch::asm!("mov cr3, {}", in(reg) pagetable);
+    }
+
+    /// Setup PAT MSR with default WB/WC/UC entries
+    pub unsafe fn setup_pat() {
+        // IA32_PAT MSR (0x277)
+        // PA0: WB (06), PA1: WC (01), PA2: UC (00)
+        let pat_val: u64 = (0x00 << 16) | (0x01 << 8) | 0x06;
+        let msr = 0x277;
+        let low = pat_val as u32;
+        let high = (pat_val >> 32) as u32;
+        core::arch::asm!("wrmsr", in("ecx") msr, in("eax") low, in("edx") high);
+    }
+
+    pub unsafe fn setup_mtrr_mmio_uc() {
+        let mut eax: u32 = 1;
+        let mut ebx: u32 = 0;
+        let mut ecx: u32 = 0;
+        let mut edx: u32 = 0;
+        core::arch::asm!(
+            "cpuid",
+            inlateout("eax") eax => eax,
+            out("ebx") ebx,
+            out("ecx") ecx,
+            out("edx") edx,
+        );
+        if (edx & (1<<12)) == 0 { return; }
+        let msr_cap: u32 = 0xFE;
+        let mut cap_lo: u32 = 0;
+        let mut cap_hi: u32 = 0;
+        core::arch::asm!("rdmsr", in("ecx") msr_cap, out("eax") cap_lo, out("edx") cap_hi);
+        let var_cnt = (cap_lo & 0xFF) as usize;
+        let def_msr: u32 = 0x2FF;
+        let mut def_lo: u32 = 0;
+        let mut def_hi: u32 = 0;
+        core::arch::asm!("rdmsr", in("ecx") def_msr, out("eax") def_lo, out("edx") def_hi);
+        def_lo = (def_lo & !0xFF) | 0x06;
+        def_lo |= 1 << 11;
+        core::arch::asm!("wrmsr", in("ecx") def_msr, in("eax") def_lo, in("edx") def_hi);
+        let mut idx = 0usize;
+        let mut regions: alloc::vec::Vec<(usize, usize, u8)> = alloc::vec::Vec::new();
+        for (b, s) in crate::mm::mmio_regions_strong() { regions.push((b, s, 2)); }
+        for (b, s) in crate::mm::mmio_regions_wc() { regions.push((b, s, 1)); }
+        for (b, s) in crate::mm::mmio_regions() { regions.push((b, s, 0)); }
+        regions.sort_by(|a, b| {
+            match b.2.cmp(&a.2) {
+                core::cmp::Ordering::Equal => b.1.cmp(&a.1),
+                o => o,
+            }
+        });
+        let total: u64 = regions.iter().map(|(_, s, _)| s as u64).sum();
+        let mut covered: u64 = 0;
+        for (base, size, class) in regions.into_iter() {
+            let mut cur_base = base as u64;
+            let mut cur_size = size as u64;
+            while cur_size != 0 && idx < var_cnt {
+                let lowbit = cur_base & (!cur_base + 1);
+                let mut blk = 1u64 << (63 - cur_size.leading_zeros() as u64);
+                if blk > cur_size { blk = cur_size; }
+                if lowbit < blk { blk = lowbit; }
+                let base_msr = 0x200 + (idx as u32) * 2;
+                let mask_msr = base_msr + 1;
+                let mtrr_type: u64 = if class == 1 { 0x01 } else { 0x00 }; // WC=1, UC=0
+                let physbase = (cur_base & !0xFFF) | mtrr_type;
+                let physmask = (! (blk - 1)) & !0xFFF;
+                let physmask_lo = (physmask as u32) | (1 << 11);
+                let physmask_hi = (physmask >> 32) as u32;
+                let physbase_lo = physbase as u32;
+                let physbase_hi = (physbase >> 32) as u32;
+                core::arch::asm!("wrmsr", in("ecx") base_msr, in("eax") physbase_lo, in("edx") physbase_hi);
+                core::arch::asm!("wrmsr", in("ecx") mask_msr, in("eax") physmask_lo, in("edx") physmask_hi);
+                cur_base += blk;
+                cur_size -= blk;
+                idx += 1;
+                covered += blk;
+            }
+            if idx >= var_cnt { break; }
+        }
+        let left = total.saturating_sub(covered);
+        crate::mm::mmio_record_mtrr_usage(idx.min(var_cnt), var_cnt, covered, left);
+        let (prev_used, prev_total, prev_cov, prev_left) = crate::mm::mmio_last_usage();
+        crate::println!("[mtrr] covered={} bytes, left={} bytes (prev: used={}/{} covered={} left={})", covered, left, prev_used, prev_total, prev_cov, prev_left);
+    }
+
+    pub unsafe fn refresh_mtrr_from_stats() {
+        let mut eax: u32 = 1;
+        let mut ebx: u32 = 0;
+        let mut ecx: u32 = 0;
+        let mut edx: u32 = 0;
+        core::arch::asm!(
+            "cpuid",
+            inlateout("eax") eax => eax,
+            out("ebx") ebx,
+            out("ecx") ecx,
+            out("edx") edx,
+        );
+        if (edx & (1<<12)) == 0 { return; }
+        let msr_cap: u32 = 0xFE;
+        let mut cap_lo: u32 = 0;
+        let mut cap_hi: u32 = 0;
+        core::arch::asm!("rdmsr", in("ecx") msr_cap, out("eax") cap_lo, out("edx") cap_hi);
+        let var_cnt = (cap_lo & 0xFF) as usize;
+        let def_msr: u32 = 0x2FF;
+        let mut def_lo: u32 = 0;
+        let mut def_hi: u32 = 0;
+        core::arch::asm!("rdmsr", in("ecx") def_msr, out("eax") def_lo, out("edx") def_hi);
+        def_lo = (def_lo & !0xFF) | 0x06;
+        def_lo |= 1 << 11;
+        core::arch::asm!("wrmsr", in("ecx") def_msr, in("eax") def_lo, in("edx") def_hi);
+        let mut stats = crate::mm::mmio_stats_take();
+        stats.sort_by(|a, b| {
+            match b.2.cmp(&a.2) {
+                core::cmp::Ordering::Equal => b.3.cmp(&a.3),
+                o => o,
+            }
+        });
+        let mut idx = 0usize;
+        let mut covered: u64 = 0;
+        let total: u64 = stats.iter().map(|(_, s, _, _)| s as u64).sum();
+        for (base, size, priority, _) in stats.into_iter() {
+            let mut cur_base = base as u64;
+            let mut cur_size = size as u64;
+            while cur_size != 0 && idx < var_cnt {
+                let lowbit = cur_base & (!cur_base + 1);
+                let mut blk = 1u64 << (63 - cur_size.leading_zeros() as u64);
+                if blk > cur_size { blk = cur_size; }
+                if lowbit < blk { blk = lowbit; }
+                let base_msr = 0x200 + (idx as u32) * 2;
+                let mask_msr = base_msr + 1;
+                let mtrr_type: u64 = if priority == 1 { 0x01 } else { 0x00 }; // WC if priority==1 (wc list), UC otherwise
+                let physbase = (cur_base & !0xFFF) | mtrr_type;
+                let physmask = (! (blk - 1)) & !0xFFF;
+                let physmask_lo = (physmask as u32) | (1 << 11);
+                let physmask_hi = (physmask >> 32) as u32;
+                let physbase_lo = physbase as u32;
+                let physbase_hi = (physbase >> 32) as u32;
+                core::arch::asm!("wrmsr", in("ecx") base_msr, in("eax") physbase_lo, in("edx") physbase_hi);
+                core::arch::asm!("wrmsr", in("ecx") mask_msr, in("eax") physmask_lo, in("edx") physmask_hi);
+                cur_base += blk;
+                cur_size -= blk;
+                idx += 1;
+                covered += blk;
+            }
+            if idx >= var_cnt { break; }
+        }
+        let left = total.saturating_sub(covered);
+        let (prev_used, prev_total, prev_cov, prev_left) = crate::mm::mmio_last_usage();
+        crate::mm::mmio_record_mtrr_usage(idx.min(var_cnt), var_cnt, covered, left);
+        crate::println!("[mtrr] refresh covered={} bytes, left={} bytes (prev: used={}/{} covered={} left={})", covered, left, prev_used, prev_total, prev_cov, prev_left);
+        let now = crate::time::get_ticks();
+        crate::mm::mmio_cooldown_all(now);
     }
 }
 
@@ -394,8 +598,43 @@ pub fn init() {
     }
     
     *KERNEL_PAGETABLE.lock() = PageTablePtr(pt as *mut PageTable);
+
+    // Probe platform for memory/MMIO via DTB/firmware (stub)
+    platform::probe_dtb();
+    crate::mm::mmio_stats_init();
     
-    // TODO: Map kernel memory regions
+    #[cfg(target_arch = "aarch64")]
+    unsafe { aarch64::setup_mair(); aarch64::setup_tcr(); }
+
+    // Map kernel memory regions - create linear PhysMap for kernel access
+    let pt = kernel_pagetable();
+    let phys_start = 0usize;
+    let phys_end = crate::mm::phys_end();
+    let size = phys_end - phys_start;
+    #[cfg(any(target_arch = "riscv64", target_arch = "aarch64"))]
+    unsafe { let _ = map_pages(pt, phys_start, phys_start, size, flags::PTE_R | flags::PTE_W); }
+    #[cfg(target_arch = "x86_64")]
+    unsafe { let _ = map_pages(pt, KERNEL_BASE + phys_start, phys_start, size, flags::PTE_R | flags::PTE_W); x86_64::setup_pat(); }
+
+    // Map MMIO device regions (kernel only, no U, no X)
+    for (base, size) in crate::mm::mmio_regions() {
+        #[cfg(any(target_arch = "riscv64", target_arch = "aarch64"))]
+        unsafe { let _ = map_pages(pt, base, base, size, flags::PTE_R | flags::PTE_W | flags::PTE_DEV); }
+        #[cfg(target_arch = "x86_64")]
+        unsafe { let _ = map_pages(pt, KERNEL_BASE + base, base, size, flags::PTE_R | flags::PTE_W | flags::PTE_DEV); }
+    }
+    for (base, size) in crate::mm::mmio_regions_strong() {
+        #[cfg(any(target_arch = "riscv64", target_arch = "aarch64"))]
+        unsafe { let _ = map_pages(pt, base, base, size, flags::PTE_R | flags::PTE_W | flags::PTE_DEV | flags::PTE_DEV_STRONG); }
+        #[cfg(target_arch = "x86_64")]
+        unsafe { let _ = map_pages(pt, KERNEL_BASE + base, base, size, flags::PTE_R | flags::PTE_W | flags::PTE_DEV); }
+    }
+    #[cfg(target_arch = "x86_64")]
+    for (base, size) in crate::mm::mmio_regions_wc() {
+        unsafe { let _ = map_pages(pt, KERNEL_BASE + base, base, size, flags::PTE_R | flags::PTE_W | flags::PTE_DEV_WC); }
+    }
+    #[cfg(target_arch = "x86_64")]
+    unsafe { x86_64::setup_mtrr_mmio_uc(); }
 }
 
 /// Get kernel page table
@@ -459,37 +698,118 @@ pub unsafe fn map_pages(
 /// Activate a page table
 pub unsafe fn activate(pagetable: *mut PageTable) {
     #[cfg(target_arch = "riscv64")]
-    unsafe { riscv64::activate(pagetable); }
+    unsafe { riscv64::activate_pt(pagetable); }
     
     #[cfg(target_arch = "aarch64")]
-    unsafe { aarch64::activate(pagetable); }
+    unsafe { aarch64::activate_pt(pagetable); }
     
     #[cfg(target_arch = "x86_64")]
-    x86_64::activate(pagetable);
+    x86_64::activate_pt(pagetable);
+}
+
+#[cfg(target_arch = "x86_64")]
+pub fn refresh_mtrr_hot() {
+    unsafe { x86_64::refresh_mtrr_from_stats(); }
+}
+
+pub fn idle_maintenance() {
+    let t = crate::time::get_ticks();
+    crate::mm::mmio_stats_periodic(t);
 }
 
 /// Copy data from kernel to user space
 pub unsafe fn copyout(
-    _pagetable: *mut PageTable,
+    pagetable: *mut PageTable,
     dst: usize,
     src: *const u8,
     len: usize,
 ) -> Result<(), ()> {
-    // TODO: Implement proper page table walk and copy
-    unsafe { ptr::copy_nonoverlapping(src, dst as *mut u8, len); }
+    if dst == 0 || src.is_null() || len == 0 {
+        return Err(());
+    }
+    // Validate user mapping and permissions
+    if dst >= KERNEL_BASE { return Err(()); }
+    user_range_check(pagetable, dst, len, true, false)?;
+    let mut copied = 0usize;
+    while copied < len {
+        let va = dst + copied;
+        let page_off = va & (PAGE_SIZE - 1);
+        let chunk = core::cmp::min(len - copied, PAGE_SIZE - page_off);
+        #[cfg(target_arch = "riscv64")]
+        let pa = match riscv64::translate(pagetable, va) { Some(p) => p, None => return Err(()) };
+        #[cfg(target_arch = "aarch64")]
+        let pa = match aarch64::walk(pagetable, va, false) { Some(p) => (*p & !0xFFF) | page_off, None => return Err(()) };
+        #[cfg(target_arch = "x86_64")]
+        let pa = match x86_64::walk(pagetable, va, false) { Some(p) => (*p & !0xFFF) | page_off, None => return Err(()) };
+        let dst_ptr = phys_to_kernel_ptr(pa);
+        let src_ptr = unsafe { src.add(copied) };
+        ptr::copy_nonoverlapping(src_ptr, dst_ptr, chunk);
+        copied += chunk;
+    }
     Ok(())
 }
 
 /// Copy data from user to kernel space
 pub unsafe fn copyin(
-    _pagetable: *mut PageTable,
+    pagetable: *mut PageTable,
     dst: *mut u8,
     src: usize,
     len: usize,
 ) -> Result<(), ()> {
-    // TODO: Implement proper page table walk and copy
-    unsafe { ptr::copy_nonoverlapping(src as *const u8, dst, len); }
+    if dst.is_null() || src == 0 || len == 0 {
+        return Err(());
+    }
+    if src >= KERNEL_BASE { return Err(()); }
+    user_range_check(pagetable, src, len, false, false)?;
+    let mut copied = 0usize;
+    while copied < len {
+        let va = src + copied;
+        let page_off = va & (PAGE_SIZE - 1);
+        let chunk = core::cmp::min(len - copied, PAGE_SIZE - page_off);
+        #[cfg(target_arch = "riscv64")]
+        let pa = match riscv64::translate(pagetable, va) { Some(p) => p, None => return Err(()) };
+        #[cfg(target_arch = "aarch64")]
+        let pa = match aarch64::walk(pagetable, va, false) { Some(p) => (*p & !0xFFF) | page_off, None => return Err(()) };
+        #[cfg(target_arch = "x86_64")]
+        let pa = match x86_64::walk(pagetable, va, false) { Some(p) => (*p & !0xFFF) | page_off, None => return Err(()) };
+        let src_ptr = phys_to_kernel_const_ptr(pa);
+        let dst_ptr = unsafe { dst.add(copied) };
+        ptr::copy_nonoverlapping(src_ptr, dst_ptr, chunk);
+        copied += chunk;
+    }
     Ok(())
+}
+
+pub unsafe fn copyinstr(
+    pagetable: *mut PageTable,
+    src: usize,
+    dst: *mut u8,
+    max: usize,
+) -> Result<usize, ()> {
+    if dst.is_null() || src == 0 || max == 0 { return Err(()); }
+    if src >= KERNEL_BASE { return Err(()); }
+    let mut copied = 0usize;
+    loop {
+        if copied >= max { return Err(()); }
+        let va = src + copied;
+        let page_off = va & (PAGE_SIZE - 1);
+        let chunk = core::cmp::min(max - copied, PAGE_SIZE - page_off);
+        #[cfg(target_arch = "riscv64")]
+        let pa = match riscv64::translate(pagetable, va) { Some(p) => p, None => return Err(()) };
+        #[cfg(target_arch = "aarch64")]
+        let pa = match aarch64::walk(pagetable, va, false) { Some(p) => (*p & !0xFFF) | page_off, None => return Err(()) };
+        #[cfg(target_arch = "x86_64")]
+        let pa = match x86_64::walk(pagetable, va, false) { Some(p) => (*p & !0xFFF) | page_off, None => return Err(()) };
+        let src_ptr = phys_to_kernel_const_ptr(pa);
+        let mut i = 0usize;
+        while i < chunk {
+            let b = *src_ptr.add(i);
+            *dst.add(copied + i) = b;
+            if b == 0 { return Ok(copied + i); }
+            i += 1;
+        }
+        copied += chunk;
+    }
 }
 
 // ============================================================================
@@ -753,3 +1073,67 @@ pub const KERNEL_BASE: usize = 0xFFFF_FFFF_8000_0000;
 
 /// User stack top address
 pub const USER_STACK_TOP: usize = 0x0000_7FFF_FFFF_F000;
+/// Check user-space mapping and permissions for a range [va, va+len)
+fn user_range_check(pagetable: *mut PageTable, va: usize, len: usize, need_write: bool, need_exec: bool) -> Result<(), ()> {
+    if len == 0 { return Err(()); }
+    let mut cur = va & !(PAGE_SIZE - 1);
+    let end = (va + len + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+    while cur < end {
+        #[cfg(target_arch = "riscv64")]
+        unsafe {
+            let pte = match riscv64::walk(pagetable, cur, false) { Some(p) => *p, None => return Err(()) };
+            let valid = (pte & flags::PTE_V) != 0 && (pte & flags::PTE_U) != 0;
+            let w_ok = !need_write || (pte & flags::PTE_W) != 0;
+            let x_ok = !need_exec || (pte & flags::PTE_X) != 0;
+            if !(valid && w_ok && x_ok) { return Err(()); }
+        }
+        #[cfg(target_arch = "aarch64")]
+        unsafe {
+            const DESC_VALID: usize = 1 << 0;
+            const DESC_AP_RO: usize = 2 << 6;
+            const DESC_AP_USER: usize = 1 << 6;
+            const DESC_UXN: usize = 1 << 54;
+            let pte = match aarch64::walk(pagetable, cur, false) { Some(p) => *p, None => return Err(()) };
+            let valid = (pte & DESC_VALID) != 0 && (pte & DESC_AP_USER) != 0;
+            let w_ok = !need_write || (pte & DESC_AP_RO) == 0;
+            let x_ok = !need_exec || (pte & DESC_UXN) == 0;
+            if !(valid && w_ok && x_ok) { return Err(()) }
+        }
+        #[cfg(target_arch = "x86_64")]
+        unsafe {
+            const PTE_P: usize = 1 << 0;    // Present
+            const PTE_RW: usize = 1 << 1;   // Read/Write
+            const PTE_US: usize = 1 << 2;   // User/Supervisor
+            const PTE_NX: usize = 1 << 63;  // No Execute
+            let pte = match x86_64::walk(pagetable, cur, false) { Some(p) => *p, None => return Err(()) };
+            let valid = (pte & PTE_P) != 0 && (pte & PTE_US) != 0;
+            let w_ok = !need_write || (pte & PTE_RW) != 0;
+            let x_ok = !need_exec || (pte & PTE_NX) == 0;
+            if !(valid && w_ok && x_ok) { return Err(()) }
+        }
+        cur += PAGE_SIZE;
+    }
+    Ok(())
+}
+#[inline]
+fn phys_to_kernel_ptr(pa: usize) -> *mut u8 {
+    #[cfg(any(target_arch = "riscv64", target_arch = "aarch64"))]
+    { pa as *mut u8 }
+    #[cfg(target_arch = "x86_64")]
+    { (KERNEL_BASE + pa) as *mut u8 }
+}
+
+#[inline]
+fn phys_to_kernel_const_ptr(pa: usize) -> *const u8 {
+    #[cfg(any(target_arch = "riscv64", target_arch = "aarch64"))]
+    { pa as *const u8 }
+    #[cfg(target_arch = "x86_64")]
+    { (KERNEL_BASE + pa) as *const u8 }
+}
+/// Convert physical address to kernel virtual address
+pub fn phys_to_virt(pa: usize) -> usize {
+    #[cfg(any(target_arch = "riscv64", target_arch = "aarch64"))]
+    { pa }
+    #[cfg(target_arch = "x86_64")]
+    { KERNEL_BASE + pa }
+}

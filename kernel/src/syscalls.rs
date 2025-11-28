@@ -25,3 +25,7 @@ pub const SYS_SELECT: usize = 24;
 pub const SYS_LSEEK: usize = 25;
 pub const SYS_DUP2: usize = 26;
 pub const SYS_GETCWD: usize = 27;
+pub const SYS_SIGACTION: usize = 29;
+pub const SYS_SIGPROCMASK: usize = 30;
+pub const SYS_SIGSUSPEND: usize = 31;
+pub const SYS_SIGPENDING: usize = 32;

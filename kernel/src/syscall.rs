@@ -4,7 +4,6 @@
 extern crate alloc;
 use crate::process::{self, TrapFrame};
 use crate::file::{FILE_TABLE, FileType, file_read, file_write, file_close, file_stat, file_alloc};
-use crate::syscalls::*;
 use crate::errno;
 use crate::posix;
 
@@ -40,6 +39,11 @@ pub enum SysNum {
     Dup2 = 26,
     Getcwd = 27,
     Rmdir = 28,
+    Sigaction = 29,
+    Sigprocmask = 30,
+    Sigsuspend = 31,
+    Sigpending = 32,
+    Execve = 44,
 }
 
 impl TryFrom<usize> for SysNum {
@@ -74,6 +78,11 @@ impl TryFrom<usize> for SysNum {
             25 => Ok(SysNum::Lseek),
             26 => Ok(SysNum::Dup2),
             27 => Ok(SysNum::Getcwd),
+            29 => Ok(SysNum::Sigaction),
+            30 => Ok(SysNum::Sigprocmask),
+            31 => Ok(SysNum::Sigsuspend),
+            32 => Ok(SysNum::Sigpending),
+            44 => Ok(SysNum::Execve),
             _ => Err(()),
         }
     }
@@ -178,6 +187,19 @@ pub fn dispatch(num: usize, args: &[usize]) -> isize {
         SysNum::Dup2 => sys_dup2(args[0] as i32, args[1] as i32),
         SysNum::Getcwd => sys_getcwd(args[0] as *mut u8, args[1]),
         SysNum::Rmdir => sys_rmdir(args[0] as *const u8),
+        SysNum::Sigaction => sys_sigaction(
+            args[0] as i32,
+            args[1] as *const crate::signal::SigAction,
+            args[2] as *mut crate::signal::SigAction,
+        ),
+        SysNum::Sigprocmask => sys_sigprocmask(
+            args[0] as i32,
+            args[1] as *const crate::signal::SigSet,
+            args[2] as *mut crate::signal::SigSet,
+        ),
+        SysNum::Sigsuspend => sys_sigsuspend(args[0] as *const crate::signal::SigSet),
+        SysNum::Sigpending => sys_sigpending(args[0] as *mut crate::signal::SigSet),
+        SysNum::Execve => sys_execve(args[0] as *const u8, args[1] as *const *const u8, args[2] as *const *const u8),
     }
 }
 
@@ -271,9 +293,15 @@ fn sys_kill(pid: usize) -> isize {
     }
 }
 
-fn sys_exec(_path: *const u8, _argv: *const *const u8) -> isize {
-    // TODO: Implement exec
-    E_NOSYS
+fn sys_exec(path: *const u8, argv: *const *const u8) -> isize {
+    crate::exec::sys_exec(path as usize, argv as usize)
+}
+
+fn sys_execve(path: *const u8, argv: *const *const u8, envp: *const *const u8) -> isize {
+    let p = path as usize;
+    let a = argv as usize;
+    let e = envp as usize;
+    crate::exec::sys_execve(p, a, e)
 }
 
 /// Get file status system call
@@ -298,13 +326,21 @@ fn sys_fstat(fd: i32, stat: *mut posix::Stat) -> isize {
 }
 
 fn sys_chdir(path: *const u8) -> isize {
-    let path_str = match unsafe { copy_path(path) } {
+    let in_path = match unsafe { copy_path(path) } {
         Ok(s) => s,
         Err(_) => return E_FAULT,
     };
+    let abs_path = {
+        let mut ptable = crate::process::PROC_TABLE.lock();
+        let cur = match crate::process::myproc().and_then(|pid| ptable.find(pid).and_then(|p| p.cwd_path.clone())) {
+            Some(s) => s,
+            None => alloc::string::String::from("/"),
+        };
+        join_path(&cur, &in_path)
+    };
     
     // Open directory
-    match crate::vfs::vfs().open(&path_str, posix::O_RDONLY as u32) {
+    match crate::vfs::vfs().open(&abs_path, posix::O_RDONLY as u32) {
         Ok(vfs_file) => {
             // Check if directory
             match vfs_file.stat() {
@@ -334,6 +370,7 @@ fn sys_chdir(path: *const u8) -> isize {
                 if let Some(proc) = ptable.find(pid) {
                     let old_cwd = proc.cwd;
                     proc.cwd = Some(fd);
+                    proc.cwd_path = Some(abs_path.clone());
                     drop(ptable);
                     drop(table); // Drop FILE_TABLE lock
                     
@@ -376,11 +413,18 @@ fn sys_getpid() -> isize {
 }
 
 fn sys_sbrk(increment: isize) -> isize {
-    // TODO: Implement sbrk (grow/shrink process heap)
-    if increment == 0 {
-        return 0;
+    // Minimal sbrk: adjust process size and return previous break
+    if let Some(pid) = process::myproc() {
+        let mut ptable = crate::process::PROC_TABLE.lock();
+        if let Some(proc) = ptable.find(pid) {
+            let old = proc.sz as isize;
+            let new = old + increment;
+            if new < 0 { return E_INVAL; }
+            proc.sz = new as usize;
+            return old;
+        }
     }
-    E_NOSYS
+    E_BADARG
 }
 
 fn sys_sleep(ticks: usize) -> isize {
@@ -403,37 +447,48 @@ fn sys_uptime() -> isize {
 
 /// Copy a string from user space to kernel space
 unsafe fn copy_path(ptr: *const u8) -> Result<alloc::string::String, ()> {
-    let mut buf = [0u8; 256];  // Maximum path length
-    let mut i = 0;
-    
-    while i < buf.len() - 1 {
-        // Copy one byte at a time (inefficient but simple)
-        let result = crate::vm::copyin(
-            core::ptr::null_mut(),
-            buf.as_mut_ptr().add(i),
-            ptr.add(i) as usize,
-            1,
-        );
-        
-        if result.is_err() {
-            return Err(());
-        }
-        
-        if buf[i] == 0 {
-            break;
-        }
-        
-        i += 1;
-    }
-    
-    // Ensure null termination
-    buf[i] = 0;
-    
-    // Convert to string
-    match alloc::string::String::from_utf8(buf[..i].to_vec()) {
+    let mut table = crate::process::PROC_TABLE.lock();
+    let pagetable = match crate::process::myproc().and_then(|pid| table.find(pid).map(|p| p.pagetable)) {
+        Some(pt) => pt,
+        None => return Err(()),
+    };
+    drop(table);
+    let mut buf = [0u8; 256];
+    let n = match crate::vm::copyinstr(pagetable, ptr as usize, buf.as_mut_ptr(), buf.len()) {
+        Ok(len) => len,
+        Err(_) => return Err(()),
+    };
+    match alloc::string::String::from_utf8(buf[..n].to_vec()) {
         Ok(s) => Ok(s),
         Err(_) => Err(()),
     }
+}
+fn join_path(base: &str, rel: &str) -> alloc::string::String {
+    let mut out: alloc::vec::Vec<alloc::string::String> = alloc::vec::Vec::new();
+    let is_abs = rel.starts_with('/');
+    if !is_abs {
+        for p in base.split('/').filter(|s| !s.is_empty()) { out.push(alloc::string::String::from(p)); }
+    }
+    for p in rel.split('/').filter(|s| !s.is_empty()) {
+        if p == "." { continue; }
+        if p == ".." { if !out.is_empty() { out.pop(); } continue; }
+        out.push(alloc::string::String::from(p));
+    }
+    let mut s = alloc::string::String::from("/");
+    for (i, seg) in out.iter().enumerate() {
+        if i > 0 { s.push('/'); }
+        s.push_str(seg);
+    }
+    s
+}
+fn resolve_with_cwd(in_path: &str) -> alloc::string::String {
+    if in_path.starts_with('/') { return alloc::string::String::from(in_path); }
+    let mut ptable = crate::process::PROC_TABLE.lock();
+    let cur = match crate::process::myproc().and_then(|pid| ptable.find(pid).and_then(|p| p.cwd_path.clone())) {
+        Some(s) => s,
+        None => alloc::string::String::from("/"),
+    };
+    join_path(&cur, in_path)
 }
 fn sys_open(path: *const u8, flags: i32, mode: u32) -> isize {
     // 将用户空间的路径字符串复制到内核空间
@@ -442,10 +497,11 @@ fn sys_open(path: *const u8, flags: i32, mode: u32) -> isize {
         Err(_) => return E_FAULT,
     };
     
+    let abs_path = resolve_with_cwd(&path_str);
     let vfs = crate::vfs::vfs();
     let res = if (flags & posix::O_CREAT) != 0 {
         // Try to open first to check existence
-        match vfs.open(&path_str, flags as u32) {
+        match vfs.open(&abs_path, flags as u32) {
             Ok(f) => {
                 if (flags & posix::O_EXCL) != 0 {
                     Err(crate::vfs::VfsError::Exists)
@@ -457,12 +513,12 @@ fn sys_open(path: *const u8, flags: i32, mode: u32) -> isize {
                 }
             }
             Err(crate::vfs::VfsError::NotFound) => {
-                vfs.create(&path_str, crate::vfs::FileMode::new(mode))
+                vfs.create(&abs_path, crate::vfs::FileMode::new(mode))
             }
             Err(e) => Err(e),
         }
     } else {
-        vfs.open(&path_str, flags as u32)
+        vfs.open(&abs_path, flags as u32)
     };
 
     // 调用VFS层的open函数
@@ -518,9 +574,28 @@ fn sys_write(fd: i32, buf: *const u8, len: usize) -> isize {
     file_write(file_idx, user_buf)
 }
 
-fn sys_mknod(_path: *const u8, _major: i16, _minor: i16) -> isize {
-    // TODO: Implement mknod
-    E_NOSYS
+fn sys_mknod(path: *const u8, major: i16, minor: i16) -> isize {
+    let path_str = match unsafe { copy_path(path) } { Ok(s) => s, Err(_) => return E_FAULT };
+    let abs_path = resolve_with_cwd(&path_str);
+    let mode = crate::vfs::FileMode::new(crate::vfs::FileMode::S_IFCHR | 0o600);
+    let vfs = crate::vfs::vfs();
+    match vfs.create(&abs_path, mode) {
+        Ok(vf) => {
+            if let Ok(mut attr) = vf.stat() {
+                attr.rdev = (((major as u32) << 16) | (minor as u32)) as u64;
+                let _ = vf.set_attr(&attr);
+            }
+            0
+        }
+        Err(e) => match e {
+            crate::vfs::VfsError::Exists => E_EXIST,
+            crate::vfs::VfsError::NotFound => E_NOENT,
+            crate::vfs::VfsError::NotDirectory => E_NOTDIR,
+            crate::vfs::VfsError::NoSpace => E_NOMEM,
+            crate::vfs::VfsError::NotSupported => E_NOSYS,
+            _ => E_IO,
+        },
+    }
 }
 
 fn sys_unlink(path: *const u8) -> isize {
@@ -528,8 +603,9 @@ fn sys_unlink(path: *const u8) -> isize {
         Ok(s) => s,
         Err(_) => return E_FAULT,
     };
+    let abs_path = resolve_with_cwd(&path_str);
     
-    match crate::vfs::vfs().unlink(&path_str) {
+    match crate::vfs::vfs().unlink(&abs_path) {
         Ok(_) => 0,
         Err(e) => match e {
             crate::vfs::VfsError::NotFound => E_NOENT,
@@ -550,8 +626,10 @@ fn sys_link(old_path: *const u8, new_path: *const u8) -> isize {
         Ok(s) => s,
         Err(_) => return E_FAULT,
     };
+    let old_abs = resolve_with_cwd(&old_path_str);
+    let new_abs = resolve_with_cwd(&new_path_str);
     
-    match crate::vfs::vfs().link(&old_path_str, &new_path_str) {
+    match crate::vfs::vfs().link(&old_abs, &new_abs) {
         Ok(_) => 0,
         Err(e) => match e {
             crate::vfs::VfsError::NotFound => E_NOENT,
@@ -568,11 +646,12 @@ fn sys_mkdir(path: *const u8) -> isize {
         Ok(s) => s,
         Err(_) => return E_FAULT,
     };
+    let abs_path = resolve_with_cwd(&path_str);
     
     // Default mode 0755
     let mode = crate::vfs::FileMode::new(crate::vfs::FileMode::S_IFDIR | 0o755);
     
-    match crate::vfs::vfs().mkdir(&path_str, mode) {
+    match crate::vfs::vfs().mkdir(&abs_path, mode) {
         Ok(_) => 0,
         Err(e) => match e {
             crate::vfs::VfsError::Exists => E_EXIST,
@@ -648,7 +727,7 @@ fn sys_poll(fds: *mut crate::posix::PollFd, nfds: usize, _timeout: i32) -> isize
             if pfd.fd < 0 { pfd.revents |= crate::posix::POLLNVAL; continue; }
             let idx = match process::fdlookup(pfd.fd) { Some(i) => i, None => { pfd.revents |= crate::posix::POLLNVAL; continue; } };
             let mut table = FILE_TABLE.lock();
-            let file = match table.get_mut(idx) { Some(f) => f, None => { pfd.revents |= crate::posix::POLLNVAL; continue; } };
+            let _file = match table.get_mut(idx) { Some(f) => f, None => { pfd.revents |= crate::posix::POLLNVAL; continue; } };
             let ev = crate::file::file_poll(idx);
             pfd.revents |= ev;
             let chan_fd = base ^ (pfd.fd as usize);
@@ -703,7 +782,7 @@ fn sys_select(nfds: i32, readfds: *mut crate::posix::FdSet, writefds: *mut crate
             if !want_read && !want_write { continue; }
             let idx = match process::fdlookup(fd as i32) { Some(i) => i, None => { continue; } };
             let mut table = FILE_TABLE.lock();
-            let file = match table.get_mut(idx) { Some(f) => f, None => { continue; } };
+            let _file = match table.get_mut(idx) { Some(f) => f, None => { continue; } };
             let ev = crate::file::file_poll(idx);
             let r_ok = want_read && ((ev & crate::posix::POLLIN) != 0);
             let w_ok = want_write && ((ev & crate::posix::POLLOUT) != 0);
@@ -807,28 +886,23 @@ fn sys_dup2(oldfd: i32, newfd: i32) -> isize {
 }
 
 fn sys_getcwd(buf: *mut u8, size: usize) -> isize {
-    if buf.is_null() || size == 0 {
-        return E_BADARG;
-    }
-    
-    // TODO: Implement getcwd properly
-    // For now, return root "/"
-    if size < 2 {
-        return E_BADARG; // ERANGE
-    }
-    
-    unsafe {
-        *buf = b'/';
-        *buf.add(1) = 0;
-    }
-    
-    // Return pointer to buf (but syscall returns isize)
-    // In Linux getcwd returns length or pointer?
-    // man getcwd: returns pointer to buf on success.
-    // But here we return isize.
-    // xv6 returns string in buf.
-    // Let's return address of buf as isize.
-    buf as isize
+    if buf.is_null() || size == 0 { return E_BADARG; }
+    let path = {
+        let mut ptable = crate::process::PROC_TABLE.lock();
+        match crate::process::myproc().and_then(|pid| ptable.find(pid).and_then(|p| p.cwd_path.clone())) {
+            Some(s) => s,
+            None => alloc::string::String::from("/"),
+        }
+    };
+    let need = path.as_bytes().len() + 1;
+    if size < need { return E_BADARG; }
+    let mut tmp = alloc::vec::Vec::with_capacity(need);
+    tmp.extend_from_slice(path.as_bytes());
+    tmp.push(0);
+    let mut ptable = crate::process::PROC_TABLE.lock();
+    let pagetable = match crate::process::myproc().and_then(|pid| ptable.find(pid).map(|p| p.pagetable)) { Some(pt) => pt, None => return E_BADARG };
+    drop(ptable);
+    unsafe { match crate::vm::copyout(pagetable, buf as usize, tmp.as_ptr(), tmp.len()) { Ok(()) => 0, Err(_) => E_FAULT } }
 }
 
 fn sys_rmdir(path: *const u8) -> isize {
@@ -836,8 +910,9 @@ fn sys_rmdir(path: *const u8) -> isize {
         Ok(s) => s,
         Err(_) => return E_FAULT,
     };
+    let abs_path = resolve_with_cwd(&path_str);
     
-    match crate::vfs::vfs().rmdir(&path_str) {
+    match crate::vfs::vfs().rmdir(&abs_path) {
         Ok(_) => 0,
         Err(e) => match e {
             crate::vfs::VfsError::NotFound => E_NOENT,
@@ -847,4 +922,98 @@ fn sys_rmdir(path: *const u8) -> isize {
             _ => E_IO,
         },
     }
+}
+
+fn ensure_signal_state<'a>(ptable: &'a mut crate::process::ProcTable, pid: crate::process::Pid) -> Option<&'a crate::signal::SignalState> {
+    let proc = ptable.find(pid)?;
+    if proc.signals.is_none() { proc.signals = Some(crate::signal::SignalState::new()); }
+    proc.signals.as_ref()
+}
+
+fn sys_sigaction(sig: i32, act: *const crate::signal::SigAction, old: *mut crate::signal::SigAction) -> isize {
+    if sig <= 0 || sig as u32 >= crate::signal::NSIG as u32 { return E_BADARG; }
+    let mut ptable = crate::process::PROC_TABLE.lock();
+    let pid = match crate::process::myproc() { Some(p) => p, None => return E_BADARG };
+    let proc = match ptable.find(pid) { Some(p) => p, None => return E_BADARG };
+    let pagetable = proc.pagetable;
+    if proc.signals.is_none() { proc.signals = Some(crate::signal::SignalState::new()); }
+    let state = proc.signals.as_ref().unwrap();
+    if !old.is_null() {
+        let cur = state.get_action(sig as u32);
+        let res = unsafe { crate::vm::copyout(pagetable, old as usize, (&cur as *const crate::signal::SigAction) as *const u8, core::mem::size_of::<crate::signal::SigAction>()) };
+        if res.is_err() { return E_FAULT; }
+    }
+    if !act.is_null() {
+        let mut new = crate::signal::SigAction::default();
+        let res = unsafe { crate::vm::copyin(pagetable, (&mut new as *mut crate::signal::SigAction) as *mut u8, act as usize, core::mem::size_of::<crate::signal::SigAction>()) };
+        if res.is_err() { return E_FAULT; }
+        match state.set_action(sig as u32, new) { Ok(_) => {}, Err(_) => return E_INVAL }
+    }
+    E_OK
+}
+
+fn sys_sigprocmask(how: i32, set: *const crate::signal::SigSet, old: *mut crate::signal::SigSet) -> isize {
+    let mut ptable = crate::process::PROC_TABLE.lock();
+    let pid = match crate::process::myproc() { Some(p) => p, None => return E_BADARG };
+    let proc = match ptable.find(pid) { Some(p) => p, None => return E_BADARG };
+    let pagetable = proc.pagetable;
+    if proc.signals.is_none() { proc.signals = Some(crate::signal::SignalState::new()); }
+    let state = proc.signals.as_ref().unwrap();
+    if !old.is_null() {
+        let cur = state.get_mask();
+        let res = unsafe { crate::vm::copyout(pagetable, old as usize, (&cur as *const crate::signal::SigSet) as *const u8, core::mem::size_of::<crate::signal::SigSet>()) };
+        if res.is_err() { return E_FAULT; }
+    }
+    if !set.is_null() {
+        let mut new = crate::signal::SigSet::empty();
+        let res = unsafe { crate::vm::copyin(pagetable, (&mut new as *mut crate::signal::SigSet) as *mut u8, set as usize, core::mem::size_of::<crate::signal::SigSet>()) };
+        if res.is_err() { return E_FAULT; }
+        match how {
+            0 => { state.block(new); }
+            1 => { state.unblock(new); }
+            2 => { state.set_mask(new); }
+            _ => return E_INVAL,
+        }
+    }
+    E_OK
+}
+
+fn sys_sigsuspend(mask: *const crate::signal::SigSet) -> isize {
+    if mask.is_null() { return E_BADARG; }
+    let mut ptable = crate::process::PROC_TABLE.lock();
+    let pid = match crate::process::myproc() { Some(p) => p, None => return E_BADARG };
+    let proc = match ptable.find(pid) { Some(p) => p, None => return E_BADARG };
+    let pagetable = proc.pagetable;
+    if proc.signals.is_none() { proc.signals = Some(crate::signal::SignalState::new()); }
+    let mut new = crate::signal::SigSet::empty();
+    let res = unsafe { crate::vm::copyin(pagetable, (&mut new as *mut crate::signal::SigSet) as *mut u8, mask as usize, core::mem::size_of::<crate::signal::SigSet>()) };
+    if res.is_err() { return E_FAULT; }
+    if let Some(ref state) = proc.signals { state.suspend(new); }
+    drop(ptable);
+    let chan = pid | 0x5000_0000;
+    loop {
+        let mut tbl = crate::process::PROC_TABLE.lock();
+        let pr = match tbl.find(pid) { Some(p) => p, None => return E_BADARG };
+        let pending = match &pr.signals { Some(s) => s.has_pending(), None => false };
+        drop(tbl);
+        if pending { break; }
+        crate::process::sleep(chan);
+    }
+    let mut ptable2 = crate::process::PROC_TABLE.lock();
+    let proc2 = match ptable2.find(pid) { Some(p) => p, None => return E_BADARG };
+    if let Some(ref sigs) = proc2.signals { sigs.restore_mask(); }
+    errno::errno_neg(errno::EINTR)
+}
+
+fn sys_sigpending(set: *mut crate::signal::SigSet) -> isize {
+    if set.is_null() { return E_BADARG; }
+    let mut ptable = crate::process::PROC_TABLE.lock();
+    let pid = match crate::process::myproc() { Some(p) => p, None => return E_BADARG };
+    let proc = match ptable.find(pid) { Some(p) => p, None => return E_BADARG };
+    let pagetable = proc.pagetable;
+    if proc.signals.is_none() { proc.signals = Some(crate::signal::SignalState::new()); }
+    let cur = crate::signal::sys_sigpending(proc.signals.as_ref().unwrap());
+    let res = unsafe { crate::vm::copyout(pagetable, set as usize, (&cur as *const crate::signal::SigSet) as *const u8, core::mem::size_of::<crate::signal::SigSet>()) };
+    if res.is_err() { return E_FAULT; }
+    E_OK
 }

@@ -1,1 +1,7 @@
 /target
+**/.DS_Store
+**/._*
+.idea/
+.vscode/
+qemu.log
+**/*.log

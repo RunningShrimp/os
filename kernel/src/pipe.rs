@@ -9,7 +9,7 @@ use alloc::collections::BTreeMap;
 
 use crate::mm::PAGE_SIZE;
 use crate::sync::Sleeplock;
-use crate::file::{FILE_TABLE, File, FileType};
+use crate::file::{FILE_TABLE, FileType};
 
 /// Pipe buffer size
 pub const PIPE_SIZE: usize = PAGE_SIZE;

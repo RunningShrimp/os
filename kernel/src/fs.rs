@@ -456,7 +456,7 @@ impl Fs {
 
     /// List directory contents
     pub fn list_dir(&self, dir_inum: u32) -> Vec<(String, u32)> {
-        let mut entries = Vec::new();
+        let entries = Vec::new();
         
         // TODO: Read directory entries
         let _ = dir_inum;

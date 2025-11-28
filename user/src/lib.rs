@@ -33,6 +33,15 @@ pub const SYS_CLOSE: usize = 21;
 pub const SYS_FCNTL: usize = 22;
 pub const SYS_POLL: usize = 23;
 pub const SYS_SELECT: usize = 24;
+pub const SYS_LSEEK: usize = 25;
+pub const SYS_DUP2: usize = 26;
+pub const SYS_GETCWD: usize = 27;
+pub const SYS_RMDIR: usize = 28;
+pub const SYS_SIGACTION: usize = 29;
+pub const SYS_SIGPROCMASK: usize = 30;
+pub const SYS_SIGSUSPEND: usize = 31;
+pub const SYS_SIGPENDING: usize = 32;
+pub const SYS_EXECVE: usize = 44;
 
 // ============================================================================
 // Low-level syscall interface
@@ -313,6 +322,10 @@ pub fn exec(path: *const u8, argv: *const *const u8) -> isize {
     syscall2(SYS_EXEC, path as usize, argv as usize)
 }
 
+pub fn execve(path: *const u8, argv: *const *const u8, envp: *const *const u8) -> isize {
+    map_ret(syscall3(SYS_EXECVE, path as usize, argv as usize, envp as usize))
+}
+
 /// Get file status
 pub fn fstat(fd: i32, stat: *mut u8) -> isize {
     map_ret(syscall2(SYS_FSTAT, fd as usize, stat as usize))
@@ -376,6 +389,46 @@ pub fn mkdir(path: *const u8) -> isize {
 /// Close a file descriptor
 pub fn close(fd: i32) -> isize {
     map_ret(syscall1(SYS_CLOSE, fd as usize))
+}
+
+// Signals (minimal)
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct SigSet { pub bits: u64 }
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct SigAction {
+    pub handler: usize,
+    pub flags: u32,
+    pub mask: SigSet,
+    pub restorer: usize,
+}
+
+pub const SIG_BLOCK: i32 = 0;
+pub const SIG_UNBLOCK: i32 = 1;
+pub const SIG_SETMASK: i32 = 2;
+pub const SIGINT: u32 = 2;
+
+#[inline]
+pub fn sigemptyset(set: &mut SigSet) { set.bits = 0; }
+#[inline]
+pub fn sigaddset(set: &mut SigSet, sig: u32) { if sig>0 { set.bits |= 1u64 << (sig - 1); } }
+
+pub fn sigprocmask(how: i32, set: *const SigSet, old: *mut SigSet) -> isize {
+    map_ret(syscall3(SYS_SIGPROCMASK, how as usize, set as usize, old as usize))
+}
+
+pub fn sigpending(set: *mut SigSet) -> isize {
+    map_ret(syscall1(SYS_SIGPENDING, set as usize))
+}
+
+pub fn sigsuspend(mask: *const SigSet) -> isize {
+    syscall1(SYS_SIGSUSPEND, mask as usize)
+}
+
+pub fn sigaction(sig: u32, act: *const SigAction, old: *mut SigAction) -> isize {
+    map_ret(syscall3(SYS_SIGACTION, sig as usize, act as usize, old as usize))
 }
 
 // ============================================================================

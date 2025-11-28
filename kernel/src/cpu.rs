@@ -3,7 +3,6 @@
 
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::cell::UnsafeCell;
-use crate::sync::SpinLock;
 use crate::process::{Context, Pid};
 
 /// Maximum number of CPUs supported

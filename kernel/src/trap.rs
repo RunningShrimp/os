@@ -4,7 +4,6 @@
 //! user and kernel mode.
 
 use crate::println;
-use crate::syscall;
 
 // ============================================================================
 // RISC-V Trap Handling
@@ -389,7 +388,7 @@ pub fn init() {
         unsafe extern "C" {
             fn exception_vector();
         }
-        core::arch::asm!("msr vbar_el1, {}", in(reg) exception_vector as usize);
+        core::arch::asm!("msr vbar_el1, {}", in(reg) exception_vector as *const () as usize);
     }
     
     #[cfg(target_arch = "x86_64")]

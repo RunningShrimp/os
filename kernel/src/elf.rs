@@ -346,7 +346,8 @@ impl<'a> ElfLoader<'a> {
         // (vaddr, readable, writable, executable) -> mapped_ptr
     {
         let mut brk: usize = 0;
-        let base = 0usize; // For static executables
+        let mut base = 0usize;
+        let mut has_interp = false;
         
         // Load each segment
         for ph in self.load_segments() {
@@ -367,7 +368,7 @@ impl<'a> ElfLoader<'a> {
                 let writable = ph.is_writable();
                 let executable = ph.is_executable();
                 
-                let page_ptr = map_page(page_vaddr, readable, writable, executable)
+                let page_ptr = map_page(page_vaddr + base, readable, writable, executable)
                     .ok_or(ElfError::OutOfMemory)?;
                 
                 // Zero the page first
@@ -384,7 +385,7 @@ impl<'a> ElfLoader<'a> {
                 
                 if data_end > data_start {
                     let file_offset = file_start + (data_start - vaddr_start);
-                    let page_offset = data_start - page_vaddr;
+                    let page_offset = (data_start + base) - (page_vaddr + base);
                     let copy_len = data_end - data_start;
                     
                     if file_offset + copy_len <= self.data.len() {
@@ -403,12 +404,28 @@ impl<'a> ElfLoader<'a> {
         // Default stack at high address
         let default_stack = 0x7FFF_FFFF_F000usize;
         
+        let mut interp: Option<[u8; 256]> = None;
+        for ph in self.program_headers() {
+            if ph.p_type == PT_INTERP {
+                if let Some(data) = self.segment_data(ph) {
+                    let mut buf = [0u8; 256];
+                    let n = core::cmp::min(buf.len(), data.len());
+                    buf[..n].copy_from_slice(&data[..n]);
+                    interp = Some(buf);
+                    has_interp = true;
+                }
+                break;
+            }
+        }
+        if self.header.e_type == ET_DYN || has_interp {
+            base = 0x400000;
+        }
         Ok(ElfInfo {
-            entry: self.header.e_entry as usize,
+            entry: (self.header.e_entry as usize).wrapping_add(base),
             base,
             brk: page_align_up(brk),
             sp: default_stack,
-            interp: None, // TODO: Parse PT_INTERP
+            interp,
         })
     }
     

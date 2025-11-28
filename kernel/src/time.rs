@@ -97,7 +97,7 @@ pub mod imp {
     const TIMER_FREQ_HZ: u64 = 10_000_000;
 
     pub fn now_ticks() -> u64 {
-        unsafe { core::ptr::read_volatile(CLINT_MTIME) }
+        crate::mm::mmio_read64(CLINT_MTIME)
     }
 
     pub fn freq_hz() -> u64 {
@@ -108,9 +108,7 @@ pub mod imp {
     pub fn init() {
         let interval = TIMER_FREQ_HZ / super::TIMER_FREQ;
         let next = now_ticks() + interval;
-        unsafe {
-            core::ptr::write_volatile(CLINT_MTIMECMP, next);
-        }
+        crate::mm::mmio_write64(CLINT_MTIMECMP, next);
         // Enable timer interrupt in SIE
         unsafe {
             core::arch::asm!("csrs sie, {}", in(reg) 1 << 5);
@@ -121,9 +119,7 @@ pub mod imp {
     pub fn set_next_timer() {
         let interval = TIMER_FREQ_HZ / super::TIMER_FREQ;
         let next = now_ticks() + interval;
-        unsafe {
-            core::ptr::write_volatile(CLINT_MTIMECMP, next);
-        }
+        crate::mm::mmio_write64(CLINT_MTIMECMP, next);
     }
 
     /// Read time CSR
@@ -208,6 +204,7 @@ pub fn tick() {
     
     // Wake up sleeping processes if needed
     wakeup_sleepers(ticks + 1);
+    crate::mm::mmio_stats_periodic(ticks + 1);
 }
 
 /// Get current tick count

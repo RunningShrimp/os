@@ -9,6 +9,7 @@ build = "build.rs"
 [features]
 baremetal = []
 kernel_tests = []
+link_phys_end = []
 
 # Features说明：
 # baremetal: 裸机启动与汇编路径（global_asm/trap/context switch等），用于真实目标板或无操作系统环境

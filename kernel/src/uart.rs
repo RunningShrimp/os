@@ -29,12 +29,12 @@ mod imp {
 
     #[inline]
     fn read_reg(offset: usize) -> u8 {
-        unsafe { core::ptr::read_volatile(reg(offset)) }
+        crate::mm::mmio_read8(reg(offset))
     }
 
     #[inline]
     fn write_reg(offset: usize, val: u8) {
-        unsafe { core::ptr::write_volatile(reg(offset), val) }
+        crate::mm::mmio_write8(reg(offset), val)
     }
 
     /// Initialize UART
@@ -135,12 +135,12 @@ mod imp {
 
     #[inline]
     fn read_reg(offset: usize) -> u32 {
-        unsafe { core::ptr::read_volatile(reg(offset)) }
+        crate::mm::mmio_read32(reg(offset))
     }
 
     #[inline]
     fn write_reg(offset: usize, val: u32) {
-        unsafe { core::ptr::write_volatile(reg(offset), val) }
+        crate::mm::mmio_write32(reg(offset), val)
     }
 
     /// Initialize UART
@@ -318,7 +318,7 @@ mod imp {
 // Public interface
 // ============================================================================
 
-pub use imp::{init, write_byte, write_str, read_byte};
+pub use imp::{init, write_byte, write_str};
 
 /// Handle UART interrupt
 pub fn intr() {

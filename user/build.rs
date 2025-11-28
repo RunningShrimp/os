@@ -10,7 +10,7 @@ fn main() {
             "x86_64" => "linker-x86_64.ld",
             _ => "linker-aarch64.ld",
         };
-        println!("cargo:rustc-link-arg=-T{}/user/{}", manifest_dir, ld);
-        println!("cargo:rerun-if-changed=user/{}", ld);
+        println!("cargo:rustc-link-arg=-T{}/{}", manifest_dir, ld);
+        println!("cargo:rerun-if-changed={}", ld);
     }
 }

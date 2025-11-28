@@ -1,0 +1,22 @@
+name: Microbench CI
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'benchmarks/microbench/**'
+      - '.github/workflows/microbench.yml'
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run microbench
+        run: cargo bench -p microbench --quiet || true
+      - name: Upload criterion report
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-report
+          path: target/criterion/**

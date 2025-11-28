@@ -8,7 +8,6 @@
 
 extern crate alloc;
 
-use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
@@ -731,6 +730,11 @@ impl VfsFile {
     /// Get file attributes
     pub fn stat(&self) -> VfsResult<FileAttr> {
         self.inode.getattr()
+    }
+
+    /// Set file attributes
+    pub fn set_attr(&self, attr: &FileAttr) -> VfsResult<()> {
+        self.inode.setattr(attr)
     }
 }
 

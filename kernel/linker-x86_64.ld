@@ -10,4 +10,5 @@ SECTIONS {
   _heap_start = .;
   . = . + 0x80000;
   _heap_end = .;
+  _phys_end = _heap_end;
 }

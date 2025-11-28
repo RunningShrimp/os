@@ -119,7 +119,7 @@ impl File {
                                 process::wakeup(Arc::as_ptr(pipe) as usize | 0x02);
                                 process::wakeup(crate::syscall::POLL_WAKE_CHAN);
                                 {
-                                    let mut p = pipe.lock();
+                                    let p = pipe.lock();
                                     p.notify_read_ready();
                                 }
                                 return n as isize;
@@ -207,7 +207,7 @@ impl File {
                                 process::wakeup(Arc::as_ptr(pipe) as usize | 0x01);
                                 process::wakeup(crate::syscall::POLL_WAKE_CHAN);
                                 {
-                                    let mut p = pipe.lock();
+                                    let p = pipe.lock();
                                     p.notify_write_ready();
                                 }
                                 return n as isize;
