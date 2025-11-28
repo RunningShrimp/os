@@ -29,6 +29,13 @@ struct Slab {
     free_list: *mut u8,
 }
 
+/// Slab allocator statistics
+#[derive(Debug, Clone, Copy)]
+pub struct AllocatorStats {
+    pub used: usize,
+    pub allocated: usize,
+}
+
 /// Main slab allocator
 pub struct SlabAllocator {
     /// Slabs for each size class
@@ -156,6 +163,7 @@ impl SlabAllocator {
                 (*header).size_class = size_class_idx as u8;
                 (*header).in_use = true;
                 
+                // Return pointer after header
                 return obj.add(core::mem::size_of::<SlabObjectHeader>());
             }
         }
@@ -203,7 +211,7 @@ impl SlabAllocator {
     }
 
     /// Get allocator statistics
-    pub fn stats(&self) -> (usize, usize) {
+    pub fn stats(&self) -> AllocatorStats {
         let mut total_allocated = 0;
         let mut total_used = 0;
         
@@ -215,7 +223,7 @@ impl SlabAllocator {
             }
         }
         
-        (total_used, total_allocated)
+        AllocatorStats { used: total_used, allocated: total_allocated }
     }
 }
 

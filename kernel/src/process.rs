@@ -6,6 +6,7 @@ extern crate alloc;
 use core::ptr::null_mut;
 use alloc::string::String;
 use alloc::collections::BTreeMap;
+use alloc::vec::Vec;
 use crate::sync::Mutex;
 use crate::mm::{kalloc, kfree, PAGE_SIZE};
 use crate::signal::SignalState;
@@ -301,8 +302,12 @@ impl TrapFrame {
 }
 
 /// Process control block
+use crate::posix;
+
 pub struct Proc {
     pub pid: Pid,
+    pub pgid: Pid,  // Process group ID
+    pub sid: Pid,   // Session ID
     pub state: ProcState,
     pub parent: Option<Pid>,
     pub kstack: usize,
@@ -312,6 +317,7 @@ pub struct Proc {
     pub cwd_path: Option<String>,
     pub cwd: Option<usize>,  // Current working directory file index
     pub signals: Option<SignalState>,
+    pub rlimits: [crate::posix::Rlimit; 16],  // Resource limits
     pub chan: usize,  // Sleep channel
     pub killed: bool,
     pub xstate: i32,  // Exit status
@@ -326,6 +332,9 @@ impl Proc {
     pub const fn new() -> Self {
         Self {
             pid: 0,
+            pgid: 0,
+            sid: 0,
+            rlimits: [crate::posix::Rlimit::default(); 16],
             state: ProcState::Unused,
             parent: None,
             kstack: 0,
@@ -353,6 +362,7 @@ pub struct ProcTable {
     procs: [Proc; NPROC],
     next_pid: Pid,
     pid_to_index: BTreeMap<Pid, usize>,  // For O(log n) lookup, could use HashMap for O(1)
+    free_list: Vec<usize>,  // Free process slot indices for O(1) allocation
 }
 
 impl ProcTable {
@@ -362,48 +372,68 @@ impl ProcTable {
             procs: [INIT_PROC; NPROC],
             next_pid: 1,
             pid_to_index: BTreeMap::new(),
+            free_list: Vec::new(),
         }
     }
 
-    /// Allocate a new process - O(n) scan for unused slot
-    /// TODO: Optimize with free list for O(1)
+    /// Allocate a new process - O(1) with free list
     pub fn alloc(&mut self) -> Option<&mut Proc> {
-        for (i, proc) in self.procs.iter_mut().enumerate() {
-            if proc.state == ProcState::Unused {
-                let new_pid = self.next_pid;
-                proc.pid = new_pid;
-                self.next_pid += 1;
-                proc.state = ProcState::Used;
-                
-                // Initialize signal state
-                proc.signals = Some(SignalState::new());
-                
-                // Allocate kernel stack
-                let kstack = kalloc();
-                if kstack.is_null() {
-                    proc.state = ProcState::Unused;
-                    proc.signals = None;
-                    return None;
-                }
-                proc.kstack = kstack as usize + PAGE_SIZE;  // Stack grows down
-                
-                // Allocate trapframe page
-                let tf = kalloc();
-                if tf.is_null() {
-                    unsafe { kfree((proc.kstack - PAGE_SIZE) as *mut u8); }
-                    proc.state = ProcState::Unused;
-                    proc.signals = None;
-                    return None;
-                }
-                proc.trapframe = tf as *mut TrapFrame;
-                
-                // Add to pid_to_index map for O(1) lookups
-                self.pid_to_index.insert(new_pid, i);
-                
-                return Some(proc);
+        // Initialize free list if it's empty
+        if self.free_list.is_empty() {
+            // Populate free list with all available indices
+            for i in 0..NPROC {
+                self.free_list.push(i);
             }
         }
-        None
+
+        // Get the first available index from free list
+        let idx = self.free_list.pop()?;
+        let proc = &mut self.procs[idx];
+        
+        // Ensure the process is actually unused (sanity check)
+        if proc.state != ProcState::Unused {
+            // Push it back if it's not unused
+            self.free_list.push(idx);
+            return None;
+        }
+
+        let new_pid = self.next_pid;
+        proc.pid = new_pid;
+        self.next_pid += 1;
+    proc.state = ProcState::Used;
+    
+    // Initialize process group and session ID
+    proc.pgid = new_pid;
+    proc.sid = new_pid;
+    
+    // Initialize signal state
+    proc.signals = Some(SignalState::new());
+        
+        // Allocate kernel stack
+        let kstack = kalloc();
+        if kstack.is_null() {
+            proc.state = ProcState::Unused;
+            proc.signals = None;
+            self.free_list.push(idx); // Return to free list
+            return None;
+        }
+        proc.kstack = kstack as usize + PAGE_SIZE;  // Stack grows down
+        
+        // Allocate trapframe page
+        let tf = kalloc();
+        if tf.is_null() {
+            unsafe { kfree((proc.kstack - PAGE_SIZE) as *mut u8); }
+            proc.state = ProcState::Unused;
+            proc.signals = None;
+            self.free_list.push(idx); // Return to free list
+            return None;
+        }
+        proc.trapframe = tf as *mut TrapFrame;
+        
+        // Add to pid_to_index map for O(1) lookups
+        self.pid_to_index.insert(new_pid, idx);
+        
+        Some(proc)
     }
 
     /// Find process by PID - O(log n) with BTreeMap
@@ -443,7 +473,12 @@ impl ProcTable {
             
             proc.state = ProcState::Unused;
             proc.signals = None;
+            
+            // Remove from PID map
             self.pid_to_index.remove(&pid);
+            
+            // Add back to free list for O(1) reuse
+            self.free_list.push(idx);
         }
     }
 
@@ -515,6 +550,17 @@ pub fn fork() -> Option<Pid> {
     let child_pid = child.pid;
     child.parent = Some(parent_pid);
     child.state = ProcState::Runnable;
+    
+    // Inherit process group and session from parent
+    let parent_pgid;
+    let parent_sid;
+    {
+        let parent = table.find(parent_pid).unwrap();
+        parent_pgid = parent.pgid;
+        parent_sid = parent.sid;
+    }
+    child.pgid = parent_pgid;
+    child.sid = parent_sid;
     
     // Copy parent's file descriptors
     for i in 0..NOFILE {
@@ -614,7 +660,7 @@ pub fn kill(pid: usize) -> bool {
 pub fn kill_proc(pid: Pid, sig: u32) -> Result<(), ()> {
     let mut table = PROC_TABLE.lock();
     if let Some(proc) = table.find(pid) {
-        if let Some(ref signals) = proc.signals {
+        if let Some(ref mut signals) = proc.signals {
             let _ = signals.send_signal(sig);
         }
         if proc.state == ProcState::Sleeping {

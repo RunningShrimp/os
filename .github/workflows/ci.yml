@@ -1,0 +1,53 @@
+name: CI for NOS Kernel
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: riscv64-unknown-none-elf, aarch64-unknown-none-elf, x86_64-unknown-none-elf
+        components: clippy, rustfmt
+        
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: ./kernel ./user ./xtask
+        
+    - name: Build kernel
+      run: |
+        cargo build -p kernel --target riscv64-unknown-none-elf
+        cargo build -p kernel --target aarch64-unknown-none-elf
+        cargo build -p kernel --target x86_64-unknown-none-elf
+        
+    - name: Build user programs
+      run: |
+        cargo build -p user --target riscv64-unknown-none-elf
+        cargo build -p user --target aarch64-unknown-none-elf
+        cargo build -p user --target x86_64-unknown-none-elf
+        
+    - name: Build xtask
+      run: cargo build -p xtask
+        
+    - name: Run tests
+      run: cargo test -p kernel --target riscv64-unknown-none-elf
+        
+    - name: Run clippy
+      run: |
+        cargo clippy -p kernel --target riscv64-unknown-none-elf -- -D warnings
+        cargo clippy -p user --target riscv64-unknown-none-elf -- -D warnings
+        
+    - name: Check formatting
+      run: cargo fmt --all --check

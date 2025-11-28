@@ -117,7 +117,7 @@ impl File {
                             Ok(n) => {
                                 drop(p);
                                 process::wakeup(Arc::as_ptr(pipe) as usize | 0x02);
-                                process::wakeup(crate::syscall::POLL_WAKE_CHAN);
+                                process::wakeup(crate::syscalls::POLL_WAKE_CHAN);
                                 {
                                     let p = pipe.lock();
                                     p.notify_read_ready();
@@ -205,7 +205,7 @@ impl File {
                             Ok(n) => {
                                 drop(p);
                                 process::wakeup(Arc::as_ptr(pipe) as usize | 0x01);
-                                process::wakeup(crate::syscall::POLL_WAKE_CHAN);
+                                process::wakeup(crate::syscalls::POLL_WAKE_CHAN);
                                 {
                                     let p = pipe.lock();
                                     p.notify_write_ready();
@@ -354,12 +354,12 @@ impl FTable {
                         p.close_read();
                         drop(p);
                         process::wakeup(Arc::as_ptr(pipe) as usize | 0x02);
-                        process::wakeup(crate::syscall::POLL_WAKE_CHAN);
+                        process::wakeup(crate::syscalls::POLL_WAKE_CHAN);
                     } else if file.writable {
                         p.close_write();
                         drop(p);
                         process::wakeup(Arc::as_ptr(pipe) as usize | 0x01);
-                        process::wakeup(crate::syscall::POLL_WAKE_CHAN);
+                        process::wakeup(crate::syscalls::POLL_WAKE_CHAN);
                     }
                 }
             }
@@ -546,4 +546,84 @@ pub fn file_poll(idx: usize) -> i16 {
         _ => {}
     }
     ev
+}
+
+/// Truncate file
+pub fn file_truncate(idx: usize, size: u64) -> Result<(), ()> {
+    match FILE_TABLE.lock().get_mut(idx) {
+        Some(f) => {
+            match f.ftype {
+                FileType::Vfs => {
+                    if let Some(ref vfs_file) = f.vfs_file {
+                        match vfs_file.truncate(size) {
+                            Ok(_) => Ok(()),
+                            Err(_) => Err(()),
+                        }
+                    } else {
+                        Err(())
+                    }
+                },
+                _ => Err(()),
+            }
+        },
+        None => Err(()),
+    }
+}
+
+/// Change file mode
+pub fn file_chmod(idx: usize, mode: u32) -> Result<(), ()> {
+    match FILE_TABLE.lock().get_mut(idx) {
+        Some(f) => {
+            match f.ftype {
+                FileType::Vfs => {
+                    if let Some(ref vfs_file) = f.vfs_file {
+                        match vfs_file.stat() {
+                            Ok(mut attr) => {
+                                // Preserve the file type, only change the permissions
+                                attr.mode = crate::vfs::FileMode::new((attr.mode.0 & !0o7777) | (mode & 0o7777));
+                                match vfs_file.set_attr(&attr) {
+                                    Ok(_) => Ok(()),
+                                    Err(_) => Err(()),
+                                }
+                            },
+                            Err(_) => Err(()),
+                        }
+                    } else {
+                        Err(())
+                    }
+                },
+                _ => Err(()),
+            }
+        },
+        None => Err(()),
+    }
+}
+
+/// Change file owner and group
+pub fn file_chown(idx: usize, uid: u32, gid: u32) -> Result<(), ()> {
+    match FILE_TABLE.lock().get_mut(idx) {
+        Some(f) => {
+            match f.ftype {
+                FileType::Vfs => {
+                    if let Some(ref vfs_file) = f.vfs_file {
+                        match vfs_file.stat() {
+                            Ok(mut attr) => {
+                                attr.uid = uid;
+                                attr.gid = gid;
+                                match vfs_file.set_attr(&attr) {
+                                    Ok(_) => Ok(()),
+                                    Err(_) => Err(()),
+                                }
+                            },
+                            Err(_) => Err(()),
+                        }
+                    } else {
+                        Err(())
+                    }
+                },
+                _ => Err(()),
+            }
+        },
+        None => Err(()),
+    }
 }

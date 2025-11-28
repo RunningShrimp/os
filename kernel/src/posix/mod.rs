@@ -735,3 +735,83 @@ impl Default for IoVec {
 
 /// Maximum number of I/O vectors
 pub const IOV_MAX: usize = 1024;
+
+// ============================================================================
+// Socket Definitions (sys/socket.h)
+// ============================================================================
+
+/// Socket address structure (generic)
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Sockaddr {
+    /// Address family
+    pub sa_family: u16,
+    /// Address data
+    pub sa_data: [u8; 14],
+}
+
+/// Socket address structure (IPv4)
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SockaddrIn {
+    /// Address family (AF_INET)
+    pub sin_family: u16,
+    /// Port number
+    pub sin_port: u16,
+    /// IPv4 address
+    pub sin_addr: InAddr,
+    /// Padding
+    pub sin_zero: [u8; 8],
+}
+
+/// IPv4 address structure
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct InAddr {
+    /// IPv4 address in network byte order
+    pub s_addr: u32,
+}
+
+/// Address families
+pub const AF_UNSPEC: i32 = 0;       // Unspecified
+pub const AF_INET: i32 = 2;         // IPv4
+pub const AF_INET6: i32 = 10;       // IPv6
+
+/// Socket types
+pub const SOCK_STREAM: i32 = 1;     // TCP
+pub const SOCK_DGRAM: i32 = 2;      // UDP
+pub const SOCK_RAW: i32 = 3;        // Raw socket
+pub const SOCK_SEQPACKET: i32 = 5;  // Sequenced packet socket
+
+/// Protocol families
+pub const PF_UNSPEC: i32 = AF_UNSPEC;
+pub const PF_INET: i32 = AF_INET;
+pub const PF_INET6: i32 = AF_INET6;
+
+/// Socket option levels
+pub const SOL_SOCKET: i32 = 1;       // Socket level
+
+/// Socket options
+pub const SO_REUSEADDR: i32 = 2;     // Reuse address
+pub const SO_REUSEPORT: i32 = 15;    // Reuse port
+pub const SO_KEEPALIVE: i32 = 9;     // Keep alive
+pub const SO_LINGER: i32 = 13;       // Linger option
+pub const SO_SNDBUF: i32 = 7;        // Send buffer size
+pub const SO_RCVBUF: i32 = 8;        // Receive buffer size
+pub const SO_SNDTIMEO: i32 = 20;     // Send timeout
+pub const SO_RCVTIMEO: i32 = 21;     // Receive timeout
+pub const SO_TYPE: i32 = 3;          // Socket type
+pub const SO_ERROR: i32 = 4;         // Socket error
+
+/// Shutdown how
+pub const SHUT_RD: i32 = 0;          // Shutdown read
+pub const SHUT_WR: i32 = 1;          // Shutdown write
+pub const SHUT_RDWR: i32 = 2;        // Shutdown both
+
+// ============================================================================
+// Thread support
+// ============================================================================
+
+pub mod thread;
+
+pub use self::thread::*;

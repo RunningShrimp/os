@@ -29,11 +29,10 @@ mod log;
 mod alloc;
 mod sync;
 mod process;
-mod syscall;
+mod syscalls;
 mod drivers;
 mod fs;
 mod time;
-mod syscalls;
 mod trap;
 mod vm;
 mod file;
@@ -49,6 +48,11 @@ mod platform;
 mod gic;
 mod gicv3;
 mod syscon;
+mod ipc;
+mod services;
+
+#[cfg(feature = "kernel_tests")]
+mod tests;
 
 // Architecture name for logging
 #[cfg(target_arch = "riscv64")]
@@ -122,6 +126,20 @@ pub extern "C" fn rust_main() -> ! {
     process::init();
     println!("[boot] process subsystem initialized");
 
+    // Initialize IPC subsystem
+    ipc::init();
+    println!("[boot] IPC subsystem initialized");
+
+    // Initialize service layer
+    services::init();
+    services::memory::init();
+    services::process::init();
+    services::fs::init();
+    services::syscall::init();
+    services::network::init();
+    services::driver::init();
+    println!("[boot] service layer initialized");
+
     // Start other CPUs
     cpu::start_aps();
     cpu::boot_complete();
@@ -169,173 +187,31 @@ pub extern "C" fn rust_main_ap() -> ! {
 /// Run kernel self-tests
 #[cfg(feature = "kernel_tests")]
 fn run_tests() {
-    println!("Running kernel self-tests...");
-    println!();
-
-    // Test heap allocation
-    test_alloc();
-
-    // Test synchronization primitives
-    test_sync();
-
-    // Test file table
-    test_file();
-
-    // Test pipe
-    test_pipe();
-    test_pipe_nonblock();
-    test_pipe_fill_nonblock();
-    test_pipe_close_read();
+    // Run tests using the new test framework
+    let (passed, failed, _skipped) = tests::run_all_tests();
+    
+    if failed > 0 {
+        println!();
+        println!("!!! {} TEST(S) FAILED !!!", failed);
+        println!();
+    } else {
+        println!();
+        println!("All {} tests passed!", passed);
+        println!();
+    }
+    
+    // Also run the legacy tests that need fork/exec
+    println!("Running legacy integration tests...");
     test_pipe_fork_rw();
     test_exec_negative();
     test_exec_positive_minimal();
-
-    // Test VFS create/write/read
-    test_vfs_io();
     test_paths_relative();
-
-    println!();
-    println!("All tests passed!");
-    println!();
+    println!("Legacy tests completed.");
 }
 
-#[cfg(feature = "kernel_tests")]
-fn test_alloc() {
-    extern crate alloc as _alloc;
-    use _alloc::vec::Vec;
-    use _alloc::boxed::Box;
-
-    print!("  alloc: ");
-
-    // Test Vec
-    let mut v: Vec<i32> = Vec::new();
-    for i in 0..10 {
-        v.push(i);
-    }
-    assert_eq!(v.iter().sum::<i32>(), 45);
-
-    // Test Box
-    let b = Box::new(42);
-    assert_eq!(*b, 42);
-
-    println!("ok");
-}
-
-#[cfg(feature = "kernel_tests")]
-fn test_sync() {
-    use crate::sync::{SpinLock, Mutex};
-
-    print!("  sync: ");
-
-    // Test SpinLock basic acquire/release
-    let sl = SpinLock::new();
-    sl.lock();
-    assert!(sl.is_locked());
-    sl.unlock();
-    assert!(!sl.is_locked());
-
-    // Test Mutex
-    let mutex: Mutex<i32> = Mutex::new(0);
-    {
-        let mut guard = mutex.lock();
-        *guard = 100;
-    }
-    assert_eq!(*mutex.lock(), 100);
-
-    println!("ok");
-}
-
-#[cfg(feature = "kernel_tests")]
-fn test_file() {
-    print!("  file: ");
-
-    if let Some(fd) = file::file_alloc() {
-        file::file_close(fd);
-    }
-
-    println!("ok");
-}
-
-#[cfg(feature = "kernel_tests")]
-fn test_pipe() {
-    print!("  pipe: ");
-
-    let result = pipe::pipe_alloc();
-    if let Some((read_fd, write_fd)) = result {
-        // Write to pipe
-        let data = b"hello";
-        let written = pipe::pipe_write(write_fd, data);
-        assert_eq!(written, 5);
-
-        // Read from pipe
-        let mut buf = [0u8; 16];
-        let read = pipe::pipe_read(read_fd, &mut buf);
-        assert_eq!(read, 5);
-        assert_eq!(&buf[..5], b"hello");
-
-        file::file_close(read_fd);
-        file::file_close(write_fd);
-        println!("ok");
-    } else {
-        println!("skipped (no alloc)");
-    }
-}
-
-#[cfg(feature = "kernel_tests")]
-fn test_pipe_nonblock() {
-    use crate::posix::O_NONBLOCK;
-    print!("  pipe-nb: ");
-    if let Some((rfd_idx, wfd_idx)) = crate::pipe::pipe_alloc() {
-        {
-            let mut table = crate::file::FILE_TABLE.lock();
-            if let Some(f) = table.get_mut(rfd_idx) { f.status_flags |= O_NONBLOCK; }
-        }
-        let mut buf = [0u8; 4];
-        let ret = crate::file::file_read(rfd_idx, &mut buf);
-        assert_eq!(ret, crate::errno::errno_neg(crate::errno::EAGAIN));
-        crate::file::file_close(rfd_idx);
-        crate::file::file_close(wfd_idx);
-        println!("ok");
-    } else {
-        println!("skipped");
-    }
-}
-
-#[cfg(feature = "kernel_tests")]
-fn test_pipe_fill_nonblock() {
-    use crate::posix::O_NONBLOCK;
-    print!("  pipe-fill-nb: ");
-    if let Some((rfd_idx, wfd_idx)) = crate::pipe::pipe_alloc() {
-        {
-            let mut table = crate::file::FILE_TABLE.lock();
-            if let Some(f) = table.get_mut(wfd_idx) { f.status_flags |= O_NONBLOCK; f.writable = true; f.readable = false; }
-            if let Some(f) = table.get_mut(rfd_idx) { f.readable = true; f.writable = false; }
-        }
-        let buf = [0xAAu8; 64];
-        loop {
-            let n = crate::file::file_write(wfd_idx, &buf);
-            if n == crate::errno::errno_neg(crate::errno::EAGAIN) { break; }
-            if n < 0 { panic!("write failed"); }
-        }
-        crate::file::file_close(rfd_idx);
-        crate::file::file_close(wfd_idx);
-        println!("ok");
-    } else { println!("skipped"); }
-}
-
-#[cfg(feature = "kernel_tests")]
-fn test_pipe_close_read() {
-    print!("  pipe-close-rd: ");
-    if let Some((rfd_idx, wfd_idx)) = crate::pipe::pipe_alloc() {
-        // Close reader, then write should return EPIPE
-        crate::file::file_close(rfd_idx);
-        let buf = [0xBBu8; 16];
-        let n = crate::file::file_write(wfd_idx, &buf);
-        assert_eq!(n, crate::errno::errno_neg(crate::errno::EPIPE));
-        crate::file::file_close(wfd_idx);
-        println!("ok");
-    } else { println!("skipped"); }
-}
+// ============================================================================
+// Legacy integration tests (require fork/exec syscalls)
+// ============================================================================
 
 #[cfg(feature = "kernel_tests")]
 fn test_pipe_fork_rw() {
@@ -343,24 +219,24 @@ fn test_pipe_fork_rw() {
     print!("  pipe-fork: ");
     // Use sys_pipe to obtain process-level fds
     let mut pfds = [0i32; 2];
-    let ret = crate::syscall::dispatch(crate::syscall::SysNum::Pipe as usize, &[pfds.as_mut_ptr() as usize, 0, 0, 0, 0, 0]);
-    if ret != crate::syscall::E_OK { println!("skipped"); return; }
-    let pid = crate::syscall::dispatch(crate::syscall::SysNum::Fork as usize, &[0,0,0,0,0,0]);
+    let ret = crate::syscalls::dispatch(crate::syscalls::SysNum::Pipe as usize, &[pfds.as_mut_ptr() as usize, 0, 0, 0, 0, 0]);
+    if ret != crate::syscalls::E_OK { println!("skipped"); return; }
+    let pid = crate::syscalls::dispatch(crate::syscalls::SysNum::Fork as usize, &[0,0,0,0,0,0]);
     if pid == 0 { // child
         // Read from pipe
         let mut buf = [0u8; 8];
-        let r = crate::syscall::dispatch(crate::syscall::SysNum::Read as usize, &[pfds[0] as usize, buf.as_mut_ptr() as usize, buf.len(), 0,0,0]);
+        let r = crate::syscalls::dispatch(crate::syscalls::SysNum::Read as usize, &[pfds[0] as usize, buf.as_mut_ptr() as usize, buf.len(), 0,0,0]);
         assert_eq!(r, 5);
         assert_eq!(&buf[..5], b"hello");
-        let _ = crate::syscall::dispatch(crate::syscall::SysNum::Close as usize, &[pfds[0] as usize, 0,0,0,0,0]);
-        let _ = crate::syscall::dispatch(crate::syscall::SysNum::Exit as usize, &[0,0,0,0,0,0]);
+        let _ = crate::syscalls::dispatch(crate::syscalls::SysNum::Close as usize, &[pfds[0] as usize, 0,0,0,0,0]);
+        let _ = crate::syscalls::dispatch(crate::syscalls::SysNum::Exit as usize, &[0,0,0,0,0,0]);
     } else {
         // parent
-        let _ = crate::syscall::dispatch(crate::syscall::SysNum::Fcntl as usize, &[pfds[1] as usize, crate::posix::F_SETFL as usize, O_NONBLOCK as usize, 0,0,0]);
-        let _ = crate::syscall::dispatch(crate::syscall::SysNum::Write as usize, &[pfds[1] as usize, b"hello".as_ptr() as usize, 5, 0,0,0]);
+        let _ = crate::syscalls::dispatch(crate::syscalls::SysNum::Fcntl as usize, &[pfds[1] as usize, crate::posix::F_SETFL as usize, O_NONBLOCK as usize, 0,0,0]);
+        let _ = crate::syscalls::dispatch(crate::syscalls::SysNum::Write as usize, &[pfds[1] as usize, b"hello".as_ptr() as usize, 5, 0,0,0]);
         let mut status = 0i32;
-        let _ = crate::syscall::dispatch(crate::syscall::SysNum::Wait as usize, &[(&mut status as *mut i32) as usize, 0,0,0,0,0]);
-        let _ = crate::syscall::dispatch(crate::syscall::SysNum::Close as usize, &[pfds[1] as usize, 0,0,0,0,0]);
+        let _ = crate::syscalls::dispatch(crate::syscalls::SysNum::Wait as usize, &[(&mut status as *mut i32) as usize, 0,0,0,0,0]);
+        let _ = crate::syscalls::dispatch(crate::syscalls::SysNum::Close as usize, &[pfds[1] as usize, 0,0,0,0,0]);
         println!("ok");
     }
 }
@@ -370,8 +246,8 @@ fn test_exec_negative() {
     print!("  exec-neg: ");
     let path = b"/bin/ls\0";
     let args: [*const u8; 1] = [core::ptr::null()];
-    let ret = crate::syscall::dispatch(crate::syscall::SysNum::Exec as usize, &[path.as_ptr() as usize, args.as_ptr() as usize, 0,0,0,0]);
-    assert_eq!(ret, crate::syscall::E_NOENT);
+    let ret = crate::syscalls::dispatch(crate::syscalls::SysNum::Exec as usize, &[path.as_ptr() as usize, args.as_ptr() as usize, 0,0,0,0]);
+    assert_eq!(ret, crate::syscalls::E_NOENT);
     println!("ok");
 }
 
@@ -427,27 +303,8 @@ fn test_exec_positive_minimal() {
     let mut f = vfs().create(path, FileMode::new(FileMode::S_IFREG | 0o755)).expect("create failed");
     let _ = f.write(elf.as_ptr() as usize, elf.len());
     let args: [*const u8; 1] = [core::ptr::null()];
-    let ret = crate::syscall::dispatch(crate::syscall::SysNum::Exec as usize, &[path.as_ptr() as usize, args.as_ptr() as usize, 0,0,0,0]);
+    let ret = crate::syscalls::dispatch(crate::syscalls::SysNum::Exec as usize, &[path.as_ptr() as usize, args.as_ptr() as usize, 0,0,0,0]);
     assert_eq!(ret, 0);
-    println!("ok");
-}
-
-#[cfg(feature = "kernel_tests")]
-fn test_vfs_io() {
-    use crate::vfs::{FileMode, vfs};
-    print!("  vfs: ");
-    // Create and write a file via VFS
-    let path = "/hello";
-    let mut file = vfs().create(path, FileMode::new(FileMode::S_IFREG | 0o644)).expect("create failed");
-    let msg = b"world";
-    let wrote = file.write(msg.as_ptr() as usize, msg.len()).expect("write failed");
-    assert_eq!(wrote, msg.len());
-    // Seek and read back
-    let mut opened = vfs().open(path, 0).expect("open failed");
-    let mut buf = [0u8; 8];
-    let read = opened.read(buf.as_mut_ptr() as usize, msg.len()).expect("read failed");
-    assert_eq!(read, msg.len());
-    assert_eq!(&buf[..msg.len()], msg);
     println!("ok");
 }
 
@@ -456,22 +313,22 @@ fn test_paths_relative() {
     use crate::posix::{O_CREAT, O_RDWR};
     print!("  paths-rel: ");
     // mkdir /tmp and chdir
-    let _ = crate::syscall::dispatch(crate::syscall::SysNum::Mkdir as usize, ["/tmp\0".as_ptr() as usize, 0,0,0,0,0].as_ref());
-    let _ = crate::syscall::dispatch(crate::syscall::SysNum::Chdir as usize, ["/tmp\0".as_ptr() as usize, 0,0,0,0,0].as_ref());
+    let _ = crate::syscalls::dispatch(crate::syscalls::SysNum::Mkdir as usize, ["/tmp\0".as_ptr() as usize, 0,0,0,0,0].as_ref());
+    let _ = crate::syscalls::dispatch(crate::syscalls::SysNum::Chdir as usize, ["/tmp\0".as_ptr() as usize, 0,0,0,0,0].as_ref());
     // open relative file foo
-    let fd = crate::syscall::dispatch(
-        crate::syscall::SysNum::Open as usize,
+    let fd = crate::syscalls::dispatch(
+        crate::syscalls::SysNum::Open as usize,
         ["foo\0".as_ptr() as usize, (O_CREAT|O_RDWR) as usize, 0o644, 0,0,0].as_ref(),
     );
     assert!(fd >= 0);
     // write
-    let _ = crate::syscall::dispatch(crate::syscall::SysNum::Write as usize, [fd as usize, b"ok".as_ptr() as usize, 2, 0,0,0].as_ref());
+    let _ = crate::syscalls::dispatch(crate::syscalls::SysNum::Write as usize, [fd as usize, b"ok".as_ptr() as usize, 2, 0,0,0].as_ref());
     // link to bar
-    let _ = crate::syscall::dispatch(crate::syscall::SysNum::Link as usize, ["foo\0".as_ptr() as usize, "bar\0".as_ptr() as usize, 0,0,0,0].as_ref());
+    let _ = crate::syscalls::dispatch(crate::syscalls::SysNum::Link as usize, ["foo\0".as_ptr() as usize, "bar\0".as_ptr() as usize, 0,0,0,0].as_ref());
     // unlink foo
-    let _ = crate::syscall::dispatch(crate::syscall::SysNum::Unlink as usize, ["foo\0".as_ptr() as usize, 0,0,0,0,0].as_ref());
+    let _ = crate::syscalls::dispatch(crate::syscalls::SysNum::Unlink as usize, ["foo\0".as_ptr() as usize, 0,0,0,0,0].as_ref());
     // open absolute /tmp/bar
-    let fd2 = crate::syscall::dispatch(crate::syscall::SysNum::Open as usize, ["/tmp/bar\0".as_ptr() as usize, O_RDWR as usize, 0, 0,0,0].as_ref());
+    let fd2 = crate::syscalls::dispatch(crate::syscalls::SysNum::Open as usize, ["/tmp/bar\0".as_ptr() as usize, O_RDWR as usize, 0, 0,0,0].as_ref());
     assert!(fd2 >= 0);
     println!("ok");
 }

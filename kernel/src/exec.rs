@@ -291,7 +291,7 @@ pub fn sys_exec(path: usize, argv: usize) -> isize {
     let path_str = match alloc::string::String::from_utf8(path_slice) { Ok(s) => s, Err(_) => return -1 };
     let abs_path = resolve_with_cwd(&path_str);
     let vfs = crate::vfs::vfs();
-    let mut file = match vfs.open(&abs_path, crate::posix::O_RDONLY as u32) { Ok(f) => f, Err(_) => return crate::syscall::E_NOENT };
+    let mut file = match vfs.open(&abs_path, crate::posix::O_RDONLY as u32) { Ok(f) => f, Err(_) => return crate::syscalls::E_NOENT };
     let mut buf = alloc::vec::Vec::new();
     let mut tmp = [0u8; 512];
     loop {
@@ -314,7 +314,7 @@ pub fn sys_execve(path: usize, argv: usize, envp: usize) -> isize {
     let path_str = match alloc::string::String::from_utf8(path_slice) { Ok(s) => s, Err(_) => return -1 };
     let abs_path = resolve_with_cwd(&path_str);
     let vfs = crate::vfs::vfs();
-    let mut file = match vfs.open(&abs_path, crate::posix::O_RDONLY as u32) { Ok(f) => f, Err(_) => return crate::syscall::E_NOENT };
+    let mut file = match vfs.open(&abs_path, crate::posix::O_RDONLY as u32) { Ok(f) => f, Err(_) => return crate::syscalls::E_NOENT };
     let mut buf = alloc::vec::Vec::new();
     let mut tmp = [0u8; 512];
     loop {

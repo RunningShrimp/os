@@ -4,6 +4,8 @@
 extern crate alloc;
 use alloc::vec::Vec;
 use alloc::string::String;
+use alloc::collections::BTreeMap;
+use core::hash::Hash;
 use crate::drivers::{BlockDevice, RamDisk};
 use crate::sync::{Sleeplock, Mutex};
 
@@ -171,58 +173,101 @@ impl Default for Buf {
     }
 }
 
-/// Buffer cache
+/// Cache key: (device, blockno)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct CacheKey {
+    dev: u32,
+    blockno: u32,
+}
+
+impl CacheKey {
+    fn new(dev: u32, blockno: u32) -> Self {
+        Self { dev, blockno }
+    }
+}
+
+/// Buffer cache - now uses hash map for O(1) lookup
 pub struct BufCache {
-    bufs: [Sleeplock<Buf>; NBUF],
+    bufs: Vec<Sleeplock<Buf>>,
+    cache: Mutex<BTreeMap<CacheKey, usize>>,  // Maps (dev, blockno) to buffer index
+    free_list: Mutex<Vec<usize>>,            // Free buffer indices for quick allocation
 }
 
 impl BufCache {
     pub const fn new() -> Self {
-        const EMPTY_BUF: Sleeplock<Buf> = Sleeplock::new(Buf {
-            flags: BufFlags::empty(),
-            dev: 0,
-            blockno: 0,
-            refcnt: 0,
-            data: [0; BSIZE],
-        });
         Self {
-            bufs: [EMPTY_BUF; NBUF],
+            bufs: Vec::new(),
+            cache: Mutex::new(BTreeMap::new()),
+            free_list: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Initialize buffer cache - needs to be called before use
+    pub fn init(&mut self) {
+        // Initialize buffers
+        self.bufs.resize(NBUF, Sleeplock::new(Buf::default()));
+        
+        // Add all buffers to free list
+        let mut free_list = self.free_list.lock();
+        free_list.clear();
+        for i in 0..NBUF {
+            free_list.push(i);
         }
     }
 
     /// Get a buffer for the given block, reading from disk if necessary
     pub fn bread(&self, dev: &impl BlockDevice, blockno: u32) -> Option<usize> {
+        let key = CacheKey::new(0, blockno);  // Note: Currently using dev=0 hardcoded
+        
         // First, try to find the block in cache
-        for (i, buf_lock) in self.bufs.iter().enumerate() {
-            let buf = buf_lock.lock();
-            if buf.dev == 0 && buf.blockno == blockno && buf.flags.contains(BufFlags::VALID) {
+        {
+            let cache = self.cache.lock();
+            if let Some(&idx) = cache.get(&key) {
+                // Increase refcount
+                let mut buf = self.bufs[idx].lock();
+                buf.refcnt += 1;
                 drop(buf);
-                return Some(i);
+                return Some(idx);
             }
         }
 
-        // Not found, allocate a buffer
-        for (i, buf_lock) in self.bufs.iter().enumerate() {
-            let mut buf = buf_lock.lock();
-            if buf.refcnt == 0 {
-                buf.dev = 0;
-                buf.blockno = blockno;
-                buf.flags = BufFlags::empty();
-                buf.refcnt = 1;
+        // Not found, allocate a buffer from free list
+        let mut free_list = self.free_list.lock();
+        let idx = free_list.pop()?;  // Get next free buffer index
+        drop(free_list);
 
-                // Read from disk
-                let offset = (blockno as usize) * BSIZE / 512;
-                for j in 0..(BSIZE / 512) {
-                    dev.read(offset + j, &mut buf.data[j * 512..(j + 1) * 512]);
-                }
-                buf.flags.set(BufFlags::VALID);
-                
-                drop(buf);
-                return Some(i);
+        // Update buffer state
+        let mut buf = self.bufs[idx].lock();
+        
+        // If the buffer was dirty, write it back to disk
+        if buf.flags.contains(BufFlags::DIRTY) {
+            let old_offset = (buf.blockno as usize) * BSIZE / 512;
+            for j in 0..(BSIZE / 512) {
+                dev.write(old_offset + j, &buf.data[j * 512..(j + 1) * 512]);
             }
         }
 
-        None // No buffers available
+        // Initialize new buffer
+        buf.dev = 0;
+        buf.blockno = blockno;
+        buf.flags = BufFlags::empty();
+        buf.refcnt = 1;
+
+        // Read from disk
+        let offset = (blockno as usize) * BSIZE / 512;
+        for j in 0..(BSIZE / 512) {
+            dev.read(offset + j, &mut buf.data[j * 512..(j + 1) * 512]);
+        }
+        buf.flags.set(BufFlags::VALID);
+        
+        drop(buf);
+
+        // Add to cache
+        let mut cache = self.cache.lock();
+        cache.insert(key, idx);
+        drop(cache);
+
+        Some(idx)
     }
 
     /// Write buffer to disk
@@ -238,6 +283,20 @@ impl BufCache {
     pub fn brelse(&self, idx: usize) {
         let mut buf = self.bufs[idx].lock();
         buf.refcnt = buf.refcnt.saturating_sub(1);
+        
+        if buf.refcnt == 0 {
+            // Buffer is no longer in use, add to free list and remove from cache
+            let key = CacheKey::new(buf.dev, buf.blockno);
+            
+            drop(buf);
+            
+            let mut cache = self.cache.lock();
+            cache.remove(&key);
+            drop(cache);
+            
+            let mut free_list = self.free_list.lock();
+            free_list.push(idx);
+        }
     }
 }
 
@@ -309,7 +368,7 @@ pub struct Fs {
 
 impl Fs {
     pub fn new() -> Self {
-        Self {
+        let mut fs = Self {
             dev: RamDisk,
             sb: SuperBlock::default(),
             buf_cache: BufCache::new(),
@@ -325,7 +384,12 @@ impl Fs {
                 size: 0,
                 addrs: [0; NDIRECT + 1],
             } }; NINODE]),
-        }
+        };
+        
+        // Initialize buffer cache
+        fs.buf_cache.init();
+        
+        fs
     }
 
     /// Read superblock from disk
