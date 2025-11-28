@@ -215,8 +215,12 @@ pub fn init() {
     }
     
     // Initialize the kernel heap allocator
+    // Split heap into slab region (first 25%) and buddy region (remaining 75%)
+    let total_size = end - start;
+    let slab_size = total_size / 4;
+    let buddy_size = total_size - slab_size;
     unsafe {
-        crate::alloc::init(start, end);
+        crate::alloc::init(start, slab_size, start + slab_size, buddy_size, PAGE_SIZE);
         // Initialize buddy allocator for multi-page allocations
         BUDDY.init(start, end);
     }

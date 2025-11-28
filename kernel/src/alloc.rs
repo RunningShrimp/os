@@ -19,6 +19,9 @@ struct BuddyAllocator {
     statistics: BuddyStats,
 }
 
+// Safety: BuddyAllocator is protected by a Mutex
+unsafe impl Send for BuddyAllocator {}
+
 struct BuddyBlock {
     next: *mut BuddyBlock,
     size: usize,
@@ -164,6 +167,9 @@ struct SlabAllocator {
     heap_size: usize,
     allocated: usize,
 }
+
+// Safety: SlabAllocator is protected by a Mutex
+unsafe impl Send for SlabAllocator {}
 
 impl SlabAllocator {
     const fn new() -> Self {

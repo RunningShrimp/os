@@ -63,7 +63,7 @@ static STARTED: AtomicBool = AtomicBool::new(false);
 
 /// Kernel main entry point
 /// Called from architecture-specific startup code
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rust_main() -> ! {
     // Early hardware initialization (UART, etc.)
     arch::early_init();
@@ -146,7 +146,7 @@ pub extern "C" fn rust_main() -> ! {
 
 /// Entry point for Application Processors (APs)
 /// Called from architecture-specific AP startup code
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rust_main_ap() -> ! {
     // Initialize this CPU
     cpu::init_ap();
