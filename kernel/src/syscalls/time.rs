@@ -305,17 +305,26 @@ fn sys_nanosleep(args: &[u64]) -> SyscallResult {
     let start_ns = crate::time::hrtime_nanos();
     let target_ns = start_ns + sleep_ns;
     
-    // High-precision sleep using busy-wait for short durations
-    // For real-time applications, we use busy-wait to avoid scheduling overhead
+    // High-precision sleep using busy-wait for very short durations
+    // For longer sleeps, use the timer sleep-queue + process sleep/wakeup
     if sleep_ns < 1_000_000 {
         // Less than 1ms: use busy-wait for precision
         while crate::time::hrtime_nanos() < target_ns {
             core::hint::spin_loop();
         }
     } else {
-        // Longer sleep: use sleep/wakeup mechanism
-        // TODO: Implement proper sleep/wakeup with high-precision timer
-        crate::time::sleep_ms(sleep_ns / 1_000_000);
+        // Longer sleep: compute target tick and sleep on channel == pid
+        // Convert nanoseconds to ticks (tick period = 1s / TIMER_FREQ)
+        let tick_ns = 1_000_000_000u64 / crate::time::TIMER_FREQ;
+        let ticks = (sleep_ns + tick_ns - 1) / tick_ns; // ceil
+
+        // Register with timer as a sleeper and block the current process
+        let chan = pid as usize;
+        let wake_tick = crate::time::get_ticks().saturating_add(ticks);
+        crate::time::add_sleeper(wake_tick, chan);
+
+        // Block current process until wakeup_sleepers wakes it
+        crate::process::sleep(chan);
     }
     
     // Check if interrupted (simplified - real implementation would check signals)
@@ -327,9 +336,8 @@ fn sys_nanosleep(args: &[u64]) -> SyscallResult {
             tv_sec: (remaining_ns / 1_000_000_000) as i64,
             tv_nsec: (remaining_ns % 1_000_000_000) as i64,
         };
-        
         unsafe {
-            copyin(pagetable, rem_ptr as *mut u8, rem_ptr as usize, core::mem::size_of::<Timespec>())
+            copyout(pagetable, rem_ptr as usize, core::ptr::addr_of!(rem) as *const u8, core::mem::size_of::<Timespec>())
                 .map_err(|_| SyscallError::BadAddress)?;
         }
         
