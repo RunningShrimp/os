@@ -608,8 +608,29 @@ fn sys_sbrk(args: &[u64]) -> SyscallResult {
 }
 
 fn sys_sleep(_args: &[u64]) -> SyscallResult {
-    // TODO: Implement sleep syscall - sleep for specified seconds
-    Err(SyscallError::NotSupported)
+    use super::common::extract_args;
+
+    let args = extract_args(_args, 1)?;
+    let seconds = args[0] as u64;
+
+    if seconds == 0 {
+        return Ok(0);
+    }
+
+    // Convert seconds to nanoseconds and then to ticks
+    let sleep_ns = seconds.saturating_mul(1_000_000_000);
+    let tick_ns = 1_000_000_000u64 / crate::time::TIMER_FREQ;
+    let ticks = (sleep_ns + tick_ns - 1) / tick_ns;
+
+    let pid = crate::process::myproc().ok_or(SyscallError::InvalidArgument)?;
+    let chan = pid as usize;
+
+    let wake_tick = crate::time::get_ticks().saturating_add(ticks);
+    crate::time::add_sleeper(wake_tick, chan);
+    crate::process::sleep(chan);
+
+    // Simplified: we don't implement signal interruptions here — return 0 on success
+    Ok(0)
 }
 
 fn sys_uptime(_args: &[u64]) -> SyscallResult {
