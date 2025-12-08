@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NOS 安全审计报告</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section h2 {
+            color: #333;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 5px;
+        }
+        .severity-high { color: #d32f2f; font-weight: bold; }
+        .severity-medium { color: #f57c00; font-weight: bold; }
+        .severity-low { color: #388e3c; font-weight: bold; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .summary {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+        .summary-item {
+            text-align: center;
+            padding: 15px;
+            background-color: #e3f2fd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>NOS 内核安全审计报告</h1>
+            <p>生成时间: {{timestamp}}</p>
+            <p>审计版本: {{version}}</p>
+        </div>
+
+        <div class="summary">
+            <div class="summary-item">
+                <h3>总问题数</h3>
+                <p>{{total_issues}}</p>
+            </div>
+            <div class="summary-item">
+                <h3>高危问题</h3>
+                <p class="severity-high">{{high_issues}}</p>
+            </div>
+            <div class="summary-item">
+                <h3>中危问题</h3>
+                <p class="severity-medium">{{medium_issues}}</p>
+            </div>
+            <div class="summary-item">
+                <h3>低危问题</h3>
+                <p class="severity-low">{{low_issues}}</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>发现的安全问题</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>严重程度</th>
+                        <th>类型</th>
+                        <th>描述</th>
+                        <th>位置</th>
+                        <th>建议</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#issues}}
+                    <tr>
+                        <td>{{id}}</td>
+                        <td class="severity-{{severity}}">{{severity}}</td>
+                        <td>{{type}}</td>
+                        <td>{{description}}</td>
+                        <td>{{location}}</td>
+                        <td>{{recommendation}}</td>
+                    </tr>
+                    {{/issues}}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>安全评分</h2>
+            <p>总体安全评分: <strong>{{score}}/100</strong></p>
+            <div style="background-color: #e0e0e0; border-radius: 5px; overflow: hidden;">
+                <div style="background-color: {{score_color}}; height: 20px; width: {{score}}%;"></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>改进建议</h2>
+            <ul>
+                {{#recommendations}}
+                <li>{{.}}</li>
+                {{/recommendations}}
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

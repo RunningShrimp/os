@@ -1,5 +1,6 @@
 //! Mount point information for VFS
 
+extern crate alloc;
 use alloc::{string::String, sync::Arc};
 
 use super::{fs::SuperBlock};

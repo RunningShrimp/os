@@ -1,0 +1,30 @@
+  --> kernel/src/libc/io_manager.rs:19:26
+   |
+19 | use crate::libc::error::{get_errno, set_errno};
+   |                          ^^^^^^^^^
+
+--
+  --> kernel/src/libc/io_manager.rs:20:64
+   |
+20 | use crate::libc::error::errno::{EBADF, EINVAL, ENOMEM, ENOENT, EIO, EAGAIN, EMFILE};
+   |                                                                ^^^  ^^^^^^
+
+--
+  --> kernel/src/libc/math_lib.rs:11:26
+   |
+11 | use crate::libc::error::{get_errno, set_errno};
+   |                          ^^^^^^^^^
+
+--
+  --> kernel/src/libc/string_lib.rs:14:26
+   |
+14 | use crate::libc::error::{get_errno, set_errno};
+   |                          ^^^^^^^^^
+
+--
+  --> kernel/src/libc/time_lib.rs:16:26
+   |
+16 | use crate::libc::error::{get_errno, set_errno};
+   |                          ^^^^^^^^^
+
+--

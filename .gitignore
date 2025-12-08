@@ -5,3 +5,16 @@
 .vscode/
 qemu.log
 **/*.log
+
+# Backup files
+**/*.bak
+**/*.backup
+**/*~
+
+# Performance baselines (keep main branch baseline)
+.baselines/*
+!.baselines/main/
+!.baselines/main/**
+
+# Performance reports
+performance-reports/

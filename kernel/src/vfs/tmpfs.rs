@@ -1,4 +1,6 @@
 //! Temporary file system (tmpfs) implementation
+
+extern crate alloc;
 //! 
 //! Similar to ramfs but with size limits and better performance
 
@@ -264,7 +266,7 @@ impl InodeOps for TmpFsInode {
         Ok(())
     }
     
-    fn symlink(&self, name: &str, target: &str) -> VfsResult<()> {
+    fn symlink(&self, name: &str, target: &str) -> VfsResult<Arc<dyn InodeOps>> {
         let mut children = self.children.lock();
         if children.contains_key(name) {
             return Err(VfsError::Exists);
@@ -274,8 +276,8 @@ impl InodeOps for TmpFsInode {
         let ino = sb.as_ref().map(|s| s.alloc_ino()).unwrap_or(1000 + name.len() as u64);
         
         let inode = Arc::new(TmpFsInode::new_symlink(ino, target, sb));
-        children.insert(name.to_string(), inode);
-        Ok(())
+        children.insert(name.to_string(), inode.clone());
+        Ok(inode)
     }
     
     fn readlink(&self) -> VfsResult<String> {
@@ -379,5 +381,8 @@ impl InodeOps for TmpFsInode {
 /// Initialize and register TmpFS
 pub fn init() {
     let tmpfs = Arc::new(TmpFsType);
-    super::vfs().register_fs(tmpfs).expect("Failed to register tmpfs");
+    if let Err(e) = super::vfs().register_fs(tmpfs) {
+        crate::println!("[tmpfs] Failed to register tmpfs: {:?}", e);
+        // In a production system, this might be fatal, but for now we log and continue
+    }
 }

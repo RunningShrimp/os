@@ -1,0 +1,60 @@
+[tool.tarpaulin]
+# Tarpaulin configuration for test coverage analysis
+
+# Timeout for tests (in seconds)
+timeout = 300
+
+# Output formats
+out = ["Lcov", "Html", "Stdout"]
+
+# Output directory
+output-dir = "coverage/"
+
+# Exclude patterns
+exclude-files = [
+    "*/build.rs",
+    "*/main.rs",
+    "*/target/*",
+    "*/tests/*",
+    "*/benches/*",
+    "*/examples/*",
+]
+
+# Include test files
+include-tests = true
+
+# Follow symlinks
+follow-exec = true
+
+# Line coverage threshold (percentage)
+line = 90.0
+
+# Branch coverage threshold (percentage)
+branch = 85.0
+
+# Fail if coverage is below threshold
+fail-under = 90.0
+
+# Exclude from coverage
+exclude = [
+    "*/build.rs",
+    "*/main.rs",
+    "*/target/*",
+    "*/tests/*",
+    "*/benches/*",
+    "*/examples/*",
+]
+
+# Include patterns for kernel tests
+include = [
+    "kernel/src/syscalls/**/*.rs",
+    "kernel/src/process/**/*.rs",
+    "kernel/src/mm/**/*.rs",
+    "kernel/src/fs/**/*.rs",
+    "kernel/src/vfs/**/*.rs",
+    "kernel/src/net/**/*.rs",
+    "kernel/src/ipc/**/*.rs",
+    "kernel/src/sync/**/*.rs",
+    "kernel/src/posix/**/*.rs",
+]
+

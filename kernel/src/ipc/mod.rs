@@ -1,5 +1,12 @@
-//! Inter-Process Communication (IPC) mechanism for hybrid architecture
-//! Implements shared memory, message queues, and signal mechanisms
+//! POSIX-compliant Inter-Process Communication (IPC) mechanism
+//!
+//! This module provides basic POSIX IPC primitives:
+//! - Shared memory (shm_*)
+//! - Message queues (msg_*)
+//! - Semaphores (sem_*)
+//!
+//! **Note**: For microkernel service communication, use `crate::microkernel::ipc`.
+//! For high-performance IPC, use `crate::services::ipc`.
 
 extern crate alloc;
 
@@ -165,3 +172,9 @@ pub fn msg_delete(queue_id: u32) -> bool {
     // TODO: Implement message queue delete
     true
 }
+
+pub mod signal;
+pub mod pipe;
+
+#[cfg(feature = "kernel_tests")]
+pub mod tests;

@@ -1,0 +1,71 @@
+# NOS Rust 代码格式化配置
+
+edition = "2021"
+
+# 最大行长度
+max_width = 100
+
+# 硬标签
+hard_tabs = false
+
+# 缩进大小
+tab_spaces = 4
+
+# 导入项排序
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+reorder_imports = true
+
+# 代码块格式化
+format_strings = true
+format_macro_matchers = true
+format_macro_bodies = true
+
+# 注释格式化
+comment_width = 80
+wrap_comments = true
+normalize_comments = true
+normalize_doc_attributes = true
+
+# 空行控制
+blank_lines_upper_bound = 1
+blank_lines_lower_bound = 0
+
+# 控制结构格式化
+control_brace_style = "AlwaysSameLine"
+brace_style = "SameLineWhere"
+indent_style = "Block"
+where_single_line = false
+
+# 函数参数格式化
+fn_params_layout = "Tall"
+fn_call_width = 100
+
+# 结构体格式化
+struct_lit_width = 60
+struct_variant_width = 60
+
+# 数组格式化
+array_width = 60
+
+# 链式调用格式化
+chain_width = 60
+
+# 单行if格式化
+single_line_if_else_max_width = 50
+
+# 空格使用
+spaces_around_ranges = false
+spaces_around_attr = false
+
+# 列表格式化
+match_block_trailing_comma = true
+trailing_comma = "Vertical"
+trailing_semicolon = false
+
+# 错误处理
+error_on_line_overflow = true
+error_on_unformatted = false
+
+# 多行格式化
+multiline_closure_forces_block = false

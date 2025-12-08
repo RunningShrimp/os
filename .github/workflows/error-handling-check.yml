@@ -1,0 +1,95 @@
+name: Error Handling Consistency Check
+
+on:
+  pull_request:
+    paths:
+      - 'kernel/src/**/*.rs'
+      - '.github/workflows/error-handling-check.yml'
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  check-error-handling:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Check for SyscallError usage outside syscalls module
+        run: |
+          echo "检查非系统调用模块是否错误使用了SyscallError..."
+          VIOLATIONS=$(grep -rn "use.*SyscallError\|SyscallError" kernel/src --include="*.rs" | grep -v "syscalls/" | grep -v "error_handling/unified.rs" | grep -v "^kernel/src/error_handling/unified.rs" || true)
+          
+          if [ -n "$VIOLATIONS" ]; then
+            echo "::error::发现非系统调用模块使用了SyscallError:"
+            echo "$VIOLATIONS"
+            echo ""
+            echo "建议: 非系统调用模块应使用KernelError而不是SyscallError"
+            exit 1
+          else
+            echo "✅ 未发现违规使用"
+          fi
+
+      - name: Check for From trait implementations
+        run: |
+          echo "检查错误转换实现..."
+          
+          # 检查From<SyscallError> for KernelError是否存在
+          if grep -q "impl From<SyscallError> for KernelError" kernel/src/error_handling/unified.rs; then
+            echo "✅ From<SyscallError> for KernelError 已实现"
+          else
+            echo "::error::From<SyscallError> for KernelError 未实现"
+            exit 1
+          fi
+          
+          # 检查to_errno方法是否存在
+          if grep -q "pub fn to_errno" kernel/src/error_handling/unified.rs; then
+            echo "✅ KernelError::to_errno() 已实现"
+          else
+            echo "::error::KernelError::to_errno() 未实现"
+            exit 1
+          fi
+
+      - name: Check error handling documentation
+        run: |
+          if [ -f "docs/ERROR_HANDLING_AUDIT.md" ]; then
+            echo "✅ 错误处理审查文档存在"
+          else
+            echo "::warning::错误处理审查文档不存在"
+          fi
+
+      - name: Generate error handling report
+        run: |
+          cat > error_handling_report.md << 'EOF'
+          # 错误处理一致性检查报告
+          
+          ## 检查项
+          
+          1. ✅ 非系统调用模块未使用SyscallError
+          2. ✅ From<SyscallError> for KernelError 已实现
+          3. ✅ KernelError::to_errno() 已实现
+          
+          ## 建议
+          
+          - 系统调用模块可以继续使用SyscallError
+          - 非系统调用模块应使用KernelError
+          - 确保所有错误类型都有到KernelError的转换
+          EOF
+          
+          cat error_handling_report.md
+
+      - name: Upload report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: error-handling-report
+          path: error_handling_report.md
+          retention-days: 30
+

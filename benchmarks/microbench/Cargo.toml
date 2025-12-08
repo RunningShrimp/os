@@ -13,3 +13,15 @@ criterion = { version = "0.5" }
 name = "join_path_bench"
 harness = false
 
+[[bench]]
+name = "copy_bench"
+harness = false
+
+[[bench]]
+name = "scheduler_bench"
+harness = false
+
+[[bench]]
+name = "mmap_bench"
+harness = false
+

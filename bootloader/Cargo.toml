@@ -1,0 +1,166 @@
+[package]
+name = "nos-bootloader"
+version = "0.1.0"
+edition = "2024"
+authors = ["NOS Development Team"]
+description = "Modern UEFI and BIOS bootloader for NOS operating system"
+
+[lib]
+name = "nos_bootloader"
+crate-type = ["staticlib"]
+
+[[bin]]
+name = "bootloader"
+path = "src/main.rs"
+
+[dependencies]
+# Core dependencies
+arrayvec = { version = "0.7", default-features = false }
+bitflags = { version = "2.4", default-features = false }
+
+# UEFI dependencies (feature-gated)
+uefi = { version = "0.28", default-features = false, optional = true }
+uefi-services = { version = "0.25", default-features = false, optional = true }
+
+# Graphics dependencies (feature-gated)
+embedded-graphics = { version = "0.8", default-features = false, optional = true }
+tinybmp = { version = "0.5", default-features = false, optional = true }
+
+# Network dependencies (feature-gated)
+smoltcp = { version = "0.11", default-features = false, optional = true }
+
+# Architecture-specific dependencies
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+x86_64 = { version = "0.15", default-features = false }
+x86 = { version = "0.52", default-features = false }
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+aarch64-cpu = { version = "9.4", default-features = false }
+
+[target.'cfg(target_arch = "riscv64")'.dependencies]
+riscv = { version = "0.11", default-features = false }
+
+[features]
+default = ["uefi_support", "bios_support"]
+uefi_support = ["uefi", "uefi-services"]
+bios_support = []
+multiboot2_support = []
+vbe_support = ["graphics_support"]
+graphics_support = ["embedded-graphics", "tinybmp"]
+network_support = ["smoltcp"]
+menu_support = ["graphics_support"]
+recovery_support = ["graphics_support", "menu_support"]
+
+# BIOS-specific features
+bios_real_mode = ["bios_support"]
+bios_protected_mode = ["bios_support"]
+bios_long_mode = ["bios_support"]
+bios_interrupts = ["bios_support"]
+bios_memory_detection = ["bios_support"]
+bios_graphics = ["bios_support", "vbe_support"]
+
+# Combined features
+bios_full = [
+    "bios_support",
+    "multiboot2_support",
+    "vbe_support",
+    "bios_interrupts",
+    "bios_memory_detection",
+    "bios_graphics",
+    "menu_support"
+]
+
+uefi_full = [
+    "uefi_support",
+    "graphics_support",
+    "network_support",
+    "menu_support",
+    "recovery_support"
+]
+
+# Build features
+debug = []
+verbose_logging = []
+
+# Target-specific features
+x86_64 = []
+aarch64 = []
+riscv64 = []
+
+[profile.dev]
+panic = "abort"
+debug = true
+
+[profile.release]
+panic = "abort"
+debug-assertions = false
+overflow-checks = false
+lto = true
+codegen-units = 1
+opt-level = "s"
+
+[build-dependencies]
+cc = "1.0"
+
+[package.metadata.bootloader]
+# Bootloader build configuration
+supported_architectures = ["x86_64", "aarch64", "riscv64"]
+supported_protocols = ["uefi", "bios"]
+default_timeout = 5
+
+# BIOS build targets
+[[package.metadata.bootloader.targets]]
+name = "bios-x86_64"
+arch = "x86_64"
+protocol = "bios"
+features = ["bios_full"]
+linker_script = "linker/bios.ld"
+output_format = "binary"
+output_name = "bios-bootloader.bin"
+
+[[package.metadata.bootloader.targets]]
+name = "bios-x86_64-debug"
+arch = "x86_64"
+protocol = "bios"
+features = ["bios_full", "debug", "verbose_logging"]
+linker_script = "linker/bios.ld"
+output_format = "binary"
+output_name = "bios-bootloader-debug.bin"
+profile = "debug"
+
+[[package.metadata.bootloader.targets]]
+name = "multiboot2-x86_64"
+arch = "x86_64"
+protocol = "multiboot2"
+features = ["bios_full", "multiboot2_support"]
+linker_script = "linker/bios.ld"
+output_format = "elf"
+output_name = "multiboot2-bootloader.elf"
+
+# UEFI build targets (existing)
+[[package.metadata.bootloader.targets]]
+name = "uefi-x86_64"
+arch = "x86_64"
+protocol = "uefi"
+features = ["uefi_full"]
+linker_script = "linker/x86_64_uefi.ld"
+output_format = "efi"
+output_name = "bootx64.efi"
+
+[[package.metadata.bootloader.targets]]
+name = "uefi-aarch64"
+arch = "aarch64"
+protocol = "uefi"
+features = ["uefi_full"]
+linker_script = "linker/aarch64_uefi.ld"
+output_format = "efi"
+output_name = "bootaa64.efi"
+
+[[package.metadata.bootloader.targets]]
+name = "uefi-riscv64"
+arch = "riscv64"
+protocol = "uefi"
+features = ["uefi_full"]
+linker_script = "linker/riscv64_uefi.ld"
+output_format = "efi"
+output_name = "bootriscv64.efi"

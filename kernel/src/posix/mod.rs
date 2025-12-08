@@ -1,6 +1,7 @@
 //! POSIX Types and Constants
-//! 
+//!
 //! Standard types and constants for POSIX compliance
+
 
 // ============================================================================
 // Basic Types
@@ -41,6 +42,9 @@ pub type Time = i64;
 
 /// Size type for syscalls
 pub type SSize = isize;
+
+/// Size type for shared memory and file sizes
+pub type Size = usize;
 
 /// Clock ID type
 pub type ClockId = i32;
@@ -629,6 +633,64 @@ pub const MAP_ANON: i32 = MAP_ANONYMOUS;
 pub const MAP_FAILED: usize = !0;
 
 // ============================================================================
+// Advanced Memory Mapping Constants
+// ============================================================================
+
+/// Additional mmap flags
+pub const MAP_LOCKED: i32 = 0x2000;     // Lock pages in memory
+pub const MAP_NORESERVE: i32 = 0x4000;  // Don't reserve swap space
+pub const MAP_POPULATE: i32 = 0x8000;   // Populate page tables
+pub const MAP_NONBLOCK: i32 = 0x10000;  // Don't block on I/O
+pub const MAP_STACK: i32 = 0x20000;      // Allocation for stack
+pub const MAP_HUGETLB: i32 = 0x40000;    // Create huge page mapping
+pub const MAP_GROWSDOWN: i32 = 0x100;   // Stack-like segment
+pub const MAP_DENYWRITE: i32 = 0x800;    // Deny write access
+pub const MAP_EXECUTABLE: i32 = 0x1000;   // Mark it as executable
+pub const MAP_HUGE_SHIFT: i32 = 26;       // Huge page size shift
+pub const MAP_HUGE_MASK: i32 = 0x3f << MAP_HUGE_SHIFT;
+
+/// Huge page size constants
+pub const MAP_HUGE_64KB: i32 = 16 << MAP_HUGE_SHIFT;
+pub const MAP_HUGE_512KB: i32 = 19 << MAP_HUGE_SHIFT;
+pub const MAP_HUGE_1MB: i32 = 20 << MAP_HUGE_SHIFT;
+pub const MAP_HUGE_2MB: i32 = 21 << MAP_HUGE_SHIFT;
+pub const MAP_HUGE_8MB: i32 = 23 << MAP_HUGE_SHIFT;
+pub const MAP_HUGE_16MB: i32 = 24 << MAP_HUGE_SHIFT;
+pub const MAP_HUGE_32MB: i32 = 25 << MAP_HUGE_SHIFT;
+pub const MAP_HUGE_256MB: i32 = 26 << MAP_HUGE_SHIFT;
+pub const MAP_HUGE_512MB: i32 = 27 << MAP_HUGE_SHIFT;
+pub const MAP_HUGE_1GB: i32 = 28 << MAP_HUGE_SHIFT;
+pub const MAP_HUGE_2GB: i32 = 29 << MAP_HUGE_SHIFT;
+pub const MAP_HUGE_16GB: i32 = 34 << MAP_HUGE_SHIFT;
+
+/// madvise advice values
+pub const MADV_NORMAL: i32 = 0;     // No special treatment
+pub const MADV_RANDOM: i32 = 1;    // Expect random page references
+pub const MADV_SEQUENTIAL: i32 = 2; // Expect sequential page references
+pub const MADV_WILLNEED: i32 = 3;  // Will need these pages
+pub const MADV_DONTNEED: i32 = 4;  // Don't need these pages
+pub const MADV_FREE: i32 = 8;       // Pages can be freed
+pub const MADV_REMOVE: i32 = 9;     // Remove pages from memory
+pub const MADV_DONTFORK: i32 = 10;  // Don't inherit across fork
+pub const MADV_DOFORK: i32 = 11;    // Do inherit across fork
+pub const MADV_MERGEABLE: i32 = 12; // KSM may merge pages
+pub const MADV_UNMERGEABLE: i32 = 13; // KSM may not merge pages
+pub const MADV_HUGEPAGE: i32 = 14;  // Use huge pages
+pub const MADV_NOHUGEPAGE: i32 = 15; // Don't use huge pages
+pub const MADV_DONTDUMP: i32 = 16;  // Exclude from core dump
+pub const MADV_DODUMP: i32 = 17;    // Include in core dump
+pub const MADV_HWPOISON: i32 = 100;  // Poison a page
+
+/// mlockall flags
+pub const MCL_CURRENT: i32 = 1;  // Lock currently mapped pages
+pub const MCL_FUTURE: i32 = 2;   // Lock future mappings
+pub const MCL_ONFAULT: i32 = 4;  // Lock pages on first fault
+
+/// remap_file_pages flags
+pub const MAP_FILE: i32 = 0;      // Mapped from file (default)
+pub const MAP_RENAME: i32 = 0;    // Rename mapping (Linux-specific)
+
+// ============================================================================
 // Rusage Structure
 // ============================================================================
 
@@ -737,6 +799,80 @@ impl Default for IoVec {
 pub const IOV_MAX: usize = 1024;
 
 // ============================================================================
+// epoll Definitions (sys/epoll.h)
+// ============================================================================
+
+/// epoll control operations
+pub const EPOLL_CTL_ADD: i32 = 1;
+pub const EPOLL_CTL_DEL: i32 = 2;
+pub const EPOLL_CTL_MOD: i32 = 3;
+
+/// epoll event flags
+pub const EPOLLIN: u32 = 0x001;
+pub const EPOLLPRI: u32 = 0x002;
+pub const EPOLLOUT: u32 = 0x004;
+pub const EPOLLERR: u32 = 0x008;
+pub const EPOLLHUP: u32 = 0x010;
+pub const EPOLLRDHUP: u32 = 0x2000;
+pub const EPOLLONESHOT: u32 = 0x40000000;
+pub const EPOLLET: u32 = 0x80000000;
+
+/// epoll create flags
+pub const EPOLL_CLOEXEC: i32 = 0x00020000;
+
+/// epoll event structure
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct EpollEvent {
+    /// Events mask
+    pub events: u32,
+    /// User data
+    pub data: EpollData,
+}
+
+impl Default for EpollEvent {
+    fn default() -> Self {
+        Self {
+            events: 0,
+            data: EpollData { u64: 0 },
+        }
+    }
+}
+
+/// epoll data union
+#[repr(C)]
+pub union EpollData {
+    pub ptr: *mut u8,
+    pub fd: i32,
+    pub u32: u32,
+    pub u64: u64,
+}
+
+// Safety: EpollData is used for epoll event data, which is typically
+// accessed from a single thread context. The raw pointer is only used
+// for user-space data passing and is not shared across threads.
+unsafe impl Send for EpollData {}
+unsafe impl Sync for EpollData {}
+
+impl Clone for EpollData {
+    fn clone(&self) -> Self {
+        unsafe { Self { u64: self.u64 } }
+    }
+}
+
+impl Default for EpollData {
+    fn default() -> Self {
+        Self { u64: 0 }
+    }
+}
+
+impl core::fmt::Debug for EpollData {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        unsafe { f.debug_struct("EpollData").field("u64", &self.u64).finish() }
+    }
+}
+
+// ============================================================================
 // Socket Definitions (sys/socket.h)
 // ============================================================================
 
@@ -809,9 +945,927 @@ pub const SHUT_WR: i32 = 1;          // Shutdown write
 pub const SHUT_RDWR: i32 = 2;        // Shutdown both
 
 // ============================================================================
+// Clone Flags (sched.h)
+// ============================================================================
+
+/// Clone flags for clone() system call
+/// These flags control what is shared between parent and child
+
+/// Share virtual memory space
+pub const CLONE_VM: i32 = 0x00000100;
+/// Share file descriptor table
+pub const CLONE_FILES: i32 = 0x00000400;
+/// Share filesystem information
+pub const CLONE_FS: i32 = 0x00000200;
+/// Share signal handlers
+pub const CLONE_SIGHAND: i32 = 0x00000800;
+/// Share parent's PID (thread in same thread group)
+pub const CLONE_THREAD: i32 = 0x00010000;
+/// Share System V IPC semaphore undo lists
+pub const CLONE_SYSVSEM: i32 = 0x00040000;
+/// Set child's parent to caller's parent
+pub const CLONE_PARENT: i32 = 0x00008000;
+/// Set child's parent to caller
+pub const CLONE_PARENT_SETTID: i32 = 0x00100000;
+/// Clear child's TID in child memory
+pub const CLONE_CHILD_CLEARTID: i32 = 0x00200000;
+/// Set child's TID in child memory
+pub const CLONE_CHILD_SETTID: i32 = 0x01000000;
+/// New uts namespace
+pub const CLONE_NEWUTS: i32 = 0x04000000;
+/// New IPC namespace
+pub const CLONE_NEWIPC: i32 = 0x08000000;
+/// New user namespace
+pub const CLONE_NEWUSER: i32 = 0x10000000;
+/// New PID namespace
+pub const CLONE_NEWPID: i32 = 0x20000000;
+/// New network namespace
+pub const CLONE_NEWNET: i32 = 0x40000000;
+/// New mount namespace
+pub const CLONE_NEWNS: i32 = 0x00020000;
+/// Share I/O context
+// pub const CLONE_IO: i32 = 0x80000000; // Commented out due to i32 overflow
+
+// ============================================================================
+// Signal Definitions (signal.h)
+// ============================================================================
+
+/// Signal set structure
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SigSet {
+    /// Signal bits (up to 64 signals)
+    pub bits: u64,
+}
+
+impl SigSet {
+    pub const fn empty() -> Self {
+        Self { bits: 0 }
+    }
+
+    pub const fn all() -> Self {
+        Self { bits: !0 }
+    }
+
+    pub const fn has(&self, sig: i32) -> bool {
+        if sig > 0 && sig <= 64 {
+            (self.bits >> (sig - 1)) & 1 != 0
+        } else {
+            false
+        }
+    }
+
+    pub const fn add(&mut self, sig: i32) {
+        if sig > 0 && sig <= 64 {
+            self.bits |= 1 << (sig - 1);
+        }
+    }
+
+    pub const fn remove(&mut self, sig: i32) {
+        if sig > 0 && sig <= 64 {
+            self.bits &= !(1 << (sig - 1));
+        }
+    }
+
+    pub const fn clear(&mut self) {
+        self.bits = 0;
+    }
+}
+
+/// Signal action structure
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct SigAction {
+    /// Signal handler or SIG_IGN/SIG_DFL
+    pub sa_handler: usize,
+    /// Signal mask to apply during handler execution
+    pub sa_mask: SigSet,
+    /// Flags for signal handling
+    pub sa_flags: i32,
+    /// Restorer function (obsolete)
+    pub sa_restorer: usize,
+}
+
+impl Default for SigAction {
+    fn default() -> Self {
+        Self {
+            sa_handler: SIG_DFL,
+            sa_mask: SigSet::empty(),
+            sa_flags: 0,
+            sa_restorer: 0,
+        }
+    }
+}
+
+/// Special signal handler values
+pub const SIG_DFL: usize = 0;      // Default handler
+pub const SIG_IGN: usize = 1;      // Ignore signal
+pub const SIG_ERR: isize = -1;     // Error return value
+
+/// Signal handling flags
+pub const SA_NOCLDSTOP: i32 = 0x00000001;  // Don't send SIGCHLD when child stops
+pub const SA_NOCLDWAIT: i32 = 0x00000002;  // Don't create zombies on child termination
+pub const SA_SIGINFO: i32 = 0x00000004;    // Use sa_sigaction instead of sa_handler
+pub const SA_ONSTACK: i32 = 0x08000000;    // Use alternate signal stack
+pub const SA_RESTART: i32 = 0x10000000;    // Restart syscall on signal
+pub const SA_NODEFER: i32 = 0x40000000;    // Don't automatically block the signal
+pub const SA_RESETHAND: i32 = -2147483648;  // Reset to SIG_DFL on signal delivery
+
+/// Signal numbers (POSIX.1-2008)
+pub const SIGHUP: i32 = 1;     // Hangup
+pub const SIGINT: i32 = 2;     // Interrupt
+pub const SIGQUIT: i32 = 3;    // Quit
+pub const SIGILL: i32 = 4;     // Illegal instruction
+pub const SIGTRAP: i32 = 5;    // Trace/breakpoint trap
+pub const SIGABRT: i32 = 6;    // Abort
+pub const SIGBUS: i32 = 7;     // Bus error
+pub const SIGFPE: i32 = 8;     // Floating point exception
+pub const SIGKILL: i32 = 9;    // Kill (cannot be caught or ignored)
+pub const SIGUSR1: i32 = 10;   // User-defined signal 1
+pub const SIGSEGV: i32 = 11;   // Segmentation violation
+pub const SIGUSR2: i32 = 12;   // User-defined signal 2
+pub const SIGPIPE: i32 = 13;   // Broken pipe
+pub const SIGALRM: i32 = 14;   // Alarm clock
+pub const SIGTERM: i32 = 15;   // Termination
+pub const SIGSTKFLT: i32 = 16; // Stack fault on coprocessor
+pub const SIGCHLD: i32 = 17;   // Child status has changed
+pub const SIGCONT: i32 = 18;   // Continue (if stopped)
+pub const SIGSTOP: i32 = 19;   // Stop (cannot be caught or ignored)
+pub const SIGTSTP: i32 = 20;   // Stop signal generated from keyboard
+pub const SIGTTIN: i32 = 21;   // Background read from tty
+pub const SIGTTOU: i32 = 22;   // Background write to tty
+pub const SIGURG: i32 = 23;    // Urgent condition on socket
+pub const SIGXCPU: i32 = 24;   // CPU limit exceeded
+pub const SIGXFSZ: i32 = 25;   // File size limit exceeded
+pub const SIGVTALRM: i32 = 26; // Virtual timer expired
+pub const SIGPROF: i32 = 27;   // Profiling timer expired
+pub const SIGWINCH: i32 = 28;  // Window size change
+pub const SIGIO: i32 = 29;     // I/O now possible
+pub const SIGPWR: i32 = 30;    // Power failure
+pub const SIGSYS: i32 = 31;    // Bad system call
+
+/// Real-time signal range
+pub const SIGRTMIN: i32 = 32;
+pub const SIGRTMAX: i32 = 64;
+
+/// Alternate signal stack structure
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct StackT {
+    /// Base address of stack
+    pub ss_sp: *mut u8,
+    /// Stack flags
+    pub ss_flags: i32,
+    /// Stack size
+    pub ss_size: usize,
+}
+
+impl Default for StackT {
+    fn default() -> Self {
+        Self {
+            ss_sp: core::ptr::null_mut(),
+            ss_flags: SS_DISABLE,
+            ss_size: 0,
+        }
+    }
+}
+
+/// Stack flags
+pub const SS_ONSTACK: i32 = 1;   // Currently executing on alternate stack
+pub const SS_DISABLE: i32 = 2;   // Alternate stack disabled
+
+/// Signal information structure (for SA_SIGINFO)
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct SigInfoT {
+    /// Signal number
+    pub si_signo: i32,
+    /// Signal code
+    pub si_code: i32,
+    /// Sending process ID
+    pub si_pid: Pid,
+    /// Sending process UID
+    pub si_uid: Uid,
+    /// Exit value or signal
+    pub si_status: i32,
+    /// User time consumed
+    pub si_utime: Time,
+    /// System time consumed
+    pub si_stime: Time,
+    /// Signal value
+    pub si_value: SigVal,
+    /// POSIX.1b timer ID
+    pub si_timerid: i32,
+    /// POSIX.1b timer overrun count
+    pub si_overrun: i32,
+    /// Faulting address
+    pub si_addr: usize,
+    /// Band event
+    pub si_band: i64,
+    /// File descriptor
+    pub si_fd: i32,
+}
+
+/// Signal value union
+#[repr(C)]
+pub union SigVal {
+    /// Integer value
+    pub sival_int: i32,
+    /// Pointer value
+    pub sival_ptr: *mut u8,
+}
+
+// SAFETY: SigVal only contains integer and raw pointer values, which are Send + Sync
+unsafe impl Send for SigVal {}
+unsafe impl Sync for SigVal {}
+
+impl Clone for SigVal {
+    fn clone(&self) -> Self {
+        unsafe { Self { sival_int: self.sival_int } }
+    }
+}
+
+impl Copy for SigVal {}
+
+impl Default for SigVal {
+    fn default() -> Self {
+        Self { sival_int: 0 }
+    }
+}
+
+impl core::fmt::Debug for SigVal {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        unsafe { f.debug_struct("SigVal").field("sival_int", &self.sival_int).finish() }
+    }
+}
+
+/// Signal codes
+pub const SI_USER: i32 = 0;        // Signal sent by kill()
+pub const SI_KERNEL: i32 = 0x80;   // Signal sent by kernel
+pub const SI_QUEUE: i32 = -1;      // Signal sent by sigqueue()
+pub const SI_TIMER: i32 = -2;      // Signal sent by timer expiration
+pub const SI_MESGQ: i32 = -3;      // Signal sent by message arrival
+pub const SI_ASYNCIO: i32 = -4;    // Signal sent by AIO completion
+pub const SI_SIGIO: i32 = -5;      // Signal sent by queued SIGIO
+
+/// Signal mask manipulation operations
+pub const SIG_BLOCK: i32 = 0;      // Block signals
+pub const SIG_UNBLOCK: i32 = 1;    // Unblock signals
+pub const SIG_SETMASK: i32 = 2;    // Set the signal mask
+
+/// Minimum stack size for alternate signal stack
+pub const MINSIGSTKSZ: usize = 2048;
+/// Recommended stack size for alternate signal stack
+pub const SIGSTKSZ: usize = 8192;
+
+/// Number of signals
+pub const NSIG: i32 = 65;
+
+// ============================================================================
+// Semaphore Definitions (semaphore.h)
+// ============================================================================
+
+/// POSIX semaphore structure
+#[repr(C)]
+pub struct SemT {
+    /// Internal semaphore implementation
+    pub sem_internal: *mut u8,
+}
+
+impl SemT {
+    /// Check if semaphore is null/uninitialized
+    pub fn is_null(&self) -> bool {
+        self.sem_internal.is_null()
+    }
+}
+
+/// Semaphore permissions
+pub const SEM_PERMISSIONS: Mode = 0o600;
+
+// ============================================================================
+// Message Queue Definitions (mqueue.h)
+// ============================================================================
+
+/// Message queue attributes
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct MqAttr {
+    /// Maximum number of messages
+    pub mq_maxmsg: i64,
+    /// Maximum message size
+    pub mq_msgsize: i64,
+    /// Number of messages currently queued
+    pub mq_curmsgs: i64,
+    /// Flags for the message queue
+    pub mq_flags: i32,
+}
+
+impl Default for MqAttr {
+    fn default() -> Self {
+        Self {
+            mq_maxmsg: 10,
+            mq_msgsize: 8192,
+            mq_curmsgs: 0,
+            mq_flags: 0,
+        }
+    }
+}
+
+/// Message queue open flags specific to mqueue
+pub const MQ_RDONLY: i32 = 0;       // Open for receiving only
+pub const MQ_WRONLY: i32 = 1;       // Open for sending only
+pub const MQ_RDWR: i32 = 2;         // Open for sending and receiving
+
+/// Message queue notification
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct MqNotify {
+    /// Notification method
+    pub notify_method: i32,
+    /// Signal number or pipe fd
+    pub notify_sig: i32,
+}
+
+/// Notification methods
+pub const MQ_SIGNAL: i32 = 1;      // Notify via signal
+pub const MQ_PIPE: i32 = 2;        // Notify via pipe
+
+// ============================================================================
+// Shared Memory Definitions (sys/mman.h extensions)
+// ============================================================================
+
+/// Shared memory open flags
+pub const SHM_R: i32 = 0o400;      // Read permission
+pub const SHM_W: i32 = 0o200;      // Write permission
+pub const SHM_RDONLY: i32 = 0o400000; // Read-only attachment
+
+/// Shared memory create flags
+pub const SHM_HUGETLB: i32 = 0o4000; // Use huge pages
+pub const SHM_HUGE_SHIFT: i32 = 26;
+pub const SHM_HUGE_MASK: i32 = 0x3f << SHM_HUGE_SHIFT;
+
+/// IPC commands
+pub const IPC_CREAT: i32 = 0o01000000;  // Create entry if key doesn't exist
+pub const IPC_EXCL: i32 = 0o02000000;    // Fail if key exists
+pub const IPC_NOWAIT: i32 = 0o04000000;  // Return error on wait
+
+/// Shared memory commands
+pub const IPC_RMID: i32 = 0;       // Remove shared memory segment
+pub const IPC_SET: i32 = 1;        // Set shared memory attributes
+pub const IPC_STAT: i32 = 2;       // Get shared memory attributes
+
+/// Shared memory flags
+pub const SHM_RND: i32 = 0o200000;  // Round attach address to SHMLBA boundary
+pub const SHMLBA: usize = 4096;     // Segment low boundary address multiple
+
+/// Shared memory information
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct ShmidDs {
+    /// Operation permissions
+    pub shm_perm: IpcPerm,
+    /// Segment size
+    pub shm_segsz: usize,
+    /// Last attach time
+    pub shm_atime: Time,
+    /// Last detach time
+    pub shm_dtime: Time,
+    /// Last change time
+    pub shm_ctime: Time,
+    /// PID of creator
+    pub shm_cpid: Pid,
+    /// PID of last shmat()
+    pub shm_lpid: Pid,
+    /// Number of current attaches
+    pub shm_nattch: u64,
+}
+
+/// IPC permissions structure
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct IpcPerm {
+    /// Owner user ID
+    pub uid: Uid,
+    /// Owner group ID
+    pub gid: Gid,
+    /// Creator user ID
+    pub cuid: Uid,
+    /// Creator group ID
+    pub cgid: Gid,
+    /// Read/write permission bits
+    pub mode: Mode,
+    /// Sequence number
+    pub seq: u16,
+    /// Key value
+    pub key: i32,
+}
+
+// ============================================================================
+// Timer Definitions (time.h extensions)
+// ============================================================================
+
+/// Timer ID type (opaque pointer)
+pub type TimerT = *mut u8;
+
+/// Timer creation flags
+pub const TIMER_ABSTIME: i32 = 1;  // Absolute time
+
+/// Timer clock types (already defined above in Clock IDs section)
+
+/// Timer expiration notification
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct SigEvent {
+    /// Notification method
+    pub sigev_notify: i32,
+    /// Signal number
+    pub sigev_signo: i32,
+    /// Signal value
+    pub sigev_value: SigVal,
+    /// Notification function
+    pub sigev_notify_function: usize,
+    /// Notification attributes
+    pub sigev_notify_attributes: usize,
+}
+
+/// Notification methods
+pub const SIGEV_NONE: i32 = 0;     // No notification
+pub const SIGEV_SIGNAL: i32 = 1;   // Signal notification
+pub const SIGEV_THREAD: i32 = 2;   // Thread notification
+
+/// Timer specifications
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct Itimerspec {
+    /// Timer initial expiration
+    pub it_interval: Timespec,
+    /// Timer interval
+    pub it_value: Timespec,
+}
+
+impl Default for Itimerspec {
+    fn default() -> Self {
+        Self {
+            it_interval: Timespec::zero(),
+            it_value: Timespec::zero(),
+        }
+    }
+}
+
+// ============================================================================
 // Thread support
 // ============================================================================
 
 pub mod thread;
+pub mod sync;
+
+// ============================================================================
+// IPC and Synchronization modules
+// ============================================================================
+
+pub mod semaphore;
+pub mod mqueue;
+pub mod shm;
+pub mod timer;
+pub mod advanced_signal;
+pub mod realtime;
+pub mod advanced_thread;
+pub mod security;
+pub mod advanced_tests;
+pub mod integration_tests;
 
 pub use self::thread::*;
+pub use self::semaphore::*;
+pub use self::mqueue::*;
+pub use self::shm::*;
+pub use self::timer::*;
+pub use self::advanced_signal::*;
+pub use self::realtime::*;
+pub use self::advanced_thread::*;
+pub use self::security::*;
+
+// Import size types from libc
+pub use crate::libc::interface::size_t;
+pub use crate::libc::ssize_t;
+
+// ============================================================================
+// Network interface configuration
+// ============================================================================
+
+/// Network interface configuration structure
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct IfConfig {
+    pub name: [u8; 32],
+    pub is_up: bool,
+    pub ipv4_addr: [u8; 4],
+    pub ipv4_netmask: [u8; 4],
+    pub ipv4_gateway: [u8; 4],
+    pub mtu: Option<u32>,
+}
+
+/// Network interface information structure
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct IfInfo {
+    pub id: u32,
+    pub name: [u8; 32],
+    pub is_up: bool,
+    pub ipv4_addr: [u8; 4],
+    pub ipv4_netmask: [u8; 4],
+    pub ipv4_gateway: [u8; 4],
+    pub mtu: u32,
+}
+
+// ============================================================================
+// System resource limits and usage
+// ============================================================================
+
+/// Resource limit structure
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct rlimit {
+    /// Soft limit
+    pub rlim_cur: u64,
+    /// Hard limit
+    pub rlim_max: u64,
+}
+
+/// Resource usage structure
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct rusage {
+    /// User CPU time used
+    pub ru_utime: Timeval,
+    /// System CPU time used
+    pub ru_stime: Timeval,
+    /// Maximum resident set size
+    pub ru_maxrss: i64,
+    /// Integral shared memory size
+    pub ru_ixrss: i64,
+    /// Integral unshared data size
+    pub ru_idrss: i64,
+    /// Integral unshared stack size
+    pub ru_isrss: i64,
+    /// Page reclaims (soft page faults)
+    pub ru_minflt: i64,
+    /// Page faults (hard page faults)
+    pub ru_majflt: i64,
+    /// Swaps
+    pub ru_nswap: i64,
+    /// Block input operations
+    pub ru_inblock: i64,
+    /// Block output operations
+    pub ru_oublock: i64,
+    /// IPC messages sent
+    pub ru_msgsnd: i64,
+    /// IPC messages received
+    pub ru_msgrcv: i64,
+    /// Signals received
+    pub ru_nsignals: i64,
+    /// Voluntary context switches
+    pub ru_nvcsw: i64,
+    /// Involuntary context switches
+    pub ru_nivcsw: i64,
+}
+
+/// System information structure
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct sysinfo {
+    /// Seconds since boot
+    pub uptime: i64,
+    /// Load averages (1, 5, 15 minutes)
+    pub loads: [u64; 3],
+    /// Total RAM
+    pub totalram: u64,
+    /// Free RAM
+    pub freeram: u64,
+    /// Shared RAM
+    pub sharedram: u64,
+    /// Buffer RAM
+    pub bufferram: u64,
+    /// Total swap
+    pub totalswap: u64,
+    /// Free swap
+    pub freeswap: u64,
+    /// Number of processes
+    pub procs: u16,
+    /// Total high memory
+    pub totalhigh: u64,
+    /// Free high memory
+    pub freehigh: u64,
+    /// Memory unit size
+    pub mem_unit: u32,
+}
+
+/// Process times structure
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct tms {
+    /// User time
+    pub tms_utime: clock_t,
+    /// System time
+    pub tms_stime: clock_t,
+    /// User time of children
+    pub tms_cutime: clock_t,
+    /// System time of children
+    pub tms_cstime: clock_t,
+}
+
+/// Clock type (clock ticks)
+pub type clock_t = i64;
+
+/// User/group ID type
+pub type id_t = u32;
+
+/// Shared memory ID structure
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct shmid_ds {
+    /// Owner's user ID
+    pub shm_perm: IpcPerm,
+    /// Size of segment in bytes
+    pub shm_segsz: usize,
+    /// Last attach time
+    pub shm_atime: i64,
+    /// Last detach time
+    pub shm_dtime: i64,
+    /// Last change time
+    pub shm_ctime: i64,
+    /// PID of creator
+    pub shm_cpid: Pid,
+    /// PID of last shmat/shmdt
+    pub shm_lpid: Pid,
+    /// Number of current attaches
+    pub shm_nattch: u64,
+}
+
+/// UTS name structure (already defined as Utsname, add alias)
+pub type utsname = Utsname;
+
+/// Time specification structure
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct timespec {
+    /// Seconds since epoch
+    pub tv_sec: i64,
+    /// Nanoseconds
+    pub tv_nsec: i64,
+}
+
+/// Signal set type (C-compatible)
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct sigset_t {
+    /// Signal set bits (64 signals)
+    pub bits: [u64; 1],
+}
+
+/// Group ID type (C-compatible alias)
+pub type gid_t = Gid;
+pub type uid_t = Uid;
+pub type socklen_t = u32;
+
+// ============================================================================
+// POSIX Thread Types
+// ============================================================================
+
+/// POSIX thread ID type
+pub type pthread_t = usize;
+
+/// POSIX mutex type
+#[repr(C)]
+pub struct pthread_mutex_t {
+    _data: [u8; 40], // Opaque structure
+}
+
+/// POSIX condition variable type
+#[repr(C)]
+pub struct pthread_cond_t {
+    _data: [u8; 48], // Opaque structure
+}
+
+/// POSIX read-write lock type
+#[repr(C)]
+pub struct pthread_rwlock_t {
+    _data: [u8; 56], // Opaque structure
+}
+
+/// POSIX spinlock type
+#[repr(C)]
+pub struct pthread_spinlock_t {
+    _data: [u8; 4], // Opaque structure
+}
+
+/// POSIX mutex attribute type
+#[repr(C)]
+pub struct pthread_mutexattr_t {
+    _data: [u8; 4], // Opaque structure
+}
+
+/// POSIX read-write lock attribute type
+#[repr(C)]
+pub struct pthread_rwlockattr_t {
+    _data: [u8; 8], // Opaque structure
+}
+
+/// POSIX thread-specific data key type
+pub type pthread_key_t = u32;
+
+/// Clock ID type
+pub type clockid_t = i32;
+
+/// Directory entry type (C-compatible)
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct dirent {
+    pub d_ino: u64,
+    pub d_off: i64,
+    pub d_reclen: u16,
+    pub d_type: u8,
+    pub d_name: [u8; 256],
+}
+
+/// Stat structure (C-compatible)
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct stat {
+    pub st_dev: u64,
+    pub st_ino: u64,
+    pub st_mode: u32,
+    pub st_nlink: u64,
+    pub st_uid: u32,
+    pub st_gid: u32,
+    pub st_rdev: u64,
+    pub st_size: i64,
+    pub st_blksize: i64,
+    pub st_blocks: i64,
+    pub st_atime: i64,
+    pub st_atime_nsec: i64,
+    pub st_mtime: i64,
+    pub st_mtime_nsec: i64,
+    pub st_ctime: i64,
+    pub st_ctime_nsec: i64,
+}
+
+// ============================================================================
+// POSIX Semaphore and Message Queue Types
+// ============================================================================
+
+/// POSIX semaphore type
+pub type sem_t = SemT;
+
+/// POSIX message queue descriptor type
+pub type mqd_t = i32;
+
+// ============================================================================
+// POSIX Socket Types
+// ============================================================================
+
+/// Socket address type (C-compatible alias)
+pub type sockaddr = Sockaddr;
+
+// ============================================================================
+// POSIX File System Types
+// ============================================================================
+
+/// File offset type (C-compatible alias)
+pub type off_t = Off;
+
+/// File mode type (C-compatible alias)
+pub type mode_t = Mode;
+
+/// Directory type
+#[repr(C)]
+pub struct DIR {
+    _data: [u8; 1], // Opaque structure
+}
+
+// ============================================================================
+// POSIX Time Types
+// ============================================================================
+
+/// Time value structure (C-compatible alias)
+pub type timeval = Timeval;
+
+/// Time structure (C-compatible)
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct tm {
+    pub tm_sec: i32,
+    pub tm_min: i32,
+    pub tm_hour: i32,
+    pub tm_mday: i32,
+    pub tm_mon: i32,
+    pub tm_year: i32,
+    pub tm_wday: i32,
+    pub tm_yday: i32,
+    pub tm_isdst: i32,
+}
+
+// ============================================================================
+// POSIX File Descriptor Set Type
+// ============================================================================
+
+/// File descriptor set type (C-compatible alias)
+pub type fd_set = FdSet;
+
+// ============================================================================
+// AIO Types (aio.h)
+// ============================================================================
+
+/// AIO operation codes
+pub const LIO_READ: i32 = 0;    // Read operation
+pub const LIO_WRITE: i32 = 1;   // Write operation
+pub const LIO_NOP: i32 = 2;     // No operation
+pub const LIO_WAIT: i32 = 1;    // Wait for all operations to complete
+pub const LIO_NOWAIT: i32 = 0; // Don't wait for operations to complete
+
+/// AIO return values
+pub const AIO_CANCELED: i32 = -1;  // Operation was canceled
+pub const AIO_NOTCANCELED: i32 = 0; // Operation could not be canceled
+pub const AIO_ALLDONE: i32 = 1;    // All operations already completed
+
+/// AIO control block structure
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct aiocb {
+    /// File descriptor
+    pub aio_fildes: i32,
+    /// File offset
+    pub aio_offset: off_t,
+    /// Buffer address
+    pub aio_buf: *mut u8,
+    /// Number of bytes to transfer
+    pub aio_nbytes: size_t,
+    /// Return value (filled by kernel)
+    pub __return_value: ssize_t,
+    /// Error code (filled by kernel)
+    pub __error_code: i32,
+    /// Request priority
+    pub aio_reqprio: aio_reqprio_t,
+    /// Signal notification
+    pub aio_sigevent: aio_sigevent_t,
+    /// List I/O operation codes
+    pub aio_lio_opcode: i32,
+    /// File synchronization mode
+    pub aio_fsync_mode: i32,
+    /// List of aiocb pointers for lio_listio
+    pub aio_listio: *mut *mut aiocb,
+    /// Number of entries in list
+    pub aio_nent: i32,
+}
+
+impl Default for aiocb {
+    fn default() -> Self {
+        Self {
+            aio_fildes: -1,
+            aio_offset: 0,
+            aio_buf: core::ptr::null_mut(),
+            aio_nbytes: 0,
+            __return_value: 0,
+            __error_code: 0,
+            aio_reqprio: 0,
+            aio_sigevent: aio_sigevent_t::default(),
+            aio_lio_opcode: LIO_NOP,
+            aio_fsync_mode: 0,
+            aio_listio: core::ptr::null_mut(),
+            aio_nent: 0,
+        }
+    }
+}
+
+/// AIO request priority type
+pub type aio_reqprio_t = i32;
+
+/// AIO signal event structure
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct aio_sigevent_t {
+    /// Notification method
+    pub sigev_notify: i32,
+    /// Signal number
+    pub sigev_signo: i32,
+    /// Signal value
+    pub sigev_value: SigVal,
+    /// Notification function
+    pub sigev_notify_function: usize,
+    /// Notification attributes
+    pub sigev_notify_attributes: usize,
+}
+
+impl Default for aio_sigevent_t {
+    fn default() -> Self {
+        Self {
+            sigev_notify: 0, // SIGEV_NONE
+            sigev_signo: 0,
+            sigev_value: SigVal::default(),
+            sigev_notify_function: 0,
+            sigev_notify_attributes: 0,
+        }
+    }
+}
+
+/// File offset type for AIO
+pub type aio_offset_t = off_t;

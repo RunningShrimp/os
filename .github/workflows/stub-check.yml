@@ -1,0 +1,73 @@
+name: Stub Check
+
+on:
+  pull_request:
+    paths:
+      - 'kernel/src/**/*.rs'
+      - 'scripts/scan_stubs.sh'
+  push:
+    branches:
+      - main
+      - master
+  schedule:
+    - cron: '0 0 * * 0'  # 每周日运行
+
+jobs:
+  scan-stubs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Scan stubs
+        run: |
+          chmod +x scripts/scan_stubs.sh
+          ./scripts/scan_stubs.sh
+
+      - name: Check stub count
+        run: |
+          if [ -f docs/STUB_REPORT.md ]; then
+            COUNT=$(grep "总计" docs/STUB_REPORT.md | grep -oE '[0-9]+' | head -1)
+            echo "当前存根数量: $COUNT"
+            
+            # 如果存根数量超过350个，发出警告
+            if [ "$COUNT" -gt 350 ]; then
+              echo "::warning::存根数量超过350个，请考虑优先处理P0级别的存根"
+            fi
+            
+            # 如果存根数量超过400个，标记为失败
+            if [ "$COUNT" -gt 400 ]; then
+              echo "::error::存根数量超过400个，请优先处理存根实现"
+              exit 1
+            fi
+          else
+            echo "::error::存根报告文件未生成"
+            exit 1
+          fi
+
+      - name: Upload stub report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: stub-report
+          path: docs/STUB_REPORT.md
+          retention-days: 30
+
+      - name: Comment PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('docs/STUB_REPORT.md')) {
+              const report = fs.readFileSync('docs/STUB_REPORT.md', 'utf8');
+              const count = report.match(/总计.*?(\d+)/)?.[1] || '0';
+              
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## 存根扫描结果\n\n当前存根数量: **${count}** 处\n\n详细报告请查看 [STUB_REPORT.md](docs/STUB_REPORT.md)`
+              });
+            }
+

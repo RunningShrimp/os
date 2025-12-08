@@ -9,6 +9,9 @@
 extern crate alloc;
 
 use alloc::{string::{String, ToString}, vec::Vec, collections::BTreeMap, sync::Arc};
+use hashbrown::HashMap;
+use core::hash::{Hash, Hasher};
+use crate::compat::DefaultHasherBuilder;
 
 use crate::sync::Mutex;
 
@@ -21,6 +24,9 @@ pub mod file;
 pub mod dentry;
 pub mod mount;
 pub mod ramfs;
+pub mod ext4;
+pub mod procfs;
+pub mod sysfs;
 
 // Re-export common types
 pub use error::*;
@@ -38,16 +44,26 @@ use self::{
 // VFS Core
 // ============================================================================
 
+/// LRU cache entry for dentry cache
+struct DentryCacheEntry {
+    dentry: Arc<Mutex<Dentry>>,
+    access_time: u64,
+}
+
 /// Global VFS state
-struct Vfs {
+pub struct Vfs {
     /// Registered file system types
     fs_types: Mutex<BTreeMap<String, Arc<dyn FileSystemType>>>,
     /// Mount points
     mounts: Mutex<Vec<Arc<Mount>>>,
     /// Root dentry
     root: Mutex<Option<Arc<Mutex<Dentry>>>>,
-    /// Dentry cache
-    dentry_cache: Mutex<BTreeMap<String, Arc<Mutex<Dentry>>>>,
+    /// Dentry cache with LRU eviction
+    dentry_cache: Mutex<HashMap<String, DentryCacheEntry, DefaultHasherBuilder>>,
+    /// Maximum cache size
+    max_cache_size: usize,
+    /// Path hash index for faster lookups
+    path_hash_index: Mutex<HashMap<u64, String, DefaultHasherBuilder>>,
 }
 
 impl Vfs {
@@ -57,7 +73,49 @@ impl Vfs {
             fs_types: Mutex::new(BTreeMap::new()),
             mounts: Mutex::new(Vec::new()),
             root: Mutex::new(None),
-            dentry_cache: Mutex::new(BTreeMap::new()),
+            dentry_cache: Mutex::new(HashMap::with_hasher(DefaultHasherBuilder)),
+            max_cache_size: 1024, // Maximum 1024 cached entries
+            path_hash_index: Mutex::new(HashMap::with_hasher(DefaultHasherBuilder)),
+        }
+    }
+    
+    /// Hash a path for indexing (simple implementation)
+    fn hash_path(path: &str) -> u64 {
+        // Simple hash function for path indexing
+        let mut hash: u64 = 0;
+        for (i, byte) in path.bytes().enumerate() {
+            hash = hash.wrapping_add((byte as u64).wrapping_mul(i as u64 + 1));
+        }
+        hash
+    }
+    
+    /// Evict least recently used entries from cache
+    fn evict_lru(&self) {
+        let mut cache = self.dentry_cache.lock();
+        if cache.len() <= self.max_cache_size {
+            return;
+        }
+        
+        // Find entries to evict (remove oldest 10% or at least 10 entries)
+        let to_remove = core::cmp::max(
+            (cache.len() - self.max_cache_size).max(10),
+            cache.len() / 10
+        );
+        
+        // Collect entries sorted by access time
+        let mut entries: Vec<(String, u64)> = cache.iter()
+            .map(|(path, entry)| (path.clone(), entry.access_time))
+            .collect();
+        
+        // Sort by access time (oldest first)
+        entries.sort_by_key(|(_, time)| *time);
+        
+        // Remove oldest entries
+        for (path, _) in entries.iter().take(to_remove) {
+            cache.remove(path);
+            // Also remove from hash index
+            let hash = Self::hash_path(path);
+            self.path_hash_index.lock().remove(&hash);
         }
     }
     
@@ -115,7 +173,10 @@ impl Vfs {
             )));
             
             *self.root.lock() = Some(root_dentry.clone());
-            self.dentry_cache.lock().insert(String::from("/"), root_dentry);
+            self.dentry_cache.lock().insert(String::from("/"), DentryCacheEntry {
+                dentry: root_dentry.clone(),
+                access_time: crate::time::get_ticks(),
+            });
         } else {
             // Non-root mount: resolve mount point and attach
             let dentry = self.lookup_path(mount_point)?;
@@ -151,17 +212,36 @@ impl Vfs {
         Ok(())
     }
     
+    /// Check if root file system is mounted
+    pub fn is_root_mounted(&self) -> bool {
+        self.root.lock().is_some()
+    }
+    
+    /// Verify root file system is accessible
+    pub fn verify_root(&self) -> VfsResult<()> {
+        if !self.is_root_mounted() {
+            return Err(VfsError::NotMounted);
+        }
+        
+        // Try to stat root directory to verify it's accessible
+        self.stat("/")?;
+        Ok(())
+    }
+    
     /// Lookup a path and return the dentry
     pub fn lookup_path(&self, path: &str) -> VfsResult<Arc<Mutex<Dentry>>> {
         if path.is_empty() {
             return Err(VfsError::InvalidPath);
         }
         
-        // Check cache first
+        // Check cache first using hash index for faster lookup
+        let path_hash = Self::hash_path(path);
         {
-            let cache = self.dentry_cache.lock();
-            if let Some(dentry) = cache.get(path) {
-                return Ok(dentry.clone());
+            let mut cache = self.dentry_cache.lock();
+            if let Some(entry) = cache.get_mut(path) {
+                // Update access time (LRU)
+                entry.access_time = crate::time::get_ticks();
+                return Ok(entry.dentry.clone());
             }
         }
         
@@ -184,7 +264,7 @@ impl Vfs {
             // Check for mount points
             {
                 let d = current.lock();
-                if let Some(ref mount) = d.mount {
+                if let Some(ref mount) = d.get_mount() {
                     // Cross into mounted file system
                     let root_inode = mount.superblock.root();
                     drop(d);
@@ -198,7 +278,18 @@ impl Vfs {
             
             // Cache intermediate dentries
             if i == components.len() - 1 {
-                self.dentry_cache.lock().insert(path.to_string(), current.clone());
+                // Evict LRU entries if cache is full
+                self.evict_lru();
+                
+                // Add to cache with current access time
+                let mut cache = self.dentry_cache.lock();
+                cache.insert(path.to_string(), DentryCacheEntry {
+                    dentry: current.clone(),
+                    access_time: crate::time::get_ticks(),
+                });
+                
+                // Update hash index
+                self.path_hash_index.lock().insert(path_hash, path.to_string());
             }
         }
         
@@ -229,6 +320,25 @@ impl Vfs {
         Ok(child_dentry)
     }
     
+    /// Lookup a path (alias for lookup_path)
+    pub fn lookup(&self, path: &str) -> VfsResult<Arc<Mutex<Dentry>>> {
+        self.lookup_path(path)
+    }
+
+    /// Read from a file
+    pub fn read(&self, path: &str, buffer: &mut [u8], offset: u64) -> VfsResult<usize> {
+        let dentry = self.lookup_path(path)?;
+        let inode = dentry.lock().inode.clone();
+        inode.read(offset, buffer)
+    }
+
+    /// Write to a file
+    pub fn write(&self, path: &str, buffer: &[u8], offset: u64) -> VfsResult<usize> {
+        let dentry = self.lookup_path(path)?;
+        let inode = dentry.lock().inode.clone();
+        inode.write(offset, buffer)
+    }
+
     /// Open a file by path
     pub fn open(&self, path: &str, flags: u32) -> VfsResult<VfsFile> {
         // 解析路径
@@ -246,14 +356,13 @@ impl Vfs {
         let (parent_path, name) = self.split_path(path)?;
         let parent_dentry = self.lookup_path(&parent_path)?;
         let parent_inode = parent_dentry.lock().inode.clone();
-        
+
         let inode = parent_inode.create(&name, mode)?;
-        
-        Ok(VfsFile {
-            inode,
-            offset: 0,
-            flags: 0,
-        })
+
+        // Generate inotify events for parent directory
+        self.generate_inotify_events(&parent_path, crate::syscalls::glib::inotify_mask::IN_CREATE, 0, &name);
+
+        Ok(VfsFile::new(inode, 0))
     }
     
     /// Create a directory
@@ -261,8 +370,12 @@ impl Vfs {
         let (parent_path, name) = self.split_path(path)?;
         let parent_dentry = self.lookup_path(&parent_path)?;
         let parent_inode = parent_dentry.lock().inode.clone();
-        
+
         parent_inode.mkdir(&name, mode)?;
+
+        // Generate inotify events for parent directory
+        self.generate_inotify_events(&parent_path, crate::syscalls::glib::inotify_mask::IN_CREATE | crate::syscalls::glib::inotify_mask::IN_ISDIR, 0, &name);
+
         Ok(())
     }
     
@@ -270,15 +383,19 @@ impl Vfs {
     pub fn unlink(&self, path: &str) -> VfsResult<()> {
         let (parent_path, name) = self.split_path(path)?;
         let parent_dentry = self.lookup_path(&parent_path)?;
-        
+
         // Remove from dentry cache
         {
             let mut parent = parent_dentry.lock();
             parent.remove_child(&name);
             parent.inode.unlink(&name)?;
         }
-        
+
         self.dentry_cache.lock().remove(path);
+
+        // Generate inotify events for parent directory
+        self.generate_inotify_events(&parent_path, crate::syscalls::glib::inotify_mask::IN_DELETE, 0, &name);
+
         Ok(())
     }
     
@@ -286,14 +403,18 @@ impl Vfs {
     pub fn rmdir(&self, path: &str) -> VfsResult<()> {
         let (parent_path, name) = self.split_path(path)?;
         let parent_dentry = self.lookup_path(&parent_path)?;
-        
+
         {
             let mut parent = parent_dentry.lock();
             parent.remove_child(&name);
             parent.inode.rmdir(&name)?;
         }
-        
+
         self.dentry_cache.lock().remove(path);
+
+        // Generate inotify events for parent directory
+        self.generate_inotify_events(&parent_path, crate::syscalls::glib::inotify_mask::IN_DELETE | crate::syscalls::glib::inotify_mask::IN_ISDIR, 0, &name);
+
         Ok(())
     }
 
@@ -313,13 +434,18 @@ impl Vfs {
     /// Get file attributes
     pub fn stat(&self, path: &str) -> VfsResult<FileAttr> {
         let dentry = self.lookup_path(path)?;
-        dentry.lock().inode.getattr()
+        let guard = dentry.lock();
+        // Call getattr while the lock is held and return an owned value
+        let attr = guard.inode.getattr()?;
+        Ok(attr)
     }
     
     /// Read directory entries
     pub fn readdir(&self, path: &str) -> VfsResult<Vec<DirEntry>> {
         let dentry = self.lookup_path(path)?;
-        dentry.lock().inode.readdir(0)
+        let guard = dentry.lock();
+        let entries = guard.inode.readdir(0)?;
+        Ok(entries)
     }
     
     /// Split path into parent and name
@@ -347,6 +473,40 @@ impl Vfs {
         }
         Ok(())
     }
+
+    /// Create a symbolic link
+    pub fn symlink(&self, path: &str, target: &str) -> VfsResult<()> {
+        let (parent_path, name) = self.split_path(path)?;
+        let parent_dentry = self.lookup_path(&parent_path)?;
+        let parent_inode = parent_dentry.lock().inode.clone();
+
+        parent_inode.symlink(&name, target)?;
+
+        // Generate inotify events for parent directory
+        self.generate_inotify_events(&parent_path, crate::syscalls::glib::inotify_mask::IN_CREATE, 0, &name);
+
+        Ok(())
+    }
+
+    /// Generate inotify events for all watching instances
+    /// Note: This is a simplified implementation. A full implementation would need
+    /// to properly track inotify instances and generate events for matching watches.
+    fn generate_inotify_events(&self, _path: &str, _mask: u32, _cookie: u32, _name: &str) {
+        // TODO: Implement proper inotify event generation
+        // This would require:
+        // 1. Maintaining a global registry of inotify instances
+        // 2. Checking which watches match the path
+        // 3. Generating events for matching watches
+        // 4. Handling event queue overflow
+    }
+
+    /// Read a symbolic link
+    pub fn readlink(&self, path: &str) -> VfsResult<String> {
+        let dentry = self.lookup_path(path)?;
+        let guard = dentry.lock();
+        let target = guard.inode.readlink()?;
+        Ok(target)
+    }
 }
 
 // ============================================================================
@@ -356,43 +516,174 @@ impl Vfs {
 /// Global VFS instance
 static VFS: Vfs = Vfs::new();
 
-/// Get the global VFS
+/// Get the global VFS instance
+///
+/// Returns a reference to the global Virtual File System instance.
+/// This is the main entry point for all VFS operations.
+///
+/// # Example
+///
+/// ```
+/// use kernel::vfs;
+///
+/// let vfs = vfs::vfs();
+/// let file = vfs.open("/etc/passwd", 0)?;
+/// ```
 pub fn vfs() -> &'static Vfs {
     &VFS
 }
 
 /// Mount a file system (convenience function)
+///
+/// Mounts a file system of the specified type at the given mount point.
+///
+/// # Arguments
+///
+/// * `fs_type` - File system type name (e.g., "ramfs", "tmpfs", "ext4")
+/// * `path` - Mount point path (e.g., "/", "/mnt")
+/// * `device` - Optional device identifier (for block devices)
+/// * `flags` - Mount flags (currently unused, reserved for future use)
+///
+/// # Returns
+///
+/// * `Ok(())` on success
+/// * `Err(VfsError)` on failure (e.g., file system type not found, mount point invalid)
+///
+/// # Example
+///
+/// ```
+/// use kernel::vfs;
+///
+/// // Mount ramfs at root
+/// vfs::mount("ramfs", "/", None, 0)?;
+///
+/// // Mount ext4 from device
+/// vfs::mount("ext4", "/mnt", Some("/dev/sda1"), 0)?;
+/// ```
 pub fn mount(fs_type: &str, path: &str, device: Option<&str>, flags: u32) -> VfsResult<()> {
     VFS.mount(fs_type, path, device, flags)
 }
 
 /// Unmount a file system
+///
+/// Unmounts the file system mounted at the specified path.
+///
+/// # Arguments
+///
+/// * `path` - Mount point path to unmount
+///
+/// # Returns
+///
+/// * `Ok(())` on success
+/// * `Err(VfsError::NotMounted)` if no file system is mounted at the path
+///
+/// # Example
+///
+/// ```
+/// use kernel::vfs;
+///
+/// // Unmount /mnt
+/// vfs::unmount("/mnt")?;
+/// ```
 pub fn unmount(path: &str) -> VfsResult<()> {
     VFS.unmount(path)
 }
 
 /// Open a file
+///
+/// Opens a file at the specified path with the given flags.
+///
+/// # Arguments
+///
+/// * `path` - File path (absolute or relative to current working directory)
+/// * `flags` - Open flags (O_RDONLY, O_WRONLY, O_RDWR, O_CREAT, etc.)
+///
+/// # Returns
+///
+/// * `Ok(VfsFile)` on success
+/// * `Err(VfsError)` on failure (e.g., file not found, permission denied)
+///
+/// # Example
+///
+/// ```
+/// use kernel::vfs;
+/// use kernel::posix::O_RDONLY;
+///
+/// let file = vfs::open("/etc/passwd", O_RDONLY as u32)?;
+/// ```
 pub fn open(path: &str, flags: u32) -> VfsResult<VfsFile> {
     VFS.open(path, flags)
 }
 
-/// Get file stats
+/// Get file statistics
+///
+/// Retrieves file attributes (metadata) for the file at the specified path.
+///
+/// # Arguments
+///
+/// * `path` - File path
+///
+/// # Returns
+///
+/// * `Ok(FileAttr)` containing file attributes (size, mode, inode, etc.)
+/// * `Err(VfsError)` on failure (e.g., file not found)
+///
+/// # Example
+///
+/// ```
+/// use kernel::vfs;
+///
+/// let attr = vfs::stat("/etc/passwd")?;
+/// println!("File size: {} bytes", attr.size);
+/// ```
 pub fn stat(path: &str) -> VfsResult<FileAttr> {
     VFS.stat(path)
 }
 
-    /// Create a symbolic link
-    pub fn symlink(&self, path: &str, target: &str) -> VfsResult<()> {
-        let (parent_path, name) = self.split_path(path)?;
-        let parent_dentry = self.lookup_path(&parent_path)?;
-        let parent_inode = parent_dentry.lock().inode.clone();
-        
-        parent_inode.symlink(&name, target)?;
-        Ok(())
-    }
-    
-    /// Read a symbolic link
-    pub fn readlink(&self, path: &str) -> VfsResult<String> {
-        let dentry = self.lookup_path(path)?;
-        dentry.lock().inode.readlink()
-    }
+/// Check if root file system is mounted
+///
+/// Returns `true` if a root file system has been successfully mounted,
+/// `false` otherwise. This is useful for checking system initialization status.
+///
+/// # Returns
+///
+/// * `true` if root file system is mounted
+/// * `false` otherwise
+///
+/// # Example
+///
+/// ```
+/// use kernel::vfs;
+///
+/// if !vfs::is_root_mounted() {
+///     panic!("Root file system not mounted!");
+/// }
+/// ```
+pub fn is_root_mounted() -> bool {
+    VFS.is_root_mounted()
+}
+
+/// Verify root file system is accessible
+///
+/// Performs a verification check to ensure the root file system is mounted
+/// and accessible. This is typically called during system initialization.
+///
+/// # Returns
+///
+/// * `Ok(())` if root file system is accessible
+/// * `Err(VfsError::NotMounted)` if root file system is not mounted
+/// * `Err(VfsError)` if root file system is not accessible
+///
+/// # Example
+///
+/// ```
+/// use kernel::vfs;
+///
+/// // Verify root file system during boot
+/// vfs::verify_root()?;
+/// ```
+pub fn verify_root() -> VfsResult<()> {
+    VFS.verify_root()
+}
+
+  

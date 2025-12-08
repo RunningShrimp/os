@@ -1,5 +1,6 @@
 //! File system type and superblock definitions
 
+extern crate alloc;
 use alloc::sync::Arc;
 
 use super::{error::*, types::*};

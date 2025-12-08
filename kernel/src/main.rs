@@ -1,11 +1,15 @@
-//! xv6-rust kernel main entry point
-//! A minimal Unix-like kernel supporting RISC-V, AArch64, and x86_64
-
 #![no_std]
 #![no_main]
+#![feature(c_variadic)]
 #![allow(unsafe_op_in_unsafe_fn)]
+
+// xv6-rust kernel main entry point
+
+extern crate alloc;
+// A minimal Unix-like kernel supporting RISC-V, AArch64, and x86_64
+
 mod posix;
-mod errno;
+// errno is in reliability module
 
 use core::sync::atomic::{AtomicBool, Ordering};
 use core::arch::global_asm;
@@ -21,12 +25,9 @@ global_asm!(include_str!("../start-aarch64.S"));
 global_asm!(include_str!("../start-x86_64.S"));
 
 // Kernel modules
-mod uart;
+mod boot;
 mod arch;
 mod mm;
-mod console;
-mod log;
-mod alloc;
 mod sync;
 mod process;
 mod syscalls;
@@ -34,22 +35,27 @@ mod drivers;
 mod fs;
 mod time;
 mod trap;
-mod vm;
-mod file;
-mod pipe;
 mod cpu;
-mod elf;
-mod exec;
-mod slab;
 mod vfs;
-mod signal;
-mod buddy;
-mod platform;
-mod gic;
-mod gicv3;
-mod syscon;
 mod ipc;
 mod services;
+mod net;
+mod microkernel;
+mod cloud_native;
+mod compat;
+mod security;
+mod security_audit;
+mod formal_verification;
+mod error_handling;
+mod debug;
+mod reliability;
+mod libc;
+mod types;
+mod collections;
+mod graphics;
+mod web;
+mod benchmark;
+mod monitoring;
 
 #[cfg(feature = "kernel_tests")]
 mod tests;
@@ -65,92 +71,252 @@ const ARCH: &str = "x86_64";
 // Boot synchronization
 static STARTED: AtomicBool = AtomicBool::new(false);
 
-/// Kernel main entry point
-/// Called from architecture-specific startup code
+/// Kernel main entry point for direct boot (legacy)
+/// Called from architecture-specific startup code when no bootloader is used
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_main() -> ! {
+    // Initialize boot information for direct QEMU boot
+    boot::init_direct_boot();
+
+    // Call the main kernel initialization
+    rust_main_with_boot_info(core::ptr::null())
+}
+
+/// Kernel main entry point with boot parameters
+/// Called from bootloader with boot information
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParameters) -> ! {
+    // Initialize boot information if provided
+    if !boot_params.is_null() {
+        boot::init_from_boot_parameters(boot_params);
+    }
+
     // Early hardware initialization (UART, etc.)
     arch::early_init();
-    
-    println!();
-    println!("xv6-rust kernel booting on {}...", ARCH);
-    println!();
+
+    crate::println!();
+    crate::println!("NOS kernel v0.1.0 booting on {}...", ARCH);
+    crate::println!();
+
+    // Print boot information
+    boot::print_boot_info();
 
     // Initialize boot CPU
     cpu::init_boot_cpu();
-    println!("[boot] boot CPU initialized");
+    crate::println!("[boot] boot CPU initialized");
 
     // Initialize trap handling early
     trap::init();
-    println!("[boot] trap handlers initialized");
+    crate::println!("[boot] trap handlers initialized");
 
-    // Initialize physical memory allocator
-    mm::init();
-    println!("[boot] physical memory initialized");
+    // Initialize memory management from boot info or fall back to legacy
+    boot::init_memory_from_boot_info();
+    if !boot::is_bootloader_boot() {
+        mm::init();
+    }
+    crate::println!("[boot] physical memory initialized");
 
     // Initialize kernel heap allocator
-    // (alloc::init is called automatically via #[global_allocator])
-    println!("[boot] kernel heap ready");
+    // (allocator::init is called in mm::init())
+    crate::println!("[boot] kernel heap ready");
+
+    // Initialize framebuffer if available from bootloader
+    boot::init_framebuffer_from_boot_info();
+
+    // Initialize ACPI if available from bootloader
+    boot::init_acpi_from_boot_info();
+
+    // Initialize device tree if available from bootloader
+    boot::init_device_tree_from_boot_info();
 
     // Initialize virtual memory / page tables
-    vm::init();
-    println!("[boot] virtual memory initialized");
+    mm::vm::init();
+    crate::println!("[boot] virtual memory initialized");
 
     // Initialize timer
     time::init();
-    println!("[boot] timer initialized");
+    crate::println!("[boot] timer initialized");
 
     // Initialize drivers
     drivers::init();
-    println!("[boot] drivers initialized");
+    crate::println!("[boot] drivers initialized");
 
     // Initialize and mount VFS root (ramfs)
     vfs::ramfs::init();
-    match vfs::mount("ramfs", "/", None, 0) {
+    vfs::tmpfs::init();
+    vfs::ext4::init();
+    vfs::procfs::fs::init();
+    vfs::sysfs::fs::init();
+    
+    // Try to mount ramfs first, fall back to tmpfs if it fails
+    let root_mounted = match vfs::mount("ramfs", "/", None, 0) {
         Ok(()) => {
-            println!("[boot] VFS root mounted (ramfs)");
-            if let Ok(attr) = vfs::vfs().stat("/") {
-                println!("[vfs] root ino={} mode={:#o} size={}B", attr.ino, attr.mode.permissions(), attr.size);
-            }
+            crate::println!("[boot] VFS root mounted (ramfs)");
+            true
         }
         Err(e) => {
-            println!("[boot] VFS mount failed: {:?}", e);
+            crate::println!("[boot] ramfs mount failed: {:?}, trying tmpfs...", e);
+            match vfs::mount("tmpfs", "/", None, 0) {
+                Ok(()) => {
+                    crate::println!("[boot] VFS root mounted (tmpfs)");
+                    true
+                }
+                Err(e2) => {
+                    crate::println!("[boot] tmpfs mount also failed: {:?}", e2);
+                    false
+                }
+            }
         }
+    };
+    
+    // Verify root file system is accessible
+    if root_mounted {
+        match vfs::verify_root() {
+            Ok(()) => {
+                if let Ok(attr) = vfs::vfs().stat("/") {
+                    crate::println!("[vfs] root verified: ino={} mode={:#o} size={}B", 
+                        attr.ino, attr.mode.permissions(), attr.size);
+                }
+            }
+            Err(e) => {
+                crate::println!("[boot] WARNING: Root file system verification failed: {:?}", e);
+                crate::println!("[boot] System may not function correctly without a root file system");
+            }
+        }
+    } else {
+        crate::println!("[boot] ERROR: Failed to mount root file system!");
+        crate::println!("[boot] System cannot continue without a root file system");
+        // In a production system, this should be fatal, but for development we continue
     }
 
     // Initialize file system
     fs::init();
-    println!("[boot] filesystem initialized");
+    crate::println!("[boot] filesystem initialized");
+
+    // Initialize C standard library (newlib)
+    libc::init().expect("C standard library initialization failed");
+    crate::println!("[boot] C standard library initialized");
+
+    // Initialize AIO subsystem
+    syscalls::aio::init().expect("AIO subsystem initialization failed");
+    crate::println!("[boot] AIO subsystem initialized");
+    
+    // Initialize advanced memory mapping subsystem
+    syscalls::memory::advanced_mmap::init().expect("Advanced memory mapping subsystem initialization failed");
+    crate::println!("[boot] Advanced memory mapping subsystem initialized");
 
     // Initialize process subsystem
     process::init();
-    println!("[boot] process subsystem initialized");
+    crate::println!("[boot] process subsystem initialized");
 
     // Initialize IPC subsystem
     ipc::init();
-    println!("[boot] IPC subsystem initialized");
+    crate::println!("[boot] IPC subsystem initialized");
+
+    // Initialize network stack
+    net::init();
+    crate::println!("[boot] network stack initialized");
+
+    // Initialize threading subsystem
+    process::thread::init();
+    crate::println!("[boot] threading subsystem initialized");
+
+    // Initialize microkernel core (required for hybrid architecture)
+    microkernel::init_microkernel().expect("Microkernel initialization failed");
+    crate::println!("[boot] microkernel core initialized");
 
     // Initialize service layer
-    services::init();
-    services::memory::init();
-    services::process::init();
-    services::fs::init();
-    services::syscall::init();
-    services::network::init();
-    services::driver::init();
-    println!("[boot] service layer initialized");
+    services::init().expect("Service layer initialization failed");
+    crate::println!("[boot] service layer initialized");
+
+    // Initialize cloud native features
+    cloud_native::init().expect("Cloud native features initialization failed");
+    crate::println!("[boot] cloud native features initialized");
+
+    // Initialize security subsystem
+    security::init_security_subsystem().expect("Security subsystem initialization failed");
+    crate::println!("[boot] security subsystem initialized");
+
+    // Initialize security audit
+    security_audit::init_security_audit().expect("Security audit initialization failed");
+    crate::println!("[boot] security audit initialized");
+
+    // Initialize formal verification system
+    formal_verification::init_formal_verification().expect("Formal verification initialization failed");
+    crate::println!("[boot] formal verification system initialized");
+
+    // Initialize error handling system
+    error_handling::init_error_handling().expect("Error handling initialization failed");
+    crate::println!("[boot] error handling system initialized");
+
+    // Initialize fault diagnosis system
+    debug::fault_diagnosis::create_fault_diagnosis_engine().lock().init().expect("Fault diagnosis initialization failed");
+    crate::println!("[boot] fault diagnosis system initialized");
+
+    // Initialize graceful degradation system
+    reliability::graceful_degradation::create_graceful_degradation_manager().lock().init().expect("Graceful degradation initialization failed");
+    crate::println!("[boot] graceful degradation system initialized");
+
+    // Initialize debugging system
+    debug::init().expect("Debugging system initialization failed");
+    crate::println!("[boot] debugging system initialized");
+
+    // Initialize monitoring system
+    debug::monitoring::init().expect("Monitoring system initialization failed");
+    crate::println!("[boot] monitoring system initialized");
+
+    // Initialize profiling system
+    debug::profiling::init().expect("Profiling system initialization failed");
+    crate::println!("[boot] profiling system initialized");
+
+    // Initialize tracing system
+    debug::tracing::init().expect("Tracing system initialization failed");
+    crate::println!("[boot] tracing system initialized");
+
+    // Initialize metrics system
+    debug::metrics::init().expect("Metrics system initialization failed");
+    crate::println!("[boot] metrics system initialized");
+
+    // Initialize debug symbols system
+    debug::symbols::init().expect("Debug symbols system initialization failed");
+    crate::println!("[boot] debug symbols system initialized");
+
+    // Initialize cross-platform compatibility layer
+    compat::init().expect("Cross-platform compatibility layer initialization failed");
+    crate::println!("[boot] cross-platform compatibility layer initialized");
+
+    // Initialize device manager system
+    drivers::device_manager::init().expect("Device manager system initialization failed");
+    crate::println!("[boot] device manager system initialized");
+
+    // Initialize graphics subsystem
+    graphics::init();
+    crate::println!("[boot] graphics subsystem initialized");
+
+    // Initialize web engine subsystem
+    web::init();
+    crate::println!("[boot] web engine subsystem initialized");
+
+    // Initialize monitoring system
+    monitoring::metrics::init_metrics_collector().expect("Metrics collector initialization failed");
+    monitoring::health::init_health_checker().expect("Health checker initialization failed");
+    monitoring::alerting::init_alert_manager().expect("Alert manager initialization failed");
+    crate::println!("[boot] monitoring system initialized");
+
+    // Initialize benchmark system (optional, for performance testing)
+    // benchmark::syscall::run_all_syscall_benchmarks(); // Uncomment to run benchmarks at boot
 
     // Start other CPUs
     cpu::start_aps();
     cpu::boot_complete();
-    println!("[boot] SMP initialization complete ({} CPUs)", cpu::ncpus());
+    crate::println!("[boot] SMP initialization complete ({} CPUs)", cpu::ncpus());
 
     // Mark boot complete
     STARTED.store(true, Ordering::SeqCst);
 
-    println!();
-    println!("xv6-rust kernel ready!");
-    println!();
+    crate::println!();
+    crate::println!("xv6-rust kernel ready!");
+    crate::println!();
 
     // Run self-tests in debug builds
     #[cfg(debug_assertions)]
@@ -178,7 +344,7 @@ pub extern "C" fn rust_main_ap() -> ! {
     { drivers::init_ap(); }
     
     let id = cpu::cpuid();
-    println!("[cpu{}] AP ready, entering scheduler", id);
+    crate::println!("[cpu{}] AP ready, entering scheduler", id);
     
     // Enter scheduler loop
     process::scheduler();
@@ -189,24 +355,28 @@ pub extern "C" fn rust_main_ap() -> ! {
 fn run_tests() {
     // Run tests using the new test framework
     let (passed, failed, _skipped) = tests::run_all_tests();
-    
+
     if failed > 0 {
-        println!();
-        println!("!!! {} TEST(S) FAILED !!!", failed);
-        println!();
+        crate::println!();
+        crate::println!("!!! {} TEST(S) FAILED !!!", failed);
+        crate::println!();
     } else {
-        println!();
-        println!("All {} tests passed!", passed);
-        println!();
+        crate::println!();
+        crate::println!("All {} tests passed!", passed);
+        crate::println!();
     }
+
+    // Print test coverage report
+    let coverage = tests::calculate_coverage();
+    coverage.print_summary();
     
     // Also run the legacy tests that need fork/exec
-    println!("Running legacy integration tests...");
+    crate::println!("Running legacy integration tests...");
     test_pipe_fork_rw();
     test_exec_negative();
     test_exec_positive_minimal();
     test_paths_relative();
-    println!("Legacy tests completed.");
+    crate::println!("Legacy tests completed.");
 }
 
 // ============================================================================
@@ -220,7 +390,7 @@ fn test_pipe_fork_rw() {
     // Use sys_pipe to obtain process-level fds
     let mut pfds = [0i32; 2];
     let ret = crate::syscalls::dispatch(crate::syscalls::SysNum::Pipe as usize, &[pfds.as_mut_ptr() as usize, 0, 0, 0, 0, 0]);
-    if ret != crate::syscalls::E_OK { println!("skipped"); return; }
+    if ret != 0 { crate::println!("skipped"); return; }
     let pid = crate::syscalls::dispatch(crate::syscalls::SysNum::Fork as usize, &[0,0,0,0,0,0]);
     if pid == 0 { // child
         // Read from pipe
@@ -237,7 +407,7 @@ fn test_pipe_fork_rw() {
         let mut status = 0i32;
         let _ = crate::syscalls::dispatch(crate::syscalls::SysNum::Wait as usize, &[(&mut status as *mut i32) as usize, 0,0,0,0,0]);
         let _ = crate::syscalls::dispatch(crate::syscalls::SysNum::Close as usize, &[pfds[1] as usize, 0,0,0,0,0]);
-        println!("ok");
+        crate::println!("ok");
     }
 }
 
@@ -247,8 +417,8 @@ fn test_exec_negative() {
     let path = b"/bin/ls\0";
     let args: [*const u8; 1] = [core::ptr::null()];
     let ret = crate::syscalls::dispatch(crate::syscalls::SysNum::Exec as usize, &[path.as_ptr() as usize, args.as_ptr() as usize, 0,0,0,0]);
-    assert_eq!(ret, crate::syscalls::E_NOENT);
-    println!("ok");
+    assert_eq!(ret, crate::reliability::errno::ENOENT as isize);
+    crate::println!("ok");
 }
 
 #[cfg(feature = "kernel_tests")]
@@ -305,7 +475,7 @@ fn test_exec_positive_minimal() {
     let args: [*const u8; 1] = [core::ptr::null()];
     let ret = crate::syscalls::dispatch(crate::syscalls::SysNum::Exec as usize, &[path.as_ptr() as usize, args.as_ptr() as usize, 0,0,0,0]);
     assert_eq!(ret, 0);
-    println!("ok");
+    crate::println!("ok");
 }
 
 #[cfg(feature = "kernel_tests")]
@@ -330,26 +500,25 @@ fn test_paths_relative() {
     // open absolute /tmp/bar
     let fd2 = crate::syscalls::dispatch(crate::syscalls::SysNum::Open as usize, ["/tmp/bar\0".as_ptr() as usize, O_RDWR as usize, 0, 0,0,0].as_ref());
     assert!(fd2 >= 0);
-    println!("ok");
+    crate::println!("ok");
 }
 
-/// Panic handler
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     // Disable interrupts
     arch::intr_off();
 
-    println!();
-    println!("!!! KERNEL PANIC !!!");
+    crate::println!();
+    crate::println!("!!! KERNEL PANIC !!!");
     
     if let Some(location) = info.location() {
-        println!("at {}:{}:{}", location.file(), location.line(), location.column());
+        crate::println!("at {}:{}:{}", location.file(), location.line(), location.column());
     }
     
-    println!("{}", info.message());
+    crate::println!("{}", info.message());
 
-    println!();
-    println!("System halted.");
+    crate::println!();
+    crate::println!("System halted.");
 
     // Halt the CPU
     loop {

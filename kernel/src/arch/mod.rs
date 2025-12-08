@@ -1,11 +1,11 @@
-//! Architecture abstraction layer
-//! Provides a unified interface for architecture-specific operations
+// Architecture abstraction layer
+// Provides a unified interface for architecture-specific operations
 
 use core::arch::asm;
 
 /// Early hardware initialization (called before any other init)
 pub fn early_init() {
-    crate::uart::init();
+    crate::drivers::uart::init();
 }
 
 /// Disable interrupts and return previous state

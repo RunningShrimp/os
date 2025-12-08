@@ -1,0 +1,141 @@
+//! Unified Error Handling
+//!
+//! 统一错误处理模块
+//! 提供统一的错误类型转换和POSIX错误码映射
+
+use crate::syscalls::common::SyscallError;
+use crate::reliability::errno;
+
+/// 统一错误类型
+/// 所有内核模块应使用此类型进行错误处理
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KernelError {
+    /// 系统调用错误
+    Syscall(SyscallError),
+    /// 内存错误
+    OutOfMemory,
+    /// 无效参数
+    InvalidArgument,
+    /// 未找到
+    NotFound,
+    /// 权限 denied
+    PermissionDenied,
+    /// I/O错误
+    IoError,
+    /// 不支持的操作
+    NotSupported,
+    /// 资源已存在
+    AlreadyExists,
+    /// 资源忙
+    ResourceBusy,
+    /// 超时
+    Timeout,
+}
+
+impl From<SyscallError> for KernelError {
+    fn from(err: SyscallError) -> Self {
+        KernelError::Syscall(err)
+    }
+}
+
+// 从process模块错误类型转换
+#[cfg(feature = "process_errors")]
+impl From<crate::process::exec::ExecError> for KernelError {
+    fn from(err: crate::process::exec::ExecError) -> Self {
+        use crate::process::exec::ExecError;
+        match err {
+            ExecError::FileNotFound => KernelError::NotFound,
+            ExecError::FileTooLarge => KernelError::InvalidArgument,
+            ExecError::InvalidElf => KernelError::InvalidArgument,
+            ExecError::OutOfMemory => KernelError::OutOfMemory,
+            ExecError::TooManyArgs => KernelError::InvalidArgument,
+            ExecError::ArgTooLong => KernelError::InvalidArgument,
+            ExecError::NoProcess => KernelError::NotFound,
+            ExecError::PermissionDenied => KernelError::PermissionDenied,
+        }
+    }
+}
+
+#[cfg(feature = "process_errors")]
+impl From<crate::process::thread::ThreadError> for KernelError {
+    fn from(err: crate::process::thread::ThreadError) -> Self {
+        use crate::process::thread::ThreadError;
+        match err {
+            ThreadError::InvalidThreadId => KernelError::InvalidArgument,
+            ThreadError::NoSlotsAvailable => KernelError::ResourceBusy,
+            ThreadError::OutOfMemory => KernelError::OutOfMemory,
+            ThreadError::OperationNotPermitted => KernelError::PermissionDenied,
+            ThreadError::PermissionDenied => KernelError::PermissionDenied,
+            ThreadError::InvalidOperation => KernelError::InvalidArgument,
+            ThreadError::ThreadKilled => KernelError::NotFound,
+            ThreadError::AlreadyDetached => KernelError::AlreadyExists,
+            ThreadError::NotJoinable => KernelError::InvalidArgument,
+            ThreadError::ResourceLimitExceeded => KernelError::ResourceBusy,
+        }
+    }
+}
+
+/// Convert VfsError to KernelError
+impl From<crate::vfs::error::VfsError> for KernelError {
+    fn from(err: crate::vfs::error::VfsError) -> Self {
+        use crate::vfs::error::VfsError;
+        match err {
+            VfsError::NotFound => KernelError::NotFound,
+            VfsError::PermissionDenied => KernelError::PermissionDenied,
+            VfsError::NotDirectory => KernelError::InvalidArgument,
+            VfsError::IsDirectory => KernelError::InvalidArgument,
+            VfsError::NotEmpty => KernelError::ResourceBusy,
+            VfsError::Exists => KernelError::AlreadyExists,
+            VfsError::NoSpace => KernelError::OutOfMemory,
+            VfsError::InvalidPath => KernelError::InvalidArgument,
+            VfsError::NotMounted => KernelError::IoError,
+            VfsError::Busy => KernelError::ResourceBusy,
+            VfsError::ReadOnly => KernelError::PermissionDenied,
+            VfsError::IoError => KernelError::IoError,
+            VfsError::NotSupported => KernelError::NotSupported,
+            VfsError::InvalidOperation => KernelError::InvalidArgument,
+        }
+    }
+}
+
+impl KernelError {
+    /// 转换为POSIX errno
+    pub fn to_errno(self) -> i32 {
+        match self {
+            KernelError::Syscall(e) => crate::syscalls::common::syscall_error_to_errno(e),
+            KernelError::OutOfMemory => errno::ENOMEM,
+            KernelError::InvalidArgument => errno::EINVAL,
+            KernelError::NotFound => errno::ENOENT,
+            KernelError::PermissionDenied => errno::EPERM,
+            KernelError::IoError => errno::EIO,
+            KernelError::NotSupported => errno::EOPNOTSUPP,
+            KernelError::AlreadyExists => errno::EEXIST,
+            KernelError::ResourceBusy => errno::EBUSY,
+            KernelError::Timeout => errno::ETIMEDOUT,
+        }
+    }
+
+    /// 转换为负数errno（用于系统调用返回值）
+    pub fn to_neg_errno(self) -> isize {
+        -(self.to_errno() as isize)
+    }
+}
+
+/// 统一结果类型
+pub type KernelResult<T> = Result<T, KernelError>;
+
+/// 从Option转换为Result的辅助函数
+pub fn option_to_result<T>(opt: Option<T>, error: KernelError) -> KernelResult<T> {
+    opt.ok_or(error)
+}
+
+/// 从Option转换为Result，使用NotFound错误
+pub fn option_to_result_not_found<T>(opt: Option<T>) -> KernelResult<T> {
+    opt.ok_or(KernelError::NotFound)
+}
+
+/// 从Option转换为Result，使用OutOfMemory错误
+pub fn option_to_result_oom<T>(opt: Option<T>) -> KernelResult<T> {
+    opt.ok_or(KernelError::OutOfMemory)
+}
+

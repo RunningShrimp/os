@@ -1,0 +1,25 @@
+# [0352] // TODO: Implement setrlimit syscall - set resource limits
+
+**File:** `kernel/src/syscalls/process.rs`
+**Line:** 636
+**Marker:** TODO
+**Suggested Priority:** Critical
+**Suggested Owner Role:** Kernel Engineer
+**Suggested Estimate (hours):** 40
+**Suggested Labels:** `critical;todo`
+
+## Context
+
+```
+633: }
+634: 
+635: fn sys_setrlimit(_args: &[u64]) -> SyscallResult {
+636:     // TODO: Implement setrlimit syscall - set resource limits
+637:     Err(SyscallError::NotSupported)
+638: }
+639: 
+```
+
+## Recommended next steps
+- Confirm the owner and adjust scope estimate\- Add unit/integration tests to cover intended behavior
+- Produce a PR that either implements the missing behavior or documents a migration if it's a stub

@@ -1,11 +1,21 @@
-//! Service layer for hybrid architecture
-//! Implements service registration, discovery, and communication
+// Service layer for hybrid architecture
+// Implements service registration, discovery, and communication
 
 extern crate alloc;
 
 use alloc::vec::Vec;
 use alloc::string::String;
-use crate::sync::{Mutex, Spinlock};
+use alloc::{format, vec};
+use crate::sync::Mutex;
+
+// Service modules
+pub mod memory;
+pub mod process;
+pub mod fs;
+pub mod syscall;
+pub mod network;
+pub mod driver;
+pub mod ipc;
 
 // ============================================================================
 // Constants
@@ -28,6 +38,7 @@ pub enum ServiceStatus {
 }
 
 /// Service Information
+#[derive(Debug, Clone)]
 pub struct ServiceInfo {
     pub name: String,
     pub description: String,
@@ -41,8 +52,8 @@ pub struct ServiceInfo {
 /// Service Registry
 pub struct ServiceRegistry {
     services: Mutex<Vec<ServiceInfo>>,
-    next_service_id: Spinlock<u32>,
-    last_heartbeat_time: Spinlock<u64>,
+    next_service_id: Mutex<u32>,
+    last_heartbeat_time: Mutex<u64>,
 }
 
 // ============================================================================
@@ -69,8 +80,8 @@ impl ServiceRegistry {
     pub const fn new() -> Self {
         Self {
             services: Mutex::new(Vec::new()),
-            next_service_id: Spinlock::new(1),
-            last_heartbeat_time: Spinlock::new(0),
+            next_service_id: Mutex::new(1),
+            last_heartbeat_time: Mutex::new(0),
         }
     }
 
@@ -101,21 +112,21 @@ impl ServiceRegistry {
     }
 
     /// Find a service by name
-    pub fn find_by_name(&self, name: &str) -> Option<&ServiceInfo> {
+    pub fn find_by_name(&self, name: &str) -> Option<ServiceInfo> {
         let services = self.services.lock();
-        services.iter().find(|s| s.name == name)
+        services.iter().find(|s| s.name == name).cloned()
     }
 
     /// Find a service by ID
-    pub fn find_by_id(&self, service_id: u32) -> Option<&ServiceInfo> {
+    pub fn find_by_id(&self, service_id: u32) -> Option<ServiceInfo> {
         let services = self.services.lock();
-        services.iter().find(|s| s.service_id == service_id)
+        services.iter().find(|s| s.service_id == service_id).cloned()
     }
 
     /// Get all services
-    pub fn all_services(&self) -> Vec<&ServiceInfo> {
+    pub fn all_services(&self) -> Vec<ServiceInfo> {
         let services = self.services.lock();
-        services.iter().collect()
+        services.iter().cloned().collect()
     }
 
     /// Update service heartbeat
@@ -159,9 +170,18 @@ pub static SERVICE_REGISTRY: ServiceRegistry = ServiceRegistry::new();
 // ============================================================================
 
 /// Initialize service layer
-pub fn init() {
-    // Nothing to initialize yet
-    crate::println!("services: initialized");
+pub fn init() -> Result<(), &'static str> {
+    // Initialize individual services
+    memory::init().map_err(|_| "Failed to initialize memory service")?;
+    process::init().map_err(|_| "Failed to initialize process service")?;
+    fs::init().map_err(|_| "Failed to initialize filesystem service")?;
+    syscall::init()?;
+    network::init()?;
+    driver::init()?;
+    ipc::init()?;
+
+    crate::println!("[services] Service layer initialized");
+    Ok(())
 }
 
 /// Register a new service
@@ -176,12 +196,12 @@ pub fn service_unregister(service_id: u32) -> bool {
 }
 
 /// Find service by name
-pub fn service_find_by_name(name: &str) -> Option<&ServiceInfo> {
+pub fn service_find_by_name(name: &str) -> Option<ServiceInfo> {
     SERVICE_REGISTRY.find_by_name(name)
 }
 
 /// Find service by ID
-pub fn service_find_by_id(service_id: u32) -> Option<&ServiceInfo> {
+pub fn service_find_by_id(service_id: u32) -> Option<ServiceInfo> {
     SERVICE_REGISTRY.find_by_id(service_id)
 }
 

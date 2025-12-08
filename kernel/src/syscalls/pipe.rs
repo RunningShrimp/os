@@ -4,14 +4,14 @@
 
 use crate::process;
 use crate::file::FILE_TABLE;
-use super::{E_OK, E_NOMEM, E_NOSPC, E_BADARG};
+use crate::reliability::errno::{errno_neg, ENOMEM, ENOSPC, EINVAL};
 
 /// Create a pipe
 pub fn sys_pipe(pipefd: *mut i32) -> isize {
     if pipefd.is_null() {
-        return E_BADARG;
+        return errno_neg(EINVAL);
     }
-    match crate::pipe::pipe_alloc() {
+    match crate::ipc::pipe::pipe_alloc() {
         Some((ridx, widx)) => {
             let rfd = match process::fdalloc(ridx) {
                 Some(fd) => fd,
@@ -19,7 +19,7 @@ pub fn sys_pipe(pipefd: *mut i32) -> isize {
                     let mut t = FILE_TABLE.lock();
                     t.close(ridx);
                     t.close(widx);
-                    return E_NOMEM;
+                    return errno_neg(ENOMEM);
                 }
             };
             let wfd = match process::fdalloc(widx) {
@@ -29,15 +29,15 @@ pub fn sys_pipe(pipefd: *mut i32) -> isize {
                     let mut t = FILE_TABLE.lock();
                     t.close(ridx);
                     t.close(widx);
-                    return E_NOMEM;
+                    return errno_neg(ENOMEM);
                 }
             };
             unsafe {
                 *pipefd.add(0) = rfd;
                 *pipefd.add(1) = wfd;
             }
-            E_OK
+            0
         }
-        None => E_NOSPC,
+        None => return errno_neg(ENOSPC),
     }
 }

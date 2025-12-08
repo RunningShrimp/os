@@ -1,5 +1,5 @@
 [workspace]
-members = ["kernel", "xtask", "user", "benchmarks/microbench"]
+members = ["kernel", "xtask", "user", "benchmarks/microbench", "bootloader"]
 default-members = ["kernel", "xtask"]
 resolver = "2"
 

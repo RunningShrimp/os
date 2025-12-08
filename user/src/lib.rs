@@ -1,9 +1,18 @@
 //! User-space library for xv6-rust
-//! Provides syscall wrappers and minimal libc functionality
+//! Provides syscall wrappers, minimal libc functionality, and GLib support
 
 #![no_std]
 
 use core::arch::asm;
+
+// Include GLib modules
+pub mod glib;
+
+// Print utilities for GLib use
+pub mod print {
+    pub use super::puts;
+    pub use super::println;
+}
 
 // ============================================================================
 // System call numbers (must match kernel/src/syscalls.rs)

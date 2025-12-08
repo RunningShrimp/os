@@ -1,6 +1,7 @@
 //! Simple RAM file system for testing
 
-use alloc::{string::String, sync::Arc, vec::Vec, collections::BTreeMap};
+extern crate alloc;
+use alloc::{string::{String, ToString}, sync::Arc, vec::Vec, collections::BTreeMap};
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::sync::Mutex;
@@ -8,7 +9,7 @@ use crate::sync::Mutex;
 use super::{
     error::*,
     types::*,
-    fs::{FileSystemType, SuperBlock, InodeOps},
+    fs::{FileSystemType, SuperBlock, InodeOps, FsStats},
     dir::DirEntry,
 };
 
@@ -81,6 +82,8 @@ struct RamFsInode {
     data: Mutex<Vec<u8>>,
     // For directories
     children: Mutex<BTreeMap<String, Arc<dyn InodeOps>>>,
+    // For symlinks
+    target: Mutex<Option<String>>,
 }
 
 impl RamFsInode {
@@ -95,6 +98,7 @@ impl RamFsInode {
             }),
             data: Mutex::new(Vec::new()),
             children: Mutex::new(BTreeMap::new()),
+            target: Mutex::new(None),
         }
     }
     
@@ -108,6 +112,22 @@ impl RamFsInode {
             }),
             data: Mutex::new(Vec::new()),
             children: Mutex::new(BTreeMap::new()),
+            target: Mutex::new(None),
+        }
+    }
+    
+    fn new_symlink(ino: u64, target: &str) -> Self {
+        Self {
+            attr: Mutex::new(FileAttr {
+                ino,
+                mode: FileMode(FileMode::S_IFLNK | 0o777),
+                nlink: 1,
+                size: target.len() as u64,
+                ..Default::default()
+            }),
+            data: Mutex::new(Vec::new()),
+            children: Mutex::new(BTreeMap::new()),
+            target: Mutex::new(Some(target.to_string())),
         }
     }
 }
@@ -233,6 +253,25 @@ impl InodeOps for RamFsInode {
         Ok(())
     }
     
+    fn symlink(&self, name: &str, target: &str) -> VfsResult<Arc<dyn InodeOps>> {
+        let mut children = self.children.lock();
+        if children.contains_key(name) {
+            return Err(VfsError::Exists);
+        }
+        
+        static NEXT_INO: AtomicUsize = AtomicUsize::new(100);
+        let ino = NEXT_INO.fetch_add(1, Ordering::Relaxed) as u64;
+        
+        let inode = Arc::new(RamFsInode::new_symlink(ino, target));
+        children.insert(name.to_string(), inode.clone());
+        Ok(inode)
+    }
+    
+    fn readlink(&self) -> VfsResult<String> {
+        let target = self.target.lock();
+        target.clone().ok_or(VfsError::InvalidOperation)
+    }
+    
     fn readdir(&self, _offset: usize) -> VfsResult<Vec<DirEntry>> {
         let attr = self.attr.lock();
         if !attr.mode.is_dir() {
@@ -293,5 +332,8 @@ impl InodeOps for RamFsInode {
 /// Initialize and register RamFS
 pub fn init() {
     let ramfs = Arc::new(RamFsType);
-    super::vfs().register_fs(ramfs).expect("Failed to register ramfs");
+    if let Err(e) = super::vfs().register_fs(ramfs) {
+        crate::println!("[ramfs] Failed to register ramfs: {:?}", e);
+        // In a production system, this might be fatal, but for now we log and continue
+    }
 }

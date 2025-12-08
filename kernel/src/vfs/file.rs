@@ -1,5 +1,6 @@
 //! VFS file handle
 
+extern crate alloc;
 use alloc::sync::Arc;
 
 use super::{fs::InodeOps, error::VfsResult, types::FileAttr};

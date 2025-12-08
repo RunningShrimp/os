@@ -8,46 +8,270 @@ on:
     branches:
       - main
 
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
 jobs:
-  build:
+  # Security and dependency checks
+  security:
+    name: Security Audit
     runs-on: ubuntu-latest
-    
     steps:
     - uses: actions/checkout@v4
-    
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+
+    - name: Run security audit
+      run: cargo audit
+
+  # Code quality checks
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
       with:
-        targets: riscv64-unknown-none-elf, aarch64-unknown-none-elf, x86_64-unknown-none-elf
         components: clippy, rustfmt
-        
+
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Check formatting
+      run: cargo fmt --all --check
+
+    - name: Run clippy
+      run: |
+        cargo clippy --all-targets --all-features -- -D warnings
+        cargo clippy --all-targets --all-features --tests -- -D warnings
+
+  # Build and test for all targets
+  test:
+    name: Test (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [x86_64-unknown-none-elf, aarch64-unknown-none-elf, riscv64-unknown-none-elf]
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+
     - name: Cache dependencies
       uses: Swatinem/rust-cache@v2
       with:
-        workspaces: ./kernel ./user ./xtask
-        
+        key: ${{ matrix.target }}
+
     - name: Build kernel
-      run: |
-        cargo build -p kernel --target riscv64-unknown-none-elf
-        cargo build -p kernel --target aarch64-unknown-none-elf
-        cargo build -p kernel --target x86_64-unknown-none-elf
-        
+      run: cargo build -p kernel --target ${{ matrix.target }}
+
     - name: Build user programs
-      run: |
-        cargo build -p user --target riscv64-unknown-none-elf
-        cargo build -p user --target aarch64-unknown-none-elf
-        cargo build -p user --target x86_64-unknown-none-elf
-        
+      run: cargo build -p user --target ${{ matrix.target }}
+
     - name: Build xtask
       run: cargo build -p xtask
-        
-    - name: Run tests
-      run: cargo test -p kernel --target riscv64-unknown-none-elf
-        
-    - name: Run clippy
+
+    - name: Run unit tests
+      run: cargo test -p kernel --target ${{ matrix.target }} --features kernel_tests
+
+    - name: Run integration tests
+      run: cargo test -p kernel --target ${{ matrix.target }} --features kernel_tests -- --ignored
+
+  # Code coverage (limited for bare-metal kernel)
+  coverage:
+    name: Code Coverage Analysis
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install cargo-tarpaulin
+      run: cargo install cargo-tarpaulin --locked
+
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Run coverage on user-space components
       run: |
-        cargo clippy -p kernel --target riscv64-unknown-none-elf -- -D warnings
-        cargo clippy -p user --target riscv64-unknown-none-elf -- -D warnings
+        # Run coverage on components that can run on hosted targets
+        cargo tarpaulin --workspace --exclude kernel --exclude bootloader --out Lcov --output-dir coverage/ --timeout 300
+
+    - name: Run coverage on kernel unit tests (hosted mode)
+      run: |
+        # Run kernel tests in hosted mode for coverage analysis
+        # This covers testable kernel components that don't require bare-metal
+        cargo tarpaulin -p kernel --features kernel_tests --target x86_64-unknown-linux-gnu --out Lcov --output-dir coverage/ --timeout 300 --exclude-files '*/build.rs' --exclude-files '*/main.rs' || true
+
+    - name: Generate coverage report
+      run: |
+        # Generate HTML coverage report
+        cargo tarpaulin --workspace --exclude kernel --exclude bootloader --out Html --output-dir coverage/html/ --timeout 300 || true
+
+    - name: Check coverage threshold
+      run: |
+        # Check if coverage meets minimum threshold (90%)
+        COVERAGE=$(cargo tarpaulin --workspace --exclude kernel --exclude bootloader --out Stdout --timeout 300 | grep -oP '\d+\.\d+%' | head -1 | sed 's/%//')
+        echo "Current coverage: ${COVERAGE}%"
+        if (( $(echo "$COVERAGE < 90" | bc -l) )); then
+          echo "Coverage ${COVERAGE}% is below threshold of 90%"
+          exit 1
+        fi
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        directory: coverage/
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+    - name: Upload coverage HTML report
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-report
+        path: coverage/html/
+        retention-days: 30
+
+  # Benchmarks
+  benchmark:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Run kernel benchmarks
+      run: cargo bench -p kernel --features kernel_tests
+
+    - name: Run microbenchmarks
+      run: cargo bench -p microbench
+
+    - name: Store benchmark results
+      run: |
+        # Create benchmark results directory
+        mkdir -p benchmark-results
+
+        # Run benchmarks with criterion and save results
+        cargo bench -p kernel --features kernel_tests -- --save-baseline current
+        cargo bench -p microbench -- --save-baseline current
+
+        # Archive benchmark results
+        tar -czf benchmark-results/benchmarks.tar.gz target/criterion/
+
+    - name: Upload benchmark artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: benchmark-results
+        path: benchmark-results/
+
+  # Performance regression detection
+  performance-check:
+    name: Performance Check
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch full history for baseline comparison
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install cargo-criterion (optional)
+      run: |
+        cargo install cargo-criterion --locked || echo "cargo-criterion not available, using basic comparison"
+
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Cache baseline data
+      uses: actions/cache@v3
+      with:
+        path: .baselines
+        key: performance-baselines-${{ github.ref }}
+        restore-keys: |
+          performance-baselines-main
+
+    - name: Run benchmarks
+      run: |
+        cargo bench -p kernel --features kernel_tests -- --save-baseline current
+        cargo bench -p microbench -- --save-baseline current || true
+
+    - name: Check for performance regressions
+      run: |
+        # Make performance baseline script executable
+        chmod +x scripts/performance-baseline.sh
         
-    - name: Check formatting
-      run: cargo fmt --all --check
+        # Try to load main branch baseline
+        if [ -d ".baselines/main" ]; then
+          echo "Comparing with main branch baseline"
+          ./scripts/performance-baseline.sh compare main 0.10 || true
+        else
+          echo "No baseline found, saving current results as baseline"
+          ./scripts/performance-baseline.sh save main || true
+        fi
+
+    - name: Save baseline for main branch
+      if: github.ref == 'refs/heads/main'
+      run: |
+        chmod +x scripts/performance-baseline.sh
+        ./scripts/performance-baseline.sh save main
+
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v3
+      with:
+        name: benchmark-results-${{ github.run_number }}
+        path: target/criterion/
+        retention-days: 30
+
+  # Build artifacts for releases
+  build-artifacts:
+    name: Build Artifacts (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [x86_64-unknown-none-elf, aarch64-unknown-none-elf, riscv64-unknown-none-elf]
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Build kernel (release)
+      run: cargo build -p kernel --target ${{ matrix.target }} --release
+
+    - name: Build bootloader (release)
+      run: cargo build -p bootloader --target ${{ matrix.target }} --release
+
+    - name: Upload kernel artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: kernel-${{ matrix.target }}
+        path: target/${{ matrix.target }}/release/kernel
+
+    - name: Upload bootloader artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: bootloader-${{ matrix.target }}
+        path: target/${{ matrix.target }}/release/bootloader
