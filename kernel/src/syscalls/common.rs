@@ -1,7 +1,7 @@
 // Shared utilities for syscall modules
 
 /// Extended syscall error types with POSIX compatibility
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SyscallError {
     // Basic errors
     InvalidSyscall,          // ENOSYS

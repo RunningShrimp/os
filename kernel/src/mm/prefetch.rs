@@ -12,6 +12,7 @@ extern crate alloc;
 use alloc::{
     collections::{BTreeMap, VecDeque},
     string::String,
+    vec::Vec,
 };
 use crate::sync::Mutex;
 
@@ -189,7 +190,7 @@ impl AdaptivePrefetcher {
             markov_state: MarkovState::new(3),
             stats: PrefetchStats::default(),
             perf_threshold: 0.25, // 25% improvement threshold
-            evaluation_timer: crate::time::get_time_ms(),
+            evaluation_timer: crate::time::timestamp_millis(),
             evaluation_interval: 5000, // Evaluate every 5 seconds
         }
     }
@@ -225,7 +226,7 @@ impl AdaptivePrefetcher {
 
     /// Evaluate and select the best prefetch strategy
     fn evaluate_strategy(&mut self) -> PrefetchStrategy {
-        let current_time = crate::time::get_time_ms();
+        let current_time = crate::time::timestamp_millis();
         if current_time - self.evaluation_timer < self.evaluation_interval {
             // Not time to evaluate yet - use current strategy
             return self.stats.current_strategy;
@@ -322,7 +323,7 @@ impl AdaptivePrefetcher {
 
     /// Get current prefetch statistics
     pub fn get_stats(&self) -> PrefetchStats {
-        self.stats
+        self.stats.clone()
     }
 
     /// Reset prefetch statistics
@@ -359,7 +360,7 @@ pub fn process_memory_access(addr: usize, page_size: usize, access_type: AccessT
     let access = MemoryAccessPattern {
         addr,
         page_size,
-        timestamp: crate::time::get_time_ms(),
+        timestamp: crate::time::timestamp_millis(),
         access_type,
     };
     

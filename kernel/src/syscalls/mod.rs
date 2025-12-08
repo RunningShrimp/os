@@ -41,7 +41,7 @@
 //! let result = syscalls::dispatch(syscalls::SYS_READ, &args);
 //! ```
 
-use common::{SyscallError, SyscallResult, syscall_error_to_errno};
+use crate::syscalls::common::{SyscallError, SyscallResult, syscall_error_to_errno};
 
 use bincode::{deserialize, serialize};
 extern crate alloc;
@@ -788,7 +788,7 @@ pub fn dispatch(syscall_num: usize, args: &[usize]) -> isize {
     let (tid, pagetable) = {
         let proc_table = crate::process::manager::PROC_TABLE.lock();
         if let Some(proc) = proc_table.find_ref(pid) {
-            (proc.tid as u64, proc.pagetable)
+            (proc.pid as u64, proc.pagetable)
         } else {
             (0, 0)
         }
@@ -819,7 +819,7 @@ pub fn dispatch(syscall_num: usize, args: &[usize]) -> isize {
                 let error_context = ErrorContext::new(
                     syscall_num as u32,
                     pid as u64,
-                    tid,
+                    pid as u64,
                     pagetable,
                 ).with_args(&args_u64[..args_len]);
                 

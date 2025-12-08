@@ -403,6 +403,9 @@ pub const EHWPOISON: i32 = 133;
 /// Maximum errno value
 pub const MAX_ERRNO: i32 = 133;
 
+/// Errno type alias
+pub type Errno = i32;
+
 /// Result type for system calls
 pub type SysResult<T> = Result<T, i32>;
 

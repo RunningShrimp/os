@@ -92,7 +92,7 @@ fn sys_pthread_attr_setschedpolicy(args: &[u64]) -> SyscallResult {
             }
         }
 
-        unsafe { core::mem::transmute::<[u8; 256], ThreadAttr>(attr_data) }
+        unsafe { core::mem::transmute::<[u8; core::mem::size_of::<ThreadAttr>()], ThreadAttr>(attr_data) }
     } else {
         ThreadAttr::new()
     };

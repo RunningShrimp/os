@@ -39,7 +39,6 @@ impl From<SyscallError> for KernelError {
 }
 
 // 从process模块错误类型转换
-#[cfg(feature = "process_errors")]
 impl From<crate::process::exec::ExecError> for KernelError {
     fn from(err: crate::process::exec::ExecError) -> Self {
         use crate::process::exec::ExecError;
@@ -56,7 +55,6 @@ impl From<crate::process::exec::ExecError> for KernelError {
     }
 }
 
-#[cfg(feature = "process_errors")]
 impl From<crate::process::thread::ThreadError> for KernelError {
     fn from(err: crate::process::thread::ThreadError) -> Self {
         use crate::process::thread::ThreadError;

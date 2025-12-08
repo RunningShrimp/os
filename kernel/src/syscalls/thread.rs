@@ -858,7 +858,8 @@ pub fn futex_wait_timeout(pagetable: *mut crate::mm::vm::PageTable, uaddr: usize
         
         // Prevent busy waiting (check every 1000 iterations)
         if slept_time > 1000 {
-            break;
+            // If we've slept too many times, return an error or timeout
+            return Err(SyscallError::TimedOut);
         }
     }
 }

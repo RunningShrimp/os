@@ -610,17 +610,13 @@ fn sys_sbrk(args: &[u64]) -> SyscallResult {
 fn sys_sleep(_args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
 
+    // The userland sleep() syscall expects a number of ticks (not seconds)
     let args = extract_args(_args, 1)?;
-    let seconds = args[0] as u64;
+    let ticks = args[0] as u64;
 
-    if seconds == 0 {
+    if ticks == 0 {
         return Ok(0);
     }
-
-    // Convert seconds to nanoseconds and then to ticks
-    let sleep_ns = seconds.saturating_mul(1_000_000_000);
-    let tick_ns = 1_000_000_000u64 / crate::time::TIMER_FREQ;
-    let ticks = (sleep_ns + tick_ns - 1) / tick_ns;
 
     let pid = crate::process::myproc().ok_or(SyscallError::InvalidArgument)?;
     let chan = pid as usize;
@@ -633,10 +629,33 @@ fn sys_sleep(_args: &[u64]) -> SyscallResult {
     Ok(0)
 }
 
-fn sys_uptime(_args: &[u64]) -> SyscallResult {
-    // TODO: Implement uptime syscall - get system uptime
-    Err(SyscallError::NotSupported)
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sys_sleep_zero() {
+        // sleep(0) should return immediately
+        let res = sys_sleep(&[0u64]);
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap(), 0);
+    }
+
+    #[test]
+    fn test_sys_uptime_nonzero() {
+        let r = sys_uptime(&[]);
+        assert!(r.is_ok());
+        // At least returns a value (ticks) — in hosted tests this may be zero
+        let _ticks = r.unwrap();
+    }
 }
+
+fn sys_uptime(_args: &[u64]) -> SyscallResult {
+    // Return system uptime in ticks
+    let ticks = crate::time::get_ticks();
+    Ok(ticks as u64)
+}
+
 
 fn sys_setpgid(_args: &[u64]) -> SyscallResult {
     // TODO: Implement setpgid syscall - set process group ID

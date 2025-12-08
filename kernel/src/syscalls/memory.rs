@@ -650,21 +650,21 @@ fn sys_mremap(args: &[u64]) -> SyscallResult {
 
     let result_addr = if aligned_new_size <= aligned_old_size {
         // Shrinking the mapping
-        handle_mremap_shrink(pagetable, old_addr, aligned_old_size, aligned_new_size, region, &mut regions)
+        handle_mremap_shrink(pagetable, old_addr, aligned_old_size, aligned_new_size, &region, &mut regions)
     } else {
         // Expanding the mapping
         if (flags & MREMAP_MAYMOVE) != 0 {
             // Try to expand in place first
-            match handle_mremap_expand_inplace(pagetable, old_addr, aligned_old_size, aligned_new_size, region) {
+            match handle_mremap_expand_inplace(pagetable, old_addr, aligned_old_size, aligned_new_size, &region) {
                 Ok(addr) => Ok(addr),
                 Err(_) => {
                     // Expansion in place failed, try to move
-                    handle_mremap_move(pagetable, old_addr, aligned_old_size, aligned_new_size, flags, new_addr, region, &mut regions)
+                    handle_mremap_move(pagetable, old_addr, aligned_old_size, aligned_new_size, flags, new_addr, &region, &mut regions)
                 }
             }
         } else {
             // Must expand in place
-            handle_mremap_expand_inplace(pagetable, old_addr, aligned_old_size, aligned_new_size, region)
+            handle_mremap_expand_inplace(pagetable, old_addr, aligned_old_size, aligned_new_size, &region)
         }
     }?;
 

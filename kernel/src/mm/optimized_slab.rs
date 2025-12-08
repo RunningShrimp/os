@@ -198,59 +198,62 @@ impl OptimizedSlabAllocator {
             return null_mut(); // Allocation too large for slab allocator
         }
 
-        let slabs = self.get_slabs_mut();
-        if size_class_idx >= slabs.len() {
-            return null_mut();
-        }
-        
-        // Try to allocate from an existing slab
-        for slab in slabs[size_class_idx].iter_mut() {
-            if slab.free_list_head.is_null() {
-                continue;
+        { // First scope: try to allocate from existing slabs
+            let slabs = self.get_slabs_mut();
+            if size_class_idx >= slabs.len() {
+                return null_mut();
             }
             
-            unsafe {
-                // Take first free object from the free list
-                let obj = slab.free_list_head;
-                slab.free_list_head = (*(obj as *mut SlabObjectHeader)).next;
-                
-                // Update the next object's prev pointer if it exists
-                if !slab.free_list_head.is_null() {
-                    (*(slab.free_list_head as *mut SlabObjectHeader)).prev = null_mut();
+            // Try to allocate from an existing slab
+            for slab in slabs[size_class_idx].iter_mut() {
+                if slab.free_list_head.is_null() {
+                    continue;
                 }
                 
-                // Increment used count and update occupancy bitmap
-                slab.used_count += 1;
-                
-                // Return pointer after header
-                return obj.add(mem::size_of::<SlabObjectHeader>());
+                unsafe {
+                    // Take first free object from the free list
+                    let obj = slab.free_list_head;
+                    slab.free_list_head = (*(obj as *mut SlabObjectHeader)).next;
+                    
+                    // Update the next object's prev pointer if it exists
+                    if !slab.free_list_head.is_null() {
+                        (*(slab.free_list_head as *mut SlabObjectHeader)).prev = null_mut();
+                    }
+                    
+                    // Increment used count and update occupancy bitmap
+                    slab.used_count += 1;
+                    
+                    // Return pointer after header
+                    return obj.add(mem::size_of::<SlabObjectHeader>());
+                }
             }
-        }
+        } // Slab borrow ends here
         
         // No free slab found, create a new one
         let slab_size = SLAB_SIZES[size_class_idx];
         let new_slab = unsafe { self.create_slab(size_class_idx, slab_size) };
         if let Some(mut slab) = new_slab {
+            // Second scope: add new slab and allocate from it
+            let slabs = self.get_slabs_mut();
+            // Allocate from the newly created slab
+            let obj = slab.free_list_head;
+            slab.free_list_head = unsafe { (*(obj as *mut SlabObjectHeader)).next };
+            
+            // Update the next object's prev pointer if it exists
+            if !slab.free_list_head.is_null() {
+                unsafe {
+                    (*(slab.free_list_head as *mut SlabObjectHeader)).prev = null_mut();
+                }
+            }
+            
+            // Increment used count
+            slab.used_count += 1;
+            
             // Add the new slab to the slab list
             slabs[size_class_idx].push(slab);
             
-            // Allocate from the newly created slab
-            let new_slab_ref = slabs[size_class_idx].last_mut().unwrap();
-            
+            // Return pointer after header
             unsafe {
-                // Take first free object from the free list
-                let obj = new_slab_ref.free_list_head;
-                new_slab_ref.free_list_head = (*(obj as *mut SlabObjectHeader)).next;
-                
-                // Update the next object's prev pointer if it exists
-                if !new_slab_ref.free_list_head.is_null() {
-                    (*(new_slab_ref.free_list_head as *mut SlabObjectHeader)).prev = null_mut();
-                }
-                
-                // Increment used count
-                new_slab_ref.used_count += 1;
-                
-                // Return pointer after header
                 return obj.add(mem::size_of::<SlabObjectHeader>());
             }
         }
@@ -387,6 +390,8 @@ mod tests {
         let ptr = alloc.alloc(layout);
         assert!(!ptr.is_null());
         
-        alloc.dealloc(ptr, layout);
+        unsafe {
+            alloc.dealloc(ptr, layout);
+        }
     }
 }

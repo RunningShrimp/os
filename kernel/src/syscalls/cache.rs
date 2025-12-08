@@ -82,7 +82,7 @@ impl Default for SyscallCacheConfig {
 }
 
 /// Cache eviction policies
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EvictionPolicy {
     /// Least Recently Used
     LRU,
@@ -158,7 +158,7 @@ impl SyscallCache {
 
         // Check TTL if enabled
         if self.config.eviction_policy == EvictionPolicy::TTL {
-            let current_time = crate::time::get_time_ms();
+            let current_time = crate::time::timestamp_nanos() / 1000000;
             if current_time - entry.timestamp > self.config.entry_timeout_ms {
                 self.entries.remove(key);
                 self.lru_list.retain(|k| k != key);
@@ -202,7 +202,7 @@ impl SyscallCache {
         // Create new entry
         let entry = SyscallCacheEntry {
             result,
-            timestamp: crate::time::get_time_ms(),
+            timestamp: crate::time::timestamp_nanos() / 1000000,
             ref_count: 1,
             flags: CacheEntryFlags::PURE, // Assume pure since we checked earlier
         };

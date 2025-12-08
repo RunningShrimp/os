@@ -10,6 +10,7 @@ pub mod compress;
 pub mod hugepage;
 pub mod traits;
 pub mod optimized_allocator;
+pub mod prefetch;
 pub mod numa;
 
 #[cfg(feature = "kernel_tests")]

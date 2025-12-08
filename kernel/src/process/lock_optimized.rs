@@ -12,7 +12,7 @@ use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use crate::sync::{Mutex, RwLock};
 
 /// 锁定统计信息
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct LockStats {
     /// 读锁获取次数
     pub read_lock_acquires: AtomicUsize,

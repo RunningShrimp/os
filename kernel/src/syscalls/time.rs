@@ -141,7 +141,7 @@ fn sys_settimeofday(_args: &[u64]) -> SyscallResult {
 /// Returns: 0 on success, error on failure
 fn sys_clock_gettime(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::copyin;
+    use crate::mm::vm::{copyin, copyout};
     use crate::posix::Timespec;
     
     let args = extract_args(args, 2)?;
@@ -211,7 +211,7 @@ fn sys_clock_settime(_args: &[u64]) -> SyscallResult {
 /// Returns: 0 on success, error on failure
 fn sys_clock_getres(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::copyin;
+    use crate::mm::vm::{copyin, copyout};
     use crate::posix::Timespec;
     
     let args = extract_args(args, 2)?;
@@ -266,7 +266,7 @@ fn sys_clock_getres(args: &[u64]) -> SyscallResult {
 /// Real-time aware: Uses high-precision timer for accurate sleep duration
 fn sys_nanosleep(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::{copyin, copyinstr};
+    use crate::mm::vm::{copyin, copyinstr, copyout};
     use crate::posix::Timespec;
     
     let args = extract_args(args, 2)?;

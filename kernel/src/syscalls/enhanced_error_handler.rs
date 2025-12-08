@@ -4,14 +4,15 @@
 //! It implements standardized error code mapping, error recovery mechanisms,
 //! and detailed error logging.
 
-use alloc::{collections::BTreeMap, string::{String, ToString}, vec::Vec};
+use alloc::{boxed::Box, collections::BTreeMap, string::{String, ToString}, vec::Vec};
 use core::fmt::Debug;
 
-use crate::common::{SyscallError, SyscallResult};
+use crate::syscalls::common::{SyscallError, SyscallResult};
 use crate::reliability::errno::{self, Errno};
 use crate::syscalls::validation::ValidationError;
 
 /// Error context containing information about the error occurrence
+#[derive(Clone)]
 pub struct ErrorContext {
     /// System call number
     pub syscall_num: u32,
@@ -39,7 +40,7 @@ impl ErrorContext {
             pagetable,
             args: Vec::new(),
             additional_context: BTreeMap::new(),
-            timestamp_ns: crate::time::get_timestamp_ns(),
+            timestamp_ns: crate::time::timestamp_nanos(),
         }
     }
     
@@ -156,22 +157,21 @@ impl StandardErrorHandler {
         mappings.insert(InvalidSyscall, ENOSYS);
         mappings.insert(InvalidArgument, EINVAL);
         mappings.insert(BadFileDescriptor, EBADF);
-        mappings.insert(MemoryError, ENOMEM);
-        mappings.insert(IoError, EIO);
-        mappings.insert(Unsupported, ENOSYS);
-        mappings.insert(NotImplemented, ENOSYS);
+        mappings.insert(SyscallError::OutOfMemory, ENOMEM);
+        mappings.insert(SyscallError::IoError, EIO);
+        mappings.insert(SyscallError::NotSupported, ENOSYS);
+        mappings.insert(SyscallError::InvalidSyscall, ENOSYS);
         mappings.insert(BadAddress, EFAULT);
         mappings.insert(Interrupted, EINTR);
-        mappings.insert(Overflow, EOVERFLOW);
-        mappings.insert(InvalidOperation, ENOSYS);
+        mappings.insert(SyscallError::FileTooBig, EOVERFLOW);
+        mappings.insert(SyscallError::InvalidSyscall, ENOSYS);
         mappings.insert(FileExists, EEXIST);
-        mappings.insert(FileNotFound, ENOENT);
-        mappings.insert(DirectoryNotEmpty, ENOTEMPTY);
-        mappings.insert(ReadonlyFileSystem, EROFS);
+        mappings.insert(SyscallError::NotFound, ENOENT);
+        mappings.insert(SyscallError::DirectoryNotEmpty, ENOTEMPTY);
         mappings.insert(TooManyOpenFiles, EMFILE);
         mappings.insert(PermissionDenied, EPERM);
-        mappings.insert(ResourceBusy, EBUSY);
-        mappings.insert(ResourceExhausted, ENOSPC);
+        mappings.insert(SyscallError::WouldBlock, EBUSY);
+        mappings.insert(SyscallError::NoSpaceLeft, ENOSPC);
         mappings.insert(TimedOut, ETIMEDOUT);
         mappings.insert(ConnectionRefused, ECONNREFUSED);
         mappings.insert(ConnectionReset, ECONNRESET);
@@ -231,17 +231,17 @@ impl StandardErrorHandler {
         
         match error {
             // Retryable errors
-            Interrupted | IoError | TimedOut | NoBufferSpace | ResourceBusy => {
+            SyscallError::Interrupted | SyscallError::IoError | SyscallError::TimedOut | SyscallError::NoBufferSpace => {
                 // These errors can be retried
                 (RecoveryStrategy::Retry, true, false)
             }
             // Partial recovery possible
-            MemoryError | TooManyOpenFiles => {
+            SyscallError::OutOfMemory | SyscallError::TooManyOpenFiles => {
                 // Try to free some resources and proceed
                 (RecoveryStrategy::PartialRecovery, false, true)
             }
             // Automatic recovery possible
-            BadAddress | PermissionDenied => {
+            SyscallError::BadAddress | SyscallError::PermissionDenied => {
                 // Check if we can fix the issue automatically
                 // For example, adjust permissions or allocate memory differently
                 (RecoveryStrategy::AutomaticRecovery, true, false)
@@ -427,7 +427,7 @@ pub fn enhanced_syscall_error_to_errno(error: &SyscallError, context: &ErrorCont
         }
         None => {
             // Fall back to default mapping if no handler exists
-            use crate::common::syscall_error_to_errno;
+            use crate::syscalls::common::syscall_error_to_errno;
             syscall_error_to_errno(*error)
         }
     }

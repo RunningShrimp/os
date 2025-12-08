@@ -505,7 +505,7 @@ pub fn sigqueue(pid: Pid, sig: i32, value: SigVal) -> Result<(), SignalQueueErro
             Some(p) => p,
             None => return Err(SignalQueueError::ProcessNotFound),
         };
-        proc.uid
+        proc.uid as Uid
     };
 
     // Create queued signal

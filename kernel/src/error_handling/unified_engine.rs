@@ -301,6 +301,12 @@ pub enum ErrorRateTrend {
     Fluctuating,
 }
 
+impl Default for ErrorRateTrend {
+    fn default() -> Self {
+        Self::Stable
+    }
+}
+
 /// 错误监控器
 #[derive(Debug)]
 pub struct ErrorMonitor {

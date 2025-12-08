@@ -4,7 +4,7 @@
 //! It offers a trait-based system for creating and combining validators,
 //! with support for fast-path validation and detailed error reporting.
 
-use alloc::{collections::BTreeMap, string::{String, ToString}, vec::Vec};
+use alloc::{boxed::Box, collections::BTreeMap, string::{String, ToString}, vec::Vec};
 use core::fmt::Debug;
 
 /// Validation context containing information about the system call being validated
@@ -117,6 +117,7 @@ impl ValidationError {
 }
 
 /// Validation error codes
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ValidationErrorCode {
     /// Invalid parameter number
     InsufficientArguments,
