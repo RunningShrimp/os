@@ -27,11 +27,62 @@ pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sys_time_with_null() {
+        let r = sys_time(&[0u64]);
+        assert!(r.is_ok());
+        let secs = r.unwrap();
+        // At least it returns a non-zero-ish value on a running environment
+        assert!(secs >= 0);
+    }
+}
+
 // Placeholder implementations - to be replaced with actual syscall logic
 
 fn sys_time(_args: &[u64]) -> SyscallResult {
-    // TODO: Implement time syscall
-    Err(SyscallError::NotSupported)
+    use super::common::extract_args;
+    use crate::mm::vm::copyout;
+    use crate::libc::interface::time_t;
+
+    // time(tloc) - one argument (pointer) which may be NULL
+    let args = match extract_args(_args, 1) {
+        Ok(a) => a,
+        Err(_) => return Err(SyscallError::InvalidArgument),
+    };
+
+    let tloc = args[0] as *mut time_t;
+
+    // Get current time in seconds (using nanosecond timestamp source)
+    let ns = crate::time::timestamp_nanos();
+    let seconds = (ns / 1_000_000_000) as u64;
+
+    // If caller provided a pointer, copy the value into user space
+    if !tloc.is_null() {
+        // Find current process pagetable
+        let pid = crate::process::myproc().ok_or(SyscallError::InvalidArgument)?;
+        let proc_table = crate::process::manager::PROC_TABLE.lock();
+        let proc = proc_table.find_ref(pid).ok_or(SyscallError::InvalidArgument)?;
+        let pagetable = proc.pagetable;
+        drop(proc_table);
+
+        if pagetable.is_null() {
+            return Err(SyscallError::BadAddress);
+        }
+
+        // Prepare bytes for time_t (platform-sized). Use native u64 -> time_t cast
+        let val: time_t = seconds as time_t;
+        let bytes = unsafe { core::slice::from_raw_parts((&val as *const time_t) as *const u8, core::mem::size_of::<time_t>()) };
+
+        // Write to user space
+        copyout(pagetable, tloc as usize, bytes.as_ptr(), bytes.len())
+            .map_err(|_| SyscallError::BadAddress)?;
+    }
+
+    Ok(seconds as u64)
 }
 
 /// Get time of day
