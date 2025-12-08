@@ -1,0 +1,36 @@
+name: Block New TODOs in Critical Paths
+
+on:
+  pull_request:
+    paths:
+      - 'kernel/src/**'
+
+jobs:
+  block-new-todos:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.ref }}:refs/remotes/origin/${{ github.event.pull_request.base.ref }}
+
+      - name: Check for added TODO/FIXME/STUB lines
+        run: |
+          set -eo pipefail
+          BASE=origin/${{ github.event.pull_request.base.ref }}
+          # Get added lines between base and head
+          git diff --unified=0 $BASE...HEAD | grep -E "^\+[^+]" | grep -nE "TODO|FIXME|STUB|placeholder|Temporary|hack" || true
+          BAD=$(git diff --unified=0 $BASE...HEAD | grep -E "^\+[^+]" | grep -nE "TODO|FIXME|STUB|placeholder|Temporary|hack" || true)
+          if [ -n "$BAD" ]; then
+            echo "Found newly added TODO-like markers in this PR. Please avoid introducing new TODO/FIXME/STUB placeholders in critical paths."
+            echo "$BAD"
+            exit 1
+          fi
+
+      - name: Success message
+        if: success()
+        run: echo "No new TODO/FIXME/STUB placeholders were added in kernel/src/ — OK"
