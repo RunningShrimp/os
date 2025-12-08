@@ -220,14 +220,23 @@ impl UnifiedPermissionChecker {
                 ResourceType::SystemCall => AclResourceType::SystemCall,
                 ResourceType::Network => AclResourceType::Network,
             },
-            resource_id: 0, // TODO: Convert resource_id properly
-            requested_permissions: self.operation_to_acl_permissions(request.operation),
-            context: crate::security::acl::AccessContext {
-                operation: format!("{:?}", request.operation),
-                path: None, // TODO: Add path information
-                flags: 0, // TODO: Add flags
-                privileged: request.context.privileged,
+            // Try to interpret resource_id as a numeric identifier (inode/file descriptor)
+            resource_id: match request.resource_id.parse::<u64>() {
+                Ok(id) => id,
+                Err(_) => 0,
             },
+            requested_permissions: self.operation_to_acl_permissions(request.operation),
+                context: crate::security::acl::AccessContext {
+                    operation: format!("{:?}", request.operation),
+                    // If resource looks like a path and resource type is file/dir, include it
+                    path: if matches!(request.resource_type, ResourceType::File | ResourceType::Directory) && !request.resource_id.is_empty() {
+                        Some(request.resource_id.clone())
+                    } else {
+                        None
+                    },
+                    flags: 0, // future: map additional flags from request
+                    privileged: request.context.privileged,
+                },
         };
 
         // Use ACL subsystem to check
