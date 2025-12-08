@@ -194,7 +194,7 @@ fn sys_clock_gettime(args: &[u64]) -> SyscallResult {
     };
     
     unsafe {
-        copyin(pagetable, tp_ptr as *mut u8, tp_ptr as usize, core::mem::size_of::<Timespec>())
+        copyout(pagetable, tp_ptr as usize, core::ptr::addr_of!(timespec) as *const u8, core::mem::size_of::<Timespec>())
             .map_err(|_| SyscallError::BadAddress)?;
     }
     
@@ -252,7 +252,7 @@ fn sys_clock_getres(args: &[u64]) -> SyscallResult {
     };
     
     unsafe {
-        copyin(pagetable, res_ptr as *mut u8, res_ptr as usize, core::mem::size_of::<Timespec>())
+        copyout(pagetable, res_ptr as usize, core::ptr::addr_of!(timespec) as *const u8, core::mem::size_of::<Timespec>())
             .map_err(|_| SyscallError::BadAddress)?;
     }
     
