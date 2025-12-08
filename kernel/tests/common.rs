@@ -69,14 +69,29 @@ impl TestUtils {
 
     /// Helper to create a temporary file for testing
     pub fn create_temp_file(name: &str, content: &[u8]) -> IntegrationTestResult {
-        // Implementation would create a temporary file in the VFS
-        Ok(())
+        // Create /tmp if missing then create the requested file and write content
+        let path = alloc::format!("/tmp/{}", name);
+
+        // Ensure tmp directory exists (best effort)
+        let _ = crate::vfs::vfs().mkdir("/tmp", crate::vfs::FileMode::new(crate::vfs::FileMode::S_IFDIR | crate::vfs::FileMode::S_IRWXU));
+
+        match crate::vfs::vfs().create(&path, crate::vfs::FileMode::new(crate::vfs::FileMode::S_IFREG | crate::vfs::FileMode::S_IRUSR | crate::vfs::FileMode::S_IWUSR)) {
+            Ok(_) => {
+                // write content at offset 0
+                let _ = crate::vfs::vfs().write(&path, content, 0);
+                Ok(())
+            }
+            Err(e) => Err(alloc::format!("failed to create temp file {}: {:?}", path, e)),
+        }
     }
 
     /// Helper to remove a temporary file
     pub fn remove_temp_file(name: &str) -> IntegrationTestResult {
-        // Implementation would remove a temporary file from the VFS
-        Ok(())
+        let path = alloc::format!("/tmp/{}", name);
+        match crate::vfs::vfs().unlink(&path) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(alloc::format!("failed to remove temp file {}: {:?}", path, e)),
+        }
     }
 }
 
