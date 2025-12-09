@@ -18,3 +18,9 @@ qemu.log
 
 # Performance reports
 performance-reports/
+
+# 临时文件和构建产物
+temp/
+*.profraw
+*_errors.txt
+*_output.txt

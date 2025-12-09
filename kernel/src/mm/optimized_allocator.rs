@@ -28,6 +28,7 @@ pub struct OptimizedHybridAllocator {
     allocation_count: AtomicUsize,
     deallocation_count: AtomicUsize,
     peak_allocated: AtomicUsize,
+    failed_allocations: AtomicUsize,
 }
 
 impl OptimizedHybridAllocator {
@@ -39,6 +40,7 @@ impl OptimizedHybridAllocator {
             allocation_count: AtomicUsize::new(0),
             deallocation_count: AtomicUsize::new(0),
             peak_allocated: AtomicUsize::new(0),
+            failed_allocations: AtomicUsize::new(0),
         }
     }
 
@@ -90,6 +92,8 @@ impl OptimizedHybridAllocator {
         let ptr = buddy.alloc(layout);
         if !ptr.is_null() {
             self.allocation_count.fetch_add(1, Ordering::Relaxed);
+        } else {
+            self.failed_allocations.fetch_add(1, Ordering::Relaxed);
         }
         ptr
     }
@@ -105,7 +109,7 @@ impl OptimizedHybridAllocator {
         if size >= crate::mm::hugepage::HPAGE_2MB {
             let mut hugepage = self.hugepage.lock();
             hugepage.dealloc(ptr, size);
-            self.deallocation_count.fetch_sub(1, Ordering::Relaxed);
+            self.deallocation_count.fetch_add(1, Ordering::Relaxed);
             return;
         }
         
@@ -113,14 +117,14 @@ impl OptimizedHybridAllocator {
         if size <= 2048 { // Matches SLAB_SIZES defined in optimized_slab.rs
             let mut slab = self.slab.lock();
             unsafe { slab.dealloc(ptr, layout); }
-            self.deallocation_count.fetch_sub(1, Ordering::Relaxed);
+            self.deallocation_count.fetch_add(1, Ordering::Relaxed);
             return;
         }
 
         // Fallback to optimized buddy allocator
         let mut buddy = self.buddy.lock();
         buddy.dealloc(ptr, layout);
-        self.deallocation_count.fetch_sub(1, Ordering::Relaxed);
+        self.deallocation_count.fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn stats(&self) -> (crate::mm::optimized_buddy::AllocatorStats, crate::mm::optimized_slab::AllocatorStats) {
@@ -188,6 +192,7 @@ impl AllocatorWithStats for OptimizedHybridAllocator {
         let (buddy_stats, slab_stats) = self.stats();
         let total_allocations = self.allocation_count.load(Ordering::Relaxed);
         let total_deallocations = self.deallocation_count.load(Ordering::Relaxed);
+        let failed_allocations = self.failed_allocations.load(Ordering::Relaxed);
         
         let current_allocated = buddy_stats.allocated - buddy_stats.freed + slab_stats.used;
         
@@ -205,7 +210,7 @@ impl AllocatorWithStats for OptimizedHybridAllocator {
             total_deallocations,
             current_allocated_bytes: current_allocated,
             peak_allocated_bytes: peak,
-            failed_allocations: 0, // TODO: Track failures
+            failed_allocations,
         }
     }
 }

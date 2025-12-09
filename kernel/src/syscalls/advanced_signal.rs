@@ -82,13 +82,13 @@ fn sys_sigqueue(args: &[u64]) -> SyscallResult {
             }
         }
 
-        unsafe { core::mem::transmute::<[u8; 8], SigVal>(value_data) }
+        unsafe { core::mem::transmute::<[u8; core::mem::size_of::<SigVal>()], SigVal>(value_data) }
     } else {
         SigVal { sival_int: 0 }
     };
 
     // Queue the signal
-    match sigqueue(pid, sig, value) {
+    match sigqueue(pid.try_into().unwrap(), sig, value) {
         Ok(()) => Ok(0),
         Err(SignalQueueError::QueueFull) => Err(SyscallError::WouldBlock),
         Err(SignalQueueError::SignalBlocked) => Err(SyscallError::WouldBlock),
@@ -144,7 +144,7 @@ fn sys_sigtimedwait(args: &[u64]) -> SyscallResult {
             }
         }
 
-        unsafe { core::mem::transmute::<[u8; 8], SigSet>(mask_data) }
+        unsafe { core::mem::transmute::<[u8; core::mem::size_of::<SigSet>()], SigSet>(mask_data) }
     } else {
         SigSet::empty()
     };
@@ -160,7 +160,7 @@ fn sys_sigtimedwait(args: &[u64]) -> SyscallResult {
             }
         }
 
-        let timeout: Timespec = unsafe { core::mem::transmute(timeout_data) };
+        let timeout: Timespec = unsafe { core::mem::transmute::<[u8; core::mem::size_of::<Timespec>()], Timespec>(timeout_data) };
         
         // Validate timeout
         if timeout.tv_sec < 0 || timeout.tv_nsec < 0 || timeout.tv_nsec >= 1_000_000_000 {
@@ -177,7 +177,7 @@ fn sys_sigtimedwait(args: &[u64]) -> SyscallResult {
         Ok(info) => {
             // Copy signal info back to user space
             if info_ptr != 0 {
-                let info_data = unsafe { core::mem::transmute::<SigInfoT, [u8; 128]>(info) };
+                let info_data = unsafe { core::mem::transmute::<SigInfoT, [u8; core::mem::size_of::<SigInfoT>()]>(info) };
                 
                 unsafe {
                     match crate::mm::vm::copyout(pagetable, info_ptr, info_data.as_ptr(), info_data.len()) {
@@ -194,6 +194,7 @@ fn sys_sigtimedwait(args: &[u64]) -> SyscallResult {
         Err(SignalWaitError::ProcessNotFound) => Err(SyscallError::NotFound),
         Err(SignalWaitError::Interrupted) => Err(SyscallError::Interrupted),
         Err(SignalWaitError::InvalidMask) => Err(SyscallError::InvalidArgument),
+        _ => Err(SyscallError::InvalidArgument), // Handle any other variants
     }
 }
 
@@ -315,7 +316,7 @@ fn sys_sigaltstack(args: &[u64]) -> SyscallResult {
             }
         }
 
-        let stack: StackT = unsafe { core::mem::transmute(stack_data) };
+        let stack: StackT = unsafe { core::mem::transmute::<[u8; core::mem::size_of::<StackT>()], StackT>(stack_data) };
         
         // Validate stack
         if stack.ss_flags & crate::posix::SS_ONSTACK != 0 {

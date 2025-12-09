@@ -8,9 +8,9 @@
 //! - 进程信息：getpid, getppid, getsid
 //! - 用户信息：getuid, getgid, geteuid, getegid
 
-use core::ffi::{c_char, c_int, c_short, c_long, c_uint, c_double, c_ushort};
+use core::ffi::{c_char, c_int, c_long, c_uint, c_double, c_ushort};
 use core::str::FromStr;
-use crate::libc::error::{get_errno, set_errno};
+use crate::libc::error::set_errno;
 use crate::libc::error::errno::{EINVAL, ENAMETOOLONG, EPERM};
 use crate::libc::interface::c_ulong;
 

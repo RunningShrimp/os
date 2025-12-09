@@ -455,8 +455,8 @@ impl SyscallService {
 
     /// 获取当前时间戳（纳秒）
     fn get_timestamp_ns(&self) -> u64 {
-        // TODO: 使用高精度定时器
-        crate::time::rdtsc() as u64
+        // Use high precision timer (nanoseconds since boot)
+        crate::time::hrtime_nanos() as u64
     }
 
     /// 获取服务ID

@@ -52,8 +52,8 @@ pub mod standard_tests;
 
 // 重新导出核心组件
 pub use interface::*;
-pub use error::*;
-pub use config::*;
+// 重新导出错误处理函数
+pub use error::{get_errno, set_errno, clear_errno, has_error, strerror, check_errno};
 
 // 重导出实现
 // Note: minimal and simple are now part of newlib.rs

@@ -48,7 +48,7 @@ fn sys_capget(args: &[u64]) -> SyscallResult {
         return Err(SyscallError::InvalidArgument);
     }
 
-    let pid = args[0] as Pid;
+    let pid: Pid = args[0] as Pid;
     let header_ptr = args[1] as usize;
     let data_ptr = args[2] as usize;
 
@@ -99,7 +99,7 @@ fn sys_capget(args: &[u64]) -> SyscallResult {
     }
 
     // Get capabilities
-    match capget(pid, &mut unsafe { core::mem::transmute::<[u8; 12], CapHeader>(header_data) }, &mut unsafe { core::mem::transmute::<[u8; 12], CapData>(data_data) }) {
+    match capget(pid, &mut unsafe { core::mem::transmute::<[u8; 8], CapHeader>(header_data) }, &mut unsafe { core::mem::transmute::<[u8; 12], CapData>(data_data) }) {
         Ok(()) => Ok(0),
         Err(SecurityError::InvalidCapability) => Err(SyscallError::InvalidArgument),
         Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
@@ -120,7 +120,7 @@ fn sys_capset(args: &[u64]) -> SyscallResult {
         return Err(SyscallError::InvalidArgument);
     }
 
-    let pid = args[0] as Pid;
+    let pid: Pid = args[0] as Pid;
     let header_ptr = args[1] as usize;
     let data_ptr = args[2] as usize;
 
@@ -171,7 +171,7 @@ fn sys_capset(args: &[u64]) -> SyscallResult {
     }
 
     // Set capabilities
-    match capset(pid, &unsafe { core::mem::transmute::<[u8; 12], CapHeader>(header_data) }, &unsafe { core::mem::transmute::<[u8; 12], CapData>(data_data) }) {
+    match capset(pid, &unsafe { core::mem::transmute::<[u8; 8], CapHeader>(header_data) }, &unsafe { core::mem::transmute::<[u8; 12], CapData>(data_data) }) {
         Ok(()) => Ok(0),
         Err(SecurityError::InvalidCapability) => Err(SyscallError::InvalidArgument),
         Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),

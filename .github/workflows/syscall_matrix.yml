@@ -2,8 +2,8 @@ name: Syscall Matrix CI
 on:
   push:
     paths:
-      - 'kernel/src/syscall.rs'
-      - 'kernel/src/syscalls.rs'
+      - 'kernel/src/syscalls/**'
+      - 'kernel/src/services/syscall.rs'
       - 'xtask/**'
       - '.github/workflows/syscall_matrix.yml'
   workflow_dispatch:

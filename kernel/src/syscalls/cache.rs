@@ -300,7 +300,19 @@ pub struct CacheStats {
 
 /// Global system call cache instance
 use crate::sync::Mutex;
-static GLOBAL_SYSCALL_CACHE: Mutex<SyscallCache> = Mutex::new(SyscallCache::new());
+static GLOBAL_SYSCALL_CACHE: Mutex<Option<SyscallCache>> = Mutex::new(None);
+
+/// Get or initialize the global system call cache
+fn get_or_init_cache() -> &'static Mutex<Option<SyscallCache>> {
+    use crate::sync::Once;
+    static INIT_ONCE: Once = Once::new();
+
+    INIT_ONCE.call_once(|| {
+        *GLOBAL_SYSCALL_CACHE.lock() = Some(SyscallCache::new());
+    });
+
+    &GLOBAL_SYSCALL_CACHE
+}
 
 /// Initialize the system call cache
 pub fn init_syscall_cache() {
@@ -311,11 +323,11 @@ pub fn init_syscall_cache() {
         pure_only: true,
         eviction_policy: EvictionPolicy::LRU,
     };
-    
-    *GLOBAL_SYSCALL_CACHE.lock() = SyscallCache::with_config(config);
+
+    *get_or_init_cache().lock() = Some(SyscallCache::with_config(config));
 }
 
 /// Get the global system call cache
-pub fn get_global_cache() -> &'static Mutex<SyscallCache> {
-    &GLOBAL_SYSCALL_CACHE
+pub fn get_global_cache() -> &'static Mutex<Option<SyscallCache>> {
+    get_or_init_cache()
 }

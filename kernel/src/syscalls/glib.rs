@@ -1026,9 +1026,58 @@ pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
 
 // Placeholder implementations - to be replaced with actual syscall logic
 
-fn sys_getrandom(_args: &[u64]) -> SyscallResult {
-    // TODO: Implement getrandom syscall
-    Err(SyscallError::NotSupported)
+fn sys_getrandom(args: &[u64]) -> SyscallResult {
+    use super::common::extract_args;
+    use crate::mm::vm::copyout;
+    
+    let args = extract_args(args, 3)?;
+    let buf_ptr = args[0] as usize;
+    let buf_len = args[1] as usize;
+    let flags = args[2] as u32;
+    
+    // Validate buffer
+    if buf_ptr == 0 || buf_len == 0 {
+        return Err(SyscallError::InvalidArgument);
+    }
+    
+    // Limit buffer size to prevent excessive work
+    let max_len = 256usize;
+    let actual_len = buf_len.min(max_len);
+    
+    // Get current process for page table access
+    let pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
+    let proc_table = crate::process::manager::PROC_TABLE.lock();
+    let proc = proc_table.find_ref(pid).ok_or(SyscallError::NotFound)?;
+    let pagetable = proc.pagetable;
+    drop(proc_table);
+    
+    if pagetable.is_null() {
+        return Err(SyscallError::BadAddress);
+    }
+    
+    // Generate pseudo-random bytes using a simple LFSR-based RNG
+    // In a real kernel, this would use hardware RNG if available
+    let mut rand_bytes = [0u8; 256];
+    let seed = crate::time::timestamp_nanos() as u64;
+    let mut state = seed;
+    
+    for i in 0..actual_len {
+        // Linear feedback shift register for pseudo-random generation
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        rand_bytes[i] = (state & 0xFF) as u8;
+    }
+    
+    // Copy random bytes to user space
+    unsafe {
+        copyout(pagetable, buf_ptr, rand_bytes.as_ptr(), actual_len)
+            .map_err(|_| SyscallError::BadAddress)?;
+    }
+    
+    let _ = flags; // Would handle GRND_RANDOM, GRND_NONBLOCK flags
+    
+    Ok(actual_len as u64)
 }
 
 fn sys_memfd_create(args: &[u64]) -> SyscallResult {

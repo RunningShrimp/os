@@ -8,7 +8,7 @@
 //! - 高性能近似算法
 
 use core::ffi::{c_double, c_float, c_int};
-use crate::libc::error::{get_errno, set_errno};
+use crate::libc::error::set_errno;
 use crate::libc::error::errno::{EDOM, ERANGE};
 use libm;
 

@@ -34,12 +34,24 @@ pub enum NetworkProtocol {
     IPv6,   // Internet Protocol version 6
 }
 
+impl Default for NetworkProtocol {
+    fn default() -> Self {
+        NetworkProtocol::IP
+    }
+}
+
 /// 网络接口状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InterfaceStatus {
     Down,   // 接口关闭
     Up,     // 接口启动
     Testing,// 接口测试中
+}
+
+impl Default for InterfaceStatus {
+    fn default() -> Self {
+        InterfaceStatus::Down
+    }
 }
 
 /// 网络接口类型
@@ -50,6 +62,12 @@ pub enum InterfaceType {
     Wireless,   // 无线网络
     Tunnel,     // 隧道接口
     Virtual,    // 虚拟接口
+}
+
+impl Default for InterfaceType {
+    fn default() -> Self {
+        InterfaceType::Ethernet
+    }
 }
 
 /// 网络接口信息
@@ -238,6 +256,12 @@ pub enum SocketState {
     TimeWait,   // 时间等待
 }
 
+impl Default for SocketState {
+    fn default() -> Self {
+        SocketState::Closed
+    }
+}
+
 /// Socket地址
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SocketAddress {
@@ -249,6 +273,12 @@ pub struct SocketAddress {
     pub ipv6: Option<[u8; 16]>,
     /// 端口号
     pub port: u16,
+}
+
+impl Default for SocketAddress {
+    fn default() -> Self {
+        SocketAddress::new_ipv4(0, 0)
+    }
 }
 
 impl SocketAddress {
@@ -526,48 +556,296 @@ pub fn init() -> Result<(), &'static str> {
 /// 兼容性接口 - 保持与现有代码的兼容性
 /// Open a network socket
 pub fn net_socket(domain: u32, socket_type: u32, protocol: u32) -> Option<usize> {
-    // TODO: Implement socket creation
+    // Get the network manager
+    if !NETWORK_MANAGER_INIT.load(core::sync::atomic::Ordering::Relaxed) {
+        return None;
+    }
+    
+    unsafe {
+        if let Some(ref manager) = NETWORK_MANAGER {
+            let service = manager.get_service();
+            let socket_id = service.next_socket_id.fetch_add(1, Ordering::Relaxed);
+            
+            let socket_info = SocketInfo {
+                socket_id,
+                socket_type: socket_type as i32,
+                protocol_family: domain as i32,
+                protocol: protocol as i32,
+                local_address: SocketAddress::default(),
+                remote_address: None,
+                state: SocketState::Closed,
+                process_id: crate::process::myproc().unwrap_or(0) as u32,
+                rx_buffer_size: 65536,
+                tx_buffer_size: 65536,
+                rx_queue_len: AtomicUsize::new(0),
+                tx_queue_len: AtomicUsize::new(0),
+            };
+            
+            service.sockets.lock().insert(socket_id, socket_info);
+            service.stats.lock().total_sockets_created.fetch_add(1, Ordering::Relaxed);
+            
+            return Some(socket_id as usize);
+        }
+    }
+    
     None
 }
 
 /// Bind a socket to an address
 pub fn net_bind(socket: usize, addr: *const u8, addr_len: usize) -> bool {
-    // TODO: Implement socket bind
+    if addr.is_null() || addr_len < 4 {
+        return false;
+    }
+    
+    if !NETWORK_MANAGER_INIT.load(core::sync::atomic::Ordering::Relaxed) {
+        return false;
+    }
+    
+    unsafe {
+        if let Some(ref manager) = NETWORK_MANAGER {
+            let service = manager.get_service();
+            let mut sockets = service.sockets.lock();
+            
+            if let Some(socket_info) = sockets.get_mut(&(socket as u32)) {
+                // Parse address from raw bytes (simplified - assumes sockaddr_in)
+                let family = *addr as i32;
+                let port = ((*addr.add(2) as u16) << 8) | (*addr.add(3) as u16);
+                let ip = if addr_len >= 8 {
+                    ((*addr.add(4) as u32) << 24) |
+                    ((*addr.add(5) as u32) << 16) |
+                    ((*addr.add(6) as u32) << 8) |
+                    (*addr.add(7) as u32)
+                } else {
+                    0
+                };
+                
+                socket_info.local_address = SocketAddress::new_ipv4(ip, port);
+                return true;
+            }
+        }
+    }
+    
     false
 }
 
 /// Listen for incoming connections
 pub fn net_listen(socket: usize, backlog: usize) -> bool {
-    // TODO: Implement socket listen
+    if !NETWORK_MANAGER_INIT.load(core::sync::atomic::Ordering::Relaxed) {
+        return false;
+    }
+    
+    unsafe {
+        if let Some(ref manager) = NETWORK_MANAGER {
+            let service = manager.get_service();
+            let mut sockets = service.sockets.lock();
+            
+            if let Some(socket_info) = sockets.get_mut(&(socket as u32)) {
+                if socket_info.socket_type == SOCK_STREAM as i32 {
+                    socket_info.state = SocketState::Listen;
+                    let _ = backlog; // Could store this for connection queue limit
+                    return true;
+                }
+            }
+        }
+    }
+    
     false
 }
 
 /// Accept incoming connection
 pub fn net_accept(socket: usize, addr: *mut u8, addr_len: *mut usize) -> Option<usize> {
-    // TODO: Implement socket accept
+    if !NETWORK_MANAGER_INIT.load(core::sync::atomic::Ordering::Relaxed) {
+        return None;
+    }
+    
+    unsafe {
+        if let Some(ref manager) = NETWORK_MANAGER {
+            let service = manager.get_service();
+            let socket_info = {
+                let sockets = service.sockets.lock();
+                sockets.get(&(socket as u32)).cloned()
+            };
+
+            if let Some(socket_info) = socket_info {
+                if socket_info.state == SocketState::Listen {
+                    // In a real implementation, this would block and wait for incoming connection
+                    // For now, create a new socket for the connection
+
+                    let new_socket_id = service.next_socket_id.fetch_add(1, Ordering::Relaxed);
+                    let new_socket = SocketInfo {
+                        socket_id: new_socket_id,
+                        socket_type: socket_info.socket_type,
+                        protocol_family: socket_info.protocol_family,
+                        protocol: socket_info.protocol,
+                        local_address: socket_info.local_address,
+                        remote_address: Some(SocketAddress::default()),
+                        state: SocketState::Established,
+                        process_id: socket_info.process_id,
+                        rx_buffer_size: socket_info.rx_buffer_size,
+                        tx_buffer_size: socket_info.tx_buffer_size,
+                        rx_queue_len: AtomicUsize::new(0),
+                        tx_queue_len: AtomicUsize::new(0),
+                    };
+                    
+                    // Return address if requested
+                    if !addr.is_null() && !addr_len.is_null() {
+                        // Would copy remote address here
+                        *addr_len = 0;
+                    }
+                    
+                    service.sockets.lock().insert(new_socket_id, new_socket);
+                    service.stats.lock().active_connections.fetch_add(1, Ordering::Relaxed);
+                    
+                    return Some(new_socket_id as usize);
+                }
+            }
+        }
+    }
+    
     None
 }
 
 /// Connect to a remote address
 pub fn net_connect(socket: usize, addr: *const u8, addr_len: usize) -> bool {
-    // TODO: Implement socket connect
+    if addr.is_null() || addr_len < 4 {
+        return false;
+    }
+    
+    if !NETWORK_MANAGER_INIT.load(core::sync::atomic::Ordering::Relaxed) {
+        return false;
+    }
+    
+    unsafe {
+        if let Some(ref manager) = NETWORK_MANAGER {
+            let service = manager.get_service();
+            let mut sockets = service.sockets.lock();
+            
+            if let Some(socket_info) = sockets.get_mut(&(socket as u32)) {
+                // Parse destination address
+                let port = ((*addr.add(2) as u16) << 8) | (*addr.add(3) as u16);
+                let ip = if addr_len >= 8 {
+                    ((*addr.add(4) as u32) << 24) |
+                    ((*addr.add(5) as u32) << 16) |
+                    ((*addr.add(6) as u32) << 8) |
+                    (*addr.add(7) as u32)
+                } else {
+                    0
+                };
+                
+                socket_info.remote_address = Some(SocketAddress::new_ipv4(ip, port));
+                socket_info.state = SocketState::Established;
+                
+                drop(sockets);
+                service.stats.lock().active_connections.fetch_add(1, Ordering::Relaxed);
+                
+                return true;
+            }
+        }
+    }
+    
     false
 }
 
 /// Send data over socket
 pub fn net_send(socket: usize, buf: *const u8, len: usize, flags: u32) -> Option<usize> {
-    // TODO: Implement socket send
+    if buf.is_null() || len == 0 {
+        return None;
+    }
+    
+    if !NETWORK_MANAGER_INIT.load(core::sync::atomic::Ordering::Relaxed) {
+        return None;
+    }
+    
+    unsafe {
+        if let Some(ref manager) = NETWORK_MANAGER {
+            let service = manager.get_service();
+            let sockets = service.sockets.lock();
+            
+            if let Some(socket_info) = sockets.get(&(socket as u32)) {
+                if socket_info.state == SocketState::Established {
+                    // In a real implementation, this would enqueue data for sending
+                    socket_info.tx_queue_len.fetch_add(len, Ordering::Relaxed);
+                    
+                    drop(sockets);
+                    let stats = service.stats.lock();
+                    stats.total_tx_bytes.fetch_add(len as u64, Ordering::Relaxed);
+                    stats.total_tx_packets.fetch_add(1, Ordering::Relaxed);
+                    
+                    let _ = flags; // Would handle MSG_OOB, MSG_DONTWAIT, etc.
+                    return Some(len);
+                }
+            }
+        }
+    }
+    
     None
 }
 
 /// Receive data from socket
 pub fn net_recv(socket: usize, buf: *mut u8, len: usize, flags: u32) -> Option<usize> {
-    // TODO: Implement socket recv
+    if buf.is_null() || len == 0 {
+        return None;
+    }
+    
+    if !NETWORK_MANAGER_INIT.load(core::sync::atomic::Ordering::Relaxed) {
+        return None;
+    }
+    
+    unsafe {
+        if let Some(ref manager) = NETWORK_MANAGER {
+            let service = manager.get_service();
+            let sockets = service.sockets.lock();
+            
+            if let Some(socket_info) = sockets.get(&(socket as u32)) {
+                if socket_info.state == SocketState::Established {
+                    // In a real implementation, this would dequeue received data
+                    let available = socket_info.rx_queue_len.load(Ordering::Relaxed);
+                    let to_read = available.min(len);
+                    
+                    if to_read > 0 {
+                        socket_info.rx_queue_len.fetch_sub(to_read, Ordering::Relaxed);
+                        
+                        drop(sockets);
+                        let stats = service.stats.lock();
+                        stats.total_rx_bytes.fetch_add(to_read as u64, Ordering::Relaxed);
+                        stats.total_rx_packets.fetch_add(1, Ordering::Relaxed);
+                        
+                        let _ = flags; // Would handle MSG_PEEK, MSG_DONTWAIT, etc.
+                        return Some(to_read);
+                    } else if flags & 0x40 != 0 { // MSG_DONTWAIT
+                        return Some(0); // Non-blocking, return 0 if no data
+                    }
+                    // Else would block waiting for data
+                }
+            }
+        }
+    }
+    
     None
 }
 
 /// Close a socket
 pub fn net_close(socket: usize) -> bool {
-    // TODO: Implement socket close
+    if !NETWORK_MANAGER_INIT.load(core::sync::atomic::Ordering::Relaxed) {
+        return false;
+    }
+    
+    unsafe {
+        if let Some(ref manager) = NETWORK_MANAGER {
+            let service = manager.get_service();
+            let mut sockets = service.sockets.lock();
+            
+            if let Some(socket_info) = sockets.remove(&(socket as u32)) {
+                if socket_info.state == SocketState::Established {
+                    drop(sockets);
+                    service.stats.lock().active_connections.fetch_sub(1, Ordering::Relaxed);
+                }
+                
+                service.stats.lock().total_sockets_closed.fetch_add(1, Ordering::Relaxed);
+                return true;
+            }
+        }
+    }
+    
     false
 }

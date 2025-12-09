@@ -12,6 +12,7 @@ use crate::posix::{Uid, Gid, Pid, Mode};
 use crate::sync::Mutex;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
+use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering};
 

@@ -17,6 +17,7 @@ use crate::posix::security::*;
 use crate::syscalls::common::SyscallError;
 use alloc::string::String;
 use alloc::vec::Vec;
+use alloc::string::ToString;
 
 /// Test result type
 pub type TestResult = Result<(), String>;
@@ -88,7 +89,7 @@ impl TestRunner {
     }
 
     /// Run a single test
-    pub fn run_test<F>(&mut self, test_name: &str, test_fn: F) -> &TestContext
+    pub fn run_test<F>(&mut self, test_name: &str, test_fn: F) -> TestContext
     where
         F: FnOnce(&mut TestContext) -> TestResult,
     {
@@ -105,14 +106,14 @@ impl TestRunner {
                 crate::println!("[test] PASSED: {}", test_name);
             }
             Err(error) => {
-                context.fail(error);
+                context.fail(&error);
                 self.tests_failed += 1;
                 crate::println!("[test] FAILED: {} - {}", test_name, error);
             }
         }
         
         self.tests_run += 1;
-        &context
+        context
     }
 
     /// Print test summary
@@ -170,6 +171,7 @@ fn test_aio_functionality(runner: &mut TestRunner) {
         assert_eq!(aiocb.aio_offset, 0, "Default offset should be 0");
         assert_eq!(aiocb.aio_nbytes, 0, "Default byte count should be 0");
         assert_eq!(aiocb.aio_reqprio, 0, "Default priority should be 0");
+        Ok(())
     });
     
     runner.run_test("AIO Return Status", |context| {
@@ -190,13 +192,14 @@ fn test_aio_functionality(runner: &mut TestRunner) {
                 context.fail(&format!("Invalid AIO return status: {}", status));
             }
         }
+        Ok(())
     });
 }
 
 /// Test advanced memory mapping
 fn test_advanced_memory_mapping(runner: &mut TestRunner) {
     runner.run_test("CPU Set Creation", |context| {
-        let cpuset = crate::posix::CpuSet::new();
+        let mut cpuset = crate::posix::CpuSet::new();
         assert_eq!(cpuset.count(), 0, "New CPU set should be empty");
         
         // Test adding CPUs
@@ -210,6 +213,7 @@ fn test_advanced_memory_mapping(runner: &mut TestRunner) {
         assert!(cpuset.is_set(1), "CPU 1 should be set");
         assert!(cpuset.is_set(2), "CPU 2 should be set");
         assert!(!cpuset.is_set(3), "CPU 3 should not be set");
+        Ok(())
     });
     
     runner.run_test("Memory Advice", |context| {
@@ -219,6 +223,7 @@ fn test_advanced_memory_mapping(runner: &mut TestRunner) {
         assert_eq!(crate::posix::MADV_SEQUENTIAL, 2, "Sequential advice should be 2");
         assert_eq!(crate::posix::MADV_WILLNEED, 3, "Will need advice should be 3");
         assert_eq!(crate::posix::MADV_DONTNEED, 4, "Don't need advice should be 4");
+        Ok(())
     });
     
     runner.run_test("Memory Locking", |context| {
@@ -226,6 +231,7 @@ fn test_advanced_memory_mapping(runner: &mut TestRunner) {
         assert_eq!(crate::posix::MCL_CURRENT, 1, "Current memory should be 1");
         assert_eq!(crate::posix::MCL_FUTURE, 2, "Future memory should be 2");
         assert_eq!(crate::posix::MCL_ONFAULT, 4, "On fault memory should be 4");
+        Ok(())
     });
 }
 
@@ -245,6 +251,7 @@ fn test_message_queue_semantics(runner: &mut TestRunner) {
         attr.mq_msgsize = 4096;
         assert_eq!(attr.mq_maxmsg, 20, "Modified max messages should be 20");
         assert_eq!(attr.mq_msgsize, 4096, "Modified message size should be 4096");
+        Ok(())
     });
     
     runner.run_test("Message Queue Notification", |context| {
@@ -256,6 +263,7 @@ fn test_message_queue_semantics(runner: &mut TestRunner) {
         
         assert_eq!(notify.notify_method, crate::posix::MQ_SIGNAL, "Notification method should be signal");
         assert_eq!(notify.notify_sig, crate::posix::SIGUSR1, "Notification signal should be SIGUSR1");
+        Ok(())
     });
 }
 
@@ -269,11 +277,12 @@ fn test_advanced_signal_handling(runner: &mut TestRunner) {
         assert_eq!(queue.len(), 0, "New queue length should be 0");
         
         // Test signal queue statistics
-        let stats = queue.get_stats(None);
+        let stats = queue.get_stats();
         assert_eq!(stats.total_pending, 0, "Total pending should be 0");
         assert_eq!(stats.real_time_pending, 0, "Real-time pending should be 0");
         assert_eq!(stats.standard_pending, 0, "Standard pending should be 0");
         assert_eq!(stats.max_capacity, crate::posix::advanced_signal::MAX_PENDING_SIGNALS, "Max capacity should be correct");
+        Ok(())
     });
     
     runner.run_test("Queued Signal Creation", |context| {
@@ -290,6 +299,7 @@ fn test_advanced_signal_handling(runner: &mut TestRunner) {
         assert_eq!(signal.info.si_uid, 1234, "UID should match");
         assert_eq!(signal.info.si_value.sival_int, 42, "Signal value should match");
         assert!(!signal.delivered, "Signal should not be delivered initially");
+        Ok(())
     });
     
     runner.run_test("Alternate Signal Stack", |context| {
@@ -297,7 +307,7 @@ fn test_advanced_signal_handling(runner: &mut TestRunner) {
             Ok(stack) => stack,
             Err(crate::posix::advanced_signal::SignalStackError::StackTooSmall) => {
                 context.fail("Should create stack successfully");
-                return;
+                return Err(());
             }
         };
         
@@ -305,6 +315,7 @@ fn test_advanced_signal_handling(runner: &mut TestRunner) {
         assert_eq!(stack.size, 4096, "Stack size should be 4096");
         assert_eq!(stack.flags, 0, "Stack flags should be 0");
         assert!(!stack.in_use, "Stack should not be in use initially");
+        Ok(())
     });
 }
 
@@ -318,10 +329,11 @@ fn test_realtime_extensions(runner: &mut TestRunner) {
         assert!(param.is_valid_for_policy(crate::posix::realtime::SCHED_RR), "Priority 50 should be valid for RR");
         assert!(!param.is_valid_for_policy(crate::posix::realtime::SCHED_NORMAL), "Priority 50 should not be valid for NORMAL");
         assert!(!param.is_valid_for_policy(crate::posix::realtime::SCHED_BATCH), "Priority 50 should not be valid for BATCH");
+        Ok(())
     });
     
     runner.run_test("CPU Affinity", |context| {
-        let cpuset = crate::posix::realtime::CpuSet::new();
+        let mut cpuset = crate::posix::realtime::CpuSet::new();
         
         // Test CPU set operations
         cpuset.set(0);
@@ -341,17 +353,19 @@ fn test_realtime_extensions(runner: &mut TestRunner) {
         // Test clearing
         cpuset.clear_all();
         assert_eq!(cpuset.count(), 0, "Cleared CPU set should be empty");
+        Ok(())
     });
     
     runner.run_test("Priority Ranges", |context| {
         // Test priority ranges for different policies
-        let (min_fifo, max_fifo) = crate::posix::realtime::sched_get_priority_max(crate::posix::realtime::SCHED_FIFO).unwrap();
-        let (min_rr, max_rr) = crate::posix::realtime::sched_get_priority_min(crate::posix::realtime::SCHED_RR).unwrap();
-        let (min_normal, max_normal) = crate::posix::realtime::sched_get_priority_max(crate::posix::realtime::SCHED_NORMAL).unwrap();
+        let max_fifo = crate::posix::realtime::sched_get_priority_max(crate::posix::realtime::SCHED_FIFO).unwrap();
+        let min_rr = crate::posix::realtime::sched_get_priority_min(crate::posix::realtime::SCHED_RR).unwrap();
+        let max_normal = crate::posix::realtime::sched_get_priority_max(crate::posix::realtime::SCHED_NORMAL).unwrap();
         
-        assert_eq!((min_fifo, max_fifo), (1, 99), "FIFO priority range should be 1-99");
-        assert_eq!((min_rr, max_rr), (1, 99), "RR priority range should be 1-99");
-        assert_eq!((min_normal, max_normal), (0, 0), "Normal priority range should be 0-0");
+        assert_eq!(max_fifo, 99, "FIFO max priority should be 99");
+        assert_eq!(min_rr, 1, "RR min priority should be 1");
+        assert_eq!(max_normal, 0, "Normal max priority should be 0");
+        Ok(())
     });
 }
 
@@ -375,6 +389,7 @@ fn test_advanced_thread_features(runner: &mut TestRunner) {
         
         assert!(attr.set_stack_size(16384).is_ok(), "Should set 16KB stack");
         assert_eq!(attr.get_stack_size(), 16384, "Stack size should be 16KB");
+        Ok(())
     });
     
     runner.run_test("Barrier Synchronization", |context| {
@@ -382,7 +397,7 @@ fn test_advanced_thread_features(runner: &mut TestRunner) {
             Ok(barrier) => barrier,
             Err(_) => {
                 context.fail("Should create barrier successfully");
-                return;
+                return Err(());
             }
         };
         
@@ -390,6 +405,7 @@ fn test_advanced_thread_features(runner: &mut TestRunner) {
         assert_eq!(stats.required, 3, "Barrier should require 3 threads");
         assert_eq!(stats.waiting, 0, "No threads should be waiting");
         assert!(!stats.in_use, "Barrier should not be in use");
+        Ok(())
     });
     
     runner.run_test("Spinlock Synchronization", |context| {
@@ -403,6 +419,7 @@ fn test_advanced_thread_features(runner: &mut TestRunner) {
         spinlock.unlock();
         assert!(!spinlock.is_locked(), "Lock should be released");
         assert_eq!(spinlock.get_stats().count, 0, "Lock count should be 0");
+        Ok(())
     });
 }
 
@@ -426,6 +443,7 @@ fn test_security_permissions(runner: &mut TestRunner) {
         assert_eq!(wheel_entry.gr_gid, 1, "Wheel GID should be 1");
         assert_eq!(wheel_entry.gr_mem.len(), 1, "Wheel group should have root member");
         assert_eq!(wheel_entry.gr_mem[0], "root", "Wheel group should have root member");
+        Ok(())
     });
     
     runner.run_test("Process Credentials", |context| {
@@ -450,6 +468,7 @@ fn test_security_permissions(runner: &mut TestRunner) {
         assert!(!creds.has_capability(crate::posix::security::CAP_KILL), "Should not have kill capability");
         creds.capabilities.effective |= crate::posix::security::CAP_KILL;
         assert!(creds.has_capability(crate::posix::security::CAP_KILL), "Should have kill capability after setting");
+        Ok(())
     });
     
     runner.run_test("Capability Constants", |context| {
@@ -458,6 +477,7 @@ fn test_security_permissions(runner: &mut TestRunner) {
         assert_eq!(crate::posix::security::CAP_KILL, 5, "CAP_KILL should be 5");
         assert_eq!(crate::posix::security::CAP_SETUID, 7, "CAP_SETUID should be 7");
         assert_eq!(crate::posix::security::CAP_NET_BIND_SERVICE, 10, "CAP_NET_BIND_SERVICE should be 10");
+        Ok(())
     });
 }
 

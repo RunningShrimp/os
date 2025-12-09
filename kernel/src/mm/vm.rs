@@ -8,12 +8,57 @@
 extern crate alloc;
 
 use core::ptr;
+use core::sync::atomic::{AtomicU32, Ordering};
+use alloc::collections::BTreeMap;
 use crate::mm::{kalloc, kfree};
 
 // Re-export PAGE_SIZE for other modules
 pub use crate::mm::PAGE_SIZE;
 use crate::drivers::platform;
 use crate::sync::Mutex;
+
+// ============================================================================
+// Page Reference Counting for COW
+// ============================================================================
+
+/// Maximum number of pages to track (configurable based on memory size)
+const MAX_TRACKED_PAGES: usize = 65536;
+
+/// Page reference counts (indexed by page frame number)
+static PAGE_REFCOUNTS: Mutex<BTreeMap<usize, u32>> = Mutex::new(BTreeMap::new());
+
+/// Increment reference count for a page
+pub fn page_ref_inc(pa: usize) {
+    let pfn = pa / PAGE_SIZE;
+    let mut refcounts = PAGE_REFCOUNTS.lock();
+    let count = refcounts.entry(pfn).or_insert(0);
+    *count = count.saturating_add(1);
+}
+
+/// Decrement reference count for a page and free if zero
+/// Returns true if the page was freed
+pub fn page_ref_dec(pa: usize) -> bool {
+    let pfn = pa / PAGE_SIZE;
+    let mut refcounts = PAGE_REFCOUNTS.lock();
+    
+    if let Some(count) = refcounts.get_mut(&pfn) {
+        *count = count.saturating_sub(1);
+        if *count == 0 {
+            refcounts.remove(&pfn);
+            // Free the page
+            unsafe { kfree(pa as *mut u8); }
+            return true;
+        }
+    }
+    false
+}
+
+/// Get reference count for a page
+pub fn page_ref_count(pa: usize) -> u32 {
+    let pfn = pa / PAGE_SIZE;
+    let refcounts = PAGE_REFCOUNTS.lock();
+    *refcounts.get(&pfn).unwrap_or(&1)
+}
 
 // ============================================================================
 // Architecture-specific page table definitions
@@ -833,8 +878,40 @@ pub unsafe fn free_pagetable(pagetable: *mut PageTable) {
         return;
     }
     
-    // TODO: Recursively free page table pages
-    unsafe { kfree(pagetable as *mut u8); }
+    // Recursively free page table pages
+    let pt = &*pagetable;
+    
+    // Iterate through top-level page table entries
+    for i in 0..512 {
+        let pte = pt.entries[i];
+        if pte != 0 && (pte & flags::PTE_V) != 0 {
+            // Check if this is a leaf page or points to another page table
+            // On RISC-V, if it's not a leaf (R/W/X bits are not set), it's a page table
+            #[cfg(target_arch = "riscv64")]
+            let is_page_table = (pte & (flags::PTE_R | flags::PTE_W | flags::PTE_X)) == 0;
+            
+            #[cfg(target_arch = "aarch64")]
+            let is_page_table = (pte & 0x3) == 0x3; // Table descriptor
+            
+            #[cfg(target_arch = "x86_64")]
+            let is_page_table = (pte & (1 << 7)) == 0; // Not a huge page
+            
+            #[cfg(not(any(target_arch = "riscv64", target_arch = "aarch64", target_arch = "x86_64")))]
+            let is_page_table = false;
+            
+            if is_page_table {
+                // Extract physical address of next level page table
+                let next_pt = ((pte >> 10) << 12) as *mut PageTable;
+                if !next_pt.is_null() {
+                    // Recursively free
+                    free_pagetable(next_pt);
+                }
+            }
+        }
+    }
+    
+    // Free this page table page
+    kfree(pagetable as *mut u8);
 }
 
 /// Map pages in a page table
@@ -1274,6 +1351,15 @@ unsafe fn handle_cow_fault(
     #[cfg(not(target_arch = "riscv64"))]
     let old_pa = (old_pte & !0xFFF) as usize;
     
+    // Check reference count - if this is the only reference, just make it writable
+    if page_ref_count(old_pa) == 1 {
+        // Only one reference, make page writable without copying
+        let new_pte = (old_pte & !flags::PTE_COW) | flags::PTE_W;
+        unsafe { *pte_ptr = new_pte; }
+        flush_tlb_page(va);
+        return PageFaultResult::Handled;
+    }
+    
     // Allocate a new page
     let new_page = kalloc();
     if new_page.is_null() {
@@ -1305,7 +1391,8 @@ unsafe fn handle_cow_fault(
     // Flush TLB for this address
     flush_tlb_page(va);
     
-    // TODO: Decrement reference count on old page and free if zero
+    // Decrement reference count on old page (may free it if count reaches 0)
+    page_ref_dec(old_pa);
     let _ = pagetable;
     
     PageFaultResult::Handled

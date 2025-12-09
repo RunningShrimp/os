@@ -13,9 +13,8 @@ use alloc::format;
 use core::ffi::{c_char, c_int};
 use crate::libc::interface::{size_t, c_long, c_longlong, time_t};
 pub type suseconds_t = i64;
-use crate::libc::error::{get_errno, set_errno};
+use crate::libc::error::set_errno;
 use crate::libc::error::errno::EINVAL;
-use crate::drivers::console;
 
 /// 时间常量
 pub mod time_constants {

@@ -512,6 +512,18 @@ pub trait CLibInterface {
     /// * 返回指向错误消息字符串的指针
     fn strerror(&self, errnum: c_int) -> *const c_char;
 
+    /// 获取错误类型
+    ///
+    /// # 返回值
+    /// * 返回错误类型代码
+    fn error_type(&self) -> c_int;
+
+    /// 获取错误代码
+    ///
+    /// # 返回值
+    /// * 返回具体错误代码
+    fn error_code(&self) -> c_int;
+
     // === 环境变量函数 ===
 
     /// 获取环境变量值

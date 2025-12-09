@@ -335,8 +335,8 @@ impl FutexTestSuite {
         let avg_latency = total_time / operations;
         
         // Update stats
-        self.stats.total_operations += operations;
-        self.stats.successful_operations += operations;
+        self.stats.total_operations += operations as usize;
+        self.stats.successful_operations += operations as usize;
         self.stats.avg_latency_ns = avg_latency;
         
         crate::println!("[futex_test] Performance test passed, avg latency: {}ns", avg_latency);

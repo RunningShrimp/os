@@ -19,7 +19,7 @@ use crate::microkernel::scheduler;
 pub const MAX_PENDING_SIGNALS: usize = 64;
 
 /// Signal queue entry for queued signals
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct QueuedSignal {
     /// Signal information
     pub info: SigInfoT,
@@ -27,6 +27,15 @@ pub struct QueuedSignal {
     pub timestamp: u64,
     /// Whether this signal has been delivered
     pub delivered: bool,
+}
+
+impl core::fmt::Debug for QueuedSignal {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("QueuedSignal")
+            .field("timestamp", &self.timestamp)
+            .field("delivered", &self.delivered)
+            .finish()
+    }
 }
 
 impl QueuedSignal {

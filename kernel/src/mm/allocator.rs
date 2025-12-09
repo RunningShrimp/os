@@ -36,6 +36,10 @@ pub struct HybridAllocator {
     buddy: Mutex<BuddyAllocator>,
     hugepage: Mutex<HugePageAllocator>,
     allocation_count: AtomicUsize,
+    deallocation_count: AtomicUsize,
+    peak_allocated_bytes: AtomicUsize,
+    current_allocated_bytes: AtomicUsize,
+    failed_allocations: AtomicUsize,
 }
 
 impl HybridAllocator {
@@ -45,6 +49,10 @@ impl HybridAllocator {
             buddy: Mutex::new(BuddyAllocator::new()),
             hugepage: Mutex::new(HugePageAllocator::new()),
             allocation_count: AtomicUsize::new(0),
+            deallocation_count: AtomicUsize::new(0),
+            peak_allocated_bytes: AtomicUsize::new(0),
+            current_allocated_bytes: AtomicUsize::new(0),
+            failed_allocations: AtomicUsize::new(0),
         }
     }
 
@@ -76,6 +84,7 @@ impl HybridAllocator {
             let ptr = hugepage.alloc(size);
             if !ptr.is_null() {
                 self.allocation_count.fetch_add(1, Ordering::Relaxed);
+                self.track_allocation(size);
                 return ptr;
             }
             // Fallback to buddy if hugepage allocation fails
@@ -87,6 +96,7 @@ impl HybridAllocator {
             let ptr = slab.alloc(layout);
             if !ptr.is_null() {
                 self.allocation_count.fetch_add(1, Ordering::Relaxed);
+                self.track_allocation(size);
                 return ptr;
             }
         }
@@ -96,8 +106,27 @@ impl HybridAllocator {
         let ptr = buddy.alloc(layout);
         if !ptr.is_null() {
             self.allocation_count.fetch_add(1, Ordering::Relaxed);
+            self.track_allocation(size);
+        } else {
+            self.failed_allocations.fetch_add(1, Ordering::Relaxed);
         }
         ptr
+    }
+    
+    fn track_allocation(&self, size: usize) {
+        let current = self.current_allocated_bytes.fetch_add(size, Ordering::Relaxed) + size;
+        // Update peak if necessary (use simple compare-and-swap loop)
+        loop {
+            let peak = self.peak_allocated_bytes.load(Ordering::Relaxed);
+            if current <= peak {
+                break;
+            }
+            if self.peak_allocated_bytes.compare_exchange_weak(
+                peak, current, Ordering::Relaxed, Ordering::Relaxed
+            ).is_ok() {
+                break;
+            }
+        }
     }
 
     fn dealloc(&self, ptr: *mut u8, layout: Layout) {
@@ -106,6 +135,10 @@ impl HybridAllocator {
         }
 
         let size = layout.size();
+        
+        // Track deallocation
+        self.deallocation_count.fetch_add(1, Ordering::Relaxed);
+        self.current_allocated_bytes.fetch_sub(size, Ordering::Relaxed);
         
         // Check if this is a huge page deallocation
         if size >= hugepage::HPAGE_2MB {
@@ -191,15 +224,18 @@ unsafe impl UnifiedAllocator for HybridAllocator {
 // Implement AllocatorWithStats for HybridAllocator
 impl AllocatorWithStats for HybridAllocator {
     fn stats(&self) -> crate::mm::traits::AllocatorStats {
-        let (buddy_stats, slab_stats) = HybridAllocator::stats(self);
         let total_allocations = self.allocation_count.load(Ordering::Relaxed);
+        let total_deallocations = self.deallocation_count.load(Ordering::Relaxed);
+        let current_allocated_bytes = self.current_allocated_bytes.load(Ordering::Relaxed);
+        let peak_allocated_bytes = self.peak_allocated_bytes.load(Ordering::Relaxed);
+        let failed_allocations = self.failed_allocations.load(Ordering::Relaxed);
         
         crate::mm::traits::AllocatorStats {
             total_allocations,
-            total_deallocations: 0, // TODO: Track deallocations
-            current_allocated_bytes: buddy_stats.allocated + slab_stats.allocated,
-            peak_allocated_bytes: buddy_stats.allocated + slab_stats.allocated, // TODO: Track peak
-            failed_allocations: 0, // TODO: Track failures
+            total_deallocations,
+            current_allocated_bytes,
+            peak_allocated_bytes,
+            failed_allocations,
         }
     }
 }

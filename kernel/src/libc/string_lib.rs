@@ -10,8 +10,10 @@
 
 use core::ffi::{c_char, c_int, c_void, c_double};
 
-pub type size_t = usize;
-use crate::libc::error::{get_errno, set_errno};
+pub type SizeT = usize;
+
+pub type size_t = SizeT;
+use crate::libc::error::set_errno;
 use crate::libc::error::errno::EINVAL;
 use crate::reliability::errno::ERANGE;
 
@@ -724,7 +726,8 @@ impl Default for EnhancedStringLib {
 }
 
 // 类型别名
-pub type c_long = isize;
+pub type CLong = isize;
+pub type c_long = CLong;
 pub type c_ulong = usize;
 
 // 导出全局字符串处理库实例

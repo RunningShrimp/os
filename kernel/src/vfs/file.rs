@@ -1,5 +1,4 @@
 //! VFS file handle
-
 extern crate alloc;
 use alloc::sync::Arc;
 

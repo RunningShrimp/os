@@ -2,13 +2,15 @@
 //!
 //! Standard types and constants for POSIX compliance
 
+use alloc::string::ToString;
+
 
 // ============================================================================
 // Basic Types
 // ============================================================================
 
 /// Process ID type
-pub type Pid = i32;
+pub type Pid = usize;
 
 /// User ID type  
 pub type Uid = u32;
@@ -98,6 +100,22 @@ pub const S_IXOTH: Mode = 0o0001;
 /// Read, write, execute for others
 pub const S_IRWXO: Mode = S_IROTH | S_IWOTH | S_IXOTH;
 
+// ============================================================================
+// Access Permission Constants
+// ============================================================================
+
+/// Test for read permission
+pub const R_OK: i32 = 4;
+
+/// Test for write permission
+pub const W_OK: i32 = 2;
+
+/// Test for execute permission
+pub const X_OK: i32 = 1;
+
+/// Test for existence of file
+pub const F_OK: i32 = 0;
+
 // File type bits
 pub const S_IFMT: Mode = 0o170000;   // File type mask
 pub const S_IFSOCK: Mode = 0o140000; // Socket
@@ -182,7 +200,20 @@ pub const O_TRUNC: i32 = 0o1000;
 pub const O_APPEND: i32 = 0o2000;
 
 /// Non-blocking mode
-pub const O_NONBLOCK: i32 = 0o4000;
+pub const O_NONBLOCK: i32 = 0x0004;
+pub const MSG_DONTWAIT: i32 = 0x40;
+pub const SOL_SOCKET: i32 = 1;
+pub const SO_REUSEADDR: i32 = 2;
+pub const SO_TYPE: i32 = 3;
+pub const SO_ERROR: i32 = 4;
+pub const SO_KEEPALIVE: i32 = 9;
+pub const SO_LINGER: i32 = 13;
+pub const SO_REUSEPORT: i32 = 15;
+pub const SO_SNDBUF: i32 = 0x1001;
+pub const SO_RCVBUF: i32 = 0x1002;
+pub const SO_RCVTIMEO: i32 = 20;
+pub const SO_SNDTIMEO: i32 = 21;
+pub const ECONNREFUSED: i32 = 111;
 pub const O_NDELAY: i32 = O_NONBLOCK;
 
 /// Synchronous writes
@@ -925,19 +956,7 @@ pub const PF_INET: i32 = AF_INET;
 pub const PF_INET6: i32 = AF_INET6;
 
 /// Socket option levels
-pub const SOL_SOCKET: i32 = 1;       // Socket level
-
-/// Socket options
-pub const SO_REUSEADDR: i32 = 2;     // Reuse address
-pub const SO_REUSEPORT: i32 = 15;    // Reuse port
-pub const SO_KEEPALIVE: i32 = 9;     // Keep alive
-pub const SO_LINGER: i32 = 13;       // Linger option
-pub const SO_SNDBUF: i32 = 7;        // Send buffer size
-pub const SO_RCVBUF: i32 = 8;        // Receive buffer size
-pub const SO_SNDTIMEO: i32 = 20;     // Send timeout
-pub const SO_RCVTIMEO: i32 = 21;     // Receive timeout
-pub const SO_TYPE: i32 = 3;          // Socket type
-pub const SO_ERROR: i32 = 4;         // Socket error
+// Socket option level and options defined earlier in this file
 
 /// Shutdown how
 pub const SHUT_RD: i32 = 0;          // Shutdown read
@@ -1435,6 +1454,12 @@ pub mod advanced_tests;
 pub mod integration_tests;
 
 pub use self::thread::*;
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Linger {
+    pub l_onoff: i32,
+    pub l_linger: i32,
+}
 pub use self::semaphore::*;
 pub use self::mqueue::*;
 pub use self::shm::*;

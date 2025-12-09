@@ -12,6 +12,7 @@ use crate::posix::security::*;
 use crate::syscalls::common::SyscallError;
 use alloc::string::String;
 use alloc::vec::Vec;
+use alloc::string::ToString;
 
 /// Integration test result
 pub type IntegrationResult = Result<(), String>;
@@ -140,6 +141,7 @@ pub fn run_all_integration_tests() {
         // For now, we'll simulate the test
         crate::println!("[integration] AIO with real-time scheduling test would require full implementation");
         context.complete(true);
+        Ok(())
     });
     
     // Test message queues with signal notifications
@@ -155,6 +157,7 @@ pub fn run_all_integration_tests() {
         // For now, we'll simulate the test
         crate::println!("[integration] Message queue with signal notifications test would require full implementation");
         context.complete(true);
+        Ok(())
     });
     
     // Test real-time scheduling with thread attributes
@@ -169,6 +172,7 @@ pub fn run_all_integration_tests() {
         // For now, we'll simulate the test
         crate::println!("[integration] Real-time scheduling with thread attributes test would require full implementation");
         context.complete(true);
+        Ok(())
     });
     
     // Test security with thread operations
@@ -183,6 +187,7 @@ pub fn run_all_integration_tests() {
         // For now, we'll simulate the test
         crate::println!("[integration] Security with thread operations test would require full implementation");
         context.complete(true);
+        Ok(())
     });
     
     // Test AIO with message queue integration
@@ -199,6 +204,7 @@ pub fn run_all_integration_tests() {
         // For now, we'll simulate the test
         crate::println!("[integration] AIO with message queue integration test would require full implementation");
         context.complete(true);
+        Ok(())
     });
     
     // Test real-time scheduling with signal handling
@@ -214,6 +220,7 @@ pub fn run_all_integration_tests() {
         // For now, we'll simulate the test
         crate::println!("[integration] Real-time scheduling with signal handling test would require full implementation");
         context.complete(true);
+        Ok(())
     });
     
     runner.print_summary();

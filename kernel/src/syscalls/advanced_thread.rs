@@ -92,7 +92,7 @@ fn sys_pthread_attr_setschedpolicy(args: &[u64]) -> SyscallResult {
             }
         }
 
-        unsafe { core::mem::transmute::<[u8; core::mem::size_of::<ThreadAttr>()], ThreadAttr>(attr_data) }
+        unsafe { core::mem::transmute::<[u8; 168], ThreadAttr>(attr_data) }
     } else {
         ThreadAttr::new()
     };
@@ -102,7 +102,7 @@ fn sys_pthread_attr_setschedpolicy(args: &[u64]) -> SyscallResult {
         Ok(()) => {
             // Write back attributes if needed
             if attr_ptr != 0 {
-                let attr_data = unsafe { core::mem::transmute::<ThreadAttr, [u8; 256]>(attr) };
+                let attr_data = unsafe { core::mem::transmute::<ThreadAttr, [u8; 168]>(attr) };
                 
                 unsafe {
                     match crate::mm::vm::copyout(pagetable, attr_ptr, attr_data.as_ptr(), attr_data.len()) {
@@ -169,7 +169,7 @@ fn sys_pthread_attr_getschedpolicy(args: &[u64]) -> SyscallResult {
             }
         }
 
-        unsafe { core::mem::transmute::<[u8; 256], ThreadAttr>(attr_data) }
+        unsafe { core::mem::transmute::<[u8; 168], ThreadAttr>(attr_data) }
     } else {
         return Err(SyscallError::BadAddress);
     };
@@ -235,7 +235,7 @@ fn sys_pthread_attr_setschedparam(args: &[u64]) -> SyscallResult {
             }
         }
 
-        unsafe { core::mem::transmute::<[u8; 256], ThreadAttr>(attr_data) }
+        unsafe { core::mem::transmute::<[u8; 168], ThreadAttr>(attr_data) }
     } else {
         ThreadAttr::new()
     };
@@ -251,7 +251,7 @@ fn sys_pthread_attr_setschedparam(args: &[u64]) -> SyscallResult {
             }
         }
 
-        unsafe { core::mem::transmute::<[u8; 16], SchedParam>(param_data) }
+        unsafe { core::mem::transmute::<[u8; 4], SchedParam>(param_data) }
     } else {
         return Err(SyscallError::BadAddress);
     };
@@ -261,7 +261,7 @@ fn sys_pthread_attr_setschedparam(args: &[u64]) -> SyscallResult {
         Ok(()) => {
             // Write back attributes if needed
             if attr_ptr != 0 {
-                let attr_data = unsafe { core::mem::transmute::<ThreadAttr, [u8; 256]>(attr) };
+                let attr_data = unsafe { core::mem::transmute::<ThreadAttr, [u8; 168]>(attr) };
                 
                 unsafe {
                     match crate::mm::vm::copyout(pagetable, attr_ptr, attr_data.as_ptr(), attr_data.len()) {
@@ -328,7 +328,7 @@ fn sys_pthread_attr_getschedparam(args: &[u64]) -> SyscallResult {
             }
         }
 
-        unsafe { core::mem::transmute::<[u8; 256], ThreadAttr>(attr_data) }
+        unsafe { core::mem::transmute::<[u8; 168], ThreadAttr>(attr_data) }
     } else {
         return Err(SyscallError::BadAddress);
     };
@@ -338,7 +338,7 @@ fn sys_pthread_attr_getschedparam(args: &[u64]) -> SyscallResult {
 
     // Copy parameters back to user space
     if param_ptr != 0 {
-        let param_data = unsafe { core::mem::transmute::<SchedParam, [u8; 16]>(param) };
+        let param_data = unsafe { core::mem::transmute::<SchedParam, [u8; 4]>(param) };
         
         unsafe {
             match crate::mm::vm::copyout(pagetable, param_ptr, param_data.as_ptr(), param_data.len()) {
@@ -396,7 +396,7 @@ fn sys_pthread_attr_setinheritsched(args: &[u64]) -> SyscallResult {
             }
         }
 
-        unsafe { core::mem::transmute::<[u8; 256], ThreadAttr>(attr_data) }
+        unsafe { core::mem::transmute::<[u8; 168], ThreadAttr>(attr_data) }
     } else {
         ThreadAttr::new()
     };
@@ -406,7 +406,7 @@ fn sys_pthread_attr_setinheritsched(args: &[u64]) -> SyscallResult {
         Ok(()) => {
             // Write back attributes if needed
             if attr_ptr != 0 {
-                let attr_data = unsafe { core::mem::transmute::<ThreadAttr, [u8; 256]>(attr) };
+                let attr_data = unsafe { core::mem::transmute::<ThreadAttr, [u8; 168]>(attr) };
                 
                 unsafe {
                     match crate::mm::vm::copyout(pagetable, attr_ptr, attr_data.as_ptr(), attr_data.len()) {
@@ -473,7 +473,7 @@ fn sys_pthread_attr_getinheritsched(args: &[u64]) -> SyscallResult {
             }
         }
 
-        unsafe { core::mem::transmute::<[u8; 256], ThreadAttr>(attr_data) }
+        unsafe { core::mem::transmute::<[u8; 168], ThreadAttr>(attr_data) }
     } else {
         return Err(SyscallError::BadAddress);
     };
@@ -538,7 +538,7 @@ fn sys_pthread_setschedparam(args: &[u64]) -> SyscallResult {
             }
         }
 
-        unsafe { core::mem::transmute::<[u8; 16], SchedParam>(param_data) }
+        unsafe { core::mem::transmute::<[u8; 4], SchedParam>(param_data) }
     } else {
         return Err(SyscallError::BadAddress);
     };
@@ -595,7 +595,7 @@ fn sys_pthread_getschedparam(args: &[u64]) -> SyscallResult {
                     return Err(SyscallError::BadAddress);
                 }
 
-                let param_data = unsafe { core::mem::transmute::<SchedParam, [u8; 16]>(param) };
+                let param_data = unsafe { core::mem::transmute::<SchedParam, [u8; 4]>(param) };
                 
                 unsafe {
                     match crate::mm::vm::copyout(pagetable, param_ptr, param_data.as_ptr(), param_data.len()) {
@@ -683,7 +683,7 @@ fn sys_pthread_barrier_init(args: &[u64]) -> SyscallResult {
 
     // Get current thread ID
     let thread_id = match crate::process::thread::current_thread() {
-        Some(tid) => tid,
+        Some(tid) => tid as Pid,
         None => return Err(SyscallError::NotFound),
     };
 
@@ -695,7 +695,7 @@ fn sys_pthread_barrier_init(args: &[u64]) -> SyscallResult {
 
     // Register barrier
     let mut registry = THREAD_REGISTRY.lock();
-    match registry.create_barrier(thread_id, count) {
+    match registry.create_barrier(thread_id as Pid, count) {
         Ok(()) => {
             // Copy barrier handle back to user space
             if barrier_ptr != 0 {
@@ -749,13 +749,13 @@ fn sys_pthread_barrier_wait(args: &[u64]) -> SyscallResult {
 
     // Get current thread ID
     let thread_id = match crate::process::thread::current_thread() {
-        Some(tid) => tid,
+        Some(tid) => tid as Pid,
         None => return Err(SyscallError::NotFound),
     };
 
     // Get barrier from registry
     let registry = THREAD_REGISTRY.lock();
-    let barrier = match registry.get_barrier(thread_id) {
+    let barrier = match registry.get_barrier(thread_id as Pid) {
         Some(barrier) => barrier,
         None => return Err(SyscallError::BadAddress),
     };
@@ -782,13 +782,13 @@ fn sys_pthread_barrier_destroy(args: &[u64]) -> SyscallResult {
 
     // Get current thread ID
     let thread_id = match crate::process::thread::current_thread() {
-        Some(tid) => tid,
+        Some(tid) => tid as Pid,
         None => return Err(SyscallError::NotFound),
     };
 
     // Remove barrier from registry
     let mut registry = THREAD_REGISTRY.lock();
-    match registry.remove_barrier(thread_id) {
+    match registry.remove_barrier(thread_id as Pid) {
         Ok(_) => Ok(0),
         Err(ThreadError::ThreadNotFound) => Err(SyscallError::BadAddress),
         Err(ThreadError::BarrierInUse) => Err(SyscallError::WouldBlock),
@@ -810,7 +810,7 @@ fn sys_pthread_spin_init(args: &[u64]) -> SyscallResult {
 
     // Get current thread ID
     let thread_id = match crate::process::thread::current_thread() {
-        Some(tid) => tid,
+        Some(tid) => tid as Pid,
         None => return Err(SyscallError::NotFound),
     };
 
@@ -819,7 +819,7 @@ fn sys_pthread_spin_init(args: &[u64]) -> SyscallResult {
 
     // Register spinlock
     let mut registry = THREAD_REGISTRY.lock();
-    match registry.create_spinlock(thread_id) {
+    match registry.create_spinlock(thread_id as Pid) {
         Ok(()) => {
             // Copy spinlock handle back to user space
             if spin_ptr != 0 {
@@ -872,13 +872,13 @@ fn sys_pthread_spin_lock(args: &[u64]) -> SyscallResult {
 
     // Get current thread ID
     let thread_id = match crate::process::thread::current_thread() {
-        Some(tid) => tid,
+        Some(tid) => tid as Pid,
         None => return Err(SyscallError::NotFound),
     };
 
     // Get spinlock from registry
     let registry = THREAD_REGISTRY.lock();
-    let spinlock = match registry.get_spinlock(thread_id) {
+    let spinlock = match registry.get_spinlock(thread_id as Pid) {
         Some(spinlock) => spinlock,
         None => return Err(SyscallError::BadAddress),
     };
@@ -903,13 +903,13 @@ fn sys_pthread_spin_unlock(args: &[u64]) -> SyscallResult {
 
     // Get current thread ID
     let thread_id = match crate::process::thread::current_thread() {
-        Some(tid) => tid,
+        Some(tid) => tid as Pid,
         None => return Err(SyscallError::NotFound),
     };
 
     // Get spinlock from registry
     let registry = THREAD_REGISTRY.lock();
-    let spinlock = match registry.get_spinlock(thread_id) {
+    let spinlock = match registry.get_spinlock(thread_id as Pid) {
         Some(spinlock) => spinlock,
         None => return Err(SyscallError::BadAddress),
     };
@@ -934,13 +934,13 @@ fn sys_pthread_spin_destroy(args: &[u64]) -> SyscallResult {
 
     // Get current thread ID
     let thread_id = match crate::process::thread::current_thread() {
-        Some(tid) => tid,
+        Some(tid) => tid as Pid,
         None => return Err(SyscallError::NotFound),
     };
 
     // Remove spinlock from registry
     let mut registry = THREAD_REGISTRY.lock();
-    match registry.remove_spinlock(thread_id) {
+    match registry.remove_spinlock(thread_id as Pid) {
         Ok(_) => Ok(0),
         Err(ThreadError::ThreadNotFound) => Err(SyscallError::BadAddress),
     }

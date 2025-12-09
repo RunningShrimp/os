@@ -10,8 +10,6 @@
 extern crate alloc;
 use core::ffi::{c_int, c_uint, c_double};
 use alloc::vec::Vec;
-use crate::libc::error::{get_errno, set_errno};
-use crate::libc::error::errno::EINVAL;
 
 /// 随机数生成器类型
 #[derive(Debug, Clone, Copy)]

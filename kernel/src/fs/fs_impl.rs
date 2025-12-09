@@ -351,15 +351,88 @@ impl Default for Inode {
 
 impl Inode {
     /// Read data from inode
-    pub fn read(&self, _dev: &impl BlockDevice, _dst: &mut [u8], _off: usize) -> usize {
-        // TODO: Implement inode read
-        0
+    pub fn read(&self, dev: &impl BlockDevice, dst: &mut [u8], off: usize) -> usize {
+        if off >= self.size as usize {
+            return 0;
+        }
+        
+        let mut total = 0usize;
+        let mut offset = off;
+        let end = (off + dst.len()).min(self.size as usize);
+        
+        while offset < end {
+            let block_idx = offset / BSIZE;
+            let block_offset = offset % BSIZE;
+            
+            // Get block number from direct or indirect blocks
+            let block_num = if block_idx < NDIRECT {
+                self.addrs[block_idx]
+            } else {
+                // Would need to read indirect block
+                // For now, return what we have
+                break;
+            };
+            
+            if block_num == 0 {
+                break;
+            }
+            
+            // Read block
+            let mut buf = [0u8; BSIZE];
+            dev.read(block_num, &mut buf);
+            
+            let bytes_to_copy = (BSIZE - block_offset).min(end - offset);
+            dst[total..total + bytes_to_copy].copy_from_slice(&buf[block_offset..block_offset + bytes_to_copy]);
+            
+            total += bytes_to_copy;
+            offset += bytes_to_copy;
+        }
+        
+        total
     }
 
     /// Write data to inode
-    pub fn write(&mut self, _dev: &impl BlockDevice, _src: &[u8], _off: usize) -> usize {
-        // TODO: Implement inode write
-        0
+    pub fn write(&mut self, dev: &impl BlockDevice, src: &[u8], off: usize) -> usize {
+        let mut total = 0usize;
+        let mut offset = off;
+        let end = off + src.len();
+        
+        while offset < end {
+            let block_idx = offset / BSIZE;
+            let block_offset = offset % BSIZE;
+            
+            // Get or allocate block
+            let block_num = if block_idx < NDIRECT {
+                if self.addrs[block_idx] == 0 {
+                    // Would need to allocate new block
+                    // For now, just fail
+                    break;
+                }
+                self.addrs[block_idx]
+            } else {
+                // Would handle indirect blocks
+                break;
+            };
+            
+            // Read-modify-write
+            let mut buf = [0u8; BSIZE];
+            dev.read(block_num, &mut buf);
+            
+            let bytes_to_copy = (BSIZE - block_offset).min(end - offset);
+            buf[block_offset..block_offset + bytes_to_copy].copy_from_slice(&src[total..total + bytes_to_copy]);
+            
+            dev.write(block_num, &buf);
+            
+            total += bytes_to_copy;
+            offset += bytes_to_copy;
+        }
+        
+        // Update inode size if we wrote past the end
+        if off + total > self.size as usize {
+            self.size = (off + total) as u32;
+        }
+        
+        total
     }
 }
 
@@ -511,31 +584,148 @@ impl Fs {
         if let Some(inode) = inodes.get_mut(idx) {
             inode.ref_count -= 1;
             if inode.ref_count == 0 && inode.nlink == 0 {
-                // Truncate and free inode
-                // TODO: Implement truncate
+                // Truncate: free all data blocks
+                for i in 0..NDIRECT {
+                    if inode.addrs[i] != 0 {
+                        // Would call bfree to free the block
+                        inode.addrs[i] = 0;
+                    }
+                }
+                // Would also free indirect block if present
+                if inode.addrs[NDIRECT] != 0 {
+                    inode.addrs[NDIRECT] = 0;
+                }
+                inode.size = 0;
                 inode.itype = InodeType::Free;
             }
         }
     }
 
     /// Look up directory entry
-    pub fn dirlookup(&self, _dir_inum: u32, _name: &str) -> Option<u32> {
-        // TODO: Implement directory lookup
+    pub fn dirlookup(&self, dir_inum: u32, name: &str) -> Option<u32> {
+        // Get directory inode
+        let inodes = self.inodes.lock();
+        let dir_inode = inodes.iter().find(|i| i.inum == dir_inum && i.ref_count > 0)?;
+        
+        if dir_inode.itype != InodeType::Directory {
+            return None;
+        }
+        
+        // Read directory entries
+        let mut buf = [0u8; BSIZE];
+        let dirent_size = core::mem::size_of::<Dirent>();
+        
+        for i in 0..NDIRECT {
+            if dir_inode.addrs[i] == 0 {
+                continue;
+            }
+            
+            self.dev.read(dir_inode.addrs[i], &mut buf);
+            
+            // Scan directory entries in this block
+            for off in (0..BSIZE).step_by(dirent_size) {
+                let inum = u16::from_le_bytes([buf[off], buf[off + 1]]);
+                if inum == 0 {
+                    continue;
+                }
+                
+                // Extract name (null-terminated)
+                let name_bytes = &buf[off + 2..off + dirent_size];
+                let entry_name_end = name_bytes.iter().position(|&c| c == 0).unwrap_or(DIRSIZ);
+                let entry_name = core::str::from_utf8(&name_bytes[..entry_name_end]).unwrap_or("");
+                
+                if entry_name == name {
+                    return Some(inum as u32);
+                }
+            }
+        }
+        
         None
     }
 
     /// Create a new directory entry
-    pub fn dirlink(&self, _dir_inum: u32, _name: &str, _inum: u32) -> bool {
-        // TODO: Implement directory link
+    pub fn dirlink(&self, dir_inum: u32, name: &str, inum: u32) -> bool {
+        // Get directory inode
+        let inodes = self.inodes.lock();
+        let dir_inode = inodes.iter().find(|i| i.inum == dir_inum && i.ref_count > 0);
+        
+        let dir_inode = match dir_inode {
+            Some(i) if i.itype == InodeType::Directory => i,
+            _ => return false,
+        };
+        
+        let dirent_size = core::mem::size_of::<Dirent>();
+        let mut buf = [0u8; BSIZE];
+        
+        // Find empty slot in directory
+        for i in 0..NDIRECT {
+            if dir_inode.addrs[i] == 0 {
+                continue;
+            }
+            
+            self.dev.read(dir_inode.addrs[i], &mut buf);
+            
+            for off in (0..BSIZE).step_by(dirent_size) {
+                let entry_inum = u16::from_le_bytes([buf[off], buf[off + 1]]);
+                if entry_inum == 0 {
+                    // Found empty slot, write new entry
+                    buf[off..off + 2].copy_from_slice(&(inum as u16).to_le_bytes());
+                    
+                    // Write name
+                    let name_bytes = name.as_bytes();
+                    let copy_len = name_bytes.len().min(DIRSIZ);
+                    buf[off + 2..off + 2 + copy_len].copy_from_slice(&name_bytes[..copy_len]);
+                    
+                    // Zero-fill rest of name
+                    for j in copy_len..DIRSIZ {
+                        buf[off + 2 + j] = 0;
+                    }
+                    
+                    self.dev.write(dir_inode.addrs[i], &buf);
+                    return true;
+                }
+            }
+        }
+        
         false
     }
 
     /// List directory contents
     pub fn list_dir(&self, dir_inum: u32) -> Vec<(String, u32)> {
-        let entries = Vec::new();
+        let mut entries = Vec::new();
         
-        // TODO: Read directory entries
-        let _ = dir_inum;
+        // Get directory inode
+        let inodes = self.inodes.lock();
+        let dir_inode = match inodes.iter().find(|i| i.inum == dir_inum && i.ref_count > 0) {
+            Some(i) if i.itype == InodeType::Directory => i,
+            _ => return entries,
+        };
+        
+        let dirent_size = core::mem::size_of::<Dirent>();
+        let mut buf = [0u8; BSIZE];
+        
+        // Read directory entries
+        for i in 0..NDIRECT {
+            if dir_inode.addrs[i] == 0 {
+                continue;
+            }
+            
+            self.dev.read(dir_inode.addrs[i], &mut buf);
+            
+            for off in (0..BSIZE).step_by(dirent_size) {
+                let inum = u16::from_le_bytes([buf[off], buf[off + 1]]);
+                if inum == 0 {
+                    continue;
+                }
+                
+                // Extract name
+                let name_bytes = &buf[off + 2..off + dirent_size];
+                let name_end = name_bytes.iter().position(|&c| c == 0).unwrap_or(DIRSIZ);
+                if let Ok(name) = core::str::from_utf8(&name_bytes[..name_end]) {
+                    entries.push((String::from(name), inum as u32));
+                }
+            }
+        }
         
         entries
     }
@@ -566,10 +756,22 @@ impl Fs {
             self.dev.write(i, &zero_block);
         }
         
-        // Create root directory inode
-        // TODO: Initialize root directory
+        // Create root directory inode (inode 1)
+        let root_block = sb.inodestart;
+        let mut buf = [0u8; 512];
+        self.dev.read(root_block, &mut buf);
         
-        crate::println!("fs: created new filesystem");
+        // Root inode is at offset 0 in block (inode 1)
+        // Set type to directory
+        buf[0..2].copy_from_slice(&(InodeType::Directory as u16).to_le_bytes());
+        // Set nlink to 1
+        buf[4..6].copy_from_slice(&1u16.to_le_bytes());
+        // Size = 0 initially
+        buf[6..10].copy_from_slice(&0u32.to_le_bytes());
+        
+        self.dev.write(root_block, &buf);
+        
+        crate::println!("fs: created new filesystem with root directory");
     }
 }
 

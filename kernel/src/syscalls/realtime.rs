@@ -44,7 +44,7 @@ fn sys_sched_setscheduler(args: &[u64]) -> SyscallResult {
         return Err(SyscallError::InvalidArgument);
     }
 
-    let pid = args[0] as i32;
+    let pid = args[0] as usize;
     let policy = args[1] as i32;
     let param_ptr = args[2] as usize;
 
@@ -111,7 +111,7 @@ fn sys_sched_getscheduler(args: &[u64]) -> SyscallResult {
         return Err(SyscallError::InvalidArgument);
     }
 
-    let pid = args[0] as i32;
+    let pid = args[0] as usize;
 
     // Get current process for permission check
     let current_pid = match myproc() {
@@ -120,7 +120,7 @@ fn sys_sched_getscheduler(args: &[u64]) -> SyscallResult {
     };
 
     // Check permissions
-    if pid != current_pid as i32 && current_pid != 0 {
+    if pid != current_pid && current_pid != 0 {
         return Err(SyscallError::PermissionDenied);
     }
 
@@ -143,7 +143,7 @@ fn sys_sched_setparam(args: &[u64]) -> SyscallResult {
         return Err(SyscallError::InvalidArgument);
     }
 
-    let pid = args[0] as i32;
+    let pid = args[0] as usize;
     let param_ptr = args[1] as usize;
 
     // Get current process for permission check
@@ -153,7 +153,7 @@ fn sys_sched_setparam(args: &[u64]) -> SyscallResult {
     };
 
     // Check permissions
-    if pid != current_pid as i32 && current_pid != 0 {
+    if pid != current_pid && current_pid != 0 {
         return Err(SyscallError::PermissionDenied);
     }
 
@@ -210,7 +210,7 @@ fn sys_sched_getparam(args: &[u64]) -> SyscallResult {
         return Err(SyscallError::InvalidArgument);
     }
 
-    let pid = args[0] as i32;
+    let pid = args[0] as usize;
     let param_ptr = args[1] as usize;
 
     // Get current process for permission check
@@ -220,7 +220,7 @@ fn sys_sched_getparam(args: &[u64]) -> SyscallResult {
     };
 
     // Check permissions
-    if pid != current_pid as i32 && current_pid != 0 {
+    if pid != current_pid && current_pid != 0 {
         return Err(SyscallError::PermissionDenied);
     }
 
@@ -310,7 +310,7 @@ fn sys_sched_rr_get_interval(args: &[u64]) -> SyscallResult {
         return Err(SyscallError::InvalidArgument);
     }
 
-    let pid = args[0] as i32;
+    let pid = args[0] as usize;
     let ts_ptr = args[1] as usize;
 
     // Get current process for permission check
@@ -320,7 +320,7 @@ fn sys_sched_rr_get_interval(args: &[u64]) -> SyscallResult {
     };
 
     // Check permissions
-    if pid != current_pid as i32 && current_pid != 0 {
+    if pid != current_pid && current_pid != 0 {
         return Err(SyscallError::PermissionDenied);
     }
 
@@ -377,7 +377,7 @@ fn sys_sched_setaffinity(args: &[u64]) -> SyscallResult {
         return Err(SyscallError::InvalidArgument);
     }
 
-    let pid = args[0] as i32;
+    let pid = args[0] as usize;
     let cpusetsize = args[1] as usize;
     let mask_ptr = args[2] as usize;
 
@@ -388,7 +388,7 @@ fn sys_sched_setaffinity(args: &[u64]) -> SyscallResult {
     };
 
     // Check permissions
-    if pid != current_pid as i32 && current_pid != 0 {
+    if pid != current_pid && current_pid != 0 {
         return Err(SyscallError::PermissionDenied);
     }
 
@@ -445,7 +445,7 @@ fn sys_sched_getaffinity(args: &[u64]) -> SyscallResult {
         return Err(SyscallError::InvalidArgument);
     }
 
-    let pid = args[0] as i32;
+    let pid = args[0] as usize;
     let cpusetsize = args[1] as usize;
     let mask_ptr = args[2] as usize;
 
@@ -456,7 +456,7 @@ fn sys_sched_getaffinity(args: &[u64]) -> SyscallResult {
     };
 
     // Check permissions
-    if pid != current_pid as i32 && current_pid != 0 {
+    if pid != current_pid && current_pid != 0 {
         return Err(SyscallError::PermissionDenied);
     }
 

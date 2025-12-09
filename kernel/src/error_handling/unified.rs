@@ -5,13 +5,16 @@
 
 use crate::syscalls::common::SyscallError;
 use crate::reliability::errno;
+use alloc::string::String;
 
 /// 统一错误类型
 /// 所有内核模块应使用此类型进行错误处理
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KernelError {
     /// 系统调用错误
     Syscall(SyscallError),
+    /// 网络错误
+    Network(crate::syscalls::net::types::NetworkError),
     /// 内存错误
     OutOfMemory,
     /// 无效参数
@@ -30,6 +33,50 @@ pub enum KernelError {
     ResourceBusy,
     /// 超时
     Timeout,
+    /// 无效地址
+    BadAddress,
+    /// 无效文件描述符
+    BadFileDescriptor,
+    /// 不是目录
+    NotADirectory,
+    /// 文件已存在
+    FileExists,
+    /// 目录不为空
+    DirectoryNotEmpty,
+    /// 文件太大
+    FileTooBig,
+    /// 只读文件系统
+    ReadOnlyFilesystem,
+    /// 名称太长
+    NameTooLong,
+    /// 没有缓冲区空间
+    NoBufferSpace,
+    /// 地址已在使用
+    AddressInUse,
+    /// 地址不可达
+    AddressNotAvailable,
+    /// 是目录
+    IsADirectory,
+    /// 不支持的系统调用
+    UnsupportedSyscall,
+    /// 服务已存在
+    ServiceAlreadyExists,
+    /// 服务有依赖项
+    ServiceHasDependents,
+    /// 服务未找到
+    ServiceNotFound,
+    /// 依赖项未找到
+    DependencyNotFound,
+    /// 循环依赖
+    CircularDependency,
+    /// 系统调用不支持
+    SyscallNotSupported,
+    /// 服务不可用
+    ServiceUnavailable(String),
+    /// 超过最大重试次数
+    MaxRetriesExceeded(u32),
+    /// 未知错误
+    Unknown(String),
 }
 
 impl From<SyscallError> for KernelError {
@@ -101,6 +148,7 @@ impl KernelError {
     pub fn to_errno(self) -> i32 {
         match self {
             KernelError::Syscall(e) => crate::syscalls::common::syscall_error_to_errno(e),
+            KernelError::Network(e) => e.error_code(),
             KernelError::OutOfMemory => errno::ENOMEM,
             KernelError::InvalidArgument => errno::EINVAL,
             KernelError::NotFound => errno::ENOENT,

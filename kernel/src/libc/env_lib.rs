@@ -12,8 +12,8 @@ extern crate alloc;
 use alloc::format;
 use core::ffi::{c_char, c_int};
 use core::str::FromStr;
-use crate::libc::error::{get_errno, set_errno};
-use crate::libc::error::errno::{EINVAL, ENOMEM, ENOENT};
+use crate::libc::error::set_errno;
+use crate::libc::error::errno::{EINVAL, ENOMEM};
 use crate::reliability::errno::{EPERM, EAGAIN};
 use crate::sync::Mutex;
 

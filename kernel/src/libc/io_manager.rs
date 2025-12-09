@@ -16,9 +16,8 @@ pub type size_t = usize;
 use core::ptr::null_mut;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use crate::libc::interface::{CLibResult, CLibError};
-use crate::libc::error::{get_errno, set_errno};
-use crate::libc::error::errno::{EBADF, EINVAL, ENOMEM, ENOENT, EIO, EAGAIN, EMFILE};
-use crate::vfs::{file as VfsFile, FileMode as VfsFileMode};
+use crate::libc::error::set_errno;
+use crate::libc::error::errno::{EINVAL, ENOENT, EIO, EAGAIN, EMFILE, ENOMEM, EBADF};
 use crate::compat::loader::OpenFlags;
 use crate::drivers::console;
 

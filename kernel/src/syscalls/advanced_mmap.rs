@@ -636,27 +636,64 @@ pub fn sys_munlockall(_args: &[u64]) -> SyscallResult {
     Ok(0)
 }
 
+// Track pinned pages using a set
+static PINNED_PAGES: crate::sync::Mutex<alloc::collections::BTreeSet<usize>> = 
+    crate::sync::Mutex::new(alloc::collections::BTreeSet::new());
+
 /// Lock a single memory page
 fn lock_memory_page(va: usize, pa: *mut u8, size: usize) -> Result<bool, SyscallError> {
-    // In a real implementation, this would:
-    // 1. Pin physical page in memory
-    // 2. Prevent swapping
-    // 3. Update accounting
+    if pa.is_null() {
+        return Err(SyscallError::BadAddress);
+    }
     
-    // For now, we just simulate success
-    // TODO: Implement actual page pinning
+    let pa_usize = pa as usize;
+    let page_addr = pa_usize & !(crate::mm::PAGE_SIZE - 1);
+    
+    // Pin the page - add to pinned set and increment reference
+    let mut pinned = PINNED_PAGES.lock();
+    
+    if pinned.contains(&page_addr) {
+        // Already pinned
+        return Ok(true);
+    }
+    
+    // Check memory limits before pinning
+    let total_pinned = pinned.len() * crate::mm::PAGE_SIZE;
+    let max_locked = 64 * 1024 * 1024; // 64MB max locked memory
+    
+    if total_pinned + size > max_locked {
+        return Err(SyscallError::OutOfMemory);
+    }
+    
+    // Add page to pinned set
+    pinned.insert(page_addr);
+    
+    // Increment page reference to prevent freeing
+    crate::mm::vm::page_ref_inc(pa_usize);
+    
+    let _ = va; // VA is used for tracking but not needed for pinning
+    
     Ok(true)
 }
 
 /// Unlock a single memory page
 fn unlock_memory_page(va: usize, pa: *mut u8, size: usize) {
-    // In a real implementation, this would:
-    // 1. Unpin physical page
-    // 2. Allow swapping
-    // 3. Update accounting
+    if pa.is_null() {
+        return;
+    }
     
-    // For now, we just simulate the operation
-    // TODO: Implement actual page unpinning
+    let pa_usize = pa as usize;
+    let page_addr = pa_usize & !(crate::mm::PAGE_SIZE - 1);
+    
+    // Remove from pinned set
+    let mut pinned = PINNED_PAGES.lock();
+    
+    if pinned.remove(&page_addr) {
+        // Decrement page reference
+        crate::mm::vm::page_ref_dec(pa_usize);
+    }
+    
+    let _ = (va, size); // Not needed for unpinning
 }
 
 // ============================================================================

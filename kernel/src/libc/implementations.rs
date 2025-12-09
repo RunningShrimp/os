@@ -17,7 +17,6 @@ use alloc::boxed::Box;
 
 use crate::libc::CLibInterface;
 use crate::libc::interface::{size_t, DivT, LDivT, CLibResult, CLibStats, c_long};
-use crate::libc::memory_adapter::get_libc_adapter;
 use core::ffi::{c_int, c_char, c_void, c_uint, c_double, c_ulong};
 use alloc::alloc::{alloc, Layout};
 
@@ -497,6 +496,14 @@ impl CLibInterface for UnifiedCLib {
     fn strerror(&self, errnum: c_int) -> *const c_char {
         static ERROR_MSG: &[u8] = b"Unknown error\0";
         ERROR_MSG.as_ptr() as *const c_char
+    }
+
+    fn error_type(&self) -> c_int {
+        0
+    }
+
+    fn error_code(&self) -> c_int {
+        0
     }
 
     // 环境变量函数 - 使用增强环境变量管理器

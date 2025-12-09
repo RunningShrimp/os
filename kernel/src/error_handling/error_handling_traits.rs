@@ -390,7 +390,7 @@ impl UnifiedErrorHandlingManager {
     }
 
     /// 处理错误
-    pub fn handle_error(&self, error: UnifiedError, context: EnhancedErrorContext) -> Result<ErrorHandlingResult, &'static str> {
+    pub fn handle_error(&self, error: &UnifiedError, context: EnhancedErrorContext) -> Result<ErrorHandlingResult, &'static str> {
         let start_time = get_timestamp();
         let error_id = self.error_counter.fetch_add(1, Ordering::SeqCst);
 

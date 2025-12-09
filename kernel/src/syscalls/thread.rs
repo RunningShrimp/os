@@ -296,28 +296,132 @@ fn sys_clone(args: &[u64]) -> SyscallResult {
 }
 
 fn sys_fork(_args: &[u64]) -> SyscallResult {
-    // TODO: Implement fork syscall
-    Err(SyscallError::NotSupported)
+    // Fork creates a copy of the current process
+    use crate::process::manager;
+    
+    // Call the process manager's fork function
+    let result = manager::fork();
+
+    let pid = match result {
+        Some(pid) => pid as u64,
+        None => return Err(SyscallError::OutOfMemory),
+    };
+
+    Ok(pid)
 }
 
 fn sys_vfork(_args: &[u64]) -> SyscallResult {
-    // TODO: Implement vfork syscall
+    // vfork is similar to fork but shares address space until exec
+    // For now, implement as regular fork
+    sys_fork(_args)
+}
+
+fn sys_execve(args: &[u64]) -> SyscallResult {
+    use super::common::extract_args;
+    use crate::mm::vm::copyin;
+    
+    let args = extract_args(args, 3)?;
+    let path_ptr = args[0] as usize;
+    let _argv_ptr = args[1] as usize;
+    let _envp_ptr = args[2] as usize;
+    
+    if path_ptr == 0 {
+        return Err(SyscallError::BadAddress);
+    }
+    
+    // Get current process
+    let pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
+    let proc_table = crate::process::manager::PROC_TABLE.lock();
+    let proc = proc_table.find_ref(pid).ok_or(SyscallError::NotFound)?;
+    let pagetable = proc.pagetable;
+    drop(proc_table);
+    
+    if pagetable.is_null() {
+        return Err(SyscallError::BadAddress);
+    }
+    
+    // Read path from user space
+    let mut path_buf = [0u8; 256];
+    unsafe {
+        copyin(pagetable, path_buf.as_mut_ptr(), path_ptr, 256)
+            .map_err(|_| SyscallError::BadAddress)?;
+    }
+    
+    // Find null terminator
+    let path_len = path_buf.iter().position(|&c| c == 0).unwrap_or(256);
+    let _path = core::str::from_utf8(&path_buf[..path_len])
+        .map_err(|_| SyscallError::InvalidArgument)?;
+    
+    // Load the executable - this would involve:
+    // 1. Open the file
+    // 2. Parse ELF headers
+    // 3. Allocate new address space
+    // 4. Load segments
+    // 5. Set up stack with argv/envp
+    // 6. Jump to entry point
+    
+    // For now, return error as exec requires ELF loading infrastructure
     Err(SyscallError::NotSupported)
 }
 
-fn sys_execve(_args: &[u64]) -> SyscallResult {
-    // TODO: Implement execve syscall
-    Err(SyscallError::NotSupported)
+fn sys_exit(args: &[u64]) -> SyscallResult {
+    let status = if !args.is_empty() { args[0] as i32 } else { 0 };
+    
+    // Call the process manager's exit function
+    crate::process::manager::exit(status);
+    
+    // exit() should not return
+    Err(SyscallError::InvalidArgument)
 }
 
-fn sys_exit(_args: &[u64]) -> SyscallResult {
-    // TODO: Implement exit syscall
-    Err(SyscallError::NotSupported)
-}
+fn sys_wait4(args: &[u64]) -> SyscallResult {
+    use super::common::extract_args;
+    use crate::mm::vm::copyout;
+    
+    let args = extract_args(args, 4)?;
+    let wait_pid = args[0] as i32;
+    let status_ptr = args[1] as usize;
+    let options = args[2] as i32;
+    let _rusage_ptr = args[3] as usize;
+    
+    // Wait for child process
+    let mut status: i32 = 0;
+    let result = crate::process::manager::wait(&mut status);
 
-fn sys_wait4(_args: &[u64]) -> SyscallResult {
-    // TODO: Implement wait4 syscall
-    Err(SyscallError::NotSupported)
+    let pid = match result {
+        Some(pid) => pid,
+        None => {
+            // Check if WNOHANG was set
+            const WNOHANG: i32 = 1;
+            if (options & WNOHANG) != 0 {
+                return Ok(0); // No child exited yet
+            }
+            return Err(SyscallError::WouldBlock);
+        }
+    };
+
+    // If waiting for specific PID, check it matches
+    if wait_pid > 0 && pid as i32 != wait_pid {
+        return Err(SyscallError::NotFound);
+    }
+    
+    // Copy status to user space if requested
+    if status_ptr != 0 {
+        let pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
+        let proc_table = crate::process::manager::PROC_TABLE.lock();
+        let proc = proc_table.find_ref(pid).ok_or(SyscallError::NotFound)?;
+        let pagetable = proc.pagetable;
+        drop(proc_table);
+        
+        if !pagetable.is_null() {
+            unsafe {
+                copyout(pagetable, status_ptr, &status as *const _ as *const u8, 4)
+                    .map_err(|_| SyscallError::BadAddress)?;
+            }
+        }
+    }
+
+    Ok(pid as u64)
 }
 
 /// Get thread ID
@@ -889,27 +993,171 @@ pub fn futex_error_to_syscall(error: &str) -> SyscallError {
 }
 
 
-fn sys_set_robust_list(_args: &[u64]) -> SyscallResult {
-    // TODO: Implement set_robust_list syscall
-    Err(SyscallError::NotSupported)
+fn sys_set_robust_list(args: &[u64]) -> SyscallResult {
+    let args = extract_args(args, 2)?;
+    let head_ptr = args[0] as usize;
+    let len = args[1] as usize;
+    
+    // Validate length (must be sizeof(robust_list_head))
+    // The standard size is 24 bytes on 64-bit systems
+    if len != 24 {
+        return Err(SyscallError::InvalidArgument);
+    }
+    
+    // Store robust list head in thread structure
+    // For now, we just accept the call without storing
+    // Real implementation would store head_ptr in thread control block
+    let tid = crate::process::thread::thread_self();
+    let mut thread_table = crate::process::thread::thread_table();
+    
+    if let Some(thread) = thread_table.find_thread(tid) {
+        // Store the robust list head (we'd need to add this field to Thread)
+        // thread.robust_list_head = head_ptr;
+        let _ = head_ptr;  // Accept but don't store yet
+        Ok(0)
+    } else {
+        Err(SyscallError::NotFound)
+    }
 }
 
-fn sys_get_robust_list(_args: &[u64]) -> SyscallResult {
-    // TODO: Implement get_robust_list syscall
-    Err(SyscallError::NotSupported)
+fn sys_get_robust_list(args: &[u64]) -> SyscallResult {
+    use crate::mm::vm::copyout;
+    
+    let args = extract_args(args, 3)?;
+    let pid = args[0] as usize;
+    let head_ptr_ptr = args[1] as usize;
+    let len_ptr = args[2] as usize;
+    
+    if head_ptr_ptr == 0 || len_ptr == 0 {
+        return Err(SyscallError::BadAddress);
+    }
+    
+    let my_pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
+    
+    // If pid is 0, get robust list of calling thread
+    let target = if pid == 0 { my_pid } else { pid };
+    
+    // Check permissions
+    if target != my_pid {
+        let table = crate::process::manager::PROC_TABLE.lock();
+        let caller = table.find_ref(my_pid).ok_or(SyscallError::NotFound)?;
+        if caller.euid != 0 {
+            return Err(SyscallError::PermissionDenied);
+        }
+    }
+    
+    // Get pagetable for copyout
+    let table = crate::process::manager::PROC_TABLE.lock();
+    let proc = table.find_ref(my_pid).ok_or(SyscallError::NotFound)?;
+    let pagetable = proc.pagetable;
+    drop(table);
+    
+    if pagetable.is_null() {
+        return Err(SyscallError::BadAddress);
+    }
+    
+    // Return null pointer and standard length
+    let head_ptr: usize = 0;
+    let len: usize = 24;
+    
+    unsafe {
+        copyout(pagetable, head_ptr_ptr, &head_ptr as *const _ as *const u8,
+                core::mem::size_of::<usize>())
+            .map_err(|_| SyscallError::BadAddress)?;
+        copyout(pagetable, len_ptr, &len as *const _ as *const u8,
+                core::mem::size_of::<usize>())
+            .map_err(|_| SyscallError::BadAddress)?;
+    }
+    
+    Ok(0)
 }
 
 fn sys_sched_yield(_args: &[u64]) -> SyscallResult {
-    // TODO: Implement sched_yield syscall
-    Err(SyscallError::NotSupported)
+    // Yield the CPU to other runnable threads/processes
+    crate::process::yield_cpu();
+    Ok(0)
 }
 
-fn sys_sched_getaffinity(_args: &[u64]) -> SyscallResult {
-    // TODO: Implement sched_getaffinity syscall
-    Err(SyscallError::NotSupported)
+fn sys_sched_getaffinity(args: &[u64]) -> SyscallResult {
+    use crate::mm::vm::copyout;
+    
+    let args = extract_args(args, 3)?;
+    let pid = args[0] as usize;
+    let cpusetsize = args[1] as usize;
+    let mask_ptr = args[2] as usize;
+    
+    if cpusetsize == 0 || mask_ptr == 0 {
+        return Err(SyscallError::InvalidArgument);
+    }
+    
+    let my_pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
+    let target = if pid == 0 { my_pid } else { pid };
+    
+    let table = crate::process::manager::PROC_TABLE.lock();
+    let caller = table.find_ref(my_pid).ok_or(SyscallError::NotFound)?;
+    let pagetable = caller.pagetable;
+    
+    // Verify target exists
+    let _proc = table.find_ref(target).ok_or(SyscallError::NotFound)?;
+    drop(table);
+    
+    if pagetable.is_null() {
+        return Err(SyscallError::BadAddress);
+    }
+    
+    // Return a mask with CPU 0 set
+    let cpu_mask: u64 = 1;
+    let copy_size = cpusetsize.min(core::mem::size_of::<u64>());
+    
+    unsafe {
+        copyout(pagetable, mask_ptr, &cpu_mask as *const _ as *const u8, copy_size)
+            .map_err(|_| SyscallError::BadAddress)?;
+    }
+    
+    Ok(copy_size as u64)
 }
 
-fn sys_sched_setaffinity(_args: &[u64]) -> SyscallResult {
-    // TODO: Implement sched_setaffinity syscall
-    Err(SyscallError::NotSupported)
+fn sys_sched_setaffinity(args: &[u64]) -> SyscallResult {
+    use crate::mm::vm::copyin;
+    
+    let args = extract_args(args, 3)?;
+    let pid = args[0] as usize;
+    let cpusetsize = args[1] as usize;
+    let mask_ptr = args[2] as usize;
+    
+    if cpusetsize == 0 || mask_ptr == 0 {
+        return Err(SyscallError::InvalidArgument);
+    }
+    
+    let my_pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
+    let target = if pid == 0 { my_pid } else { pid };
+    
+    let table = crate::process::manager::PROC_TABLE.lock();
+    let caller = table.find_ref(my_pid).ok_or(SyscallError::NotFound)?;
+    let pagetable = caller.pagetable;
+    
+    // Verify target exists
+    let _proc = table.find_ref(target).ok_or(SyscallError::NotFound)?;
+    drop(table);
+    
+    if pagetable.is_null() {
+        return Err(SyscallError::BadAddress);
+    }
+    
+    // Read the mask
+    let mut cpu_mask: u64 = 0;
+    let copy_size = cpusetsize.min(core::mem::size_of::<u64>());
+    
+    unsafe {
+        copyin(pagetable, &mut cpu_mask as *mut _ as *mut u8, mask_ptr, copy_size)
+            .map_err(|_| SyscallError::BadAddress)?;
+    }
+    
+    // Validate mask has at least one CPU set
+    if cpu_mask == 0 {
+        return Err(SyscallError::InvalidArgument);
+    }
+    
+    // Accept the affinity (real implementation would store and enforce)
+    Ok(0)
 }

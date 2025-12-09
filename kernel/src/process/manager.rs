@@ -350,6 +350,13 @@ pub struct Proc {
     pub pid: Pid,
     pub pgid: Pid,  // Process group ID
     pub sid: Pid,   // Session ID
+    // User/Group IDs (POSIX credentials)
+    pub uid: posix::Uid,   // Real user ID
+    pub gid: posix::Gid,   // Real group ID
+    pub euid: posix::Uid,  // Effective user ID
+    pub egid: posix::Gid,  // Effective group ID
+    pub suid: posix::Uid,  // Saved set-user-ID
+    pub sgid: posix::Gid,  // Saved set-group-ID
     pub state: ProcState,
     pub parent: Option<Pid>,
     pub kstack: usize,
@@ -368,6 +375,8 @@ pub struct Proc {
     pub xstate: i32,  // Exit status
     pub sz: usize,    // Memory size
     pub pagetable: *mut PageTable,  // Page table pointer
+    pub nice: i32,    // Process nice value (-20 to 19)
+    pub umask: u32,   // File creation mask
 }
 
 // Safety: Process control block is protected by PROC_TABLE mutex
@@ -379,6 +388,12 @@ impl Proc {
             pid: 0,
             pgid: 0,
             sid: 0,
+            uid: 0,
+            gid: 0,
+            euid: 0,
+            egid: 0,
+            suid: 0,
+            sgid: 0,
             rlimits: [crate::posix::Rlimit { rlim_cur: 0, rlim_max: 0 }; 16],
             state: ProcState::Unused,
             parent: None,
@@ -395,6 +410,8 @@ impl Proc {
             xstate: 0,
             sz: 0,
             pagetable: null_mut(),
+            nice: 0,
+            umask: 0o022,  // Default umask
         }
     }
     
@@ -871,9 +888,9 @@ pub fn fork() -> Option<Pid> {
     let mut table = PROC_TABLE.lock();
 
     // Extract all parent data first, then release borrow
-    let (parent_pgid, parent_sid, parent_ofile, parent_cwd_path, parent_cwd, parent_rlimits, parent_pagetable, parent_sz, parent_trapframe) = {
+    let (parent_pgid, parent_sid, parent_uid, parent_gid, parent_euid, parent_egid, parent_suid, parent_sgid, parent_nice, parent_umask, parent_ofile, parent_cwd_path, parent_cwd, parent_rlimits, parent_pagetable, parent_sz, parent_trapframe) = {
         let parent = table.find(parent_pid)?;
-        (parent.pgid, parent.sid, parent.ofile.clone(), parent.cwd_path.clone(), parent.cwd, parent.rlimits.clone(), parent.pagetable, parent.sz, parent.trapframe)
+        (parent.pgid, parent.sid, parent.uid, parent.gid, parent.euid, parent.egid, parent.suid, parent.sgid, parent.nice, parent.umask, parent.ofile.clone(), parent.cwd_path.clone(), parent.cwd, parent.rlimits.clone(), parent.pagetable, parent.sz, parent.trapframe)
     };
 
     // Allocate child process (now we can use table mutably again)
@@ -885,6 +902,15 @@ pub fn fork() -> Option<Pid> {
     child.state = ProcState::Runnable;
     child.pgid = parent_pgid;
     child.sid = parent_sid;
+    // Inherit credentials from parent
+    child.uid = parent_uid;
+    child.gid = parent_gid;
+    child.euid = parent_euid;
+    child.egid = parent_egid;
+    child.suid = parent_suid;
+    child.sgid = parent_sgid;
+    child.nice = parent_nice;
+    child.umask = parent_umask;
     
     // Drop mutable borrow of child before calling add_child_to_parent
     drop(child);

@@ -339,20 +339,32 @@ impl AdaptivePrefetcher {
 }
 
 /// Global adaptive prefetcher instance
-static GLOBAL_PREFETCHER: Mutex<AdaptivePrefetcher> = Mutex::new(AdaptivePrefetcher::new());
+static GLOBAL_PREFETCHER: Mutex<Option<AdaptivePrefetcher>> = Mutex::new(None);
+
+/// Get or initialize the global prefetcher
+fn get_or_init_prefetcher() -> &'static Mutex<Option<AdaptivePrefetcher>> {
+    use crate::sync::Once;
+    static INIT_ONCE: Once = Once::new();
+
+    INIT_ONCE.call_once(|| {
+        *GLOBAL_PREFETCHER.lock() = Some(AdaptivePrefetcher::new());
+    });
+
+    &GLOBAL_PREFETCHER
+}
 
 /// Initialize the adaptive prefetching system
 pub fn init_prefetcher() {
     // Configure and initialize the prefetcher
-    let mut prefetcher = GLOBAL_PREFETCHER.lock();
-    
-    // Set aggressive prefetching for performance-critical workloads
-    prefetcher.set_strategy(PrefetchStrategy::Adaptive);
+    if let Some(ref mut prefetcher) = *get_or_init_prefetcher().lock() {
+        // Set aggressive prefetching for performance-critical workloads
+        prefetcher.set_strategy(PrefetchStrategy::Adaptive);
+    }
 }
 
 /// Get the global adaptive prefetcher instance
-pub fn get_global_prefetcher() -> &'static Mutex<AdaptivePrefetcher> {
-    &GLOBAL_PREFETCHER
+pub fn get_global_prefetcher() -> &'static Mutex<Option<AdaptivePrefetcher>> {
+    get_or_init_prefetcher()
 }
 
 /// Process a memory access for prefetching
@@ -363,7 +375,8 @@ pub fn process_memory_access(addr: usize, page_size: usize, access_type: AccessT
         timestamp: crate::time::timestamp_millis(),
         access_type,
     };
-    
-    let mut prefetcher = GLOBAL_PREFETCHER.lock();
-    prefetcher.process_access(access);
+
+    if let Some(ref mut prefetcher) = *get_or_init_prefetcher().lock() {
+        prefetcher.process_access(access);
+    }
 }
