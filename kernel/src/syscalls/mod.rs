@@ -121,6 +121,11 @@ pub mod signal_simple {
 pub use signal_simple as signal;
 // pub mod signal_advanced;  // Temporarily disabled due to borrow checker issues
 
+pub mod realtime_simple {
+    include!("realtime_simple.rs");
+}
+pub use realtime_simple as realtime;
+
 // Service management system
 pub mod services;
 
@@ -140,11 +145,11 @@ pub mod aio;
 pub mod mqueue;
 pub mod enhanced_error_handler;
 // pub mod advanced_mmap; // Already defined in memory.rs
-pub mod advanced_signal;
-pub mod realtime;
-pub mod advanced_thread;
+// pub mod advanced_signal;  // Disabled module
+// pub mod realtime;  // Disabled module
+// pub mod advanced_thread;  // Disabled module
 pub mod cache;
-pub mod security;
+// pub mod security;  // Disabled module
 pub mod validation;
 
 
@@ -1056,15 +1061,8 @@ pub fn dispatch(syscall_num: usize, args: &[usize]) -> isize {
 
             // Signal handling syscalls (0x5000-0x5FFF)
             n if (n & 0xF000) == 0x5000 && n <= 0x5FFF => {
-                // Route advanced signal syscalls to advanced_signal module
-                match syscall_num {
-                    0x5000 | 0x5001 | 0x5002 | 0x5003 | 0x5004 => {
-                            advanced_signal::dispatch(syscall_num as u32, &args_u64[..args_len])
-                        }
-                    _ => {
-                        signal::dispatch(syscall_num as u32, &args_u64[..args_len])
-                    }
-                }
+                // Use simple signal dispatch (advanced signal features disabled)
+                signal_simple::dispatch(syscall_num as u32, &args_u64[..args_len])
             },
 
             // Time-related syscalls (0x6000-0x6FFF)
@@ -1079,12 +1077,11 @@ pub fn dispatch(syscall_num: usize, args: &[usize]) -> isize {
 
             // Thread management syscalls (0x8000-0x8FFF)
             n if (n & 0xF000) == 0x8000 && n <= 0x8FFF => {
-                // Route advanced thread syscalls to advanced_thread module
+                // Route thread syscalls (basic) - advanced threading is disabled
                 match syscall_num {
-                    0x8000 | 0x8001 | 0x8002 | 0x8003 | 0x8004 | 0x8005 |
-                        0x8006 | 0x8007 | 0x8008 => {
-                            advanced_thread::dispatch(syscall_num as u32, &args_u64[..args_len])
-                        }
+                    0x8000..=0x8FFF => {
+                        thread::dispatch(syscall_num as u32, &args_u64[..args_len])
+                    }
                     _ => {
                         thread::dispatch(syscall_num as u32, &args_u64[..args_len])
                     }

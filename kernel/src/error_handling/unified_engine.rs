@@ -1260,14 +1260,14 @@ impl HealthChecker {
         Self {
             health_check_rules: Vec::new(),
             health_score_calculator: HealthScoreCalculator::new(),
-            current_health_status: HealthStatus::Unknown,
+            current_health_status: HealthStatus::unknown(),
         }
     }
 
     /// 执行健康检查
     pub fn perform_health_check(&mut self) -> HealthStatus {
         // 简化的健康检查实现
-        HealthStatus::Healthy
+        HealthStatus::healthy()
     }
 }
 
