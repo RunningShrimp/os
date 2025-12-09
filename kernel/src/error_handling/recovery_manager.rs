@@ -317,6 +317,7 @@ impl RecoveryManager {
             error_type: ErrorType::RuntimeError,
             category: ErrorCategory::System,
             severity: ErrorSeverity::Error,
+            priority: ErrorPriority::Normal,
             status: ErrorStatus::Active,
             message: String::new(),
             description: String::new(),

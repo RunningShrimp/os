@@ -281,7 +281,7 @@ impl Default for ConnectionParams {
 /// 
 /// 定义网络模块特有的错误类型。
 #[derive(Debug, Clone)]
-#[derive(Clone, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 pub enum NetworkError {
     /// 地址已在使用
     AddressInUse,

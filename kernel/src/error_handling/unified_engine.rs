@@ -413,7 +413,16 @@ pub enum HealthCheckCondition {
 
 /// 健康状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HealthStatus {
+#[derive(Debug, Clone)]
+pub struct HealthStatus {
+    /// 状态
+    pub status: HealthStatusEnum,
+    /// 健康评分 (0.0-1.0)
+    pub score: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HealthStatusEnum {
     /// 健康
     Healthy,
     /// 警告
@@ -422,6 +431,28 @@ pub enum HealthStatus {
     Critical,
     /// 未知
     Unknown,
+}
+
+impl HealthStatus {
+    pub fn new(status: HealthStatusEnum, score: f64) -> Self {
+        Self { status, score }
+    }
+
+    pub fn healthy() -> Self {
+        Self::new(HealthStatusEnum::Healthy, 1.0)
+    }
+
+    pub fn warning() -> Self {
+        Self::new(HealthStatusEnum::Warning, 0.7)
+    }
+
+    pub fn critical() -> Self {
+        Self::new(HealthStatusEnum::Critical, 0.3)
+    }
+
+    pub fn unknown() -> Self {
+        Self::new(HealthStatusEnum::Unknown, 0.5)
+    }
 }
 
 /// 健康评分计算器
@@ -872,6 +903,7 @@ impl UnifiedErrorHandlingEngine {
             error_type: ErrorType::RuntimeError,
             category: error.category(),
             severity: error.severity(),
+            priority: ErrorPriority::Normal,
             status: ErrorStatus::New,
             message: context.basic_context.error_message.clone(),
             description: context.basic_context.error_description.clone(),
