@@ -352,7 +352,7 @@ impl OptimizedProcessLockManager {
     /// 尝试锁升级（读锁升级为写锁）
     #[inline]
     pub fn try_lock_upgrade(&self, read_guard: &FineGrainedReadLockGuard) -> Option<FineGrainedWriteLockGuard> {
-        if self.lock_upgrade_in_progress.compare_exchange(false, true, Ordering::Acquire) != Ok(false) {
+        if self.lock_upgrade_in_progress.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed) != Ok(false) {
             return None; // 已有锁升级在进行
         }
 

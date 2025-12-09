@@ -379,7 +379,7 @@ impl Inode {
             
             // Read block
             let mut buf = [0u8; BSIZE];
-            dev.read(block_num, &mut buf);
+            dev.read(block_num as usize, &mut buf);
             
             let bytes_to_copy = (BSIZE - block_offset).min(end - offset);
             dst[total..total + bytes_to_copy].copy_from_slice(&buf[block_offset..block_offset + bytes_to_copy]);
@@ -416,12 +416,12 @@ impl Inode {
             
             // Read-modify-write
             let mut buf = [0u8; BSIZE];
-            dev.read(block_num, &mut buf);
+            dev.read(block_num as usize, &mut buf);
             
             let bytes_to_copy = (BSIZE - block_offset).min(end - offset);
             buf[block_offset..block_offset + bytes_to_copy].copy_from_slice(&src[total..total + bytes_to_copy]);
             
-            dev.write(block_num, &buf);
+            dev.write(block_num as usize, &buf);
             
             total += bytes_to_copy;
             offset += bytes_to_copy;
@@ -480,7 +480,7 @@ impl Fs {
     /// Read superblock from disk
     pub fn read_super(&self) -> SuperBlock {
         let mut buf = [0u8; 512];
-        self.dev.read(1, &mut buf); // Superblock is at block 1
+        self.dev.read(1 as usize, &mut buf); // Superblock is at block 1
 
         SuperBlock {
             magic: u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]),
@@ -505,7 +505,7 @@ impl Fs {
         buf[20..24].copy_from_slice(&sb.logstart.to_le_bytes());
         buf[24..28].copy_from_slice(&sb.inodestart.to_le_bytes());
         buf[28..32].copy_from_slice(&sb.bmapstart.to_le_bytes());
-        self.dev.write(1, &buf);
+        self.dev.write(1 as usize, &buf);
     }
 
     /// Initialize file system
@@ -620,7 +620,7 @@ impl Fs {
                 continue;
             }
             
-            self.dev.read(dir_inode.addrs[i], &mut buf);
+            self.dev.read(dir_inode.addrs[i] as usize, &mut buf);
             
             // Scan directory entries in this block
             for off in (0..BSIZE).step_by(dirent_size) {
@@ -663,7 +663,7 @@ impl Fs {
                 continue;
             }
             
-            self.dev.read(dir_inode.addrs[i], &mut buf);
+            self.dev.read(dir_inode.addrs[i] as usize, &mut buf);
             
             for off in (0..BSIZE).step_by(dirent_size) {
                 let entry_inum = u16::from_le_bytes([buf[off], buf[off + 1]]);
@@ -681,7 +681,7 @@ impl Fs {
                         buf[off + 2 + j] = 0;
                     }
                     
-                    self.dev.write(dir_inode.addrs[i], &buf);
+                    self.dev.write(dir_inode.addrs[i] as usize, &buf);
                     return true;
                 }
             }
@@ -710,7 +710,7 @@ impl Fs {
                 continue;
             }
             
-            self.dev.read(dir_inode.addrs[i], &mut buf);
+            self.dev.read(dir_inode.addrs[i] as usize, &mut buf);
             
             for off in (0..BSIZE).step_by(dirent_size) {
                 let inum = u16::from_le_bytes([buf[off], buf[off + 1]]);
@@ -753,13 +753,13 @@ impl Fs {
         // Zero out all blocks
         let zero_block = [0u8; 512];
         for i in 0..100 {
-            self.dev.write(i, &zero_block);
+            self.dev.write(i as usize, &zero_block);
         }
         
         // Create root directory inode (inode 1)
         let root_block = sb.inodestart;
         let mut buf = [0u8; 512];
-        self.dev.read(root_block, &mut buf);
+        self.dev.read(root_block as usize, &mut buf);
         
         // Root inode is at offset 0 in block (inode 1)
         // Set type to directory
@@ -769,7 +769,7 @@ impl Fs {
         // Size = 0 initially
         buf[6..10].copy_from_slice(&0u32.to_le_bytes());
         
-        self.dev.write(root_block, &buf);
+        self.dev.write(root_block as usize, &buf);
         
         crate::println!("fs: created new filesystem with root directory");
     }

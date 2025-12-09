@@ -416,7 +416,7 @@ impl Namespace {
 
         // 挂载根文件系统
         let flags = if read_only { 0x1 } else { 0x0 }; // MS_RDONLY
-        crate::syscalls::fs::mount("rootfs", "/", Some(rootfs_path), flags)?;
+        crate::syscalls::fs::mount("rootfs", "/", Some(rootfs_path), flags).map_err(|_| -1)?;
 
         Ok(())
     }
@@ -433,7 +433,7 @@ impl Namespace {
             &mount_point.target,
             Some(&mount_point.source[..]),
             mount_point.flags as u32,
-        )?;
+        ).map_err(|_| -1)?;
 
         Ok(())
     }
