@@ -673,7 +673,7 @@ fn sys_setuid(args: &[u64]) -> SyscallResult {
     let uid = args[0] as Uid;
 
     // Set user ID
-    match setuid(uid) {
+    match setuid(uid, uid) {
         Ok(()) => Ok(0),
         Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
         Err(SecurityError::UserNotFound) => Err(SyscallError::NotFound),
@@ -694,7 +694,7 @@ fn sys_setgid(args: &[u64]) -> SyscallResult {
     let gid = args[0] as Gid;
 
     // Set group ID
-    match setgid(gid) {
+    match setgid(gid, gid) {
         Ok(()) => Ok(0),
         Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
         Err(SecurityError::GroupNotFound) => Err(SyscallError::NotFound),

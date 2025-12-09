@@ -118,7 +118,7 @@ pub enum HealingTriggerCondition {
 }
 
 /// 指标比较方式
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MetricComparison {
     /// 大于
     GreaterThan,

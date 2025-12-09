@@ -21,7 +21,7 @@ use super::{
 };
 
 /// 错误模式
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ErrorPattern {
     /// 模式ID
     pub id: u64,
@@ -48,7 +48,7 @@ pub struct ErrorPattern {
 }
 
 /// 模式匹配条件
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum PatternCondition {
     /// 系统负载条件
     SystemLoad {
@@ -119,7 +119,7 @@ pub enum ProcessConditionType {
 }
 
 /// 资源类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ResourceType {
     /// CPU使用率
     CpuUsage,

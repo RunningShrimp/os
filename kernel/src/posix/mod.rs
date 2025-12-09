@@ -10,7 +10,7 @@ use alloc::string::ToString;
 // ============================================================================
 
 /// Process ID type
-pub type Pid = usize;
+pub type Pid = i32;
 
 /// User ID type  
 pub type Uid = u32;

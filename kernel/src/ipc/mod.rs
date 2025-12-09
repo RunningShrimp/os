@@ -147,7 +147,9 @@ pub fn shm_create(size: usize, permissions: u32) -> Option<u32> {
             // Cleanup on failure
             for j in 0..i {
                 let cleanup_addr = base_addr + j * page_size;
-                crate::mm::kfree(cleanup_addr as *mut u8);
+                unsafe {
+                    crate::mm::kfree(cleanup_addr as *mut u8);
+                }
             }
             return None;
         }
@@ -233,7 +235,9 @@ pub fn shm_delete(shm_id: u32) -> bool {
     let pages = shm.size / page_size;
     for i in 0..pages {
         let addr = shm.base_addr + i * page_size;
-        crate::mm::kfree(addr as *mut u8);
+        unsafe {
+            crate::mm::kfree(addr as *mut u8);
+        }
     }
     
     // Remove from list (swap with last and pop)

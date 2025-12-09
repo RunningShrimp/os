@@ -9,7 +9,7 @@ use alloc::string::String;
 
 /// 统一错误类型
 /// 所有内核模块应使用此类型进行错误处理
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum KernelError {
     /// 系统调用错误
     Syscall(SyscallError),

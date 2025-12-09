@@ -78,8 +78,10 @@ fn sys_time(_args: &[u64]) -> SyscallResult {
         let bytes = unsafe { core::slice::from_raw_parts((&val as *const time_t) as *const u8, core::mem::size_of::<time_t>()) };
 
         // Write to user space
-        copyout(pagetable, tloc as usize, bytes.as_ptr(), bytes.len())
-            .map_err(|_| SyscallError::BadAddress)?;
+        unsafe {
+            copyout(pagetable, tloc as usize, bytes.as_ptr(), bytes.len())
+                .map_err(|_| SyscallError::BadAddress)?;
+        }
     }
 
     Ok(seconds as u64)

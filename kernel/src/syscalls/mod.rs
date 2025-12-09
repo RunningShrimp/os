@@ -928,7 +928,7 @@ pub fn dispatch(syscall_num: usize, args: &[usize]) -> isize {
         if let Some(proc) = proc_table.find_ref(pid) {
             (proc.pid as u64, proc.pagetable)
         } else {
-            (0, 0)
+            (0, core::ptr::null_mut())
         }
     };
     let validation_context = ValidationContext::with_process_info(
@@ -982,8 +982,12 @@ pub fn dispatch(syscall_num: usize, args: &[usize]) -> isize {
     
     // Try to get cached result
     if let Some(cache_result) = {
-        let mut cache = crate::syscalls::cache::get_global_cache().lock();
-        cache.get(&cache_key)
+        let cache_guard = crate::syscalls::cache::get_global_cache().lock();
+        if let Some(ref cache) = *cache_guard {
+            cache.get(&cache_key)
+        } else {
+            None
+        }
     } {
         return match cache_result {
             Ok(value) => value as isize,
@@ -1125,12 +1129,16 @@ pub fn dispatch(syscall_num: usize, args: &[usize]) -> isize {
     };
 
     // Cache the result if the syscall is pure
-    let cache = crate::syscalls::cache::get_global_cache().lock();
-    if cache.is_pure_syscall(syscall_num as u32) {
-        drop(cache); // Drop lock before writing
-        
-        let mut cache = crate::syscalls::cache::get_global_cache().lock();
-        cache.put(cache_key, result.clone());
+    let cache_guard = crate::syscalls::cache::get_global_cache().lock();
+    if let Some(ref cache) = *cache_guard {
+        if cache.is_pure_syscall(syscall_num as u32) {
+            drop(cache_guard); // Drop lock before writing
+
+            let cache_guard = crate::syscalls::cache::get_global_cache().lock();
+            if let Some(ref mut cache) = *cache_guard {
+                cache.put(cache_key, result.clone());
+            }
+        }
     }
 
     // Return the result

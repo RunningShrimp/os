@@ -383,7 +383,7 @@ pub struct SpinlockStats {
 }
 
 /// Thread CPU clock information
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ThreadClock {
     /// Thread ID
     pub thread_id: Pid,
