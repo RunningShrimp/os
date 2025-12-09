@@ -115,15 +115,11 @@ pub mod fs;
 pub mod mm;  // Memory management module (renamed from memory for clarity)
 pub mod net;  // Network module (renamed from network for consistency)
 pub mod ipc;  // Inter-process communication module
-pub mod signal_simple {
-    include!("signal_simple.rs");
-}
+pub mod signal_simple;
 pub use signal_simple as signal;
 // pub mod signal_advanced;  // Temporarily disabled due to borrow checker issues
 
-pub mod realtime_simple {
-    include!("realtime_simple.rs");
-}
+pub mod realtime_simple;
 pub use realtime_simple as realtime;
 
 // Service management system

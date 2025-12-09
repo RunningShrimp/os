@@ -1467,7 +1467,7 @@ pub use self::timer::*;
 // pub use self::advanced_signal::*;  // Disabled module
 // pub use self::realtime::*;  // Disabled module
 // pub use self::advanced_thread::*;  // Disabled module
-pub use self::security::*;
+// pub use self::security::*;  // Disabled module
 
 // Import size types from libc
 pub use crate::libc::interface::size_t;

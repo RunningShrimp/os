@@ -102,7 +102,7 @@ pub enum ComparisonOperator {
 }
 
 /// 进程条件类型
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ProcessConditionType {
     /// 进程存在
     Exists,

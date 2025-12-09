@@ -412,8 +412,7 @@ pub enum HealthCheckCondition {
 }
 
 /// 健康状态
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HealthStatus {
     /// 状态
     pub status: HealthStatusEnum,
