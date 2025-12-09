@@ -2,6 +2,7 @@ extern crate alloc;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use crate::sync::Mutex;
+#[cfg(feature = "posix_layer")]
 use crate::posix;
 
 #[derive(Clone, Copy)]

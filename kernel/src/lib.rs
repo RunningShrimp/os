@@ -39,6 +39,19 @@ extern crate alloc;
 #[macro_use]
 mod test_macros;
 
+// Logging macros (stub implementations for no_std environments)
+#[macro_export]
+macro_rules! log_debug { ($($arg:tt)*) => { let _ = ($($arg)*); }; }
+
+#[macro_export]
+macro_rules! log_info { ($($arg:tt)*) => { let _ = ($($arg)*); }; }
+
+#[macro_export]
+macro_rules! log_warn { ($($arg:tt)*) => { let _ = ($($arg)*); }; }
+
+#[macro_export]
+macro_rules! log_error { ($($arg:tt)*) => { let _ = ($($arg)*); }; }
+
 // Re-export commonly used modules for testing
 /// System call interface and dispatch mechanism
 pub mod syscalls;
@@ -59,14 +72,17 @@ pub use crate::error_handling::error_reporting::ErrorReporter;
 // Include necessary internal modules for the library
 mod arch;
 mod boot;
+#[cfg(feature = "cloud_native")]
 mod cloud_native;
 mod compat;
 mod collections;
 mod types;
 mod cpu;
+#[cfg(feature = "debug_subsystems")]
 mod debug;
 mod drivers;
 mod error_handling;
+#[cfg(feature = "formal_verification")]
 mod formal_verification;
 mod fs;
 mod ids;
@@ -75,9 +91,12 @@ mod libc;
 mod microkernel;
 mod mm;
 mod sched;
+#[cfg(feature = "net_stack")]
 mod net;
-mod posix;
+#[cfg(feature = "posix_layer")]
+pub mod posix;
 mod security;
+#[cfg(feature = "security_audit")]
 mod security_audit;
 mod services;
 mod sync;
