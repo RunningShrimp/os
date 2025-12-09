@@ -519,6 +519,8 @@ pub struct BasicContext {
     pub error_message: String,
     /// 错误描述
     pub error_description: String,
+    /// 错误源
+    pub source: ErrorSource,
 }
 
 /// 执行环境信息
@@ -923,7 +925,7 @@ impl UnifiedError {
         
         let fingerprint_hash = {
             use core::hash::{Hash, Hasher};
-            let mut hasher = DefaultHasherBuilder.build_hasher();
+            let mut hasher = <DefaultHasherBuilder as core::hash::BuildHasher>::build_hasher(&DefaultHasherBuilder);
             fingerprint_data.hash(&mut hasher);
             hasher.finish()
         };

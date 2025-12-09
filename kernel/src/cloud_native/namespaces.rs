@@ -448,7 +448,7 @@ impl Namespace {
         };
 
         crate::println!("[namespaces] Setting mount propagation: {:?}", propagation);
-        crate::syscalls::fs::mount("none", "/", None, mount_flag)?;
+        crate::syscalls::fs::mount("none", "/", None, mount_flag).map_err(|_| -1)?;
 
         Ok(())
     }
