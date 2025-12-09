@@ -313,7 +313,7 @@ fn sys_getpwnam(args: &[u64]) -> SyscallResult {
                 };
             }
             
-            Ok(0);
+            Ok(0)
         }
         Err(SecurityError::UserNotFound) => Err(SyscallError::NotFound),
     }
@@ -434,7 +434,7 @@ fn sys_getpwuid(args: &[u64]) -> SyscallResult {
                 };
             }
             
-            Ok(0);
+            Ok(0)
         }
         Err(SecurityError::UserNotFound) => Err(SyscallError::NotFound),
     }
@@ -553,7 +553,7 @@ fn sys_getgrnam(args: &[u64]) -> SyscallResult {
                 };
             }
             
-            Ok(0);
+            Ok(0)
         }
         Err(SecurityError::GroupNotFound) => Err(SyscallError::NotFound),
     }
@@ -653,7 +653,7 @@ fn sys_getgrgid(args: &[u64]) -> SyscallResult {
                 };
             }
             
-            Ok(0);
+            Ok(0)
         }
         Err(SecurityError::GroupNotFound) => Err(SyscallError::NotFound),
     }

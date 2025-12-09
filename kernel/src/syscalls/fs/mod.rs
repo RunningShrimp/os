@@ -22,6 +22,7 @@ use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use crate::syscalls::services::SyscallService;
+use crate::syscalls::common::SyscallError;
 
 /// Create filesystem syscall service instance
 ///
@@ -70,17 +71,18 @@ pub fn dispatch(syscall_id: u32, args: &[u64]) -> Result<u64, crate::syscalls::c
     // For now, delegate to handlers directly
     // TODO: This should eventually be removed in favor of service-based dispatch
     use handlers::*;
+    use crate::error_handling::unified::KernelError;
     match syscall_id {
-        0x7000 => handle_chdir(args),
-        0x7001 => handle_fchdir(args),
-        0x7002 => handle_getcwd(args),
-        0x7003 => handle_mkdir(args),
-        0x7004 => handle_rmdir(args),
-        0x7005 => handle_unlink(args),
-        0x7006 => handle_rename(args),
-        0x7007 => handle_link(args),
-        0x7008 => handle_symlink(args),
-        _ => Err(crate::error_handling::unified::KernelError::SyscallNotSupported),
+        0x7000 => handle_chdir(args).map_err(|e: KernelError| SyscallError::from(e)),
+        0x7001 => handle_fchdir(args).map_err(|e: KernelError| SyscallError::from(e)),
+        0x7002 => handle_getcwd(args).map_err(|e: KernelError| SyscallError::from(e)),
+        0x7003 => handle_mkdir(args).map_err(|e: KernelError| SyscallError::from(e)),
+        0x7004 => handle_rmdir(args).map_err(|e: KernelError| SyscallError::from(e)),
+        0x7005 => handle_unlink(args).map_err(|e: KernelError| SyscallError::from(e)),
+        0x7006 => handle_rename(args).map_err(|e: KernelError| SyscallError::from(e)),
+        0x7007 => handle_link(args).map_err(|e: KernelError| SyscallError::from(e)),
+        0x7008 => handle_symlink(args).map_err(|e: KernelError| SyscallError::from(e)),
+        _ => Err(crate::syscalls::common::SyscallError::InvalidSyscall),
     }
 }
 

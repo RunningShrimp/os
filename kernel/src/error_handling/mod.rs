@@ -145,6 +145,28 @@ pub enum ErrorType {
     SystemError,
 }
 
+impl core::fmt::Display for ErrorType {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            ErrorType::RuntimeError => write!(f, "RuntimeError"),
+            ErrorType::LogicError => write!(f, "LogicError"),
+            ErrorType::CompileError => write!(f, "CompileError"),
+            ErrorType::ConfigurationError => write!(f, "ConfigurationError"),
+            ErrorType::ResourceError => write!(f, "ResourceError"),
+            ErrorType::PermissionError => write!(f, "PermissionError"),
+            ErrorType::NetworkError => write!(f, "NetworkError"),
+            ErrorType::IOError => write!(f, "IOError"),
+            ErrorType::MemoryError => write!(f, "MemoryError"),
+            ErrorType::SyscallError => write!(f, "SyscallError"),
+            ErrorType::SecurityError => write!(f, "SecurityError"),
+            ErrorType::ValidationError => write!(f, "ValidationError"),
+            ErrorType::TimeoutError => write!(f, "TimeoutError"),
+            ErrorType::CancellationError => write!(f, "CancellationError"),
+            ErrorType::SystemError => write!(f, "SystemError"),
+        }
+    }
+}
+
 /// 恢复策略
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RecoveryStrategy {

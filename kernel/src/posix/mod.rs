@@ -10,7 +10,7 @@ use alloc::string::ToString;
 // ============================================================================
 
 /// Process ID type
-pub type Pid = i32;
+pub type Pid = usize;
 
 /// User ID type  
 pub type Uid = u32;
@@ -434,7 +434,7 @@ pub const WUNTRACED: i32 = 2;
 pub const WCONTINUED: i32 = 8;
 
 /// Wait for any child
-pub const WAIT_ANY: Pid = -1;
+pub const WAIT_ANY: usize = usize::MAX;
 
 /// Wait for any child in process group
 pub const WAIT_MYPGRP: Pid = 0;

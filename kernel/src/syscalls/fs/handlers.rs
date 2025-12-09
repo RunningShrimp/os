@@ -429,8 +429,8 @@ pub fn handle_link(args: &[u64]) -> Result<u64, KernelError> {
     }
 
     // Read paths from user space and resolve them
-    let abs_old_path = read_and_resolve_path(pagetable as usize, oldpath_ptr, &Some(cwd_path.clone()))?;
-    let abs_new_path = read_and_resolve_path(pagetable as usize, newpath_ptr, &Some(cwd_path.clone()))?;
+    let abs_old_path = read_and_resolve_path(pagetable as usize, oldpath_ptr, &cwd_path)?;
+    let abs_new_path = read_and_resolve_path(pagetable as usize, newpath_ptr, &cwd_path)?;
 
     // Get old inode
     let vfs = crate::vfs::vfs();
@@ -846,10 +846,10 @@ fn get_process_context() -> Result<(usize, Option<alloc::string::String>), Kerne
     let pid = crate::process::myproc().ok_or(KernelError::NotFound)?;
     let proc_table = crate::process::manager::PROC_TABLE.lock();
     let proc = proc_table.find_ref(pid).ok_or(KernelError::NotFound)?;
-    let pagetable = proc.pagetable;
+    let pagetable = proc.pagetable as usize;
     let cwd_path = proc.cwd_path.clone();
 
-    if pagetable.is_null() {
+    if pagetable == 0 {
         return Err(KernelError::BadAddress);
     }
 
@@ -861,12 +861,12 @@ fn get_process_context_full() -> Result<(usize, Option<alloc::string::String>, u
     let pid = crate::process::myproc().ok_or(KernelError::NotFound)?;
     let proc_table = crate::process::manager::PROC_TABLE.lock();
     let proc = proc_table.find_ref(pid).ok_or(KernelError::NotFound)?;
-    let pagetable = proc.pagetable;
+    let pagetable = proc.pagetable as usize;
     let cwd_path = proc.cwd_path.clone();
     let uid = proc.uid;
     let gid = proc.gid;
 
-    if pagetable.is_null() {
+    if pagetable == 0 {
         return Err(KernelError::BadAddress);
     }
 

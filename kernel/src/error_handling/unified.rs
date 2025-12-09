@@ -85,6 +85,47 @@ impl From<SyscallError> for KernelError {
     }
 }
 
+// 从KernelError转换到SyscallError
+impl From<KernelError> for SyscallError {
+    fn from(err: KernelError) -> Self {
+        match err {
+            KernelError::Syscall(e) => e,
+            KernelError::OutOfMemory => SyscallError::OutOfMemory,
+            KernelError::InvalidArgument => SyscallError::InvalidArgument,
+            KernelError::NotFound => SyscallError::NotFound,
+            KernelError::PermissionDenied => SyscallError::PermissionDenied,
+            KernelError::IoError => SyscallError::IoError,
+            KernelError::NotSupported => SyscallError::NotSupported,
+            KernelError::AlreadyExists => SyscallError::FileExists,
+            KernelError::ResourceBusy => SyscallError::WouldBlock,
+            KernelError::Timeout => SyscallError::TimedOut,
+            KernelError::BadAddress => SyscallError::BadAddress,
+            KernelError::BadFileDescriptor => SyscallError::BadFileDescriptor,
+            KernelError::NotADirectory => SyscallError::NotADirectory,
+            KernelError::FileExists => SyscallError::FileExists,
+            KernelError::DirectoryNotEmpty => SyscallError::DirectoryNotEmpty,
+            KernelError::FileTooBig => SyscallError::FileTooBig,
+            KernelError::ReadOnlyFilesystem => SyscallError::NoSpaceLeft,
+            KernelError::NameTooLong => SyscallError::NameTooLong,
+            KernelError::NoBufferSpace => SyscallError::NoBufferSpace,
+            KernelError::AddressInUse => SyscallError::InvalidArgument,
+            KernelError::AddressNotAvailable => SyscallError::InvalidArgument,
+            KernelError::IsADirectory => SyscallError::IsADirectory,
+            KernelError::Network(_) => SyscallError::IoError,
+            KernelError::UnsupportedSyscall => SyscallError::InvalidSyscall,
+            KernelError::ServiceAlreadyExists => SyscallError::FileExists,
+            KernelError::ServiceHasDependents => SyscallError::WouldBlock,
+            KernelError::ServiceNotFound => SyscallError::NotFound,
+            KernelError::DependencyNotFound => SyscallError::NotFound,
+            KernelError::CircularDependency => SyscallError::InvalidArgument,
+            KernelError::SyscallNotSupported => SyscallError::InvalidSyscall,
+            KernelError::ServiceUnavailable(_) => SyscallError::NotSupported,
+            KernelError::MaxRetriesExceeded(_) => SyscallError::TimedOut,
+            KernelError::Unknown(_) => SyscallError::IoError,
+        }
+    }
+}
+
 // 从process模块错误类型转换
 impl From<crate::process::exec::ExecError> for KernelError {
     fn from(err: crate::process::exec::ExecError) -> Self {

@@ -145,25 +145,6 @@ impl From<crate::process::exec::ExecError> for SyscallError {
     }
 }
 
-/// Convert KernelError to SyscallError
-/// This allows internal modules using KernelError to be used in syscall handlers
-impl From<crate::error_handling::unified::KernelError> for SyscallError {
-    fn from(err: crate::error_handling::unified::KernelError) -> Self {
-        use crate::error_handling::unified::KernelError;
-        match err {
-            KernelError::Syscall(e) => e,
-            KernelError::OutOfMemory => SyscallError::OutOfMemory,
-            KernelError::InvalidArgument => SyscallError::InvalidArgument,
-            KernelError::NotFound => SyscallError::NotFound,
-            KernelError::PermissionDenied => SyscallError::PermissionDenied,
-            KernelError::IoError => SyscallError::IoError,
-            KernelError::NotSupported => SyscallError::NotSupported,
-            KernelError::AlreadyExists => SyscallError::FileExists,
-            KernelError::ResourceBusy => SyscallError::WouldBlock,
-            KernelError::Timeout => SyscallError::TimedOut,
-        }
-    }
-}
 
 /// Convert VfsError to SyscallError
 impl From<crate::vfs::error::VfsError> for SyscallError {
