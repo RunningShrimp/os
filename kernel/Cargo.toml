@@ -34,6 +34,11 @@ batch_syscalls = []
 net_opt = []
 sched_opt = []
 lazy_init = []
+security_audit = []
+formal_verification = []
+observability = []
+debug_subsystems = []
+cloud_native = []
 
 # Features说明：
 # baremetal: 裸机启动与汇编路径（global_asm/trap/context switch等），用于真实目标板或无操作系统环境

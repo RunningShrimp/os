@@ -5,7 +5,8 @@ extern crate alloc;
 use core::alloc::Layout;
 use core::ptr::null_mut;
 
-use crate::mm::optimized_buddy;
+use crate::mm::buddy;
+use crate::mm::buddy::BuddyBlock;
 
 // ============================================================================
 // Constants
@@ -25,7 +26,7 @@ pub const HPAGE_MAX_ORDERS: usize = 8;
 /// Huge pages allocator
 pub struct HugePageAllocator {
     /// Free lists for each huge page size
-    free_lists: [*mut buddy::BuddyBlock; HPAGE_MAX_ORDERS],
+    free_lists: [*mut BuddyBlock; HPAGE_MAX_ORDERS],
     /// Available huge page sizes in bytes
     hpage_sizes: [usize; HPAGE_MAX_ORDERS],
     /// Number of available huge page sizes
@@ -98,7 +99,7 @@ impl HugePageAllocator {
             // Add all huge pages to the free list
             let mut addr = aligned_start;
             while addr + hpage_size <= aligned_end {
-                let block = addr as *mut buddy::BuddyBlock;
+                let block = addr as *mut BuddyBlock;
                 
                 (*block).size = hpage_size;
                 (*block).next = self.free_lists[i];
@@ -142,7 +143,7 @@ impl HugePageAllocator {
         
         for i in 0..self.num_hpage_sizes {
             if self.hpage_sizes[i] == size {
-                let block = ptr as *mut buddy::BuddyBlock;
+                let block = ptr as *mut BuddyBlock;
                 
                 unsafe {
                     (*block).next = self.free_lists[i];

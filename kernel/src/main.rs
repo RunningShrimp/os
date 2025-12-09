@@ -41,12 +41,16 @@ mod ipc;
 mod services;
 mod net;
 mod microkernel;
+#[cfg(feature = "cloud_native")]
 mod cloud_native;
 mod compat;
 mod security;
+#[cfg(feature = "security_audit")]
 mod security_audit;
+#[cfg(feature = "formal_verification")]
 mod formal_verification;
 mod error_handling;
+#[cfg(feature = "debug_subsystems")]
 mod debug;
 mod reliability;
 mod libc;
@@ -55,6 +59,7 @@ mod collections;
 mod graphics;
 mod web;
 mod benchmark;
+#[cfg(feature = "observability")]
 mod monitoring;
 
 #[cfg(feature = "kernel_tests")]
@@ -235,21 +240,27 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
     crate::println!("[boot] service layer initialized");
     monitoring::timeline::record("services_init");
 
-    // Initialize cloud native features
-    cloud_native::init().expect("Cloud native features initialization failed");
-    crate::println!("[boot] cloud native features initialized");
+    #[cfg(feature = "cloud_native")]
+    {
+        cloud_native::init().expect("Cloud native features initialization failed");
+        crate::println!("[boot] cloud native features initialized");
+    }
 
     // Initialize security subsystem
     security::init_security_subsystem().expect("Security subsystem initialization failed");
     crate::println!("[boot] security subsystem initialized");
 
-    // Initialize security audit
-    security_audit::init_security_audit().expect("Security audit initialization failed");
-    crate::println!("[boot] security audit initialized");
+    #[cfg(feature = "security_audit")]
+    {
+        security_audit::init_security_audit().expect("Security audit initialization failed");
+        crate::println!("[boot] security audit initialized");
+    }
 
-    // Initialize formal verification system
-    formal_verification::init_formal_verification().expect("Formal verification initialization failed");
-    crate::println!("[boot] formal verification system initialized");
+    #[cfg(feature = "formal_verification")]
+    {
+        formal_verification::init_formal_verification().expect("Formal verification initialization failed");
+        crate::println!("[boot] formal verification system initialized");
+    }
 
     // Initialize error handling system
     error_handling::init_error_handling().expect("Error handling initialization failed");
@@ -263,29 +274,26 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
     reliability::graceful_degradation::create_graceful_degradation_manager().lock().init().expect("Graceful degradation initialization failed");
     crate::println!("[boot] graceful degradation system initialized");
 
-    // Initialize debugging system
-    debug::init().expect("Debugging system initialization failed");
-    crate::println!("[boot] debugging system initialized");
+    #[cfg(feature = "debug_subsystems")]
+    {
+        debug::init().expect("Debugging system initialization failed");
+        crate::println!("[boot] debugging system initialized");
 
-    // Initialize monitoring system
-    debug::monitoring::init().expect("Monitoring system initialization failed");
-    crate::println!("[boot] monitoring system initialized");
+        debug::monitoring::init().expect("Monitoring system initialization failed");
+        crate::println!("[boot] monitoring system initialized");
 
-    // Initialize profiling system
-    debug::profiling::init().expect("Profiling system initialization failed");
-    crate::println!("[boot] profiling system initialized");
+        debug::profiling::init().expect("Profiling system initialization failed");
+        crate::println!("[boot] profiling system initialized");
 
-    // Initialize tracing system
-    debug::tracing::init().expect("Tracing system initialization failed");
-    crate::println!("[boot] tracing system initialized");
+        debug::tracing::init().expect("Tracing system initialization failed");
+        crate::println!("[boot] tracing system initialized");
 
-    // Initialize metrics system
-    debug::metrics::init().expect("Metrics system initialization failed");
-    crate::println!("[boot] metrics system initialized");
+        debug::metrics::init().expect("Metrics system initialization failed");
+        crate::println!("[boot] metrics system initialized");
 
-    // Initialize debug symbols system
-    debug::symbols::init().expect("Debug symbols system initialization failed");
-    crate::println!("[boot] debug symbols system initialized");
+        debug::symbols::init().expect("Debug symbols system initialization failed");
+        crate::println!("[boot] debug symbols system initialized");
+    }
 
     // Initialize cross-platform compatibility layer
     compat::init().expect("Cross-platform compatibility layer initialization failed");
@@ -307,11 +315,13 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
         crate::println!("[boot] web engine subsystem initialized");
     }
 
-    // Initialize monitoring system
-    monitoring::metrics::init_metrics_collector().expect("Metrics collector initialization failed");
-    monitoring::health::init_health_checker().expect("Health checker initialization failed");
-    monitoring::alerting::init_alert_manager().expect("Alert manager initialization failed");
-    crate::println!("[boot] monitoring system initialized");
+    #[cfg(feature = "observability")]
+    {
+        monitoring::metrics::init_metrics_collector().expect("Metrics collector initialization failed");
+        monitoring::health::init_health_checker().expect("Health checker initialization failed");
+        monitoring::alerting::init_alert_manager().expect("Alert manager initialization failed");
+        crate::println!("[boot] monitoring system initialized");
+    }
 
     // Initialize benchmark system (optional, for performance testing)
     // benchmark::syscall::run_all_syscall_benchmarks(); // Uncomment to run benchmarks at boot

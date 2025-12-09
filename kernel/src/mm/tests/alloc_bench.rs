@@ -5,12 +5,9 @@
 
 use core::alloc::Layout;
 use crate::mm::{
-    buddy::BuddyAllocator,
-    slab::SlabAllocator,
-    optimized_buddy::OptimizedBuddyAllocator,
-    optimized_slab::OptimizedSlabAllocator,
+    buddy::{BuddyAllocator, OptimizedBuddyAllocator},
+    slab::{SlabAllocator, OptimizedSlabAllocator},
     optimized_allocator::OptimizedHybridAllocator,
-    hybrid::HybridAllocator, // If the original was named HybridAllocator
     traits::{UnifiedAllocator, AllocatorWithStats},
 };
 

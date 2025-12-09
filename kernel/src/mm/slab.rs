@@ -395,3 +395,6 @@ mod tests {
         }
     }
 }
+
+/// Alias for backward compatibility
+pub type SlabAllocator = OptimizedSlabAllocator;

@@ -19,13 +19,13 @@ use crate::sync::Mutex;
 // pub mod compress;
 
 
-use crate::mm::optimized_buddy;
-use crate::mm::optimized_slab;
-use crate::mm::optimized_buddy::AllocatorStats as BuddyStats;
-use crate::mm::optimized_slab::AllocatorStats as SlabStats;
+use crate::mm::buddy;
+use crate::mm::slab;
+use crate::mm::buddy::AllocatorStats as BuddyStats;
+use crate::mm::slab::AllocatorStats as SlabStats;
 use crate::mm::hugepage;
-use crate::mm::optimized_buddy::OptimizedBuddyAllocator;
-use crate::mm::optimized_slab::OptimizedSlabAllocator;
+use crate::mm::buddy::OptimizedBuddyAllocator;
+use crate::mm::slab::OptimizedSlabAllocator;
 use crate::mm::hugepage::HugePageAllocator;
 use crate::mm::traits::{UnifiedAllocator, AllocatorWithStats, AllocatorStats};
 

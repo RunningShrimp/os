@@ -196,6 +196,38 @@ pub mod vfs_tests {
         Ok(())
     }
 
+    pub fn test_procfs_heapstats() -> TestResult {
+        let mut f = match vfs().open("/proc/heapstats", 0) {
+            Ok(f) => f,
+            Err(e) => return Err(alloc::format!("open heapstats failed: {:?}", e)),
+        };
+        let mut buf = [0u8; 512];
+        let n = match f.read(buf.as_mut_ptr() as usize, buf.len()) {
+            Ok(n) => n,
+            Err(e) => return Err(alloc::format!("read heapstats failed: {:?}", e)),
+        };
+        test_assert!(n > 0);
+        let s = core::str::from_utf8(&buf[..n]).unwrap_or("");
+        test_assert!(s.contains("Heap Stats"));
+        Ok(())
+    }
+
+    pub fn test_procfs_timesummary() -> TestResult {
+        let mut f = match vfs().open("/proc/timesummary", 0) {
+            Ok(f) => f,
+            Err(e) => return Err(alloc::format!("open timesummary failed: {:?}", e)),
+        };
+        let mut buf = [0u8; 512];
+        let n = match f.read(buf.as_mut_ptr() as usize, buf.len()) {
+            Ok(n) => n,
+            Err(e) => return Err(alloc::format!("read timesummary failed: {:?}", e)),
+        };
+        test_assert!(n >= 0);
+        let s = core::str::from_utf8(&buf[..core::cmp::min(n, buf.len())]).unwrap_or("");
+        test_assert!(s.contains("Boot Timeline Summary") || s.contains("Timeline"));
+        Ok(())
+    }
+
     pub fn test_procfs_timeline() -> TestResult {
         let mut f = match vfs().open("/proc/timeline", 0) {
             Ok(f) => f,

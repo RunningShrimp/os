@@ -1,10 +1,8 @@
 pub mod phys;
 pub mod vm;
 pub mod allocator;
-// pub mod buddy;  // Removed - use optimized_buddy instead
-// pub mod slab;   // Removed - use optimized_slab instead
-pub mod optimized_buddy;
-pub mod optimized_slab;
+pub mod buddy;  // Uses optimized implementation
+pub mod slab;   // Uses optimized implementation
 pub mod mempool;
 pub mod compress;
 pub mod hugepage;
@@ -19,8 +17,8 @@ pub mod tests;
 
 pub use phys::*;
 pub use traits::*;
-pub use optimized_buddy::OptimizedBuddyAllocator;
-pub use optimized_slab::OptimizedSlabAllocator;
+pub use buddy::*;
+pub use slab::*;
 pub use mempool::*;
 pub use optimized_allocator::OptimizedHybridAllocator;
 pub use numa::*;

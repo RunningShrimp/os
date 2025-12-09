@@ -4,7 +4,7 @@
 use crate::sync::Mutex;
 use crate::println;
 use core::ptr;
-use crate::mm::optimized_buddy::OptimizedBuddyAllocator;
+use crate::mm::buddy::OptimizedBuddyAllocator;
 
 static BUDDY: Mutex<OptimizedBuddyAllocator> = Mutex::new(OptimizedBuddyAllocator::new());
 use core::sync::atomic::{AtomicUsize, Ordering};

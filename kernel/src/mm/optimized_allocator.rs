@@ -12,8 +12,8 @@ use crate::sync::Mutex;
 // Re-export the allocator modules
 // ============================================================================
 
-use crate::mm::optimized_buddy::OptimizedBuddyAllocator;
-use crate::mm::optimized_slab::OptimizedSlabAllocator;
+use crate::mm::buddy::OptimizedBuddyAllocator;
+use crate::mm::slab::OptimizedSlabAllocator;
 use crate::mm::hugepage::HugePageAllocator;
 use crate::mm::traits::{UnifiedAllocator, AllocatorWithStats, AllocatorStats};
 
@@ -127,7 +127,7 @@ impl OptimizedHybridAllocator {
         self.deallocation_count.fetch_add(1, Ordering::Relaxed);
     }
 
-    pub fn stats(&self) -> (crate::mm::optimized_buddy::AllocatorStats, crate::mm::optimized_slab::AllocatorStats) {
+    pub fn stats(&self) -> (crate::mm::buddy::AllocatorStats, crate::mm::slab::AllocatorStats) {
         let buddy = self.buddy.lock();
         let slab_stats = self.slab.lock().stats();
 

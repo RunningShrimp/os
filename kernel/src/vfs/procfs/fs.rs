@@ -297,6 +297,27 @@ zombie: {}\n",
                 let gen = Box::new(|| crate::monitoring::timeline::to_string());
                 return Ok(Arc::new(ProcFsInode::new_file(1015, gen)));
             }
+            "timesummary" => {
+                let gen = Box::new(|| crate::monitoring::timeline::summary());
+                return Ok(Arc::new(ProcFsInode::new_file(1018, gen)));
+            }
+            "heapstats" => {
+                let gen = Box::new(|| {
+                    let (b, s) = crate::mm::allocator::heap_stats();
+                    alloc::format!(
+                        "# Heap Stats\n\
+buddy_allocated: {}\n\
+buddy_freed: {}\n\
+buddy_fragmentation: {}\n\
+slab_used: {}\n\
+slab_allocated: {}\n\
+slab_count: {}\n",
+                        b.allocated, b.freed, b.fragmentation,
+                        s.used, s.allocated, s.slab_count,
+                    )
+                });
+                return Ok(Arc::new(ProcFsInode::new_file(1017, gen)));
+            }
             _ => {}
         }
         
@@ -348,7 +369,7 @@ zombie: {}\n",
         }
         
         // Add standard entries
-        let standard_entries = ["self", "sys", "meminfo", "stat", "version", "uptime", "loadavg", "servicestats", "servicehealth", "features", "initlazy", "processstats", "perfsummary", "timeline", "perfmonitor"];
+        let standard_entries = ["self", "sys", "meminfo", "stat", "version", "uptime", "loadavg", "servicestats", "servicehealth", "features", "initlazy", "processstats", "perfsummary", "timeline", "timesummary", "perfmonitor", "heapstats"];
         let std_start = if offset > 2 + pids.len() { offset - 2 - pids.len() } else { 0 };
         for (idx, entry) in standard_entries.iter().enumerate().skip(std_start) {
             entries.push(DirEntry {

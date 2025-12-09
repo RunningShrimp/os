@@ -365,3 +365,6 @@ mod tests {
         assert!(!ptr.is_null());
     }
 }
+
+/// Alias for backward compatibility
+pub type BuddyAllocator = OptimizedBuddyAllocator;
