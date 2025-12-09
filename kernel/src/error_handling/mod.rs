@@ -203,6 +203,8 @@ pub struct ErrorRecord {
     pub category: ErrorCategory,
     /// 严重级别
     pub severity: ErrorSeverity,
+    /// 优先级
+    pub priority: ErrorPriority,
     /// 错误状态
     pub status: ErrorStatus,
     /// 错误消息

@@ -136,7 +136,7 @@ pub mod zero_copy;
 pub mod epoll;
 pub mod glib;
 pub mod batch;
-pub mod aio;
+// pub mod aio;  // Temporarily disabled - has 22+ compilation errors
 pub mod mqueue;
 pub mod enhanced_error_handler;
 // pub mod advanced_mmap; // Already defined in memory.rs
