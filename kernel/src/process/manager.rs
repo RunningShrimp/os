@@ -369,6 +369,7 @@ pub struct Proc {
     pub cwd_path: Option<String>,
     pub cwd: Option<usize>,  // Current working directory file index
     pub signals: Option<SignalState>,
+    pub alt_signal_stack: Option<crate::posix::StackT>,  // Alternate signal stack
     pub rlimits: [crate::posix::Rlimit; 16],  // Resource limits
     pub chan: usize,  // Sleep channel
     pub killed: bool,
@@ -405,6 +406,7 @@ impl Proc {
             cwd_path: None,
             cwd: None,
             signals: None,
+            alt_signal_stack: None,
             chan: 0,
             killed: false,
             xstate: 0,

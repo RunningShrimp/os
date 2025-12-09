@@ -14,7 +14,7 @@ use core::any::TypeId;
 use super::*;
 use super::unified::{KernelError, KernelResult};
 use crate::syscalls::common::SyscallError;
-use super::error_classifier::{ErrorClassification, ClassificationType, Urgency, RecoveryComplexity};
+use super::error_classifier::{ErrorClassification, ClassificationType, Urgency, RecoveryComplexity, ImpactScope};
 use crate::compat::DefaultHasherBuilder;
 
 /// 统一错误类型 - 所有错误的基础类型
@@ -425,6 +425,17 @@ pub enum UnknownError {
     UnknownErrorType(String),
     /// 未知错误源
     UnknownErrorSource(String),
+}
+
+impl core::fmt::Display for UnknownError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            UnknownError::UnknownErrorCode(code) => write!(f, "Unknown error code: {}", code),
+            UnknownError::UnknownErrorMessage(msg) => write!(f, "Unknown error message: {}", msg),
+            UnknownError::UnknownErrorType(type_str) => write!(f, "Unknown error type: {}", type_str),
+            UnknownError::UnknownErrorSource(source) => write!(f, "Unknown error source: {}", source),
+        }
+    }
 }
 
 /// 错误优先级
@@ -993,6 +1004,73 @@ impl UnifiedError {
             custom_attributes: BTreeMap::new(),
         }
     }
+
+    /// 获取错误类型
+    pub fn error_type(&self) -> ErrorType {
+        match self {
+            UnifiedError::Syscall(_) => ErrorType::SystemCallError,
+            UnifiedError::Memory(_) => ErrorType::MemoryError,
+            UnifiedError::FileSystem(_) => ErrorType::IOError,
+            UnifiedError::Network(_) => ErrorType::NetworkError,
+            UnifiedError::Process(_) => ErrorType::RuntimeError,
+            UnifiedError::Device(_) => ErrorType::IOError,
+            UnifiedError::Security(_) => ErrorType::PermissionError,
+            UnifiedError::Configuration(_) => ErrorType::ConfigurationError,
+            UnifiedError::Hardware(_) => ErrorType::SystemError,
+            UnifiedError::Timeout(_) => ErrorType::TimeoutError,
+            UnifiedError::Data(_) => ErrorType::ValidationError,
+            UnifiedError::Protocol(_) => ErrorType::NetworkError,
+            UnifiedError::Resource(_) => ErrorType::ResourceError,
+            UnifiedError::User(_) => ErrorType::ValidationError,
+            UnifiedError::Interface(_) => ErrorType::SystemError,
+            UnifiedError::Unknown(_) => ErrorType::SystemError,
+        }
+    }
+
+    /// 获取错误代码
+    pub fn error_code(&self) -> u32 {
+        match self {
+            UnifiedError::Syscall(_) => 1u32,
+            UnifiedError::Memory(_) => 2u32,
+            UnifiedError::FileSystem(_) => 3u32,
+            UnifiedError::Network(_) => 4u32,
+            UnifiedError::Process(_) => 5u32,
+            UnifiedError::Device(_) => 6u32,
+            UnifiedError::Security(_) => 7u32,
+            UnifiedError::Configuration(_) => 8u32,
+            UnifiedError::Hardware(_) => 9u32,
+            UnifiedError::Timeout(_) => 10u32,
+            UnifiedError::Data(_) => 11u32,
+            UnifiedError::Protocol(_) => 12u32,
+            UnifiedError::Resource(_) => 13u32,
+            UnifiedError::User(_) => 14u32,
+            UnifiedError::Interface(_) => 15u32,
+            UnifiedError::Unknown(UnknownError::UnknownErrorCode(code)) => *code,
+            UnifiedError::Unknown(_) => 999u32, // Default unknown error code
+        }
+    }
+
+    /// 获取错误消息
+    pub fn message(&self) -> String {
+        match self {
+            UnifiedError::Syscall(err) => format!("System call error: {:?}", err),
+            UnifiedError::Memory(err) => format!("Memory error: {:?}", err),
+            UnifiedError::FileSystem(err) => format!("Filesystem error: {:?}", err),
+            UnifiedError::Network(err) => format!("Network error: {:?}", err),
+            UnifiedError::Process(err) => format!("Process error: {:?}", err),
+            UnifiedError::Device(err) => format!("Device error: {:?}", err),
+            UnifiedError::Security(err) => format!("Security error: {:?}", err),
+            UnifiedError::Configuration(err) => format!("Configuration error: {:?}", err),
+            UnifiedError::Hardware(err) => format!("Hardware error: {:?}", err),
+            UnifiedError::Timeout(err) => format!("Timeout error: {:?}", err),
+            UnifiedError::Data(err) => format!("Data error: {:?}", err),
+            UnifiedError::Protocol(err) => format!("Protocol error: {:?}", err),
+            UnifiedError::Resource(err) => format!("Resource error: {:?}", err),
+            UnifiedError::User(err) => format!("User error: {:?}", err),
+            UnifiedError::Interface(err) => format!("Interface error: {:?}", err),
+            UnifiedError::Unknown(code) => format!("Unknown error: {}", code),
+        }
+    }
 }
 
 // 错误转换实现
@@ -1015,6 +1093,7 @@ impl From<KernelError> for UnifiedError {
             KernelError::AlreadyExists => UnifiedError::FileSystem(FileSystemError::FileExists),
             KernelError::ResourceBusy => UnifiedError::Resource(ResourceError::ResourceBusy),
             KernelError::Timeout => UnifiedError::Timeout(TimeoutError::OperationTimeout),
+            _ => UnifiedError::Unknown(UnknownError::UnknownErrorCode(1)), // 默认未知错误
         }
     }
 }

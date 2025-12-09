@@ -429,7 +429,7 @@ impl SmapSmepSubsystem {
     /// Kill a process
     fn kill_process(&self, pid: u64) {
         // Send SIGKILL to the process
-        crate::syscalls::signal::kill_process(pid, 9);
+        crate::syscalls::signal::kill_process(pid as usize, 9);
     }
 
     /// Log a violation

@@ -27,11 +27,17 @@ pub fn handle_fork(args: &[u64]) -> Result<u64, KernelError> {
         return Err(KernelError::InvalidArgument);
     }
 
-    // TODO: 实现fork逻辑
-    crate::log_debug!("fork syscall called");
-    
-    // 临时返回值
-    Ok(0)
+    // 调用fork函数创建子进程
+    match crate::process::fork() {
+        Some(child_pid) => {
+            crate::log_debug!("fork syscall called, child PID: {}", child_pid);
+            Ok(child_pid as u64)
+        },
+        None => {
+            crate::log_debug!("fork syscall failed");
+            Err(KernelError::ResourceExhausted)
+        }
+    }
 }
 
 /// execve系统调用处理函数
@@ -111,11 +117,12 @@ pub fn handle_exit(args: &[u64]) -> Result<u64, KernelError> {
 
     let exit_code = args[0] as i32;
 
-    // TODO: 实现exit逻辑
+    // 调用进程退出函数
     crate::log_debug!("exit syscall called: exit_code={}", exit_code);
+    crate::process::exit(exit_code);
     
-    // 临时返回值
-    Ok(0)
+    // 不应该返回
+    unreachable!("Process should have exited");
 }
 
 /// kill系统调用处理函数
@@ -162,11 +169,11 @@ pub fn handle_getpid(args: &[u64]) -> Result<u64, KernelError> {
         return Err(KernelError::InvalidArgument);
     }
 
-    // TODO: 实现getpid逻辑
-    crate::log_debug!("getpid syscall called");
+    // 获取当前进程ID
+    let pid = crate::process::getpid();
+    crate::log_debug!("getpid syscall called, returning PID: {}", pid);
     
-    // 临时返回值
-    Ok(1000) // 临时PID
+    Ok(pid as u64)
 }
 
 /// getppid系统调用处理函数
@@ -186,11 +193,23 @@ pub fn handle_getppid(args: &[u64]) -> Result<u64, KernelError> {
         return Err(KernelError::InvalidArgument);
     }
 
-    // TODO: 实现getppid逻辑
-    crate::log_debug!("getppid syscall called");
+    // 获取当前进程ID
+    let current_pid = match crate::process::myproc() {
+        Some(pid) => pid,
+        None => return Ok(0), // 没有当前进程时返回0
+    };
+
+    // 获取父进程ID
+    let ppid = {
+        let table = crate::process::PROC_TABLE.lock();
+        table.find_ref(current_pid)
+            .and_then(|proc| proc.parent)
+            .unwrap_or(0) // init进程没有父进程，返回0
+    };
+
+    crate::log_debug!("getppid syscall called, returning PPID: {}", ppid);
     
-    // 临时返回值
-    Ok(999) // 临时父PID
+    Ok(ppid as u64)
 }
 
 /// sched_yield系统调用处理函数

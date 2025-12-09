@@ -898,7 +898,7 @@ impl UnifiedErrorHandlingEngine {
         
         ErrorRecord {
             id: error_id,
-            code: metadata.error_id,
+            code: metadata.error_id as u32,
             error_type: ErrorType::RuntimeError,
             category: error.category(),
             severity: error.severity(),
@@ -1200,11 +1200,11 @@ impl ErrorAggregator {
         *bucket.error_severities.entry(error_record.severity).or_insert(0) += 1;
 
         // 更新最频繁错误
-        self.update_most_frequent_errors(bucket);
+        Self::update_most_frequent_errors_static(bucket);
     }
 
     /// 更新最频繁错误
-    fn update_most_frequent_errors(&mut self, bucket: &mut ErrorAggregationBucket) {
+    fn update_most_frequent_errors_static(bucket: &mut ErrorAggregationBucket) {
         let mut errors: Vec<_> = bucket.error_types.iter().collect();
         errors.sort_by(|a, b| b.1.cmp(a.1));
         
@@ -1356,7 +1356,8 @@ pub fn create_unified_error_handling_engine() -> Arc<Mutex<UnifiedErrorHandlingE
 
 /// 初始化全局统一错误处理引擎
 pub fn init_global_unified_error_handling() -> UnifiedResult<()> {
-    let mut engine = create_unified_error_handling_engine().lock();
+    let engine_guard = create_unified_error_handling_engine();
+    let mut engine = engine_guard.lock();
     engine.init()
 }
 

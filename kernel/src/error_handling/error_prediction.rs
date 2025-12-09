@@ -488,21 +488,23 @@ impl ErrorPredictor {
             }
         }
 
-        // 更新预测统计
-        self.update_prediction_stats(&predictions);
-
         // 存储预测结果
         {
+            let predictions_clone: Vec<_> = predictions.iter().cloned().collect();
             let mut stored_predictions = self.predictions.lock();
-            for prediction in &predictions {
-                stored_predictions.push(prediction.clone());
+            for prediction in predictions_clone {
+                stored_predictions.push(prediction);
             }
-            
+
             // 限制预测结果数量
-            if stored_predictions.len() > self.config.max_predictions {
-                stored_predictions.drain(0..stored_predictions.len() - self.config.max_predictions);
+            let current_len = stored_predictions.len();
+            if current_len > self.config.max_predictions {
+                stored_predictions.drain(0..current_len - self.config.max_predictions);
             }
         }
+
+        // 更新预测统计
+        self.update_prediction_stats(&predictions);
 
         Ok(predictions)
     }
@@ -540,7 +542,7 @@ impl ErrorPredictor {
                 false
             },
             PatternCondition::TimeWindow { start_hour, end_hour } => {
-                let current_hour = (crate::time::get_timestamp() / 3600) % 24;
+                let current_hour = ((crate::time::get_timestamp() / 3600) % 24) as u8;
                 current_hour >= *start_hour && current_hour <= *end_hour
             },
             PatternCondition::ProcessCondition { process_name: _, condition: _ } => {

@@ -70,7 +70,6 @@ impl QueuedSignal {
 }
 
 /// Per-process signal queue
-#[derive(Debug)]
 pub struct SignalQueue {
     /// Queue of pending signals
     pending: Mutex<VecDeque<QueuedSignal>>,
@@ -78,6 +77,14 @@ pub struct SignalQueue {
     sigmask: Mutex<SigSet>,
     /// Number of signals in queue
     count: AtomicUsize,
+}
+
+impl core::fmt::Debug for SignalQueue {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("SignalQueue")
+            .field("count", &self.count)
+            .finish()
+    }
 }
 
 impl SignalQueue {
@@ -316,7 +323,6 @@ pub enum SignalStackError {
 }
 
 /// Thread signal mask management
-#[derive(Debug)]
 pub struct ThreadSignalMask {
     /// Current signal mask
     mask: Mutex<SigSet>,
@@ -594,7 +600,7 @@ pub fn sigaltstack(new_stack: Option<&crate::posix::StackT>, old_stack: Option<&
     };
 
     let mut proc_table = crate::process::manager::PROC_TABLE.lock();
-    let proc = match proc_table.find_mut(pid) {
+    let proc = match proc_table.find(pid) {
         Some(p) => p,
         None => return Err(SignalStackError::NoAlternateStack),
     };
@@ -602,7 +608,7 @@ pub fn sigaltstack(new_stack: Option<&crate::posix::StackT>, old_stack: Option<&
     // Save old stack if requested
     if let Some(old) = old_stack {
         if let Some(ref alt_stack) = proc.alt_signal_stack {
-            *old = alt_stack.as_stackt();
+            *old = *alt_stack;
         } else {
             *old = crate::posix::StackT::default();
         }
@@ -626,7 +632,7 @@ pub fn sigaltstack(new_stack: Option<&crate::posix::StackT>, old_stack: Option<&
 
             // Create new alternate stack
             let alt_stack = AlternateSignalStack::new(new.ss_size)?;
-            proc.alt_signal_stack = Some(alt_stack);
+            proc.alt_signal_stack = Some(alt_stack.as_stackt());
         }
     }
 
@@ -645,13 +651,8 @@ pub fn pthread_sigmask(
         None => return Err(SignalMaskError::InvalidSignal),
     };
 
-    // Get or create thread signal mask
-    let thread_mask = {
-        let mut registry = SIGNAL_QUEUE_REGISTRY.lock();
-        // For simplicity, we use process ID as thread ID for now
-        // In a real implementation, we'd have a separate thread registry
-        registry.get_or_create_queue(thread_id)
-    };
+    // Create a thread signal mask instance
+    let thread_mask = ThreadSignalMask::new(thread_id);
 
     // Set the mask
     thread_mask.set_mask(how, new_mask, old_mask)

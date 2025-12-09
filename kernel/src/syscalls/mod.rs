@@ -42,6 +42,7 @@
 //! ```
 
 use crate::syscalls::common::{SyscallError, SyscallResult, syscall_error_to_errno};
+use crate::syscalls::enhanced_error_handler::ErrorContext;
 use alloc::vec::Vec;
 
 // Import new modular architecture services
@@ -941,7 +942,7 @@ pub fn dispatch(syscall_num: usize, args: &[usize]) -> isize {
         syscall_num as u32,
         pid as u64,
         tid as u64,
-        pagetable,
+        pagetable as usize,
     );
     
     // Validate parameters
@@ -964,7 +965,7 @@ pub fn dispatch(syscall_num: usize, args: &[usize]) -> isize {
                     syscall_num as u32,
                     pid as u64,
                     pid as u64,
-                    pagetable,
+                    pagetable as usize,
                 ).with_args(&args_u64[..args_len]);
                 
                 let errno = validation_error_to_errno(&error, &error_context);
@@ -987,14 +988,16 @@ pub fn dispatch(syscall_num: usize, args: &[usize]) -> isize {
     let cache_key = crate::syscalls::cache::SyscallCacheKey::new(syscall_num as u32, &args_u64[..args_len]);
     
     // Try to get cached result
-    if let Some(cache_result) = {
-        let cache_guard = crate::syscalls::cache::get_global_cache().lock();
-        if let Some(ref cache) = *cache_guard {
+    let cache_result = {
+        let mut cache_guard = crate::syscalls::cache::get_global_cache().lock();
+        if let Some(ref mut cache) = *cache_guard {
             cache.get(&cache_key)
         } else {
             None
         }
-    } {
+    };
+
+    if let Some(cache_result) = cache_result {
         return match cache_result {
             Ok(value) => value as isize,
             Err(error) => -(syscall_error_to_errno(error) as isize),
@@ -1027,17 +1030,8 @@ pub fn dispatch(syscall_num: usize, args: &[usize]) -> isize {
         match syscall_num {
             // Process management syscalls (0x1000-0x1FFF)
             n if (n & 0xF000) == 0x1000 && n <= 0x1FFF => {
-                // Try new modular process service first, fallback to legacy
-                match process::dispatch(syscall_num as u32, &args_u64[..args_len]) {
-                    Ok(result) => Ok(result),
-                    Err(_) => {
-                        // Fallback to legacy implementation if available
-                        // TODO: Remove this fallback once all process syscalls are migrated
-                        crate::println!("[syscall] Process service failed, falling back to legacy");
-                        // For now, return error until legacy is fully removed
-                        Err(SyscallError::NotSupported)
-                    }
-                }
+                // Use process dispatch
+                process::dispatch(syscall_num as u32, &args_u64[..args_len])
             },
 
             // File I/O syscalls (0x2000-0x2FFF)
@@ -1047,7 +1041,7 @@ pub fn dispatch(syscall_num: usize, args: &[usize]) -> isize {
 
             // Memory management syscalls (0x3000-0x3FFF)
             n if (n & 0xF000) == 0x3000 && n <= 0x3FFF => {
-                mm::handlers::dispatch_syscall(syscall_num as u32, &args_u64[..args_len])
+                mm::handlers::dispatch_syscall(syscall_num as u32, &args_u64[..args_len]).map_err(|e| e.into())
             },
 
             // Network syscalls (0x4000-0x4FFF)
@@ -1089,8 +1083,9 @@ pub fn dispatch(syscall_num: usize, args: &[usize]) -> isize {
                 // Special handling for batch syscall
                 if n == SYS_BATCH as usize {
                     return match fast_path_batch(args) {
-                        Ok(value) => value as isize,
-                        Err(error) => -(syscall_error_to_errno(error) as isize),
+                        Some(Ok(value)) => value as isize,
+                        Some(Err(error)) => -(syscall_error_to_errno(error) as isize),
+                        None => -(syscall_error_to_errno(SyscallError::InvalidArgument) as isize),
                     };
                 }
                 zero_copy::dispatch(syscall_num as u32, &args_u64[..args_len])
@@ -1132,7 +1127,7 @@ pub fn dispatch(syscall_num: usize, args: &[usize]) -> isize {
         if cache.is_pure_syscall(syscall_num as u32) {
             drop(cache_guard); // Drop lock before writing
 
-            let cache_guard = crate::syscalls::cache::get_global_cache().lock();
+            let mut cache_guard = crate::syscalls::cache::get_global_cache().lock();
             if let Some(ref mut cache) = *cache_guard {
                 cache.put(cache_key, result.clone());
             }

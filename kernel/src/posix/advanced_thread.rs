@@ -177,7 +177,6 @@ unsafe impl Send for ThreadAttr {}
 unsafe impl Sync for ThreadAttr {}
 
 /// Barrier synchronization primitive
-#[derive(Debug)]
 pub struct Barrier {
     /// Number of threads required to reach the barrier
     pub required: AtomicUsize,
@@ -187,6 +186,16 @@ pub struct Barrier {
     pub state: AtomicUsize,
     /// Mutex for barrier operations
     pub mutex: Mutex<()>,
+}
+
+impl core::fmt::Debug for Barrier {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Barrier")
+            .field("required", &self.required)
+            .field("waiting", &self.waiting)
+            .field("state", &self.state)
+            .finish()
+    }
 }
 
 impl Barrier {

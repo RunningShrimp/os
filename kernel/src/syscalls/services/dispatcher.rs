@@ -325,24 +325,30 @@ impl SyscallDispatcher {
     fn check_cache(&self, syscall_number: u32) -> Option<CachedServiceInfo> {
         let mut cache = self.syscall_cache.lock();
         
-        if let Some(cached_info) = cache.get(&syscall_number) {
+        if let Some(cached_info) = cache.get(&syscall_number).cloned() {
             let current_time = self.get_current_time_ns() / 1_000_000_000; // 转换为秒
-            
+
             // 检查缓存是否过期
             if current_time - cached_info.cache_timestamp <= self.config.cache_ttl_seconds {
+                // 释放不可变借用，然后进行更新
+                drop(cache);
+
                 // 更新访问统计
-                let mut updated_info = cached_info.clone();
-                updated_info.access_count += 1;
-                updated_info.last_access = current_time;
-                cache.insert(syscall_number, updated_info);
-                
+                {
+                    let mut cache = self.syscall_cache.lock();
+                    let mut updated_info = cached_info.clone();
+                    updated_info.access_count += 1;
+                    updated_info.last_access = current_time;
+                    cache.insert(syscall_number, updated_info);
+                }
+
                 // 更新缓存命中统计
                 if self.config.enable_stats {
                     let mut stats = self.stats.lock();
                     stats.cache_hits += 1;
                 }
-                
-                return Some(cached_info.clone());
+
+                return Some(cached_info);
             } else {
                 // 缓存过期，移除
                 cache.remove(&syscall_number);

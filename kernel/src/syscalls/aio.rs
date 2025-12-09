@@ -400,7 +400,7 @@ fn send_completion_notification(aiocb_ptr: *mut aiocb) {
         let pid = myproc().unwrap_or(0);
         
         // Send signal to process using kill_process function
-        let _ = crate::syscalls::signal::kill_process(pid as u64, signal as i32);
+        let _ = crate::syscalls::signal::kill_process(pid as usize, signal as i32);
     }
 }
 

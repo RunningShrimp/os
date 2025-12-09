@@ -607,7 +607,7 @@ impl Fs {
         let inodes = self.inodes.lock();
         let dir_inode = inodes.iter().find(|i| i.inum == dir_inum && i.ref_count > 0)?;
         
-        if dir_inode.itype != InodeType::Directory {
+        if dir_inode.itype != InodeType::Dir {
             return None;
         }
         
@@ -650,7 +650,7 @@ impl Fs {
         let dir_inode = inodes.iter().find(|i| i.inum == dir_inum && i.ref_count > 0);
         
         let dir_inode = match dir_inode {
-            Some(i) if i.itype == InodeType::Directory => i,
+            Some(i) if i.itype == InodeType::Dir => i,
             _ => return false,
         };
         
@@ -697,7 +697,7 @@ impl Fs {
         // Get directory inode
         let inodes = self.inodes.lock();
         let dir_inode = match inodes.iter().find(|i| i.inum == dir_inum && i.ref_count > 0) {
-            Some(i) if i.itype == InodeType::Directory => i,
+            Some(i) if i.itype == InodeType::Dir => i,
             _ => return entries,
         };
         
@@ -763,7 +763,7 @@ impl Fs {
         
         // Root inode is at offset 0 in block (inode 1)
         // Set type to directory
-        buf[0..2].copy_from_slice(&(InodeType::Directory as u16).to_le_bytes());
+        buf[0..2].copy_from_slice(&(InodeType::Dir as u16).to_le_bytes());
         // Set nlink to 1
         buf[4..6].copy_from_slice(&1u16.to_le_bytes());
         // Size = 0 initially

@@ -257,7 +257,7 @@ pub unsafe extern "C" fn timer_create(
     let id = NEXT_TIMER_ID.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
 
     // Create timer
-    let timer = Timer::new(id, clock_id, sigevent, current_pid, current_tid);
+    let timer = Timer::new(id, clock_id, sigevent, current_pid.try_into().unwrap(), current_tid);
     let timer = Arc::new(Mutex::new(timer));
 
     // Register timer
@@ -265,7 +265,7 @@ pub unsafe extern "C" fn timer_create(
 
     // Check timer limit per process
     let timer_count = registry.values()
-        .filter(|t| t.lock().owner_pid == current_pid)
+        .filter(|t| t.lock().owner_pid as i32 == current_pid)
         .count();
 
     if timer_count >= TIMER_MAX {

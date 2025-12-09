@@ -145,7 +145,7 @@ pub unsafe extern "C" fn shmget(key: i32, size: Size, shmflg: i32) -> i32 {
             pages,
             perm,
             nattch: 0,
-            creator_pid: crate::process::getpid() as i32,
+            creator_pid: crate::process::getpid(),
             last_attach_pid: 0,
             last_detach_time: 0,
             creation_time: 0, // TODO: Get current time
@@ -265,7 +265,7 @@ pub unsafe extern "C" fn shmat(shmid: i32, shmaddr: *mut u8, shmflg: i32) -> *mu
 
     // Update segment statistics
     seg_guard.nattch += 1;
-    seg_guard.last_attach_pid = current_pid as i32;
+    seg_guard.last_attach_pid = current_pid;
 
     virt_addr as *mut u8
 }

@@ -520,14 +520,12 @@ pub fn setuid(ruid: Uid, euid: Uid) -> Result<(), SecurityError> {
     let mut registry = SECURITY_REGISTRY.lock();
     
     // Get or create process credentials
-    let creds = if registry.process_credentials.contains_key(&current_pid) {
-        registry.process_credentials.get_mut(&current_pid).unwrap()
-    } else {
+    if !registry.process_credentials.contains_key(&current_pid) {
         let mut creds = ProcessCredentials::new();
         creds.set_uids(ruid, euid);
         registry.set_process_credentials(current_pid, creds).unwrap();
-        creds
-    };
+    }
+    let creds = registry.process_credentials.get_mut(&current_pid).unwrap();
     
     creds.set_uids(ruid, euid);
     Ok(())
@@ -543,14 +541,12 @@ pub fn setgid(rgid: Gid, egid: Gid) -> Result<(), SecurityError> {
     let mut registry = SECURITY_REGISTRY.lock();
     
     // Get or create process credentials
-    let creds = if registry.process_credentials.contains_key(&current_pid) {
-        registry.process_credentials.get_mut(&current_pid).unwrap()
-    } else {
+    if !registry.process_credentials.contains_key(&current_pid) {
         let mut creds = ProcessCredentials::new();
         creds.set_gids(rgid, egid);
         registry.set_process_credentials(current_pid, creds).unwrap();
-        creds
-    };
+    }
+    let creds = registry.process_credentials.get_mut(&current_pid).unwrap();
     
     creds.set_gids(rgid, egid);
     Ok(())
@@ -566,14 +562,12 @@ pub fn seteuid(euid: Uid) -> Result<(), SecurityError> {
     let mut registry = SECURITY_REGISTRY.lock();
     
     // Get or create process credentials
-    let creds = if registry.process_credentials.contains_key(&current_pid) {
-        registry.process_credentials.get_mut(&current_pid).unwrap()
-    } else {
+    if !registry.process_credentials.contains_key(&current_pid) {
         let mut creds = ProcessCredentials::new();
         creds.effective_uid = euid;
         registry.set_process_credentials(current_pid, creds).unwrap();
-        creds
-    };
+    }
+    let creds = registry.process_credentials.get_mut(&current_pid).unwrap();
     
     creds.effective_uid = euid;
     Ok(())
@@ -589,14 +583,12 @@ pub fn setegid(egid: Gid) -> Result<(), SecurityError> {
     let mut registry = SECURITY_REGISTRY.lock();
     
     // Get or create process credentials
-    let creds = if registry.process_credentials.contains_key(&current_pid) {
-        registry.process_credentials.get_mut(&current_pid).unwrap()
-    } else {
+    if !registry.process_credentials.contains_key(&current_pid) {
         let mut creds = ProcessCredentials::new();
         creds.effective_gid = egid;
         registry.set_process_credentials(current_pid, creds).unwrap();
-        creds
-    };
+    }
+    let creds = registry.process_credentials.get_mut(&current_pid).unwrap();
     
     creds.effective_gid = egid;
     Ok(())
@@ -612,15 +604,13 @@ pub fn setreuid(ruid: Uid, euid: Uid) -> Result<(), SecurityError> {
     let mut registry = SECURITY_REGISTRY.lock();
     
     // Get or create process credentials
-    let creds = if registry.process_credentials.contains_key(&current_pid) {
-        registry.process_credentials.get_mut(&current_pid).unwrap()
-    } else {
+    if !registry.process_credentials.contains_key(&current_pid) {
         let mut creds = ProcessCredentials::new();
         creds.set_uids(ruid, euid);
         creds.save_ids();
         registry.set_process_credentials(current_pid, creds).unwrap();
-        creds
-    };
+    }
+    let creds = registry.process_credentials.get_mut(&current_pid).unwrap();
     
     creds.set_uids(ruid, euid);
     Ok(())
@@ -636,15 +626,13 @@ pub fn setregid(rgid: Gid, egid: Gid) -> Result<(), SecurityError> {
     let mut registry = SECURITY_REGISTRY.lock();
     
     // Get or create process credentials
-    let creds = if registry.process_credentials.contains_key(&current_pid) {
-        registry.process_credentials.get_mut(&current_pid).unwrap()
-    } else {
+    if !registry.process_credentials.contains_key(&current_pid) {
         let mut creds = ProcessCredentials::new();
         creds.set_gids(rgid, egid);
         creds.save_ids();
         registry.set_process_credentials(current_pid, creds).unwrap();
-        creds
-    };
+    }
+    let creds = registry.process_credentials.get_mut(&current_pid).unwrap();
     
     creds.set_gids(rgid, egid);
     Ok(())

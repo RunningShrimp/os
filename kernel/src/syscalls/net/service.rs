@@ -268,8 +268,9 @@ impl NetworkService {
     /// 
     /// * `interface` - 网络接口信息
     pub fn add_interface(&mut self, interface: crate::syscalls::net::types::NetworkInterface) {
+        let name = interface.name.clone();
         self.interfaces.push(interface);
-        crate::log_debug!("Added network interface: {}", interface.name);
+        crate::log_debug!("Added network interface: {}", name);
     }
 
     /// 移除网络接口

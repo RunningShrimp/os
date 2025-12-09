@@ -132,6 +132,7 @@ impl MarkovState {
 }
 
 /// Prefetch statistics
+#[derive(Clone)]
 pub struct PrefetchStats {
     /// Number of prefetches performed
     pub prefetches: usize,

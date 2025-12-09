@@ -264,7 +264,7 @@ impl File {
                         let nonblock = (self.status_flags & crate::posix::O_NONBLOCK) != 0;
                         match instance.read(buf, nonblock) {
                             Ok(n) => n as isize,
-                            Err(crate::syscalls::common::SyscallError::Again) => {
+                            Err(crate::syscalls::common::SyscallError::WouldBlock) => {
                                 crate::reliability::errno::errno_neg(crate::reliability::errno::EAGAIN)
                             },
                             Err(crate::syscalls::common::SyscallError::InvalidArgument) => {
@@ -285,7 +285,7 @@ impl File {
                         let nonblock = (self.status_flags & crate::posix::O_NONBLOCK) != 0;
                         match instance.read_signals(buf, nonblock) {
                             Ok(n) => n as isize,
-                            Err(crate::syscalls::common::SyscallError::Again) => {
+                            Err(crate::syscalls::common::SyscallError::WouldBlock) => {
                                 crate::reliability::errno::errno_neg(crate::reliability::errno::EAGAIN)
                             },
                             Err(crate::syscalls::common::SyscallError::InvalidArgument) => {
@@ -306,7 +306,7 @@ impl File {
                         let nonblock = (self.status_flags & crate::posix::O_NONBLOCK) != 0;
                         match instance.read_expirations(buf, nonblock) {
                             Ok(n) => n as isize,
-                            Err(crate::syscalls::common::SyscallError::Again) => {
+                            Err(crate::syscalls::common::SyscallError::WouldBlock) => {
                                 crate::reliability::errno::errno_neg(crate::reliability::errno::EAGAIN)
                             },
                             Err(crate::syscalls::common::SyscallError::InvalidArgument) => {
@@ -862,6 +862,49 @@ pub fn file_unsubscribe(idx: usize, chan: usize) {
             }
             _ => {}
         }
+    }
+}
+
+/// Seek in file
+pub fn file_lseek(idx: usize, offset: i64, whence: i32) -> isize {
+    match FILE_TABLE.lock().get_mut(idx) {
+        Some(f) => {
+            let current_size = match f.ftype {
+                FileType::Vfs => {
+                    if let Some(ref vfs_file) = f.vfs_file {
+                        match vfs_file.stat() {
+                            Ok(attr) => attr.size as i64,
+                            Err(_) => return -1,
+                        }
+                    } else {
+                        0
+                    }
+                }
+                FileType::Inode => {
+                    // Simplified: assume size is 0 for now
+                    0
+                }
+                _ => return -1,
+            };
+
+            let new_offset = match whence {
+                crate::posix::SEEK_SET => offset,
+                crate::posix::SEEK_CUR => f.offset as i64 + offset,
+                crate::posix::SEEK_END => current_size + offset,
+                _ => return -1,
+            };
+
+            if new_offset < 0 {
+                return -1;
+            }
+
+            let new_offset_usize = new_offset as usize;
+            match f.seek(new_offset_usize) {
+                -1 => -1,
+                offset => offset,
+            }
+        }
+        None => -1,
     }
 }
 

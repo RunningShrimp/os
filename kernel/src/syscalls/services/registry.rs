@@ -206,7 +206,7 @@ impl ServiceRegistry {
         // 移除服务
         {
             let mut services = self.services.lock();
-            if let Some(entry) = services.remove(name) {
+            if let Some(mut entry) = services.remove(name) {
                 // 停止服务
                 let _ = entry.service.stop();
             } else {

@@ -199,6 +199,7 @@ impl KernelError {
             KernelError::AlreadyExists => errno::EEXIST,
             KernelError::ResourceBusy => errno::EBUSY,
             KernelError::Timeout => errno::ETIMEDOUT,
+            _ => errno::EINVAL, // 默认错误码
         }
     }
 
