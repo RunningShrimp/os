@@ -200,6 +200,13 @@ cargo check
 - **[TODO Cleanup Plan](./docs/TODO_CLEANUP_PLAN.md)** - Detailed TODO tracking
 - **[Week 1 Guide](./docs/plans/WEEK1_DETAILED_GUIDE.md)** - First week tasks
 - **[Documentation Index](./docs/README.md)** - All documentation
+ - **[Architecture Overview](./docs/ARCHITECTURE_OVERVIEW.md)** - Layered architecture summary
+ - **[Dependency Rules](./docs/DEPENDENCY_RULES.md)** - Module boundaries & CI rules
+ - **[Syscalls Overview](./docs/SYSCALLS_OVERVIEW.md)** - Ranges, dispatch & feature gates
+ - **[ProcFS Guide](./docs/PROCFS.md)** - Runtime observability nodes
+ - **[Kernel Features](./docs/FEATURES.md)** - Feature flags and usage
+ - **[6–12M Roadmap](./docs/ROADMAP_6_12M.md)** - Milestones
+ - **[Implementation Checklist](./docs/IMPLEMENTATION_CHECKLIST.md)** - Current status & TODOs
 
 ---
 

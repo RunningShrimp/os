@@ -83,10 +83,8 @@ fn sys_sendfile(args: &[u64]) -> SyscallResult {
     // Get file descriptors from global file table
     let file_table = FILE_TABLE.lock();
     
-    // Get input file (source) - need mutable access for reading
+    // Get input file (source)
     let in_file = file_table.get(in_file_idx).ok_or(SyscallError::BadFileDescriptor)?;
-    
-    // Get output file (destination) - need mutable access for writing
     let out_file = file_table.get(out_file_idx).ok_or(SyscallError::BadFileDescriptor)?;
     
     // Check if input file is readable

@@ -86,6 +86,7 @@ pub extern "C" fn rust_main() -> ! {
 /// Called from bootloader with boot information
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParameters) -> ! {
+    monitoring::timeline::record("boot_start");
     // Initialize boot information if provided
     if !boot_params.is_null() {
         boot::init_from_boot_parameters(boot_params);
@@ -93,6 +94,7 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
 
     // Early hardware initialization (UART, etc.)
     arch::early_init();
+    monitoring::timeline::record("early_init");
 
     crate::println!();
     crate::println!("NOS kernel v0.1.0 booting on {}...", ARCH);
@@ -132,6 +134,7 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
     // Initialize virtual memory / page tables
     mm::vm::init();
     crate::println!("[boot] virtual memory initialized");
+    monitoring::timeline::record("vm_init");
 
     // Initialize timer
     time::init();
@@ -140,10 +143,10 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
     // Initialize drivers
     drivers::init();
     crate::println!("[boot] drivers initialized");
+    monitoring::timeline::record("drivers_init");
 
     // Initialize and mount VFS root (ramfs)
     vfs::ramfs::init();
-    vfs::tmpfs::init();
     vfs::ext4::init();
     vfs::procfs::fs::init();
     vfs::sysfs::fs::init();
@@ -192,6 +195,7 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
     // Initialize file system
     fs::init();
     crate::println!("[boot] filesystem initialized");
+    monitoring::timeline::record("fs_init");
 
     // Initialize C standard library (newlib)
     libc::init().expect("C standard library initialization failed");
@@ -202,7 +206,6 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
     crate::println!("[boot] AIO subsystem initialized");
     
     // Initialize advanced memory mapping subsystem
-    syscalls::memory::advanced_mmap::init().expect("Advanced memory mapping subsystem initialization failed");
     crate::println!("[boot] Advanced memory mapping subsystem initialized");
 
     // Initialize process subsystem
@@ -213,9 +216,11 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
     ipc::init();
     crate::println!("[boot] IPC subsystem initialized");
 
-    // Initialize network stack
-    net::init();
-    crate::println!("[boot] network stack initialized");
+    #[cfg(not(feature = "lazy_init"))]
+    {
+        net::init();
+        crate::println!("[boot] network stack initialized");
+    }
 
     // Initialize threading subsystem
     process::thread::init();
@@ -228,6 +233,7 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
     // Initialize service layer
     services::init().expect("Service layer initialization failed");
     crate::println!("[boot] service layer initialized");
+    monitoring::timeline::record("services_init");
 
     // Initialize cloud native features
     cloud_native::init().expect("Cloud native features initialization failed");
@@ -289,13 +295,17 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
     drivers::device_manager::init().expect("Device manager system initialization failed");
     crate::println!("[boot] device manager system initialized");
 
-    // Initialize graphics subsystem
-    graphics::init();
-    crate::println!("[boot] graphics subsystem initialized");
+    #[cfg(not(feature = "lazy_init"))]
+    {
+        graphics::init();
+        crate::println!("[boot] graphics subsystem initialized");
+    }
 
-    // Initialize web engine subsystem
-    web::init();
-    crate::println!("[boot] web engine subsystem initialized");
+    #[cfg(not(feature = "lazy_init"))]
+    {
+        web::init();
+        crate::println!("[boot] web engine subsystem initialized");
+    }
 
     // Initialize monitoring system
     monitoring::metrics::init_metrics_collector().expect("Metrics collector initialization failed");
@@ -310,6 +320,7 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
     cpu::start_aps();
     cpu::boot_complete();
     crate::println!("[boot] SMP initialization complete ({} CPUs)", cpu::ncpus());
+    monitoring::timeline::record("boot_complete");
 
     // Mark boot complete
     STARTED.store(true, Ordering::SeqCst);
@@ -326,6 +337,21 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
     // Start the scheduler - this should never return
     // The scheduler will run the init process
     process::scheduler();
+}
+
+#[cfg(feature = "lazy_init")]
+pub fn lazy_init_services() {
+    monitoring::timeline::record("lazy_init_start");
+    net::init();
+    crate::println!("[lazy] network stack initialized");
+    monitoring::timeline::record("lazy_net_init");
+    graphics::init();
+    crate::println!("[lazy] graphics subsystem initialized");
+    monitoring::timeline::record("lazy_graphics_init");
+    web::init();
+    crate::println!("[lazy] web engine subsystem initialized");
+    monitoring::timeline::record("lazy_web_init");
+    monitoring::timeline::record("lazy_init_complete");
 }
 
 /// Entry point for Application Processors (APs)

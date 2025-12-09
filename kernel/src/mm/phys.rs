@@ -4,9 +4,9 @@
 use crate::sync::Mutex;
 use crate::println;
 use core::ptr;
-use crate::mm::buddy::BuddyAllocator;
+use crate::mm::optimized_buddy::OptimizedBuddyAllocator;
 
-static BUDDY: Mutex<BuddyAllocator> = Mutex::new(BuddyAllocator::new());
+static BUDDY: Mutex<OptimizedBuddyAllocator> = Mutex::new(OptimizedBuddyAllocator::new());
 use core::sync::atomic::{AtomicUsize, Ordering};
 extern crate alloc;
 
@@ -178,8 +178,9 @@ impl FreeListAllocator {
         
         // Memory pressure handling: enable compression when free pages < 10%
         if self.free_count < self.total_pages / 10 {
-            let freed = crate::mm::slab::slab_shrink();
-            crate::println!("[mm] pressure: free={} total={} shrink_freed={} slabs", self.free_count, self.total_pages, freed);
+            // TODO: Implement slab_shrink in optimized_slab module
+            // let freed = crate::mm::optimized_slab::slab_shrink();
+            crate::println!("[mm] pressure: free={} total={}", self.free_count, self.total_pages);
             
             // Trigger memory compression for inactive pages
             // This compresses pages that haven't been accessed recently to free up more memory
@@ -334,10 +335,11 @@ pub fn init() {
     // Buddy allocator statistics
     let stats = BUDDY.lock().stats();
     crate::println!("[mm] buddy: allocated={}, freed={}, frag={}", stats.allocated, stats.freed, stats.fragmentation);
-    let slab = crate::mm::slab::slab_stats();
-    crate::println!("[mm] slab: used={} allocated={}", slab.used, slab.allocated);
-    let freed = crate::mm::slab::slab_shrink();
-    crate::println!("[mm] slab: shrink freed {} empty slabs", freed);
+    // TODO: Implement slab_stats and slab_shrink in optimized_slab module
+    // let slab = crate::mm::optimized_slab::slab_stats();
+    // crate::println!("[mm] slab: used={} allocated={}", slab.used, slab.allocated);
+    // let freed = crate::mm::optimized_slab::slab_shrink();
+    // crate::println!("[mm] slab: shrink freed {} empty slabs", freed);
     
     // Huge page allocator statistics
     let hugepage = crate::mm::allocator::get_global_allocator();

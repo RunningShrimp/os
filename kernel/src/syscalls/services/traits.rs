@@ -278,6 +278,54 @@ pub trait ServiceFactory: Send + Sync {
     /// 
     /// 返回此工厂能够创建的服务类型名称。
     fn service_type(&self) -> &str;
+    
+    /// 创建性能优化服务
+    /// 
+    /// 创建性能优化服务实例。
+    /// 
+    /// # 返回值
+    /// 
+    /// * `Box<dyn Service>` - 性能优化服务实例
+    fn create_performance_service(&self) -> Box<dyn Service> {
+        // TODO: Implement when optimization services are refactored
+        Box::new(MemoryService::new())
+    }
+    
+    /// 创建调度器优化服务
+    /// 
+    /// 创建调度器优化服务实例。
+    /// 
+    /// # 返回值
+    /// 
+    /// * `Box<dyn Service>` - 调度器优化服务实例
+    fn create_scheduler_service(&self) -> Box<dyn Service> {
+        // TODO: Implement when optimization services are refactored
+        Box::new(MemoryService::new())
+    }
+    
+    /// 创建零拷贝I/O优化服务
+    /// 
+    /// 创建零拷贝I/O优化服务实例。
+    /// 
+    /// # 返回值
+    /// 
+    /// * `Box<dyn Service>` - 零拷贝I/O优化服务实例
+    fn create_zerocopy_service(&self) -> Box<dyn Service> {
+        // TODO: Implement when optimization services are refactored
+        Box::new(MemoryService::new())
+    }
+    
+    /// 创建优化管理服务
+    /// 
+    /// 创建综合优化管理服务实例。
+    /// 
+    /// # 返回值
+    /// 
+    /// * `Box<dyn Service>` - 优化管理服务实例
+    fn create_manager_service(&self) -> Box<dyn Service> {
+        // TODO: Implement when optimization services are refactored
+        Box::new(MemoryService::new())
+    }
 }
 
 /// 服务提供者特征

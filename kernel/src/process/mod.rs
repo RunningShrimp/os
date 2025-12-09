@@ -5,6 +5,7 @@ pub mod elf;
 pub mod dynamic_linker;
 pub mod fd_cache;
 pub mod lock_optimized;
+pub mod rcu_table;
 
 #[cfg(feature = "kernel_tests")]
 pub mod tests;
@@ -12,6 +13,7 @@ pub mod tests;
 pub use manager::*;
 pub use fd_cache::*;
 pub use lock_optimized::*;
+pub use rcu_table::*;
 
 use crate::types::stubs::{uid_t, gid_t};
 

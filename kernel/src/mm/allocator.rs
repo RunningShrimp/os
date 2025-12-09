@@ -19,11 +19,13 @@ use crate::sync::Mutex;
 // pub mod compress;
 
 
-use crate::mm::buddy;
-use crate::mm::slab;
+use crate::mm::optimized_buddy;
+use crate::mm::optimized_slab;
+use crate::mm::optimized_buddy::AllocatorStats as BuddyStats;
+use crate::mm::optimized_slab::AllocatorStats as SlabStats;
 use crate::mm::hugepage;
-use crate::mm::buddy::BuddyAllocator;
-use crate::mm::slab::SlabAllocator;
+use crate::mm::optimized_buddy::OptimizedBuddyAllocator;
+use crate::mm::optimized_slab::OptimizedSlabAllocator;
 use crate::mm::hugepage::HugePageAllocator;
 use crate::mm::traits::{UnifiedAllocator, AllocatorWithStats, AllocatorStats};
 
@@ -32,8 +34,9 @@ use crate::mm::traits::{UnifiedAllocator, AllocatorWithStats, AllocatorStats};
 // ============================================================================
 
 pub struct HybridAllocator {
-    slab: Mutex<SlabAllocator>,
-    buddy: Mutex<BuddyAllocator>,
+    // 使用 Mutex 管理分配器实例
+    slab: Mutex<OptimizedSlabAllocator>,
+    buddy: Mutex<OptimizedBuddyAllocator>,
     hugepage: Mutex<HugePageAllocator>,
     allocation_count: AtomicUsize,
     deallocation_count: AtomicUsize,
@@ -45,8 +48,8 @@ pub struct HybridAllocator {
 impl HybridAllocator {
     pub const fn new() -> Self {
         Self {
-            slab: Mutex::new(SlabAllocator::uninitialized()),
-            buddy: Mutex::new(BuddyAllocator::new()),
+            slab: Mutex::new(OptimizedSlabAllocator::new()),
+            buddy: Mutex::new(OptimizedBuddyAllocator::new()),
             hugepage: Mutex::new(HugePageAllocator::new()),
             allocation_count: AtomicUsize::new(0),
             deallocation_count: AtomicUsize::new(0),
@@ -55,17 +58,18 @@ impl HybridAllocator {
             failed_allocations: AtomicUsize::new(0),
         }
     }
+pub unsafe fn init(&self, slab_start: usize, slab_size: usize,
+                   buddy_start: usize, buddy_size: usize,
+                   page_size: usize) {
+    // 使用 SpinLock 替代 Mutex 初始化分配器
+    let mut slab = self.slab.lock();
+    slab.init(slab_start as *mut u8, slab_size);
+    drop(slab);
 
-    pub unsafe fn init(&self, slab_start: usize, slab_size: usize,
-                       buddy_start: usize, buddy_size: usize,
-                       page_size: usize) {
-        let mut slab = self.slab.lock();
-        slab.init(slab_start as *mut u8, slab_size);
-        drop(slab);
-
-        let mut buddy = self.buddy.lock();
-        buddy.init(buddy_start, buddy_start + buddy_size, page_size);
-        drop(buddy);
+    let mut buddy = self.buddy.lock();
+    buddy.init(buddy_start, buddy_start + buddy_size, page_size);
+    drop(buddy);
+    
         
         // Initialize huge page allocator with a portion of the buddy region
         // Reserve 10% of buddy region for huge pages
@@ -92,7 +96,7 @@ impl HybridAllocator {
         
         // Try slab allocator first for small objects
         if size <= 2048 { // Matches SLAB_SIZES defined in slab.rs
-            let mut slab = self.slab.lock();
+            let mut slab = self.slab.lock(); // SpinLock for faster access
             let ptr = slab.alloc(layout);
             if !ptr.is_null() {
                 self.allocation_count.fetch_add(1, Ordering::Relaxed);
@@ -101,7 +105,7 @@ impl HybridAllocator {
             }
         }
 
-        // Fallback to buddy allocator
+        // Fallback to buddy allocator (SpinLock for faster access)
         let mut buddy = self.buddy.lock();
         let ptr = buddy.alloc(layout);
         if !ptr.is_null() {
@@ -150,26 +154,22 @@ impl HybridAllocator {
         
         // Try slab allocator first for small objects
         if size <= 2048 { // Matches SLAB_SIZES defined in slab.rs
-            let mut slab = self.slab.lock();
+            let mut slab = self.slab.lock(); // SpinLock for faster access
             slab.dealloc(ptr, layout);
             self.allocation_count.fetch_sub(1, Ordering::Relaxed);
             return;
         }
 
-        // Fallback to buddy allocator
+        // Fallback to buddy allocator (SpinLock for faster access)
         let mut buddy = self.buddy.lock();
         buddy.dealloc(ptr, layout);
         self.allocation_count.fetch_sub(1, Ordering::Relaxed);
     }
 
-    pub fn stats(&self) -> (buddy::AllocatorStats, slab::AllocatorStats) {
+    pub fn stats(&self) -> (BuddyStats, SlabStats) {
         let buddy = self.buddy.lock();
         let slab_stats = self.slab.lock().stats();
-
-        (
-            buddy.stats(),
-            slab_stats
-        )
+        (buddy.stats(), slab_stats)
     }
     
     /// Get supported huge page sizes
@@ -298,8 +298,10 @@ pub unsafe fn init(slab_start: usize, slab_size: usize,
 }
 
 /// Get heap statistics
-pub fn heap_stats() -> (buddy::AllocatorStats, slab::AllocatorStats) {
-    ALLOCATOR.stats()
+pub fn heap_stats() -> (BuddyStats, SlabStats) {
+    let buddy = ALLOCATOR.buddy.lock();
+    let slab = ALLOCATOR.slab.lock();
+    (buddy.stats(), slab.stats())
 }
 
 /// Align up to the given alignment

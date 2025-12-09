@@ -22,6 +22,7 @@ pub mod route;
 pub mod fragment;
 pub mod processor;
 pub mod socket;
+pub mod zero_copy;
 
 // Import packet pool and other essential types
 use packet::PacketPool;

@@ -5,7 +5,7 @@ extern crate alloc;
 use core::alloc::Layout;
 use core::ptr::null_mut;
 
-use crate::mm::buddy;
+use crate::mm::optimized_buddy;
 
 // ============================================================================
 // Constants

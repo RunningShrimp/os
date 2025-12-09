@@ -1,8 +1,8 @@
 pub mod phys;
 pub mod vm;
 pub mod allocator;
-pub mod buddy;
-pub mod slab;
+// pub mod buddy;  // Removed - use optimized_buddy instead
+// pub mod slab;   // Removed - use optimized_slab instead
 pub mod optimized_buddy;
 pub mod optimized_slab;
 pub mod mempool;
@@ -10,6 +10,7 @@ pub mod compress;
 pub mod hugepage;
 pub mod traits;
 pub mod optimized_allocator;
+pub mod percpu_allocator;
 pub mod prefetch;
 pub mod numa;
 
@@ -23,6 +24,7 @@ pub use optimized_slab::OptimizedSlabAllocator;
 pub use mempool::*;
 pub use optimized_allocator::OptimizedHybridAllocator;
 pub use numa::*;
+pub use percpu_allocator::*;
 
 /// Align up to the given alignment
 pub const fn align_up(addr: usize, align: usize) -> usize {

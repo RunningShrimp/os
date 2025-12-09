@@ -288,7 +288,7 @@ impl SyscallDispatcher {
     }
     
     /// 尝试执行系统调用
-    /// 
+    ///
     /// 单次执行尝试，不包含重试逻辑。
     fn try_execute_syscall(
         &self,
@@ -297,20 +297,53 @@ impl SyscallDispatcher {
         args: &[u64],
         start_time: u64,
     ) -> Result<DispatchResult, KernelError> {
-        // 这里需要从注册表获取服务实例
-        // 由于所有权问题，实际实现可能需要使用Arc或其他共享机制
-        // 暂时返回一个模拟结果
-        
-        let end_time = self.get_current_time_ns();
-        let dispatch_time = end_time - start_time;
-        
-        Ok(DispatchResult {
-            success: true,
-            return_value: 0, // 模拟返回值
-            error: None,
-            dispatch_time_ns: dispatch_time,
-            service_name: service_name.to_string(),
-        })
+        // 从注册表获取服务实例
+        let mut service_ref = self.registry.get_service_mut_ref(service_name)?
+            .ok_or_else(|| KernelError::ServiceNotFound)?;
+
+        // 尝试将服务转换为 SyscallService
+        let syscall_service = service_ref.as_any_mut()
+            .downcast_mut::<dyn SyscallService>();
+
+        if let Some(syscall_service) = syscall_service {
+            // 执行系统调用
+            let result = syscall_service.handle_syscall(syscall_number, args);
+            
+            let end_time = self.get_current_time_ns();
+            let dispatch_time = end_time - start_time;
+
+            match result {
+                Ok(return_value) => {
+                    // 更新成功统计
+                    let mut stats = self.stats.lock();
+                    stats.successful_dispatches += 1;
+                    
+                    Ok(DispatchResult {
+                        success: true,
+                        return_value,
+                        error: None,
+                        dispatch_time_ns: dispatch_time,
+                        service_name: service_name.to_string(),
+                    })
+                },
+                Err(error) => {
+                    // 更新失败统计
+                    let mut stats = self.stats.lock();
+                    stats.failed_dispatches += 1;
+                    
+                    Ok(DispatchResult {
+                        success: false,
+                        return_value: 0,
+                        error: Some(error),
+                        dispatch_time_ns: dispatch_time,
+                        service_name: service_name.to_string(),
+                    })
+                }
+            }
+        } else {
+            // 服务不是系统调用服务
+            Err(KernelError::ServiceNotSyscallService)
+        }
     }
     
     /// 检查缓存

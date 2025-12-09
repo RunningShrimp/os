@@ -91,6 +91,12 @@ pub enum ServiceType {
     Memory,
     /// 设备驱动服务
     Device,
+    /// 性能优化服务
+    PerformanceOptimization,
+    /// 调度器优化服务
+    SchedulerOptimization,
+    /// 零拷贝I/O优化服务
+    ZeroCopyOptimization,
     /// 用户自定义服务
     Custom,
 }
@@ -229,26 +235,45 @@ impl ServiceRegistry {
         Ok(())
     }
     
-    /// 获取服务
-    /// 
-    /// 根据名称获取已注册的服务。
-    /// 
+    /// 获取服务实例（不可变引用）
+    ///
+    /// 根据名称获取已注册的服务实例。
+    ///
     /// # 参数
-    /// 
+    ///
     /// * `name` - 服务名称
-    /// 
+    ///
     /// # 返回值
-    /// 
-    /// * `Ok(Some(Box<dyn Service>))` - 找到服务
+    ///
+    /// * `Ok(Some(&dyn Service))` - 找到服务引用
     /// * `Ok(None)` - 服务不存在
     /// * `Err(KernelError)` - 获取失败
-    pub fn get_service(&self, name: &str) -> Result<Option<Box<dyn Service>>, KernelError> {
+    pub fn get_service_ref(&self, name: &str) -> Result<Option<&dyn Service>, KernelError> {
         let services = self.services.lock();
         if let Some(entry) = services.get(name) {
-            // 这里需要克隆服务实例，但Service trait不是Clone
-            // 实际实现中可能需要使用Arc或其他共享机制
-            // 暂时返回None作为占位符
+            Ok(Some(&*entry.service))
+        } else {
             Ok(None)
+        }
+    }
+
+    /// 获取服务实例（可变引用）
+    ///
+    /// 根据名称获取已注册的服务实例，用于修改操作。
+    ///
+    /// # 参数
+    ///
+    /// * `name` - 服务名称
+    ///
+    /// # 返回值
+    ///
+    /// * `Ok(Some(&mut dyn Service))` - 找到服务引用
+    /// * `Ok(None)` - 服务不存在
+    /// * `Err(KernelError)` - 获取失败
+    pub fn get_service_mut_ref(&self, name: &str) -> Result<Option<&mut dyn Service>, KernelError> {
+        let mut services = self.services.lock();
+        if let Some(entry) = services.get_mut(name) {
+            Ok(Some(&mut *entry.service))
         } else {
             Ok(None)
         }
@@ -381,22 +406,38 @@ impl ServiceRegistry {
     }
     
     /// 更新系统调用映射
-    /// 
+    ///
     /// 为系统调用服务更新系统调用号映射。
-    /// 
+    ///
     /// # 参数
-    /// 
+    ///
     /// * `service_name` - 服务名称
-    /// 
+    ///
     /// # 返回值
-    /// 
+    ///
     /// * `Ok(())` - 更新成功
     /// * `Err(KernelError)` - 更新失败
     fn update_syscall_mapping(&self, service_name: &str) -> Result<(), KernelError> {
         let services = self.services.lock();
-        // TODO: 重新实现 syscall mapping 更新
-        // 当前版本暂时跳过 downcast 检查
-        let _ = service_name;
+        let service_entry = services.get(service_name)
+            .ok_or(KernelError::ServiceNotFound)?;
+
+        // 尝试将服务转换为 SyscallService
+        let syscall_service = service_entry.service.as_any()
+            .downcast_ref::<dyn SyscallService>();
+
+        if let Some(syscall_service) = syscall_service {
+            // 获取服务支持的系统调用
+            let syscalls = syscall_service.supported_syscalls();
+            drop(services); // 释放服务锁
+
+            // 更新系统调用映射
+            let mut syscall_map = self.syscall_mapping.lock();
+            for syscall in syscalls {
+                syscall_map.insert(syscall, service_name.to_string());
+            }
+        }
+
         Ok(())
     }
     

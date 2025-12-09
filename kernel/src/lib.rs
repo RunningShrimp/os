@@ -74,6 +74,7 @@ mod ipc;
 mod libc;
 mod microkernel;
 mod mm;
+mod sched;
 mod net;
 mod posix;
 mod security;
@@ -83,6 +84,7 @@ mod sync;
 mod time;
 mod trap;
 mod vfs;
+mod procfs;
 
 #[cfg(feature = "kernel_tests")]
 /// Kernel test framework and test cases

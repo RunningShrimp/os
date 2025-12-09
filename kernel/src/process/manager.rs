@@ -670,6 +670,8 @@ impl ProcTable {
         // Add to pid_to_index map for O(1) lookups
         // Note: We can safely insert here because ensure_initialized() was called earlier
         self.pid_to_index.insert(pid, idx);
+        // RCU 分片注册（占位，不改变主路径）
+        crate::process::rcu_table::with_sharded(|s| s.register(pid));
         
         // Return reference to the proc (idx is valid, managed internally)
         Some(proc)
@@ -792,6 +794,7 @@ impl ProcTable {
 
             // Remove from PID map
             self.pid_to_index.remove(&pid);
+            crate::process::rcu_table::with_sharded(|s| s.remove(pid));
 
             // Add back to free list for O(1) reuse
             self.free_list.push(idx);

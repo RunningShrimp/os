@@ -1450,6 +1450,8 @@ pub mod advanced_signal;
 pub mod realtime;
 pub mod advanced_thread;
 pub mod security;
+pub mod session;
+pub mod fd_flags;
 // pub mod advanced_tests;  // Temporarily disabled
 // pub mod integration_tests;  // Temporarily disabled
 

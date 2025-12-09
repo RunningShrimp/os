@@ -9,13 +9,267 @@ extern crate alloc;
 
 use core::ptr;
 use core::sync::atomic::{AtomicU32, Ordering};
+use core::ops::Range;
 use alloc::collections::BTreeMap;
+use alloc::vec::Vec;
 use crate::mm::{kalloc, kfree};
 
 // Re-export PAGE_SIZE for other modules
 pub use crate::mm::PAGE_SIZE;
 use crate::drivers::platform;
 use crate::sync::Mutex;
+
+// ============================================================================
+// VMA 区间管理（mmap 基础骨架）
+// ============================================================================
+
+/// 虚拟区间权限
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VmPerm {
+    pub read: bool,
+    pub write: bool,
+    pub exec: bool,
+    pub user: bool,
+}
+
+impl VmPerm {
+    pub const fn rw() -> Self {
+        Self {
+            read: true,
+            write: true,
+            exec: false,
+            user: true,
+        }
+    }
+
+    pub const fn r() -> Self {
+        Self {
+            read: true,
+            write: false,
+            exec: false,
+            user: true,
+        }
+    }
+
+    pub const fn rx() -> Self {
+        Self {
+            read: true,
+            write: false,
+            exec: true,
+            user: true,
+        }
+    }
+
+    pub fn to_pte_flags(&self) -> usize {
+        let mut flags = flags::PTE_V;
+        if self.read {
+            flags |= flags::PTE_R;
+        }
+        if self.write {
+            flags |= flags::PTE_W;
+        }
+        if self.exec {
+            flags |= flags::PTE_X;
+        }
+        if self.user {
+            flags |= flags::PTE_U;
+        }
+        flags
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VmError {
+    InvalidRange,
+    Overlap,
+    NotFound,
+    NotPinned,
+    NoMemory,
+    MapFailed,
+}
+
+#[derive(Debug, Clone)]
+pub struct VmArea {
+    pub range: Range<usize>,
+    pub perm: VmPerm,
+    pub file_backed: bool,
+    pub file_offset: usize,
+    pub lazy: bool,
+    pub cow: bool,
+}
+
+impl VmArea {
+    pub fn len(&self) -> usize {
+        self.range.end.saturating_sub(self.range.start)
+    }
+}
+
+/// 简单 VMA 树，后续可替换为平衡树/区间树。
+#[derive(Default, Debug)]
+pub struct VmSpace {
+    areas: BTreeMap<usize, VmArea>,
+}
+
+impl VmSpace {
+    fn overlap(range: &Range<usize>, other: &Range<usize>) -> bool {
+        range.start < other.end && other.start < range.end
+    }
+
+    pub fn map(
+        &mut self,
+        start: usize,
+        length: usize,
+        perm: VmPerm,
+        file_backed: bool,
+        file_offset: usize,
+    ) -> Result<usize, VmError> {
+        if length == 0 {
+            return Err(VmError::InvalidRange);
+        }
+        let start_aligned = start & !(PAGE_SIZE - 1);
+        let end_aligned = (start_aligned + length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+        if end_aligned <= start_aligned {
+            return Err(VmError::InvalidRange);
+        }
+
+        let new_range = start_aligned..end_aligned;
+        for area in self.areas.values() {
+            if Self::overlap(&new_range, &area.range) {
+                return Err(VmError::Overlap);
+            }
+        }
+
+        self.areas.insert(
+            start_aligned,
+            VmArea {
+                range: new_range.clone(),
+                perm,
+                file_backed,
+                file_offset,
+                lazy: false,
+                cow: false,
+            },
+        );
+        Ok(start_aligned)
+    }
+
+    pub fn mmap_anonymous(&mut self, hint: usize, length: usize, perm: VmPerm) -> Result<usize, VmError> {
+        let start = if hint == 0 {
+            self.find_free_area(length).ok_or(VmError::InvalidRange)?
+        } else {
+            hint
+        };
+        self.map(start, length, perm, false, 0)
+    }
+
+    pub fn unmap(&mut self, start: usize, length: usize) -> Result<(), VmError> {
+        let start_aligned = start & !(PAGE_SIZE - 1);
+        let end_aligned = (start_aligned + length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+        let target = start_aligned..end_aligned;
+
+        let key = self
+            .areas
+            .iter()
+            .find(|(_, area)| area.range == target)
+            .map(|(k, _)| *k)
+            .ok_or(VmError::NotFound)?;
+
+        self.areas.remove(&key);
+        Ok(())
+    }
+
+    pub fn find_free_area(&self, length: usize) -> Option<usize> {
+        let length_aligned = (length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+        let mut cursor = PAGE_SIZE; // 保留低地址
+        for area in self.areas.values() {
+            if cursor + length_aligned <= area.range.start {
+                return Some(cursor);
+            }
+            cursor = area.range.end;
+        }
+        Some(cursor)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &VmArea> {
+        self.areas.values()
+    }
+
+    /// 针对懒分配：调用者提供映射回调
+    pub fn fault_in<F>(
+        &mut self,
+        va: usize,
+        map_fn: F,
+    ) -> Result<(), VmError>
+    where
+        F: FnOnce(&VmArea) -> Result<(), VmError>,
+    {
+        let page_base = va & !(PAGE_SIZE - 1);
+        let area = self
+            .areas
+            .iter_mut()
+            .find(|(_, a)| a.range.start <= page_base && page_base < a.range.end)
+            .ok_or(VmError::NotFound)?
+            .1;
+        if !area.lazy {
+            return Err(VmError::MapFailed);
+        }
+        map_fn(area)?;
+        area.lazy = false;
+        Ok(())
+    }
+
+    /// 针对 COW：调用者提供复制+映射回调
+    pub fn handle_cow<F>(
+        &mut self,
+        va: usize,
+        copy_map_fn: F,
+    ) -> Result<(), VmError>
+    where
+        F: FnOnce(&VmArea) -> Result<(), VmError>,
+    {
+        let page_base = va & !(PAGE_SIZE - 1);
+        let area = self
+            .areas
+            .iter_mut()
+            .find(|(_, a)| a.range.start <= page_base && page_base < a.range.end)
+            .ok_or(VmError::NotFound)?
+            .1;
+        if !area.cow {
+            return Err(VmError::MapFailed);
+        }
+        copy_map_fn(area)?;
+        area.cow = false;
+        Ok(())
+    }
+
+    /// 将区间标记为懒分配
+    pub fn mark_lazy(&mut self, start: usize, length: usize) -> Result<(), VmError> {
+        let start_aligned = start & !(PAGE_SIZE - 1);
+        let end_aligned = (start_aligned + length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+        let target = start_aligned..end_aligned;
+        let (_, area) = self
+            .areas
+            .iter_mut()
+            .find(|(_, area)| area.range == target)
+            .ok_or(VmError::NotFound)?;
+        area.lazy = true;
+        Ok(())
+    }
+
+    /// 标记区间为 COW
+    pub fn mark_cow(&mut self, start: usize, length: usize) -> Result<(), VmError> {
+        let start_aligned = start & !(PAGE_SIZE - 1);
+        let end_aligned = (start_aligned + length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+        let target = start_aligned..end_aligned;
+        let (_, area) = self
+            .areas
+            .iter_mut()
+            .find(|(_, area)| area.range == target)
+            .ok_or(VmError::NotFound)?;
+        area.cow = true;
+        Ok(())
+    }
+}
 
 // ============================================================================
 // Page Reference Counting for COW
@@ -58,6 +312,33 @@ pub fn page_ref_count(pa: usize) -> u32 {
     let pfn = pa / PAGE_SIZE;
     let refcounts = PAGE_REFCOUNTS.lock();
     *refcounts.get(&pfn).unwrap_or(&1)
+}
+
+// ============================================================================
+// 用户页 pin/unpin（零拷贝基础）
+// ============================================================================
+
+/// 固定用户页，返回物理页帧列表（占位实现）
+pub fn pin_user_pages(_pagetable: *mut PageTable, addrs: &[usize]) -> Result<Vec<usize>, VmError> {
+    // TODO: walk pagetable, increase refcount and mark pinned
+    let mut frames = Vec::with_capacity(addrs.len());
+    for &va in addrs {
+        // 对齐到页
+        let pa = va & !(PAGE_SIZE - 1);
+        frames.push(pa);
+        page_ref_inc(pa);
+    }
+    Ok(frames)
+}
+
+/// 解除固定用户页（占位实现）
+pub fn unpin_user_pages(frames: &[usize]) -> Result<(), VmError> {
+    for &pa in frames {
+        if !page_ref_dec(pa) {
+            // 未真正减少到零也视为成功
+        }
+    }
+    Ok(())
 }
 
 // ============================================================================
@@ -1313,7 +1594,6 @@ pub unsafe fn handle_page_fault(
             }
             
             // Check for lazy allocation (valid VMA but not yet allocated)
-            // For now, treat unmapped pages in user space as potential lazy alloc
             if (pte & flags::PTE_V) == 0 && is_user {
                 unsafe { return handle_lazy_alloc(pagetable, va, true, true, false); }
             }

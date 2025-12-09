@@ -13,7 +13,7 @@ use hashbrown::HashMap;
 use core::hash::{Hash, Hasher};
 use crate::compat::DefaultHasherBuilder;
 
-use crate::sync::Mutex;
+use crate::sync::{Mutex, RwLock};
 
 // Re-export modules
 pub mod error;
@@ -23,6 +23,8 @@ pub mod fs;
 pub mod file;
 pub mod dentry;
 pub mod mount;
+pub mod journal;
+pub mod log_buffer;
 pub mod ramfs;
 pub mod ext4;
 pub mod procfs;
@@ -39,6 +41,8 @@ use self::{
     dentry::Dentry,
     mount::Mount,
 };
+use self::journal::{Journal, JournalOptions};
+use self::log_buffer::LogBuffer;
 
 // ============================================================================
 // VFS Core
@@ -64,6 +68,12 @@ pub struct Vfs {
     max_cache_size: usize,
     /// Path hash index for faster lookups
     path_hash_index: Mutex<HashMap<u64, String, DefaultHasherBuilder>>,
+    /// 读多写少的路径保护
+    path_guard: RwLock<()>,
+    /// 简单日志接口（占位）
+    journal: Journal,
+    /// 内存日志缓冲
+    logbuf: LogBuffer,
 }
 
 impl Vfs {
@@ -76,6 +86,14 @@ impl Vfs {
             dentry_cache: Mutex::new(HashMap::with_hasher(DefaultHasherBuilder)),
             max_cache_size: 1024, // Maximum 1024 cached entries
             path_hash_index: Mutex::new(HashMap::with_hasher(DefaultHasherBuilder)),
+            path_guard: RwLock::new(()),
+            journal: Journal {
+                opts: JournalOptions {
+                    enabled: false,
+                    sync_on_commit: false,
+                },
+            },
+            logbuf: LogBuffer::with_capacity(128),
         }
     }
     
@@ -233,15 +251,16 @@ impl Vfs {
         if path.is_empty() {
             return Err(VfsError::InvalidPath);
         }
-        
-        // Check cache first using hash index for faster lookup
-        let path_hash = Self::hash_path(path);
+        // 读锁保护的快路径
         {
-            let mut cache = self.dentry_cache.lock();
-            if let Some(entry) = cache.get_mut(path) {
-                // Update access time (LRU)
-                entry.access_time = crate::time::get_ticks();
-                return Ok(entry.dentry.clone());
+            let _r = self.path_guard.read();
+            let path_hash = Self::hash_path(path);
+            let cache = self.dentry_cache.lock();
+            if let Some(entry) = cache.get(path) {
+                let dentry = entry.dentry.clone();
+                drop(cache);
+                self.path_hash_index.lock().insert(path_hash, path.to_string());
+                return Ok(dentry);
             }
         }
         
@@ -258,6 +277,8 @@ impl Vfs {
             .filter(|s| !s.is_empty())
             .collect();
         
+        let _w = self.path_guard.write();
+        let path_hash = Self::hash_path(path);
         for (i, component) in components.iter().enumerate() {
             current = self.lookup_child(&current, component)?;
             
@@ -294,6 +315,12 @@ impl Vfs {
         }
         
         Ok(current)
+    }
+
+    /// 仅在读锁下使用的快速缓存读取
+    fn fast_lookup(&self, path: &str) -> Option<Arc<Mutex<Dentry>>> {
+        let cache = self.dentry_cache.lock();
+        cache.get(path).map(|e| e.dentry.clone())
     }
     
     /// Lookup a child in a directory dentry
@@ -375,6 +402,8 @@ impl Vfs {
 
         // Generate inotify events for parent directory
         self.generate_inotify_events(&parent_path, crate::syscalls::glib::inotify_mask::IN_CREATE | crate::syscalls::glib::inotify_mask::IN_ISDIR, 0, &name);
+        let _ = self.journal.record("mkdir");
+        self.logbuf.push(format!("mkdir {} {}", parent_path, name));
 
         Ok(())
     }
@@ -391,6 +420,8 @@ impl Vfs {
             parent.inode.unlink(&name)?;
         }
 
+        let _ = self.journal.record("unlink");
+        self.logbuf.push(format!("unlink {} {}", parent_path, name));
         self.dentry_cache.lock().remove(path);
 
         // Generate inotify events for parent directory
@@ -411,6 +442,8 @@ impl Vfs {
         }
 
         self.dentry_cache.lock().remove(path);
+        let _ = self.journal.record("rmdir");
+        self.logbuf.push(format!("rmdir {} {}", parent_path, name));
 
         // Generate inotify events for parent directory
         self.generate_inotify_events(&parent_path, crate::syscalls::glib::inotify_mask::IN_DELETE | crate::syscalls::glib::inotify_mask::IN_ISDIR, 0, &name);
@@ -428,6 +461,21 @@ impl Vfs {
         let parent_inode = parent_dentry.lock().inode.clone();
         
         parent_inode.link(&name, old_inode)?;
+
+        // 维护缓存与事件
+        let full_new = if parent_path == "/" {
+            format!("/{}", name)
+        } else {
+            format!("{}/{}", parent_path, name)
+        };
+        self.dentry_cache.lock().remove(&full_new);
+        let _ = self.journal.record("link"); // 占位
+        self.generate_inotify_events(
+            &parent_path,
+            crate::syscalls::glib::inotify_mask::IN_CREATE,
+            0,
+            &name,
+        );
         Ok(())
     }
     
@@ -484,6 +532,8 @@ impl Vfs {
 
         // Generate inotify events for parent directory
         self.generate_inotify_events(&parent_path, crate::syscalls::glib::inotify_mask::IN_CREATE, 0, &name);
+        let _ = self.journal.record("symlink");
+        self.logbuf.push(format!("symlink {} -> {}", path, target));
 
         Ok(())
     }

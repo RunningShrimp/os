@@ -188,6 +188,115 @@ impl InodeOps for ProcFsInode {
             "loadavg" => {
                 return sys_info::create_loadavg();
             }
+            "servicestats" => {
+                // Generate service registry statistics
+                let gen = Box::new(|| crate::services::service_stats_string());
+                return Ok(Arc::new(ProcFsInode::new_file(1009, gen)));
+            }
+            "servicehealth" => {
+                let gen = Box::new(|| {
+                    // Default timeout: 5s
+                    let unhealthy = crate::services::service_check_health(5_000_000_000);
+                    let mut s = String::new();
+                    s.push_str("# Service Health (timeout=5s)\n");
+                    if unhealthy.is_empty() {
+                        s.push_str("all services healthy\n");
+                    } else {
+                        for id in unhealthy {
+                            if let Some(info) = crate::services::service_find_by_id(id) {
+                                s.push_str(&format!("- id={} name={} status={:?}\n", info.service_id, info.name, info.status));
+                            } else {
+                                s.push_str(&format!("- id={} (not found)\n", id));
+                            }
+                        }
+                    }
+                    s
+                });
+                return Ok(Arc::new(ProcFsInode::new_file(1011, gen)));
+            }
+            "initlazy" => {
+                let gen = Box::new(|| {
+                    let mut s = String::new();
+                    s.push_str("# Lazy Init Trigger\n");
+                    #[cfg(feature = "lazy_init")]
+                    {
+                        crate::lazy_init_services();
+                        s.push_str("lazy_init executed\n");
+                    }
+                    #[cfg(not(feature = "lazy_init"))]
+                    {
+                        s.push_str("lazy_init feature disabled\n");
+                    }
+                    s
+                });
+                return Ok(Arc::new(ProcFsInode::new_file(1012, gen)));
+            }
+            "features" => {
+                let gen = Box::new(|| {
+                    let mut s = String::new();
+                    s.push_str("# Kernel Feature Flags\n");
+                    s.push_str(&format!("fast_syscall: {}\n", if cfg!(feature = "fast_syscall") { 1 } else { 0 }));
+                    s.push_str(&format!("zero_copy: {}\n", if cfg!(feature = "zero_copy") { 1 } else { 0 }));
+                    s.push_str(&format!("batch_syscalls: {}\n", if cfg!(feature = "batch_syscalls") { 1 } else { 0 }));
+                    s.push_str(&format!("net_opt: {}\n", if cfg!(feature = "net_opt") { 1 } else { 0 }));
+                    s.push_str(&format!("sched_opt: {}\n", if cfg!(feature = "sched_opt") { 1 } else { 0 }));
+                    s.push_str(&format!("lazy_init: {}\n", if cfg!(feature = "lazy_init") { 1 } else { 0 }));
+                    s
+                });
+                return Ok(Arc::new(ProcFsInode::new_file(1010, gen)));
+            }
+            "processstats" => {
+                let gen = Box::new(|| {
+                    let ps = crate::services::process::proc_get_stats();
+                    alloc::format!(
+                        "# Process Stats\n\
+total: {}\n\
+runnable: {}\n\
+sleeping: {}\n\
+zombie: {}\n",
+                        ps.total_processes,
+                        ps.runnable_processes,
+                        ps.sleeping_processes,
+                        ps.zombie_processes,
+                    )
+                });
+                return Ok(Arc::new(ProcFsInode::new_file(1013, gen)));
+            }
+            "perfsummary" => {
+                let gen = Box::new(|| {
+                    let mut s = String::new();
+                    s.push_str("# Performance Summary\n\n");
+                    // Service stats
+                    s.push_str(&crate::services::service_stats_string());
+                    s.push_str("\n");
+                    // Process stats
+                    let ps = crate::services::process::proc_get_stats();
+                    s.push_str(&alloc::format!(
+                        "# Process Stats\n\
+total: {}\n\
+runnable: {}\n\
+sleeping: {}\n\
+zombie: {}\n",
+                        ps.total_processes,
+                        ps.runnable_processes,
+                        ps.sleeping_processes,
+                        ps.zombie_processes,
+                    ));
+                    s
+                });
+                return Ok(Arc::new(ProcFsInode::new_file(1014, gen)));
+            }
+            "perfmonitor" => {
+                let gen = Box::new(|| {
+                    let report = crate::syscalls::performance_monitor::SystemPerformanceReport::new();
+                    report.generate_text_report()
+                });
+                return Ok(Arc::new(ProcFsInode::new_file(1016, gen)));
+            }
+            "timeline" => {
+                let gen = Box::new(|| crate::monitoring::timeline::to_string());
+                return Ok(Arc::new(ProcFsInode::new_file(1015, gen)));
+            }
             _ => {}
         }
         
@@ -239,7 +348,7 @@ impl InodeOps for ProcFsInode {
         }
         
         // Add standard entries
-        let standard_entries = ["self", "sys", "meminfo", "stat", "version", "uptime", "loadavg"];
+        let standard_entries = ["self", "sys", "meminfo", "stat", "version", "uptime", "loadavg", "servicestats", "servicehealth", "features", "initlazy", "processstats", "perfsummary", "timeline", "perfmonitor"];
         let std_start = if offset > 2 + pids.len() { offset - 2 - pids.len() } else { 0 };
         for (idx, entry) in standard_entries.iter().enumerate().skip(std_start) {
             entries.push(DirEntry {
@@ -322,4 +431,3 @@ impl ProcFsInode {
         }
     }
 }
-

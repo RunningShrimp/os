@@ -7,6 +7,8 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::{format, vec};
 use crate::sync::Mutex;
+use core::sync::atomic::{AtomicU64, Ordering};
+use crate::services::traits::ServiceCapabilities;
 
 // Service modules
 pub mod memory;
@@ -16,6 +18,7 @@ pub mod syscall;
 pub mod network;
 pub mod driver;
 pub mod ipc;
+pub mod traits;
 
 // ============================================================================
 // Constants
@@ -47,6 +50,8 @@ pub struct ServiceInfo {
     pub endpoint: usize,    // IPC endpoint for the service
     pub dependencies: Vec<String>,
     pub last_heartbeat: u64, // Last heartbeat timestamp for health check
+    pub version: Option<(u16,u16)>,
+    pub capabilities: Option<ServiceCapabilities>,
 }
 
 /// Service Registry
@@ -54,6 +59,8 @@ pub struct ServiceRegistry {
     services: Mutex<Vec<ServiceInfo>>,
     next_service_id: Mutex<u32>,
     last_heartbeat_time: Mutex<u64>,
+    registrations: AtomicU64,
+    lookups: AtomicU64,
 }
 
 // ============================================================================
@@ -71,6 +78,8 @@ impl ServiceInfo {
             endpoint,
             dependencies: Vec::new(),
             last_heartbeat: 0,
+            version: None,
+            capabilities: None,
         }
     }
 }
@@ -82,6 +91,8 @@ impl ServiceRegistry {
             services: Mutex::new(Vec::new()),
             next_service_id: Mutex::new(1),
             last_heartbeat_time: Mutex::new(0),
+            registrations: AtomicU64::new(0),
+            lookups: AtomicU64::new(0),
         }
     }
 
@@ -95,6 +106,7 @@ impl ServiceRegistry {
         service.last_heartbeat = *self.last_heartbeat_time.lock();
         
         services.push(service);
+        self.registrations.fetch_add(1, Ordering::SeqCst);
         
         new_id
     }
@@ -114,12 +126,14 @@ impl ServiceRegistry {
     /// Find a service by name
     pub fn find_by_name(&self, name: &str) -> Option<ServiceInfo> {
         let services = self.services.lock();
+        self.lookups.fetch_add(1, Ordering::SeqCst);
         services.iter().find(|s| s.name == name).cloned()
     }
 
     /// Find a service by ID
     pub fn find_by_id(&self, service_id: u32) -> Option<ServiceInfo> {
         let services = self.services.lock();
+        self.lookups.fetch_add(1, Ordering::SeqCst);
         services.iter().find(|s| s.service_id == service_id).cloned()
     }
 
@@ -190,6 +204,19 @@ pub fn service_register(name: &str, description: &str, endpoint: usize) -> u32 {
     SERVICE_REGISTRY.register(service)
 }
 
+pub fn service_register_with_meta(
+    name: &str,
+    description: &str,
+    endpoint: usize,
+    version: Option<(u16,u16)>,
+    capabilities: Option<ServiceCapabilities>,
+) -> u32 {
+    let mut service = ServiceInfo::new(name, description, endpoint);
+    service.version = version;
+    service.capabilities = capabilities;
+    SERVICE_REGISTRY.register(service)
+}
+
 /// Unregister a service
 pub fn service_unregister(service_id: u32) -> bool {
     SERVICE_REGISTRY.unregister(service_id)
@@ -218,4 +245,39 @@ pub fn service_update_heartbeat_time(time: u64) {
 /// Check service health
 pub fn service_check_health(timeout: u64) -> Vec<u32> {
     SERVICE_REGISTRY.check_health(timeout)
+}
+
+pub fn service_stats_registrations() -> u64 {
+    SERVICE_REGISTRY.registrations.load(Ordering::SeqCst)
+}
+
+pub fn service_stats_lookups() -> u64 {
+    SERVICE_REGISTRY.lookups.load(Ordering::SeqCst)
+}
+
+pub fn service_stats_string() -> alloc::string::String {
+    use alloc::string::ToString;
+    let regs = SERVICE_REGISTRY.registrations.load(Ordering::SeqCst);
+    let lookups = SERVICE_REGISTRY.lookups.load(Ordering::SeqCst);
+    let services = SERVICE_REGISTRY.all_services();
+    let mut s = alloc::string::String::new();
+    s.push_str("# Service Registry Stats\n");
+    s.push_str(&("registrations: ".to_string() + &regs.to_string() + "\n"));
+    s.push_str(&("lookups: ".to_string() + &lookups.to_string() + "\n"));
+    s.push_str(&("services: ".to_string() + &services.len().to_string() + "\n\n"));
+    for info in services {
+        let ver = info.version.map(|(maj,min)| format!("{}.{}", maj, min)).unwrap_or_else(|| "n/a".to_string());
+        let caps = info.capabilities.map(|c| format!("0x{:08x}", c.bits())).unwrap_or_else(|| "n/a".to_string());
+        s.push_str(&format!(
+            "- [{}] id={} name={} ver={} caps={} desc={} deps={:?}\n",
+            match info.status { ServiceStatus::Active => "active", ServiceStatus::Inactive => "inactive", ServiceStatus::Failed => "failed", ServiceStatus::Suspended => "suspended" },
+            info.service_id,
+            info.name,
+            ver,
+            caps,
+            info.description,
+            info.dependencies,
+        ));
+    }
+    s
 }

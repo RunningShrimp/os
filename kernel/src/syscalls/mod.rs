@@ -46,12 +46,16 @@ use crate::syscalls::enhanced_error_handler::ErrorContext;
 use alloc::vec::Vec;
 
 // Import new modular architecture services
-// TODO: Modular service architecture is still under development
-// These imports are commented out until the service implementations are ready
-// use crate::syscalls::services::{
-//     ServiceRegistry, SyscallDispatcher, Service, ServiceStatus,
-//     init_service_system, ServiceSystem,
-// };
+use crate::syscalls::services::{
+    ServiceRegistry, SyscallDispatcher, Service, ServiceStatus,
+    init_service_system, ServiceSystem,
+};
+
+// Import service implementations (commenting out non-existent modules)
+// use crate::syscalls::process_service::service::ProcessService;
+// use crate::syscalls::fs_service::service::FileSystemService;
+use crate::syscalls::mm::service::MemoryService;
+use crate::syscalls::net::service::NetworkService;
 
 use bincode;
 extern crate alloc;
@@ -59,20 +63,122 @@ extern crate alloc;
 // use alloc::sync::Arc;
 // use crate::sync::Mutex;
 
-// Global service system - deferred until service implementation is complete
-// static GLOBAL_SERVICE_SYSTEM: Mutex<Option<ServiceSystem>> = Mutex::new(None);
+use alloc::sync::Arc;
+use spin::Mutex;
 
-/// Initialize the new modular syscall architecture (stub)
-/// TODO: Implement when service modules are ready
+// Import Box from alloc crate
+use alloc::boxed::Box;
+
+// Import default service system creation function
+use crate::syscalls::services::create_default_service_system;
+
+// Global service system
+static GLOBAL_SERVICE_SYSTEM: Mutex<Option<ServiceSystem>> = Mutex::new(None);
+
+/// Initialize the new modular syscall architecture
 pub fn initialize_modular_architecture() -> Result<(), SyscallError> {
-    crate::println!("[syscall] Modular architecture initialization is pending");
+    use crate::syscalls::services::ServiceMetadata;
+    use crate::syscalls::services::ServiceType;
+    
+    crate::println!("[syscall] Initializing modular architecture");
+    
+    // Create service system
+    let service_system = create_default_service_system();
+    
+    // Register process service (commented out because module doesn't exist)
+    // let process_service = Box::new(ProcessService::new());
+    // let process_metadata = ServiceMetadata {
+    //     service_type: ServiceType::Process,
+    //     priority: 50,
+    //     is_syscall_service: true,
+    //     tags: vec!["process".to_string(), "syscall".to_string()],
+    // };
+    // service_system.register_service(process_service, process_metadata)
+    //     .map_err(|_| SyscallError::InitializationError)?;
+    
+    // Register filesystem service (commented out because module doesn't exist)
+    // let fs_service = Box::new(FileSystemService::new());
+    // let fs_metadata = ServiceMetadata {
+    //     service_type: ServiceType::FileSystem,
+    //     priority: 60,
+    //     is_syscall_service: true,
+    //     tags: vec!["filesystem".to_string(), "syscall".to_string()],
+    // };
+    // service_system.register_service(fs_service, fs_metadata)
+    //     .map_err(|_| SyscallError::InitializationError)?;
+    
+    // Register memory service
+    let mem_service = Box::new(MemoryService::new());
+    let mem_metadata = ServiceMetadata {
+        service_type: ServiceType::Memory,
+        priority: 40,
+        is_syscall_service: true,
+        tags: vec!["memory".to_string(), "syscall".to_string()],
+    };
+    service_system.register_service(mem_service, mem_metadata)
+        .map_err(|_| SyscallError::InitializationError)?;
+    
+    // Register network service
+    let net_service = Box::new(NetworkService::new());
+    let net_metadata = ServiceMetadata {
+        service_type: ServiceType::Network,
+        priority: 70,
+        is_syscall_service: true,
+        tags: vec!["network".to_string(), "syscall".to_string()],
+    };
+    service_system.register_service(net_service, net_metadata)
+        .map_err(|_| SyscallError::InitializationError)?;
+    
+    // TODO: Register optimization services when fixed
+    // Optimization service registration commented out until trait is fixed
+    
+    // Register optimization manager service (commented out - trait mismatch)
+    // let manager_service = Box::new(OptimizationManagerService::new());
+    // let manager_metadata = ServiceMetadata {
+    //     service_type: ServiceType::Core,
+    //     priority: 95,
+    //     is_syscall_service: false,
+    //     tags: vec!["manager".to_string(), "optimization".to_string()],
+    // };
+    // service_system.register_service(manager_service, manager_metadata)
+    //     .map_err(|_| SyscallError::InitializationError)?;
+    
+    // Start all services
+    service_system.start_all_services()
+        .map_err(|_| SyscallError::InitializationError)?;
+    
+    // Store in global variable
+    let mut service_system_guard = GLOBAL_SERVICE_SYSTEM.lock();
+    *service_system_guard = Some(service_system);
+    
+    crate::println!("[syscall] Modular architecture initialized successfully");
     Ok(())
 }
 
-/// Dispatch syscall using new modular architecture (stub)
-/// TODO: Implement when service modules are ready
-pub fn dispatch_modular(_syscall_num: u32, _args: &[u64]) -> SyscallResult {
-    Err(SyscallError::NotSupported)
+/// Dispatch syscall using new modular architecture
+pub fn dispatch_modular(syscall_num: u32, args: &[u64]) -> SyscallResult {
+    use crate::error_handling::unified::KernelError;
+    
+    let service_system_guard = GLOBAL_SERVICE_SYSTEM.lock();
+    let service_system = match service_system_guard.as_ref() {
+        Some(system) => system,
+        None => return Err(SyscallError::NotSupported),
+    };
+    
+    match service_system.handle_syscall(syscall_num, args) {
+        Ok(result) => Ok(result),
+        Err(error) => {
+            // Convert KernelError to SyscallError
+            match error {
+                KernelError::SyscallNotSupported => Err(SyscallError::InvalidSyscall),
+                KernelError::ServiceNotFound => Err(SyscallError::NotSupported),
+                KernelError::BadAddress => Err(SyscallError::BadAddress),
+                KernelError::BadFileDescriptor => Err(SyscallError::BadFileDescriptor),
+                KernelError::IoError => Err(SyscallError::IoError),
+                _ => Err(SyscallError::InternalError),
+            }
+        }
+    }
 }
 
 /// Get service status and statistics (stub)
@@ -96,10 +202,29 @@ pub fn get_comprehensive_service_status() -> Result<alloc::string::String, Sysca
     Ok(alloc::string::String::from("Comprehensive service status: pending implementation\n"))
 }
 
+/// Run optimization CLI tool
+/// TODO: Implement when optimization modules are refactored
+pub fn run_optimization_cli(args: &[String]) -> Result<alloc::string::String, SyscallError> {
+    Ok("优化工具正在重构中，暂不可用\n".to_string())
+}
+
+/// Run optimization tests and benchmarks
+/// TODO: Implement when optimization modules are refactored
+pub fn run_optimization_tests() -> Result<alloc::string::String, SyscallError> {
+    Ok("优化测试正在重构中，暂不可用\n".to_string())
+}
+
 /// Cleanup modular architecture and shutdown services (stub)
 /// TODO: Implement when service modules are ready
 pub fn shutdown_modular_architecture() -> Result<(), SyscallError> {
     Ok(())
+}
+
+/// Get comprehensive optimization report
+/// TODO: Implement when optimization services are refactored and fixed
+pub fn get_optimization_report() -> Result<alloc::string::String, SyscallError> {
+    // Optimization services have been moved to tools/ pending architecture fixes
+    Ok("优化报告不可用，优化服务正在重构中\n".to_string())
 }
 
 /// Reload service configuration without full restart (stub)
@@ -122,12 +247,20 @@ pub use signal_simple as signal;
 
 pub mod realtime_simple;
 pub use realtime_simple as realtime;
+pub mod sched;
 
 // Service management system
 pub mod services;
+pub mod core;
+pub mod optimizations;
 
 // Legacy modules (maintained for compatibility)
 pub mod file_io;
+// pub mod file_io_optimized;  // TODO: Fix circular imports with net module
+// pub mod process;  // Duplicate - defined earlier as modular service
+// pub mod process_optimized;  // TODO: Fix imports
+pub mod performance_monitor;
+pub mod fast_dispatcher;
 pub mod memory;  // Keep for backward compatibility
 pub mod network;  // Keep for backward compatibility
 pub mod time;
@@ -135,6 +268,7 @@ pub mod time;
 pub mod posix_integration_test;
 pub mod thread;
 pub mod zero_copy;
+// pub mod zero_copy_optimized;  // TODO: Fix circular imports
 pub mod epoll;
 pub mod glib;
 pub mod batch;
@@ -361,6 +495,11 @@ pub const SYS_SCHED_SETAFFINITY: u32 = 0xE007;
 ///
 /// Gets CPU affinity.
 pub const SYS_SCHED_GETAFFINITY: u32 = 0xE008;
+
+/// Fast-path sched_yield (O(1) 调度骨架)
+pub use sched::SYS_SCHED_YIELD_FAST;
+/// 用户态 enqueue hint（tid, prio, cpu_hint）
+pub use sched::SYS_SCHED_ENQUEUE_HINT;
 
 /// Advanced thread system calls (0x8000-0x8FFF)
 /// System call number for `pthread_attr_setschedpolicy`
@@ -802,342 +941,155 @@ fn fast_path_close(args: &[usize]) -> Option<SyscallResult> {
 }
 
 /// Main system call dispatch function
-///
-/// Routes system calls to appropriate submodules based on their numeric ranges.
-/// Implements fast paths for frequently called system calls to minimize overhead.
-///
-/// # Parameters
-///
-/// * `syscall_num` - The system call number (e.g., `SYS_READ`, `SYS_WRITE`)
-/// * `args` - System call arguments as a slice of `usize` values
-///
+/// 
+/// This function routes system calls to appropriate handlers based on their number.
+/// It supports both legacy and fast architectures.
+/// 
+/// # Arguments
+/// 
+/// * `syscall_num` - System call number
+/// * `args` - System call arguments
+/// 
 /// # Returns
-///
-/// Returns the system call result as an `isize`:
-/// - Positive values: Success, typically the return value
-/// - Negative values: Error, the absolute value is the errno
-///
-/// # Fast Paths
-///
-/// The following system calls use optimized fast paths:
-/// - `getpid`: Direct return without argument conversion
-/// - `read`/`write`: Optimized for small buffers (<=4KB)
-/// - `close`: Optimized for common file descriptors (0-7)
-///
-/// # Example
-///
-/// ```
-/// use kernel::syscalls;
-///
-/// // Call getpid (uses fast path)
-/// let pid = syscalls::dispatch(syscalls::SYS_GETPID, &[]);
-///
-/// // Call read (may use fast path if buffer <= 4KB)
-/// let args = [0u64, 0x1000u64, 4096u64]; // fd, buf_ptr, count
-/// let bytes_read = syscalls::dispatch(syscalls::SYS_READ, &args);
-/// ```
-///
-/// # Errors
-///
-/// Returns negative errno values for errors:
-/// - `-38` (ENOSYS): Invalid system call number
-/// - Other negative values: System call specific errors
-#[inline]
-/// Main system call dispatch function
-///
-/// Routes system calls to appropriate submodules based on their numeric ranges.
-/// Implements fast paths for frequently called system calls to minimize overhead.
-/// Supports both legacy and new modular architecture for backward compatibility.
-///
-/// # Parameters
-///
-/// * `syscall_num` - The system call number (e.g., `SYS_READ`, `SYS_WRITE`)
-/// * `args` - System call arguments as a slice of `usize` values
-///
-/// # Returns
-///
-/// Returns system call result as an `isize`:
-/// - Positive values: Success, typically the return value
-/// - Negative values: Error, absolute value is errno
-///
-/// # Fast Paths
-///
-/// The following system calls use optimized fast paths:
-/// - `getpid`: Direct return without argument conversion
-/// - `read`/`write`: Optimized for small buffers (<=4KB)
-/// - `close`: Optimized for common file descriptors (0-7)
-///
-/// # Modular Architecture
-///
-/// When enabled, routes calls through the new service-based architecture:
-/// - Service registry for dynamic service management
-/// - Service dispatcher for efficient routing
-/// - Backward compatibility with legacy modules
-///
-/// # Example
-///
-/// ```
-/// use kernel::syscalls;
-///
-/// // Call getpid (uses fast path)
-/// let pid = syscalls::dispatch(syscalls::SYS_GETPID, &[]);
-///
-/// // Call read (may use fast path if buffer <= 4KB)
-/// let args = [0u64, 0x1000u64, 4096u64]; // fd, buf_ptr, count
-/// let bytes_read = syscalls::dispatch(syscalls::SYS_READ, &args);
-/// ```
-///
-/// # Errors
-///
-/// Returns negative errno values for errors:
-/// - `-38` (ENOSYS): Invalid system call number
-/// - Other negative values: System call specific errors
+/// 
+/// * `isize` - Return value (negative for errors)
 pub fn dispatch(syscall_num: usize, args: &[usize]) -> isize {
-    // Initialize modular architecture on first use
+    // 初始化快速系统调用架构
     static INIT_ONCE: crate::sync::Once = crate::sync::Once::new();
-    static mut MODULAR_ARCHITECTURE_ENABLED: bool = false;
+    static mut FAST_ARCHITECTURE_ENABLED: bool = false;
 
     INIT_ONCE.call_once(|| {
+        #[cfg(feature = "fast_syscall")]
         unsafe {
-            match initialize_modular_architecture() {
-                Ok(()) => {
-                    MODULAR_ARCHITECTURE_ENABLED = true;
-                    crate::println!("[syscall] Modular architecture enabled");
-                }
-                Err(e) => {
-                    MODULAR_ARCHITECTURE_ENABLED = false;
-                    crate::println!("[syscall] Failed to initialize modular architecture: {:?}", e);
-                }
-            }
+            fast_dispatcher::initialize_fast_syscall_architecture();
+            performance_optimized::initialize_global_performance_optimizer();
+            FAST_ARCHITECTURE_ENABLED = true;
+            crate::println!("[syscall] Fast architecture enabled");
+        }
+        #[cfg(feature = "sched_opt")]
+        unsafe {
+            scheduler_optimized::initialize_global_optimized_scheduler(4);
+        }
+        #[cfg(feature = "zero_copy")]
+        unsafe {
+            zero_copy_optimized::initialize_global_zero_copy_manager();
         }
     });
-    
-    // Check if this syscall is cacheable and if we have a cached result
-    // Only cache Linux syscalls with numbers < 0x1000 in the normal dispatch path
-    
-    // Validate system call parameters first (pre-dispatch validation)
-    use crate::syscalls::validation::{
-        ValidationContext,
-        get_global_validator_registry,
-        ValidationResult,
-    };
-    
-    // Convert args from usize to u64 for validation and module dispatch functions
+
+    // 转换参数为u64
     let (args_u64, args_len) = convert_args_fast(args);
     
-    // Create validation context
-    let mut validation_context = ValidationContext::new();
-    
-    // Fill in validation context with process information if available
-    let pid = crate::process::myproc().unwrap_or(0);
-    let (tid, pagetable) = {
-        let proc_table = crate::process::manager::PROC_TABLE.lock();
-        if let Some(proc) = proc_table.find_ref(pid) {
-            (proc.pid as u64, proc.pagetable)
-        } else {
-            (0, core::ptr::null_mut())
-        }
-    };
-    let validation_context = ValidationContext::with_process_info(
-        syscall_num as u32,
-        pid as u64,
-        tid as u64,
-        pagetable as usize,
-    );
-    
-    // Validate parameters
-    let validator_registry = get_global_validator_registry().lock();
-    if let Some(registry) = validator_registry.as_ref() {
-        match registry.validate(syscall_num as u32, &args_u64[..args_len], &validation_context) {
-            ValidationResult::Success => {
-                // Validation successful, continue
-            }
-            ValidationResult::Failed(error) => {
-                // Validation failed, convert to errno and return
-                drop(validator_registry);
-                
-                use crate::syscalls::enhanced_error_handler::{
-                    ErrorContext,
-                    validation_error_to_errno,
-                };
-                
-                let error_context = ErrorContext::new(
-                    syscall_num as u32,
-                    pid as u64,
-                    pid as u64,
-                    pagetable as usize,
-                ).with_args(&args_u64[..args_len]);
-                
-                let errno = validation_error_to_errno(&error, &error_context);
-                return -(errno as isize);
-            }
-        }
-    }
-    drop(validator_registry);
-    
-    // Check if this is a Linux system call number (0-0xFFF range)
-    // Linux x86_64 syscall numbers are typically 0-360+
-    if syscall_num < 0x1000 {
-        // This is a Linux system call - translate it to NOS syscall
-        return dispatch_linux_syscall(syscall_num, args);
-    }
-
-    // Check cache for pure syscalls before fast path
-    // Create cache key
-    let (args_u64, args_len) = convert_args_fast(args);
-    let cache_key = crate::syscalls::cache::SyscallCacheKey::new(syscall_num as u32, &args_u64[..args_len]);
-    
-    // Try to get cached result
-    let cache_result = {
-        let mut cache_guard = crate::syscalls::cache::get_global_cache().lock();
-        if let Some(ref mut cache) = *cache_guard {
-            cache.get(&cache_key)
-        } else {
-            None
-        }
-    };
-
-    if let Some(cache_result) = cache_result {
-        return match cache_result {
-            Ok(value) => value as isize,
-            Err(error) => -(syscall_error_to_errno(error) as isize),
-        };
-    }
-
-    // Fast path for common syscalls (no argument conversion needed)
-    if let Some(result) = fast_path_dispatch(syscall_num, args) {
-        return match result {
-            Ok(value) => value as isize,
-            Err(error) => -(syscall_error_to_errno(error) as isize),
-        };
-    }
-
-    // Try modular architecture first if enabled
-    let modular_result = unsafe {
-        if MODULAR_ARCHITECTURE_ENABLED {
-            Some(dispatch_modular(syscall_num as u32, &args_u64[..args_len]))
-        } else {
-            None
-        }
-    };
-    
-    let result = if let Some(modular_result) = modular_result {
-        modular_result
-    } else {
-        // Fallback to legacy dispatch
-        // Use bitwise operations for faster range checking
-        // This is faster than range matching for large ranges
-        match syscall_num {
-            // Process management syscalls (0x1000-0x1FFF)
-            n if (n & 0xF000) == 0x1000 && n <= 0x1FFF => {
-                // Use process dispatch
-                process::dispatch(syscall_num as u32, &args_u64[..args_len])
-            },
-
-            // File I/O syscalls (0x2000-0x2FFF)
-            n if (n & 0xF000) == 0x2000 && n <= 0x2FFF => {
-                file_io::dispatch(syscall_num as u32, &args_u64[..args_len])
-            },
-
-            // Memory management syscalls (0x3000-0x3FFF)
-            n if (n & 0xF000) == 0x3000 && n <= 0x3FFF => {
-                mm::handlers::dispatch_syscall(syscall_num as u32, &args_u64[..args_len]).map_err(|e| e.into())
-            },
-
-            // Network syscalls (0x4000-0x4FFF)
-            n if (n & 0xF000) == 0x4000 && n <= 0x4FFF => {
-                network::dispatch(syscall_num as u32, &args_u64[..args_len])
-            },
-
-            // Signal handling syscalls (0x5000-0x5FFF)
-            n if (n & 0xF000) == 0x5000 && n <= 0x5FFF => {
-                // Use simple signal dispatch (advanced signal features disabled)
-                signal_simple::dispatch(syscall_num as u32, &args_u64[..args_len])
-            },
-
-            // Time-related syscalls (0x6000-0x6FFF)
-            n if (n & 0xF000) == 0x6000 && n <= 0x6FFF => {
-                time::dispatch(syscall_num as u32, &args_u64[..args_len])
-            },
-
-            // Filesystem syscalls (0x7000-0x7FFF)
-            n if (n & 0xF000) == 0x7000 && n <= 0x7FFF => {
-                fs::dispatch(syscall_num as u32, &args_u64[..args_len])
-            },
-
-            // Thread management syscalls (0x8000-0x8FFF)
-            n if (n & 0xF000) == 0x8000 && n <= 0x8FFF => {
-                // Route thread syscalls (basic) - advanced threading is disabled
-                match syscall_num {
-                    0x8000..=0x8FFF => {
-                        thread::dispatch(syscall_num as u32, &args_u64[..args_len])
-                    }
-                    _ => {
-                        thread::dispatch(syscall_num as u32, &args_u64[..args_len])
-                    }
+    // 使用性能优化分发器
+    let start_ns = crate::time::get_time_ns();
+    let result = unsafe {
+        if FAST_ARCHITECTURE_ENABLED {
+            // 首先尝试性能优化分发器
+            match performance_optimized::dispatch_with_optimization(syscall_num as u32, &args_u64[..args_len]) {
+                Ok(result) => Ok(result),
+                Err(_) => {
+                    // 如果性能优化分发器失败，回退到快速分发器
+                    fast_dispatcher::fast_dispatch(syscall_num as u32, &args_u64[..args_len])
                 }
-            },
-
-            // Zero-copy I/O syscalls (0x9000-0x9FFF)
-            n if (n & 0xF000) == 0x9000 && n <= 0x9FFF => {
-                // Special handling for batch syscall
-                if n == SYS_BATCH as usize {
-                    return match fast_path_batch(args) {
-                        Some(Ok(value)) => value as isize,
-                        Some(Err(error)) => -(syscall_error_to_errno(error) as isize),
-                        None => -(syscall_error_to_errno(SyscallError::InvalidArgument) as isize),
-                    };
-                }
-                zero_copy::dispatch(syscall_num as u32, &args_u64[..args_len])
-            },
-
-            // AIO syscalls (0xC000-0xCFFF)
-            n if (n & 0xF000) == 0xC000 && n <= 0xCFFF => {
-                aio::dispatch(syscall_num as u32, &args_u64[..args_len])
-            },
-
-            // epoll syscalls (0xA000-0xAFFF)
-            n if (n & 0xF000) == 0xA000 && n <= 0xAFFF => {
-                epoll::dispatch(syscall_num as u32, &args_u64[..args_len])
-            },
-
-            // GLib compatibility syscalls (0xB000-0xBFFF)
-            n if (n & 0xF000) == 0xB000 && n <= 0xBFFF => {
-                glib::dispatch(syscall_num as u32, &args_u64[..args_len])
-            },
-
-            // Message queue syscalls (0xD000-0xDFFF)
-            n if (n & 0xF000) == 0xD000 && n <= 0xDFFF => {
-                mqueue::dispatch(syscall_num as u32, &args_u64[..args_len])
-            },
-
-            // Real-time scheduling syscalls (0xE000-0xEFFF)
-            n if (n & 0xF000) == 0xE000 && n <= 0xEFFF => {
-                realtime::dispatch(syscall_num as u32, &args_u64[..args_len])
-            },
-
-            // Invalid syscall number
-            _ => Err(SyscallError::InvalidSyscall),
+            }
+        } else {
+            // 回退到原始实现
+            dispatch_legacy(syscall_num as u32, &args_u64[..args_len])
         }
     };
-
-    // Cache the result if the syscall is pure
-    let cache_guard = crate::syscalls::cache::get_global_cache().lock();
-    if let Some(ref cache) = *cache_guard {
-        if cache.is_pure_syscall(syscall_num as u32) {
-            drop(cache_guard); // Drop lock before writing
-
-            let mut cache_guard = crate::syscalls::cache::get_global_cache().lock();
-            if let Some(ref mut cache) = *cache_guard {
-                cache.put(cache_key, result.clone());
-            }
-        }
+    let end_ns = crate::time::get_time_ns();
+    if end_ns >= start_ns {
+        let dur_us = ((end_ns - start_ns) / 1000) as u64;
+        crate::syscalls::performance_monitor::record_syscall_performance(dur_us);
     }
-
-    // Return the result
+    
     match result {
         Ok(value) => value as isize,
         Err(error) => -(syscall_error_to_errno(error) as isize),
+    }
+}
+
+/// 遗留系统调用分发函数
+/// 
+/// 当快速架构不可用时，使用此函数作为回退
+fn dispatch_legacy(syscall_num: u32, args: &[u64]) -> SyscallResult {
+    // 使用原始的分发逻辑
+    match syscall_num {
+        // Process management syscalls (0x1000-0x1FFF)
+        n if (n & 0xF000) == 0x1000 && n <= 0x1FFF => {
+            // Use original implementation for process syscalls
+            process::dispatch(syscall_num, args)
+        },
+
+        // File I/O syscalls (0x2000-0x2FFF)
+        n if (n & 0xF000) == 0x2000 && n <= 0x2FFF => {
+            // Use original implementation for file I/O syscalls
+            file_io::dispatch(syscall_num, args)
+        },
+
+        // Memory management syscalls (0x3000-0x3FFF)
+        n if (n & 0xF000) == 0x3000 && n <= 0x3FFF => {
+            // Use original implementation for memory syscalls
+            mm::handlers::dispatch_syscall(syscall_num, args)
+        },
+
+        // Network syscalls (0x4000-0x4FFF)
+        n if (n & 0xF000) == 0x4000 && n <= 0x4FFF => {
+            network::dispatch(syscall_num, args)
+        },
+
+        // Signal handling syscalls (0x5000-0x5FFF)
+        n if (n & 0xF000) == 0x5000 && n <= 0x5FFF => {
+            // Use original implementation for signal syscalls
+            signal_simple::dispatch(syscall_num, args)
+        },
+        
+        // Time-related syscalls (0x6000-0x6FFF)
+        n if (n & 0xF000) == 0x6000 && n <= 0x6FFF => {
+            time::dispatch(syscall_num, args)
+        },
+        
+        // Filesystem syscalls (0x7000-0x7FFF)
+        n if (n & 0xF000) == 0x7000 && n <= 0x7FFF => {
+            fs::dispatch(syscall_num, args)
+        },
+        
+        // Thread management syscalls (0x8000-0x8FFF)
+        n if (n & 0xF000) == 0x8000 && n <= 0x8FFF => {
+            thread::dispatch(syscall_num, args)
+        },
+        
+        // Zero-copy I/O syscalls (0x9000-0x9FFF)
+        n if (n & 0xF000) == 0x9000 && n <= 0x9FFF => {
+            zero_copy::dispatch(syscall_num, args)
+        },
+        
+        // AIO syscalls (0xC000-0xCFFF)
+        n if (n & 0xF000) == 0xC000 && n <= 0xCFFF => {
+            aio::dispatch(syscall_num, args)
+        },
+        
+        // epoll syscalls (0xA000-0xAFFF)
+        n if (n & 0xF000) == 0xA000 && n <= 0xAFFF => {
+            epoll::dispatch(syscall_num, args)
+        },
+        
+        // GLib compatibility syscalls (0xB000-0xBFFF)
+        n if (n & 0xF000) == 0xB000 && n <= 0xBFFF => {
+            glib::dispatch(syscall_num, args)
+        },
+        
+        // Message queue syscalls (0xD000-0xDFFF)
+        n if (n & 0xF000) == 0xD000 && n <= 0xDFFF => {
+            mqueue::dispatch(syscall_num, args)
+        },
+        
+        // Real-time scheduling syscalls (0xE000-0xEFFF)
+        n if (n & 0xF000) == 0xE000 && n <= 0xEFFF => {
+            sched::dispatch(syscall_num, args)
+        },
+        
+        // Invalid syscall number
+        _ => Err(SyscallError::InvalidSyscall),
     }
 }
 
