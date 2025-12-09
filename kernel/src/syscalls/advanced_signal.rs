@@ -268,6 +268,8 @@ fn sys_sigwaitinfo(args: &[u64]) -> SyscallResult {
         Err(SignalWaitError::ProcessNotFound) => Err(SyscallError::NotFound),
         Err(SignalWaitError::Interrupted) => Err(SyscallError::Interrupted),
         Err(SignalWaitError::InvalidMask) => Err(SyscallError::InvalidArgument),
+        Err(SignalWaitError::Timeout) => Err(SyscallError::TimedOut),
+        Err(SignalWaitError::InvalidTimeout) => Err(SyscallError::InvalidArgument),
     }
 }
 

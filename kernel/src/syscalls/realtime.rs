@@ -95,6 +95,7 @@ fn sys_sched_setscheduler(args: &[u64]) -> SyscallResult {
         Err(SchedError::InvalidPriority) => Err(SyscallError::InvalidArgument),
         Err(SchedError::InvalidAffinity) => Err(SyscallError::InvalidArgument),
         Err(SchedError::ProcessNotFound) => Err(SyscallError::NotFound),
+        Err(_) => Err(SyscallError::InvalidArgument),
         Err(SchedError::PermissionDenied) => Err(SyscallError::PermissionDenied),
         Err(SchedError::NotSupported) => Err(SyscallError::NotSupported),
     }
@@ -128,6 +129,8 @@ fn sys_sched_getscheduler(args: &[u64]) -> SyscallResult {
     match sched_getscheduler(pid) {
         Ok(policy) => Ok(policy as u64),
         Err(SchedError::ProcessNotFound) => Err(SyscallError::NotFound),
+        Err(_) => Err(SyscallError::InvalidArgument),
+        Err(_) => Err(SyscallError::InvalidArgument),
     }
 }
 
@@ -191,6 +194,7 @@ fn sys_sched_setparam(args: &[u64]) -> SyscallResult {
         Ok(()) => Ok(0),
         Err(SchedError::InvalidPriority) => Err(SyscallError::InvalidArgument),
         Err(SchedError::ProcessNotFound) => Err(SyscallError::NotFound),
+        Err(_) => Err(SyscallError::InvalidArgument),
         Err(SchedError::PermissionDenied) => Err(SyscallError::PermissionDenied),
         Err(SchedError::InvalidAffinity) => Err(SyscallError::InvalidArgument),
         Err(SchedError::InvalidPolicy) => Err(SyscallError::InvalidArgument),
@@ -255,6 +259,7 @@ fn sys_sched_getparam(args: &[u64]) -> SyscallResult {
             Ok(0)
         }
         Err(SchedError::ProcessNotFound) => Err(SyscallError::NotFound),
+        Err(_) => Err(SyscallError::InvalidArgument),
     }
 }
 
@@ -360,6 +365,7 @@ fn sys_sched_rr_get_interval(args: &[u64]) -> SyscallResult {
             Ok(0)
         }
         Err(SchedError::ProcessNotFound) => Err(SyscallError::NotFound),
+        Err(_) => Err(SyscallError::InvalidArgument),
         Err(SchedError::InvalidPolicy) => Err(SyscallError::InvalidArgument),
     }
 }
@@ -426,6 +432,7 @@ fn sys_sched_setaffinity(args: &[u64]) -> SyscallResult {
         Ok(()) => Ok(0),
         Err(SchedError::InvalidAffinity) => Err(SyscallError::InvalidArgument),
         Err(SchedError::ProcessNotFound) => Err(SyscallError::NotFound),
+        Err(_) => Err(SyscallError::InvalidArgument),
         Err(SchedError::PermissionDenied) => Err(SyscallError::PermissionDenied),
         Err(SchedError::InvalidPolicy) => Err(SyscallError::InvalidArgument),
         Err(SchedError::NotSupported) => Err(SyscallError::NotSupported),
@@ -492,6 +499,7 @@ fn sys_sched_getaffinity(args: &[u64]) -> SyscallResult {
             Ok(0)
         }
         Err(SchedError::ProcessNotFound) => Err(SyscallError::NotFound),
+        Err(_) => Err(SyscallError::InvalidArgument),
     }
 }
 

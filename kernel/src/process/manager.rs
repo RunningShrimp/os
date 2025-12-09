@@ -963,15 +963,18 @@ pub fn fork() -> Option<Pid> {
     
     // Set return value to 0 for child process (architecture-specific register)
     unsafe {
-        if cfg!(target_arch = "riscv64") {
+        #[cfg(target_arch = "riscv64")]
+        {
             (*child.trapframe).a0 = 0;
         }
 
-        if cfg!(target_arch = "aarch64") {
+        #[cfg(target_arch = "aarch64")]
+        {
             (*child.trapframe).regs[0] = 0; // On aarch64, a0 is regs[0]
         }
 
-        if cfg!(target_arch = "x86_64") {
+        #[cfg(target_arch = "x86_64")]
+        {
             (*child.trapframe).rax = 0; // On x86_64, rax is the return value register
         }
     }
