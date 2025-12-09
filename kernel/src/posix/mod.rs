@@ -1446,9 +1446,9 @@ pub mod semaphore;
 pub mod mqueue;
 pub mod shm;
 pub mod timer;
-// pub mod advanced_signal;  // Temporarily disabled for compilation
-// pub mod realtime;  // Temporarily disabled due to match exhaustiveness issues
-// pub mod advanced_thread;  // Temporarily disabled for compilation
+pub mod advanced_signal;
+pub mod realtime;
+pub mod advanced_thread;
 pub mod security;
 // pub mod advanced_tests;  // Temporarily disabled
 // pub mod integration_tests;  // Temporarily disabled
