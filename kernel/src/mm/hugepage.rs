@@ -2,7 +2,7 @@
 
 extern crate alloc;
 
-use core::alloc::Layout;
+
 use core::ptr::null_mut;
 
 use crate::mm::buddy;

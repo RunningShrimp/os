@@ -1,11 +1,12 @@
 //! UEFI 2.10 Implementation
 //!
 //! This module provides a comprehensive UEFI 2.10 implementation for the NOS bootloader,
-//! supporting all major UEFI protocols and features.
+//! supporting all major UEFI protocols and features with GOP mode caching.
+
+extern crate alloc;
 
 pub mod main;
 pub mod memory;
-pub mod protocol;
 pub mod secure_boot;
 
 // Re-export main components
@@ -21,6 +22,101 @@ pub use super::protocol::uefi::*;
 // Version information
 pub const UEFI_VERSION_MAJOR: u16 = 2;
 pub const UEFI_VERSION_MINOR: u16 = 10;
+
+/// UEFI system table cache to avoid repeated acquire calls
+#[cfg(feature = "uefi_support")]
+pub struct SystemTableCache {
+    cached: bool,
+    firmware_vendor: Option<alloc::string::String>,
+    firmware_revision: u32,
+}
+
+#[cfg(feature = "uefi_support")]
+impl SystemTableCache {
+    /// Create new system table cache
+    pub fn new() -> Self {
+        Self {
+            cached: false,
+            firmware_vendor: None,
+            firmware_revision: 0,
+        }
+    }
+
+    /// Cache system table information
+    pub fn cache(&mut self, vendor: alloc::string::String, revision: u32) {
+        self.firmware_vendor = Some(vendor);
+        self.firmware_revision = revision;
+        self.cached = true;
+    }
+
+    /// Get cached vendor string
+    pub fn vendor(&self) -> Option<&str> {
+        self.firmware_vendor.as_ref().map(|s| s.as_str())
+    }
+
+    /// Get cached revision
+    pub fn revision(&self) -> u32 {
+        self.firmware_revision
+    }
+
+    /// Check if cached
+    pub fn is_cached(&self) -> bool {
+        self.cached
+    }
+}
+    pub mode_id: u32,
+    pub width: u32,
+    pub height: u32,
+    pub pixel_format: u32,
+    pub cached: bool,
+}
+
+/// UEFI GOP Mode cache
+pub struct GopModeCache {
+    entries: [Option<GopModeCacheEntry>; 16],
+    size: usize,
+}
+
+impl GopModeCache {
+    /// Create new GOP mode cache
+    pub fn new() -> Self {
+        Self {
+            entries: [None; 16],
+            size: 0,
+        }
+    }
+
+    /// Get cached mode info
+    pub fn get(&self, mode_id: u32) -> Option<GopModeCacheEntry> {
+        for i in 0..self.size {
+            if let Some(entry) = self.entries[i] {
+                if entry.mode_id == mode_id && entry.cached {
+                    return Some(entry);
+                }
+            }
+        }
+        None
+    }
+
+    /// Add mode to cache
+    pub fn add(&mut self, entry: GopModeCacheEntry) -> Result<(), BootError> {
+        if self.size < 16 {
+            self.entries[self.size] = Some(entry);
+            self.size += 1;
+            Ok(())
+        } else {
+            Err(BootError::HardwareError("GOP mode cache full"))
+        }
+    }
+
+    /// Clear cache
+    pub fn clear(&mut self) {
+        for i in 0..self.size {
+            self.entries[i] = None;
+        }
+        self.size = 0;
+    }
+}
 
 /// UEFI specification revision
 pub fn uefi_spec_revision() -> (u16, u16) {

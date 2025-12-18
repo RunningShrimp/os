@@ -6,7 +6,7 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use alloc::string::String;
-use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicU64, Ordering};
 use crate::sync::Mutex;
 
 /// Health check status

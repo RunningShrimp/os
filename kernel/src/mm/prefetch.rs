@@ -11,7 +11,6 @@ extern crate alloc;
 
 use alloc::{
     collections::{BTreeMap, VecDeque},
-    string::String,
     vec::Vec,
 };
 use crate::sync::Mutex;

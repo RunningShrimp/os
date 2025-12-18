@@ -27,11 +27,11 @@ pub extern "C" fn main() -> ! {
     } else {
         // parent: write large data to fill and block, then resume after child reads
         let chunk = [0xAAu8; 256];
-        let mut wrote = 0usize;
+        let mut _wrote = 0usize;
         for _ in 0..(PIPE_TARGET()) {
             let n = write(pfds[1], chunk.as_ptr(), chunk.len());
             if n < 0 { break; }
-            wrote += n as usize;
+            _wrote += n as usize;
         }
         // poll for readability on reader side
         let mut pfd = [PollFd{fd: pfds[0], events: user::POLLIN, revents: 0}];

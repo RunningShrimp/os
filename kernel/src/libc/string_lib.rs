@@ -12,6 +12,7 @@ use core::ffi::{c_char, c_int, c_void, c_double};
 
 pub type SizeT = usize;
 
+#[allow(non_camel_case_types)]
 pub type size_t = SizeT;
 use crate::libc::error::set_errno;
 use crate::libc::error::errno::EINVAL;
@@ -727,8 +728,11 @@ impl Default for EnhancedStringLib {
 
 // 类型别名
 pub type CLong = isize;
+#[allow(non_camel_case_types)]
 pub type c_long = CLong;
-pub type c_ulong = usize;
+pub type CUlong = usize;
+#[allow(non_camel_case_types)]
+pub type c_ulong = CUlong;
 
 // 导出全局字符串处理库实例
 pub static STRING_LIB: EnhancedStringLib = EnhancedStringLib;

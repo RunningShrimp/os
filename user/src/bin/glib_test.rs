@@ -13,26 +13,25 @@
 #![no_main]
 
 extern crate alloc;
-use user::glib::*;
-use user::glib::error::*;
-use user::glib::collections::*;
-use user::glib::string::*;
-use user::glib::utils::*;
+use user::glib::{init, cleanup, g_malloc, g_malloc0, g_realloc, g_free, g_strdup, strlen, g_utf8_validate, g_strcmp0, g_ascii_strcasecmp, g_path_dirname, g_path_basename, GList, GSList, GHashTable, GQueue, GPtrArray, GTimeVal_, gpointer, gconstpointer, gboolean, g_slice_free1, get_memory_stats, check_memory_leaks, g_strndup};
+// 使用user::println函数而不是宏
+use user::glib::string::{GString};
+use user::glib::utils::{math, bit_ops, g_random_set_seed, g_random_int, g_random_int_range, g_random_double, g_random_double_range, G_PI};
+use user::glib::time::{g_time, g_get_current_time, g_get_monotonic_time, g_get_real_time};
 
 use core::ptr;
-use core::ffi::c_void;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn main() -> i32 {
-    println!("=== NOS GLib Test Program ===");
+    user::println("=== NOS GLib Test Program ===");
 
     // 初始化GLib
-    match glib::init() {
+    match init() {
         Ok(_) => {
-            println!("✓ GLib initialized successfully");
+            user::println("✓ GLib initialized successfully");
         }
         Err(e) => {
-            println!("✗ GLib initialization failed: {:?}", e);
+            user::println("✗ GLib initialization failed: {:?}", e);
             return 1;
         }
     }
@@ -56,14 +55,14 @@ pub extern "C" fn main() -> i32 {
     test_utility_functions();
 
     // 清理GLib
-    glib::cleanup();
+    cleanup();
 
-    println!("=== GLib Test Complete ===");
+    user::println("=== GLib Test Complete ===");
     0
 }
 
 fn test_memory_management() {
-    println!("\n--- Testing Memory Management ---");
+    user::println("\n--- Testing Memory Management ---");
 
     // 测试基本内存分配
     let ptr = g_malloc(100);
@@ -95,22 +94,22 @@ fn test_memory_management() {
     // 释放内存
     g_free(realloc_ptr);
     g_free(zero_ptr);
-    g_free(batch_ptr as gpointer);
-    unsafe { g_slice_free(64, slice_ptr); }
+    g_free(batch_ptr);
+    unsafe { g_slice_free1(64, slice_ptr); }
 
-    println!("✓ Memory management tests passed");
+    user::println("✓ Memory management tests passed");
 
     // 检查内存统计
     let stats = get_memory_stats();
-    println!("  Total allocations: {}", stats.total_allocations.load(core::sync::atomic::Ordering::SeqCst));
-    println!("  Current allocated: {} bytes", stats.current_allocated.load(core::sync::atomic::Ordering::SeqCst));
+    user::println("  Total allocations: {}", stats.total_allocations.load(core::sync::atomic::Ordering::SeqCst));
+    user::println("  Current allocated: {} bytes", stats.current_allocated.load(core::sync::atomic::Ordering::SeqCst));
 
     let leaks = check_memory_leaks();
-    println!("  Memory leaks: {}", leaks);
+    user::println("  Memory leaks: {}", leaks);
 }
 
 fn test_data_structures() {
-    println!("\n--- Testing Data Structures ---");
+    user::println("\n--- Testing Data Structures ---");
 
     // 测试链表
     test_linked_lists();
@@ -124,7 +123,7 @@ fn test_data_structures() {
     // 测试指针数组
     test_pointer_arrays();
 
-    println!("✓ Data structure tests passed");
+    user::println("✓ Data structure tests passed");
 }
 
 fn test_linked_lists() {
@@ -157,7 +156,7 @@ fn test_linked_lists() {
 
     GSList::free(slist);
 
-    println!("  ✓ Linked lists tests passed");
+    user::println("  ✓ Linked lists tests passed");
 }
 
 fn test_hash_tables() {
@@ -189,7 +188,7 @@ fn test_hash_tables() {
 
     GHashTable::destroy(table);
 
-    println!("  ✓ Hash table tests passed");
+    user::println("  ✓ Hash table tests passed");
 }
 
 fn test_queues() {
@@ -212,7 +211,7 @@ fn test_queues() {
 
     GQueue::free(queue);
 
-    println!("  ✓ Queue tests passed");
+    user::println("  ✓ Queue tests passed");
 }
 
 fn test_pointer_arrays() {
@@ -239,11 +238,11 @@ fn test_pointer_arrays() {
 
     GPtrArray::free(array);
 
-    println!("  ✓ Pointer array tests passed");
+    user::println("  ✓ Pointer array tests passed");
 }
 
 fn test_string_operations() {
-    println!("\n--- Testing String Operations ---");
+    user::println("\n--- Testing String Operations ---");
 
     // 测试GString创建
     let gstring = GString::new("Hello");
@@ -295,7 +294,7 @@ fn test_string_operations() {
     assert_eq!(g_utf8_validate(valid_utf8.as_ptr() as *const i8, -1), 1);
 
     let invalid_utf8 = b"\xFF\xFE\xFD";
-    assert_eq!(g_utf8_validate(invalid_utf8.as_ptr() as *const i8, invalid_utf8.len()), 0);
+    assert_eq!(g_utf8_validate(invalid_utf8.as_ptr() as *const i8, invalid_utf8.len() as isize), 0);
 
     // 测试字符串比较
     assert_eq!(g_strcmp0("Hello".as_ptr() as *const i8, "Hello".as_ptr() as *const i8), 0);
@@ -331,11 +330,11 @@ fn test_string_operations() {
     g_free(dirname as gpointer);
     g_free(basename as gpointer);
 
-    println!("  ✓ String operation tests passed");
+    user::println("  ✓ String operations tests passed");
 }
 
 fn test_math_functions() {
-    println!("\n--- Testing Math Functions ---");
+    user::println("\n--- Testing Math Functions ---");
 
     assert_eq!(math::g_abs(-5), 5);
     assert_eq!(math::g_max(3, 7), 7);
@@ -352,36 +351,36 @@ fn test_math_functions() {
     assert!((math::g_sin(angle) - 0.7071).abs() < 0.01);
     assert!((math::g_cos(angle) - 0.7071).abs() < 0.01);
 
-    println!("  ✓ Math function tests passed");
+    user::println("  ✓ Math function tests passed");
 }
 
 fn test_time_functions() {
-    println!("\n--- Testing Time Functions ---");
+    user::println("\n--- Testing Time Functions ---");
 
     // 测试基本时间获取
     let mut time_val = 0i32;
-    let current_time = time::g_time(&mut time_val);
+    let current_time = g_time(&mut time_val);
     assert!(current_time > 0);
     assert!(time_val > 0);
 
     // 测试高精度时间
     let mut tv = GTimeVal_ { tv_sec: 0, tv_usec: 0 };
-    time::g_get_current_time(&mut tv);
+    g_get_current_time(&mut tv);
     assert!(tv.tv_sec > 0);
 
     // 测试单调时间
-    let monotonic_time = time::g_get_monotonic_time();
+    let monotonic_time = g_get_monotonic_time();
     assert!(monotonic_time > 0);
 
     // 测试实时时间
-    let real_time = time::g_get_real_time();
+    let real_time = g_get_real_time();
     assert!(real_time > 0);
 
-    println!("  ✓ Time function tests passed");
+    user::println("  ✓ Time function tests passed");
 }
 
 fn test_utility_functions() {
-    println!("\n--- Testing Utility Functions ---");
+    user::println("\n--- Testing Utility Functions ---");
 
     // 测试随机数生成
     g_random_set_seed(12345);
@@ -406,7 +405,7 @@ fn test_utility_functions() {
     let net_val = bit_ops::g_htonl(host_val);
     assert_eq!(bit_ops::g_ntohl(net_val), host_val);
 
-    println!("  ✓ Utility function tests passed");
+    user::println("  ✓ Utility function tests passed");
 }
 
 // 简化的时间实现
@@ -418,7 +417,7 @@ pub mod time {
         TIMESTAMP.fetch_add(1, Ordering::SeqCst)
     }
 
-    pub fn sleep(duration: core::time::Duration) {
+    pub fn sleep(_duration: core::time::Duration) {
         // 简化实现：实际实现中会使用系统调用
         use core::sync::atomic::{AtomicU64, Ordering};
         static SLEEP_COUNT: AtomicU64 = AtomicU64::new(0);

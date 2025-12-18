@@ -7,7 +7,7 @@
 //! - Barrier synchronization primitives
 //! - Spinlock synchronization primitives
 
-use crate::posix::{Pid, ClockId, Timespec};
+use crate::posix::{Pid, ClockId};
 use crate::sync::Mutex;
 use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicUsize, AtomicU64, Ordering};

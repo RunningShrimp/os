@@ -1,0 +1,48 @@
+[package]
+name = "nos-memory-management"
+version = "0.1.0"
+edition = "2024"
+authors = ["NOS Developers"]
+description = "NOS Memory Management - Physical and virtual memory management"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/nos/nos-memory-management"
+keywords = ["nos", "memory", "mmu", "os"]
+categories = ["os", "no-std"]
+
+[dependencies]
+# Core dependencies
+nos-api = { workspace = true, features = ["alloc"] }
+spin = { workspace = true }
+
+# External dependencies
+log = { workspace = true, optional = true }
+bitflags = { workspace = true }
+static_assertions = { workspace = true }
+criterion = { workspace = true, optional = true }
+
+[features]
+default = []
+std = []
+alloc = []
+log = ["dep:log"]
+debug_subsystems = []
+formal_verification = []
+security_audit = []
+
+# Feature flags for conditional compilation
+minimal = []
+embedded = ["alloc"]
+server = ["alloc", "log"]
+desktop = ["alloc", "log"]
+
+[lib]
+name = "nos_memory_management"
+path = "src/lib.rs"
+
+[[bench]]
+name = "mm_benchmarks"
+harness = false
+
+[[test]]
+name = "mm_tests"
+path = "tests/mm_tests.rs"

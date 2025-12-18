@@ -6,20 +6,28 @@
 //! - 错误码定义
 //! - 错误消息格式化
 
-#![no_std]
+
 
 extern crate alloc;
 
 use alloc::string::String;
 use core::ffi::c_int;
-use crate::glib::types::*;
 
 /// GLib错误域类型
 pub type GQuark = u32;
 
-impl GQuark {
+/// GQuark扩展trait
+pub trait GQuarkExt {
     /// 从字符串创建错误域
-    pub fn from_string(string: &str) -> GQuark {
+    fn from_string(string: &str) -> GQuark;
+    
+    /// 转换为字符串（简化实现）
+    fn to_string(&self) -> String;
+}
+
+impl GQuarkExt for GQuark {
+    /// 从字符串创建错误域
+    fn from_string(string: &str) -> GQuark {
         // 简单的哈希实现
         let mut hash: u32 = 5381;
         for byte in string.bytes() {
@@ -29,7 +37,7 @@ impl GQuark {
     }
 
     /// 转换为字符串（简化实现）
-    pub fn to_string(&self) -> String {
+    fn to_string(&self) -> String {
         alloc::format!("domain-{}", self)
     }
 }
@@ -51,7 +59,7 @@ impl GError {
         Self {
             domain,
             code,
-            message: message.to_string(),
+            message: String::from(message),
         }
     }
 
@@ -60,16 +68,16 @@ impl GError {
         Self {
             domain,
             code,
-            message: message.to_string(),
+            message: String::from(message),
         }
     }
 
     /// 格式化错误消息
-    pub fn new_printf(domain: GQuark, code: c_int, format: &str, args: core::fmt::Arguments) -> Self {
+    pub fn new_printf(domain: GQuark, code: c_int, _format: &str, args: core::fmt::Arguments) -> Self {
         Self {
             domain,
             code,
-            message: alloc::format!("{}", format),
+            message: alloc::format!("{}", args),
         }
     }
 
@@ -110,13 +118,18 @@ pub mod domains {
 
     /// 自定义错误域
     pub fn g_quark_from_static_string(string: &str) -> GQuark {
-        GQuark::from_string(string)
+        // 简单的哈希实现，与GQuark::from_string相同
+        let mut hash: u32 = 5381;
+        for byte in string.bytes() {
+            hash = ((hash << 5).wrapping_add(hash)).wrapping_add(byte as u32);
+        }
+        hash
     }
 }
 
 /// 文件错误码
 pub mod file_errors {
-    use crate::glib::types::*;
+    use core::ffi::c_int;
 
     pub const G_FILE_ERROR_EXIST: c_int = 2;
     pub const G_FILE_ERROR_ISDIR: c_int = 3;
@@ -134,12 +147,15 @@ pub mod file_errors {
 /// 错误工具函数
 pub mod error_utils {
     use super::*;
+    use alloc::boxed::Box;
 
     /// 设置错误指针
     pub unsafe fn set_error(error: *mut *mut GError, domain: GQuark, code: c_int, message: &str) {
-        if !error.is_null() && (*error).is_null() {
-            let gerror = Box::new(GError::new(domain, code, message));
-            *error = Box::into_raw(gerror);
+        unsafe {
+            if !error.is_null() && (*error).is_null() {
+                let gerror = Box::new(GError::new(domain, code, message));
+                *error = Box::into_raw(gerror);
+            }
         }
     }
 
@@ -151,34 +167,42 @@ pub mod error_utils {
         format: &str,
         args: core::fmt::Arguments,
     ) {
-        if !error.is_null() && (*error).is_null() {
-            let gerror = Box::new(GError::new_printf(domain, code, format, args));
-            *error = Box::into_raw(gerror);
+        unsafe {
+            if !error.is_null() && (*error).is_null() {
+                let gerror = Box::new(GError::new_printf(domain, code, format, args));
+                *error = Box::into_raw(gerror);
+            }
         }
     }
 
     /// 传播错误
     pub unsafe fn propagate_error(dest: *mut *mut GError, src: *mut GError) {
-        if !dest.is_null() && (*dest).is_null() && !src.is_null() {
-            *dest = src;
+        unsafe {
+            if !dest.is_null() && (*dest).is_null() && !src.is_null() {
+                *dest = src;
+            }
         }
     }
 
     /// 释放错误
     pub unsafe fn clear_error(error: *mut *mut GError) {
-        if !error.is_null() && !(*error).is_null() {
-            let _ = Box::from_raw(*error);
-            *error = core::ptr::null_mut();
+        unsafe {
+            if !error.is_null() && !(*error).is_null() {
+                let _ = Box::from_raw(*error);
+                *error = core::ptr::null_mut();
+            }
         }
     }
 
     /// 复制错误
     pub unsafe fn copy_error(src: *const GError) -> *mut GError {
-        if src.is_null() {
-            return core::ptr::null_mut();
+        unsafe {
+            if src.is_null() {
+                return core::ptr::null_mut();
+            }
+            let gerror = (*src).copy();
+            Box::into_raw(Box::new(gerror))
         }
-        let gerror = (*src).copy();
-        Box::into_raw(Box::new(gerror))
     }
 }
 

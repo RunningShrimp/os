@@ -5,7 +5,7 @@
 
 use core::cell::UnsafeCell;
 use core::ops::{Deref, DerefMut};
-use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering, fence};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 // ============================================================================
 // Interrupt control for SMP safety

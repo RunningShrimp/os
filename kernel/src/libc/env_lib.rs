@@ -12,6 +12,7 @@ extern crate alloc;
 use alloc::format;
 use core::ffi::{c_char, c_int};
 use core::str::FromStr;
+use heapless::{String, Vec};
 use crate::libc::error::set_errno;
 use crate::libc::error::errno::{EINVAL, ENOMEM};
 use crate::reliability::errno::{EPERM, EAGAIN};
@@ -21,13 +22,13 @@ use crate::sync::Mutex;
 #[derive(Debug, Clone)]
 pub struct EnvEntry {
     /// 变量名
-    pub name: heapless::String<256>,
+    pub name: String<256>,
     /// 变量值
-    pub value: heapless::String<1024>,
+    pub value: String<1024>,
     /// 是否被修改过
     pub modified: bool,
     /// 原始值（用于reset）
-    pub original_value: Option<heapless::String<1024>>,
+    pub original_value: Option<String<1024>>,
 }
 
 /// 环境变量管理器配置
@@ -81,7 +82,7 @@ pub struct EnhancedEnvManager {
     /// 统计信息
     stats: Mutex<EnvStats>,
     /// 环境变量表
-    env_table: crate::sync::Mutex<heapless::Vec<EnvEntry, 128>>,
+    env_table: crate::sync::Mutex<Vec<EnvEntry, 128>>,
     /// 系统环境变量前缀
     sys_prefixes: &'static [&'static str; 5],
 }
@@ -101,7 +102,7 @@ impl EnhancedEnvManager {
         Self {
             config,
             stats: Mutex::new(EnvStats::default()),
-            env_table: crate::sync::Mutex::new(heapless::Vec::new()),
+            env_table: crate::sync::Mutex::new(Vec::new()),
             sys_prefixes: &SYSTEM_ENV_PREFIXES,
         }
     }
@@ -220,8 +221,8 @@ impl EnhancedEnvManager {
             // 添加新条目
             if table.len() < self.config.max_entries {
                 let mut entry = EnvEntry {
-                    name: heapless::String::from_str(name_str).unwrap_or_else(|_| heapless::String::new()),
-                    value: heapless::String::from_str(value_str).unwrap_or_else(|_| heapless::String::new()),
+                    name: String::from_str(name_str).unwrap_or_else(|_| String::new()),
+                    value: String::from_str(value_str).unwrap_or_else(|_| String::new()),
                     modified: true,
                     original_value: None,
                 };
@@ -347,13 +348,13 @@ impl EnhancedEnvManager {
     }
 
     /// 列出所有环境变量
-    pub fn list_variables(&self) -> heapless::Vec<(heapless::String<256>, heapless::String<256>), 128> {
-        let mut result = heapless::Vec::new();
+    pub fn list_variables(&self) -> Vec<(String<256>, String<256>), 128> {
+        let mut result = Vec::new();
 
         if let Some(table) = self.env_table.try_lock() {
             for entry in table.iter() {
-                let name = heapless::String::<256>::from_str(&entry.name).unwrap_or_default();
-                let value = heapless::String::<256>::from_str(&entry.value).unwrap_or_default();
+                let name = String::<256>::from_str(&entry.name).unwrap_or_default();
+                let value = String::<256>::from_str(&entry.value).unwrap_or_default();
                 if result.push((name, value)).is_err() {
                     break;
                 }

@@ -1,7 +1,11 @@
-pub use crate::vfs;
-pub use crate::fs;
-pub use crate::net;
-pub use crate::ipc;
-pub use crate::process;
-pub use crate::time;
-pub use crate::drivers;
+pub mod fs;
+pub mod net;
+pub mod ipc;
+pub mod process;
+
+// Flattened modules from deep nesting
+pub mod process_service;
+pub mod glib_memory;
+
+// Re-exports for convenience
+pub use self::fs as vfs; // vfs alias if needed

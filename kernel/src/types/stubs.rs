@@ -4,13 +4,12 @@
 //! haven't been fully implemented yet, allowing compilation to proceed.
 
 extern crate alloc;
-use alloc::string::String;
 use alloc::vec::Vec;
 use heapless::String as HeaplessString;
 
 // Microkernel IPC types - using real implementations
 pub use crate::microkernel::service_registry::{
-    ServiceId, ServiceCategory, ServiceInfo, InterfaceVersion, ServiceStatus, ServicePriority
+    ServiceId
 };
 pub use crate::microkernel::ipc::IpcMessage as Message;
 
@@ -107,15 +106,16 @@ pub fn receive_message() -> Result<Message, ()> {
 use crate::posix::{Pid, Uid, Gid};
 
 // Re-export POSIX types (use posix module types if available)
-pub type pid_t = crate::posix::Pid;
-pub type uid_t = crate::posix::Uid;
-pub type gid_t = crate::posix::Gid;
-pub type AF_UNIX = i32;
+pub type PidT = crate::posix::Pid;
+pub type UidT = crate::posix::Uid;
+pub type GidT = crate::posix::Gid;
+pub type AfUnix = i32;
 
-pub const AF_UNIX_CONST: AF_UNIX = 1;
+pub const AF_UNIX_CONST: AfUnix = 1;
 
 // Service registry - using real implementation
-pub use crate::microkernel::service_registry::{ServiceRegistry, get_service_registry};
+// TODO: Re-enable when service registry is fully implemented
+// pub use crate::microkernel::service_registry::{ServiceRegistry, get_service_registry};
 
 // Process stubs - Use real Process type from process module when possible
 // For compatibility, keep a minimal stub but prefer using crate::process::Proc
@@ -227,7 +227,8 @@ pub const SOCK_DGRAM: i32 = 2;
 pub const SOCK_RAW: i32 = 3;
 
 // Additional type stubs for re-exporting core atomic types
-pub use core::sync::atomic::{AtomicU32, AtomicU64};
+// TODO: Re-enable when atomic types are needed
+// pub use core::sync::atomic::{AtomicU32, AtomicU64};
 
 // Device driver trait stubs
 pub trait BlockDevice {

@@ -8,7 +8,7 @@
 //! - Real-time signal support (SIGRTMIN-SIGRTMAX)
 
 use crate::posix::{SigSet, SigInfoT, SigVal, Pid, Uid, SIGRTMIN, SIGRTMAX};
-use crate::process::{Proc as Process, Pid as ProcessId};
+use crate::process::{Pid as ProcessId};
 use crate::sync::Mutex;
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;

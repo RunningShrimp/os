@@ -11,8 +11,10 @@ extern crate alloc;
 
 use alloc::format;
 use core::ffi::{c_char, c_int};
-use crate::libc::interface::{size_t, c_long, c_longlong, time_t};
-pub type suseconds_t = i64;
+use crate::libc::interface::{size_t, c_long, time_t};
+pub type SusecondsT = i64;
+#[allow(non_camel_case_types)]
+pub type suseconds_t = SusecondsT;
 use crate::libc::error::set_errno;
 use crate::libc::error::errno::EINVAL;
 

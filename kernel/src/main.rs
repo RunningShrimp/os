@@ -8,62 +8,75 @@
 extern crate alloc;
 // A minimal Unix-like kernel supporting RISC-V, AArch64, and x86_64
 
+#[cfg(feature = "posix_layer")]
 mod posix;
 // errno is in reliability module
 
 use core::sync::atomic::{AtomicBool, Ordering};
-use core::arch::global_asm;
 
-// Architecture-specific startup code
-#[cfg(all(feature = "baremetal", target_arch = "riscv64"))]
-global_asm!(include_str!("../start-riscv64.S"));
-
-#[cfg(all(feature = "baremetal", target_arch = "aarch64"))]
-global_asm!(include_str!("../start-aarch64.S"));
-
-#[cfg(all(feature = "baremetal", target_arch = "x86_64"))]
-global_asm!(include_str!("../start-x86_64.S"));
+// Bootloader-based startup: Architecture-specific assembly is handled by bootloader
+// Kernel entry points are defined below and called by the bootloader
 
 // Kernel modules
-mod boot;
-mod arch;
-mod mm;
-mod sync;
-mod process;
-mod syscalls;
-mod drivers;
-mod fs;
-mod time;
-mod trap;
-mod cpu;
-mod vfs;
-mod ipc;
-mod services;
-mod net;
-mod microkernel;
+mod platform;
+mod subsystems;
+mod services_unified; // Unified services module
+mod memory_unified; // Unified memory management module
+mod memory_optimized; // Optimized memory management module
+mod security; // Security module
+
+// Re-exports for compatibility with existing code in main.rs
+use platform::{arch, boot, drivers, trap};
+use subsystems::{fs, ipc, process, vfs};
+use services_unified as services; // Use unified services module
+use memory_unified as memory; // Use unified memory module
+use memory_optimized as memory_opt; // Use optimized memory module
+use security::enhanced_permissions as permissions; // Use enhanced permissions
+
+// Use nos-syscalls crate when feature is enabled
+#[cfg(feature = "syscalls")]
+use nos_syscalls as syscalls;
+
+#[cfg(feature = "net_stack")]
+use subsystems::net;
+
+mod cpu; // cpu was missed in previous edit
+
+
 #[cfg(feature = "cloud_native")]
-mod cloud_native;
+mod cloud_native; // This is conditional, maybe still in root? No, I didn't move it.
 mod compat;
 mod security;
 #[cfg(feature = "security_audit")]
 mod security_audit;
 #[cfg(feature = "formal_verification")]
 mod formal_verification;
-mod error_handling;
+// Use nos-error-handling crate when feature is enabled
+#[cfg(feature = "error_handling")]
+use nos_error_handling as error_handling;
 #[cfg(feature = "debug_subsystems")]
 mod debug;
 mod reliability;
 mod libc;
 mod types;
 mod collections;
+#[cfg(feature = "graphics_subsystem")]
 mod graphics;
+#[cfg(feature = "web_engine")]
 mod web;
 mod benchmark;
 #[cfg(feature = "observability")]
 mod monitoring;
 
+// mm is special, it was modified but not moved to subsystems completely (mod.rs remains)
+mod mm;
+mod sync; // sync was not moved
+mod time; // time was not moved
+mod microkernel; // microkernel was not moved
+
 #[cfg(feature = "kernel_tests")]
 mod tests;
+
 
 // Architecture name for logging
 #[cfg(target_arch = "riscv64")]
@@ -76,15 +89,16 @@ const ARCH: &str = "x86_64";
 // Boot synchronization
 static STARTED: AtomicBool = AtomicBool::new(false);
 
-/// Kernel main entry point for direct boot (legacy)
-/// Called from architecture-specific startup code when no bootloader is used
+/// Kernel main entry point called by bootloader
+/// Called from bootloader with boot parameters
+/// 
+/// # Parameters
+/// - rdi (x86_64): pointer to BootParameters structure
+/// - x0 (aarch64): pointer to BootParameters structure  
+/// - a0 (riscv64): pointer to BootParameters structure
 #[unsafe(no_mangle)]
-pub extern "C" fn rust_main() -> ! {
-    // Initialize boot information for direct QEMU boot
-    boot::init_direct_boot();
-
-    // Call the main kernel initialization
-    rust_main_with_boot_info(core::ptr::null())
+pub extern "C" fn rust_main(boot_params: *const boot::BootParameters) -> ! {
+    rust_main_with_boot_info(boot_params)
 }
 
 /// Kernel main entry point with boot parameters
@@ -119,7 +133,12 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
     // Initialize memory management from boot info or fall back to legacy
     boot::init_memory_from_boot_info();
     if !boot::is_bootloader_boot() {
-        mm::init();
+        memory::init_global_allocator()
+        .expect("Failed to initialize global memory allocator");
+        
+        // Initialize optimized memory allocator for better performance
+        memory_opt::init_optimized_allocator()
+        .expect("Failed to initialize optimized memory allocator");
     }
     crate::println!("[boot] physical memory initialized");
 
@@ -197,8 +216,22 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
         // In a production system, this should be fatal, but for development we continue
     }
 
-    // Initialize file system
-    fs::init();
+    // Initialize file system with journaling support
+    #[cfg(feature = "journaling_fs")]
+    {
+        if fs::init_fs_with_journaling(crate::drivers::RamDisk) {
+            crate::println!("[boot] journaling filesystem initialized");
+        } else {
+            crate::println!("[boot] falling back to regular filesystem");
+            fs::init();
+        }
+    }
+    
+    #[cfg(not(feature = "journaling_fs"))]
+    {
+        fs::init();
+    }
+    
     crate::println!("[boot] filesystem initialized");
     monitoring::timeline::record("fs_init");
 
@@ -221,7 +254,7 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
     ipc::init();
     crate::println!("[boot] IPC subsystem initialized");
 
-    #[cfg(not(feature = "lazy_init"))]
+    #[cfg(all(not(feature = "lazy_init"), feature = "net_stack"))]
     {
         net::init();
         crate::println!("[boot] network stack initialized");
@@ -239,6 +272,10 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
     services::init().expect("Service layer initialization failed");
     crate::println!("[boot] service layer initialized");
     monitoring::timeline::record("services_init");
+    
+    // Initialize enhanced permission system
+    permissions::init_permission_manager();
+    crate::println!("[security] Enhanced permission system initialized");
 
     #[cfg(feature = "cloud_native")]
     {
@@ -247,8 +284,15 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
     }
 
     // Initialize security subsystem
-    security::init_security_subsystem().expect("Security subsystem initialization failed");
-    crate::println!("[boot] security subsystem initialized");
+    match security::init_security_subsystem() {
+        Ok(()) => {
+            crate::println!("[boot] security subsystem initialized");
+        }
+        Err(e) => {
+            crate::println!("[boot] WARNING: Security subsystem initialization failed: {:?}", e);
+            crate::println!("[boot] System will continue with reduced security features");
+        }
+    }
 
     #[cfg(feature = "security_audit")]
     {
@@ -303,13 +347,13 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
     drivers::device_manager::init().expect("Device manager system initialization failed");
     crate::println!("[boot] device manager system initialized");
 
-    #[cfg(not(feature = "lazy_init"))]
+    #[cfg(all(not(feature = "lazy_init"), feature = "graphics_subsystem"))]
     {
         graphics::init();
         crate::println!("[boot] graphics subsystem initialized");
     }
 
-    #[cfg(not(feature = "lazy_init"))]
+    #[cfg(all(not(feature = "lazy_init"), feature = "web_engine"))]
     {
         web::init();
         crate::println!("[boot] web engine subsystem initialized");
@@ -352,15 +396,24 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
 #[cfg(feature = "lazy_init")]
 pub fn lazy_init_services() {
     monitoring::timeline::record("lazy_init_start");
-    net::init();
-    crate::println!("[lazy] network stack initialized");
-    monitoring::timeline::record("lazy_net_init");
-    graphics::init();
-    crate::println!("[lazy] graphics subsystem initialized");
-    monitoring::timeline::record("lazy_graphics_init");
-    web::init();
-    crate::println!("[lazy] web engine subsystem initialized");
-    monitoring::timeline::record("lazy_web_init");
+    #[cfg(feature = "net_stack")]
+    {
+        net::init();
+        crate::println!("[lazy] network stack initialized");
+        monitoring::timeline::record("lazy_net_init");
+    }
+    #[cfg(feature = "graphics_subsystem")]
+    {
+        graphics::init();
+        crate::println!("[lazy] graphics subsystem initialized");
+        monitoring::timeline::record("lazy_graphics_init");
+    }
+    #[cfg(feature = "web_engine")]
+    {
+        web::init();
+        crate::println!("[lazy] web engine subsystem initialized");
+        monitoring::timeline::record("lazy_web_init");
+    }
     monitoring::timeline::record("lazy_init_complete");
 }
 

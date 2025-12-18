@@ -4,8 +4,9 @@
 //! CPU architectures, allowing the bootloader to support x86_64, AArch64,
 //! and RISC-V with a unified interface.
 
-use crate::error::{BootError, Result};
+use crate::utils::error::{BootError, Result};
 use core::arch::asm;
+use crate::println;
 
 // Architecture-specific modules
 #[cfg(target_arch = "x86_64")]
@@ -78,7 +79,7 @@ impl Architecture {
     }
 
     /// Get architecture-specific CPU features
-    pub fn cpu_features(self) -> CpuFeatures {
+    pub fn cpu_features(self) -> u64 {
         match self {
             #[cfg(target_arch = "x86_64")]
             Architecture::X86_64 => x86_64::get_cpu_features(),
@@ -90,7 +91,7 @@ impl Architecture {
             Architecture::RiscV64 => riscv64::get_cpu_features(),
 
             #[allow(unreachable_patterns)]
-            _ => CpuFeatures::default(),
+            _ => 0,
         }
     }
 }
@@ -220,22 +221,20 @@ impl BootParameters {
             magic: 0x4E4F5342_4F4F5452, // "NOS_BOOT"
             version: 1,
             architecture: match boot_info.protocol_type {
-                crate::protocol::ProtocolType::UEFI => 1,
-                crate::protocol::ProtocolType::BIOS => 2,
-                crate::protocol::ProtocolType::Multiboot2 => 3,
-                _ => 0,
+                crate::protocol::BootProtocolType::Uefi => 1,
+                crate::protocol::BootProtocolType::Bios => 2,
+                crate::protocol::BootProtocolType::Multiboot2 => 3,
             },
             boot_protocol: match boot_info.protocol_type {
-                crate::protocol::ProtocolType::UEFI => 1,
-                crate::protocol::ProtocolType::BIOS => 2,
-                crate::protocol::ProtocolType::Multiboot2 => 3,
-                _ => 0,
+                crate::protocol::BootProtocolType::Uefi => 1,
+                crate::protocol::BootProtocolType::Bios => 2,
+                crate::protocol::BootProtocolType::Multiboot2 => 3,
             },
             memory_map: 0, // Will be filled in by architecture-specific code
             memory_map_size: 0,
             framebuffer: 0, // Will be filled in if framebuffer is available
-            acpi_rsdp: boot_info.acpi_rsdp.unwrap_or(0),
-            device_tree: boot_info.device_tree.unwrap_or(0),
+            acpi_rsdp: boot_info.acpi_rsdp.unwrap_or(0) as usize,
+            device_tree: boot_info.device_tree.unwrap_or(0) as usize,
             command_line: 0, // Will be filled in if command line is available
             command_line_size: 0,
             timestamp: boot_info.boot_timestamp,
@@ -386,13 +385,13 @@ pub unsafe fn jump_to_kernel(entry_point: usize, boot_params: &BootParameters) -
 
     match Architecture::current() {
         #[cfg(target_arch = "x86_64")]
-        Architecture::X86_64 => x86_64::jump_to_kernel(entry_point, boot_params),
+        Architecture::X86_64 => x86_64::jump_to_kernel(entry_point),
 
         #[cfg(target_arch = "aarch64")]
-        Architecture::AArch64 => aarch64::jump_to_kernel(entry_point, boot_params),
+        Architecture::AArch64 => aarch64::jump_to_kernel(entry_point),
 
         #[cfg(target_arch = "riscv64")]
-        Architecture::RiscV64 => riscv64::jump_to_kernel(entry_point, boot_params),
+        Architecture::RiscV64 => riscv64::jump_to_kernel(entry_point),
 
         #[allow(unreachable_patterns)]
         _ => panic!("Unsupported architecture"),

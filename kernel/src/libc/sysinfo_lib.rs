@@ -10,6 +10,7 @@
 
 use core::ffi::{c_char, c_int, c_long, c_uint, c_double, c_ushort};
 use core::str::FromStr;
+use heapless::{String, Vec};
 use crate::libc::error::set_errno;
 use crate::libc::error::errno::{EINVAL, ENAMETOOLONG, EPERM};
 use crate::libc::interface::c_ulong;
@@ -19,28 +20,28 @@ use crate::libc::interface::c_ulong;
 #[derive(Debug, Clone)]
 pub struct UtsName {
     /// 系统名称
-    pub sysname: heapless::String<65>,
+    pub sysname: String<65>,
     /// 节点名
-    pub nodename: heapless::String<65>,
+    pub nodename: String<65>,
     /// 发行版本
-    pub release: heapless::String<65>,
+    pub release: String<65>,
     /// 版本信息
-    pub version: heapless::String<65>,
+    pub version: String<65>,
     /// 硬件标识
-    pub machine: heapless::String<65>,
+    pub machine: String<65>,
     /// 域名（可选）
-    pub domainname: heapless::String<65>,
+    pub domainname: String<65>,
 }
 
 impl Default for UtsName {
     fn default() -> Self {
         Self {
-            sysname: heapless::String::from_str("NOS").unwrap_or_default(),
-            nodename: heapless::String::from_str("localhost").unwrap_or_default(),
-            release: heapless::String::from_str("1.0.0").unwrap_or_default(),
-            version: heapless::String::from_str("NOS Kernel v1.0.0").unwrap_or_default(),
-            machine: heapless::String::from_str("x86_64").unwrap_or_default(),
-            domainname: heapless::String::new(),
+            sysname: String::from_str("NOS").unwrap_or_default(),
+            nodename: String::from_str("localhost").unwrap_or_default(),
+            release: String::from_str("1.0.0").unwrap_or_default(),
+            version: String::from_str("NOS Kernel v1.0.0").unwrap_or_default(),
+            machine: String::from_str("x86_64").unwrap_or_default(),
+            domainname: String::new(),
         }
     }
 }
@@ -90,9 +91,9 @@ pub struct SysInfo {
 #[derive(Debug, Clone)]
 pub struct CpuInfo {
     /// CPU架构
-    pub architecture: heapless::String<64>,
+    pub architecture: String<64>,
     /// CPU型号
-    pub model: heapless::String<64>,
+    pub model: String<64>,
     /// CPU频率（MHz）
     pub frequency_mhz: u32,
     /// CPU核心数
@@ -104,7 +105,7 @@ pub struct CpuInfo {
     /// 是否支持虚拟化
     pub virtualization: bool,
     /// CPU特性
-    pub features: heapless::Vec<heapless::String<32>, 16>,
+    pub features: Vec<String<32>, 16>,
 }
 
 /// 内存信息结构体
@@ -132,11 +133,11 @@ pub struct MemoryInfo {
 #[derive(Debug, Clone)]
 pub struct NetworkInterface {
     /// 接口名称
-    pub name: heapless::String<16>,
+    pub name: String<16>,
     /// MAC地址
-    pub mac_address: heapless::String<18>,
+    pub mac_address: String<18>,
     /// IP地址
-    pub ip_address: heapless::String<16>,
+    pub ip_address: String<16>,
     /// 接口状态
     pub is_up: bool,
     /// 接收字节数

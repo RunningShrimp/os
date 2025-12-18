@@ -4,12 +4,15 @@
 
 use core::ffi::c_int;
 use core::sync::atomic::{AtomicI32, Ordering};
+use heapless::Vec;
+use crate::sync::Mutex;
 
 /// 全局errno变量
 ///
 /// 使用原子变量确保线程安全的errno访问
 static mut ERRNO: c_int = 0;
 static ERRNO_ATOMIC: AtomicI32 = AtomicI32::new(0);
+static ERROR_STATS: Mutex<Option<ErrorStats>> = Mutex::new(None);
 
 /// POSIX错误码定义
 ///
@@ -304,8 +307,7 @@ pub fn strerror(error_code: c_int) -> &'static str {
         errno::EMSGSIZE => "Message too long",
         errno::EPROTONOSUPPORT => "Protocol not supported",
         errno::ESOCKTNOSUPPORT => "Socket type not supported",
-        errno::ENOTSUP => "Operation not supported",
-        errno::EOPNOTSUPP => "Operation not supported",
+        errno::ENOTSUP | errno::EOPNOTSUPP => "Operation not supported",
         errno::EPFNOSUPPORT => "Protocol family not supported",
         errno::EAFNOSUPPORT => "Address family not supported",
         errno::EADDRINUSE => "Address already in use",
@@ -367,7 +369,7 @@ pub struct ErrorStats {
     /// 最近一次错误码
     pub last_error: c_int,
     /// 错误历史（最多保存最近的100个错误）
-    pub error_history: heapless::Vec<c_int, 100>,
+    pub error_history: Vec<c_int, 100>,
 }
 
 impl Default for ErrorStats {
@@ -376,7 +378,7 @@ impl Default for ErrorStats {
             error_counts: [0u64; 128],
             total_errors: 0,
             last_error: 0,
-            error_history: heapless::Vec::new(),
+            error_history: Vec::new(),
         }
     }
 }
@@ -392,11 +394,18 @@ impl ErrorStats {
 /// # 参数
 /// * `error_code` - 发生的错误码
 pub fn record_error(error_code: c_int) {
-    // 这里可以添加错误统计逻辑
-    // 目前只是记录最后一次错误
     unsafe {
         ERRNO = error_code;
         ERRNO_ATOMIC.store(error_code, Ordering::SeqCst);
+    }
+    let mut stats = ERROR_STATS.lock();
+    let s = stats.get_or_insert_with(ErrorStats::new);
+    s.last_error = error_code;
+    s.total_errors = s.total_errors.saturating_add(1);
+    let idx = (error_code as usize) % s.error_counts.len();
+    s.error_counts[idx] = s.error_counts[idx].saturating_add(1);
+    if s.error_history.len() < s.error_history.capacity() {
+        let _ = s.error_history.push(error_code);
     }
 
     // 可以在调试模式下打印错误信息
@@ -429,7 +438,42 @@ pub fn init_error_handling() {
         ERRNO = 0;
         ERRNO_ATOMIC.store(0, Ordering::SeqCst);
     }
+    let mut stats = ERROR_STATS.lock();
+    if stats.is_none() {
+        *stats = Some(ErrorStats::new());
+    }
     crate::println!("[libc] 错误处理系统初始化完成");
+}
+
+pub fn error_stats_string() -> alloc::string::String {
+    let mut guard = ERROR_STATS.lock();
+    let st = guard.get_or_insert_with(ErrorStats::new);
+    let mut out = alloc::string::String::new();
+    out.push_str("# Error Stats\n");
+    out.push_str(&alloc::format!("total_errors: {}\n", st.total_errors));
+    out.push_str(&alloc::format!("last_error: {} ({})\n", st.last_error, strerror(st.last_error)));
+    out.push_str("recent: [");
+    for (i, e) in st.error_history.iter().enumerate() {
+        out.push_str(&alloc::format!("{}{}", e, if i + 1 < st.error_history.len() { "," } else { "" }));
+    }
+    out.push_str("]\n");
+    out
+}
+
+pub fn error_stats_json() -> alloc::string::String {
+    let mut guard = ERROR_STATS.lock();
+    let st = guard.get_or_insert_with(ErrorStats::new);
+    let mut out = alloc::string::String::new();
+    out.push_str("{\n");
+    out.push_str(&alloc::format!("  \"total_errors\": {},\n", st.total_errors));
+    out.push_str(&alloc::format!("  \"last_error\": {},\n", st.last_error));
+    out.push_str(&alloc::format!("  \"last_error_str\": \"{}\",\n", strerror(st.last_error)));
+    out.push_str("  \"recent\": [");
+    for (i, e) in st.error_history.iter().enumerate() {
+        out.push_str(&alloc::format!("{}{}", e, if i + 1 < st.error_history.len() { "," } else { "" }));
+    }
+    out.push_str(" ]\n}\n");
+    out
 }
 
 #[cfg(test)]

@@ -1,0 +1,46 @@
+[package]
+name = "nos-syscalls"
+version = "0.1.0"
+edition = "2024"
+authors = ["NOS Developers"]
+description = "NOS System Calls - System call interface and dispatch mechanism"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/nos/nos-syscalls"
+keywords = ["nos", "syscalls", "kernel", "os"]
+categories = ["os", "no-std"]
+
+[dependencies]
+# Core dependencies
+nos-api = { workspace = true, default-features = false }
+
+# External dependencies
+hashbrown = { workspace = true }
+spin = { workspace = true }
+log = { workspace = true, optional = true }
+libm = { workspace = true }
+
+[features]
+default = []
+std = []
+alloc = ["nos-api/alloc"]
+log = ["dep:log"]
+debug_subsystems = []
+formal_verification = []
+security_audit = []
+advanced_syscalls = []
+
+# Feature flags for conditional compilation
+minimal = []
+embedded = ["alloc"]
+server = ["alloc", "log", "advanced_syscalls"]
+desktop = ["alloc", "log", "advanced_syscalls"]
+
+[lib]
+name = "nos_syscalls"
+path = "src/lib.rs"
+
+
+
+[[test]]
+name = "syscall_tests"
+path = "tests/syscall_tests.rs"

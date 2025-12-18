@@ -7,6 +7,8 @@ extern crate alloc;
 use core::alloc::{GlobalAlloc, Layout};
 use core::ptr::null_mut;
 use core::sync::atomic::{AtomicUsize, Ordering};
+use nos_perf::monitoring::{get_perf_stats};
+use nos_perf::core::{UnifiedSyscallStats, SyscallStatsSnapshot};
 use alloc::vec::Vec;
 use crate::sync::Mutex;
 
@@ -48,7 +50,7 @@ pub struct HybridAllocator {
 impl HybridAllocator {
     pub const fn new() -> Self {
         Self {
-            slab: Mutex::new(OptimizedSlabAllocator::new()),
+            slab: Mutex::new(OptimizedSlabAllocator::uninitialized()),
             buddy: Mutex::new(OptimizedBuddyAllocator::new()),
             hugepage: Mutex::new(HugePageAllocator::new()),
             allocation_count: AtomicUsize::new(0),
@@ -117,9 +119,9 @@ pub unsafe fn init(&self, slab_start: usize, slab_size: usize,
         ptr
     }
     
-    fn track_allocation(&self, size: usize) {
-        let current = self.current_allocated_bytes.fetch_add(size, Ordering::Relaxed) + size;
-        // Update peak if necessary (use simple compare-and-swap loop)
+   fn track_allocation(&self, size: usize) {
+       let current = self.current_allocated_bytes.fetch_add(size, Ordering::Relaxed) + size;
+       // Update peak if necessary (use simple compare-and-swap loop)
         loop {
             let peak = self.peak_allocated_bytes.load(Ordering::Relaxed);
             if current <= peak {
@@ -155,7 +157,7 @@ pub unsafe fn init(&self, slab_start: usize, slab_size: usize,
         // Try slab allocator first for small objects
         if size <= 2048 { // Matches SLAB_SIZES defined in slab.rs
             let mut slab = self.slab.lock(); // SpinLock for faster access
-            slab.dealloc(ptr, layout);
+            unsafe { slab.dealloc(ptr, layout); }
             self.allocation_count.fetch_sub(1, Ordering::Relaxed);
             return;
         }
@@ -282,6 +284,52 @@ unsafe impl GlobalAlloc for HybridAllocator {
 
 #[global_allocator]
 static ALLOCATOR: HybridAllocator = HybridAllocator::new();
+
+/// Get total memory size from system
+fn get_total_memory() -> usize {
+    // Try to get memory size from platform-specific sources
+    #[cfg(target_arch = "x86_64")]
+    {
+        // For x86_64, we could read from BIOS or use a fixed value for now
+        // In a real implementation, this would query the hardware
+        512 * 1024 * 1024 // 512 MB default for x86_64
+    }
+    
+    #[cfg(target_arch = "aarch64")]
+    {
+        // For aarch64, we could read from device tree
+        // In a real implementation, this would query the device tree
+        512 * 1024 * 1024 // 512 MB default for aarch64
+    }
+    
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+    {
+        // Default fallback for other architectures
+        256 * 1024 * 1024 // 256 MB default
+    }
+}
+
+/// Calculate memory pressure as (current_allocated / total) * 10000
+pub fn calculate_memory_pressure() -> u64 {
+    let current = ALLOCATOR.current_allocated_bytes.load(Ordering::Relaxed);
+    let total = get_total_memory();
+    
+    // If total memory is 0, return maximum pressure
+    if total == 0 {
+        return 10000; // Maximum pressure
+    }
+    
+    (current * 10000) / total
+}
+
+/// Expose memory metrics for monitoring
+pub fn get_memory_metrics() -> (usize, usize, usize) {
+    let current = ALLOCATOR.current_allocated_bytes.load(Ordering::Relaxed);
+    let peak = ALLOCATOR.peak_allocated_bytes.load(Ordering::Relaxed);
+    let failed = ALLOCATOR.failed_allocations.load(Ordering::Relaxed);
+    
+    (current, peak, failed)
+}
 
 /// Get reference to the global allocator
 pub fn get_global_allocator() -> &'static HybridAllocator {

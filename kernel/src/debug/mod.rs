@@ -10,6 +10,7 @@ pub mod profiling;
 pub mod metrics;
 pub mod monitoring;
 pub mod symbols;
+pub mod visualization;
 pub mod fault_diagnosis;
 
 // 新拆分的子模块
@@ -65,7 +66,23 @@ pub use manager::{
 
 /// Initialize debug module (module-level function)
 pub fn init() -> Result<(), &'static str> {
-    // Placeholder: In a real implementation, this would initialize the global debug manager
+    // Initialize all debug subsystems
+    if let Err(_) = metrics::init() {
+        return Err("Failed to initialize metrics subsystem");
+    }
+    
+    if let Err(_) = profiling::init() {
+        return Err("Failed to initialize profiling subsystem");
+    }
+    
+    if let Err(_) = monitoring::init() {
+        return Err("Failed to initialize monitoring subsystem");
+    }
+    
+    if let Err(_) = visualization::init() {
+        return Err("Failed to initialize visualization subsystem");
+    }
+    
     Ok(())
 }
 

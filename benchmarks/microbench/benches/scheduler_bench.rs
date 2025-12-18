@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion, black_box};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 #[derive(Clone, Copy)]
 struct Node { pid: usize, next: usize }
@@ -17,7 +17,7 @@ fn sim_runqueue(n: usize) {
         picked += nodes[cur].pid;
         head = nodes[cur].next;
     }
-    black_box(picked);
+    std::hint::black_box(picked);
 }
 
 fn bench_scheduler(c: &mut Criterion) {

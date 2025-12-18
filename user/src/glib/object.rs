@@ -8,13 +8,16 @@
 //! - 引用计数管理
 //! - 继承和接口支持
 
-#![no_std]
+
 
 extern crate alloc;
 
-use crate::glib::{types::*, g_free, g_malloc, g_malloc0, get_state_mut};
+use crate::glib::{types::*, collections::*, g_malloc0};
+use crate::glib::error::{GError, GQuark};
 use alloc::collections::BTreeMap;
-use core::ptr::{self, NonNull};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use core::ptr;
 use core::ffi::c_void;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
@@ -259,7 +262,7 @@ fn register_gobject_type() -> Result<(), GError> {
         }
 
         // 注册到内核
-        let result = crate::syscall(syscall_number::GLibObjectTypeRegister, [
+        let result = crate::syscall(syscall_number::GLIB_OBJECT_TYPE_REGISTER, [
             "GObject\0".as_ptr() as usize,
             type_id,
             core::mem::size_of::<GObject>(),
@@ -280,17 +283,19 @@ fn register_gobject_type() -> Result<(), GError> {
 
 /// GObject类初始化函数
 unsafe extern "C" fn gobject_class_init(class: gpointer, class_data: gpointer) {
-    glib_println!("[glib_object] GObject类初始化");
+    glib_println!("[glib_object] GObject类初始化: 类={:p}, 类数据={:p}", class, class_data);
 
     let gobject_class = class as *mut GObjectClass;
 
     // 设置默认方法
-    (*gobject_class).constructor = Some(gobject_constructor);
-    (*gobject_class).dispose = Some(gobject_dispose);
-    (*gobject_class).finalize = Some(gobject_finalize);
-    (*gobject_class).set_property = Some(gobject_set_property);
-    (*gobject_class).get_property = Some(gobject_get_property);
-    (*gobject_class).notify = Some(gobject_notify);
+    unsafe {
+        (*gobject_class).constructor = Some(gobject_constructor);
+        (*gobject_class).dispose = Some(gobject_dispose);
+        (*gobject_class).finalize = Some(gobject_finalize);
+        (*gobject_class).set_property = Some(gobject_set_property);
+        (*gobject_class).get_property = Some(gobject_get_property);
+        (*gobject_class).notify = Some(gobject_notify);
+    }
 
     // 添加基础属性
     // 实际实现中应该调用g_object_class_install_property
@@ -298,11 +303,13 @@ unsafe extern "C" fn gobject_class_init(class: gpointer, class_data: gpointer) {
 
 /// GObject实例初始化函数
 unsafe extern "C" fn gobject_instance_init(instance: gpointer, class: gpointer) {
-    glib_println!("[glib_object] GObject实例初始化");
+    glib_println!("[glib_object] GObject实例初始化: 实例={:p}, 类={:p}", instance, class);
 
     let gobject = instance as *mut GObject;
-    (*gobject).ref_count = AtomicUsize::new(1);
-    (*gobject).qdata = ptr::null_mut();
+    unsafe {
+        (*gobject).ref_count = AtomicUsize::new(1);
+        (*gobject).qdata = ptr::null_mut();
+    }
 
     OBJECT_STATS.total_instances.fetch_add(1, Ordering::SeqCst);
 }
@@ -313,13 +320,20 @@ unsafe extern "C" fn gobject_constructor(
     n_construct_properties: guint,
     construct_params: *mut GObjectConstructParam,
 ) -> *mut GObject {
-    glib_println!("[glib_object] 构造GObject实例");
+    glib_println!("[glib_object] 构造GObject实例: type_id={}, construct_properties={}", type_id, n_construct_properties);
+
+    // 处理构造参数
+    if n_construct_properties > 0 && !construct_params.is_null() {
+        glib_println!("[glib_object] 有{}个构造参数需要处理", n_construct_properties);
+        // 这里可以添加构造参数的处理逻辑
+    }
 
     // 在内核中创建实例
-    let instance_id = crate::syscall(syscall_number::GLibObjectInstanceCreate, [
+    let instance_id = crate::syscall(syscall_number::GLIB_OBJECT_INSTANCE_CREATE, [
         type_id,
-        0, // 对象指针（由内核分配）
-        0, 0, 0, 0,
+        construct_params as usize, // 传递构造参数
+        n_construct_properties as usize, // 构造参数数量
+        0, 0,
     ]) as u64;
 
     if instance_id == 0 {
@@ -333,16 +347,23 @@ unsafe extern "C" fn gobject_constructor(
     }
 
     // 初始化实例
-    (*gobject).ref_count = AtomicUsize::new(1);
-    (*gobject).qdata = ptr::null_mut();
-    (*gobject).g_type_instance.g_class = ptr::null_mut(); // 需要从内核获取类信息
+    unsafe {
+        (*gobject).ref_count = AtomicUsize::new(1);
+        (*gobject).qdata = ptr::null_mut();
+        (*gobject).g_type_instance.g_class = ptr::null_mut(); // 需要从内核获取类信息
+    }
 
     gobject
 }
 
 /// GObject销毁函数
 unsafe extern "C" fn gobject_dispose(object: *mut GObject) {
-    glib_println!("[glib_object] GObject dispose");
+    glib_println!("[glib_object] GObject dispose: {:p}", object);
+    // 在内核中处理dispose
+    crate::syscall(syscall_number::GLIB_OBJECT_DISPOSE, [
+        object as usize,
+        0, 0, 0, 0,
+    ]);
 }
 
 /// GObject终结函数
@@ -350,9 +371,9 @@ unsafe extern "C" fn gobject_finalize(object: *mut GObject) {
     glib_println!("[glib_object] GObject finalize");
 
     // 在内核中销毁实例
-    crate::syscall(syscall_number::GLibObjectUnref, [
+    crate::syscall(syscall_number::GLIB_OBJECT_UNREF, [
         object as usize,
-        0, 0, 0, 0, 0,
+        0, 0, 0, 0,
     ]);
 
     OBJECT_STATS.total_instances.fetch_sub(1, Ordering::SeqCst);
@@ -365,7 +386,15 @@ unsafe extern "C" fn gobject_set_property(
     value: *const GValue,
     pspec: *mut GParamSpec,
 ) {
-    glib_println!("[glib_object] 设置属性 ID={}", property_id);
+    glib_println!("[glib_object] 设置属性: 对象={:p}, ID={}", object, property_id);
+    // 调用内核系统调用设置属性
+    crate::syscall(syscall_number::GLIB_OBJECT_SET_PROPERTY, [
+        object as usize,
+        property_id as usize,
+        value as usize,
+        pspec as usize,
+        0,
+    ]);
 }
 
 /// GObject属性获取函数
@@ -375,12 +404,26 @@ unsafe extern "C" fn gobject_get_property(
     value: *mut GValue,
     pspec: *mut GParamSpec,
 ) {
-    glib_println!("[glib_object] 获取属性 ID={}", property_id);
+    glib_println!("[glib_object] 获取属性: 对象={:p}, ID={}", object, property_id);
+    // 调用内核系统调用获取属性
+    crate::syscall(syscall_number::GLIB_OBJECT_GET_PROPERTY, [
+        object as usize,
+        property_id as usize,
+        value as usize,
+        pspec as usize,
+        0,
+    ]);
 }
 
 /// GObject通知函数
 unsafe extern "C" fn gobject_notify(object: *mut GObject, pspec: *mut GParamSpec) {
-    glib_println!("[glib_object] 属性通知");
+    glib_println!("[glib_object] 属性通知: 对象={:p}", object);
+    // 调用内核系统调用发送通知
+    crate::syscall(syscall_number::GLIB_OBJECT_NOTIFY, [
+        object as usize,
+        pspec as usize,
+        0, 0, 0,
+    ]);
 }
 
 /// 注册新的对象类型
@@ -412,7 +455,7 @@ pub fn g_type_register_static_simple(
         }
 
         // 注册到内核
-        let result = crate::syscall(syscall_number::GLibObjectTypeRegister, [
+        let result = crate::syscall(syscall_number::GLIB_OBJECT_TYPE_REGISTER, [
             type_name.as_ptr() as usize,
             type_id,
             instance_size,
@@ -438,9 +481,9 @@ pub fn g_object_ref(object: *mut GObject) -> *mut GObject {
 
     unsafe {
         // 在内核中增加引用计数
-        let result = crate::syscall(syscall_number::GLibObjectRef, [
+        let result = crate::syscall(syscall_number::GLIB_OBJECT_REF, [
             object as usize,
-            0, 0, 0, 0, 0,
+            0, 0, 0, 0,
         ]);
 
         if result > 0 {
@@ -461,9 +504,9 @@ pub fn g_object_unref(object: *mut GObject) {
 
     unsafe {
         // 在内核中减少引用计数
-        let result = crate::syscall(syscall_number::GLibObjectUnref, [
+        let _result = crate::syscall(syscall_number::GLIB_OBJECT_UNREF, [
             object as usize,
-            0, 0, 0, 0, 0,
+            0, 0, 0, 0,
         ]);
 
         let current = (*object).ref_count.fetch_sub(1, Ordering::SeqCst);
@@ -472,7 +515,7 @@ pub fn g_object_unref(object: *mut GObject) {
         // 如果引用计数为0，调用finalize
         if current == 1 {
             if let Some(ref mut registry) = TYPE_REGISTRY {
-                if let Some(type_info) = registry.get(&G_TYPE_OBJECT) {
+                if let Some(_type_info) = registry.get(&G_TYPE_OBJECT) {
                     if let Some(class) = ((*object).g_type_instance.g_class as *mut GObjectClass).as_ref() {
                         if let Some(finalize) = class.finalize {
                             finalize(object);
@@ -490,19 +533,17 @@ pub fn g_object_set(object: *mut GObject, property_name: &str, value: gpointer) 
         return;
     }
 
-    unsafe {
-        let result = crate::syscall(syscall_number::GLibObjectSetProperty, [
-            object as usize,
-            property_name.as_ptr() as usize,
-            value as usize,
-            0, 0, 0,
-        ]);
+    let result = crate::syscall(syscall_number::GLIB_OBJECT_SET_PROPERTY, [
+        object as usize,
+        property_name.as_ptr() as usize,
+        value as usize,
+        0, 0,
+    ]);
 
-        if result == 0 {
-            glib_println!("[glib_object] 设置属性成功: {}={:?}", property_name, value);
-        } else {
-            glib_println!("[glib_object] 设置属性失败: {}", property_name);
-        }
+    if result == 0 {
+        glib_println!("[glib_object] 设置属性成功: {}={:?}", property_name, value);
+    } else {
+        glib_println!("[glib_object] 设置属性失败: {}", property_name);
     }
 }
 
@@ -512,22 +553,21 @@ pub fn g_object_get(object: *mut GObject, property_name: &str) -> gpointer {
         return ptr::null_mut();
     }
 
-    unsafe {
-        let mut value = 0u64;
-        let result = crate::syscall(syscall_number::GLibObjectGetProperty, [
-            object as usize,
-            property_name.as_ptr() as usize,
-            &mut value as *mut u64 as usize,
-            0, 0, 0,
-        ]);
+    let mut value = 0u64;
+    let value_ptr = &mut value as *mut u64 as usize;
+    let result = crate::syscall(syscall_number::GLIB_OBJECT_GET_PROPERTY, [
+        object as usize,
+        property_name.as_ptr() as usize,
+        value_ptr,
+        0, 0,
+    ]);
 
-        if result == 0 {
-            glib_println!("[glib_object] 获取属性成功: {}={:?}", property_name, value as gpointer);
-            value as gpointer
-        } else {
-            glib_println!("[glib_object] 获取属性失败: {}", property_name);
-            ptr::null_mut()
-        }
+    if result == 0 {
+        glib_println!("[glib_object] 获取属性成功: {}={:?}", property_name, value as gpointer);
+        value as gpointer
+    } else {
+        glib_println!("[glib_object] 获取属性失败: {}", property_name);
+        ptr::null_mut()
     }
 }
 
@@ -535,11 +575,11 @@ pub fn g_object_get(object: *mut GObject, property_name: &str) -> gpointer {
 pub fn g_signal_new(
     signal_name: &str,
     itype: GType,
-    signal_flags: GSignalFlags,
-    class_closure: GClosure,
-    accumulator: GSignalAccumulator,
-    accu_data: gpointer,
-    c_marshaller: GSignalCMarshaller,
+    _signal_flags: GSignalFlags,
+    _class_closure: GClosure,
+    _accumulator: GSignalAccumulator,
+    _accu_data: gpointer,
+    _c_marshaller: GSignalCMarshaller,
     return_type: GType,
     n_params: u32,
     param_types: *const GType,
@@ -548,23 +588,20 @@ pub fn g_signal_new(
         return 0;
     }
 
-    unsafe {
-        let result = crate::syscall(syscall_number::GLibObjectSignalRegister, [
-            itype,
-            signal_name.as_ptr() as usize,
-            param_types as usize,
-            n_params as usize,
-            return_type,
-            signal_flags as usize,
-        ]);
+    let result = crate::syscall(syscall_number::GLIB_OBJECT_SIGNAL_REGISTER, [
+        itype,
+        signal_name.as_ptr() as usize,
+        param_types as usize,
+        n_params as usize,
+        return_type,
+    ]);
 
-        if result > 0 {
-            OBJECT_STATS.total_signals.fetch_add(1, Ordering::SeqCst);
-            glib_println!("[glib_object] 注册信号: {} (ID={})", signal_name, result);
-            result as guint
-        } else {
-            0
-        }
+    if result > 0 {
+        OBJECT_STATS.total_signals.fetch_add(1, Ordering::SeqCst);
+        glib_println!("[glib_object] 注册信号: {} (ID={})", signal_name, result);
+        result as guint
+    } else {
+        0
     }
 }
 
@@ -575,9 +612,24 @@ pub fn g_signal_connect(
     c_handler: GCallback,
     data: gpointer,
 ) -> gulong {
-    // 简化实现，实际应该维护处理器列表
-    glib_println!("[glib_object] 连接信号: {} -> {:?}", detailed_signal, c_handler);
-    1 // 返回处理器ID
+    if instance.is_null() {
+        return 0;
+    }
+    // 调用内核系统调用连接信号
+    let handler_id = crate::syscall(syscall_number::GLIB_OBJECT_SIGNAL_CONNECT, [
+        instance as usize,
+        detailed_signal.as_ptr() as usize,
+        c_handler as usize,
+        data as usize,
+        0,
+    ]) as gulong;
+    
+    if handler_id != 0 {
+        glib_println!("[glib_object] 连接信号: 对象={:p}, 信号={}, 处理器={:?}, 数据={:?}, ID={}", 
+            instance, detailed_signal, c_handler, data, handler_id);
+    }
+    
+    handler_id
 }
 
 /// 发射信号
@@ -591,18 +643,17 @@ pub fn g_signal_emit(
         return;
     }
 
-    unsafe {
-        let result = crate::syscall(syscall_number::GLibObjectSignalEmit, [
-            instance as usize,
-            signal_id as usize,
-            var_args as usize, // 参数数组指针（简化）
-            0, // 参数数量（简化）
-            0,
-        ]);
+    let result = crate::syscall(syscall_number::GLIB_OBJECT_SIGNAL_EMIT, [
+        instance as usize,
+        signal_id as usize,
+        var_args as usize, // 参数数组指针
+        detail as usize, // 信号详情
+        0,
+    ]);
 
-        if result >= 0 {
-            glib_println!("[glib_object] 信号发射成功: ID={}, handlers={}", signal_id, result);
-        }
+    if result >= 0 {
+        glib_println!("[glib_object] 信号发射成功: 对象={:p}, ID={}, 详情={}, handlers={}", 
+            instance, signal_id, detail, result);
     }
 }
 
@@ -633,7 +684,7 @@ pub fn cleanup() {
 
     unsafe {
         // 清理内核中的所有对象
-        crate::syscall(syscall_number::GLibObjectCleanup, [0, 0, 0, 0, 0, 0]);
+        crate::syscall(syscall_number::GLIB_OBJECT_CLEANUP, [0, 0, 0, 0, 0]);
 
         // 清理类型注册表
         TYPE_REGISTRY = None;
@@ -751,13 +802,16 @@ mod tests {
 
 // 系统调用号映射
 mod syscall_number {
-    pub const GLibObjectTypeRegister: usize = 1020;
-    pub const GLibObjectInstanceCreate: usize = 1021;
-    pub const GLibObjectRef: usize = 1022;
-    pub const GLibObjectUnref: usize = 1023;
-    pub const GLibObjectSignalRegister: usize = 1024;
-    pub const GLibObjectSignalEmit: usize = 1025;
-    pub const GLibObjectSetProperty: usize = 1026;
-    pub const GLibObjectGetProperty: usize = 1027;
-    pub const GLibObjectCleanup: usize = 1029;
+    pub const GLIB_OBJECT_TYPE_REGISTER: usize = 1020;
+    pub const GLIB_OBJECT_INSTANCE_CREATE: usize = 1021;
+    pub const GLIB_OBJECT_REF: usize = 1022;
+    pub const GLIB_OBJECT_UNREF: usize = 1023;
+    pub const GLIB_OBJECT_SIGNAL_REGISTER: usize = 1024;
+    pub const GLIB_OBJECT_SIGNAL_EMIT: usize = 1025;
+    pub const GLIB_OBJECT_SET_PROPERTY: usize = 1026;
+    pub const GLIB_OBJECT_GET_PROPERTY: usize = 1027;
+    pub const GLIB_OBJECT_DISPOSE: usize = 1028;
+    pub const GLIB_OBJECT_CLEANUP: usize = 1029;
+    pub const GLIB_OBJECT_NOTIFY: usize = 1030;
+    pub const GLIB_OBJECT_SIGNAL_CONNECT: usize = 1031;
 }

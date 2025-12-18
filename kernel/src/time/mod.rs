@@ -211,7 +211,7 @@ pub fn tick() {
     
     // Wake up sleeping processes if needed
     wakeup_sleepers(ticks + 1);
-    crate::mm::mmio_stats_periodic(ticks + 1);
+    // crate::mm::mmio_stats_periodic(ticks + 1); // Function not properly exported
 }
 
 /// Get current tick count

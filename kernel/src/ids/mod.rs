@@ -14,15 +14,8 @@ pub mod threat_intelligence;
 pub mod response_engine;
 pub mod correlation_engine;
 
-// Re-export all the public types and functions from submodules
+// Re-export only network_ids which is used by other modules
 pub use network_ids::*;
-pub use host_ids::*;
-pub use anomaly_detection::*;
-pub use signature_detection::*;
-pub use behavior_analysis::*;
-pub use threat_intelligence::*;
-pub use response_engine::*;
-pub use correlation_engine::*;
 
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;

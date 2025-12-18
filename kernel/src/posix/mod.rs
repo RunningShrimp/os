@@ -2,7 +2,7 @@
 //!
 //! Standard types and constants for POSIX compliance
 
-use alloc::string::ToString;
+
 
 
 // ============================================================================
@@ -50,6 +50,15 @@ pub type Size = usize;
 
 /// Clock ID type
 pub type ClockId = i32;
+
+/// Clock tick type
+pub type clock_t = i64;
+
+/// File offset type (alternative name)
+pub type off_t = Off;
+
+/// AIO request priority type
+pub type aio_reqprio_t = i32;
 
 // ============================================================================
 // File Mode Bits
@@ -1601,10 +1610,10 @@ pub struct tms {
 }
 
 /// Clock type (clock ticks)
-pub type clock_t = i64;
+pub type ClockT = i64;
 
 /// User/group ID type
-pub type id_t = u32;
+pub type IdT = u32;
 
 /// Shared memory ID structure
 #[repr(C)]
@@ -1628,8 +1637,7 @@ pub struct shmid_ds {
     pub shm_nattch: u64,
 }
 
-/// UTS name structure (already defined as Utsname, add alias)
-pub type utsname = Utsname;
+/// UTS name structure (C-compatible struct already defined above)
 
 /// Time specification structure
 #[repr(C)]
@@ -1650,16 +1658,16 @@ pub struct sigset_t {
 }
 
 /// Group ID type (C-compatible alias)
-pub type gid_t = Gid;
-pub type uid_t = Uid;
-pub type socklen_t = u32;
+pub type GidT = Gid;
+pub type UidT = Uid;
+pub type SocklenT = u32;
 
 // ============================================================================
 // POSIX Thread Types
 // ============================================================================
 
 /// POSIX thread ID type
-pub type pthread_t = usize;
+pub type PthreadT = usize;
 
 /// POSIX mutex type
 #[repr(C)]
@@ -1698,10 +1706,10 @@ pub struct pthread_rwlockattr_t {
 }
 
 /// POSIX thread-specific data key type
-pub type pthread_key_t = u32;
+pub type PthreadKeyT = u32;
 
 /// Clock ID type
-pub type clockid_t = i32;
+pub type ClockidT = i32;
 
 /// Directory entry type (C-compatible)
 #[repr(C)]
@@ -1741,27 +1749,26 @@ pub struct stat {
 // ============================================================================
 
 /// POSIX semaphore type
-pub type sem_t = SemT;
+pub type SemT = SemT;
 
 /// POSIX message queue descriptor type
-pub type mqd_t = i32;
+pub type MqdT = i32;
 
 // ============================================================================
 // POSIX Socket Types
 // ============================================================================
 
-/// Socket address type (C-compatible alias)
-pub type sockaddr = Sockaddr;
+/// Socket address type (C-compatible struct already defined above)
 
 // ============================================================================
 // POSIX File System Types
 // ============================================================================
 
 /// File offset type (C-compatible alias)
-pub type off_t = Off;
+pub type OffT = Off;
 
 /// File mode type (C-compatible alias)
-pub type mode_t = Mode;
+pub type ModeT = Mode;
 
 /// Directory type
 #[repr(C)]
@@ -1773,8 +1780,7 @@ pub struct DIR {
 // POSIX Time Types
 // ============================================================================
 
-/// Time value structure (C-compatible alias)
-pub type timeval = Timeval;
+/// Time value structure (C-compatible struct already defined above)
 
 /// Time structure (C-compatible)
 #[repr(C)]
@@ -1795,8 +1801,7 @@ pub struct tm {
 // POSIX File Descriptor Set Type
 // ============================================================================
 
-/// File descriptor set type (C-compatible alias)
-pub type fd_set = FdSet;
+/// File descriptor set type (C-compatible struct already defined above)
 
 // ============================================================================
 // AIO Types (aio.h)
@@ -1864,7 +1869,7 @@ impl Default for aiocb {
 }
 
 /// AIO request priority type
-pub type aio_reqprio_t = i32;
+pub type AioReqprioT = i32;
 
 /// AIO signal event structure
 #[repr(C)]
@@ -1895,4 +1900,4 @@ impl Default for aio_sigevent_t {
 }
 
 /// File offset type for AIO
-pub type aio_offset_t = off_t;
+pub type AioOffsetT = off_t;

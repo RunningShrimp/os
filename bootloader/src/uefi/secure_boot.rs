@@ -3,7 +3,7 @@
 //! This module implements UEFI Secure Boot functionality including signature
 //! verification, key database management, and boot chain validation.
 
-use crate::error::{BootError, Result};
+use crate::utils::error::{BootError, Result};
 use core::ptr;
 
 #[cfg(feature = "uefi_support")]
@@ -55,7 +55,7 @@ impl SecureBootManager {
         use uefi::proto::loaded_image::LoadedImage;
         use uefi::proto::media::file::File;
         use uefi::proto::media::fs::SimpleFileSystem;
-        use uefi::table::boot::MemoryType;
+
 
         // Get the loaded image to access variables
         let loaded_image = unsafe {
@@ -334,7 +334,7 @@ impl EfiSignatureDatabase {
         // Parse the signature database format
         // For now, just create an empty database
         Ok(Self {
-            name: name.to_string(),
+            name: name.to_owned(),
             signatures: Vec::new(),
         })
     }
@@ -367,13 +367,21 @@ enum VariableVendorData {
 
 /// EFI GUID constants
 #[cfg(feature = "uefi_support")]
-const EFI_GLOBAL_VARIABLE_GUID: uefi::Guid = uefi::Guid::from_values(
-    0x8BE4DF61, 0x93CA, 0x11d2, 0xAA, 0x0D, [0x00, 0xE0, 0x98, 0x03, 0x2B, 0x8C]
+const EFI_GLOBAL_VARIABLE_GUID: uefi::Guid = uefi::Guid::new(
+    [0x61, 0xdf, 0xe4, 0x8b], // time_low (little-endian)
+    [0xca, 0x93],             // time_mid (little-endian)
+    [0xd2, 0x11],             // time_high_and_version (little-endian)
+    0xaa, 0x0d,               // clock_seq_hi_and_reserved, clock_seq_low
+    [0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c] // node
 );
 
 #[cfg(feature = "uefi_support")]
-const EFI_IMAGE_SECURITY_DATABASE_GUID: uefi::Guid = uefi::Guid::from_values(
-    0xD719B2CB, 0x3D3A, 0x4596, 0xA3, 0xBC, [0xDA, 0xD0, 0x0E, 0x67, 0x65, 0x6F]
+const EFI_IMAGE_SECURITY_DATABASE_GUID: uefi::Guid = uefi::Guid::new(
+    [0xcb, 0xb2, 0x19, 0xd7], // time_low (little-endian)
+    [0x3a, 0x3d],             // time_mid (little-endian)
+    [0x96, 0x45],             // time_high_and_version (little-endian)
+    0xa3, 0xbc,               // clock_seq_hi_and_reserved, clock_seq_low
+    [0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f] // node
 );
 
 /// Non-UEFI stub implementations

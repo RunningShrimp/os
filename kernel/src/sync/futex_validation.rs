@@ -6,10 +6,7 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
-use alloc::collections::BTreeMap;
-use core::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
-use crate::sync::Mutex;
+use core::sync::atomic::{AtomicI32, Ordering};
 use crate::syscalls::thread::{
     FutexWaiter, PiFutexData, FUTEX_WAIT_QUEUE,
     futex_wait_timeout, futex_wake_optimized, futex_requeue,

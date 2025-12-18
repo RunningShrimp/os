@@ -6,10 +6,10 @@
 extern crate alloc;
 use alloc::collections::VecDeque;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicUsize, Ordering};
 use crate::sync::Mutex;
 use crate::reliability::errno::{EINVAL, ESRCH};
-use crate::process::thread::{Thread, ThreadState, Tid};
+use crate::process::thread::{ThreadState, Tid};
 
 /// Scheduling policies
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

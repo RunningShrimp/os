@@ -21,12 +21,13 @@ mod host_ids;
 
 // 重新导出主要类型
 pub use host_ids::{
-    HostIds, HostIdsStats,
+    HostIds,
 };
 
-// 重新导出各监控器（从临时文件）
-pub use host_ids::{
-    SyscallMonitor, FileMonitor, ProcessMonitor, RegistryMonitor,
-    NetworkMonitor, UserMonitor, IntegrityChecker, MalwareScanner,
-};
+// 注意：暂时注释掉未使用的重新导出以避免警告
+// TODO: 在实现完整的子模块后重新启用这些导出
+// pub use host_ids::{
+//     SyscallMonitor, FileMonitor, ProcessMonitor, RegistryMonitor,
+//     NetworkMonitor, UserMonitor, IntegrityChecker, MalwareScanner,
+// };
 

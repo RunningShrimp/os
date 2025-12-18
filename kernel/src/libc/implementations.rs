@@ -17,8 +17,8 @@ use alloc::boxed::Box;
 
 use crate::libc::CLibInterface;
 use crate::libc::interface::{size_t, DivT, LDivT, CLibResult, CLibStats, c_long};
-use core::ffi::{c_int, c_char, c_void, c_uint, c_double, c_ulong};
-use alloc::alloc::{alloc, Layout};
+use core::ffi::{c_int, c_char, c_void, c_uint, c_double};
+
 
 // 导入增强库模块
 use crate::libc::string_lib::EnhancedStringLib;
@@ -38,14 +38,7 @@ pub enum ImplementationType {
     Unified,
 }
 
-// 重新导出类型以保持向后兼容
-pub mod simple {
-    pub use crate::libc::implementations::UnifiedCLib;
-}
 
-pub mod minimal {
-    pub use crate::libc::implementations::UnifiedCLib;
-}
 
 /// 统一的C标准库实现
 /// 

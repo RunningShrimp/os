@@ -314,11 +314,9 @@ pub unsafe extern "C" fn shmdt(shmaddr: *mut u8) -> i32 {
             // Try to find a mapping for this address
             let table = crate::process::manager::PROC_TABLE.lock();
             if let Some(proc) = table.find_ref(current_pid) {
-                unsafe {
-                    if vm::get_page_mapping(proc as *const crate::process::manager::Proc, vaddr).is_some() {
-                        found_segment = Some(segment.clone());
-                        break;
-                    }
+                if vm::get_page_mapping(proc as *const crate::process::manager::Proc, vaddr).is_some() {
+                    found_segment = Some(segment.clone());
+                    break;
                 }
             }
         }
@@ -337,12 +335,10 @@ pub unsafe extern "C" fn shmdt(shmaddr: *mut u8) -> i32 {
     let num_pages = seg_guard.size / vm::PAGE_SIZE;
     let mut unmapped_pages = 0;
 
-    unsafe {
-        for i in 0..num_pages {
-            let page_vaddr = vaddr + (i * vm::PAGE_SIZE);
-            if vm::unmap_page(pagetable, page_vaddr).is_ok() {
-                unmapped_pages += 1;
-            }
+    for i in 0..num_pages {
+        let page_vaddr = vaddr + (i * vm::PAGE_SIZE);
+        if vm::unmap_page(pagetable, page_vaddr).is_ok() {
+            unmapped_pages += 1;
         }
     }
 

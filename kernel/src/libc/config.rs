@@ -3,8 +3,7 @@
 //! 提供灵活的配置系统，支持不同的C库实现类型和参数调整。
 //! 允许在编译时和运行时配置C库行为。
 
-use core::ffi::c_int;
-use crate::libc::interface::{ImplementationType, CLibStats};
+use crate::libc::interface::{ImplementationType};
 use core::cell::Cell;
 
 /// C库配置结构

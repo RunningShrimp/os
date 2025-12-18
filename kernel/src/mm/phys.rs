@@ -6,37 +6,18 @@ use crate::println;
 use core::ptr;
 use crate::mm::buddy::OptimizedBuddyAllocator;
 
+// Re-export types from nos-mm
+pub use nos_mm::physical::{
+    PAGE_SIZE, PAGE_SHIFT,
+    page_round_down, page_round_up,
+    addr_to_pfn, pfn_to_addr,
+    PhysAddr
+};
+pub use nos_mm::virtual_mem::VirtAddr;
+
 static BUDDY: Mutex<OptimizedBuddyAllocator> = Mutex::new(OptimizedBuddyAllocator::new());
 use core::sync::atomic::{AtomicUsize, Ordering};
 extern crate alloc;
-
-/// Page size (4KB)
-pub const PAGE_SIZE: usize = 4096;
-pub const PAGE_SHIFT: usize = 12;
-
-/// Align address down to page boundary
-#[inline]
-pub const fn page_round_down(addr: usize) -> usize {
-    addr & !(PAGE_SIZE - 1)
-}
-
-/// Align address up to page boundary
-#[inline]
-pub const fn page_round_up(addr: usize) -> usize {
-    (addr + PAGE_SIZE - 1) & !(PAGE_SIZE - 1)
-}
-
-/// Physical address to page number
-#[inline]
-pub const fn addr_to_pfn(addr: usize) -> usize {
-    addr >> PAGE_SHIFT
-}
-
-/// Page number to physical address
-#[inline]
-pub const fn pfn_to_addr(pfn: usize) -> usize {
-    pfn << PAGE_SHIFT
-}
 
 // ============================================================================
 // Memory layout symbols from linker script
@@ -585,140 +566,6 @@ pub fn mmio_write64(addr: *mut u64, val: u64) {
 pub fn mem_stats() -> (usize, usize) {
     let alloc = PAGE_ALLOCATOR.lock();
     (alloc.free_pages(), alloc.total_pages())
-}
-
-// ============================================================================
-// Physical Address wrapper
-// ============================================================================
-
-/// A physical address
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[repr(transparent)]
-pub struct PhysAddr(pub usize);
-
-impl PhysAddr {
-    pub const fn new(addr: usize) -> Self {
-        Self(addr)
-    }
-
-    pub const fn as_usize(self) -> usize {
-        self.0
-    }
-
-    pub const fn page_offset(self) -> usize {
-        self.0 & (PAGE_SIZE - 1)
-    }
-
-    pub const fn page_number(self) -> usize {
-        self.0 >> PAGE_SHIFT
-    }
-
-    pub const fn is_page_aligned(self) -> bool {
-        self.page_offset() == 0
-    }
-
-    pub const fn page_round_up(self) -> Self {
-        Self(page_round_up(self.0))
-    }
-
-    pub const fn page_round_down(self) -> Self {
-        Self(page_round_down(self.0))
-    }
-}
-
-impl From<usize> for PhysAddr {
-    fn from(addr: usize) -> Self {
-        Self(addr)
-    }
-}
-
-impl From<PhysAddr> for usize {
-    fn from(addr: PhysAddr) -> Self {
-        addr.0
-    }
-}
-
-// ============================================================================
-// Virtual Address wrapper
-// ============================================================================
-
-/// A virtual address
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[repr(transparent)]
-pub struct VirtAddr(pub usize);
-
-impl VirtAddr {
-    pub const fn new(addr: usize) -> Self {
-        Self(addr)
-    }
-
-    pub const fn as_usize(self) -> usize {
-        self.0
-    }
-
-    pub const fn page_offset(self) -> usize {
-        self.0 & (PAGE_SIZE - 1)
-    }
-
-    pub const fn page_number(self) -> usize {
-        self.0 >> PAGE_SHIFT
-    }
-
-    pub const fn is_page_aligned(self) -> bool {
-        self.page_offset() == 0
-    }
-
-    pub const fn page_round_up(self) -> Self {
-        Self(page_round_up(self.0))
-    }
-
-    pub const fn page_round_down(self) -> Self {
-        Self(page_round_down(self.0))
-    }
-
-    /// Get page table indices for this virtual address (for 4-level paging)
-    #[cfg(target_arch = "x86_64")]
-    pub const fn page_table_indices(self) -> [usize; 4] {
-        [
-            (self.0 >> 39) & 0x1FF, // PML4
-            (self.0 >> 30) & 0x1FF, // PDPT
-            (self.0 >> 21) & 0x1FF, // PD
-            (self.0 >> 12) & 0x1FF, // PT
-        ]
-    }
-
-    /// Get page table indices for Sv39 (RISC-V)
-    #[cfg(target_arch = "riscv64")]
-    pub const fn page_table_indices(self) -> [usize; 3] {
-        [
-            (self.0 >> 30) & 0x1FF, // VPN[2]
-            (self.0 >> 21) & 0x1FF, // VPN[1]
-            (self.0 >> 12) & 0x1FF, // VPN[0]
-        ]
-    }
-
-    /// Get page table indices for AArch64 4KB granule
-    #[cfg(target_arch = "aarch64")]
-    pub const fn page_table_indices(self) -> [usize; 4] {
-        [
-            (self.0 >> 39) & 0x1FF, // L0
-            (self.0 >> 30) & 0x1FF, // L1
-            (self.0 >> 21) & 0x1FF, // L2
-            (self.0 >> 12) & 0x1FF, // L3
-        ]
-    }
-}
-
-impl From<usize> for VirtAddr {
-    fn from(addr: usize) -> Self {
-        Self(addr)
-    }
-}
-
-impl From<VirtAddr> for usize {
-    fn from(addr: VirtAddr) -> Self {
-        addr.0
-    }
 }
 
 // ============================================================================

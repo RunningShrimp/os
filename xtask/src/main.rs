@@ -32,7 +32,7 @@ fn main() {
 }
 
 fn build_kernel(args: Vec<String>) {
-    let target = args.get(0).map(String::as_str).unwrap_or("aarch64");
+    let target = args.first().map(String::as_str).unwrap_or("aarch64");
     let tests = args.iter().any(|a| a == "--tests");
     let target_json = match target {
         "aarch64" => "targets/aarch64-nostd.json",
@@ -52,7 +52,7 @@ fn build_kernel(args: Vec<String>) {
 }
 
 fn build_user(args: Vec<String>) {
-    let target = args.get(0).map(String::as_str).unwrap_or("aarch64");
+    let target = args.first().map(String::as_str).unwrap_or("aarch64");
     let target_json = match target {
         "aarch64" => "targets/aarch64-nostd.json",
         "riscv64" => "targets/riscv64-nostd.json",
@@ -125,13 +125,14 @@ fn generate_syscall_matrix() -> Result<()> {
     impls.sort_by(|a,b| a.0.cmp(&b.0));
     variants.sort_by(|a,b| a.1.cmp(&b.1));
 
-    let mut lines = Vec::new();
-    lines.push(String::from("# 系统调用覆盖矩阵"));
-    lines.push(String::from(""));
-    lines.push(String::from("来源: kernel/src/syscalls/mod.rs"));
-    lines.push(String::from(""));
-    lines.push(String::from("| 编号 | 名称 | 实现函数 | 备注 |"));
-    lines.push(String::from("|---:|---|---|---|"));
+    let mut lines = vec![
+        String::from("# 系统调用覆盖矩阵"),
+        String::from(""),
+        String::from("来源: kernel/src/syscalls/mod.rs"),
+        String::from(""),
+        String::from("| 编号 | 名称 | 实现函数 | 备注 |"),
+        String::from("|---:|---|---|---|"),
+    ];
     for (name, num) in variants.iter() {
         let func = impls.iter().find(|(n, _)| n == name).map(|(_, f)| f.clone()).unwrap_or_else(|| String::from("未实现"));
         let note = if func == "未实现" { "未匹配到 dispatch 分支" } else { "已实现" };

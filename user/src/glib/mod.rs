@@ -13,7 +13,7 @@
 //! - string: 字符串操作 (GString, 字符串工具函数)
 //! - utils: 工具函数和宏
 
-#![no_std]
+#![allow(non_camel_case_types)]
 
 extern crate alloc;
 
@@ -42,9 +42,11 @@ pub use main_loop::*;
 pub use async_io::*;
 pub use string::*;
 pub use utils::*;
+pub use macros::*;
 
 // GLib错误处理
 pub mod error;
+pub use error::GError;
 
 /// GLib初始化函数
 ///
@@ -86,10 +88,16 @@ pub struct GLibState {
 
 static mut G_LIB_STATE: Option<GLibState> = None;
 
+/// 获取G_LIB_STATE的raw pointer
+unsafe fn get_glib_state_ptr() -> *mut Option<GLibState> {
+    core::ptr::addr_of_mut!(G_LIB_STATE)
+}
+
 /// 获取GLib全局状态
 pub fn get_state() -> &'static GLibState {
     unsafe {
-        G_LIB_STATE.as_ref().unwrap_or_else(|| {
+        let state_ptr = get_glib_state_ptr();
+        (*state_ptr).as_ref().unwrap_or_else(|| {
             panic!("GLib未初始化！请先调用glib::init()");
         })
     }
@@ -98,7 +106,8 @@ pub fn get_state() -> &'static GLibState {
 /// 获取可变GLib全局状态
 pub fn get_state_mut() -> &'static mut GLibState {
     unsafe {
-        G_LIB_STATE.as_mut().unwrap_or_else(|| {
+        let state_ptr = get_glib_state_ptr();
+        (*state_ptr).as_mut().unwrap_or_else(|| {
             panic!("GLib未初始化！请先调用glib::init()");
         })
     }
@@ -109,28 +118,28 @@ pub mod macros {
     /// g_new宏 - 分配并初始化数组
     #[macro_export]
     macro_rules! g_new {
-        ($type:ty, $n:expr) => {
-            $crate::glib::g_malloc_n(core::mem::size_of::<$type>() * $n) as *mut $type
+        ($type:ty, $count:expr) => {
+            {
+                let size = core::mem::size_of::<$type>() * $count;
+                let ptr = nos_api::memory::malloc(size);
+                if ptr.is_null() {
+                    core::ptr::null_mut()
+                } else {
+                    ptr as *mut $type
+                }
+            }
         };
     }
-
-    /// g_new0宏 - 分配、初始化为零的数组
+    
+    /// g_free宏 - 释放内存
     #[macro_export]
-    macro_rules! g_new0 {
-        ($type:ty, $n:expr) => {
-            $crate::glib::g_malloc0_n(core::mem::size_of::<$type>() * $n) as *mut $type
+    macro_rules! g_free {
+        ($ptr:expr) => {
+            if !$ptr.is_null() {
+                nos_api::memory::free($ptr as *mut core::ffi::c_void);
+            }
         };
     }
-
-    /// g_renew宏 - 重新分配数组
-    #[macro_export]
-    macro_rules! g_renew {
-        ($type:ty, $mem:expr, $n:expr) => {
-            $crate::glib::g_realloc($mem as *mut _, core::mem::size_of::<$type>() * $n) as *mut $type
-        };
-    }
-
-    // Assertion macros are now defined locally in each module to avoid conflicts
 }
 
 // 常量定义
@@ -150,7 +159,7 @@ pub mod constants {
     /// 默认最大内存池数量
     pub const DEFAULT_MAX_MEMORY_POOLS: usize = 16;
 
-    /// 默认事件循环优先级
+    /// GLib优先级常量
     pub const G_PRIORITY_DEFAULT: i32 = 0;
     pub const G_PRIORITY_DEFAULT_IDLE: i32 = 200;
     pub const G_PRIORITY_HIGH: i32 = -100;
@@ -173,32 +182,69 @@ pub mod types {
 
     /// GLib布尔类型
     pub type gboolean = c_int;
+    pub type Gboolean = c_int;
 
     /// GLib字符类型
     pub type gchar = c_char;
+    pub type Gchar = c_char;
 
     /// GLib无符号字符类型
     pub type guchar = core::ffi::c_uchar;
+    pub type Guchar = core::ffi::c_uchar;
 
     /// GLib整数类型
     pub type gint = c_int;
+    pub type Gint = c_int;
     pub type guint = c_uint;
+    pub type Guint = c_uint;
+
+    /// GLib短整数类型
+    pub type gshort = i16;
+    pub type Gshort = i16;
+    pub type gushort = u16;
+    pub type Gushort = u16;
+    
+    /// GLib精确宽度的整数类型
+    pub type gint8 = i8;
+    pub type Gint8 = i8;
+    pub type guint8 = u8;
+    pub type Guint8 = u8;
+    pub type gint16 = i16;
+    pub type Gint16 = i16;
+    pub type guint16 = u16;
+    pub type Guint16 = u16;
+    pub type gint32 = i32;
+    pub type Gint32 = i32;
+    pub type guint32 = u32;
+    pub type Guint32 = u32;
+    pub type gint64 = i64;
+    pub type Gint64 = i64;
+    pub type guint64 = u64;
+    pub type Guint64 = u64;
 
     /// GLib长整数类型
     pub type glong = isize;
+    pub type Glong = isize;
     pub type gulong = usize;
+    pub type Gulong = usize;
 
     /// GLib指针类型
     pub type gpointer = *mut c_void;
+    pub type Gpointer = *mut c_void;
     pub type gconstpointer = *const c_void;
+    pub type Gconstpointer = *const c_void;
 
     /// GLib大小类型
     pub type gsize = usize;
+    pub type Gsize = usize;
     pub type gssize = isize;
+    pub type Gssize = isize;
 
-    /// GLib时间戳类型
-    pub type gint64 = i64;
-    pub type guint64 = u64;
+    /// GLib浮点类型
+    pub type gfloat = f32;
+    pub type Gfloat = f32;
+    pub type gdouble = f64;
+    pub type Gdouble = f64;
 
     /// GLib回调函数类型
     pub type GFunc = unsafe extern "C" fn(gpointer, gpointer);

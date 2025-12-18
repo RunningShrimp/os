@@ -18,7 +18,7 @@ use spin::Mutex;
 // Import println macro
 #[allow(unused_imports)]
 use crate::println;
-use crate::error_handling::{error_recovery::ExecutionStatus, diagnostic_tools::LogLevel, fault_tolerance::ConditionType};
+use nos_error_handling::{error_recovery::ExecutionStatus, diagnostic_tools::LogLevel, fault_tolerance::ConditionType};
 
 /// 优雅降级管理器
 pub struct GracefulDegradationManager {

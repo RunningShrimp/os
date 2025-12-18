@@ -15,7 +15,7 @@ use spin::Mutex;
 use crate::arch;
 // TODO: Implement X86Feature and X86Cpu in arch module
 // use crate::arch::{self, X86Feature, X86Cpu};
-use crate::types::stubs::*;
+use crate::types::stubs::VirtAddr;
 
 /// SMAP/SMEP configuration
 #[derive(Debug, Clone)]

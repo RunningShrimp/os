@@ -173,9 +173,7 @@ impl Timer {
         match self.sigevent.sigev_notify {
             crate::posix::SIGEV_SIGNAL => {
                 // Send signal to process
-                unsafe {
-                    let _ = crate::ipc::signal::kill(self.owner_pid as usize, self.sigevent.sigev_signo as u32);
-                }
+                let _ = crate::ipc::signal::kill(self.owner_pid as usize, self.sigevent.sigev_signo as u32);
             }
             crate::posix::SIGEV_THREAD => {
                 // Lightweight thread notification: in full implementation we would

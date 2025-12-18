@@ -9,17 +9,19 @@ extern crate alloc;
 // - 文件系统集成
 // - 错误处理和恢复
 
-use core::ffi::{c_char, c_int, c_void, c_uint};
+use core::ffi::{c_char, c_int, c_void};
 use core::str::FromStr;
+use heapless::{String, Vec};
 
-pub type size_t = usize;
+pub type SizeT = usize;
+#[allow(non_camel_case_types)]
+pub type size_t = SizeT;
 use core::ptr::null_mut;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use crate::libc::interface::{CLibResult, CLibError};
 use crate::libc::error::set_errno;
-use crate::libc::error::errno::{EINVAL, ENOENT, EIO, EAGAIN, EMFILE, ENOMEM, EBADF};
+use crate::libc::error::errno::{EINVAL, ENOENT, EMFILE, ENOMEM, EBADF};
 use crate::compat::loader::OpenFlags;
-use crate::drivers::console;
 
 /// 文件打开模式 (C库专用)
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -47,7 +49,7 @@ pub struct CFile {
     /// 文件描述符
     pub fd: c_int,
     /// 文件路径（可选，用于调试）
-    pub path: Option<heapless::String<256>>,
+    pub path: Option<String<256>>,
     /// 打开模式
     pub mode: CFileMode,
     /// 当前位置
@@ -134,9 +136,9 @@ pub struct EnhancedIOManager {
     /// 统计信息
     stats: IOStats,
     /// 打开的文件表
-    open_files: crate::sync::Mutex<heapless::Vec<Option<*mut CFile>, 256>>,
+    open_files: crate::sync::Mutex<Vec<Option<*mut CFile>, 256>>,
     /// 缓冲区池
-    buffer_pool: crate::sync::Mutex<heapless::Vec<&'static mut [u8], 128>>,
+    buffer_pool: crate::sync::Mutex<Vec<&'static mut [u8], 128>>,
     /// 下一个文件描述符
     next_fd: AtomicUsize,
 }
@@ -157,8 +159,8 @@ impl EnhancedIOManager {
         Self {
             config,
             stats: IOStats::default(),
-            open_files: crate::sync::Mutex::new(heapless::Vec::new()),
-            buffer_pool: crate::sync::Mutex::new(heapless::Vec::new()),
+            open_files: crate::sync::Mutex::new(Vec::new()),
+            buffer_pool: crate::sync::Mutex::new(Vec::new()),
             next_fd: AtomicUsize::new(3), // 从3开始，0-2是标准流
         }
     }
@@ -620,7 +622,7 @@ impl EnhancedIOManager {
 
         unsafe {
             (*c_file).fd = fd;
-            (*c_file).path = path.and_then(|p| heapless::String::from_str(p).ok());
+            (*c_file).path = path.and_then(|p| String::from_str(p).ok());
             (*c_file).mode = mode;
             (*c_file).position = 0;
             (*c_file).size = 0;
@@ -796,7 +798,9 @@ impl Default for EnhancedIOManager {
 }
 
 /// 类型别名
-pub type c_long = isize;
+pub type CLong = isize;
+#[allow(non_camel_case_types)]
+pub type c_long = CLong;
 
 // 获取标准流的函数
 pub unsafe fn stdin() -> *mut CFile {

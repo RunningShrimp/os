@@ -10,7 +10,7 @@
 use crate::posix::Pid;
 use crate::sync::Mutex;
 use alloc::collections::BTreeMap;
-use core::sync::atomic::{AtomicU32, Ordering};
+
 
 /// Scheduling policies
 pub const SCHED_NORMAL: i32 = 0;    // Normal (non-real-time) scheduling

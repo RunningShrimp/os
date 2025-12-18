@@ -9,14 +9,13 @@
 //! - 内存对齐优化
 //! - 泄漏检测
 
-#![no_std]
+
 
 extern crate alloc;
 
-use crate::glib::{types::*, error::GError, get_state_mut};
-use alloc::alloc::{GlobalAlloc, Layout};
-use core::ffi::c_void;
-use core::ptr::{self, NonNull};
+use crate::glib::{types::*, error::GError, G_MEM_ALIGN};
+use alloc::alloc::Layout;
+use core::ptr;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 
@@ -79,13 +78,11 @@ pub fn init() -> Result<(), GError> {
 /// 创建默认内存池
 fn create_memory_pools() -> Result<(), GError> {
     // 创建小对象内存池
-    let small_pool_id = unsafe {
-        crate::syscall(syscall_number::GLibMemoryPoolCreate, [
-            64,    // 64字节块
-            8,     // 8字节对齐
-            0, 0, 0, 0
-        ]) as i32
-    };
+    let small_pool_id = crate::syscall(syscall_number::GLIB_MEMORY_POOL_CREATE, [
+        64,    // 64字节块
+        8,     // 8字节对齐
+        0, 0, 0
+    ]) as i32;
 
     if small_pool_id <= 0 {
         return Err(GError::new(crate::glib::error::domains::G_FILE_ERROR,
@@ -94,13 +91,11 @@ fn create_memory_pools() -> Result<(), GError> {
     }
 
     // 创建中等对象内存池
-    let medium_pool_id = unsafe {
-        crate::syscall(syscall_number::GLibMemoryPoolCreate, [
-            512,   // 512字节块
-            16,    // 16字节对齐
-            0, 0, 0, 0
-        ]) as i32
-    };
+    let medium_pool_id = crate::syscall(syscall_number::GLIB_MEMORY_POOL_CREATE, [
+        512,   // 512字节块
+        16,    // 16字节对齐
+        0, 0, 0
+    ]) as i32;
 
     if medium_pool_id <= 0 {
         return Err(GError::new(crate::glib::error::domains::G_FILE_ERROR,
@@ -274,13 +269,11 @@ pub fn g_slice_alloc(block_size: usize) -> gpointer {
     // 选择合适的内存池
     let pool_id = select_slice_pool(aligned_size);
     if pool_id > 0 {
-        let ptr = unsafe {
-            crate::syscall(syscall_number::GLibMemoryPoolAlloc, [
-                pool_id as usize,
-                aligned_size,
-                0, 0, 0, 0
-            ]) as gpointer
-        };
+        let ptr = crate::syscall(syscall_number::GLIB_MEMORY_POOL_ALLOC, [
+            pool_id as usize,
+            aligned_size,
+            0, 0, 0
+        ]) as gpointer;
 
         if !ptr.is_null() {
             update_alloc_stats(aligned_size);
@@ -303,10 +296,10 @@ pub unsafe fn g_slice_free1(block_size: usize, mem_block: gpointer) {
     // 尝试释放到内存池
     let pool_id = select_slice_pool(aligned_size);
     if pool_id > 0 {
-        crate::syscall(syscall_number::GLibMemoryPoolFree, [
+        crate::syscall(syscall_number::GLIB_MEMORY_POOL_FREE, [
             pool_id as usize,
             mem_block as usize,
-            0, 0, 0, 0
+            0, 0, 0
         ]);
         update_free_stats(aligned_size);
         return;
@@ -358,13 +351,11 @@ fn try_slice_alloc(size: usize) -> gpointer {
         return ptr::null_mut();
     }
 
-    unsafe {
-        crate::syscall(syscall_number::GLibMemoryPoolAlloc, [
-            pool_id as usize,
-            size,
-            0, 0, 0, 0
-        ]) as gpointer
-    }
+    crate::syscall(syscall_number::GLIB_MEMORY_POOL_ALLOC, [
+        pool_id as usize,
+        size,
+        0, 0, 0
+    ]) as gpointer
 }
 
 /// 尝试切片释放
@@ -374,13 +365,11 @@ fn try_slice_free(mem: gpointer, size: usize) -> bool {
         return false;
     }
 
-    unsafe {
-        crate::syscall(syscall_number::GLibMemoryPoolFree, [
-            pool_id as usize,
-            mem as usize,
-            0, 0, 0, 0
-        ]) == 0
-    }
+    crate::syscall(syscall_number::GLIB_MEMORY_POOL_FREE, [
+        pool_id as usize,
+        mem as usize,
+        0, 0, 0
+    ]) == 0
 }
 
 /// 选择切片池
@@ -461,7 +450,7 @@ pub fn cleanup() {
 
     // 清理内存池
     unsafe {
-        crate::syscall(syscall_number::GLibMemoryPoolsCleanup, [0, 0, 0, 0, 0, 0]);
+        crate::syscall(syscall_number::GLIB_MEMORY_POOLS_CLEANUP, [0, 0, 0, 0, 0]);
         SLICE_ALLOCATOR = None;
     }
 
@@ -584,8 +573,8 @@ mod tests {
 
 // 系统调用号映射
 mod syscall_number {
-    pub const GLibMemoryPoolCreate: usize = 1001;
-    pub const GLibMemoryPoolAlloc: usize = 1002;
-    pub const GLibMemoryPoolFree: usize = 1003;
-    pub const GLibMemoryPoolsCleanup: usize = 1006;
+    pub const GLIB_MEMORY_POOL_CREATE: usize = 1001;
+    pub const GLIB_MEMORY_POOL_ALLOC: usize = 1002;
+    pub const GLIB_MEMORY_POOL_FREE: usize = 1003;
+    pub const GLIB_MEMORY_POOLS_CLEANUP: usize = 1006;
 }

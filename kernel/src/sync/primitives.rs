@@ -8,7 +8,7 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use alloc::boxed::Box;
-use core::sync::atomic::{AtomicBool, AtomicUsize, AtomicU64, AtomicPtr, Ordering};
+use core::sync::atomic::{AtomicUsize, AtomicU64, AtomicPtr, Ordering};
 use core::cell::UnsafeCell;
 use crate::sync::{Mutex, RawSpinLock};
 use core::ops::{Deref, DerefMut};
