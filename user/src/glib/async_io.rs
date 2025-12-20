@@ -13,9 +13,10 @@
 extern crate alloc;
 
 use crate::glib::{types::*, collections::*, g_free, g_malloc, g_malloc0, error::GError};
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use core::ptr::{self, NonNull};
-use core::ffi::c_void;
+use core::ffi::{c_void, c_int};
+use crate::glib::GObject;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 
@@ -64,7 +65,7 @@ pub struct AsyncResult {
 }
 
 /// 异步回调函数类型
-pub type AsyncReadyCallback = unsafe extern "C" fn(*mut GObject, *mut AsyncResult, gpointer);
+pub type AsyncReadyCallback = unsafe extern "C" fn(*mut GObject, *mut GAsyncResult, gpointer);
 
 /// 异步操作信息
 #[derive(Debug)]
@@ -199,14 +200,14 @@ pub fn g_async_context_new(name: &str, max_operations: usize) -> *mut AsyncIOCon
         }
 
         (*context).context_id = context_id;
-        (*context).name = name.to_string();
+        (*context).name = String::from(name);
         (*context).max_operations = max_operations;
         (*context).active_operations = BTreeMap::new();
         (*context).next_operation_id = AtomicUsize::new(1);
         (*context).created_timestamp = crate::time::get_timestamp() as u64;
 
         // 注册到内核
-        let result = crate::syscall(syscall_number::GLibAsyncContextCreate, [
+        let result = crate::syscall(syscall_number::GLibAsyncContextCreate, &[
             name.as_ptr() as usize,
             max_operations,
             0, 0, 0, 0,
@@ -241,7 +242,7 @@ pub fn g_async_context_destroy(context: *mut AsyncIOContext) {
         }
 
         // 销毁内核上下文
-        let result = crate::syscall(syscall_number::GLibAsyncContextDestroy, [
+        let result = crate::syscall(syscall_number::GLibAsyncContextDestroy, &[
             (*context).context_id as usize,
             0, 0, 0, 0, 0,
         ]);
@@ -349,9 +350,9 @@ pub fn g_async_read(
         }
 
         // 提交到内核
-        let result = crate::syscall(syscall_number::GLibAsyncRead, [
+        let result = crate::syscall(syscall_number::GLibAsyncRead, &[
             (*context).context_id as usize,
-            -1, // 假设的文件描述符
+            (-1isize) as usize, // 假设的文件描述符
             buffer as usize,
             count,
             usize::MAX as usize, // offset (使用最大值表示当前位置)
@@ -410,9 +411,9 @@ pub fn g_async_write(
         }
 
         // 提交到内核
-        let result = crate::syscall(syscall_number::GLibAsyncWrite, [
+        let result = crate::syscall(syscall_number::GLibAsyncWrite, &[
             (*context).context_id as usize,
-            -1, // 假设的文件描述符
+            (-1isize) as usize, // 假设的文件描述符
             buffer as usize,
             count,
             usize::MAX as usize, // offset
@@ -446,7 +447,7 @@ pub fn g_async_operation_cancel(operation: *mut AsyncOperation) -> gboolean {
         }
 
         // 调用内核取消
-        let result = crate::syscall(syscall_number::GLibAsyncCancel, [
+        let result = crate::syscall(syscall_number::GLibAsyncCancel, &[
             (*operation).operation_id as usize,
             0, 0, 0, 0, 0,
         ]);
@@ -482,7 +483,7 @@ pub fn g_async_operation_query(operation: *mut AsyncOperation) -> AsyncResult {
         let mut bytes_transferred = 0usize;
         let mut error_code = 0i32;
 
-        let result = crate::syscall(syscall_number::GLibAsyncQuery, [
+        let result = crate::syscall(syscall_number::GLibAsyncQuery, &[
             (*operation).operation_id as usize,
             &mut state as *mut AsyncOperationState as usize,
             &mut bytes_transferred as *mut usize as usize,
@@ -517,7 +518,7 @@ pub fn g_async_operation_wait(operation: *mut AsyncOperation, timeout_ms: u32) -
     }
 
     unsafe {
-        let result = crate::syscall(syscall_number::GLibAsyncWait, [
+        let result = crate::syscall(syscall_number::GLibAsyncWait, &[
             (*operation).operation_id as usize,
             timeout_ms as usize,
         ]);
@@ -556,7 +557,7 @@ pub fn g_file_input_stream_new(file_path: &str) -> *mut GFileInputStream {
         }
 
         (*stream).parent_instance.async_context = async_context;
-        (*stream).file_path = file_path.to_string();
+        (*stream).file_path = String::from(file_path);
         (*stream).file_descriptor = -1; // 将在open时设置
 
         glib_println!("[glib_async_io] 创建文件输入流: {}", file_path);
@@ -583,7 +584,7 @@ pub fn g_file_output_stream_new(file_path: &str) -> *mut GFileOutputStream {
         }
 
         (*stream).parent_instance.async_context = async_context;
-        (*stream).file_path = file_path.to_string();
+        (*stream).file_path = String::from(file_path);
         (*stream).file_descriptor = -1;
 
         glib_println!("[glib_async_io] 创建文件输出流: {}", file_path);
@@ -708,8 +709,9 @@ pub fn handle_async_operation_complete(operation_id: u64, bytes_transferred: usi
                 (*result).operation_id = operation_id;
 
                 // 调用回调函数
-                if !(*operation).callback.is_null() {
-                    (*operation).callback((*operation).source_object, result, (*operation).user_data);
+                let callback = (*operation).callback;
+                if callback as *const () != core::ptr::null() {
+                    callback((*operation).source_object, result, (*operation).user_data);
                 }
 
                 g_free(result as gpointer);
@@ -778,7 +780,7 @@ pub fn cleanup() {
         ASYNC_CONTEXTS.clear();
 
         // 清理内核中的异步操作
-        crate::syscall(syscall_number::GLibAsyncCleanup, [0, 0, 0, 0, 0, 0]);
+        crate::syscall(syscall_number::GLibAsyncCleanup, &[0, 0, 0, 0, 0, 0]);
     }
 
     glib_println!("[glib_async_io] 异步I/O系统清理完成");

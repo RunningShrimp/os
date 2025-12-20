@@ -12,8 +12,8 @@
 
 extern crate alloc;
 
-use crate::glib::{types::*, collections::*, g_free, g_malloc, g_malloc0, get_state_mut};
-use alloc::collections::{BTreeMap, VecDeque};
+use crate::glib::{types::*, collections::*, constants::*, error::GError, g_free, g_malloc, g_malloc0, get_state_mut};
+use alloc::{collections::{BTreeMap, VecDeque}, vec::Vec};
 use core::ptr::{self, NonNull};
 use core::ffi::c_void;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -84,10 +84,10 @@ pub struct GSource {
 pub struct GSourceFuncs {
     pub prepare: Option<unsafe extern "C" fn(*mut GSource, *mut gint) -> gboolean>,
     pub check: Option<unsafe extern "C" fn(*mut GSource) -> gboolean>,
-    pub dispatch: Option<unsafe extern "C" fn(*mut GSource, GSourceFunc, gpointer) -> GSourceReturn>,
+    pub dispatch: Option<unsafe extern "C" fn(*mut GSource, Option<GSourceFunc>, gpointer) -> GSourceReturn>,
     pub finalize: Option<unsafe extern "C" fn(*mut GSource)>,
-    pub closure_callback: GSourceCallbackFunc,
-    pub closure_marshal: GSourceDummyMarshal,
+    pub closure_callback: Option<GSourceCallbackFunc>,
+    pub closure_marshal: Option<GSourceDummyMarshal>,
 }
 
 /// GMainContext主上下文结构
@@ -174,7 +174,7 @@ pub fn g_main_context_new() -> *mut GMainContext {
         (*context).state = MainContextState::Initialized;
 
         // 创建GLib专用epoll实例
-        let epoll_fd = crate::syscall(syscall_number::GLibEpollCreate, [0, 0, 0, 0, 0, 0]) as i32;
+        let epoll_fd = crate::syscall(syscall_number::GLibEpollCreate, &[0, 0, 0, 0, 0, 0]) as i32;
         if epoll_fd <= 0 {
             glib_println!("[glib_main_loop] 创建epoll实例失败");
             g_free(context as gpointer);
@@ -233,7 +233,7 @@ unsafe fn g_main_context_cleanup(context: *mut GMainContext) {
 
     // 关闭epoll文件描述符
     if (*context).epoll_fd > 0 {
-        crate::syscall(syscall_number::GLibEpollClose, [
+        crate::syscall(syscall_number::GLibEpollClose, &[
             (*context).epoll_fd as usize,
             0, 0, 0, 0, 0,
         ]);
@@ -295,7 +295,7 @@ pub fn g_main_loop_run(loop_: *mut GMainLoop) {
 
         // 主循环事件分发
         while (*loop_).running.load(Ordering::SeqCst) {
-            if !g_main_context_iteration(context, 0) {
+            if g_main_context_iteration(context, 0) == 0 {
                 glib_println!("[glib_main_loop] 上下文迭代失败，退出循环");
                 break;
             }
@@ -386,12 +386,13 @@ pub fn g_main_context_iteration(context: *mut GMainContext, may_block: gboolean)
         // 1. 检查待处理的准备事件
         for (_, source) in (*context).sources.iter() {
             if !source.is_null() {
+                let source: *mut GSource = *source;
                 if let Some(prepare) = (*(*source).callback_funcs).prepare {
                     let mut timeout = -1i32;
-                    if prepare(*source, &mut timeout) != 0 {
+                    if prepare(source, &mut timeout) != 0 {
                         // 准备就绪，进行分发
                         if let Some(dispatch) = (*(*source).callback_funcs).dispatch {
-                            let result = dispatch(*source, None, (*source).priv_data);
+                            let result = dispatch(source, None, (*source).priv_data);
                             if result == G_SOURCE_REMOVE {
                                 // 移除事件源
                                 g_source_remove((*source).source_id);
@@ -432,6 +433,7 @@ unsafe fn g_main_context_poll(context: *mut GMainContext, timeout: i32) -> i32 {
     // 添加文件描述符事件源到轮询记录
     for (_, source) in (*context).sources.iter() {
         if !source.is_null() {
+            let source: *mut GSource = *source;
             if (*source).priority > max_priority {
                 max_priority = (*source).priority;
             }
@@ -444,10 +446,10 @@ unsafe fn g_main_context_poll(context: *mut GMainContext, timeout: i32) -> i32 {
     }
 
     // 使用GLib专用epoll进行轮询
-    let events_ptr = g_malloc0((*context).poll_records.len() * core::mem::size_of::<crate::fs::epoll::EpollEvent>())
-        as *mut crate::fs::epoll::EpollEvent;
+    let events_ptr = g_malloc0((*context).poll_records.len() * core::mem::size_of::<crate::posix::EpollEvent>())
+        as *mut crate::posix::EpollEvent;
 
-    let result = crate::syscall(syscall_number::GLibEpollWait, [
+    let result = crate::syscall(syscall_number::GLibEpollWait, &[
         (*context).epoll_fd as usize,
         events_ptr as usize,
         (*context).poll_records.len(),
@@ -465,10 +467,11 @@ unsafe fn g_main_context_poll(context: *mut GMainContext, timeout: i32) -> i32 {
             // 查找对应的事件源并分发
             for (_, source) in (*context).sources.iter() {
                 if !source.is_null() {
+                    let source: *mut GSource = *source;
                     if let Some(check) = (*(*source).callback_funcs).check {
-                        if check(*source) != 0 {
+                        if check(source) != 0 {
                             if let Some(dispatch) = (*(*source).callback_funcs).dispatch {
-                                dispatch(*source, None, (*source).priv_data);
+                                dispatch(source, None, (*source).priv_data);
                             }
                         }
                     }
@@ -659,7 +662,7 @@ pub fn g_source_remove(source_id: guint) -> gboolean {
 }
 
 /// 创建超时事件源
-pub fn g_timeout_add_full(priority: i32, interval: guint, func: GSourceFunc, data: gpointer, notify: GDestroyNotify) -> guint {
+pub fn g_timeout_add_full(priority: i32, interval: guint, func: GSourceFunc, data: gpointer, notify: Option<GDestroyNotify>) -> guint {
     // 简化实现：创建一个基础事件源
     static TIMEOUT_SOURCE_FUNCS: GSourceFuncs = GSourceFuncs {
         prepare: Some(timeout_source_prepare),
@@ -707,7 +710,7 @@ pub struct TimeoutSourceData {
     pub interval: guint,
     pub func: GSourceFunc,
     pub data: gpointer,
-    pub notify: GDestroyNotify,
+    pub notify: Option<GDestroyNotify>,
     pub last_time: u64,
 }
 
@@ -738,7 +741,7 @@ unsafe extern "C" fn timeout_source_check(source: *mut GSource) -> gboolean {
 }
 
 /// 超时事件源分发函数
-unsafe extern "C" fn timeout_source_dispatch(source: *mut GSource, callback: GSourceFunc, user_data: gpointer) -> GSourceReturn {
+unsafe extern "C" fn timeout_source_dispatch(source: *mut GSource, callback: Option<GSourceFunc>, user_data: gpointer) -> GSourceReturn {
     let data = (*source).priv_data as *mut TimeoutSourceData;
     if data.is_null() {
         return G_SOURCE_REMOVE;
@@ -748,10 +751,10 @@ unsafe extern "C" fn timeout_source_dispatch(source: *mut GSource, callback: GSo
     (*data).last_time = get_current_time();
 
     // 调用回调函数
-    let func = if !callback.is_null() { callback } else { (*data).func };
-    let data_arg = if !user_data.is_null() { user_data } else { (*data).data };
+    let func = callback.unwrap_or((*data).func);
+    let data_arg = if user_data as *const () != core::ptr::null() { user_data } else { (*data).data };
 
-    let result = if !func.is_null() { func(data_arg) } else { 0 };
+    let result = if func as *const () != core::ptr::null() { func(data_arg) } else { 0 };
 
     if result != 0 {
         G_SOURCE_CONTINUE
@@ -764,15 +767,15 @@ unsafe extern "C" fn timeout_source_dispatch(source: *mut GSource, callback: GSo
 unsafe extern "C" fn timeout_source_finalize(source: *mut GSource) {
     let data = (*source).priv_data as *mut TimeoutSourceData;
     if !data.is_null() {
-        if !(*data).notify.is_null() {
-            (*data).notify((*data).data);
+        if let Some(notify_func) = (*data).notify {
+            notify_func((*data).data);
         }
         g_free(data as gpointer);
     }
 }
 
 /// 创建空闲事件源
-pub fn g_idle_add_full(priority: i32, func: GSourceFunc, data: gpointer, notify: GDestroyNotify) -> guint {
+pub fn g_idle_add_full(priority: i32, func: GSourceFunc, data: gpointer, notify: Option<GDestroyNotify>) -> guint {
     // 简化实现：创建一个基础事件源
     static IDLE_SOURCE_FUNCS: GSourceFuncs = GSourceFuncs {
         prepare: Some(idle_source_prepare),
@@ -817,7 +820,7 @@ pub fn g_idle_add(func: GSourceFunc, data: gpointer) -> guint {
 pub struct IdleSourceData {
     pub func: GSourceFunc,
     pub data: gpointer,
-    pub notify: GDestroyNotify,
+    pub notify: Option<GDestroyNotify>,
 }
 
 /// 空闲事件源准备函数
@@ -833,17 +836,17 @@ unsafe extern "C" fn idle_source_check(source: *mut GSource) -> gboolean {
 }
 
 /// 空闲事件源分发函数
-unsafe extern "C" fn idle_source_dispatch(source: *mut GSource, callback: GSourceFunc, user_data: gpointer) -> GSourceReturn {
+unsafe extern "C" fn idle_source_dispatch(source: *mut GSource, callback: Option<GSourceFunc>, user_data: gpointer) -> GSourceReturn {
     let data = (*source).priv_data as *mut IdleSourceData;
     if data.is_null() {
         return G_SOURCE_REMOVE;
     }
 
     // 调用回调函数
-    let func = if !callback.is_null() { callback } else { (*data).func };
-    let data_arg = if !user_data.is_null() { user_data } else { (*data).data };
+    let func = callback.unwrap_or((*data).func);
+    let data_arg = if user_data as *const () != core::ptr::null() { user_data } else { (*data).data };
 
-    let result = if !func.is_null() { func(data_arg) } else { 0 };
+    let result = if func as *const () != core::ptr::null() { func(data_arg) } else { 0 };
 
     if result != 0 {
         G_SOURCE_CONTINUE
@@ -856,8 +859,8 @@ unsafe extern "C" fn idle_source_dispatch(source: *mut GSource, callback: GSourc
 unsafe extern "C" fn idle_source_finalize(source: *mut GSource) {
     let data = (*source).priv_data as *mut IdleSourceData;
     if !data.is_null() {
-        if !(*data).notify.is_null() {
-            (*data).notify((*data).data);
+        if let Some(notify_func) = (*data).notify {
+            notify_func((*data).data);
         }
         g_free(data as gpointer);
     }
@@ -866,8 +869,7 @@ unsafe extern "C" fn idle_source_finalize(source: *mut GSource) {
 /// 获取当前时间（毫秒）
 fn get_current_time() -> u64 {
     // 简化实现：使用系统时间
-    use core::time;
-    time::get_timestamp() * 1000 // 转换为毫秒
+    crate::time::get_timestamp() * 1000 // 转换为毫秒
 }
 
 /// 清理主循环系统

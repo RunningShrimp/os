@@ -15,6 +15,7 @@ extern crate alloc;
 use crate::glib::{types::*, g_free, g_malloc, g_malloc0, g_realloc};
 use alloc::collections::BTreeMap;
 use core::ptr::{self, NonNull};
+use core::mem;
 use core::ffi::c_void;
 
 /// GList 双向链表节点
@@ -131,7 +132,7 @@ impl GList {
 
         unsafe {
             while !current.is_null() {
-                if (*current).data == data {
+                if (*current).data == data as gpointer {
                     let next = (*current).next;
                     let prev = (*current).prev;
 
@@ -211,7 +212,7 @@ impl GList {
 
         unsafe {
             while !current.is_null() {
-                if (*current).data == data {
+                if (*current).data == data as gpointer {
                     return current as *mut GList;
                 }
                 current = (*current).next;
@@ -293,7 +294,7 @@ impl GList {
         unsafe {
             while !current.is_null() {
                 next = (*current).next;
-                if !free_func.is_null() {
+                if free_func as *const () != core::ptr::null() {
                     free_func((*current).data);
                 }
                 g_free(current as gpointer);
@@ -395,7 +396,7 @@ impl GSList {
         unsafe {
             while !current.is_null() {
                 next = (*current).next;
-                if !free_func.is_null() {
+                if free_func as *const () != core::ptr::null() {
                     free_func((*current).data);
                 }
                 g_free(current as gpointer);
@@ -435,7 +436,7 @@ pub type GEqualFunc = unsafe extern "C" fn(gconstpointer, gconstpointer) -> gboo
 impl GHashTable {
     /// 创建新的哈希表
     pub fn new(key_hash_func: GHashFunc, key_equal_func: GEqualFunc) -> *mut GHashTable {
-        Self::new_full(key_hash_func, key_equal_func, None, None)
+        Self::new_full(key_hash_func, key_equal_func, unsafe { mem::transmute(ptr::null::<()>() as *const ()) }, unsafe { mem::transmute(ptr::null::<()>() as *const ()) })
     }
 
     /// 创建新的哈希表（带销毁函数）
@@ -471,8 +472,9 @@ impl GHashTable {
         }
 
         unsafe {
-            let hash = if !(*table).key_hash_func.is_null() {
-                (*table).key_hash_func(key)
+            let hash_func = (*table).key_hash_func;
+            let hash = if hash_func as *const () != core::ptr::null() {
+                hash_func(key)
             } else {
                 default_hash_func(key)
             };
@@ -481,19 +483,21 @@ impl GHashTable {
 
             // 检查键是否已存在
             let mut node = *(*table).nodes.add(index as usize);
-            let mut prev = ptr::null_mut();
+            let mut prev: *mut GHashTableNode = ptr::null_mut();
 
             while !node.is_null() {
-                let keys_equal = if !(*table).key_equal_func.is_null() {
-                    (*table).key_equal_func((*node).key, key) != 0
+                let keys_equal = if (*table).key_equal_func as *const () != core::ptr::null() {
+                    let equal_func = (*table).key_equal_func;
+                    equal_func((*node).key, key) != 0
                 } else {
-                    (*node).key == key
+                    (*node).key == key as gpointer
                 };
 
                 if keys_equal {
                     // 键已存在，更新值
-                    if !(*table).value_destroy_func.is_null() {
-                        (*table).value_destroy_func((*node).value);
+                    let value_destroy_func = (*table).value_destroy_func;
+                    if value_destroy_func as *const () != core::ptr::null() {
+                        value_destroy_func((*node).value);
                     }
                     (*node).value = value;
                     return;
@@ -532,8 +536,9 @@ impl GHashTable {
         }
 
         unsafe {
-            let hash = if !(*table).key_hash_func.is_null() {
-                (*table).key_hash_func(key)
+            let hash_func = (*table).key_hash_func;
+            let hash = if hash_func as *const () != core::ptr::null() {
+                hash_func(key)
             } else {
                 default_hash_func(key)
             };
@@ -542,10 +547,11 @@ impl GHashTable {
             let mut node = *(*table).nodes.add(index as usize);
 
             while !node.is_null() {
-                let keys_equal = if !(*table).key_equal_func.is_null() {
-                    (*table).key_equal_func((*node).key, key) != 0
+                let keys_equal = if (*table).key_equal_func as *const () != core::ptr::null() {
+                    let equal_func = (*table).key_equal_func;
+                    equal_func((*node).key, key) != 0
                 } else {
-                    (*node).key == key
+                    (*node).key == key as gpointer
                 };
 
                 if keys_equal {
@@ -566,30 +572,34 @@ impl GHashTable {
         }
 
         unsafe {
-            let hash = if !(*table).key_hash_func.is_null() {
-                (*table).key_hash_func(key)
+            let hash_func = (*table).key_hash_func;
+            let hash = if hash_func as *const () != core::ptr::null() {
+                hash_func(key)
             } else {
                 default_hash_func(key)
             };
 
             let index = hash % (*table).size;
             let mut node = *(*table).nodes.add(index as usize);
-            let mut prev = ptr::null_mut();
+            let mut prev: *mut GHashTableNode = ptr::null_mut();
 
             while !node.is_null() {
-                let keys_equal = if !(*table).key_equal_func.is_null() {
-                    (*table).key_equal_func((*node).key, key) != 0
+                let keys_equal = if (*table).key_equal_func as *const () != core::ptr::null() {
+                    let equal_func = (*table).key_equal_func;
+                    equal_func((*node).key, key) != 0
                 } else {
-                    (*node).key == key
+                    (*node).key == key as gpointer
                 };
 
                 if keys_equal {
                     // 调用销毁函数
-                    if !(*table).key_destroy_func.is_null() {
-                        (*table).key_destroy_func((*node).key);
+                    let key_destroy_func = (*table).key_destroy_func;
+                    let value_destroy_func = (*table).value_destroy_func;
+                    if key_destroy_func as *const () != core::ptr::null() {
+                        key_destroy_func((*node).key);
                     }
-                    if !(*table).value_destroy_func.is_null() {
-                        (*table).value_destroy_func((*node).value);
+                    if value_destroy_func as *const () != core::ptr::null() {
+                        value_destroy_func((*node).value);
                     }
 
                     // 从链表中移除节点
@@ -634,11 +644,13 @@ impl GHashTable {
                     let next = (*node).next;
 
                     // 调用销毁函数
-                    if !(*table).key_destroy_func.is_null() {
-                        (*table).key_destroy_func((*node).key);
+                    let key_destroy_func = (*table).key_destroy_func;
+                    let value_destroy_func = (*table).value_destroy_func;
+                    if key_destroy_func as *const () != core::ptr::null() {
+                        key_destroy_func((*node).key);
                     }
-                    if !(*table).value_destroy_func.is_null() {
-                        (*table).value_destroy_func((*node).value);
+                    if value_destroy_func as *const () != core::ptr::null() {
+                        value_destroy_func((*node).value);
                     }
 
                     g_free(node as gpointer);
@@ -960,7 +972,7 @@ impl GPtrArray {
         unsafe {
             for i in 0..(*array).len {
                 let data = *((*array).pdata).add(i as usize);
-                if !free_func.is_null() {
+                if free_func as *const () != core::ptr::null() {
                     free_func(data);
                 }
             }

@@ -16,7 +16,7 @@ use crate::glib::{types::*, g_free, g_malloc, g_malloc0, g_realloc, error::GErro
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::ptr::{self, NonNull};
-use core::ffi::{c_char, c_void};
+use core::ffi::{c_char, c_int, c_void};
 use core::str;
 
 
@@ -545,7 +545,7 @@ pub fn g_strdup_printf(format: *const gchar, _args: *mut c_void) -> *mut gchar {
 /// 字符串连接
 pub fn g_strconcat(str1: *const gchar, str2: *const gchar) -> *mut gchar {
     if str1.is_null() && str2.is_null() {
-        return g_strdup("");
+        return g_strdup(b"".as_ptr() as *const c_char);
     }
 
     unsafe {
@@ -589,7 +589,7 @@ pub fn g_strconcat(str1: *const gchar, str2: *const gchar) -> *mut gchar {
 /// 路径处理：获取目录名
 pub fn g_path_dirname(file_path: *const gchar) -> *mut gchar {
     if file_path.is_null() {
-        return g_strdup(".");
+        return g_strdup(b".".as_ptr() as *const c_char);
     }
 
     unsafe {
@@ -599,7 +599,7 @@ pub fn g_path_dirname(file_path: *const gchar) -> *mut gchar {
         }
 
         if len == 0 {
-            return g_strdup(".");
+            return g_strdup(b".".as_ptr() as *const c_char);
         }
 
         // 查找最后一个路径分隔符
@@ -612,12 +612,12 @@ pub fn g_path_dirname(file_path: *const gchar) -> *mut gchar {
         }
 
         if last_slash == 0 {
-            return g_strdup("/");
+            return g_strdup(b"/".as_ptr() as *const c_char);
         }
 
         if last_slash == len {
             // 没有找到分隔符
-            return g_strdup(".");
+            return g_strdup(b".".as_ptr() as *const c_char);
         }
 
         g_strndup(file_path, last_slash)
@@ -627,7 +627,7 @@ pub fn g_path_dirname(file_path: *const gchar) -> *mut gchar {
 /// 路径处理：获取文件名
 pub fn g_path_basename(file_path: *const gchar) -> *mut gchar {
     if file_path.is_null() {
-        return g_strdup(".");
+        return g_strdup(b".".as_ptr() as *const c_char);
     }
 
     unsafe {
@@ -637,7 +637,7 @@ pub fn g_path_basename(file_path: *const gchar) -> *mut gchar {
         }
 
         if len == 0 {
-            return g_strdup(".");
+            return g_strdup(b".".as_ptr() as *const c_char);
         }
 
         // 查找最后一个路径分隔符
@@ -655,7 +655,7 @@ pub fn g_path_basename(file_path: *const gchar) -> *mut gchar {
         }
 
         if last_slash + 1 >= len {
-            return g_strdup("/");
+            return g_strdup(b"/".as_ptr() as *const c_char);
         }
 
         g_strdup(file_path.add(last_slash + 1))
@@ -714,7 +714,7 @@ pub fn g_option_context_new(parameter_string: *const gchar) -> *mut GOptionConte
             String::from_utf8_unchecked(core::slice::from_raw_parts(
                 parameter_string as *const u8,
                 len,
-            ))
+            ).to_vec())
         }
     } else {
         String::new()

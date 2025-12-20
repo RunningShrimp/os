@@ -13,7 +13,7 @@
 
 extern crate alloc;
 
-use crate::glib::{types::*, error::GError, get_state_mut};
+use crate::glib::{types::*, constants::*, error::GError, get_state_mut};
 use alloc::alloc::{GlobalAlloc, Layout};
 use core::ffi::c_void;
 use core::ptr::{self, NonNull};
@@ -80,7 +80,7 @@ pub fn init() -> Result<(), GError> {
 fn create_memory_pools() -> Result<(), GError> {
     // 创建小对象内存池
     let small_pool_id = unsafe {
-        crate::syscall(syscall_number::GLibMemoryPoolCreate, [
+        crate::syscall(syscall_number::GLibMemoryPoolCreate, &[
             64,    // 64字节块
             8,     // 8字节对齐
             0, 0, 0, 0
@@ -95,7 +95,7 @@ fn create_memory_pools() -> Result<(), GError> {
 
     // 创建中等对象内存池
     let medium_pool_id = unsafe {
-        crate::syscall(syscall_number::GLibMemoryPoolCreate, [
+        crate::syscall(syscall_number::GLibMemoryPoolCreate, &[
             512,   // 512字节块
             16,    // 16字节对齐
             0, 0, 0, 0
@@ -275,7 +275,7 @@ pub fn g_slice_alloc(block_size: usize) -> gpointer {
     let pool_id = select_slice_pool(aligned_size);
     if pool_id > 0 {
         let ptr = unsafe {
-            crate::syscall(syscall_number::GLibMemoryPoolAlloc, [
+            crate::syscall(syscall_number::GLibMemoryPoolAlloc, &[
                 pool_id as usize,
                 aligned_size,
                 0, 0, 0, 0
@@ -303,7 +303,7 @@ pub unsafe fn g_slice_free1(block_size: usize, mem_block: gpointer) {
     // 尝试释放到内存池
     let pool_id = select_slice_pool(aligned_size);
     if pool_id > 0 {
-        crate::syscall(syscall_number::GLibMemoryPoolFree, [
+        crate::syscall(syscall_number::GLibMemoryPoolFree, &[
             pool_id as usize,
             mem_block as usize,
             0, 0, 0, 0
@@ -359,7 +359,7 @@ fn try_slice_alloc(size: usize) -> gpointer {
     }
 
     unsafe {
-        crate::syscall(syscall_number::GLibMemoryPoolAlloc, [
+        crate::syscall(syscall_number::GLibMemoryPoolAlloc, &[
             pool_id as usize,
             size,
             0, 0, 0, 0
@@ -375,7 +375,7 @@ fn try_slice_free(mem: gpointer, size: usize) -> bool {
     }
 
     unsafe {
-        crate::syscall(syscall_number::GLibMemoryPoolFree, [
+        crate::syscall(syscall_number::GLibMemoryPoolFree, &[
             pool_id as usize,
             mem as usize,
             0, 0, 0, 0
@@ -461,7 +461,7 @@ pub fn cleanup() {
 
     // 清理内存池
     unsafe {
-        crate::syscall(syscall_number::GLibMemoryPoolsCleanup, [0, 0, 0, 0, 0, 0]);
+        crate::syscall(syscall_number::GLibMemoryPoolsCleanup, &[0, 0, 0, 0, 0, 0]);
         SLICE_ALLOCATOR = None;
     }
 

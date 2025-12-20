@@ -13,25 +13,21 @@ extern crate alloc;
 use alloc::string::String;
 use core::ffi::c_int;
 use crate::glib::types::*;
+use alloc::boxed::Box;
 
-/// GLib错误域类型
-pub type GQuark = u32;
-
-impl GQuark {
-    /// 从字符串创建错误域
-    pub fn from_string(string: &str) -> GQuark {
-        // 简单的哈希实现
-        let mut hash: u32 = 5381;
-        for byte in string.bytes() {
-            hash = ((hash << 5).wrapping_add(hash)).wrapping_add(byte as u32);
-        }
-        hash
+/// 从字符串创建错误域
+pub fn g_quark_from_string(string: &str) -> GQuark {
+    // 简单的哈希实现
+    let mut hash: u32 = 5381;
+    for byte in string.bytes() {
+        hash = ((hash << 5).wrapping_add(hash)).wrapping_add(byte as u32);
     }
+    hash
+}
 
-    /// 转换为字符串（简化实现）
-    pub fn to_string(&self) -> String {
-        alloc::format!("domain-{}", self)
-    }
+/// 将错误域转换为字符串（简化实现）
+pub fn g_quark_to_string(quark: GQuark) -> String {
+    alloc::format!("domain-{}", quark)
 }
 
 /// GLib错误结构体
@@ -51,7 +47,7 @@ impl GError {
         Self {
             domain,
             code,
-            message: message.to_string(),
+            message: String::from(message),
         }
     }
 
@@ -60,7 +56,7 @@ impl GError {
         Self {
             domain,
             code,
-            message: message.to_string(),
+            message: String::from(message),
         }
     }
 
@@ -117,6 +113,7 @@ pub mod domains {
 /// 文件错误码
 pub mod file_errors {
     use crate::glib::types::*;
+    use core::ffi::c_int;
 
     pub const G_FILE_ERROR_EXIST: c_int = 2;
     pub const G_FILE_ERROR_ISDIR: c_int = 3;

@@ -45,6 +45,7 @@ pub use utils::*;
 
 // GLib错误处理
 pub mod error;
+use error::GError;
 
 /// GLib初始化函数
 ///
@@ -183,6 +184,14 @@ pub mod types {
     /// GLib整数类型
     pub type gint = c_int;
     pub type guint = c_uint;
+    pub type gshort = i16;
+    pub type gushort = u16;
+    pub type gint8 = i8;
+    pub type gint16 = i16;
+    pub type gint32 = i32;
+    pub type guint8 = u8;
+    pub type guint16 = u16;
+    pub type guint32 = u32;
 
     /// GLib长整数类型
     pub type glong = isize;
@@ -200,6 +209,10 @@ pub mod types {
     pub type gint64 = i64;
     pub type guint64 = u64;
 
+    /// GLib浮点类型
+    pub type gfloat = f32;
+    pub type gdouble = f64;
+
     /// GLib回调函数类型
     pub type GFunc = unsafe extern "C" fn(gpointer, gpointer);
     pub type GCallback = unsafe extern "C" fn();
@@ -207,6 +220,9 @@ pub mod types {
     pub type GCompareDataFunc = unsafe extern "C" fn(gconstpointer, gconstpointer, gpointer) -> c_int;
     pub type GDestroyNotify = unsafe extern "C" fn(gpointer);
     pub type GCopyFunc = unsafe extern "C" fn(gconstpointer, gpointer) -> gpointer;
+
+    /// GLib错误域类型
+    pub type GQuark = u32;
 }
 
 // 重新导出常用函数和类型

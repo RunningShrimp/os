@@ -12,8 +12,8 @@
 
 extern crate alloc;
 
-use crate::glib::{types::*, g_free, g_malloc, g_malloc0, get_state_mut};
-use alloc::collections::BTreeMap;
+use crate::glib::{types::*, collections::*, error::GError, g_free, g_malloc, g_malloc0, get_state_mut};
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use core::ptr::{self, NonNull};
 use core::ffi::c_void;
 use core::sync::atomic::{AtomicUsize, Ordering};
@@ -239,7 +239,7 @@ pub fn init() -> Result<(), GError> {
 /// 注册GObject基础类型
 fn register_gobject_type() -> Result<(), GError> {
     let type_info = GObjectTypeInfo {
-        name: "GObject".to_string(),
+        name: "GObject"String::from(),
         parent_type: G_TYPE_NONE,
         type_size: core::mem::size_of::<GObject>(),
         class_size: core::mem::size_of::<GObjectClass>(),
@@ -259,7 +259,7 @@ fn register_gobject_type() -> Result<(), GError> {
         }
 
         // 注册到内核
-        let result = crate::syscall(syscall_number::GLibObjectTypeRegister, [
+        let result = crate::syscall(syscall_number::GLibObjectTypeRegister, &[
             "GObject\0".as_ptr() as usize,
             type_id,
             core::mem::size_of::<GObject>(),
@@ -316,7 +316,7 @@ unsafe extern "C" fn gobject_constructor(
     glib_println!("[glib_object] 构造GObject实例");
 
     // 在内核中创建实例
-    let instance_id = crate::syscall(syscall_number::GLibObjectInstanceCreate, [
+    let instance_id = crate::syscall(syscall_number::GLibObjectInstanceCreate, &[
         type_id,
         0, // 对象指针（由内核分配）
         0, 0, 0, 0,
@@ -350,7 +350,7 @@ unsafe extern "C" fn gobject_finalize(object: *mut GObject) {
     glib_println!("[glib_object] GObject finalize");
 
     // 在内核中销毁实例
-    crate::syscall(syscall_number::GLibObjectUnref, [
+    crate::syscall(syscall_number::GLibObjectUnref, &[
         object as usize,
         0, 0, 0, 0, 0,
     ]);
@@ -397,7 +397,7 @@ pub fn g_type_register_static_simple(
         NEXT_TYPE_ID += 1;
 
         let type_info = GObjectTypeInfo {
-            name: type_name.to_string(),
+            name: String::from(type_name),
             parent_type,
             type_size: instance_size,
             class_size,
@@ -412,7 +412,7 @@ pub fn g_type_register_static_simple(
         }
 
         // 注册到内核
-        let result = crate::syscall(syscall_number::GLibObjectTypeRegister, [
+        let result = crate::syscall(syscall_number::GLibObjectTypeRegister, &[
             type_name.as_ptr() as usize,
             type_id,
             instance_size,
@@ -438,7 +438,7 @@ pub fn g_object_ref(object: *mut GObject) -> *mut GObject {
 
     unsafe {
         // 在内核中增加引用计数
-        let result = crate::syscall(syscall_number::GLibObjectRef, [
+        let result = crate::syscall(syscall_number::GLibObjectRef, &[
             object as usize,
             0, 0, 0, 0, 0,
         ]);
@@ -461,7 +461,7 @@ pub fn g_object_unref(object: *mut GObject) {
 
     unsafe {
         // 在内核中减少引用计数
-        let result = crate::syscall(syscall_number::GLibObjectUnref, [
+        let result = crate::syscall(syscall_number::GLibObjectUnref, &[
             object as usize,
             0, 0, 0, 0, 0,
         ]);
@@ -491,7 +491,7 @@ pub fn g_object_set(object: *mut GObject, property_name: &str, value: gpointer) 
     }
 
     unsafe {
-        let result = crate::syscall(syscall_number::GLibObjectSetProperty, [
+        let result = crate::syscall(syscall_number::GLibObjectSetProperty, &[
             object as usize,
             property_name.as_ptr() as usize,
             value as usize,
@@ -514,7 +514,7 @@ pub fn g_object_get(object: *mut GObject, property_name: &str) -> gpointer {
 
     unsafe {
         let mut value = 0u64;
-        let result = crate::syscall(syscall_number::GLibObjectGetProperty, [
+        let result = crate::syscall(syscall_number::GLibObjectGetProperty, &[
             object as usize,
             property_name.as_ptr() as usize,
             &mut value as *mut u64 as usize,
@@ -549,7 +549,7 @@ pub fn g_signal_new(
     }
 
     unsafe {
-        let result = crate::syscall(syscall_number::GLibObjectSignalRegister, [
+        let result = crate::syscall(syscall_number::GLibObjectSignalRegister, &[
             itype,
             signal_name.as_ptr() as usize,
             param_types as usize,
@@ -592,7 +592,7 @@ pub fn g_signal_emit(
     }
 
     unsafe {
-        let result = crate::syscall(syscall_number::GLibObjectSignalEmit, [
+        let result = crate::syscall(syscall_number::GLibObjectSignalEmit, &[
             instance as usize,
             signal_id as usize,
             var_args as usize, // 参数数组指针（简化）
@@ -633,7 +633,7 @@ pub fn cleanup() {
 
     unsafe {
         // 清理内核中的所有对象
-        crate::syscall(syscall_number::GLibObjectCleanup, [0, 0, 0, 0, 0, 0]);
+        crate::syscall(syscall_number::GLibObjectCleanup, &[0, 0, 0, 0, 0, 0]);
 
         // 清理类型注册表
         TYPE_REGISTRY = None;
