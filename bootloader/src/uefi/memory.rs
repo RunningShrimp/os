@@ -6,6 +6,7 @@
 use crate::error::{BootError, Result};
 use crate::memory::MemoryRegionType;
 use core::ptr;
+use alloc::vec::Vec;
 
 #[cfg(feature = "uefi_support")]
 use uefi::table::boot::{BootServices, MemoryType};
@@ -64,7 +65,7 @@ impl UefiMemoryManager {
                 uefi::table::boot::AllocateType::AnyPages,
                 memory_type,
                 pages,
-                uefi::table::boot::MemoryAddress(0),
+                0,
             )?
         };
 
@@ -77,7 +78,7 @@ impl UefiMemoryManager {
 
         unsafe {
             bs.free_pages(
-                uefi::table::boot::MemoryAddress(address),
+                address,
                 pages,
             )?;
         }
@@ -405,6 +406,7 @@ impl MemoryAllocationBuilder {
         Self { _private: () }
     }
 
+extern crate alloc;
     pub fn allocate(self, _size: usize) -> Result<*mut u8> {
         Err(BootError::FeatureNotEnabled("UEFI memory management"))
     }

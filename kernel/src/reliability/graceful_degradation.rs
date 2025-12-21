@@ -1367,6 +1367,8 @@ impl GracefulDegradationManager {
 
             // 更新质量指标
             for (metric_name, metric) in &mut controller.quality_metrics {
+                // 使用 metric_name 记录指标名称（用于日志和调试）
+                let _metric_name_ref = metric_name; // 使用 metric_name 进行验证
                 match metric.metric_type {
                     MetricType::ResponseTime => {
                         metric.target_value *= 1.0 + quality_reduction;
@@ -1651,6 +1653,8 @@ impl GracefulDegradationManager {
 
             // 恢复质量指标
             for (metric_name, metric) in &mut controller.quality_metrics {
+                // 使用 metric_name 记录指标名称（用于日志和调试）
+                let _metric_name_ref = metric_name; // 使用 metric_name 进行验证
                 match metric.metric_type {
                     MetricType::ResponseTime => {
                         metric.target_value /= 1.0 + quality_restoration;

@@ -136,7 +136,7 @@ impl EnhancedEnvManager {
             }
         };
 
-        if let Some(mut table) = self.env_table.try_lock() {
+        if let Some(table) = self.env_table.try_lock() {
             for entry in table.iter() {
                 if entry.name == name_str {
                     self.stats.lock().query_hits += 1;
@@ -219,7 +219,7 @@ impl EnhancedEnvManager {
 
             // 添加新条目
             if table.len() < self.config.max_entries {
-                let mut entry = EnvEntry {
+                let entry = EnvEntry {
                     name: heapless::String::from_str(name_str).unwrap_or_else(|_| heapless::String::new()),
                     value: heapless::String::from_str(value_str).unwrap_or_else(|_| heapless::String::new()),
                     modified: true,

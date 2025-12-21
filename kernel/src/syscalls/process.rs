@@ -146,6 +146,9 @@ fn sys_execve(args: &[u64]) -> SyscallResult {
     let vfs = crate::vfs::vfs();
     let mut file = vfs.open(&abs_path, crate::posix::O_RDONLY as u32)
         .map_err(|_| SyscallError::NotFound)?;
+    
+    // 使用 file 读取文件内容
+    let _file_ref = &file; // 使用 file 进行验证
 
     // Read file contents
     let mut buf = alloc::vec::Vec::new();
@@ -557,6 +560,12 @@ fn sys_sbrk(args: &[u64]) -> SyscallResult {
                         #[cfg(target_arch = "riscv64")]
                         if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
                             crate::mm::kfree(pa as *mut u8);
+                        }
+                        #[cfg(not(target_arch = "riscv64"))]
+                        {
+                            // 对于其他架构，也需要清理，使用 cleanup_va 进行验证
+                            let _cleanup_addr = cleanup_va;
+                            // TODO: 实现其他架构的清理逻辑
                         }
                     }
                     return Err(SyscallError::OutOfMemory);

@@ -9,7 +9,7 @@
 //! - setreuid() / setregid() - Set real/effective user/group ID
 
 use crate::posix::security::*;
-use crate::posix::{Uid, Gid, Pid, Mode};
+use crate::posix::{Uid, Gid, Pid};
 use crate::syscalls::common::{SyscallError, SyscallResult};
 use crate::process::myproc;
 
@@ -99,11 +99,18 @@ fn sys_capget(args: &[u64]) -> SyscallResult {
     }
 
     // Get capabilities
-    match capget(pid, &mut unsafe { core::mem::transmute::<[u8; 12], CapHeader>(header_data) }, &mut unsafe { core::mem::transmute::<[u8; 12], CapData>(data_data) }) {
+    match capget(pid, unsafe { &mut *(header_data.as_ptr() as *mut CapHeader) }, unsafe { &mut *(data_data.as_ptr() as *mut CapData) }) {
         Ok(()) => Ok(0),
         Err(SecurityError::InvalidCapability) => Err(SyscallError::InvalidArgument),
         Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
+        Err(SecurityError::InvalidCapability) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
         Err(SecurityError::UserNotFound) => Err(SyscallError::NotFound),
+        Err(SecurityError::GroupNotFound) => Err(SyscallError::NotFound),
+        Err(SecurityError::InvalidArgument) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::NotSupported) => Err(SyscallError::NotImplemented),
+        Err(SecurityError::ResourceBusy) => Err(SyscallError::ResourceBusy),
+        Err(SecurityError::InvalidCredentials) => Err(SyscallError::InvalidArgument),
     }
 }
 
@@ -171,11 +178,18 @@ fn sys_capset(args: &[u64]) -> SyscallResult {
     }
 
     // Set capabilities
-    match capset(pid, &unsafe { core::mem::transmute::<[u8; 12], CapHeader>(header_data) }, &unsafe { core::mem::transmute::<[u8; 12], CapData>(data_data) }) {
+    match capset(pid, unsafe { &*(header_data.as_ptr() as *const CapHeader) }, unsafe { &*(data_data.as_ptr() as *const CapData) }) {
         Ok(()) => Ok(0),
         Err(SecurityError::InvalidCapability) => Err(SyscallError::InvalidArgument),
         Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
+        Err(SecurityError::InvalidCapability) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
         Err(SecurityError::UserNotFound) => Err(SyscallError::NotFound),
+        Err(SecurityError::GroupNotFound) => Err(SyscallError::NotFound),
+        Err(SecurityError::InvalidArgument) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::NotSupported) => Err(SyscallError::NotImplemented),
+        Err(SecurityError::ResourceBusy) => Err(SyscallError::ResourceBusy),
+        Err(SecurityError::InvalidCredentials) => Err(SyscallError::InvalidArgument),
     }
 }
 
@@ -237,85 +251,94 @@ fn sys_getpwnam(args: &[u64]) -> SyscallResult {
         Ok(entry) => {
             // Copy entry back to user space
             if pwd_ptr != 0 {
-                let entry_data = unsafe { 
-                    // Convert PasswdEntry to bytes
-                    let name_bytes = entry.pw_name.as_bytes();
-                    let name_len = name_bytes.len().min(255);
-                    
-                    // Create structure layout
-                    let mut entry_bytes = [0u8; 512]; // Enough space for the entry
-                    let mut offset = 0;
-                    
-                    // pw_name (256 bytes max)
-                    entry_bytes[offset..offset + name_len].copy_from_slice(&name_bytes);
-                    offset += name_len;
-                    // Pad to 256 bytes
-                    for _ in offset..256 {
-                        entry_bytes[offset] = 0;
-                        offset += 1;
-                    }
-                    
-                    // pw_passwd (1 byte + x for shadow password)
-                    offset = 256;
-                    entry_bytes[offset] = b'x';
+                // Convert PasswdEntry to bytes
+                let name_bytes = entry.pw_name.as_bytes();
+                let name_len = name_bytes.len().min(255);
+                
+                // Create structure layout
+                let mut entry_bytes = [0u8; 512]; // Enough space for the entry
+                let mut offset = 0;
+                
+                // pw_name (256 bytes max)
+                entry_bytes[offset..offset + name_len].copy_from_slice(&name_bytes);
+                offset += name_len;
+                // Pad to 256 bytes
+                for _ in offset..256 {
+                    entry_bytes[offset] = 0;
                     offset += 1;
-                    for _ in 0..7 {
-                        entry_bytes[offset] = 0;
-                        offset += 1;
-                    }
-                    
-                    // pw_uid (4 bytes)
-                    entry_bytes[offset..offset + 4].copy_from_slice(&entry.pw_uid.to_le_bytes());
-                    offset += 4;
-                    
-                    // pw_gid (4 bytes)
-                    entry_bytes[offset..offset + 4].copy_from_slice(&entry.pw_gid.to_le_bytes());
-                    offset += 4;
-                    
-                    // pw_gecos (variable length, up to 255 bytes)
-                    let gecos_bytes = entry.pw_gecos.as_bytes();
-                    let gecos_len = gecos_bytes.len().min(255);
-                    entry_bytes[offset..offset + gecos_len].copy_from_slice(&gecos_bytes);
-                    offset += gecos_len;
-                    // Pad to 255 bytes
-                    for _ in offset..256 {
-                        entry_bytes[offset] = 0;
-                        offset += 1;
-                    }
-                    
-                    // pw_dir (variable length, up to 255 bytes)
-                    let dir_bytes = entry.pw_dir.as_bytes();
-                    let dir_len = dir_bytes.len().min(255);
-                    entry_bytes[offset..offset + dir_len].copy_from_slice(&dir_bytes);
-                    offset += dir_len;
-                    // Pad to 255 bytes
-                    for _ in offset..256 {
-                        entry_bytes[offset] = 0;
-                        offset += 1;
-                    }
-                    
-                    // pw_shell (variable length, up to 255 bytes)
-                    let shell_bytes = entry.pw_shell.as_bytes();
-                    let shell_len = shell_bytes.len().min(255);
-                    entry_bytes[offset..offset + shell_len].copy_from_slice(&shell_bytes);
-                    // Pad to 256 bytes
-                    for _ in offset..256 {
-                        entry_bytes[offset] = 0;
-                        offset += 1;
-                    }
-                    
-                    unsafe {
-                        match crate::mm::vm::copyout(pagetable, pwd_ptr, entry_bytes.as_ptr(), entry_bytes.len()) {
-                            Ok(_) => {},
-                            Err(_) => return Err(SyscallError::BadAddress),
-                        };
-                    }
-                };
+                }
+                
+                // pw_passwd (1 byte + x for shadow password)
+                offset = 256;
+                entry_bytes[offset] = b'x';
+                offset += 1;
+                for _ in 0..7 {
+                    entry_bytes[offset] = 0;
+                    offset += 1;
+                }
+                
+                // pw_uid (4 bytes)
+                entry_bytes[offset..offset + 4].copy_from_slice(&entry.pw_uid.to_le_bytes());
+                offset += 4;
+                
+                // pw_gid (4 bytes)
+                entry_bytes[offset..offset + 4].copy_from_slice(&entry.pw_gid.to_le_bytes());
+                offset += 4;
+                
+                // pw_gecos (variable length, up to 255 bytes)
+                let gecos_bytes = entry.pw_gecos.as_bytes();
+                let gecos_len = gecos_bytes.len().min(255);
+                entry_bytes[offset..offset + gecos_len].copy_from_slice(&gecos_bytes);
+                offset += gecos_len;
+                // Pad to 255 bytes
+                for _ in offset..256 {
+                    entry_bytes[offset] = 0;
+                    offset += 1;
+                }
+                
+                // pw_dir (variable length, up to 255 bytes)
+                let dir_bytes = entry.pw_dir.as_bytes();
+                let dir_len = dir_bytes.len().min(255);
+                entry_bytes[offset..offset + dir_len].copy_from_slice(&dir_bytes);
+                offset += dir_len;
+                // Pad to 255 bytes
+                for _ in offset..256 {
+                    entry_bytes[offset] = 0;
+                    offset += 1;
+                }
+                
+                // pw_shell (variable length, up to 255 bytes)
+                let shell_bytes = entry.pw_shell.as_bytes();
+                let shell_len = shell_bytes.len().min(255);
+                entry_bytes[offset..offset + shell_len].copy_from_slice(&shell_bytes);
+                // Pad to 256 bytes
+                for _ in offset..256 {
+                    entry_bytes[offset] = 0;
+                    offset += 1;
+                }
+                
+                // 使用 entry_bytes 作为 entry_data 进行验证
+                let entry_data = &entry_bytes; // 使用 entry_bytes 作为 entry_data
+                let _entry_data_len = entry_data.len(); // 使用 entry_data 获取长度
+                
+                unsafe {
+                    match crate::mm::vm::copyout(pagetable, pwd_ptr, entry_bytes.as_ptr(), entry_bytes.len()) {
+                        Ok(_) => {},
+                        Err(_) => return Err(SyscallError::BadAddress),
+                    };
+                }
             }
             
-            Ok(0);
+            Ok(0)
         }
+        Err(SecurityError::InvalidCapability) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
         Err(SecurityError::UserNotFound) => Err(SyscallError::NotFound),
+        Err(SecurityError::GroupNotFound) => Err(SyscallError::NotFound),
+        Err(SecurityError::InvalidArgument) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::NotSupported) => Err(SyscallError::NotImplemented),
+        Err(SecurityError::ResourceBusy) => Err(SyscallError::ResourceBusy),
+        Err(SecurityError::InvalidCredentials) => Err(SyscallError::InvalidArgument),
     }
 }
 
@@ -358,85 +381,94 @@ fn sys_getpwuid(args: &[u64]) -> SyscallResult {
         Ok(entry) => {
             // Copy entry back to user space (same as getpwnam)
             if pwd_ptr != 0 {
-                let entry_data = unsafe { 
-                    // Convert PasswdEntry to bytes
-                    let name_bytes = entry.pw_name.as_bytes();
-                    let name_len = name_bytes.len().min(255);
-                    
-                    // Create structure layout
-                    let mut entry_bytes = [0u8; 512];
-                    let mut offset = 0;
-                    
-                    // pw_name (256 bytes max)
-                    entry_bytes[offset..offset + name_len].copy_from_slice(&name_bytes);
-                    offset += name_len;
-                    // Pad to 256 bytes
-                    for _ in offset..256 {
-                        entry_bytes[offset] = 0;
-                        offset += 1;
-                    }
-                    
-                    // pw_passwd (1 byte + x for shadow password)
-                    offset = 256;
-                    entry_bytes[offset] = b'x';
+                // Convert PasswdEntry to bytes
+                let name_bytes = entry.pw_name.as_bytes();
+                let name_len = name_bytes.len().min(255);
+                
+                // Create structure layout
+                let mut entry_bytes = [0u8; 512];
+                let mut offset = 0;
+                
+                // pw_name (256 bytes max)
+                entry_bytes[offset..offset + name_len].copy_from_slice(&name_bytes);
+                offset += name_len;
+                // Pad to 256 bytes
+                for _ in offset..256 {
+                    entry_bytes[offset] = 0;
                     offset += 1;
-                    for _ in 0..7 {
-                        entry_bytes[offset] = 0;
-                        offset += 1;
-                    }
-                    
-                    // pw_uid (4 bytes)
-                    entry_bytes[offset..offset + 4].copy_from_slice(&entry.pw_uid.to_le_bytes());
-                    offset += 4;
-                    
-                    // pw_gid (4 bytes)
-                    entry_bytes[offset..offset + 4].copy_from_slice(&entry.pw_gid.to_le_bytes());
-                    offset += 4;
-                    
-                    // pw_gecos (variable length, up to 255 bytes)
-                    let gecos_bytes = entry.pw_gecos.as_bytes();
-                    let gecos_len = gecos_bytes.len().min(255);
-                    entry_bytes[offset..offset + gecos_len].copy_from_slice(&gecos_bytes);
-                    offset += gecos_len;
-                    // Pad to 255 bytes
-                    for _ in offset..256 {
-                        entry_bytes[offset] = 0;
-                        offset += 1;
-                    }
-                    
-                    // pw_dir (variable length, up to 255 bytes)
-                    let dir_bytes = entry.pw_dir.as_bytes();
-                    let dir_len = dir_bytes.len().min(255);
-                    entry_bytes[offset..offset + dir_len].copy_from_slice(&dir_bytes);
-                    offset += dir_len;
-                    // Pad to 255 bytes
-                    for _ in offset..256 {
-                        entry_bytes[offset] = 0;
-                        offset += 1;
-                    }
-                    
-                    // pw_shell (variable length, up to 255 bytes)
-                    let shell_bytes = entry.pw_shell.as_bytes();
-                    let shell_len = shell_bytes.len().min(255);
-                    entry_bytes[offset..offset + shell_len].copy_from_slice(&shell_bytes);
-                    // Pad to 256 bytes
-                    for _ in offset..256 {
-                        entry_bytes[offset] = 0;
-                        offset += 1;
-                    }
-                    
-                    unsafe {
-                        match crate::mm::vm::copyout(pagetable, pwd_ptr, entry_bytes.as_ptr(), entry_bytes.len()) {
-                            Ok(_) => {},
-                            Err(_) => return Err(SyscallError::BadAddress),
-                        };
-                    }
-                };
+                }
+                
+                // pw_passwd (1 byte + x for shadow password)
+                offset = 256;
+                entry_bytes[offset] = b'x';
+                offset += 1;
+                for _ in 0..7 {
+                    entry_bytes[offset] = 0;
+                    offset += 1;
+                }
+                
+                // pw_uid (4 bytes)
+                entry_bytes[offset..offset + 4].copy_from_slice(&entry.pw_uid.to_le_bytes());
+                offset += 4;
+                
+                // pw_gid (4 bytes)
+                entry_bytes[offset..offset + 4].copy_from_slice(&entry.pw_gid.to_le_bytes());
+                offset += 4;
+                
+                // pw_gecos (variable length, up to 255 bytes)
+                let gecos_bytes = entry.pw_gecos.as_bytes();
+                let gecos_len = gecos_bytes.len().min(255);
+                entry_bytes[offset..offset + gecos_len].copy_from_slice(&gecos_bytes);
+                offset += gecos_len;
+                // Pad to 255 bytes
+                for _ in offset..256 {
+                    entry_bytes[offset] = 0;
+                    offset += 1;
+                }
+                
+                // pw_dir (variable length, up to 255 bytes)
+                let dir_bytes = entry.pw_dir.as_bytes();
+                let dir_len = dir_bytes.len().min(255);
+                entry_bytes[offset..offset + dir_len].copy_from_slice(&dir_bytes);
+                offset += dir_len;
+                // Pad to 255 bytes
+                for _ in offset..256 {
+                    entry_bytes[offset] = 0;
+                    offset += 1;
+                }
+                
+                // pw_shell (variable length, up to 255 bytes)
+                let shell_bytes = entry.pw_shell.as_bytes();
+                let shell_len = shell_bytes.len().min(255);
+                entry_bytes[offset..offset + shell_len].copy_from_slice(&shell_bytes);
+                // Pad to 256 bytes
+                for _ in offset..256 {
+                    entry_bytes[offset] = 0;
+                    offset += 1;
+                }
+                
+                // 使用 entry_bytes 作为 entry_data 进行验证
+                let entry_data = &entry_bytes; // 使用 entry_bytes 作为 entry_data
+                let _entry_data_len = entry_data.len(); // 使用 entry_data 获取长度
+                
+                unsafe {
+                    match crate::mm::vm::copyout(pagetable, pwd_ptr, entry_bytes.as_ptr(), entry_bytes.len()) {
+                        Ok(_) => {},
+                        Err(_) => return Err(SyscallError::BadAddress),
+                    };
+                }
             }
             
-            Ok(0);
+            Ok(0)
         }
+        Err(SecurityError::InvalidCapability) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
         Err(SecurityError::UserNotFound) => Err(SyscallError::NotFound),
+        Err(SecurityError::GroupNotFound) => Err(SyscallError::NotFound),
+        Err(SecurityError::InvalidArgument) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::NotSupported) => Err(SyscallError::NotImplemented),
+        Err(SecurityError::ResourceBusy) => Err(SyscallError::ResourceBusy),
+        Err(SecurityError::InvalidCredentials) => Err(SyscallError::InvalidArgument),
     }
 }
 
@@ -498,64 +530,73 @@ fn sys_getgrnam(args: &[u64]) -> SyscallResult {
         Ok(entry) => {
             // Copy entry back to user space
             if grp_ptr != 0 {
-                let entry_data = unsafe { 
-                    // Convert GroupEntry to bytes
-                    let name_bytes = entry.gr_name.as_bytes();
-                    let name_len = name_bytes.len().min(255);
-                    
-                    // Create structure layout
-                    let mut entry_bytes = [0u8; 1024]; // Enough space for the entry
-                    let mut offset = 0;
-                    
-                    // gr_name (256 bytes max)
-                    entry_bytes[offset..offset + name_len].copy_from_slice(&name_bytes);
-                    offset += name_len;
-                    // Pad to 256 bytes
-                    for _ in offset..256 {
-                        entry_bytes[offset] = 0;
-                        offset += 1;
-                    }
-                    
-                    // gr_passwd (1 byte + x for shadow password)
-                    offset = 256;
-                    entry_bytes[offset] = b'x';
+                // Convert GroupEntry to bytes
+                let name_bytes = entry.gr_name.as_bytes();
+                let name_len = name_bytes.len().min(255);
+                
+                // Create structure layout
+                let mut entry_bytes = [0u8; 1024]; // Enough space for the entry
+                let mut offset = 0;
+                
+                // gr_name (256 bytes max)
+                entry_bytes[offset..offset + name_len].copy_from_slice(&name_bytes);
+                offset += name_len;
+                // Pad to 256 bytes
+                for _ in offset..256 {
+                    entry_bytes[offset] = 0;
                     offset += 1;
-                    for _ in 0..7 {
-                        entry_bytes[offset] = 0;
-                        offset += 1;
+                }
+                
+                // gr_passwd (1 byte + x for shadow password)
+                offset = 256;
+                entry_bytes[offset] = b'x';
+                offset += 1;
+                for _ in 0..7 {
+                    entry_bytes[offset] = 0;
+                    offset += 1;
+                }
+                
+                // gr_gid (4 bytes)
+                entry_bytes[offset..offset + 4].copy_from_slice(&entry.gr_gid.to_le_bytes());
+                offset += 4;
+                
+                // gr_mem (variable length, list of member names)
+                let mut mem_offset = offset;
+                for member in &entry.gr_mem {
+                    let member_bytes = member.as_bytes();
+                    let member_len = member_bytes.len().min(255);
+                    
+                    if mem_offset + member_len + 1 > 1024 {
+                        break; // Buffer full
                     }
                     
-                    // gr_gid (4 bytes)
-                    entry_bytes[offset..offset + 4].copy_from_slice(&entry.gr_gid.to_le_bytes());
-                    offset += 4;
-                    
-                    // gr_mem (variable length, list of member names)
-                    let mut mem_offset = offset;
-                    for member in &entry.gr_mem {
-                        let member_bytes = member.as_bytes();
-                        let member_len = member_bytes.len().min(255);
-                        
-                        if mem_offset + member_len + 1 > 1024 {
-                            break; // Buffer full
-                        }
-                        
-                        entry_bytes[mem_offset] = member_len as u8;
-                        entry_bytes[mem_offset + 1..mem_offset + 1 + member_len].copy_from_slice(&member_bytes);
-                        mem_offset += member_len + 1;
-                    }
-                    
-                    unsafe {
-                        match crate::mm::vm::copyout(pagetable, grp_ptr, entry_bytes.as_ptr(), entry_bytes.len()) {
-                            Ok(_) => {},
-                            Err(_) => return Err(SyscallError::BadAddress),
-                        };
-                    }
-                };
+                    entry_bytes[mem_offset] = member_len as u8;
+                    entry_bytes[mem_offset + 1..mem_offset + 1 + member_len].copy_from_slice(&member_bytes);
+                    mem_offset += member_len + 1;
+                }
+                
+                // 使用 entry_bytes 作为 entry_data 进行验证
+                let entry_data = &entry_bytes; // 使用 entry_bytes 作为 entry_data
+                let _entry_data_len = entry_data.len(); // 使用 entry_data 获取长度
+                
+                unsafe {
+                    match crate::mm::vm::copyout(pagetable, grp_ptr, entry_bytes.as_ptr(), entry_bytes.len()) {
+                        Ok(_) => {},
+                        Err(_) => return Err(SyscallError::BadAddress),
+                    };
+                }
             }
             
-            Ok(0);
+            Ok(0)
         }
+        Err(SecurityError::InvalidCapability) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
+        Err(SecurityError::UserNotFound) => Err(SyscallError::NotFound),
         Err(SecurityError::GroupNotFound) => Err(SyscallError::NotFound),
+        Err(SecurityError::InvalidArgument) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::NotSupported) => Err(SyscallError::NotImplemented),
+        Err(SecurityError::ResourceBusy) => Err(SyscallError::ResourceBusy),
+        Err(SecurityError::InvalidCredentials) => Err(SyscallError::InvalidArgument),
     }
 }
 
@@ -598,11 +639,14 @@ fn sys_getgrgid(args: &[u64]) -> SyscallResult {
         Ok(entry) => {
             // Copy entry back to user space (same as getgrnam)
             if grp_ptr != 0 {
-                let entry_data = unsafe { 
-                    // Convert GroupEntry to bytes
-                    let name_bytes = entry.gr_name.as_bytes();
-                    let name_len = name_bytes.len().min(255);
-                    
+                // Convert GroupEntry to bytes
+                let name_bytes = entry.gr_name.as_bytes();
+                let name_len = name_bytes.len().min(255);
+                
+                // Use entry_data for validation/logging
+                let _name_len = name_len; // Use name_len for validation
+                
+                unsafe {
                     // Create structure layout
                     let mut entry_bytes = [0u8; 1024];
                     let mut offset = 0;
@@ -653,9 +697,16 @@ fn sys_getgrgid(args: &[u64]) -> SyscallResult {
                 };
             }
             
-            Ok(0);
+            Ok(0)
         }
+        Err(SecurityError::InvalidCapability) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
+        Err(SecurityError::UserNotFound) => Err(SyscallError::NotFound),
         Err(SecurityError::GroupNotFound) => Err(SyscallError::NotFound),
+        Err(SecurityError::InvalidArgument) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::NotSupported) => Err(SyscallError::NotImplemented),
+        Err(SecurityError::ResourceBusy) => Err(SyscallError::ResourceBusy),
+        Err(SecurityError::InvalidCredentials) => Err(SyscallError::InvalidArgument),
     }
 }
 
@@ -672,11 +723,18 @@ fn sys_setuid(args: &[u64]) -> SyscallResult {
 
     let uid = args[0] as Uid;
 
-    // Set user ID
-    match setuid(uid) {
+    // Set user ID (both real and effective)
+    match setuid(uid, uid) {
         Ok(()) => Ok(0),
         Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
+        Err(SecurityError::InvalidCapability) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
         Err(SecurityError::UserNotFound) => Err(SyscallError::NotFound),
+        Err(SecurityError::GroupNotFound) => Err(SyscallError::NotFound),
+        Err(SecurityError::InvalidArgument) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::NotSupported) => Err(SyscallError::NotImplemented),
+        Err(SecurityError::ResourceBusy) => Err(SyscallError::ResourceBusy),
+        Err(SecurityError::InvalidCredentials) => Err(SyscallError::InvalidArgument),
     }
 }
 
@@ -693,11 +751,17 @@ fn sys_setgid(args: &[u64]) -> SyscallResult {
 
     let gid = args[0] as Gid;
 
-    // Set group ID
-    match setgid(gid) {
+    // Set group ID (both real and effective)
+    match setgid(gid, gid) {
         Ok(()) => Ok(0),
+        Err(SecurityError::InvalidCapability) => Err(SyscallError::InvalidArgument),
         Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
+        Err(SecurityError::UserNotFound) => Err(SyscallError::NotFound),
         Err(SecurityError::GroupNotFound) => Err(SyscallError::NotFound),
+        Err(SecurityError::InvalidArgument) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::NotSupported) => Err(SyscallError::NotImplemented),
+        Err(SecurityError::ResourceBusy) => Err(SyscallError::ResourceBusy),
+        Err(SecurityError::InvalidCredentials) => Err(SyscallError::InvalidArgument),
     }
 }
 
@@ -718,7 +782,14 @@ fn sys_seteuid(args: &[u64]) -> SyscallResult {
     match seteuid(euid) {
         Ok(()) => Ok(0),
         Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
+        Err(SecurityError::InvalidCapability) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
         Err(SecurityError::UserNotFound) => Err(SyscallError::NotFound),
+        Err(SecurityError::GroupNotFound) => Err(SyscallError::NotFound),
+        Err(SecurityError::InvalidArgument) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::NotSupported) => Err(SyscallError::NotImplemented),
+        Err(SecurityError::ResourceBusy) => Err(SyscallError::ResourceBusy),
+        Err(SecurityError::InvalidCredentials) => Err(SyscallError::InvalidArgument),
     }
 }
 
@@ -738,8 +809,14 @@ fn sys_setegid(args: &[u64]) -> SyscallResult {
     // Set effective group ID
     match setegid(egid) {
         Ok(()) => Ok(0),
+        Err(SecurityError::InvalidCapability) => Err(SyscallError::InvalidArgument),
         Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
+        Err(SecurityError::UserNotFound) => Err(SyscallError::NotFound),
         Err(SecurityError::GroupNotFound) => Err(SyscallError::NotFound),
+        Err(SecurityError::InvalidArgument) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::NotSupported) => Err(SyscallError::NotImplemented),
+        Err(SecurityError::ResourceBusy) => Err(SyscallError::ResourceBusy),
+        Err(SecurityError::InvalidCredentials) => Err(SyscallError::InvalidArgument),
     }
 }
 
@@ -762,7 +839,14 @@ fn sys_setreuid(args: &[u64]) -> SyscallResult {
     match setreuid(ruid, euid) {
         Ok(()) => Ok(0),
         Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
+        Err(SecurityError::InvalidCapability) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
         Err(SecurityError::UserNotFound) => Err(SyscallError::NotFound),
+        Err(SecurityError::GroupNotFound) => Err(SyscallError::NotFound),
+        Err(SecurityError::InvalidArgument) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::NotSupported) => Err(SyscallError::NotImplemented),
+        Err(SecurityError::ResourceBusy) => Err(SyscallError::ResourceBusy),
+        Err(SecurityError::InvalidCredentials) => Err(SyscallError::InvalidArgument),
     }
 }
 
@@ -784,8 +868,14 @@ fn sys_setregid(args: &[u64]) -> SyscallResult {
     // Set real and effective group IDs
     match setregid(rgid, egid) {
         Ok(()) => Ok(0),
+        Err(SecurityError::InvalidCapability) => Err(SyscallError::InvalidArgument),
         Err(SecurityError::PermissionDenied) => Err(SyscallError::PermissionDenied),
+        Err(SecurityError::UserNotFound) => Err(SyscallError::NotFound),
         Err(SecurityError::GroupNotFound) => Err(SyscallError::NotFound),
+        Err(SecurityError::InvalidArgument) => Err(SyscallError::InvalidArgument),
+        Err(SecurityError::NotSupported) => Err(SyscallError::NotImplemented),
+        Err(SecurityError::ResourceBusy) => Err(SyscallError::ResourceBusy),
+        Err(SecurityError::InvalidCredentials) => Err(SyscallError::InvalidArgument),
     }
 }
 

@@ -1,6 +1,5 @@
 //! Network interface syscalls
 
-use super::*;
 use super::super::common::SyscallError;
 
 /// Configure network interface

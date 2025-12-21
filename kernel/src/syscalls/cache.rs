@@ -13,7 +13,7 @@ use alloc::{
     vec::Vec,
     string::{String, ToString},
 };
-use crate::syscalls::common::{SyscallError, SyscallResult};
+use crate::syscalls::common::SyscallResult;
 
 /// Cache entry for system call results
 pub struct SyscallCacheEntry {
@@ -107,6 +107,22 @@ pub struct SyscallCache {
 }
 
 impl SyscallCache {
+    /// Create a new system call cache with default configuration
+    pub const fn new_const() -> Self {
+        Self {
+            config: SyscallCacheConfig {
+                max_entries: 1024,
+                entry_timeout_ms: 1000, // 1 second
+                pure_only: true,
+                eviction_policy: EvictionPolicy::LRU,
+            },
+            entries: BTreeMap::new(),
+            lru_list: Vec::new(),
+            next_id: 0,
+            pure_syscalls: BTreeMap::new(),
+        }
+    }
+
     /// Create a new system call cache with default configuration
     pub fn new() -> Self {
         Self::with_config(SyscallCacheConfig::default())
@@ -300,7 +316,7 @@ pub struct CacheStats {
 
 /// Global system call cache instance
 use crate::sync::Mutex;
-static GLOBAL_SYSCALL_CACHE: Mutex<SyscallCache> = Mutex::new(SyscallCache::new());
+static GLOBAL_SYSCALL_CACHE: Mutex<SyscallCache> = Mutex::new(SyscallCache::new_const());
 
 /// Initialize the system call cache
 pub fn init_syscall_cache() {

@@ -223,7 +223,7 @@ impl EnhancedSystemInfo {
 
         let utsname = if self.config.enable_caching && self.is_cache_valid() {
             // 使用缓存数据
-            if let Some(mut cached) = self.cached_utsname.try_lock() {
+            if let Some(cached) = self.cached_utsname.try_lock() {
                 if cached.is_some() {
                     self.stats.cache_hits.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
                     cached.clone().unwrap()
@@ -274,7 +274,7 @@ impl EnhancedSystemInfo {
 
         let sysinfo = if self.config.enable_caching && self.is_cache_valid() {
             // 使用缓存数据
-            if let Some(mut cached) = self.cached_sysinfo.try_lock() {
+            if let Some(cached) = self.cached_sysinfo.try_lock() {
                 if cached.is_some() {
                     self.stats.cache_hits.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
                     cached.clone().unwrap()

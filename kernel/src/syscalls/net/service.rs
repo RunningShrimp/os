@@ -12,6 +12,7 @@ use crate::syscalls::services::{Service, ServiceStatus, SyscallService};
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::any::Any;
 
 /// 网络系统调用服务
 /// 
@@ -43,9 +44,9 @@ impl NetworkService {
     /// * `Self` - 新的服务实例
     pub fn new() -> Self {
         Self {
-            name: .to_string()("network"),
-            version: .to_string()("1.0.0"),
-            description: .to_string()("Network syscall service"),
+            name: String::from("network"),
+            version: String::from("1.0.0"),
+            description: String::from("Network syscall service"),
             status: ServiceStatus::Uninitialized,
             supported_syscalls: handlers::get_supported_syscalls(),
             socket_table: Vec::new(),
@@ -115,7 +116,7 @@ impl NetworkService {
         let fd = self.next_socket_fd;
         self.next_socket_fd += 1;
 
-        let socket_info = crate::syscalls::net::types::SocketInfo {
+        let _socket_info = crate::syscalls::net::types::SocketInfo {
             fd,
             socket_type,
             address_family: family,
@@ -143,7 +144,7 @@ impl NetworkService {
     /// 
     /// * `Result<(), NetworkError>` - 操作结果
     pub fn deallocate_socket(&mut self, fd: i32) -> Result<(), crate::syscalls::net::types::NetworkError> {
-        if let Some(pos) = self.socket_table.iter().position(|s| s.fd == fd) {
+        if let Some(_pos) = self.socket_table.iter().position(|s| s.fd == fd) {
             // println removed for no_std compatibility
             // println removed for no_std compatibility
             Ok(())
@@ -203,7 +204,7 @@ impl NetworkService {
     /// # 返回值
     /// 
     /// * `Result<(), NetworkError>` - 操作结果
-    pub fn listen_socket(&mut self, fd: i32, backlog: i32) -> Result<(), crate::syscalls::net::types::NetworkError> {
+    pub fn listen_socket(&mut self, fd: i32, _backlog: i32) -> Result<(), crate::syscalls::net::types::NetworkError> {
         if let Some(socket) = self.socket_table.iter_mut().find(|s| s.fd == fd) {
             socket.state = crate::syscalls::net::types::SocketState::Listening;
             // println removed for no_std compatibility
@@ -227,9 +228,15 @@ impl NetworkService {
             let new_fd = self.next_socket_fd;
             self.next_socket_fd += 1;
 
+            // Create a dummy client address for now
+            let client_address = crate::syscalls::net::types::NetworkAddress::IPv4 {
+                address: [127, 0, 0, 1],
+                port: 12345,
+            };
+
             // println removed for no_std compatibility
-            
-            let new_socket = crate::syscalls::net::types::SocketInfo {
+
+            let _new_socket = crate::syscalls::net::types::SocketInfo {
                 fd: new_fd,
                 socket_type: crate::syscalls::net::types::SocketType::Stream,
                 address_family: crate::syscalls::net::types::AddressFamily::IPv4,
@@ -264,7 +271,7 @@ impl NetworkService {
     /// # 参数
     /// 
     /// * `interface` - 网络接口信息
-    pub fn add_interface(&mut self, interface: crate::syscalls::net::types::NetworkInterface) {
+    pub fn add_interface(&mut self, _interface: crate::syscalls::net::types::NetworkInterface) {
         // println removed for no_std compatibility
         // println removed for no_std compatibility
     }
@@ -279,7 +286,7 @@ impl NetworkService {
     ///
     /// * `Result<(), NetworkError>` - 操作结果
     pub fn remove_interface(&mut self, name: &str) -> Result<(), crate::syscalls::net::types::NetworkError> {
-        if let Some(pos) = self.interfaces.iter().position(|i| i.name == name) {
+        if let Some(_pos) = self.interfaces.iter().position(|i| i.name == name) {
             // println removed for no_std compatibility
             // println removed for no_std compatibility
             Ok(())
@@ -311,8 +318,7 @@ impl NetworkService {
             10 => crate::syscalls::net::types::AddressFamily::IPv6, // AF_INET6
             1 => crate::syscalls::net::types::AddressFamily::Unix,  // AF_UNIX
             _ => {
-                // println removed for no_std compatibility
-                // println removed for no_std compatibility
+                return Err(crate::syscalls::net::types::NetworkError::InvalidArgument);
             }
         };
 
@@ -322,8 +328,7 @@ impl NetworkService {
             2 => crate::syscalls::net::types::SocketType::Datagram,   // SOCK_DGRAM
             3 => crate::syscalls::net::types::SocketType::Raw,        // SOCK_RAW
             _ => {
-                // println removed for no_std compatibility
-                // println removed for no_std compatibility
+                return Err(crate::syscalls::net::types::NetworkError::InvalidArgument);
             }
         };
 
@@ -337,8 +342,7 @@ impl NetworkService {
             6 => crate::syscalls::net::types::SocketProtocol::TCP,    // IPPROTO_TCP
             17 => crate::syscalls::net::types::SocketProtocol::UDP,   // IPPROTO_UDP
             _ => {
-                // println removed for no_std compatibility
-                // println removed for no_std compatibility
+                return Err(crate::syscalls::net::types::NetworkError::InvalidArgument);
             }
         };
 
@@ -361,7 +365,7 @@ impl NetworkService {
     /// # 返回值
     ///
     /// * `Result<i32, NetworkError>` - 0表示成功或错误
-    pub fn handle_bind(&mut self, fd: i32, addr_ptr: u64, addrlen: u32) -> Result<i32, crate::syscalls::net::types::NetworkError> {
+    pub fn handle_bind(&mut self, fd: i32, _addr_ptr: u64, _addrlen: u32) -> Result<i32, crate::syscalls::net::types::NetworkError> {
         // 检查套接字是否存在
         if self.get_socket_info(fd).is_none() {
             // println removed for no_std compatibility
@@ -418,7 +422,7 @@ impl NetworkService {
     /// # 返回值
     ///
     /// * `Result<i32, NetworkError>` - 新套接字描述符或错误
-    pub fn handle_accept(&mut self, fd: i32, addr_ptr: u64, addrlen_ptr: u64) -> Result<i32, crate::syscalls::net::types::NetworkError> {
+    pub fn handle_accept(&mut self, fd: i32, _addr_ptr: u64, _addrlen_ptr: u64) -> Result<i32, crate::syscalls::net::types::NetworkError> {
         // 检查监听套接字状态
         match self.get_socket_info(fd) {
             Some(socket) => {
@@ -432,7 +436,7 @@ impl NetworkService {
         // TODO: 实现用户空间拷贝后，此处将处理真实连接
         // 目前模拟接受连接
 
-        let (new_fd, client_addr) = self.accept_connection(fd)?;
+        let (new_fd, _client_addr) = self.accept_connection(fd)?;
         // println removed for no_std compatibility
 
         // TODO: 拷贝客户端地址到用户空间
@@ -456,7 +460,7 @@ impl NetworkService {
     /// # 返回值
     ///
     /// * `Result<i32, NetworkError>` - 0表示成功或错误
-    pub fn handle_connect(&mut self, fd: i32, addr_ptr: u64, addrlen: u32) -> Result<i32, crate::syscalls::net::types::NetworkError> {
+    pub fn handle_connect(&mut self, fd: i32, _addr_ptr: u64, _addrlen: u32) -> Result<i32, crate::syscalls::net::types::NetworkError> {
         // 检查套接字状态
         match self.get_socket_info(fd) {
             Some(socket) => {
@@ -490,7 +494,7 @@ impl NetworkService {
     /// # 返回值
     ///
     /// * `Result<usize, NetworkError>` - 发送的字节数或错误
-    pub fn handle_send(&mut self, fd: i32, buf_ptr: u64, len: usize, flags: i32) -> Result<usize, crate::syscalls::net::types::NetworkError> {
+    pub fn handle_send(&mut self, fd: i32, _buf_ptr: u64, len: usize, _flags: i32) -> Result<usize, crate::syscalls::net::types::NetworkError> {
         // 检查套接字状态
         match self.get_socket_info(fd) {
             Some(socket) => {
@@ -524,19 +528,52 @@ impl NetworkService {
     /// * `Result<usize, NetworkError>` - 接收的字节数或错误
     pub fn handle_recv(&mut self, fd: i32, buf_ptr: u64, len: usize, flags: i32) -> Result<usize, crate::syscalls::net::types::NetworkError> {
         // 检查套接字状态
-        match self.get_socket_info(fd) {
-            Some(socket) => {
-                if socket.state != crate::syscalls::net::types::SocketState::Connected {
-                    // println removed for no_std compatibility
-                }
-            }
+        let socket = match self.get_socket_info(fd) {
+            Some(s) => s,
             None => return Err(crate::syscalls::net::types::NetworkError::InvalidSocket),
+        };
+        
+        // 验证套接字状态和类型
+        if socket.state != crate::syscalls::net::types::SocketState::Connected {
+            return Err(crate::syscalls::net::types::NetworkError::InvalidSocket);
+        }
+        
+        // 检查套接字类型，确保是流套接字（TCP）才能使用 recv
+        if socket.socket_type != crate::syscalls::net::types::SocketType::Stream {
+            return Err(crate::syscalls::net::types::NetworkError::InvalidArgument);
         }
 
-        // TODO: 实现数据接收功能
+        // 验证参数有效性
+        if buf_ptr == 0 {
+            return Err(crate::syscalls::net::types::NetworkError::InvalidArgument);
+        }
+        if len == 0 {
+            return Ok(0);
+        }
+        
+        // 检查标志位（MSG_PEEK, MSG_WAITALL等）
+        let peek_mode = (flags & 0x2) != 0; // MSG_PEEK
+        let waitall = (flags & 0x100) != 0; // MSG_WAITALL
+        
+        // 根据套接字状态和标志位决定接收行为
+        // peek_mode: 只查看数据，不移除
+        // waitall: 等待接收完整的数据
+        let _receive_behavior = if peek_mode {
+            "peek"
+        } else if waitall {
+            "waitall"
+        } else {
+            "normal"
+        };
+        
+        // TODO: 从用户空间读取数据到内核缓冲区
         // 目前作为占位符，返回0
-
-        // println removed for no_std compatibility
+        // 在实际实现中，应该：
+        // 1. 从套接字接收缓冲区读取数据（根据 peek_mode 决定是否移除）
+        // 2. 将数据复制到用户空间 buf_ptr
+        // 3. 如果 waitall 为 true，等待接收完整的数据
+        // 4. 返回实际接收的字节数
+        
         Ok(0)
     }
 
@@ -558,13 +595,59 @@ impl NetworkService {
     /// * `Result<usize, NetworkError>` - 发送的字节数或错误
     pub fn handle_sendto(&mut self, fd: i32, buf_ptr: u64, len: usize, flags: i32, addr_ptr: u64, addrlen: u32) -> Result<usize, crate::syscalls::net::types::NetworkError> {
         // 检查套接字存在性
-        if self.get_socket_info(fd).is_none() {
-            // println removed for no_std compatibility
+        let socket = match self.get_socket_info(fd) {
+            Some(s) => s,
+            None => return Err(crate::syscalls::net::types::NetworkError::InvalidSocket),
+        };
+
+        // 验证套接字类型，sendto 支持数据报套接字（UDP）
+        let is_datagram = socket.socket_type == crate::syscalls::net::types::SocketType::Datagram;
+        let is_stream = socket.socket_type == crate::syscalls::net::types::SocketType::Stream;
+        
+        // 对于流套接字，addr_ptr 应该为空（已连接）
+        // 对于数据报套接字，addr_ptr 可以指定目标地址
+        if is_stream && addr_ptr != 0 {
+            return Err(crate::syscalls::net::types::NetworkError::InvalidArgument);
+        }
+        if is_datagram && addr_ptr == 0 && socket.state != crate::syscalls::net::types::SocketState::Connected {
+            return Err(crate::syscalls::net::types::NetworkError::InvalidArgument);
         }
 
-        // TODO: 读取目标地址和发送数据
-        // 目前作为占位符
-        // println removed for no_std compatibility
+        // 验证参数有效性
+        if buf_ptr == 0 {
+            return Err(crate::syscalls::net::types::NetworkError::InvalidArgument);
+        }
+        if len == 0 {
+            return Ok(0);
+        }
+        
+        // 验证地址参数
+        if addr_ptr != 0 && addrlen == 0 {
+            return Err(crate::syscalls::net::types::NetworkError::InvalidArgument);
+        }
+        
+        // 检查标志位（MSG_DONTWAIT, MSG_NOSIGNAL等）
+        let nonblock = (flags & 0x40) != 0; // MSG_DONTWAIT
+        let nosignal = (flags & 0x4000) != 0; // MSG_NOSIGNAL
+        
+        // 根据套接字类型和标志位决定发送行为
+        let _send_mode = if is_datagram {
+            "datagram"
+        } else if nonblock {
+            "nonblock"
+        } else if nosignal {
+            "nosignal"
+        } else {
+            "normal"
+        };
+        
+        // TODO: 实现数据发送功能
+        // 1. 从用户空间 buf_ptr 读取数据
+        // 2. 如果 addr_ptr 不为空，读取目标地址
+        // 3. 将数据发送到目标地址
+        // 4. 返回实际发送的字节数
+        
+        // 目前作为占位符，返回请求的长度
         Ok(len)
     }
 
@@ -586,13 +669,53 @@ impl NetworkService {
     /// * `Result<usize, NetworkError>` - 接收的字节数或错误
     pub fn handle_recvfrom(&mut self, fd: i32, buf_ptr: u64, len: usize, flags: i32, addr_ptr: u64, addrlen_ptr: u64) -> Result<usize, crate::syscalls::net::types::NetworkError> {
         // 检查套接字存在性
-        if self.get_socket_info(fd).is_none() {
-            // println removed for no_std compatibility
+        let socket = match self.get_socket_info(fd) {
+            Some(s) => s,
+            None => return Err(crate::syscalls::net::types::NetworkError::InvalidSocket),
+        };
+
+        // 验证套接字类型，recvfrom 主要用于数据报套接字（UDP）
+        let is_datagram = socket.socket_type == crate::syscalls::net::types::SocketType::Datagram;
+        // 对于数据报套接字，通常需要提供地址指针
+        if is_datagram && addr_ptr == 0 {
+            // 允许但不推荐，将无法获取源地址
         }
 
-        // TODO: 读取数据和源地址
-        // 目前作为占位符
-        // println removed for no_std compatibility
+        // 验证参数有效性
+        if buf_ptr == 0 {
+            return Err(crate::syscalls::net::types::NetworkError::InvalidArgument);
+        }
+        if len == 0 {
+            return Ok(0);
+        }
+        
+        // 验证地址长度指针
+        if addr_ptr != 0 && addrlen_ptr == 0 {
+            return Err(crate::syscalls::net::types::NetworkError::InvalidArgument);
+        }
+        
+        // 检查标志位
+        let peek_mode = (flags & 0x2) != 0; // MSG_PEEK
+        let waitall = (flags & 0x100) != 0; // MSG_WAITALL
+        
+        // 根据套接字类型和标志位决定接收行为
+        let _receive_mode = if is_datagram {
+            if peek_mode { "datagram_peek" } else { "datagram" }
+        } else if peek_mode {
+            "peek"
+        } else if waitall {
+            "waitall"
+        } else {
+            "normal"
+        };
+        
+        // TODO: 实现数据接收功能
+        // 1. 从套接字接收缓冲区读取数据
+        // 2. 将数据复制到用户空间 buf_ptr
+        // 3. 如果 addr_ptr 不为空，将源地址复制到用户空间
+        // 4. 如果 addrlen_ptr 不为空，更新地址长度
+        // 5. 返回实际接收的字节数
+        
         Ok(0)
     }
 
@@ -610,20 +733,40 @@ impl NetworkService {
     /// * `Result<i32, NetworkError>` - 0表示成功或错误
     pub fn handle_shutdown(&mut self, fd: i32, how: i32) -> Result<i32, crate::syscalls::net::types::NetworkError> {
         // 检查套接字存在性
-        match self.get_socket_info(fd) {
-            Some(socket) => {
-                // 检查是否为已连接状态
-                if socket.state != crate::syscalls::net::types::SocketState::Connected {
-                    // println removed for no_std compatibility
-                }
-            }
+        let socket = match self.get_socket_info(fd) {
+            Some(s) => s,
             None => return Err(crate::syscalls::net::types::NetworkError::InvalidSocket),
+        };
+        
+        // 验证 how 参数 (SHUT_RD=0, SHUT_WR=1, SHUT_RDWR=2)
+        if how < 0 || how > 2 {
+            return Err(crate::syscalls::net::types::NetworkError::InvalidArgument);
         }
-
-        // TODO: 实现实际的连接关闭逻辑
-        // 目前作为占位符
-
-        // println removed for no_std compatibility
+        
+        // 检查是否为已连接状态（对于TCP套接字）
+        if socket.socket_type == crate::syscalls::net::types::SocketType::Stream {
+            if socket.state != crate::syscalls::net::types::SocketState::Connected {
+                return Err(crate::syscalls::net::types::NetworkError::InvalidSocket);
+            }
+        }
+        
+        // 根据 how 参数执行相应的关闭操作
+        match how {
+            0 => {
+                // SHUT_RD: 关闭读取方向
+                // TODO: 实现读取方向的关闭逻辑
+            }
+            1 => {
+                // SHUT_WR: 关闭写入方向
+                // TODO: 实现写入方向的关闭逻辑
+            }
+            2 => {
+                // SHUT_RDWR: 关闭读写两个方向
+                // TODO: 实现双向关闭逻辑
+            }
+            _ => unreachable!(),
+        }
+        
         Ok(0)
     }
 
@@ -644,14 +787,30 @@ impl NetworkService {
     /// * `Result<i32, NetworkError>` - 0表示成功或错误
     pub fn handle_getsockopt(&mut self, fd: i32, level: i32, optname: i32, optval_ptr: u64, optlen_ptr: u64) -> Result<i32, crate::syscalls::net::types::NetworkError> {
         // 检查套接字存在性
-        if self.get_socket_info(fd).is_none() {
-            // println removed for no_std compatibility
+        let _socket = match self.get_socket_info(fd) {
+            Some(s) => s,
+            None => return Err(crate::syscalls::net::types::NetworkError::InvalidSocket),
+        };
+
+        // 验证参数有效性
+        if optval_ptr == 0 || optlen_ptr == 0 {
+            return Err(crate::syscalls::net::types::NetworkError::InvalidArgument);
         }
-
+        
+        // 验证选项级别和选项名
+        // SOL_SOCKET = 1, IPPROTO_TCP = 6, IPPROTO_IP = 0
+        if level < 0 || level > 255 {
+            return Err(crate::syscalls::net::types::NetworkError::InvalidArgument);
+        }
+        if optname < 0 || optname > 255 {
+            return Err(crate::syscalls::net::types::NetworkError::InvalidArgument);
+        }
+        
         // TODO: 实现实际的套接字选项查询逻辑
-        // 目前作为占位符
-
-        // println removed for no_std compatibility
+        // 1. 根据 level 和 optname 获取选项值
+        // 2. 将选项值复制到用户空间 optval_ptr
+        // 3. 更新 optlen_ptr 指向的长度值
+        
         Ok(0)
     }
 
@@ -672,12 +831,31 @@ impl NetworkService {
     /// * `Result<i32, NetworkError>` - 0表示成功或错误
     pub fn handle_setsockopt(&mut self, fd: i32, level: i32, optname: i32, optval_ptr: u64, optlen: u32) -> Result<i32, crate::syscalls::net::types::NetworkError> {
         // 检查套接字存在性
-        if self.get_socket_info(fd).is_none() {
-            // println removed for no_std compatibility
-        }
+        let _socket = match self.get_socket_info(fd) {
+            Some(s) => s,
+            None => return Err(crate::syscalls::net::types::NetworkError::InvalidSocket),
+        };
 
+        // 验证参数有效性
+        if optval_ptr == 0 {
+            return Err(crate::syscalls::net::types::NetworkError::InvalidArgument);
+        }
+        if optlen == 0 {
+            return Err(crate::syscalls::net::types::NetworkError::InvalidArgument);
+        }
+        
+        // 验证选项级别和选项名
+        if level < 0 || level > 255 {
+            return Err(crate::syscalls::net::types::NetworkError::InvalidArgument);
+        }
+        if optname < 0 || optname > 255 {
+            return Err(crate::syscalls::net::types::NetworkError::InvalidArgument);
+        }
+        
         // TODO: 实现实际的套接字选项设置逻辑
-        // 目前作为占位符
+        // 1. 从用户空间 optval_ptr 读取选项值
+        // 2. 根据 level 和 optname 验证选项值的有效性
+        // 3. 设置套接字选项
 
         // println removed for no_std compatibility
         Ok(0)
@@ -691,6 +869,10 @@ impl Default for NetworkService {
 }
 
 impl Service for NetworkService {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -773,6 +955,14 @@ impl SyscallService for NetworkService {
                 let domain = args[0] as i32;
                 let socket_type = args[1] as i32;
                 let protocol = args[2] as i32;
+                
+                // 验证参数有效性
+                if socket_type < 1 || socket_type > 3 {
+                    return Err(KernelError::InvalidArgument);
+                }
+                if protocol < 0 || protocol > 255 {
+                    return Err(KernelError::InvalidArgument);
+                }
 
                 match self.handle_socket(domain, socket_type, protocol) {
                     Ok(fd) => Ok(fd as u64),
@@ -955,6 +1145,10 @@ impl SyscallService for NetworkService {
 
     fn priority(&self) -> u32 {
         70 // 网络服务优先级
+    }
+
+    fn as_syscall_service(&self) -> Option<&dyn SyscallService> {
+        Some(self)
     }
 }
 

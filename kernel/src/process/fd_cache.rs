@@ -7,8 +7,7 @@
 //! - 缓存统计和性能监控
 
 extern crate alloc;
-use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicU64, Ordering};
 
 /// 缓存的文件描述符信息
 #[derive(Debug, Clone, Copy)]

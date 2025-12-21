@@ -459,7 +459,7 @@ impl ServiceRegistry {
     }
 
     pub fn add_service_dependency(&self, service_id: ServiceId, dependency: ServiceDependency) -> Result<(), i32> {
-        let mut services = self.services.lock();
+        let services = self.services.lock();
         let mut dependency_graph = self.dependency_graph.lock();
 
         // Check if service exists

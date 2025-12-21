@@ -440,8 +440,8 @@ impl EnhancedTimeLib {
         }
 
         // 简化的日期计算（不考虑闰年等复杂情况）
-        let mut year = 1970 + (days / 365) as c_int;
-        let mut day_of_year = (days % 365) as c_int;
+        let year = 1970 + (days / 365) as c_int;
+        let day_of_year = (days % 365) as c_int;
 
         // 简化的月份计算
         let month_days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];

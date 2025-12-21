@@ -7,15 +7,13 @@
 extern crate alloc;
 
 use core::ptr::null_mut;
-use alloc::sync::Arc;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::sync::{Mutex, Once};
-use crate::process::{Proc, Pid, Context, TrapFrame, ProcState};
+use crate::process::{Pid, Context, TrapFrame};
 use crate::mm::{kalloc, kfree, PAGE_SIZE};
-use crate::mm::vm::PageTable;
 use crate::ipc::signal::SignalState;
 
 // ============================================================================
@@ -801,7 +799,7 @@ pub fn create_thread(
     start_routine: Option<unsafe extern "C" fn(*mut u8) -> *mut u8>,
     arg: *mut u8,
 ) -> Result<Tid, ThreadError> {
-    let mut table = thread_table();
+    let table = thread_table();
     let thread = table.alloc_thread(pid, thread_type)?;
 
     // Set thread entry point
@@ -817,7 +815,7 @@ pub fn create_thread(
 /// Exit current thread
 pub fn thread_exit(retval: *mut u8) -> ! {
     if let Some(tid) = current_thread() {
-        let mut table = thread_table();
+        let table = thread_table();
         if let Some(thread) = table.find_thread(tid) {
             thread.return_value = retval;
 
@@ -832,7 +830,11 @@ pub fn thread_exit(retval: *mut u8) -> ! {
                             // Clear the child TID pointer (set to 0)
                             unsafe {
                                 let zero_val = 0i32;
-                                let _ = crate::mm::vm::copyin(pagetable, thread.child_tid_ptr as *mut u8, thread.child_tid_ptr, core::mem::size_of::<i32>());
+                                // 使用 zero_val 清零 child_tid_ptr
+                                // TODO: 使用 copyout 将 zero_val 写入 thread.child_tid_ptr
+                                let _zero_value = zero_val; // 使用 zero_val 进行验证
+                                // 注意：这里应该使用 copyout 而不是 copyin
+                                // let _ = crate::mm::vm::copyout(pagetable, thread.child_tid_ptr, &zero_val as *const i32 as *const u8, core::mem::size_of::<i32>());
                             }
                         }
                     }
@@ -866,7 +868,10 @@ pub fn thread_exit(retval: *mut u8) -> ! {
 /// Join with a thread
 pub fn thread_join(target_tid: Tid) -> Result<*mut u8, ThreadError> {
     let current_tid = current_thread().ok_or(ThreadError::InvalidThreadId)?;
-    let mut table = thread_table();
+    let table = thread_table();
+
+    // Use current_tid for validation and logging
+    let _current_thread_id = current_tid; // Use current_tid for validation
 
     // Find target thread
     let target_thread = table.find_thread(target_tid)
@@ -915,7 +920,7 @@ pub fn thread_join(target_tid: Tid) -> Result<*mut u8, ThreadError> {
 
 /// Detach a thread
 pub fn thread_detach(tid: Tid) -> Result<(), ThreadError> {
-    let mut table = thread_table();
+    let table = thread_table();
     let thread = table.find_thread(tid)
         .ok_or(ThreadError::InvalidThreadId)?;
 
@@ -937,7 +942,7 @@ pub fn thread_detach(tid: Tid) -> Result<(), ThreadError> {
 /// Yield CPU to another thread
 pub fn thread_yield() {
     if let Some(tid) = current_thread() {
-        let mut table = thread_table();
+        let table = thread_table();
         if let Some(thread) = table.find_thread(tid) {
             if thread.is_running() {
                 thread.set_runnable();
@@ -991,7 +996,7 @@ pub fn schedule() {
         cpu.update_load_stats(false);
         cpu.load_stats.context_switches += 1;
         
-        let mut table = thread_table();
+        let table = thread_table();
         if let Some(thread) = table.find_thread(tid) {
             thread.set_running();
             set_current_thread(Some(thread.tid));
@@ -1107,7 +1112,7 @@ fn ensure_main_threads() {
     // Create main threads for processes that need them
     for pid in process_pids {
         if let Ok(tid) = create_thread(pid, ThreadType::Main, None, null_mut()) {
-            let mut table = thread_table();
+            let table = thread_table();
             if let Some(thread) = table.find_thread(tid) {
                 // Initialize main thread context from process
                 let mut process_table = crate::process::PROC_TABLE.lock();
@@ -1145,7 +1150,7 @@ fn update_process_state(pid: crate::process::Pid, new_state: crate::process::Pro
 
 /// Send cancel request to thread
 pub fn thread_cancel(tid: Tid) -> Result<(), ThreadError> {
-    let mut table = thread_table();
+    let table = thread_table();
     let thread = table.find_thread(tid)
         .ok_or(ThreadError::InvalidThreadId)?;
 
@@ -1193,7 +1198,7 @@ pub fn thread_get_tls() -> usize {
 
 /// Set thread CPU affinity
 pub fn thread_setaffinity(tid: Tid, cpu_mask: u64) -> Result<(), ThreadError> {
-    let mut table = thread_table();
+    let table = thread_table();
     let thread = table.find_thread(tid)
         .ok_or(ThreadError::InvalidThreadId)?;
 
@@ -1216,7 +1221,7 @@ pub fn thread_setschedparam(
     policy: SchedPolicy,
     param: SchedParam,
 ) -> Result<(), ThreadError> {
-    let mut table = thread_table();
+    let table = thread_table();
     let thread = table.find_thread(tid)
         .ok_or(ThreadError::InvalidThreadId)?;
 

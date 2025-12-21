@@ -18,6 +18,8 @@ use core::ptr::{self, NonNull};
 use core::ffi::{c_void, c_int};
 use crate::glib::GObject;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+// Note: In no_std environment, we need to use alternative synchronization
+// For now, we'll use a simple approach without Mutex for static variables
 
 
 /// 异步操作状态
@@ -179,7 +181,10 @@ pub fn init() -> Result<(), GError> {
     glib_println!("[glib_async_io] 初始化异步I/O系统");
 
     unsafe {
-        NEXT_ASYNC_CONTEXT_ID.store(1, Ordering::SeqCst);
+        unsafe {
+            let ptr = core::ptr::addr_of!(NEXT_ASYNC_CONTEXT_ID);
+            (*ptr).store(1, Ordering::SeqCst);
+        }
     }
 
     glib_println!("[glib_async_io] 异步I/O系统初始化完成");
@@ -193,7 +198,10 @@ pub fn g_async_context_new(name: &str, max_operations: usize) -> *mut AsyncIOCon
     }
 
     unsafe {
-        let context_id = NEXT_ASYNC_CONTEXT_ID.fetch_add(1, Ordering::SeqCst) as u64;
+        let context_id = unsafe {
+            let ptr = core::ptr::addr_of!(NEXT_ASYNC_CONTEXT_ID);
+            (*ptr).fetch_add(1, Ordering::SeqCst)
+        } as u64;
         let context = g_malloc0(core::mem::size_of::<AsyncIOContext>()) as *mut AsyncIOContext;
         if context.is_null() {
             return ptr::null_mut();
@@ -219,7 +227,9 @@ pub fn g_async_context_new(name: &str, max_operations: usize) -> *mut AsyncIOCon
             return ptr::null_mut();
         }
 
-        ASYNC_CONTEXTS.insert(context_id, context);
+        unsafe {
+            ASYNC_CONTEXTS.insert(context_id, context);
+        }
 
         glib_println!("[glib_async_io] 创建异步上下文: {} (ID={})", name, context_id);
         context
@@ -254,7 +264,9 @@ pub fn g_async_context_destroy(context: *mut AsyncIOContext) {
         }
 
         // 从注册表中移除
-        ASYNC_CONTEXTS.remove(&(*context).context_id);
+        unsafe {
+            ASYNC_CONTEXTS.remove(&(*context).context_id);
+        }
 
         // 释放内存
         g_free(context as gpointer);
@@ -681,7 +693,8 @@ pub fn handle_async_operation_complete(operation_id: u64, bytes_transferred: usi
         let mut found_operation = None;
         let mut context = ptr::null_mut();
 
-        for (_, context_ptr) in ASYNC_CONTEXTS.iter() {
+        let ptr = core::ptr::addr_of!(ASYNC_CONTEXTS);
+        for (_, context_ptr) in (*ptr).iter() {
             if let Some(operation) = (**context_ptr).active_operations.get(&operation_id) {
                 found_operation = Some(*operation);
                 context = *context_ptr;
@@ -770,14 +783,14 @@ pub fn cleanup() {
 
     unsafe {
         // 清理所有异步上下文
-        let context_ids: Vec<u64> = ASYNC_CONTEXTS.keys().cloned().collect();
+        let context_ids: Vec<u64> = unsafe { (&*core::ptr::addr_of!(ASYNC_CONTEXTS)).keys().cloned().collect() };
         for context_id in context_ids {
-            if let Some(context_ptr) = ASYNC_CONTEXTS.get(&context_id) {
+            if let Some(context_ptr) = unsafe { (&*core::ptr::addr_of!(ASYNC_CONTEXTS)).get(&context_id) } {
                 g_async_context_destroy(*context_ptr);
             }
         }
 
-        ASYNC_CONTEXTS.clear();
+        unsafe { ASYNC_CONTEXTS.clear() };
 
         // 清理内核中的异步操作
         crate::syscall(syscall_number::GLibAsyncCleanup, &[0, 0, 0, 0, 0, 0]);

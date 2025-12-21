@@ -13,9 +13,6 @@ use crate::syscalls::common::SyscallError;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-/// Integration test result
-pub type IntegrationResult = Result<(), String>;
-
 /// Integration test context
 pub struct IntegrationTestContext {
     /// Test name
@@ -32,8 +29,8 @@ impl IntegrationTestContext {
     /// Create a new integration test context
     pub fn new(name: &str, description: &str) -> Self {
         Self {
-            name: name.to_string(),
-            description: description.to_string(),
+            name: name.into(),
+            description: description.into(),
             steps: Vec::new(),
             current_step: 0,
         }
@@ -41,13 +38,13 @@ impl IntegrationTestContext {
 
     /// Add a test step
     pub fn add_step(&mut self, step: &str) {
-        self.steps.push(step.to_string());
+        self.steps.push(step.into());
         self.current_step += 1;
         crate::println!("[integration] {}: Step {}: {}", self.name, self.current_step, step);
     }
 
     /// Complete test
-    pub fn complete(&mut self, success: bool) {
+    pub fn complete(&mut self, success: bool) -> bool {
         if success {
             crate::println!("[integration] {}: COMPLETED - All {} steps passed", 
                 self.name, self.steps.len());
@@ -55,6 +52,7 @@ impl IntegrationTestContext {
             crate::println!("[integration] {}: FAILED at step {}", 
                 self.name, self.current_step);
         }
+        success
     }
 }
 
@@ -79,31 +77,23 @@ impl IntegrationTestRunner {
     }
 
     /// Run an integration test
-    pub fn run_test<F>(&mut self, test_name: &str, test_fn: F) -> IntegrationResult
+    pub fn run_test<F>(&mut self, test_name: &str, test_fn: F)
     where
-        F: FnOnce(&mut IntegrationTestContext) -> IntegrationResult,
+        F: FnOnce(&mut IntegrationTestContext),
     {
         let mut context = IntegrationTestContext::new(test_name, "");
         
         crate::println!("[integration] Starting integration test: {}", test_name);
         
-        let result = test_fn(&mut context);
+        test_fn(&mut context);
         
-        match result {
-            Ok(()) => {
-                context.complete(true);
-                self.tests_passed += 1;
-            }
-            Err(error) => {
-                context.complete(false);
-                self.tests_failed += 1;
-                return Err(error);
-            }
+        if context.complete(true) {
+            self.tests_passed += 1;
+        } else {
+            self.tests_failed += 1;
         }
         
         self.tests_run += 1;
-        
-        result
     }
 
     /// Print test summary

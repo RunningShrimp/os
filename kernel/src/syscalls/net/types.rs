@@ -116,7 +116,8 @@ impl NetworkAddress {
             Self::IPv6 { address, port, .. } => {
                 let addr_str = address.iter()
                     .map(|b| format!("{:02x}", b))
-                    .collect::<Vec<_>>();
+                    .collect::<Vec<_>>()
+                    .join(":");
                 // println removed for no_std compatibility
                 format!("[{}]:{}", addr_str, port)
             }
@@ -280,7 +281,7 @@ impl Default for ConnectionParams {
 /// 网络错误类型
 /// 
 /// 定义网络模块特有的错误类型。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NetworkError {
     /// 地址已在使用
     AddressInUse,
@@ -310,6 +311,8 @@ pub enum NetworkError {
     BufferSpaceInsufficient,
     /// 系统调用不支持
     UnsupportedSyscall,
+    /// 无效参数
+    InvalidArgument,
 }
 
 impl NetworkError {
@@ -330,6 +333,7 @@ impl NetworkError {
             NetworkError::PermissionDenied => -13,
             NetworkError::BufferSpaceInsufficient => -105,
             NetworkError::UnsupportedSyscall => -38,
+            NetworkError::InvalidArgument => -22,
         }
     }
 
@@ -350,6 +354,7 @@ impl NetworkError {
             NetworkError::PermissionDenied => "Permission denied",
             NetworkError::BufferSpaceInsufficient => "Insufficient buffer space",
             NetworkError::UnsupportedSyscall => "Unsupported syscall",
+            NetworkError::InvalidArgument => "Invalid argument",
         }
     }
 }

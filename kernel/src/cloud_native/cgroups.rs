@@ -14,7 +14,6 @@ use alloc::sync::Arc;
 use spin::Mutex;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 /// cgroup版本
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

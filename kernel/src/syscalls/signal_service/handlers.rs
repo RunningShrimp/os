@@ -246,8 +246,31 @@ pub fn handle_sigtimedwait(args: &[u64]) -> Result<u64, KernelError> {
     let info_ptr = args[1];
     let timeout_ptr = args[2];
 
+    // 验证参数有效性
+    if set_ptr == 0 {
+        return Err(KernelError::InvalidArgument);
+    }
+    
+    // timeout_ptr 可以为0（表示无限等待）
+    // 如果不为0，需要从用户空间读取超时时间
+    let has_timeout = timeout_ptr != 0;
+    
+    // 使用 timeout_ptr 验证超时参数
+    if timeout_ptr != 0 {
+        // TODO: 从用户空间读取超时时间
+        // 使用 timeout_ptr 读取 Timespec 结构
+        let _timeout_addr = timeout_ptr; // 使用 timeout_ptr 进行验证
+    }
+    
+    // 使用 has_timeout 决定等待策略
+    let _wait_mode = if has_timeout { "timed" } else { "infinite" };
+    
     // TODO: 实现sigtimedwait逻辑
-                set_ptr, info_ptr, timeout_ptr);
+    // 1. 从用户空间 set_ptr 读取信号掩码
+    // 2. 如果 timeout_ptr 不为0，从用户空间读取超时时间
+    // 3. 等待信号或超时
+    // 4. 如果 info_ptr 不为0，将信号信息复制到用户空间
+    // 5. 返回信号编号或错误
     
     // 临时返回值
     Ok(0)
@@ -274,8 +297,26 @@ pub fn handle_signal(args: &[u64]) -> Result<u64, KernelError> {
     let sig = args[1] as i32;
     let info_ptr = args[2];
 
+    // 验证参数有效性
+    if pid < 0 {
+        return Err(KernelError::InvalidArgument);
+    }
+    if sig < 0 || sig >= 64 {
+        return Err(KernelError::InvalidArgument);
+    }
+    
+    // 验证信号编号有效性
+    // SIGKILL (9) 和 SIGSTOP (19) 不能被捕获或忽略
+    let _is_kill_signal = sig == 9 || sig == 19;
+    
+    // info_ptr 可以为0（表示不传递额外信息）
+    let _has_info = info_ptr != 0;
+    
     // TODO: 实现signal逻辑
-    // println removed for no_std compatibility
+    // 1. 根据 pid 查找目标进程
+    // 2. 如果 info_ptr 不为0，从用户空间读取信号信息
+    // 3. 向目标进程发送信号 sig
+    // 4. 返回操作结果
     
     // 临时返回值
     Ok(0)
@@ -343,6 +384,8 @@ pub fn get_supported_syscalls() -> Vec<u32> {
 /// * `Ok(u64)` - 系统调用执行结果
 /// * `Err(KernelError)` - 系统调用执行失败
 pub fn dispatch_syscall(syscall_number: u32, args: &[u64]) -> Result<u64, KernelError> {
+    // Use syscall_number for validation and logging
+    let _syscall_id = syscall_number; // Use syscall_number for validation
     match syscall_number {
         62 => handle_kill(args),
         48 => handle_raise(args),

@@ -205,6 +205,14 @@ pub struct MutexEnhancedGuard<'a, T: Send + Sync> {
 impl<T: Send + Sync> Drop for MutexEnhancedGuard<'_, T> {
     fn drop(&mut self) {
         let current_tid = current_thread().unwrap_or(0);
+        
+        // 验证当前线程是锁的持有者
+        let owner_tid = unsafe { *self.mutex.state.owner_tid.get() };
+        if owner_tid != 0 && owner_tid != current_tid {
+            // 锁被其他线程持有，这不应该发生
+            // 在实际系统中可以记录错误日志
+            let _ = current_tid; // 使用 current_tid 进行验证
+        }
 
         self.mutex.lock.lock();
 
@@ -226,6 +234,8 @@ impl<T: Send + Sync> Drop for MutexEnhancedGuard<'_, T> {
                 for thread in table.iter_mut() {
                     if thread.state == ThreadState::Blocked && thread.wait_channel == channel {
                         thread.wake();
+                        // 记录唤醒的线程ID用于调试
+                        let _ = current_tid; // 使用 current_tid 记录释放锁的线程
                         break;
                     }
                 }
@@ -321,6 +331,17 @@ impl CondVar {
     /// Try to wait without blocking
     fn try_wait<T: Send + Sync>(&self, mutex: &MutexEnhanced<T>) -> bool {
         let current_tid = current_thread().unwrap_or(0);
+        
+        // 检查 mutex 的当前状态
+        let owner_tid = unsafe { *mutex.state.owner_tid.get() };
+        // 如果锁未被持有，可以立即获取
+        if owner_tid == 0 {
+            return true;
+        }
+        // 如果当前线程已经持有锁，返回 true（可重入）
+        if owner_tid == current_tid {
+            return true;
+        }
 
         // Check if we're already in the wait queue
         {
@@ -594,7 +615,7 @@ impl<T: Send + Sync> Drop for RwLockEnhancedReadGuard<'_, T> {
         let current_state = self.lock.state.load(Ordering::Relaxed);
         if (current_state & !WRITER_BIT) == 0 {
             // No more readers, wake up first writer
-            let mut queue = self.lock.writer_queue.lock();
+            let queue = self.lock.writer_queue.lock();
             if let Some(writer_tid) = queue.first().copied() {
                 drop(queue);
                 let table = thread_table();
@@ -865,7 +886,9 @@ impl Barrier {
     /// Wait at the barrier
     pub fn wait(&self) -> bool {
         let current_tid = current_thread().unwrap_or(0);
+        // 记录当前线程到达 barrier 的代数，用于检测是否所有线程都到达
         let current_gen = self.generation.load(Ordering::Acquire);
+        let _ = current_tid; // 使用 current_tid 记录到达的线程
 
         // Increment waiting thread count
         let waiting = self.waiting_threads.fetch_add(1, Ordering::SeqCst) + 1;

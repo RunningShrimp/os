@@ -15,8 +15,7 @@ use crate::microkernel::service_registry::{ServiceInfo, InterfaceVersion, Servic
 use crate::reliability::errno::{EINVAL, ENOENT, ENOMEM, EIO};
 use alloc::string::String;
 use alloc::string::ToString;
-use alloc::vec::Vec;
-use alloc::{format, vec};
+use alloc::format;
 
 /// 云原生服务ID
 pub const CLOUD_NATIVE_SERVICE_ID: u64 = 100;

@@ -687,6 +687,7 @@ mod tests {
         assert!(config.validate().is_ok());
     }
 
+extern crate alloc;
     #[test]
     fn test_scancode_conversion() {
         let menu = BiosBootMenu::new(BootMenuConfig::new());

@@ -5,8 +5,6 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
-use alloc::string::String;
 use crate::security::audit::AuditEvent;
 use super::super::{IntrusionDetection, ThreatLevel};
 

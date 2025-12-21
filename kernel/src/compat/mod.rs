@@ -556,7 +556,7 @@ pub fn init_compatibility_layer() -> Result<()> {
     });
 
     // Initialize platform modules
-    let mut platform_modules: HashMap<TargetPlatform, Arc<dyn PlatformModule>, DefaultHasherBuilder> = HashMap::with_hasher(DefaultHasherBuilder);
+    let platform_modules: HashMap<TargetPlatform, Arc<dyn PlatformModule>, DefaultHasherBuilder> = HashMap::with_hasher(DefaultHasherBuilder);
 
     // Register platform modules (will be implemented in submodules)
     // platform_modules.insert(TargetPlatform::Windows, Arc::new(platforms::windows::WindowsModule::new()));

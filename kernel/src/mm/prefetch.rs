@@ -132,6 +132,7 @@ impl MarkovState {
 }
 
 /// Prefetch statistics
+#[derive(Clone)]
 pub struct PrefetchStats {
     /// Number of prefetches performed
     pub prefetches: usize,
@@ -180,6 +181,36 @@ pub struct AdaptivePrefetcher {
 }
 
 impl AdaptivePrefetcher {
+    /// Create a new adaptive prefetcher (const version for static initialization)
+    pub const fn new_const() -> Self {
+        Self {
+            strategy: PrefetchStrategy::Adaptive,
+            history: VecDeque::new(),
+            max_history: 1024,
+            stride_state: StrideState {
+                stride: 0,
+                confidence: 0,
+                last_addr: 0,
+                consistent_count: 0,
+            },
+            markov_state: MarkovState {
+                current: Vec::new(),
+                transitions: BTreeMap::new(),
+                max_sequence: 3,
+            },
+            stats: PrefetchStats {
+                prefetches: 0,
+                hits: 0,
+                misses: 0,
+                current_strategy: PrefetchStrategy::Adaptive,
+                avg_latency_improvement: 0.0,
+            },
+            perf_threshold: 0.25, // 25% improvement threshold
+            evaluation_timer: 0,
+            evaluation_interval: 5000, // Evaluate every 5 seconds
+        }
+    }
+
     /// Create a new adaptive prefetcher
     pub fn new() -> Self {
         Self {
@@ -312,7 +343,7 @@ impl AdaptivePrefetcher {
     }
 
     /// Issue a prefetch command
-    fn issue_prefetch(&self, addr: usize) {
+    fn issue_prefetch(&self, _addr: usize) {
         // In a real implementation, this would interact with the MMU
         // to issue a hardware prefetch or populate the cache
         
@@ -339,7 +370,7 @@ impl AdaptivePrefetcher {
 }
 
 /// Global adaptive prefetcher instance
-static GLOBAL_PREFETCHER: Mutex<AdaptivePrefetcher> = Mutex::new(AdaptivePrefetcher::new());
+static GLOBAL_PREFETCHER: Mutex<AdaptivePrefetcher> = Mutex::new(AdaptivePrefetcher::new_const());
 
 /// Initialize the adaptive prefetching system
 pub fn init_prefetcher() {

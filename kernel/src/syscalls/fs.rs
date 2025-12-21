@@ -487,7 +487,7 @@ fn sys_rename(args: &[u64]) -> SyscallResult {
     // Get old inode
     let old_dentry = vfs.lookup_path(&abs_old_path)
         .map_err(|_| SyscallError::NotFound)?;
-    let old_inode = old_dentry.lock().inode.clone();
+    let _old_inode = old_dentry.lock().inode.clone();
     
     // Split paths manually (since split_path is private)
     let split_path_helper = |path: &str| -> Result<(String, String), SyscallError> {
@@ -788,7 +788,7 @@ fn sys_readlink(args: &[u64]) -> SyscallResult {
 /// Returns: 0 on success, error on failure
 fn sys_chmod(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::{copyinstr, copyin};
+    use crate::mm::vm::copyinstr;
     
     let args = extract_args(args, 2)?;
     let pathname_ptr = args[0] as usize;
@@ -1238,19 +1238,20 @@ fn sys_mount(args: &[u64]) -> SyscallResult {
     use crate::mm::vm::copyinstr;
     
     let args = extract_args(args, 5)?;
-    let source_ptr = args[0] as usize;
+    let _source_ptr = args[0] as usize;
     let target_ptr = args[1] as usize;
     let fstype_ptr = args[2] as usize;
     let flags = args[3] as u32;
     let _data_ptr = args[4] as usize;
-    
+
     // Get current process
     let pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
-    let proc_table = crate::process::manager::PROC_TABLE.lock();
-    let proc = proc_table.find_ref(pid).ok_or(SyscallError::NotFound)?;
-    let pagetable = proc.pagetable;
-    drop(proc_table);
-    
+    let (pagetable, cwd_path) = {
+        let proc_table = crate::process::manager::PROC_TABLE.lock();
+        let proc = proc_table.find_ref(pid).ok_or(SyscallError::NotFound)?;
+        (proc.pagetable, proc.cwd_path.clone())
+    };
+
     if pagetable.is_null() {
         return Err(SyscallError::BadAddress);
     }
@@ -1291,11 +1292,11 @@ fn sys_mount(args: &[u64]) -> SyscallResult {
     let abs_target = if target_str.starts_with('/') {
         target_str.to_string()
     } else {
-        let cwd_path = proc.cwd_path.as_ref().map(|s| s.as_str()).unwrap_or("/");
-        if cwd_path == "/" {
+        let cwd_path_str = cwd_path.as_ref().map(|s| s.as_str()).unwrap_or("/");
+        if cwd_path_str == "/" {
             format!("/{}", target_str)
         } else {
-            format!("{}/{}", cwd_path, target_str)
+            format!("{}/{}", cwd_path_str, target_str)
         }
     };
     
@@ -1342,14 +1343,15 @@ fn sys_umount(args: &[u64]) -> SyscallResult {
     
     let args = extract_args(args, 1)?;
     let target_ptr = args[0] as usize;
-    
+
     // Get current process
     let pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
-    let proc_table = crate::process::manager::PROC_TABLE.lock();
-    let proc = proc_table.find_ref(pid).ok_or(SyscallError::NotFound)?;
-    let pagetable = proc.pagetable;
-    drop(proc_table);
-    
+    let (pagetable, cwd_path) = {
+        let proc_table = crate::process::manager::PROC_TABLE.lock();
+        let proc = proc_table.find_ref(pid).ok_or(SyscallError::NotFound)?;
+        (proc.pagetable, proc.cwd_path.clone())
+    };
+
     if pagetable.is_null() {
         return Err(SyscallError::BadAddress);
     }
@@ -1376,11 +1378,11 @@ fn sys_umount(args: &[u64]) -> SyscallResult {
     let abs_target = if target_str.starts_with('/') {
         target_str.to_string()
     } else {
-        let cwd_path = proc.cwd_path.as_ref().map(|s| s.as_str()).unwrap_or("/");
-        if cwd_path == "/" {
+        let cwd_path_str = cwd_path.as_ref().map(|s| s.as_str()).unwrap_or("/");
+        if cwd_path_str == "/" {
             format!("/{}", target_str)
         } else {
-            format!("{}/{}", cwd_path, target_str)
+            format!("{}/{}", cwd_path_str, target_str)
         }
     };
     

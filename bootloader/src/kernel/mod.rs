@@ -8,6 +8,8 @@ use crate::error::{BootError, Result};
 use crate::memory::BootMemoryManager;
 use crate::protocol::{BootInfo, KernelImage, MemoryMap};
 use core::ptr;
+use alloc::vec::Vec;
+use alloc::string::String;
 
 /// Kernel image formats supported
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -302,15 +304,15 @@ impl KernelLoader {
 }
 
 /// Boot parameters preparation
-pub struct BootParameters {
+pub struct KernelBootParameters {
     boot_info: BootInfo,
     kernel_image: KernelImage,
 }
 
-impl BootParameters {
+impl KernelBootParameters {
     /// Create new boot parameters
     pub fn new(boot_info: &BootInfo, kernel_image: &KernelImage) -> crate::arch::BootParameters {
-        let mut params = crate::arch::BootParameters::new(boot_info, kernel_image);
+        let params = crate::arch::BootParameters::new(boot_info, kernel_image);
 
         // Set up memory map information
         // In a real implementation, we'd convert the bootloader's memory map
@@ -322,9 +324,9 @@ impl BootParameters {
 
     /// Get the boot parameters structure
     pub fn into_struct(self) -> crate::arch::BootParameters {
-        let BootParameters { boot_info, kernel_image } = self;
+        let KernelBootParameters { boot_info, kernel_image } = self;
 
-        let mut params = crate::arch::BootParameters::new(&boot_info, &kernel_image);
+        let params = crate::arch::BootParameters::new(&boot_info, &kernel_image);
 
         // Additional setup could be done here
         params

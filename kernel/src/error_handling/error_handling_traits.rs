@@ -351,7 +351,7 @@ impl UnifiedErrorHandlingManager {
 
     /// 注册错误处理器
     pub fn register_handler(&self, handler: Box<dyn ErrorHandler>) {
-        let mut handlers = Arc::as_ptr(&self.handlers) as *mut Vec<Box<dyn ErrorHandler>>;
+        let handlers = Arc::as_ptr(&self.handlers) as *mut Vec<Box<dyn ErrorHandler>>;
         unsafe {
             (*handlers).push(handler);
         }
@@ -359,7 +359,7 @@ impl UnifiedErrorHandlingManager {
 
     /// 注册错误恢复器
     pub fn register_recoverer(&self, recoverer: Box<dyn ErrorRecoverer>) {
-        let mut recoverers = Arc::as_ptr(&self.recoverers) as *mut Vec<Box<dyn ErrorRecoverer>>;
+        let recoverers = Arc::as_ptr(&self.recoverers) as *mut Vec<Box<dyn ErrorRecoverer>>;
         unsafe {
             (*recoverers).push(recoverer);
         }
@@ -367,7 +367,7 @@ impl UnifiedErrorHandlingManager {
 
     /// 注册错误诊断器
     pub fn register_diagnoser(&self, diagnoser: Box<dyn ErrorDiagnoser>) {
-        let mut diagnosers = Arc::as_ptr(&self.diagnosers) as *mut Vec<Box<dyn ErrorDiagnoser>>;
+        let diagnosers = Arc::as_ptr(&self.diagnosers) as *mut Vec<Box<dyn ErrorDiagnoser>>;
         unsafe {
             (*diagnosers).push(diagnoser);
         }
@@ -375,7 +375,7 @@ impl UnifiedErrorHandlingManager {
 
     /// 注册错误预测器
     pub fn register_predictor(&self, predictor: Box<dyn ErrorPredictorTrait>) {
-        let mut predictors = Arc::as_ptr(&self.predictors) as *mut Vec<Box<dyn ErrorPredictorTrait>>;
+        let predictors = Arc::as_ptr(&self.predictors) as *mut Vec<Box<dyn ErrorPredictorTrait>>;
         unsafe {
             (*predictors).push(predictor);
         }
@@ -383,7 +383,7 @@ impl UnifiedErrorHandlingManager {
 
     /// 注册错误监听器
     pub fn register_listener(&self, listener: Box<dyn ErrorListener>) {
-        let mut listeners = Arc::as_ptr(&self.listeners) as *mut Vec<Box<dyn ErrorListener>>;
+        let listeners = Arc::as_ptr(&self.listeners) as *mut Vec<Box<dyn ErrorListener>>;
         unsafe {
             (*listeners).push(listener);
         }
@@ -405,10 +405,11 @@ impl UnifiedErrorHandlingManager {
 
         // 记录错误到预测器
         let error_record = self.create_error_record(&error, &context, &diagnosis_result);
+        let error_record_clone = error_record.clone();
         let _ = self.error_predictor.add_error_record(error_record);
 
         // 触发自愈合
-        let _ = self.self_healing_system.handle_error(&error_record);
+        let _ = self.self_healing_system.handle_error(&error_record_clone);
 
         // 通知监听器错误解决
         self.notify_error_resolved(&error, &recovery_result.method);
@@ -474,7 +475,7 @@ impl UnifiedErrorHandlingManager {
     }
 
     /// 创建错误记录
-    fn create_error_record(&self, error: &UnifiedError, context: &EnhancedErrorContext, diagnosis: &DiagnosisResult) -> ErrorRecord {
+    fn create_error_record(&self, error: &UnifiedError, _context: &EnhancedErrorContext, diagnosis: &DiagnosisResult) -> ErrorRecord {
         ErrorRecord {
             id: self.error_counter.load(Ordering::SeqCst),
             code: error.error_code(),
@@ -534,24 +535,24 @@ impl UnifiedErrorHandlingManager {
 
     /// 更新统计信息
     fn update_statistics(&self, success: bool, processing_time: u64) {
-        let mut stats = unsafe { &mut *Arc::as_ptr(&self.stats) as *mut ManagerStatistics };
         unsafe {
-            (*stats).total_errors_processed += 1;
+            let stats = &mut *(Arc::as_ptr(&self.stats) as *const ManagerStatistics as *mut ManagerStatistics);
+            stats.total_errors_processed += 1;
             if success {
-                (*stats).successful_processings += 1;
+                stats.successful_processings += 1;
             } else {
-                (*stats).failed_processings += 1;
+                stats.failed_processings += 1;
             }
             
             // 更新平均处理时间
-            if (*stats).total_errors_processed > 0 {
-                (*stats).avg_processing_time_ms = 
-                    ((*stats).avg_processing_time_ms * ((*stats).total_errors_processed - 1) + processing_time) / (*stats).total_errors_processed;
+            if stats.total_errors_processed > 0 {
+                stats.avg_processing_time_ms = 
+                    (stats.avg_processing_time_ms * (stats.total_errors_processed - 1) + processing_time) / stats.total_errors_processed;
             }
             
             // 更新成功率
-            (*stats).success_rate = (*stats).successful_processings as f64 / (*stats).total_errors_processed as f64;
-            (*stats).last_processing_time = get_timestamp();
+            stats.success_rate = stats.successful_processings as f64 / stats.total_errors_processed as f64;
+            stats.last_processing_time = get_timestamp();
         }
     }
 

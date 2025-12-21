@@ -37,6 +37,10 @@ pub enum BootError {
     DeviceNotFound,
     DeviceError(&'static str),
 
+    /// Hardware errors
+    HardwareError(&'static str),
+    InsufficientMemory,
+
     /// Filesystem errors
     FileNotFound,
     FileSystemError,
@@ -93,13 +97,15 @@ impl BootError {
             BootError::ProtocolNotSupported => 0x3000,
             BootError::ProtocolDetectionFailed => 0x3001,
             BootError::ProtocolInitializationFailed(_) => 0x3002,
-            BootError::UefiError(status) => status.as_usize() as u32,
+            BootError::UefiError(status) => status.0 as u32,
             BootError::UefiNotFound => 0x4001,
             BootError::UefiUnsupported => 0x4002,
             BootError::BiosInterruptFailed(int) => 0x5000 + (*int as u32),
             BootError::BiosNotSupported => 0x50FF,
             BootError::DeviceNotFound => 0x6000,
             BootError::DeviceError(_) => 0x6001,
+            BootError::HardwareError(_) => 0x7000,
+            BootError::InsufficientMemory => 0x7001,
             BootError::FileNotFound => 0x7000,
             BootError::FileSystemError => 0x7001,
             BootError::InvalidFileFormat => 0x7002,
@@ -227,6 +233,7 @@ pub fn bios_interrupt_error(interrupt: u8, ax: u16) -> BootError {
 }
 
 /// Macro for creating formatted bootloader errors
+extern crate alloc;
 #[macro_export]
 macro_rules! boot_error {
     ($error:expr, $($arg:tt)*) => {

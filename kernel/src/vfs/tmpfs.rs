@@ -1,10 +1,10 @@
 //! Temporary file system (tmpfs) implementation
-
-extern crate alloc;
 //! 
 //! Similar to ramfs but with size limits and better performance
 
-use alloc::{string::String, sync::Arc, vec::Vec, collections::BTreeMap};
+extern crate alloc;
+
+use alloc::{string::{String, ToString}, sync::Arc, vec::Vec, collections::BTreeMap};
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::sync::Mutex;
@@ -12,7 +12,7 @@ use crate::sync::Mutex;
 use super::{
     error::*,
     types::*,
-    fs::{FileSystemType, SuperBlock, InodeOps},
+    fs::{FileSystemType, SuperBlock, InodeOps, FsStats},
     dir::DirEntry,
 };
 
@@ -68,7 +68,7 @@ impl SuperBlock for TmpFsSuperBlock {
     fn statfs(&self) -> VfsResult<FsStats> {
         Ok(FsStats {
             bsize: 4096,
-            blocks: (self.total_bytes.load(Ordering::Relaxed) + 4095) / 4096,
+            blocks: ((self.total_bytes.load(Ordering::Relaxed) + 4095) / 4096) as u64,
             bfree: 0, // No limit enforcement yet
             bavail: 0,
             files: self.next_ino.load(Ordering::Relaxed) as u64,
@@ -282,7 +282,7 @@ impl InodeOps for TmpFsInode {
     
     fn readlink(&self) -> VfsResult<String> {
         let target = self.target.lock();
-        target.clone().ok_or(VfsError::InvalidArgument)
+        target.clone().ok_or(VfsError::InvalidPath)
     }
     
     fn readdir(&self, _offset: usize) -> VfsResult<Vec<DirEntry>> {

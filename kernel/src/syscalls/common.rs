@@ -12,7 +12,9 @@ pub enum SyscallError {
     Interrupted,             // EINTR
     IoError,                 // EIO
     WouldBlock,              // EAGAIN/EWOULDBLOCK
+    Again,                   // EAGAIN (try again)
     NotSupported,            // EOPNOTSUPP
+    NotImplemented,          // ENOSYS (functionality not implemented)
     
     // Extended errors for better diagnostics
     BadFileDescriptor,       // EBADF
@@ -33,9 +35,48 @@ pub enum SyscallError {
     ConnectionReset,         // ECONNRESET
     BrokenPipe,              // EPIPE
     TimedOut,                // ETIMEDOUT
+    ResourceBusy,            // EBUSY
 }
 
 pub type SyscallResult = Result<u64, SyscallError>;
+
+impl SyscallError {
+    /// Convert SyscallError to error code for unified error handling
+    pub fn as_error_code(&self) -> u32 {
+        match self {
+            SyscallError::InvalidSyscall => 1,
+            SyscallError::PermissionDenied => 2,
+            SyscallError::InvalidArgument => 3,
+            SyscallError::NotFound => 4,
+            SyscallError::OutOfMemory => 5,
+            SyscallError::Interrupted => 6,
+            SyscallError::IoError => 7,
+            SyscallError::WouldBlock => 8,
+            SyscallError::Again => 8,
+            SyscallError::NotSupported => 9,
+            SyscallError::NotImplemented => 28,
+            SyscallError::BadFileDescriptor => 10,
+            SyscallError::TooManyOpenFiles => 11,
+            SyscallError::NoBufferSpace => 12,
+            SyscallError::NotADirectory => 13,
+            SyscallError::IsADirectory => 14,
+            SyscallError::DirectoryNotEmpty => 15,
+            SyscallError::FileExists => 16,
+            SyscallError::CrossDeviceLink => 17,
+            SyscallError::FileTooBig => 18,
+            SyscallError::NoSpaceLeft => 19,
+            SyscallError::BadAddress => 20,
+            SyscallError::DeadlockWouldOccur => 21,
+            SyscallError::NameTooLong => 22,
+            SyscallError::TooManySymlinks => 23,
+            SyscallError::ConnectionRefused => 24,
+            SyscallError::ConnectionReset => 25,
+            SyscallError::BrokenPipe => 26,
+            SyscallError::TimedOut => 27,
+            SyscallError::ResourceBusy => 16,
+        }
+    }
+}
 
 /// Convert syscall result to raw value for return
 pub fn result_to_raw(result: SyscallResult) -> u64 {
@@ -53,7 +94,9 @@ pub fn result_to_raw(result: SyscallResult) -> u64 {
                 SyscallError::Interrupted => u64::MAX - 6,
                 SyscallError::IoError => u64::MAX - 7,
                 SyscallError::WouldBlock => u64::MAX - 8,
+                SyscallError::Again => u64::MAX - 8, // Same as WouldBlock
                 SyscallError::NotSupported => u64::MAX - 9,
+                SyscallError::NotImplemented => u64::MAX - 28,
                 SyscallError::BadFileDescriptor => u64::MAX - 10,
                 SyscallError::TooManyOpenFiles => u64::MAX - 11,
                 SyscallError::NoBufferSpace => u64::MAX - 12,
@@ -72,6 +115,7 @@ pub fn result_to_raw(result: SyscallResult) -> u64 {
                 SyscallError::ConnectionReset => u64::MAX - 25,
                 SyscallError::BrokenPipe => u64::MAX - 26,
                 SyscallError::TimedOut => u64::MAX - 27,
+                SyscallError::ResourceBusy => u64::MAX - 16,
             }
         }
     }
@@ -98,7 +142,9 @@ pub fn syscall_error_to_errno(error: SyscallError) -> i32 {
         SyscallError::Interrupted => EINTR,
         SyscallError::IoError => EIO,
         SyscallError::WouldBlock => EAGAIN,
+        SyscallError::Again => EAGAIN,
         SyscallError::NotSupported => EOPNOTSUPP,
+        SyscallError::NotImplemented => ENOSYS,
         SyscallError::BadFileDescriptor => EBADF,
         SyscallError::TooManyOpenFiles => EMFILE,
         SyscallError::NoBufferSpace => ENOBUFS,
@@ -117,6 +163,7 @@ pub fn syscall_error_to_errno(error: SyscallError) -> i32 {
         SyscallError::ConnectionReset => ECONNRESET,
         SyscallError::BrokenPipe => EPIPE,
         SyscallError::TimedOut => ETIMEDOUT,
+        SyscallError::ResourceBusy => EBUSY,
     }
 }
 
@@ -161,6 +208,14 @@ impl From<crate::error_handling::unified::KernelError> for SyscallError {
             KernelError::AlreadyExists => SyscallError::FileExists,
             KernelError::ResourceBusy => SyscallError::WouldBlock,
             KernelError::Timeout => SyscallError::TimedOut,
+            KernelError::Network(_) => SyscallError::InvalidArgument,
+            KernelError::ServiceAlreadyExists => SyscallError::FileExists,
+            KernelError::ServiceNotFound => SyscallError::NotFound,
+            KernelError::ServiceHasDependents => SyscallError::ResourceBusy,
+            KernelError::DependencyNotFound(_, _) => SyscallError::NotFound,
+            KernelError::CircularDependency(_) => SyscallError::ResourceBusy,
+            KernelError::Unknown => SyscallError::InvalidArgument,
+            KernelError::UnsupportedSyscall => SyscallError::NotSupported,
         }
     }
 }

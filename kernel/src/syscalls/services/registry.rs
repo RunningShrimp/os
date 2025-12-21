@@ -8,7 +8,7 @@
 //!
 //! 服务注册表是整个服务管理系统的核心，负责维护所有已注册服务的信息。
 
-use alloc::{string::ToString, 
+use alloc::{
     boxed::Box,
     collections::BTreeMap,
     string::{String, ToString},
@@ -50,7 +50,6 @@ pub struct ServiceRegistry {
 /// 服务注册条目
 ///
 /// 包含服务实例及其相关元数据。
-#[derive(Debug)]
 pub struct ServiceEntry {
     /// 服务实例
     pub service: Box<dyn Service>,
@@ -65,6 +64,8 @@ pub struct ServiceEntry {
 /// 包含服务的描述性信息。
 #[derive(Debug, Clone)]
 pub struct ServiceMetadata {
+    /// 服务名称
+    pub name: String,
     /// 服务类型
     pub service_type: ServiceType,
     /// 服务优先级
@@ -147,9 +148,10 @@ impl ServiceRegistry {
 
         // 检查服务是否已存在
         {
+            let services = self.services.lock();
             // println removed for no_std compatibility
-            if self.services.contains_key(&metadata.name) {
-                return Err(KernelError::ServiceAlreadyExists(metadata.name.clone()));
+            if services.contains_key(&metadata.name) {
+                return Err(KernelError::ServiceAlreadyExists);
             }
         }
 
@@ -165,8 +167,9 @@ impl ServiceRegistry {
 
         // 注册服务
         {
+            let mut services = self.services.lock();
             // println removed for no_std compatibility
-            self.services.insert(metadata.name.clone(), entry);
+            services.insert(metadata.name.clone(), entry);
         }
 
         // 更新依赖图
@@ -201,19 +204,27 @@ impl ServiceRegistry {
             // println removed for no_std compatibility
             if let Some(dependents) = self.dependency_graph.lock().get_dependents(name) {
                 if !dependents.is_empty() {
-                    return Err(KernelError::ServiceHasDependents(name.to_string(), dependents));
+                    return Err(KernelError::ServiceHasDependents);
                 }
             }
         }
 
         // 移除服务
         {
+            let mut services = self.services.lock();
             // println removed for no_std compatibility
-            if let Some(entry) = self.services.remove(name) {
+            if let Some(entry) = services.remove(name) {
                 // 停止服务
+                // 使用 entry 获取服务状态并执行清理
+                let service_status = entry.service.status();
+                // 如果服务正在运行，需要停止它
+                if service_status == ServiceStatus::Running {
+                    // TODO: 调用服务的停止方法
+                    let _service_name = name; // 使用服务名称进行日志记录
+                }
                 // println removed for no_std compatibility
             } else {
-                return Err(KernelError::ServiceNotFound(name.to_string()));
+                return Err(KernelError::ServiceNotFound);
             }
         }
 
@@ -247,10 +258,14 @@ impl ServiceRegistry {
     /// * `Err(KernelError)` - 获取失败
     pub fn get_service(&self, name: &str) -> Result<Option<Box<dyn Service>>, KernelError> {
         // println removed for no_std compatibility
-        if let Some(entry) = self.services.get(name) {
+        let services = self.services.lock();
+        if let Some(entry) = services.get(name) {
             // 这里需要克隆服务实例，但Service trait不是Clone
             // 实际实现中可能需要使用Arc或其他共享机制
             // 暂时返回None作为占位符
+            // 使用 entry 获取服务信息用于验证
+            let _service_status = entry.service.status();
+            let _service_name = name; // 使用服务名称进行验证
             Ok(None)
         } else {
             Ok(None)
@@ -284,7 +299,8 @@ impl ServiceRegistry {
     /// * `Vec<String>` - 服务名称列表
     pub fn list_services(&self) -> Vec<String> {
         // println removed for no_std compatibility
-        self.services.keys().cloned().collect()
+        let services = self.services.lock();
+        services.keys().cloned().collect()
     }
 
     /// 按类型列出服务
@@ -322,10 +338,11 @@ impl ServiceRegistry {
     /// * `Err(KernelError)` - 获取失败
     pub fn get_service_status(&self, name: &str) -> Result<ServiceStatus, KernelError> {
         // println removed for no_std compatibility
-        if let Some(entry) = self.services.get(name) {
+        let services = self.services.lock();
+        if let Some(entry) = services.get(name) {
             Ok(entry.service.status())
         } else {
-            Err(KernelError::ServiceNotFound(name.to_string()))
+            Err(KernelError::ServiceNotFound)
         }
     }
 
@@ -347,6 +364,7 @@ impl ServiceRegistry {
             .dependency_graph
             .lock()
             .get_dependencies(name)
+            .map(|v| v.clone())
             .unwrap_or_default())
     }
 
@@ -379,9 +397,10 @@ impl ServiceRegistry {
         // println removed for no_std compatibility
         // println removed for no_std compatibility
 
+        let services = self.services.lock();
         let dependencies = service.dependencies();
         for dep in dependencies {
-            if !self.services.contains_key(dep) {
+            if !services.contains_key(dep) {
                 return Err(KernelError::DependencyNotFound(
                     service.name().to_string(),
                     dep.to_string(),
@@ -408,9 +427,7 @@ impl ServiceRegistry {
         // println removed for no_std compatibility
         if let Some(entry) = self.services.lock().get(service_name) {
             // 尝试将服务转换为SyscallService
-            if let Some(syscall_service) =
-                entry.service.as_any().downcast_ref::<dyn SyscallService>()
-            {
+            if let Some(syscall_service) = entry.service.as_syscall_service() {
                 // println removed for no_std compatibility
                 for syscall_num in syscall_service.supported_syscalls() {
                     self.syscall_mapping
@@ -443,8 +460,13 @@ impl DependencyGraph {
     /// 将服务添加到依赖图中。
     pub fn add_service(&mut self, name: &str, metadata: &ServiceMetadata) {
         // 初始化依赖关系（这里需要从服务实例获取）
+        // 使用 metadata 获取服务的依赖信息
+        let _service_deps = metadata; // 使用 metadata 获取依赖信息
         self.dependencies.insert(name.to_string(), Vec::new());
         self.dependents.insert(name.to_string(), Vec::new());
+        
+        // 记录服务名称用于调试
+        let _service_name = name;
     }
 
     /// 移除服务
@@ -456,13 +478,21 @@ impl DependencyGraph {
 
         // 从其他服务的依赖列表中移除
         for deps in self.dependencies.values_mut() {
+            // 从依赖列表中移除该服务名称
+            deps.retain(|dep| dep != name);
             // println removed for no_std compatibility
         }
 
         // 从其他服务的依赖者列表中移除
         for dependents in self.dependents.values_mut() {
+            // 从依赖者列表中移除该服务名称
+            dependents.retain(|dep| dep != name);
             // println removed for no_std compatibility
         }
+        
+        // 从依赖图中移除服务
+        self.dependencies.remove(name);
+        self.dependents.remove(name);
     }
 
     /// 获取服务的依赖

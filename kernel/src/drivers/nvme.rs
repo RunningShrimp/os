@@ -659,12 +659,12 @@ impl NvmeController {
 
         // 设置CC寄存器
         let mut cc = 0u32;
-        cc |= (4 << 20); // MQES - 最大队列大小
-        cc |= (0 << 19); // CQR - 队列配置
-        cc |= (1 << 18); // AMS - arb机制
-        cc |= (0 << 17); // SHN - 关闭通知
-        cc |= (1 << 16); // IOSQES - I/O提交队列大小
-        cc |= (1 << 14); // IOCQES - I/O完成队列大小
+        cc |= 4 << 20; // MQES - 最大队列大小
+        cc |= 0 << 19; // CQR - 队列配置
+        cc |= 1 << 18; // AMS - arb机制
+        cc |= 0 << 17; // SHN - 关闭通知
+        cc |= 1 << 16; // IOSQES - I/O提交队列大小
+        cc |= 1 << 14; // IOCQES - I/O完成队列大小
         self.write_register(NvmeRegister::Config, cc);
 
         // 设置Admin Queue地址

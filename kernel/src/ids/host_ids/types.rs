@@ -2,10 +2,6 @@
 //!
 //! 主机入侵检测系统共享类型定义
 
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use alloc::string::String;
-
 use super::super::{ThreatLevel, Evidence};
 
 /// 主机入侵检测统计

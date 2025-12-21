@@ -7,8 +7,7 @@ extern crate alloc;
 use alloc::boxed::Box;
 
 use alloc::vec::Vec;
-use alloc::string::String;
-use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicU32, Ordering};
 use crate::sync::Mutex;
 use crate::reliability::errno::{EINVAL, ENOMEM, EIO};
 // Note: Graphics types are used conceptually, actual implementation would integrate with graphics subsystem

@@ -1,8 +1,13 @@
-//! Boot protocol abstraction layer
-//!
-//! This module provides a unified interface for different boot protocols
-//! (UEFI, BIOS/Multiboot2, etc.) allowing the bootloader to work with
-//! various firmware implementations.
+extern crate alloc;
+use alloc::boxed::Box;
+use alloc::vec::Vec;
+use alloc::string::String;
+
+// Boot protocol abstraction layer
+//
+// This module provides a unified interface for different boot protocols
+// (UEFI, BIOS/Multiboot2, etc.) allowing the bootloader to work with
+// various firmware implementations.
 
 use crate::error::{BootError, Result};
 use crate::memory::BootMemoryManager;
@@ -127,6 +132,7 @@ pub enum MemoryType {
     RuntimeData,
     ConventionMemory,
     UnconventionalMemory,
+    DeviceMemory,
 }
 
 /// Memory map

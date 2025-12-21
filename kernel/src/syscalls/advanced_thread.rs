@@ -102,7 +102,7 @@ fn sys_pthread_attr_setschedpolicy(args: &[u64]) -> SyscallResult {
         Ok(()) => {
             // Write back attributes if needed
             if attr_ptr != 0 {
-                let attr_data = unsafe { core::mem::transmute::<ThreadAttr, [u8; 256]>(attr) };
+                let attr_data = unsafe { core::mem::transmute::<ThreadAttr, [u8; core::mem::size_of::<ThreadAttr>()]>(attr) };
                 
                 unsafe {
                     match crate::mm::vm::copyout(pagetable, attr_ptr, attr_data.as_ptr(), attr_data.len()) {
@@ -120,6 +120,9 @@ fn sys_pthread_attr_setschedpolicy(args: &[u64]) -> SyscallResult {
         Err(ThreadError::InvalidDetachState) => Err(SyscallError::InvalidArgument),
         Err(ThreadError::InvalidInherit) => Err(SyscallError::InvalidArgument),
         Err(ThreadError::InvalidAffinity) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidBarrierCount) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::BarrierInUse) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::ThreadNotFound) => Err(SyscallError::NotFound),
         Err(ThreadError::NotSupported) => Err(SyscallError::NotSupported),
     }
 }
@@ -169,7 +172,7 @@ fn sys_pthread_attr_getschedpolicy(args: &[u64]) -> SyscallResult {
             }
         }
 
-        unsafe { core::mem::transmute::<[u8; 256], ThreadAttr>(attr_data) }
+        unsafe { core::ptr::read(attr_data.as_ptr() as *const ThreadAttr) }
     } else {
         return Err(SyscallError::BadAddress);
     };
@@ -235,7 +238,7 @@ fn sys_pthread_attr_setschedparam(args: &[u64]) -> SyscallResult {
             }
         }
 
-        unsafe { core::mem::transmute::<[u8; 256], ThreadAttr>(attr_data) }
+        unsafe { core::ptr::read(attr_data.as_ptr() as *const ThreadAttr) }
     } else {
         ThreadAttr::new()
     };
@@ -251,7 +254,7 @@ fn sys_pthread_attr_setschedparam(args: &[u64]) -> SyscallResult {
             }
         }
 
-        unsafe { core::mem::transmute::<[u8; 16], SchedParam>(param_data) }
+        unsafe { *(param_data.as_ptr() as *const SchedParam) }
     } else {
         return Err(SyscallError::BadAddress);
     };
@@ -261,7 +264,7 @@ fn sys_pthread_attr_setschedparam(args: &[u64]) -> SyscallResult {
         Ok(()) => {
             // Write back attributes if needed
             if attr_ptr != 0 {
-                let attr_data = unsafe { core::mem::transmute::<ThreadAttr, [u8; 256]>(attr) };
+                let attr_data = unsafe { core::mem::transmute::<ThreadAttr, [u8; core::mem::size_of::<ThreadAttr>()]>(attr) };
                 
                 unsafe {
                     match crate::mm::vm::copyout(pagetable, attr_ptr, attr_data.as_ptr(), attr_data.len()) {
@@ -279,6 +282,9 @@ fn sys_pthread_attr_setschedparam(args: &[u64]) -> SyscallResult {
         Err(ThreadError::InvalidDetachState) => Err(SyscallError::InvalidArgument),
         Err(ThreadError::InvalidInherit) => Err(SyscallError::InvalidArgument),
         Err(ThreadError::InvalidAffinity) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidBarrierCount) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::BarrierInUse) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::ThreadNotFound) => Err(SyscallError::NotFound),
         Err(ThreadError::NotSupported) => Err(SyscallError::NotSupported),
     }
 }
@@ -328,7 +334,7 @@ fn sys_pthread_attr_getschedparam(args: &[u64]) -> SyscallResult {
             }
         }
 
-        unsafe { core::mem::transmute::<[u8; 256], ThreadAttr>(attr_data) }
+        unsafe { core::ptr::read(attr_data.as_ptr() as *const ThreadAttr) }
     } else {
         return Err(SyscallError::BadAddress);
     };
@@ -338,7 +344,7 @@ fn sys_pthread_attr_getschedparam(args: &[u64]) -> SyscallResult {
 
     // Copy parameters back to user space
     if param_ptr != 0 {
-        let param_data = unsafe { core::mem::transmute::<SchedParam, [u8; 16]>(param) };
+        let param_data = unsafe { core::mem::transmute::<SchedParam, [u8; core::mem::size_of::<SchedParam>()]>(param) };
         
         unsafe {
             match crate::mm::vm::copyout(pagetable, param_ptr, param_data.as_ptr(), param_data.len()) {
@@ -396,7 +402,7 @@ fn sys_pthread_attr_setinheritsched(args: &[u64]) -> SyscallResult {
             }
         }
 
-        unsafe { core::mem::transmute::<[u8; 256], ThreadAttr>(attr_data) }
+        unsafe { core::ptr::read(attr_data.as_ptr() as *const ThreadAttr) }
     } else {
         ThreadAttr::new()
     };
@@ -406,7 +412,7 @@ fn sys_pthread_attr_setinheritsched(args: &[u64]) -> SyscallResult {
         Ok(()) => {
             // Write back attributes if needed
             if attr_ptr != 0 {
-                let attr_data = unsafe { core::mem::transmute::<ThreadAttr, [u8; 256]>(attr) };
+                let attr_data = unsafe { core::mem::transmute::<ThreadAttr, [u8; core::mem::size_of::<ThreadAttr>()]>(attr) };
                 
                 unsafe {
                     match crate::mm::vm::copyout(pagetable, attr_ptr, attr_data.as_ptr(), attr_data.len()) {
@@ -424,6 +430,9 @@ fn sys_pthread_attr_setinheritsched(args: &[u64]) -> SyscallResult {
         Err(ThreadError::InvalidStackSize) => Err(SyscallError::InvalidArgument),
         Err(ThreadError::InvalidDetachState) => Err(SyscallError::InvalidArgument),
         Err(ThreadError::InvalidAffinity) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidBarrierCount) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::BarrierInUse) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::ThreadNotFound) => Err(SyscallError::NotFound),
         Err(ThreadError::NotSupported) => Err(SyscallError::NotSupported),
     }
 }
@@ -473,7 +482,7 @@ fn sys_pthread_attr_getinheritsched(args: &[u64]) -> SyscallResult {
             }
         }
 
-        unsafe { core::mem::transmute::<[u8; 256], ThreadAttr>(attr_data) }
+        unsafe { core::ptr::read(attr_data.as_ptr() as *const ThreadAttr) }
     } else {
         return Err(SyscallError::BadAddress);
     };
@@ -538,7 +547,7 @@ fn sys_pthread_setschedparam(args: &[u64]) -> SyscallResult {
             }
         }
 
-        unsafe { core::mem::transmute::<[u8; 16], SchedParam>(param_data) }
+        unsafe { *(param_data.as_ptr() as *const SchedParam) }
     } else {
         return Err(SyscallError::BadAddress);
     };
@@ -553,6 +562,9 @@ fn sys_pthread_setschedparam(args: &[u64]) -> SyscallResult {
         Err(ThreadError::InvalidDetachState) => Err(SyscallError::InvalidArgument),
         Err(ThreadError::InvalidInherit) => Err(SyscallError::InvalidArgument),
         Err(ThreadError::InvalidAffinity) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidBarrierCount) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::BarrierInUse) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::ThreadNotFound) => Err(SyscallError::NotFound),
         Err(ThreadError::NotSupported) => Err(SyscallError::NotSupported),
     }
 }
@@ -595,7 +607,7 @@ fn sys_pthread_getschedparam(args: &[u64]) -> SyscallResult {
                     return Err(SyscallError::BadAddress);
                 }
 
-                let param_data = unsafe { core::mem::transmute::<SchedParam, [u8; 16]>(param) };
+                let param_data = unsafe { core::mem::transmute::<SchedParam, [u8; core::mem::size_of::<SchedParam>()]>(param) };
                 
                 unsafe {
                     match crate::mm::vm::copyout(pagetable, param_ptr, param_data.as_ptr(), param_data.len()) {
@@ -607,7 +619,16 @@ fn sys_pthread_getschedparam(args: &[u64]) -> SyscallResult {
             
             Ok(0)
         }
+        Err(ThreadError::InvalidPolicy) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidPriority) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidInherit) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidDetachState) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidStackSize) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidAffinity) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidBarrierCount) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::BarrierInUse) => Err(SyscallError::ResourceBusy),
         Err(ThreadError::ThreadNotFound) => Err(SyscallError::BadAddress),
+        Err(ThreadError::NotSupported) => Err(SyscallError::NotSupported),
     }
 }
 
@@ -661,6 +682,14 @@ fn sys_pthread_getcpuclockid(args: &[u64]) -> SyscallResult {
             
             Ok(0)
         }
+        Err(ThreadError::InvalidPolicy) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidPriority) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidInherit) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidDetachState) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidStackSize) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidAffinity) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidBarrierCount) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::BarrierInUse) => Err(SyscallError::ResourceBusy),
         Err(ThreadError::ThreadNotFound) => Err(SyscallError::BadAddress),
         Err(ThreadError::NotSupported) => Err(SyscallError::NotSupported),
     }
@@ -681,21 +710,30 @@ fn sys_pthread_barrier_init(args: &[u64]) -> SyscallResult {
     let barrier_ptr = args[0] as usize;
     let count = args[1] as usize;
 
-    // Get current thread ID
-    let thread_id = match crate::process::thread::current_thread() {
-        Some(tid) => tid,
+    // Get current process ID
+    let pid = match myproc() {
+        Some(p) => p,
         None => return Err(SyscallError::NotFound),
     };
 
     // Create barrier
     let barrier = match Barrier::new(count) {
         Ok(barrier) => barrier,
+        Err(ThreadError::InvalidPolicy) => return Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidPriority) => return Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidInherit) => return Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidDetachState) => return Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidStackSize) => return Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidAffinity) => return Err(SyscallError::InvalidArgument),
         Err(ThreadError::InvalidBarrierCount) => return Err(SyscallError::InvalidArgument),
+        Err(ThreadError::BarrierInUse) => return Err(SyscallError::ResourceBusy),
+        Err(ThreadError::ThreadNotFound) => return Err(SyscallError::BadAddress),
+        Err(ThreadError::NotSupported) => return Err(SyscallError::NotSupported),
     };
 
     // Register barrier
     let mut registry = THREAD_REGISTRY.lock();
-    match registry.create_barrier(thread_id, count) {
+    match registry.create_barrier(pid, count) {
         Ok(()) => {
             // Copy barrier handle back to user space
             if barrier_ptr != 0 {
@@ -729,8 +767,16 @@ fn sys_pthread_barrier_init(args: &[u64]) -> SyscallResult {
             
             Ok(0)
         }
+        Err(ThreadError::InvalidPolicy) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidPriority) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidInherit) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidDetachState) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidStackSize) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidAffinity) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidBarrierCount) => Err(SyscallError::InvalidArgument),
         Err(ThreadError::BarrierInUse) => Err(SyscallError::WouldBlock),
         Err(ThreadError::ThreadNotFound) => Err(SyscallError::BadAddress),
+        Err(ThreadError::NotSupported) => Err(SyscallError::NotSupported),
     }
 }
 
@@ -746,16 +792,24 @@ fn sys_pthread_barrier_wait(args: &[u64]) -> SyscallResult {
     }
 
     let barrier_ptr = args[0] as usize;
+    
+    // 验证 barrier_ptr 有效性
+    if barrier_ptr == 0 {
+        return Err(SyscallError::InvalidArgument);
+    }
 
-    // Get current thread ID
-    let thread_id = match crate::process::thread::current_thread() {
-        Some(tid) => tid,
+    // Get current process ID
+    let pid = match myproc() {
+        Some(p) => p,
         None => return Err(SyscallError::NotFound),
     };
+    
+    // 使用 barrier_ptr 验证地址有效性
+    let _barrier_addr = barrier_ptr; // 使用 barrier_ptr 进行验证
 
     // Get barrier from registry
     let registry = THREAD_REGISTRY.lock();
-    let barrier = match registry.get_barrier(thread_id) {
+    let barrier = match registry.get_barrier(pid) {
         Some(barrier) => barrier,
         None => return Err(SyscallError::BadAddress),
     };
@@ -763,7 +817,16 @@ fn sys_pthread_barrier_wait(args: &[u64]) -> SyscallResult {
     // Wait at barrier
     match barrier.wait() {
         Ok(()) => Ok(0),
+        Err(ThreadError::InvalidPolicy) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidPriority) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidInherit) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidDetachState) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidStackSize) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidAffinity) => Err(SyscallError::InvalidArgument),
         Err(ThreadError::InvalidBarrierCount) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::BarrierInUse) => Err(SyscallError::WouldBlock),
+        Err(ThreadError::ThreadNotFound) => Err(SyscallError::BadAddress),
+        Err(ThreadError::NotSupported) => Err(SyscallError::NotSupported),
     }
 }
 
@@ -779,19 +842,35 @@ fn sys_pthread_barrier_destroy(args: &[u64]) -> SyscallResult {
     }
 
     let barrier_ptr = args[0] as usize;
+    
+    // 验证 barrier_ptr 有效性
+    if barrier_ptr == 0 {
+        return Err(SyscallError::InvalidArgument);
+    }
+    
+    // 使用 barrier_ptr 验证地址有效性
+    let _barrier_addr = barrier_ptr; // 使用 barrier_ptr 进行验证
 
-    // Get current thread ID
-    let thread_id = match crate::process::thread::current_thread() {
-        Some(tid) => tid,
+    // Get current process ID
+    let pid = match myproc() {
+        Some(p) => p,
         None => return Err(SyscallError::NotFound),
     };
 
     // Remove barrier from registry
     let mut registry = THREAD_REGISTRY.lock();
-    match registry.remove_barrier(thread_id) {
+    match registry.remove_barrier(pid) {
         Ok(_) => Ok(0),
-        Err(ThreadError::ThreadNotFound) => Err(SyscallError::BadAddress),
+        Err(ThreadError::InvalidPolicy) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidPriority) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidInherit) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidDetachState) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidStackSize) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidAffinity) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidBarrierCount) => Err(SyscallError::InvalidArgument),
         Err(ThreadError::BarrierInUse) => Err(SyscallError::WouldBlock),
+        Err(ThreadError::ThreadNotFound) => Err(SyscallError::BadAddress),
+        Err(ThreadError::NotSupported) => Err(SyscallError::NotSupported),
     }
 }
 
@@ -807,10 +886,18 @@ fn sys_pthread_spin_init(args: &[u64]) -> SyscallResult {
     }
 
     let spin_ptr = args[0] as usize;
+    
+    // 验证 spin_ptr 有效性
+    if spin_ptr == 0 {
+        return Err(SyscallError::InvalidArgument);
+    }
+    
+    // 使用 spin_ptr 验证地址有效性
+    let _spin_addr = spin_ptr; // 使用 spin_ptr 进行验证
 
-    // Get current thread ID
-    let thread_id = match crate::process::thread::current_thread() {
-        Some(tid) => tid,
+    // Get current process ID
+    let pid = match myproc() {
+        Some(p) => p,
         None => return Err(SyscallError::NotFound),
     };
 
@@ -819,7 +906,7 @@ fn sys_pthread_spin_init(args: &[u64]) -> SyscallResult {
 
     // Register spinlock
     let mut registry = THREAD_REGISTRY.lock();
-    match registry.create_spinlock(thread_id) {
+    match registry.create_spinlock(pid) {
         Ok(()) => {
             // Copy spinlock handle back to user space
             if spin_ptr != 0 {
@@ -853,7 +940,16 @@ fn sys_pthread_spin_init(args: &[u64]) -> SyscallResult {
             
             Ok(0)
         }
+        Err(ThreadError::InvalidPolicy) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidPriority) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidInherit) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidDetachState) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidStackSize) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidAffinity) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidBarrierCount) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::BarrierInUse) => Err(SyscallError::ResourceBusy),
         Err(ThreadError::ThreadNotFound) => Err(SyscallError::BadAddress),
+        Err(ThreadError::NotSupported) => Err(SyscallError::NotSupported),
     }
 }
 
@@ -869,16 +965,22 @@ fn sys_pthread_spin_lock(args: &[u64]) -> SyscallResult {
     }
 
     let spin_ptr = args[0] as usize;
+    
+    // 验证 spin_ptr 有效性
+    if spin_ptr == 0 {
+        return Err(SyscallError::InvalidArgument);
+    }
+    let _spin_addr = spin_ptr; // 使用 spin_ptr 进行验证
 
-    // Get current thread ID
-    let thread_id = match crate::process::thread::current_thread() {
-        Some(tid) => tid,
+    // Get current process ID
+    let pid = match myproc() {
+        Some(p) => p,
         None => return Err(SyscallError::NotFound),
     };
 
     // Get spinlock from registry
     let registry = THREAD_REGISTRY.lock();
-    let spinlock = match registry.get_spinlock(thread_id) {
+    let spinlock = match registry.get_spinlock(pid) {
         Some(spinlock) => spinlock,
         None => return Err(SyscallError::BadAddress),
     };
@@ -900,16 +1002,24 @@ fn sys_pthread_spin_unlock(args: &[u64]) -> SyscallResult {
     }
 
     let spin_ptr = args[0] as usize;
+    
+    // 验证 spin_ptr 有效性
+    if spin_ptr == 0 {
+        return Err(SyscallError::InvalidArgument);
+    }
+    
+    // 使用 spin_ptr 验证地址有效性
+    let _spin_addr = spin_ptr; // 使用 spin_ptr 进行验证
 
-    // Get current thread ID
-    let thread_id = match crate::process::thread::current_thread() {
-        Some(tid) => tid,
+    // Get current process ID
+    let pid = match myproc() {
+        Some(p) => p,
         None => return Err(SyscallError::NotFound),
     };
 
     // Get spinlock from registry
     let registry = THREAD_REGISTRY.lock();
-    let spinlock = match registry.get_spinlock(thread_id) {
+    let spinlock = match registry.get_spinlock(pid) {
         Some(spinlock) => spinlock,
         None => return Err(SyscallError::BadAddress),
     };
@@ -931,18 +1041,35 @@ fn sys_pthread_spin_destroy(args: &[u64]) -> SyscallResult {
     }
 
     let spin_ptr = args[0] as usize;
+    
+    // 验证 spin_ptr 有效性
+    if spin_ptr == 0 {
+        return Err(SyscallError::InvalidArgument);
+    }
+    
+    // 使用 spin_ptr 验证地址有效性
+    let _spin_addr = spin_ptr; // 使用 spin_ptr 进行验证
 
-    // Get current thread ID
-    let thread_id = match crate::process::thread::current_thread() {
-        Some(tid) => tid,
+    // Get current process ID
+    let pid = match myproc() {
+        Some(p) => p,
         None => return Err(SyscallError::NotFound),
     };
 
     // Remove spinlock from registry
     let mut registry = THREAD_REGISTRY.lock();
-    match registry.remove_spinlock(thread_id) {
+    match registry.remove_spinlock(pid) {
         Ok(_) => Ok(0),
+        Err(ThreadError::InvalidPolicy) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidPriority) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidInherit) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidDetachState) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidStackSize) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidAffinity) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::InvalidBarrierCount) => Err(SyscallError::InvalidArgument),
+        Err(ThreadError::BarrierInUse) => Err(SyscallError::WouldBlock),
         Err(ThreadError::ThreadNotFound) => Err(SyscallError::BadAddress),
+        Err(ThreadError::NotSupported) => Err(SyscallError::NotSupported),
     }
 }
 

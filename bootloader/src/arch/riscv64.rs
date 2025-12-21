@@ -91,6 +91,7 @@ pub fn reboot() -> ! {
 }
 
 /// Shutdown the system on RISC-V
+extern crate alloc;
 pub fn shutdown() -> ! {
     loop {
         wait_for_interrupt();

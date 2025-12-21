@@ -7,8 +7,7 @@
 #![feature(panic_info_message)]
 #![allow(unsafe_op_in_unsafe_fn)]
 
-// Re-export main modules
-pub use main::*;
+extern crate alloc;
 
 // Core modules
 pub mod arch;
@@ -18,17 +17,17 @@ pub mod protocol;
 
 // Architecture-specific modules
 #[cfg(target_arch = "x86_64")]
-pub mod x86_64;
+pub use arch::x86_64;
 #[cfg(target_arch = "aarch64")]
-pub mod aarch64;
+pub use arch::aarch64;
 #[cfg(target_arch = "riscv64")]
-pub mod riscv64;
+pub use arch::riscv64;
 
 // Protocol-specific modules
 #[cfg(feature = "uefi_support")]
 pub mod uefi;
 #[cfg(feature = "bios_support")]
-pub mod bios;
+pub use protocol::bios;
 
 // Feature-specific modules
 #[cfg(feature = "graphics_support")]

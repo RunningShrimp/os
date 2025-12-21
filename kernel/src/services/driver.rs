@@ -319,7 +319,7 @@ impl DriverService {
 
         // 更新统计信息
         {
-            let mut stats = self.driver_stats.lock();
+            let stats = self.driver_stats.lock();
             stats.total_drivers.fetch_add(1, Ordering::Relaxed);
         }
 
@@ -337,7 +337,7 @@ impl DriverService {
 
         // 更新统计信息
         {
-            let mut stats = self.driver_stats.lock();
+            let stats = self.driver_stats.lock();
             stats.total_drivers.fetch_sub(1, Ordering::Relaxed);
         }
 
@@ -365,7 +365,7 @@ impl DriverService {
 
         // 更新统计信息
         {
-            let mut stats = self.driver_stats.lock();
+            let stats = self.driver_stats.lock();
             stats.total_devices.fetch_add(1, Ordering::Relaxed);
         }
 
@@ -393,7 +393,7 @@ impl DriverService {
 
             // 更新统计信息
             {
-                let mut stats = self.driver_stats.lock();
+                let stats = self.driver_stats.lock();
                 stats.total_devices.fetch_sub(1, Ordering::Relaxed);
             }
 
@@ -455,7 +455,7 @@ impl DriverService {
 
             // 更新统计信息
             {
-                let mut stats = self.driver_stats.lock();
+                let stats = self.driver_stats.lock();
                 stats.configured_devices.fetch_add(1, Ordering::Relaxed);
             }
 
@@ -478,7 +478,7 @@ impl DriverService {
 
                 // 更新统计信息
                 {
-                    let mut stats = self.driver_stats.lock();
+                    let stats = self.driver_stats.lock();
                     stats.configured_devices.fetch_sub(1, Ordering::Relaxed);
                 }
 
@@ -503,7 +503,7 @@ impl DriverService {
 
             // 更新统计信息
             {
-                let mut stats = self.driver_stats.lock();
+                let stats = self.driver_stats.lock();
                 if status == DeviceStatus::Error && old_status != DeviceStatus::Error {
                     stats.error_devices.fetch_add(1, Ordering::Relaxed);
                 } else if status != DeviceStatus::Error && old_status == DeviceStatus::Error {

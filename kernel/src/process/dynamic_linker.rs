@@ -10,7 +10,7 @@ use alloc::vec::Vec;
 use alloc::string::{String, ToString};
 use alloc::collections::BTreeMap;
 use core::mem::size_of;
-use crate::process::elf::{ElfLoader, Elf64Header, Elf64Phdr, ElfError, PAGE_SIZE};
+use crate::process::elf::{ElfLoader, ElfError};
 
 // ============================================================================
 // Dynamic Linking Constants

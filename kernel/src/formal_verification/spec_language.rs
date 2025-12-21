@@ -10,7 +10,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::boxed::Box;
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::Ordering;
 use spin::Mutex;
 use crate::compat::DefaultHasherBuilder;
 

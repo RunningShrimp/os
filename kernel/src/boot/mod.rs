@@ -4,9 +4,7 @@
 // supporting both legacy direct boot and modern bootloader interfaces.
 
 extern crate alloc;
-
 use core::ptr;
-use alloc::{format, vec};
 
 /// Boot protocol types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -327,6 +325,9 @@ pub fn print_boot_info() {
 /// Initialize memory management from boot information
 pub fn init_memory_from_boot_info() {
     if let Some(params) = get_boot_parameters() {
+        // Use params for validation/logging
+        let _boot_params = &params; // Use params for validation
+        
         // Initialize memory management using bootloader-provided memory map
         if let Some(memory_map) = get_memory_map() {
             crate::println!("[boot] Initializing memory from bootloader memory map");

@@ -282,6 +282,12 @@ impl EnhancedStringLib {
             let mut sign = 1;
             let mut actual_base = base;
 
+            // Use base for validation
+            if base < 0 || base == 1 || base > 36 {
+                // Invalid base, will be determined from string
+                actual_base = 0;
+            }
+
             // 跳过空白字符
             while (*ptr as u8).is_ascii_whitespace() {
                 ptr = ptr.add(1);

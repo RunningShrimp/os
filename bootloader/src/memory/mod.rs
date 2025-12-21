@@ -1,7 +1,10 @@
-//! Boot-time memory management
-//!
-//! This module provides memory management facilities for the bootloader,
-//! including physical memory management, heap allocation, and memory map handling.
+extern crate alloc;
+use alloc::vec::Vec;
+
+// Boot-time memory management
+//
+// This module provides memory management facilities for the bootloader,
+// including physical memory management, heap allocation, and memory map handling.
 
 use crate::arch::Architecture;
 use crate::error::{BootError, Result};
@@ -26,7 +29,7 @@ pub enum MemoryRegionType {
 }
 
 /// Memory region descriptor
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MemoryRegion {
     /// Physical base address
     pub base: usize,
@@ -203,7 +206,8 @@ impl BootMemoryManager {
                 if let Some((before, after)) = region.split_at(aligned_base) {
                     if let Some((allocated, after_allocated)) = after.split_at(aligned_size) {
                         // Replace the region with before + allocated + after_allocated
-                        self.regions.remove_item(region);
+                        let region_index = self.regions.iter().position(|r| r == region).unwrap();
+                        self.regions.remove(region_index);
                         self.regions.push(before);
                         self.regions.push(allocated_region);
                         self.regions.push(after_allocated);
@@ -244,12 +248,14 @@ impl BootMemoryManager {
     pub fn reserve_region(&mut self, base: usize, size: usize) -> Result<()> {
         let end = base + size;
 
-        for region in &mut self.regions {
+        let mut i = 0;
+        while i < self.regions.len() {
+            let region = &self.regions[i];
             if region.overlaps(&MemoryRegion::new(base, size, MemoryRegionType::Reserved)) {
                 if let Some((before, after)) = region.split_at(base) {
                     if let Some((reserved, after_reserved)) = after.split_at(size) {
                         // Replace with before + reserved + after_reserved
-                        self.regions.remove_item(region);
+                        self.regions.remove(i);
                         self.regions.push(before);
                         self.regions.push(MemoryRegion::with_name(
                             base,
@@ -266,6 +272,7 @@ impl BootMemoryManager {
                     }
                 }
             }
+            i += 1;
         }
 
         Err(BootError::MemoryMapError)

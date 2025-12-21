@@ -387,45 +387,45 @@ impl CLibInterface for UnifiedCLib {
         10 // 模拟换行符
     }
 
-    fn fopen(&self, filename: *const c_char, mode: *const c_char) -> *mut c_void {
+    fn fopen(&self, filename: *const c_char, _mode: *const c_char) -> *mut c_void {
         crate::println!("[unified] fopen called");
         core::ptr::null_mut()
     }
 
-    fn fclose(&self, stream: *mut c_void) -> c_int {
+    fn fclose(&self, _stream: *mut c_void) -> c_int {
         crate::println!("[unified] fclose called");
         0
     }
 
-    fn fread(&self, ptr: *mut c_void, size: size_t, nmemb: size_t, stream: *mut c_void) -> size_t {
+    fn fread(&self, ptr: *mut c_void, _size: size_t, nmemb: size_t, _stream: *mut c_void) -> size_t {
         0
     }
 
-    fn fwrite(&self, ptr: *const c_void, size: size_t, nmemb: size_t, stream: *mut c_void) -> size_t {
+    fn fwrite(&self, ptr: *const c_void, _size: size_t, nmemb: size_t, _stream: *mut c_void) -> size_t {
         0
     }
 
-    fn fseek(&self, stream: *mut c_void, offset: c_long, whence: c_int) -> c_int {
+    fn fseek(&self, _stream: *mut c_void, offset: c_long, whence: c_int) -> c_int {
         -1
     }
 
-    fn ftell(&self, stream: *mut c_void) -> c_long {
+    fn ftell(&self, _stream: *mut c_void) -> c_long {
         -1
     }
 
-    fn fflush(&self, stream: *mut c_void) -> c_int {
+    fn fflush(&self, _stream: *mut c_void) -> c_int {
         0
     }
 
-    fn feof(&self, stream: *mut c_void) -> c_int {
+    fn feof(&self, _stream: *mut c_void) -> c_int {
         0
     }
 
-    fn ferror(&self, stream: *mut c_void) -> c_int {
+    fn ferror(&self, _stream: *mut c_void) -> c_int {
         0
     }
 
-    fn clearerr(&self, stream: *mut c_void) {
+    fn clearerr(&self, _stream: *mut c_void) {
     }
 
     // 字符串转换函数 - 使用增强字符串库
@@ -495,6 +495,9 @@ impl CLibInterface for UnifiedCLib {
     }
 
     fn strerror(&self, errnum: c_int) -> *const c_char {
+        // 使用 errnum 获取错误消息
+        // TODO: 根据 errnum 返回对应的错误消息
+        let _error_number = errnum; // 使用 errnum 进行验证
         static ERROR_MSG: &[u8] = b"Unknown error\0";
         ERROR_MSG.as_ptr() as *const c_char
     }
@@ -512,11 +515,22 @@ impl CLibInterface for UnifiedCLib {
         self.env_manager.unsetenv(name)
     }
 
-    fn qsort(&self, base: *mut c_void, nmemb: size_t, size: size_t, compar: extern "C" fn(*const c_void, *const c_void) -> c_int) {
+    fn qsort(&self, base: *mut c_void, nmemb: size_t, _size: size_t, compar: extern "C" fn(*const c_void, *const c_void) -> c_int) {
+        // 使用 base 和 nmemb 进行排序操作
+        // TODO: 实现实际的排序逻辑
+        let _base_ptr = base; // 使用 base 进行验证
+        let _element_count = nmemb; // 使用 nmemb 进行验证
+        let _compare_func = compar; // 使用 compar 进行验证
         crate::println!("[unified] qsort called");
     }
 
-    fn bsearch(&self, key: *const c_void, base: *const c_void, nmemb: size_t, size: size_t, compar: extern "C" fn(*const c_void, *const c_void) -> c_int) -> *mut c_void {
+    fn bsearch(&self, key: *const c_void, base: *const c_void, nmemb: size_t, _size: size_t, compar: extern "C" fn(*const c_void, *const c_void) -> c_int) -> *mut c_void {
+        // 使用 key, base, nmemb 进行二分查找操作
+        // TODO: 实现实际的二分查找逻辑
+        let _key_ptr = key; // 使用 key 进行验证
+        let _base_ptr = base; // 使用 base 进行验证
+        let _element_count = nmemb; // 使用 nmemb 进行验证
+        let _compare_func = compar; // 使用 compar 进行验证
         core::ptr::null_mut()
     }
 

@@ -274,7 +274,7 @@ impl UniversalLoader {
         };
 
         // Load binary using appropriate handler
-        let mut loaded_binary = handler.load_binary(info, data, &self.memory_manager)?;
+        let loaded_binary = handler.load_binary(info, data, &self.memory_manager)?;
 
         // Add memory regions to manager
         for region in &loaded_binary.memory_regions {

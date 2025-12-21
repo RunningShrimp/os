@@ -444,7 +444,7 @@ impl FileSystemService {
         };
 
         let flags = O_RDONLY; // Default flags (simplified)
-        let mode = 0o644; // Default mode
+        let _mode = 0o644; // Default mode
 
         // Open file through VFS
         let vfs_file = match crate::vfs::vfs().open(&path, flags) {
@@ -474,7 +474,7 @@ impl FileSystemService {
 
         // Update statistics
         {
-            let mut stats = self.stats.lock();
+            let stats = self.stats.lock();
             stats.open_files.fetch_add(1, Ordering::SeqCst);
         }
 
@@ -507,7 +507,7 @@ impl FileSystemService {
 
         if removed {
             // Update statistics
-            let mut stats = self.stats.lock();
+            let stats = self.stats.lock();
             stats.open_files.fetch_sub(1, Ordering::SeqCst);
         }
 
@@ -556,7 +556,7 @@ impl FileSystemService {
 
         // Update statistics
         {
-            let mut stats = self.stats.lock();
+            let stats = self.stats.lock();
             stats.read_operations.fetch_add(1, Ordering::SeqCst);
             stats.total_bytes_read.fetch_add(bytes_read as u64, Ordering::SeqCst);
         }
@@ -616,7 +616,7 @@ impl FileSystemService {
 
         // Update statistics
         {
-            let mut stats = self.stats.lock();
+            let stats = self.stats.lock();
             stats.write_operations.fetch_add(1, Ordering::SeqCst);
             stats.total_bytes_written.fetch_add(bytes_written as u64, Ordering::SeqCst);
         }
@@ -787,7 +787,7 @@ impl FileSystemService {
         Ok(response_data)
     }
 
-    fn handle_mount_filesystem(&self, data: &[u8]) -> Result<Vec<u8>, i32> {
+    fn handle_mount_filesystem(&self, _data: &[u8]) -> Result<Vec<u8>, i32> {
         // Simplified mount implementation
         // In a real implementation, this would parse mount options and mount the filesystem
         let response = FileOperationResponse {
@@ -854,7 +854,7 @@ impl FileSystemService {
 
         // Update statistics
         {
-            let mut stats = self.stats.lock();
+            let stats = self.stats.lock();
             stats.open_files.fetch_sub(cleaned_count, Ordering::SeqCst);
         }
 
@@ -864,7 +864,7 @@ impl FileSystemService {
     pub fn sync_filesystem(&self, fs_id: u64) -> Result<(), i32> {
         // Sync filesystem (simplified)
         {
-            let mut stats = self.stats.lock();
+            let stats = self.stats.lock();
             stats.fs_sync_operations.fetch_add(1, Ordering::SeqCst);
         }
 

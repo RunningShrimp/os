@@ -8,7 +8,7 @@ extern crate alloc;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::Ordering;
 use spin::Mutex;
 
 /// POSIX capability constants (Linux capability numbering)

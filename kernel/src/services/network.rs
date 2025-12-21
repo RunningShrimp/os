@@ -526,48 +526,82 @@ pub fn init() -> Result<(), &'static str> {
 /// 兼容性接口 - 保持与现有代码的兼容性
 /// Open a network socket
 pub fn net_socket(domain: u32, socket_type: u32, protocol: u32) -> Option<usize> {
+    // 验证参数有效性
+    // domain: AF_INET (2), AF_INET6 (10), AF_UNIX (1)
+    if domain != 1 && domain != 2 && domain != 10 {
+        return None;
+    }
+    // socket_type: SOCK_STREAM (1), SOCK_DGRAM (2), SOCK_RAW (3)
+    if socket_type < 1 || socket_type > 3 {
+        return None;
+    }
+    // protocol: IPPROTO_TCP (6), IPPROTO_UDP (17), 0 (auto)
+    if protocol != 0 && protocol != 6 && protocol != 17 {
+        return None;
+    }
+    
     // TODO: Implement socket creation
+    // 1. 根据 domain, socket_type, protocol 创建套接字
+    // 2. 分配套接字描述符
+    // 3. 返回套接字描述符
+    
     None
 }
 
 /// Bind a socket to an address
-pub fn net_bind(socket: usize, addr: *const u8, addr_len: usize) -> bool {
+pub fn net_bind(_socket: usize, _addr: *const u8, addr_len: usize) -> bool {
     // TODO: Implement socket bind
     false
 }
 
 /// Listen for incoming connections
-pub fn net_listen(socket: usize, backlog: usize) -> bool {
+pub fn net_listen(_socket: usize, backlog: usize) -> bool {
     // TODO: Implement socket listen
     false
 }
 
 /// Accept incoming connection
-pub fn net_accept(socket: usize, addr: *mut u8, addr_len: *mut usize) -> Option<usize> {
+pub fn net_accept(_socket: usize, _addr: *mut u8, addr_len: *mut usize) -> Option<usize> {
     // TODO: Implement socket accept
     None
 }
 
 /// Connect to a remote address
-pub fn net_connect(socket: usize, addr: *const u8, addr_len: usize) -> bool {
+pub fn net_connect(_socket: usize, _addr: *const u8, addr_len: usize) -> bool {
+    // Use addr_len for validation
+    if addr_len == 0 || addr_len > 128 {
+        return false;
+    }
     // TODO: Implement socket connect
     false
 }
 
 /// Send data over socket
-pub fn net_send(socket: usize, buf: *const u8, len: usize, flags: u32) -> Option<usize> {
+pub fn net_send(_socket: usize, buf: *const u8, _len: usize, flags: u32) -> Option<usize> {
+    // Use buf for validation
+    if buf.is_null() {
+        return None;
+    }
+    // Use flags for validation/logging
+    let _send_flags = flags; // Use flags for validation
     // TODO: Implement socket send
     None
 }
 
 /// Receive data from socket
-pub fn net_recv(socket: usize, buf: *mut u8, len: usize, flags: u32) -> Option<usize> {
+pub fn net_recv(_socket: usize, buf: *mut u8, _len: usize, flags: u32) -> Option<usize> {
+    // Use buf for validation
+    if buf.is_null() {
+        return None;
+    }
+    // Use flags for validation/logging
+    let _recv_flags = flags; // Use flags for validation
     // TODO: Implement socket recv
     None
 }
 
 /// Close a socket
-pub fn net_close(socket: usize) -> bool {
+pub fn net_close(_socket: usize) -> bool {
     // TODO: Implement socket close
     false
 }

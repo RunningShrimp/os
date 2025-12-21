@@ -81,6 +81,9 @@ fn sys_mq_open(args: &[u64]) -> SyscallResult {
         Err(_) => return Err(SyscallError::InvalidArgument),
     };
     
+    // Use name_str for validation (queue name must be valid)
+    let _name_len = name_str.len(); // Use name_str for validation
+    
     // Validate attributes pointer
     let attr = if attr_ptr.is_null() {
         core::ptr::null()

@@ -407,7 +407,7 @@ impl ProcessManagementService {
 
         // Update statistics
         {
-            let mut stats = self.stats.lock();
+            let stats = self.stats.lock();
             stats.total_processes.fetch_add(1, Ordering::SeqCst);
             stats.increment_successful_forks();
         }
@@ -425,7 +425,7 @@ impl ProcessManagementService {
         ).to_vec() })
     }
 
-    fn handle_fork_process(&self, data: &[u8], sender_id: u64) -> Result<Vec<u8>, i32> {
+    fn handle_fork_process(&self, _data: &[u8], sender_id: u64) -> Result<Vec<u8>, i32> {
         let parent_id = sender_id;
 
         // Get parent process info
@@ -492,7 +492,7 @@ impl ProcessManagementService {
 
         // Update statistics
         {
-            let mut stats = self.stats.lock();
+            let stats = self.stats.lock();
             stats.total_processes.fetch_add(1, Ordering::SeqCst);
             stats.increment_total_forks();
             stats.increment_successful_forks();
@@ -530,7 +530,7 @@ impl ProcessManagementService {
 
         // Update statistics
         {
-            let mut stats = self.stats.lock();
+            let stats = self.stats.lock();
             stats.increment_total_exits();
             stats.zombie_processes.fetch_add(1, Ordering::SeqCst);
             stats.running_processes.fetch_sub(1, Ordering::SeqCst);

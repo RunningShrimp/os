@@ -170,7 +170,7 @@ pub unsafe fn mempool_create(base: *mut u8, size: usize, block_size: usize, alig
 
 /// Allocate from a registered memory pool
 pub fn mempool_alloc(pool_id: usize) -> *mut u8 {
-    let mut registry = MEMORY_POOL_REGISTRY.lock();
+    let registry = MEMORY_POOL_REGISTRY.lock();
     if pool_id < registry.pools.len() {
         registry.pools[pool_id].lock().alloc()
     } else {
@@ -180,7 +180,7 @@ pub fn mempool_alloc(pool_id: usize) -> *mut u8 {
 
 /// Deallocate from a registered memory pool
 pub unsafe fn mempool_dealloc(pool_id: usize, ptr: *mut u8) {
-    let mut registry = MEMORY_POOL_REGISTRY.lock();
+    let registry = MEMORY_POOL_REGISTRY.lock();
     if pool_id < registry.pools.len() {
         registry.pools[pool_id].lock().dealloc(ptr);
     }

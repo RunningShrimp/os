@@ -16,7 +16,6 @@ extern crate alloc;
 
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
-use alloc::vec;
 use alloc::vec::Vec;
 use alloc::format;
 use alloc::boxed::Box;

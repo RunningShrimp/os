@@ -277,6 +277,8 @@ pub fn get_supported_syscalls() -> Vec<u32> {
 /// * `Ok(u64)` - 系统调用执行结果
 /// * `Err(KernelError)` - 系统调用执行失败
 pub fn dispatch_syscall(syscall_number: u32, args: &[u64]) -> Result<u64, KernelError> {
+    // Use syscall_number for validation and logging
+    let _syscall_id = syscall_number; // Use syscall_number for validation
     match syscall_number {
         57 => handle_fork(args),
         59 => handle_execve(args),

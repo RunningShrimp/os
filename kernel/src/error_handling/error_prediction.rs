@@ -21,7 +21,7 @@ use super::{
 };
 
 /// 错误模式
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ErrorPattern {
     /// 模式ID
     pub id: u64,
@@ -48,7 +48,7 @@ pub struct ErrorPattern {
 }
 
 /// 模式匹配条件
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum PatternCondition {
     /// 系统负载条件
     SystemLoad {
@@ -102,7 +102,7 @@ pub enum ComparisonOperator {
 }
 
 /// 进程条件类型
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ProcessConditionType {
     /// 进程存在
     Exists,
@@ -500,7 +500,9 @@ impl ErrorPredictor {
             
             // 限制预测结果数量
             if stored_predictions.len() > self.config.max_predictions {
-                stored_predictions.drain(0..stored_predictions.len() - self.config.max_predictions);
+                let len = stored_predictions.len();
+                let remove_count = len - self.config.max_predictions;
+                stored_predictions.drain(0..remove_count);
             }
         }
 
@@ -541,7 +543,7 @@ impl ErrorPredictor {
             },
             PatternCondition::TimeWindow { start_hour, end_hour } => {
                 let current_hour = (crate::time::get_timestamp() / 3600) % 24;
-                current_hour >= *start_hour && current_hour <= *end_hour
+                current_hour >= *start_hour as u64 && current_hour <= *end_hour as u64
             },
             PatternCondition::ProcessCondition { process_name: _, condition: _ } => {
                 // 简化实现，实际应该查询进程状态

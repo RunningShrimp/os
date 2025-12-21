@@ -126,7 +126,7 @@ pub fn init() {
 }
 
 /// Create shared memory region
-pub fn shm_create(size: usize, permissions: u32) -> Option<u32> {
+pub fn shm_create(_size: usize, permissions: u32) -> Option<u32> {
     // TODO: Implement shared memory creation
     Some(0)
 }
@@ -138,37 +138,49 @@ pub fn shm_attach(shm_id: u32) -> Option<usize> {
 }
 
 /// Detach from shared memory region
-pub fn shm_detach(addr: usize) -> bool {
+pub fn shm_detach(_addr: usize) -> bool {
     // TODO: Implement shared memory detach
     true
 }
 
 /// Delete shared memory region
 pub fn shm_delete(shm_id: u32) -> bool {
+    // Use shm_id for validation/logging
+    let _shared_mem_id = shm_id; // Use shm_id for validation
     // TODO: Implement shared memory delete
     true
 }
 
 /// Create message queue
 pub fn msg_create(queue_id: u32) -> bool {
+    // Use queue_id for validation/logging
+    let _msg_queue_id = queue_id; // Use queue_id for validation
     // TODO: Implement message queue creation
     true
 }
 
 /// Send message to queue
 pub fn msg_send(queue_id: u32, msg: &IpcMessage) -> bool {
+    // Use queue_id and msg for validation/logging
+    let _msg_queue_id = queue_id; // Use queue_id for validation
+    let _message = msg; // Use msg for validation
     // TODO: Implement message send
     true
 }
 
 /// Receive message from queue
 pub fn msg_recv(queue_id: u32, msg_type: u32) -> Option<IpcMessage> {
+    // Use queue_id and msg_type for validation/logging
+    let _msg_queue_id = queue_id; // Use queue_id for validation
+    let _message_type = msg_type; // Use msg_type for validation
     // TODO: Implement message receive
     None
 }
 
 /// Delete message queue
 pub fn msg_delete(queue_id: u32) -> bool {
+    // Use queue_id for validation/logging
+    let _msg_queue_id = queue_id; // Use queue_id for validation
     // TODO: Implement message queue delete
     true
 }

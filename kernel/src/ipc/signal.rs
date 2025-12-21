@@ -372,7 +372,7 @@ impl SignalState {
 
         // Check if signal should be delivered to signalfd first
         let pid = crate::process::myproc().unwrap_or(0);
-        if crate::syscalls::glib::deliver_signal_to_signalfd(pid, sig, SigInfo {
+        if crate::syscalls::glib::deliver_signal_to_signalfd(pid as usize, sig, SigInfo {
             signo: sig as i32,
             code: si_code::SI_KERNEL,
             ..Default::default()
@@ -396,7 +396,7 @@ impl SignalState {
 
         // Check if signal should be delivered to signalfd first
         let pid = crate::process::myproc().unwrap_or(0);
-        if crate::syscalls::glib::deliver_signal_to_signalfd(pid, sig, info) {
+        if crate::syscalls::glib::deliver_signal_to_signalfd(pid as usize, sig, info) {
             // Signal was delivered to signalfd, don't set pending bit
             return Ok(());
         }

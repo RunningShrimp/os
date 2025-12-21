@@ -12,10 +12,14 @@ hashbrown = { version = "0.14", default-features = false }
 heapless = "0.7"
 spin = "0.9"
 libm = "0.2"
-bincode = "1.0"
+# bincode requires serde which links std, disabled for no_std kernel
+# bincode = { version = "1.0", default-features = false }
 bitflags = "2.0"
+# serde derive feature requires std, disabled for no_std kernel
+# serde = { version = "1.0", default-features = false, features = ["derive"] }
 
 # Test dependencies
+# Note: These dependencies may link std, so panic_handler is conditionally compiled
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
 proptest = "1.0"

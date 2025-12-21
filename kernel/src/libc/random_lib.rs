@@ -98,7 +98,7 @@ impl SystemEntropy {
     fn get_system_state(&self) -> usize {
         // 使用栈指针、寄存器等作为熵源
         // 在实际实现中，这里应该使用真正的硬件随机数生成器
-        let mut pointer = 0usize;
+        let pointer = 0usize;
         // 编译器优化：使用栈地址作为熵源
         unsafe {
             core::ptr::read_volatile(&pointer);

@@ -2,6 +2,7 @@
 #![no_main]
 #![feature(c_variadic)]
 #![allow(unsafe_op_in_unsafe_fn)]
+#![allow(missing_docs)]
 
 // xv6-rust kernel main entry point
 
@@ -202,7 +203,7 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
     crate::println!("[boot] AIO subsystem initialized");
     
     // Initialize advanced memory mapping subsystem
-    syscalls::memory::advanced_mmap::init().expect("Advanced memory mapping subsystem initialization failed");
+    syscalls::advanced_mmap::init();
     crate::println!("[boot] Advanced memory mapping subsystem initialized");
 
     // Initialize process subsystem
@@ -503,6 +504,9 @@ fn test_paths_relative() {
     crate::println!("ok");
 }
 
+// Only define panic_handler when building the binary (not as a library)
+// Test dependencies may link std which provides its own panic_handler
+#[cfg(all(not(test), not(doctest)))]
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     // Disable interrupts

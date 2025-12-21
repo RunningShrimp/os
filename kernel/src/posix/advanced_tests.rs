@@ -16,7 +16,6 @@ use crate::posix::advanced_thread::*;
 use crate::posix::security::*;
 use crate::syscalls::common::SyscallError;
 use alloc::string::String;
-use alloc::vec::Vec;
 
 /// Test result type
 pub type TestResult = Result<(), String>;
@@ -35,8 +34,8 @@ impl TestContext {
     /// Create a new test context
     pub fn new(name: &str) -> Self {
         Self {
-            name: name.to_string(),
-            passed: false,
+            name: name.into(),
+            passed: true,  // Default to passed, fail if needed
             error: String::new(),
         }
     }
@@ -49,7 +48,7 @@ impl TestContext {
     /// Mark test as failed with error message
     pub fn fail(&mut self, error: &str) {
         self.passed = false;
-        self.error = error.to_string();
+        self.error = error.into();
     }
 
     /// Check if test passed
@@ -88,31 +87,25 @@ impl TestRunner {
     }
 
     /// Run a single test
-    pub fn run_test<F>(&mut self, test_name: &str, test_fn: F) -> &TestContext
+    pub fn run_test<F>(&mut self, test_name: &str, test_fn: F)
     where
-        F: FnOnce(&mut TestContext) -> TestResult,
+        F: FnOnce(&mut TestContext),
     {
         let mut context = TestContext::new(test_name);
         
         crate::println!("[test] Running: {}", test_name);
         
-        let result = test_fn(&mut context);
+        test_fn(&mut context);
         
-        match result {
-            Ok(()) => {
-                context.pass();
-                self.tests_passed += 1;
-                crate::println!("[test] PASSED: {}", test_name);
-            }
-            Err(error) => {
-                context.fail(error);
-                self.tests_failed += 1;
-                crate::println!("[test] FAILED: {} - {}", test_name, error);
-            }
+        if context.is_passed() {
+            self.tests_passed += 1;
+            crate::println!("[test] PASSED: {}", test_name);
+        } else {
+            self.tests_failed += 1;
+            crate::println!("[test] FAILED: {} - {}", test_name, &context.error);
         }
         
         self.tests_run += 1;
-        &context
     }
 
     /// Print test summary
@@ -164,12 +157,13 @@ pub fn run_all_tests() {
 
 /// Test AIO functionality
 fn test_aio_functionality(runner: &mut TestRunner) {
-    runner.run_test("AIO Control Block Creation", |context| {
+    runner.run_test("AIO Control Block Creation", |_context| {
         let aiocb = crate::posix::aiocb::default();
         assert_eq!(aiocb.aio_fildes, -1, "Default file descriptor should be -1");
         assert_eq!(aiocb.aio_offset, 0, "Default offset should be 0");
         assert_eq!(aiocb.aio_nbytes, 0, "Default byte count should be 0");
         assert_eq!(aiocb.aio_reqprio, 0, "Default priority should be 0");
+        ()
     });
     
     runner.run_test("AIO Return Status", |context| {
@@ -187,7 +181,7 @@ fn test_aio_functionality(runner: &mut TestRunner) {
                 // Valid completed status
             }
             _ => {
-                context.fail(&format!("Invalid AIO return status: {}", status));
+                context.fail("Invalid AIO return status");
             }
         }
     });
@@ -195,8 +189,8 @@ fn test_aio_functionality(runner: &mut TestRunner) {
 
 /// Test advanced memory mapping
 fn test_advanced_memory_mapping(runner: &mut TestRunner) {
-    runner.run_test("CPU Set Creation", |context| {
-        let cpuset = crate::posix::CpuSet::new();
+    runner.run_test("CPU Set Creation", |_context| {
+        let mut cpuset = crate::posix::CpuSet::new();
         assert_eq!(cpuset.count(), 0, "New CPU set should be empty");
         
         // Test adding CPUs
@@ -212,7 +206,7 @@ fn test_advanced_memory_mapping(runner: &mut TestRunner) {
         assert!(!cpuset.is_set(3), "CPU 3 should not be set");
     });
     
-    runner.run_test("Memory Advice", |context| {
+    runner.run_test("Memory Advice", |_context| {
         // Test memory advice constants
         assert_eq!(crate::posix::MADV_NORMAL, 0, "Normal advice should be 0");
         assert_eq!(crate::posix::MADV_RANDOM, 1, "Random advice should be 1");
@@ -221,7 +215,7 @@ fn test_advanced_memory_mapping(runner: &mut TestRunner) {
         assert_eq!(crate::posix::MADV_DONTNEED, 4, "Don't need advice should be 4");
     });
     
-    runner.run_test("Memory Locking", |context| {
+    runner.run_test("Memory Locking", |_context| {
         // Test memory locking constants
         assert_eq!(crate::posix::MCL_CURRENT, 1, "Current memory should be 1");
         assert_eq!(crate::posix::MCL_FUTURE, 2, "Future memory should be 2");
@@ -231,7 +225,7 @@ fn test_advanced_memory_mapping(runner: &mut TestRunner) {
 
 /// Test message queue semantics
 fn test_message_queue_semantics(runner: &mut TestRunner) {
-    runner.run_test("Message Queue Attributes", |context| {
+    runner.run_test("Message Queue Attributes", |_context| {
         let mut attr = crate::posix::MqAttr::default();
         
         // Test default attributes
@@ -247,7 +241,7 @@ fn test_message_queue_semantics(runner: &mut TestRunner) {
         assert_eq!(attr.mq_msgsize, 4096, "Modified message size should be 4096");
     });
     
-    runner.run_test("Message Queue Notification", |context| {
+    runner.run_test("Message Queue Notification", |_context| {
         // Test notification structure
         let notify = crate::posix::MqNotify {
             notify_method: crate::posix::MQ_SIGNAL,
@@ -261,7 +255,7 @@ fn test_message_queue_semantics(runner: &mut TestRunner) {
 
 /// Test advanced signal handling
 fn test_advanced_signal_handling(runner: &mut TestRunner) {
-    runner.run_test("Signal Queue Creation", |context| {
+    runner.run_test("Signal Queue Creation", |_context| {
         let queue = crate::posix::advanced_signal::SignalQueue::new();
         
         // Test empty queue
@@ -269,14 +263,14 @@ fn test_advanced_signal_handling(runner: &mut TestRunner) {
         assert_eq!(queue.len(), 0, "New queue length should be 0");
         
         // Test signal queue statistics
-        let stats = queue.get_stats(None);
+        let stats = queue.get_stats();
         assert_eq!(stats.total_pending, 0, "Total pending should be 0");
         assert_eq!(stats.real_time_pending, 0, "Real-time pending should be 0");
         assert_eq!(stats.standard_pending, 0, "Standard pending should be 0");
         assert_eq!(stats.max_capacity, crate::posix::advanced_signal::MAX_PENDING_SIGNALS, "Max capacity should be correct");
     });
     
-    runner.run_test("Queued Signal Creation", |context| {
+    runner.run_test("Queued Signal Creation", |_context| {
         let signal = crate::posix::advanced_signal::QueuedSignal::from_sigqueue(
             crate::posix::SIGUSR1,
             1234, // PID
@@ -288,29 +282,30 @@ fn test_advanced_signal_handling(runner: &mut TestRunner) {
         assert_eq!(signal.info.si_code, crate::posix::SI_QUEUE, "Signal code should be SI_QUEUE");
         assert_eq!(signal.info.si_pid, 1234, "PID should match");
         assert_eq!(signal.info.si_uid, 1234, "UID should match");
-        assert_eq!(signal.info.si_value.sival_int, 42, "Signal value should match");
+        unsafe {
+            assert_eq!(signal.info.si_value.sival_int, 42, "Signal value should match");
+        }
         assert!(!signal.delivered, "Signal should not be delivered initially");
     });
     
     runner.run_test("Alternate Signal Stack", |context| {
-        let stack = match crate::posix::advanced_signal::AlternateSignalStack::new(4096) {
-            Ok(stack) => stack,
-            Err(crate::posix::advanced_signal::SignalStackError::StackTooSmall) => {
-                context.fail("Should create stack successfully");
-                return;
+        match crate::posix::advanced_signal::AlternateSignalStack::new(4096) {
+            Ok(stack) => {
+                assert!(!stack.base.is_null(), "Stack base should not be null");
+                assert_eq!(stack.size, 4096, "Stack size should be 4096");
+                assert_eq!(stack.flags, 0, "Stack flags should be 0");
+                assert!(!stack.in_use, "Stack should not be in use initially");
             }
-        };
-        
-        assert!(!stack.base.is_null(), "Stack base should not be null");
-        assert_eq!(stack.size, 4096, "Stack size should be 4096");
-        assert_eq!(stack.flags, 0, "Stack flags should be 0");
-        assert!(!stack.in_use, "Stack should not be in use initially");
+            Err(_) => {
+                context.fail("Should create stack successfully");
+            }
+        }
     });
 }
 
 /// Test real-time extensions
 fn test_realtime_extensions(runner: &mut TestRunner) {
-    runner.run_test("Scheduling Parameters", |context| {
+    runner.run_test("Scheduling Parameters", |_context| {
         let param = crate::posix::realtime::SchedParam::new(50);
         
         // Test parameter validation
@@ -320,8 +315,8 @@ fn test_realtime_extensions(runner: &mut TestRunner) {
         assert!(!param.is_valid_for_policy(crate::posix::realtime::SCHED_BATCH), "Priority 50 should not be valid for BATCH");
     });
     
-    runner.run_test("CPU Affinity", |context| {
-        let cpuset = crate::posix::realtime::CpuSet::new();
+    runner.run_test("CPU Affinity", |_context| {
+        let mut cpuset = crate::posix::realtime::CpuSet::new();
         
         // Test CPU set operations
         cpuset.set(0);
@@ -343,11 +338,14 @@ fn test_realtime_extensions(runner: &mut TestRunner) {
         assert_eq!(cpuset.count(), 0, "Cleared CPU set should be empty");
     });
     
-    runner.run_test("Priority Ranges", |context| {
+    runner.run_test("Priority Ranges", |_context| {
         // Test priority ranges for different policies
-        let (min_fifo, max_fifo) = crate::posix::realtime::sched_get_priority_max(crate::posix::realtime::SCHED_FIFO).unwrap();
-        let (min_rr, max_rr) = crate::posix::realtime::sched_get_priority_min(crate::posix::realtime::SCHED_RR).unwrap();
-        let (min_normal, max_normal) = crate::posix::realtime::sched_get_priority_max(crate::posix::realtime::SCHED_NORMAL).unwrap();
+        let min_fifo = crate::posix::realtime::sched_get_priority_min(crate::posix::realtime::SCHED_FIFO).unwrap();
+        let max_fifo = crate::posix::realtime::sched_get_priority_max(crate::posix::realtime::SCHED_FIFO).unwrap();
+        let min_rr = crate::posix::realtime::sched_get_priority_min(crate::posix::realtime::SCHED_RR).unwrap();
+        let max_rr = crate::posix::realtime::sched_get_priority_max(crate::posix::realtime::SCHED_RR).unwrap();
+        let min_normal = crate::posix::realtime::sched_get_priority_min(crate::posix::realtime::SCHED_NORMAL).unwrap();
+        let max_normal = crate::posix::realtime::sched_get_priority_max(crate::posix::realtime::SCHED_NORMAL).unwrap();
         
         assert_eq!((min_fifo, max_fifo), (1, 99), "FIFO priority range should be 1-99");
         assert_eq!((min_rr, max_rr), (1, 99), "RR priority range should be 1-99");
@@ -357,7 +355,7 @@ fn test_realtime_extensions(runner: &mut TestRunner) {
 
 /// Test advanced thread features
 fn test_advanced_thread_features(runner: &mut TestRunner) {
-    runner.run_test("Thread Attributes", |context| {
+    runner.run_test("Thread Attributes", |_context| {
         let mut attr = crate::posix::advanced_thread::ThreadAttr::new();
         
         // Test attribute operations
@@ -378,21 +376,20 @@ fn test_advanced_thread_features(runner: &mut TestRunner) {
     });
     
     runner.run_test("Barrier Synchronization", |context| {
-        let barrier = match crate::posix::advanced_thread::Barrier::new(3) {
-            Ok(barrier) => barrier,
+        match crate::posix::advanced_thread::Barrier::new(3) {
+            Ok(barrier) => {
+                let stats = barrier.get_stats();
+                assert_eq!(stats.required, 3, "Barrier should require 3 threads");
+                assert_eq!(stats.waiting, 0, "No threads should be waiting");
+                assert!(!stats.in_use, "Barrier should not be in use");
+            }
             Err(_) => {
                 context.fail("Should create barrier successfully");
-                return;
             }
-        };
-        
-        let stats = barrier.get_stats();
-        assert_eq!(stats.required, 3, "Barrier should require 3 threads");
-        assert_eq!(stats.waiting, 0, "No threads should be waiting");
-        assert!(!stats.in_use, "Barrier should not be in use");
+        }
     });
     
-    runner.run_test("Spinlock Synchronization", |context| {
+    runner.run_test("Spinlock Synchronization", |_context| {
         let spinlock = crate::posix::advanced_thread::Spinlock::new();
         
         // Test spinlock operations

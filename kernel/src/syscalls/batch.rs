@@ -9,10 +9,14 @@
 extern crate alloc;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, Ordering};
-use crate::syscalls::common::SyscallError;
+
+// Serde for serialization
+#[cfg(feature = "serde_support")]
+extern crate serde;
 
 /// 批处理系统调用类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(serde::Serialize, serde::Deserialize))]
 pub enum BatchSyscallType {
     /// 文件I/O操作
     FileIO,
@@ -30,6 +34,7 @@ pub enum BatchSyscallType {
 
 /// 单个批处理系统调用描述
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_support", derive(serde::Serialize, serde::Deserialize))]
 pub struct BatchSyscall {
     /// 系统调用编号
     pub syscall_num: u32,
@@ -77,6 +82,7 @@ impl BatchSyscall {
 
 /// 批处理系统调用结果
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_support", derive(serde::Serialize, serde::Deserialize))]
 pub struct BatchSyscallResult {
     /// 系统调用编号
     pub syscall_num: u32,
@@ -150,6 +156,7 @@ impl BatchSyscallResult {
 
 /// 批处理请求
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_support", derive(serde::Serialize, serde::Deserialize))]
 pub struct BatchRequest {
     /// 批处理ID
     pub batch_id: u64,
@@ -193,6 +200,7 @@ impl BatchRequest {
 
 /// 批处理响应
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_support", derive(serde::Serialize, serde::Deserialize))]
 pub struct BatchResponse {
     /// 批处理ID
     pub batch_id: u64,
@@ -264,6 +272,7 @@ impl BatchResponse {
 
 /// 批处理状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_support", derive(serde::Serialize, serde::Deserialize))]
 pub enum BatchStatus {
     /// 批处理成功完成
     Completed,

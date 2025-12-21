@@ -522,7 +522,7 @@ impl ModelChecker {
             return Err("Model checker is not running");
         }
 
-        let start_time_ms = 0u64; // TODO: Implement proper timestamp
+        let _start_time_ms = 0u64; // TODO: Implement proper timestamp
         let mut verification_results = Vec::new();
 
         // 构建状态空间
@@ -550,7 +550,7 @@ impl ModelChecker {
 
     /// 检查特定规范
     pub fn check_specification(&mut self, spec: &TemporalLogicFormula) -> Result<ModelCheckingResult, &'static str> {
-        let start_time_ms = 0u64; // TODO: Implement proper timestamp
+        let _start_time_ms = 0u64; // TODO: Implement proper timestamp
 
         let result = match self.config.algorithm {
             ModelCheckingAlgorithm::ExplicitState => {

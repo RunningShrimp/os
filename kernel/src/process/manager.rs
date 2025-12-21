@@ -36,7 +36,7 @@ pub const NOFILE: usize = 16;
 // ============================================================================
 
 /// Process ID type
-pub type Pid = usize;
+pub type Pid = i32;
 
 /// Process state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -937,15 +937,18 @@ pub fn fork() -> Option<Pid> {
     
     // Set return value to 0 for child process (architecture-specific register)
     unsafe {
-        if cfg!(target_arch = "riscv64") {
+        #[cfg(target_arch = "riscv64")]
+        {
             (*child.trapframe).a0 = 0;
         }
 
-        if cfg!(target_arch = "aarch64") {
+        #[cfg(target_arch = "aarch64")]
+        {
             (*child.trapframe).regs[0] = 0; // On aarch64, a0 is regs[0]
         }
 
-        if cfg!(target_arch = "x86_64") {
+        #[cfg(target_arch = "x86_64")]
+        {
             (*child.trapframe).rax = 0; // On x86_64, rax is the return value register
         }
     }
@@ -1128,7 +1131,7 @@ pub fn waitpid(pid: i32, status: *mut i32, options: i32) -> Option<Pid> {
 /// Kill a process
 pub fn kill(pid: usize) -> bool {
     let mut table = PROC_TABLE.lock();
-    if let Some(proc) = table.find(pid) {
+    if let Some(proc) = table.find(pid as Pid) {
         proc.killed = true;
         if proc.state == ProcState::Sleeping {
             proc.state = ProcState::Runnable;

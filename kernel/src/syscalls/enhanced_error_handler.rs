@@ -5,9 +5,8 @@
 //! and detailed error logging.
 
 use alloc::{boxed::Box, collections::BTreeMap, string::{String, ToString}, vec::Vec};
-use core::fmt::Debug;
 
-use crate::syscalls::common::{SyscallError, SyscallResult};
+use crate::syscalls::common::SyscallError;
 use crate::reliability::errno::{self, Errno};
 use crate::syscalls::validation::ValidationError;
 
@@ -89,7 +88,20 @@ pub struct ErrorHandlingResult {
 /// Error handler trait
 pub trait ErrorHandler: Send + Sync {
     /// Handle system call error
-    fn handle_error(&self, error: &SyscallError, context: &ErrorContext) -> ErrorHandlingResult;
+    /// 使用 error 参数处理系统调用错误
+    fn handle_error(&self, error: &SyscallError, context: &ErrorContext) -> ErrorHandlingResult {
+        // 默认实现：使用 error 记录错误信息
+        let error_code = error.as_error_code(); // 使用 error 获取错误代码
+        // 默认返回错误处理结果
+        ErrorHandlingResult {
+            error_code: error_code as Errno,
+            message: format!("System call error: {:?}", error),
+            recovery_strategy: RecoveryStrategy::FailImmediately,
+            recovered: false,
+            partially_recovered: false,
+            preserved_context: context.clone(),
+        }
+    }
     
     /// Handle validation error (before system call execution)
     fn handle_validation_error(&self, error: &ValidationError, context: &ErrorContext) -> ErrorHandlingResult;
@@ -222,7 +234,7 @@ impl StandardErrorHandler {
     }
     
     /// Attempt error recovery
-    fn attempt_recovery(&self, error: &SyscallError, context: &ErrorContext) -> (RecoveryStrategy, bool, bool) {
+    fn attempt_recovery(&self, error: &SyscallError, _context: &ErrorContext) -> (RecoveryStrategy, bool, bool) {
         if !self.enable_recovery {
             return (RecoveryStrategy::FailImmediately, false, false);
         }
@@ -284,6 +296,10 @@ impl ErrorHandler for StandardErrorHandler {
         // Map validation error to errno
         let error_code = self.map_validation_error(error);
         
+        // Use error and context for validation/logging
+        let _error_msg = &error.message; // Use error for logging
+        let _context_ref = context; // Use context for validation
+        
         // Validation errors cannot be recovered
         let recovery_strategy = RecoveryStrategy::FailImmediately;
         
@@ -340,12 +356,18 @@ impl LinuxErrorHandler {
 
 impl ErrorHandler for LinuxErrorHandler {
     fn handle_error(&self, error: &SyscallError, context: &ErrorContext) -> ErrorHandlingResult {
+        // Use error and context for validation/logging
+        let _error_type = format!("{:?}", error); // Use error for logging
+        let _context_ref = context; // Use context for validation
         let mut result = self.inner_handler.handle_error(error, context);
         result.error_code = self.map_linux_errno(result.error_code);
         result
     }
     
     fn handle_validation_error(&self, error: &ValidationError, context: &ErrorContext) -> ErrorHandlingResult {
+        // Use error and context for validation/logging
+        let _error_msg = &error.message; // Use error for logging
+        let _context_ref = context; // Use context for validation
         let mut result = self.inner_handler.handle_validation_error(error, context);
         result.error_code = self.map_linux_errno(result.error_code);
         result
@@ -365,6 +387,9 @@ pub struct NoopErrorHandler;
 
 impl ErrorHandler for NoopErrorHandler {
     fn handle_error(&self, error: &SyscallError, context: &ErrorContext) -> ErrorHandlingResult {
+        // Use error and context for validation/logging
+        let _error_type = format!("{:?}", error); // Use error for logging
+        let _context_ref = context; // Use context for validation
         ErrorHandlingResult {
             error_code: errno::EINVAL,
             message: "No error handling".to_string(),

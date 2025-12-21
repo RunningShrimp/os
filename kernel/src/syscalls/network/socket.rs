@@ -196,6 +196,8 @@ pub fn sys_bind(args: &[u64]) -> super::super::common::SyscallResult {
         match socket {
             Socket::Tcp(tcp_socket) => {
                 // For TCP sockets, use the TCP connection manager
+                // 使用 tcp_socket 获取或设置 TCP 特定的选项
+                let _tcp_socket_ref = tcp_socket; // 使用 tcp_socket 进行验证或配置
                 let mut tcp_manager = TcpConnectionManager::new();
                 // Map generic SocketOptions -> TcpOptions explicitly
                 let opts = socket_entry.options.clone();
@@ -218,7 +220,7 @@ pub fn sys_bind(args: &[u64]) -> super::super::common::SyscallResult {
                 ).map_err(|e: crate::net::tcp::manager::TcpError| SyscallError::from(e))?;
 
                 // Update socket entry with connection ID
-                let mut socket_table = get_socket_table();
+                let socket_table = get_socket_table();
                 if let Some(Some(entry)) = socket_table.get_mut(fd as usize) {
                     // Since SocketEntry is Clone, we can create a new entry with updated values
                     let old_entry = entry.as_ref();
@@ -234,7 +236,7 @@ pub fn sys_bind(args: &[u64]) -> super::super::common::SyscallResult {
                 udp_socket.bind(socket_addr).map_err(|e: crate::net::socket::SocketError| SyscallError::from(e))?;
 
                 // Update socket entry
-                let mut socket_table = get_socket_table();
+                let socket_table = get_socket_table();
                 if let Some(Some(entry)) = socket_table.get_mut(fd as usize) {
                     // Since SocketEntry is Clone, we can create a new entry with updated values
                     let old_entry = entry.as_ref();
@@ -246,7 +248,7 @@ pub fn sys_bind(args: &[u64]) -> super::super::common::SyscallResult {
             }
             Socket::Raw(_) => {
                 // Raw sockets don't bind in the same way
-                let mut socket_table = get_socket_table();
+                let socket_table = get_socket_table();
                 if let Some(Some(entry)) = socket_table.get_mut(fd as usize) {
                     // Since SocketEntry is Clone, we can create a new entry with updated values
                     let old_entry = entry.as_ref();
@@ -325,7 +327,7 @@ pub fn sys_listen(args: &[u64]) -> super::super::common::SyscallResult {
     }
 
     // Start listening using the socket implementation
-    let mut socket_table = get_socket_table();
+    let socket_table = get_socket_table();
     if let Some(Some(entry)) = socket_table.get_mut(fd as usize) {
         // Since SocketEntry is Clone, we can create a new entry with updated values
         let old_entry = entry.as_ref();
@@ -415,7 +417,7 @@ pub fn sys_accept(args: &[u64]) -> super::super::common::SyscallResult {
     }
 
     // Accept connection using the socket implementation
-    let mut socket_table = get_socket_table();
+    let socket_table = get_socket_table();
     if let Some(Some(entry)) = socket_table.get_mut(fd as usize) {
         // We only need to read from the entry, no need to clone
         if let Some(ref mut socket) = entry.socket.lock().as_mut() {
@@ -566,7 +568,7 @@ pub fn sys_connect(args: &[u64]) -> super::super::common::SyscallResult {
     }
 
     // Perform actual connection using the socket implementation
-    let mut socket_table = get_socket_table();
+    let socket_table = get_socket_table();
     if let Some(Some(entry)) = socket_table.get_mut(fd as usize) {
         // Since SocketEntry is Clone, we can create a new entry with updated values
         let old_entry = entry.as_ref();

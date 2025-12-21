@@ -760,11 +760,11 @@ impl GQueue {
 
     /// 从队尾弹出元素
     pub fn pop_tail(queue: *mut GQueue) -> gpointer {
-        if queue.is_null() || (*queue).tail.is_null() {
-            return ptr::null_mut();
-        }
-
         unsafe {
+            if queue.is_null() || (*queue).tail.is_null() {
+                return ptr::null_mut();
+            }
+
             let data = (*(*queue).tail).data;
             let new_tail = (*(*queue).tail).prev;
 
@@ -784,11 +784,11 @@ impl GQueue {
 
     /// 从队头弹出元素
     pub fn pop_head(queue: *mut GQueue) -> gpointer {
-        if queue.is_null() || (*queue).head.is_null() {
-            return ptr::null_mut();
-        }
-
         unsafe {
+            if queue.is_null() || (*queue).head.is_null() {
+                return ptr::null_mut();
+            }
+
             let data = (*(*queue).head).data;
             let new_head = (*(*queue).head).next;
 

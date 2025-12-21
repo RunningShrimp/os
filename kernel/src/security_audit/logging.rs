@@ -282,7 +282,7 @@ impl LogManager {
         // 更新压缩统计
         {
             let mut stats = self.stats.lock();
-            let mut comp_stats = &mut stats.compression_stats;
+            let comp_stats = &mut stats.compression_stats;
             comp_stats.uncompressed_size += data.len() as u64;
             comp_stats.compressed_size += compressed.len() as u64;
             comp_stats.compression_time_us += elapsed / 1000;
@@ -316,7 +316,7 @@ impl LogManager {
         // 更新加密统计
         {
             let mut stats = self.stats.lock();
-            let mut enc_stats = &mut stats.encryption_stats;
+            let enc_stats = &mut stats.encryption_stats;
             enc_stats.encryption_operations += 1;
             enc_stats.encryption_time_us += elapsed / 1000;
         }

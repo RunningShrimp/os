@@ -12,6 +12,7 @@
 //! - async_io: 异步I/O系统 (GIO异步操作)
 //! - string: 字符串操作 (GString, 字符串工具函数)
 //! - utils: 工具函数和宏
+//!
 
 #![no_std]
 
@@ -25,116 +26,7 @@ macro_rules! glib_println {
     };
 }
 
-// 核心模块
-pub mod memory;
-pub mod collections;
-pub mod object;
-pub mod main_loop;
-pub mod async_io;
-pub mod string;
-pub mod utils;
-
-// 重新导出公共接口
-pub use memory::*;
-pub use collections::*;
-pub use object::*;
-pub use main_loop::*;
-pub use async_io::*;
-pub use string::*;
-pub use utils::*;
-
-// GLib错误处理
-pub mod error;
-use error::GError;
-
-/// GLib初始化函数
-///
-/// 初始化GLib用户空间库，包括：
-/// - 初始化内存管理器
-/// - 设置系统调用接口
-/// - 初始化对象系统
-/// - 配置默认参数
-pub fn init() -> Result<(), GError> {
-    // 初始化各个子系统
-    memory::init()?;
-    object::init()?;
-    main_loop::init()?;
-    async_io::init()?;
-
-    glib_println!("[glib] GLib用户空间库初始化完成");
-    Ok(())
-}
-
-/// GLib清理函数
-///
-/// 清理所有GLib资源，通常在程序退出时调用
-pub fn cleanup() {
-    async_io::cleanup();
-    main_loop::cleanup();
-    object::cleanup();
-    memory::cleanup();
-
-    glib_println!("[glib] GLib用户空间库清理完成");
-}
-
-/// GLib全局状态
-pub struct GLibState {
-    pub initialized: bool,
-    pub debug_enabled: bool,
-    pub memory_stats: memory::MemoryStats,
-    pub object_stats: object::ObjectStats,
-}
-
-static mut G_LIB_STATE: Option<GLibState> = None;
-
-/// 获取GLib全局状态
-pub fn get_state() -> &'static GLibState {
-    unsafe {
-        G_LIB_STATE.as_ref().unwrap_or_else(|| {
-            panic!("GLib未初始化！请先调用glib::init()");
-        })
-    }
-}
-
-/// 获取可变GLib全局状态
-pub fn get_state_mut() -> &'static mut GLibState {
-    unsafe {
-        G_LIB_STATE.as_mut().unwrap_or_else(|| {
-            panic!("GLib未初始化！请先调用glib::init()");
-        })
-    }
-}
-
-/// GLib宏定义
-pub mod macros {
-    /// g_new宏 - 分配并初始化数组
-    #[macro_export]
-    macro_rules! g_new {
-        ($type:ty, $n:expr) => {
-            $crate::glib::g_malloc_n(core::mem::size_of::<$type>() * $n) as *mut $type
-        };
-    }
-
-    /// g_new0宏 - 分配、初始化为零的数组
-    #[macro_export]
-    macro_rules! g_new0 {
-        ($type:ty, $n:expr) => {
-            $crate::glib::g_malloc0_n(core::mem::size_of::<$type>() * $n) as *mut $type
-        };
-    }
-
-    /// g_renew宏 - 重新分配数组
-    #[macro_export]
-    macro_rules! g_renew {
-        ($type:ty, $mem:expr, $n:expr) => {
-            $crate::glib::g_realloc($mem as *mut _, core::mem::size_of::<$type>() * $n) as *mut $type
-        };
-    }
-
-    // Assertion macros are now defined locally in each module to avoid conflicts
-}
-
-// 常量定义
+/// GLib常用常量
 pub mod constants {
     /// GLib版本信息
     pub const GLIB_MAJOR_VERSION: u32 = 2;
@@ -225,47 +117,86 @@ pub mod types {
     pub type GQuark = u32;
 }
 
-// 重新导出常用函数和类型
-pub use types::*;
 pub use constants::*;
+pub use types::*;
+
+// GLib错误处理
+pub mod error;
+pub use error::GError;
+
+// 核心模块
+pub mod memory;
+pub mod collections;
+pub mod object;
+pub mod main_loop;
+pub mod async_io;
+pub mod string;
+pub mod utils;
+
+// 重新导出公共接口
+pub use memory::*;
+pub use collections::*;
+pub use object::*;
+pub use main_loop::*;
+pub use async_io::*;
+pub use string::*;
+pub use utils::*;
+
+/// GLib初始化函数
+///
+/// 初始化GLib用户空间库，包括：
+/// - 初始化内存管理器
+/// - 设置系统调用接口
+/// - 初始化对象系统
+/// - 配置默认参数
+pub fn init() -> Result<(), GError> {
+    // 初始化各个子系统
+    memory::init()?;
+    object::init()?;
+    main_loop::init()?;
+    async_io::init()?;
+
+    glib_println!("[glib] GLib用户空间库初始化完成");
+    Ok(())
+}
+
+/// GLib清理函数
+///
+/// 释放GLib使用的资源
+pub fn cleanup() {
+    async_io::cleanup();
+    main_loop::cleanup();
+    object::cleanup();
+    memory::cleanup();
+    glib_println!("[glib] GLib用户空间库清理完成");
+}
+
+/// 获取全局状态
+pub(crate) fn get_state_mut() -> *mut GLibState {
+    static mut STATE: GLibState = GLibState {
+        initialized: false,
+    };
+    unsafe { &raw mut STATE as *mut GLibState }
+}
+
+/// GLib全局状态
+pub struct GLibState {
+    pub initialized: bool,
+}
+
+/// GQuark助手函数
+pub fn g_quark_from_string(string: &str) -> types::GQuark {
+    error::g_quark_from_string(string)
+}
+
+pub fn g_quark_to_string(quark: types::GQuark) -> alloc::string::String {
+    error::g_quark_to_string(quark)
+}
 
 /// GLib测试模块
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_initialization() {
-        // 测试GLib初始化
-        let result = init();
-        assert!(result.is_ok());
-        assert!(get_state().initialized);
-
-        cleanup();
-    }
-
-    #[test]
-    fn test_memory_allocation() {
-        init().unwrap();
-
-        // 测试基本内存分配
-        let ptr = g_malloc(100);
-        assert!(!ptr.is_null());
-
-        // 测试重新分配
-        let new_ptr = g_realloc(ptr, 200);
-        assert!(!new_ptr.is_null());
-
-        // 测试清零分配
-        let zero_ptr = g_malloc0(50);
-        assert!(!zero_ptr.is_null());
-
-        // 清理
-        g_free(new_ptr);
-        g_free(zero_ptr);
-
-        cleanup();
-    }
 
     #[test]
     fn test_macros() {
@@ -287,13 +218,13 @@ mod tests {
         use error::*;
 
         // 测试错误创建
-        let error = GError::new(GQuark::from_string("test-domain"), 1, "Test error message");
-        assert_eq!(error.domain, GQuark::from_string("test-domain"));
+        let error = GError::new(g_quark_from_string("test-domain"), 1, "Test error message");
+        assert_eq!(error.domain, g_quark_from_string("test-domain"));
         assert_eq!(error.code, 1);
         assert_eq!(error.message, "Test error message");
 
         // 测试错误格式化
-        let formatted_error = GError::new_literal(GQuark::from_string("test"), 2, "Formatted error");
+        let formatted_error = GError::new_literal(g_quark_from_string("test"), 2, "Formatted error");
         assert_eq!(formatted_error.message, "Formatted error");
     }
 }

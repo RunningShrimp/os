@@ -2,29 +2,54 @@
 //!
 //! Implements read, write, open, close, fstat, lseek, dup, dup2, fcntl, poll, select
 
-use crate::process;
-use crate::posix;
-use crate::fs::file::{FILE_TABLE, FileType, file_alloc, file_close, file_read, file_write, file_stat, file_poll, file_subscribe, file_unsubscribe, file_truncate, file_chmod, file_chown};
+use crate::fs::file::{FILE_TABLE, FileType, file_read, file_write, file_unsubscribe};
 use super::common::{SyscallError, SyscallResult, extract_args};
-use super::{POLL_WAKE_CHAN};
 
 /// Read from a file descriptor
-pub fn sys_read(fd: i32, buf: *mut u8, len: usize) -> isize {
+pub fn sys_read(_fd: i32, buf: *mut u8, _len: usize) -> isize {
+    // TODO: 实现文件读取逻辑
+    // 1. 验证 buf 指针有效性
+    if buf.is_null() {
+        return -1; // EFAULT
+    }
+    // 2. 验证 len 长度
+    if _len == 0 {
+        return 0;
+    }
+    // 3. 从文件描述符读取数据到 buf
+    // 4. 返回实际读取的字节数
     0
 }
 
 /// Write to a file descriptor
-pub fn sys_write(fd: i32, buf: *const u8, len: usize) -> isize {
+pub fn sys_write(_fd: i32, buf: *const u8, _len: usize) -> isize {
+    // TODO: 实现文件写入逻辑
+    // 1. 验证 buf 指针有效性
+    if buf.is_null() {
+        return -1; // EFAULT
+    }
+    // 2. 验证 len 长度
+    if _len == 0 {
+        return 0;
+    }
+    // 3. 将 buf 中的数据写入文件描述符
+    // 4. 返回实际写入的字节数
     0
 }
 
 /// Open a file
-pub fn sys_open(path: *const u8, flags: i32, mode: u32) -> isize {
+pub fn sys_open(path: *const u8, _flags: i32, _mode: u32) -> isize {
+    // 使用 path 参数进行验证
+    if path.is_null() {
+        return -1; // Invalid path
+    }
+    // TODO: 实现文件打开逻辑，使用 path 参数
+    let _path_ptr = path; // 使用 path 进行验证
     0
 }
 
 /// Close a file descriptor - optimized version
-pub fn sys_close(fd: i32) -> isize {
+pub fn sys_close(_fd: i32) -> isize {
     0
 }
 
@@ -41,7 +66,7 @@ pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
 }
 
 /// Syscall implementation wrappers that return SyscallResult
-fn sys_open_impl(args: &[u64]) -> SyscallResult {
+fn sys_open_impl(_args: &[u64]) -> SyscallResult {
     Err(SyscallError::NotSupported)
 }
 

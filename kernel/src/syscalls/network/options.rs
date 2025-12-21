@@ -1,6 +1,5 @@
 //! Socket options syscalls
 
-use super::*;
 use super::super::common::SyscallError;
 
 /// Set socket options

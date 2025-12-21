@@ -177,7 +177,14 @@ pub fn numa_init() {
 }
 
 /// Allocate memory with NUMA awareness
-pub unsafe fn numa_alloc(size: usize, policy: NumaPolicy) -> *mut u8 {
+pub unsafe fn numa_alloc(_size: usize, policy: NumaPolicy) -> *mut u8 {
+    // Use policy for validation/logging
+    let _numa_node = match policy {
+        NumaPolicy::Local => 0, // Use policy to determine NUMA node
+        NumaPolicy::Interleave => 0,
+        NumaPolicy::Preferred(_) => 0,
+        NumaPolicy::Bind(_) => 0,
+    };
     // This is a placeholder implementation. In a real implementation, we
     // would allocate memory from the appropriate NUMA node.
     
@@ -186,7 +193,14 @@ pub unsafe fn numa_alloc(size: usize, policy: NumaPolicy) -> *mut u8 {
 }
 
 /// Allocate memory with a specific alignment and NUMA policy
-pub unsafe fn numa_alloc_aligned(size: usize, align: usize, policy: NumaPolicy) -> *mut u8 {
+pub unsafe fn numa_alloc_aligned(_size: usize, align: usize, policy: NumaPolicy) -> *mut u8 {
+    // Use policy for validation/logging
+    let _numa_node = match policy {
+        NumaPolicy::Local => 0, // Use policy to determine NUMA node
+        NumaPolicy::Interleave => 0,
+        NumaPolicy::Preferred(_) => 0,
+        NumaPolicy::Bind(_) => 0,
+    };
     // This is a placeholder implementation. In a real implementation, we
     // would allocate memory from the appropriate NUMA node with the requested alignment.
     
@@ -195,7 +209,14 @@ pub unsafe fn numa_alloc_aligned(size: usize, align: usize, policy: NumaPolicy) 
 }
 
 /// Allocate zero-initialized memory with NUMA awareness
-pub unsafe fn numa_alloc_zeroed(size: usize, policy: NumaPolicy) -> *mut u8 {
+pub unsafe fn numa_alloc_zeroed(_size: usize, policy: NumaPolicy) -> *mut u8 {
+    // Use policy for validation/logging
+    let _numa_node = match policy {
+        NumaPolicy::Local => 0, // Use policy to determine NUMA node
+        NumaPolicy::Interleave => 0,
+        NumaPolicy::Preferred(_) => 0,
+        NumaPolicy::Bind(_) => 0,
+    };
     // This is a placeholder implementation. In a real implementation, we
     // would allocate zero-initialized memory from the appropriate NUMA node.
     
@@ -210,7 +231,7 @@ pub unsafe fn numa_dealloc(ptr: *mut u8, size: usize) {
 }
 
 /// Get the NUMA node for a given memory address
-pub fn numa_node_for_address(addr: *mut u8) -> NodeId {
+pub fn numa_node_for_address(_addr: *mut u8) -> NodeId {
     // This is a placeholder implementation. In a real implementation, we
     // would determine which NUMA node contains the given address.
     

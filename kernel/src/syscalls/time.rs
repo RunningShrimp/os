@@ -1,7 +1,7 @@
 //! Time-related syscalls
 
 use super::common::{SyscallError, SyscallResult};
-use crate::libc::time_lib::{Timespec, Timezone};
+use crate::posix::Timespec;
 
 /// Dispatch time-related syscalls
 pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
@@ -78,8 +78,10 @@ fn sys_time(_args: &[u64]) -> SyscallResult {
         let bytes = unsafe { core::slice::from_raw_parts((&val as *const time_t) as *const u8, core::mem::size_of::<time_t>()) };
 
         // Write to user space
-        copyout(pagetable, tloc as usize, bytes.as_ptr(), bytes.len())
-            .map_err(|_| SyscallError::BadAddress)?;
+        unsafe {
+            copyout(pagetable, tloc as usize, bytes.as_ptr(), bytes.len())
+                .map_err(|_| SyscallError::BadAddress)?;
+        }
     }
 
     Ok(seconds as u64)
@@ -92,7 +94,7 @@ fn sys_gettimeofday(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
     use crate::mm::vm::copyout;
     use crate::posix::Timeval;
-    use crate::libc::time_lib::{Timespec, Timezone};
+    use crate::libc::time_lib::Timezone;
     
     let args = extract_args(args, 2)?;
     let tv_ptr = args[0] as *mut Timeval;
@@ -141,8 +143,7 @@ fn sys_settimeofday(_args: &[u64]) -> SyscallResult {
 /// Returns: 0 on success, error on failure
 fn sys_clock_gettime(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::{copyin, copyout};
-    use crate::posix::Timespec;
+    use crate::mm::vm::copyout;
     
     let args = extract_args(args, 2)?;
     let clockid = args[0] as i32;
@@ -211,8 +212,7 @@ fn sys_clock_settime(_args: &[u64]) -> SyscallResult {
 /// Returns: 0 on success, error on failure
 fn sys_clock_getres(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::{copyin, copyout};
-    use crate::posix::Timespec;
+    use crate::mm::vm::copyout;
     
     let args = extract_args(args, 2)?;
     let clockid = args[0] as i32;
@@ -266,8 +266,7 @@ fn sys_clock_getres(args: &[u64]) -> SyscallResult {
 /// Real-time aware: Uses high-precision timer for accurate sleep duration
 fn sys_nanosleep(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::{copyin, copyinstr, copyout};
-    use crate::posix::Timespec;
+    use crate::mm::vm::{copyin, copyout};
     
     let args = extract_args(args, 2)?;
     let req_ptr = args[0] as *const Timespec;
@@ -373,7 +372,7 @@ fn sys_getitimer(_args: &[u64]) -> SyscallResult {
 fn sys_timer_create(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
     use crate::mm::vm::{copyin, copyout};
-    use crate::posix::{SigEvent, SIGEV_SIGNAL, TIMER_ABSTIME, CLOCK_REALTIME};
+    use crate::posix::{SigEvent, SIGEV_SIGNAL};
     
     let args = extract_args(args, 3)?;
     let clockid = args[0] as i32;

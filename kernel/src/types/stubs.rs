@@ -4,7 +4,6 @@
 //! haven't been fully implemented yet, allowing compilation to proceed.
 
 extern crate alloc;
-use alloc::string::String;
 use alloc::vec::Vec;
 use heapless::String as HeaplessString;
 
@@ -227,7 +226,7 @@ pub const SOCK_DGRAM: i32 = 2;
 pub const SOCK_RAW: i32 = 3;
 
 // Additional type stubs for re-exporting core atomic types
-pub use core::sync::atomic::{AtomicU32, AtomicU64};
+pub use core::sync::atomic::AtomicU32;
 
 // Device driver trait stubs
 pub trait BlockDevice {

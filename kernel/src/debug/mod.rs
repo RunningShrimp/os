@@ -49,9 +49,7 @@ pub use analyzer::{
     HotspotAnalysisConfig,
 };
 
-pub use plugin::{
-    DebugPlugin, PluginType, PluginConfig, PluginInterface,
-};
+
 
 pub use types::{
     SymbolManager, SymbolTable, SymbolTableType, Symbol, SymbolType, SymbolScope,

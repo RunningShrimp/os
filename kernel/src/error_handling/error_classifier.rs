@@ -15,7 +15,7 @@ use alloc::string::String;
 use alloc::string::ToString;
 use alloc::{format, vec};
 use alloc::boxed::Box;
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::Ordering;
 
 use super::*;
 
@@ -444,7 +444,7 @@ impl ErrorClassifier {
 
     /// 分类错误
     pub fn classify_error(&mut self, error_record: &mut ErrorRecord) -> Result<(), &'static str> {
-        let start_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap_or_default();
+        let _start_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap_or_default();
 
         // 应用分类规则
         let mut best_classification = None;
@@ -533,7 +533,7 @@ impl ErrorClassifier {
             ClassificationCondition::SeverityMatch(severity) => error_record.severity == *severity,
             ClassificationCondition::MessageContains(keyword) => error_record.message.contains(keyword),
             ClassificationCondition::SourceMatch(source) => error_record.source.module.contains(source),
-            ClassificationCondition::ContextMatch(context) => {
+            ClassificationCondition::ContextMatch(_context) => {
                 // 简化的上下文匹配
                 false // 在实际实现中会更复杂
             }
@@ -696,7 +696,10 @@ impl ErrorClassifier {
             ErrorType::ValidationError => 11,
             ErrorType::TimeoutError => 12,
             ErrorType::CancellationError => 13,
-            ErrorType::SystemError => 14, // Added for completeness
+            ErrorType::Data => 14,
+            ErrorType::Protocol => 15,
+            ErrorType::Unknown => 16,
+            ErrorType::SystemError => 17, // Added for completeness
         };
         features.push(Feature {
             name: "error_type".to_string(),

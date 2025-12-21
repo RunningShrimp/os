@@ -157,6 +157,28 @@ pub enum NetworkError {
     ConnectionLimit,
 }
 
+impl From<crate::syscalls::net::types::NetworkError> for NetworkError {
+    fn from(err: crate::syscalls::net::types::NetworkError) -> Self {
+        match err {
+            crate::syscalls::net::types::NetworkError::AddressInUse => NetworkError::AddressInUse,
+            crate::syscalls::net::types::NetworkError::AddressNotAvailable => NetworkError::AddressNotAvailable,
+            crate::syscalls::net::types::NetworkError::NetworkUnreachable => NetworkError::NetworkUnreachable,
+            crate::syscalls::net::types::NetworkError::ConnectionRefused => NetworkError::ConnectionRefused,
+            crate::syscalls::net::types::NetworkError::ConnectionTimeout => NetworkError::ConnectionTimeout,
+            crate::syscalls::net::types::NetworkError::ConnectionReset => NetworkError::ConnectionReset,
+            crate::syscalls::net::types::NetworkError::ConnectionClosed => NetworkError::ConnectionReset,
+            crate::syscalls::net::types::NetworkError::InvalidSocket => NetworkError::ProtocolError,
+            crate::syscalls::net::types::NetworkError::SocketTableFull => NetworkError::ConnectionLimit,
+            crate::syscalls::net::types::NetworkError::ProtocolNotSupported => NetworkError::ProtocolError,
+            crate::syscalls::net::types::NetworkError::AddressFamilyNotSupported => NetworkError::ProtocolError,
+            crate::syscalls::net::types::NetworkError::PermissionDenied => NetworkError::HostUnreachable,
+            crate::syscalls::net::types::NetworkError::BufferSpaceInsufficient => NetworkError::BandwidthLimit,
+            crate::syscalls::net::types::NetworkError::UnsupportedSyscall => NetworkError::ProtocolError,
+            crate::syscalls::net::types::NetworkError::InvalidArgument => NetworkError::ProtocolError,
+        }
+    }
+}
+
 /// 进程错误类型
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProcessError {
@@ -354,6 +376,8 @@ pub enum ResourceError {
     ResourceNotFound,
     /// 资源忙
     ResourceBusy,
+    /// 资源已存在
+    ResourceExists,
     /// 资源不可用
     ResourceUnavailable,
     /// 资源配额超出
@@ -660,6 +684,72 @@ impl UnifiedError {
         error
     }
 
+    /// 获取错误类型
+    pub fn error_type(&self) -> ErrorType {
+        match self {
+            UnifiedError::Syscall(_) => ErrorType::SystemCallError,
+            UnifiedError::Memory(_) => ErrorType::MemoryError,
+            UnifiedError::FileSystem(_) => ErrorType::IOError,
+            UnifiedError::Network(_) => ErrorType::NetworkError,
+            UnifiedError::Process(_) => ErrorType::RuntimeError,
+            UnifiedError::Device(_) => ErrorType::ResourceError,
+            UnifiedError::Security(_) => ErrorType::PermissionError,
+            UnifiedError::Configuration(_) => ErrorType::ConfigurationError,
+            UnifiedError::Hardware(_) => ErrorType::ResourceError,
+            UnifiedError::Timeout(_) => ErrorType::TimeoutError,
+            UnifiedError::Data(_) => ErrorType::Data,
+            UnifiedError::Protocol(_) => ErrorType::Protocol,
+            UnifiedError::Resource(_) => ErrorType::ResourceError,
+            UnifiedError::User(_) => ErrorType::RuntimeError,
+            UnifiedError::Interface(_) => ErrorType::ResourceError,
+            UnifiedError::Unknown(_) => ErrorType::Unknown,
+        }
+    }
+
+    /// 获取错误代码
+    pub fn error_code(&self) -> u32 {
+        match self {
+            UnifiedError::Syscall(err) => err.as_error_code(),
+            UnifiedError::Memory(_) => 0x2000,
+            UnifiedError::FileSystem(_) => 0x3000,
+            UnifiedError::Network(_) => 0x4000,
+            UnifiedError::Process(_) => 0x5000,
+            UnifiedError::Device(_) => 0x6000,
+            UnifiedError::Security(_) => 0x7000,
+            UnifiedError::Configuration(_) => 0x8000,
+            UnifiedError::Hardware(_) => 0x9000,
+            UnifiedError::Timeout(_) => 0xA000,
+            UnifiedError::Data(_) => 0xB000,
+            UnifiedError::Protocol(_) => 0xC000,
+            UnifiedError::Resource(_) => 0xD000,
+            UnifiedError::User(_) => 0xE000,
+            UnifiedError::Interface(_) => 0xF000,
+            UnifiedError::Unknown(_) => 0xFFFF,
+        }
+    }
+
+    /// 获取错误消息
+    pub fn message(&self) -> String {
+        match self {
+            UnifiedError::Syscall(err) => format!("System call error: {:?}", err),
+            UnifiedError::Memory(err) => format!("Memory error: {:?}", err),
+            UnifiedError::FileSystem(err) => format!("Filesystem error: {:?}", err),
+            UnifiedError::Network(err) => format!("Network error: {:?}", err),
+            UnifiedError::Process(err) => format!("Process error: {:?}", err),
+            UnifiedError::Device(err) => format!("Device error: {:?}", err),
+            UnifiedError::Security(err) => format!("Security error: {:?}", err),
+            UnifiedError::Configuration(err) => format!("Configuration error: {:?}", err),
+            UnifiedError::Hardware(err) => format!("Hardware error: {:?}", err),
+            UnifiedError::Timeout(err) => format!("Timeout error: {:?}", err),
+            UnifiedError::Data(err) => format!("Data error: {:?}", err),
+            UnifiedError::Protocol(err) => format!("Protocol error: {:?}", err),
+            UnifiedError::Resource(err) => format!("Resource error: {:?}", err),
+            UnifiedError::User(err) => format!("User error: {:?}", err),
+            UnifiedError::Interface(err) => format!("Interface error: {:?}", err),
+            UnifiedError::Unknown(err) => format!("Unknown error: {:?}", err),
+        }
+    }
+
     /// 获取错误类型名称
     pub fn error_type_name(&self) -> &'static str {
         match self {
@@ -694,7 +784,9 @@ impl UnifiedError {
                 SyscallError::Interrupted => ErrorSeverity::Info,
                 SyscallError::IoError => ErrorSeverity::Error,
                 SyscallError::WouldBlock => ErrorSeverity::Info,
+                SyscallError::Again => ErrorSeverity::Info,
                 SyscallError::NotSupported => ErrorSeverity::Warning,
+                SyscallError::NotImplemented => ErrorSeverity::Warning,
                 SyscallError::BadFileDescriptor => ErrorSeverity::Error,
                 SyscallError::TooManyOpenFiles => ErrorSeverity::Error,
                 SyscallError::NoBufferSpace => ErrorSeverity::Warning,
@@ -713,6 +805,7 @@ impl UnifiedError {
                 SyscallError::ConnectionReset => ErrorSeverity::Error,
                 SyscallError::BrokenPipe => ErrorSeverity::Error,
                 SyscallError::TimedOut => ErrorSeverity::Warning,
+                SyscallError::ResourceBusy => ErrorSeverity::Warning,
             },
             UnifiedError::Memory(mem_err) => match mem_err {
                 MemoryError::OutOfMemory => ErrorSeverity::Critical,
@@ -849,6 +942,7 @@ impl UnifiedError {
                 ResourceError::ResourceExhausted => ErrorSeverity::Critical,
                 ResourceError::ResourceNotFound => ErrorSeverity::Warning,
                 ResourceError::ResourceBusy => ErrorSeverity::Warning,
+                ResourceError::ResourceExists => ErrorSeverity::Warning,
                 ResourceError::ResourceUnavailable => ErrorSeverity::Error,
                 ResourceError::ResourceQuotaExceeded => ErrorSeverity::Error,
                 ResourceError::ResourcePermissionError => ErrorSeverity::Error,
@@ -921,11 +1015,13 @@ impl UnifiedError {
             signature.source_line
         );
         
+        // Simple hash calculation for fingerprint
         let fingerprint_hash = {
-            use core::hash::{Hash, Hasher};
-            let mut hasher = DefaultHasherBuilder.build_hasher();
-            fingerprint_data.hash(&mut hasher);
-            hasher.finish()
+            let mut hash = 0u64;
+            for byte in fingerprint_data.as_bytes() {
+                hash = hash.wrapping_mul(31).wrapping_add(*byte as u64);
+            }
+            hash
         };
         
         ErrorFingerprint {
@@ -977,7 +1073,7 @@ impl UnifiedError {
                 classification_type: ClassificationType::UnknownIssue,
                 severity: self.severity(),
                 urgency: Urgency::Medium,
-                impact_scope: ImpactScope::Local,
+                impact_scope: super::error_classifier::ImpactScope::Local,
                 recovery_complexity: RecoveryComplexity::Medium,
                 requires_immediate_action: self.severity() >= ErrorSeverity::Error,
                 auto_recoverable: self.severity() < ErrorSeverity::Critical,
@@ -1013,6 +1109,14 @@ impl From<KernelError> for UnifiedError {
             KernelError::AlreadyExists => UnifiedError::FileSystem(FileSystemError::FileExists),
             KernelError::ResourceBusy => UnifiedError::Resource(ResourceError::ResourceBusy),
             KernelError::Timeout => UnifiedError::Timeout(TimeoutError::OperationTimeout),
+            KernelError::Network(net_err) => UnifiedError::Network(net_err.into()),
+            KernelError::ServiceAlreadyExists => UnifiedError::Resource(ResourceError::ResourceExists),
+            KernelError::ServiceNotFound => UnifiedError::Resource(ResourceError::ResourceNotFound),
+            KernelError::ServiceHasDependents => UnifiedError::Resource(ResourceError::ResourceBusy),
+            KernelError::DependencyNotFound(_, _) => UnifiedError::Resource(ResourceError::ResourceNotFound),
+            KernelError::CircularDependency(_) => UnifiedError::Resource(ResourceError::ResourceBusy),
+            KernelError::Unknown => UnifiedError::Unknown(UnknownError::UnknownErrorCode(0)),
+            KernelError::UnsupportedSyscall => UnifiedError::Interface(InterfaceError::InterfaceUnavailable),
         }
     }
 }
@@ -1061,6 +1165,7 @@ impl From<UnifiedError> for KernelError {
                 ResourceError::ResourceExhausted => KernelError::OutOfMemory,
                 ResourceError::ResourceNotFound => KernelError::NotFound,
                 ResourceError::ResourceBusy => KernelError::ResourceBusy,
+                ResourceError::ResourceExists => KernelError::AlreadyExists,
                 ResourceError::ResourceUnavailable => KernelError::NotSupported,
                 ResourceError::ResourceQuotaExceeded => KernelError::ResourceBusy,
                 ResourceError::ResourcePermissionError => KernelError::PermissionDenied,

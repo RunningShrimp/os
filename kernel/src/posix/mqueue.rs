@@ -261,7 +261,7 @@ fn send_notification(mq: &MessageQueue) {
 pub extern "C" fn mq_open(
     name: *const i8,
     oflag: i32,
-    mode: crate::posix::Mode,
+    _mode: crate::posix::Mode,
     attr: *const MqAttr,
 ) -> i32 {
     // Convert name to string

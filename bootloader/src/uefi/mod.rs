@@ -3,20 +3,23 @@
 //! This module provides a comprehensive UEFI 2.10 implementation for the NOS bootloader,
 //! supporting all major UEFI protocols and features.
 
+extern crate alloc;
+
+use alloc::string::String;
+
 pub mod main;
 pub mod memory;
-pub mod protocol;
 pub mod secure_boot;
 
 // Re-export main components
 #[cfg(feature = "uefi_support")]
-pub use main::*;
+pub use self::main::*;
 #[cfg(feature = "uefi_support")]
-pub use memory::*;
+pub use self::memory::*;
 #[cfg(feature = "uefi_support")]
-pub use secure_boot::*;
+pub use self::secure_boot::*;
 #[cfg(feature = "uefi_support")]
-pub use super::protocol::uefi::*;
+pub use crate::protocol::uefi::{UefiProtocol, set_active_protocol, get_active_protocol};
 
 // Version information
 pub const UEFI_VERSION_MAJOR: u16 = 2;

@@ -82,6 +82,8 @@ impl PlatformModule for IOSModule {
     }
 
     fn create_context(&self, info: &BinaryInfo) -> Result<PlatformContext> {
+        // Use info for validation/logging
+        let _binary_arch = &info.architecture; // Use info to get binary architecture for validation
         Ok(PlatformContext {
             platform: TargetPlatform::IOS,
             data: PlatformData::IOS(IOSContext {

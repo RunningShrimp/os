@@ -8,8 +8,7 @@ extern crate alloc;
 use hashbrown::{HashMap, HashSet};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use alloc::string::String;
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::Ordering;
 use spin::Mutex;
 
 use super::*;

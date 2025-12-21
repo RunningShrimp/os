@@ -9,9 +9,8 @@ use hashbrown::{HashMap, HashSet};
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use alloc::string::String;
 use alloc::{format, vec};
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::Ordering;
 use spin::Mutex;
 use crate::compat::DefaultHasherBuilder;
 

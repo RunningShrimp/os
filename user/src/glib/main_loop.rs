@@ -12,11 +12,13 @@
 
 extern crate alloc;
 
-use crate::glib::{types::*, collections::*, constants::*, error::GError, g_free, g_malloc, g_malloc0, get_state_mut};
+use crate::glib::{types::*, collections::*, constants::*, error::GError, g_free, g_malloc, g_malloc0};
 use alloc::{collections::{BTreeMap, VecDeque}, vec::Vec};
 use core::ptr::{self, NonNull};
 use core::ffi::c_void;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+// Note: In no_std environment, we need to use alternative synchronization
+// For now, we'll use a simple approach without Mutex for static variables
 
 
 /// 主上下文状态
@@ -150,7 +152,7 @@ pub fn init() -> Result<(), GError> {
     glib_println!("[glib_main_loop] 初始化主循环系统");
 
     unsafe {
-        NEXT_GLOBAL_SOURCE_ID.store(1, Ordering::SeqCst);
+        (*(&raw mut NEXT_GLOBAL_SOURCE_ID)).store(1, Ordering::SeqCst);
     }
 
     glib_println!("[glib_main_loop] 主循环系统初始化完成");
@@ -243,7 +245,7 @@ unsafe fn g_main_context_cleanup(context: *mut GMainContext) {
 }
 
 /// 创建新的主循环
-pub fn g_main_loop_new(context: *mut GMainContext, is_running: gboolean) -> *mut GMainLoop {
+pub fn g_main_loop_new(mut context: *mut GMainContext, is_running: gboolean) -> *mut GMainLoop {
     if context.is_null() {
         context = g_main_context_default();
         if context.is_null() {
@@ -462,7 +464,7 @@ unsafe fn g_main_context_poll(context: *mut GMainContext, timeout: i32) -> i32 {
 
         // 处理事件
         for i in 0..result as usize {
-            let event = unsafe { *events_ptr.add(i) };
+            let event = unsafe { events_ptr.add(i).read() };
 
             // 查找对应的事件源并分发
             for (_, source) in (*context).sources.iter() {
@@ -532,7 +534,10 @@ pub fn g_source_attach(source: *mut GSource, context: *mut GMainContext) -> guin
 
     unsafe {
         // 分配事件源ID
-        let source_id = NEXT_GLOBAL_SOURCE_ID.fetch_add(1, Ordering::SeqCst) as guint;
+        let source_id = unsafe {
+            let ptr = core::ptr::addr_of!(NEXT_GLOBAL_SOURCE_ID);
+            (*ptr).fetch_add(1, Ordering::SeqCst)
+        } as guint;
         (*source).source_id = source_id;
         (*source).context = context;
 

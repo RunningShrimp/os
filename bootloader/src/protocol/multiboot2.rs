@@ -612,6 +612,7 @@ mod tests {
         assert_eq!(module_entry.end, 0x200000);
         assert_eq!(module_entry.cmdline, 0x300000);
 
+extern crate alloc;
         let fb_info = create_framebuffer_info(
             1024, 768, 32, 4096, 0xE0000000, Multiboot2FramebufferType::RGB
         );

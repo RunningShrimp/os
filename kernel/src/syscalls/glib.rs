@@ -1390,7 +1390,7 @@ fn sys_signalfd4(args: &[u64]) -> SyscallResult {
     }
 
     // Get current process
-    let pid = crate::process::myproc().ok_or(SyscallError::NotFound)? as usize;
+    let pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
     let proc_table = crate::process::manager::PROC_TABLE.lock();
     let proc = proc_table.find_ref(pid).ok_or(SyscallError::NotFound)?;
     let pagetable = proc.pagetable;

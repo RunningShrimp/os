@@ -31,6 +31,7 @@
 
 #![no_std]
 #![allow(dead_code)]
+#![allow(missing_docs)]
 
 #[macro_use]
 extern crate alloc;

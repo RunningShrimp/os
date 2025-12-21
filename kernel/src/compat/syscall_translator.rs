@@ -500,7 +500,7 @@ impl SyscallTranslator {
     fn create_linux_translation_table(&self) -> Result<TranslationTable> {
         let mut name_to_number = BTreeMap::new();
         let mut number_translation = BTreeMap::new();
-        let mut special_handlers: BTreeMap<u32, Box<dyn SpecialHandler + Send + Sync>> = BTreeMap::new();
+        let special_handlers: BTreeMap<u32, Box<dyn SpecialHandler + Send + Sync>> = BTreeMap::new();
 
         // File I/O syscalls (most common)
         number_translation.insert(0, crate::syscalls::SYS_READ as usize);   // sys_read
@@ -1040,9 +1040,9 @@ impl SyscallTranslator {
 
     /// Create Windows translation table
     fn create_windows_translation_table(&self) -> Result<TranslationTable> {
-        let mut name_to_number = BTreeMap::new();
-        let mut number_translation = BTreeMap::new();
-        let mut special_handlers: BTreeMap<u32, Box<dyn SpecialHandler + Send + Sync>> = BTreeMap::new();
+        let name_to_number = BTreeMap::new();
+        let number_translation = BTreeMap::new();
+        let special_handlers: BTreeMap<u32, Box<dyn SpecialHandler + Send + Sync>> = BTreeMap::new();
 
         // Windows has a different syscall mechanism
         // We would map Windows API calls to NOS syscalls here
@@ -1057,9 +1057,9 @@ impl SyscallTranslator {
 
     /// Create macOS translation table
     fn create_macos_translation_table(&self) -> Result<TranslationTable> {
-        let mut name_to_number = BTreeMap::new();
-        let mut number_translation = BTreeMap::new();
-        let mut special_handlers: BTreeMap<u32, Box<dyn SpecialHandler + Send + Sync>> = BTreeMap::new();
+        let name_to_number = BTreeMap::new();
+        let number_translation = BTreeMap::new();
+        let special_handlers: BTreeMap<u32, Box<dyn SpecialHandler + Send + Sync>> = BTreeMap::new();
 
         // macOS syscall mappings
         // These would be based on the xnu kernel syscall table
@@ -1103,7 +1103,7 @@ impl SyscallTranslator {
         for (_, cached) in cache.iter() {
             if cached.usage_count > 100 { // Hot path threshold
                 // JIT compile this syscall
-                let mut jit = self.jit_compiler.lock();
+                let _jit = self.jit_compiler.lock();
                 // jit.compile_syscall(cached)?; // Would implement actual compilation
             }
         }

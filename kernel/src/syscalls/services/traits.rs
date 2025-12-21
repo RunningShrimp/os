@@ -8,6 +8,7 @@
 //! 这些特征为依赖注入和服务发现机制提供了统一的接口规范。
 
 use alloc::{boxed::Box, string::String, vec::Vec};
+use core::any::Any;
 
 use crate::error_handling::unified::KernelError;
 
@@ -16,6 +17,19 @@ use crate::error_handling::unified::KernelError;
 /// 所有服务都必须实现此特征，提供基本的服务标识和状态管理功能。
 /// 支持服务的初始化、启动、停止和销毁等生命周期操作。
 pub trait Service: Send + Sync {
+    /// 获取服务的Any引用，用于向下转型
+    ///
+    /// 这个方法允许将服务实例向下转型为具体类型。
+    /// 实现者应该返回self的Any引用。
+    fn as_any(&self) -> &dyn Any;
+
+    /// 获取服务的SyscallService引用（如果适用）
+    ///
+    /// 这个方法允许将服务向下转型为SyscallService类型。
+    /// 默认实现返回None，需要实现SyscallService trait的服务应覆盖此方法。
+    fn as_syscall_service(&self) -> Option<&dyn SyscallService> {
+        None
+    }
     /// 获取服务名称
     ///
     /// 返回服务的唯一标识符，用于服务注册和发现。
@@ -138,6 +152,12 @@ pub trait SyscallService: Service {
     fn priority(&self) -> u32 {
         100 // 默认优先级
     }
+
+    /// 获取服务的SyscallService引用
+    ///
+    /// 这个方法允许将服务向下转型为SyscallService类型。
+    /// SyscallService trait的实现者必须提供此方法。
+    fn as_syscall_service(&self) -> Option<&dyn SyscallService>;
 }
 
 /// 服务生命周期管理特征

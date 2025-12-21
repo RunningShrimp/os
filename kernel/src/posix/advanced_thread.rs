@@ -14,7 +14,7 @@ use core::sync::atomic::{AtomicUsize, AtomicU64, Ordering};
 use core::ptr;
 
 /// Thread attribute structure
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ThreadAttr {
     /// Scheduling policy
     pub sched_policy: i32,
@@ -177,7 +177,6 @@ unsafe impl Send for ThreadAttr {}
 unsafe impl Sync for ThreadAttr {}
 
 /// Barrier synchronization primitive
-#[derive(Debug)]
 pub struct Barrier {
     /// Number of threads required to reach the barrier
     pub required: AtomicUsize,
@@ -383,7 +382,7 @@ pub struct SpinlockStats {
 }
 
 /// Thread CPU clock information
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ThreadClock {
     /// Thread ID
     pub thread_id: Pid,
@@ -484,7 +483,6 @@ pub enum ThreadError {
 pub static THREAD_REGISTRY: Mutex<ThreadRegistry> = Mutex::new(ThreadRegistry::new());
 
 /// Thread registry for managing advanced thread features
-#[derive(Debug)]
 pub struct ThreadRegistry {
     /// Map from thread ID to thread attributes
     pub thread_attrs: BTreeMap<Pid, ThreadAttr>,

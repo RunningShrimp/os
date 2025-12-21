@@ -5,6 +5,8 @@
 
 use crate::error::{BootError, Result};
 use core::ptr;
+use alloc::vec::Vec;
+use alloc::string::String;
 
 #[cfg(feature = "uefi_support")]
 use uefi::prelude::*;
@@ -417,6 +419,7 @@ impl SecureBootManager {
     }
 }
 
+extern crate alloc;
 #[cfg(not(feature = "uefi_support"))]
 #[derive(Debug, Clone)]
 pub struct SecureBootStatus {

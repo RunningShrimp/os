@@ -43,7 +43,7 @@ impl PlatformModule for WindowsModule {
         matches!(info.format, BinaryFormat::Pe)
     }
 
-    fn load_binary(&mut self, mut info: BinaryInfo) -> Result<LoadedBinary> {
+    fn load_binary(&mut self, info: BinaryInfo) -> Result<LoadedBinary> {
         // Validate required DLLs (simplified)
 
         // Create placeholder memory regions
@@ -77,6 +77,8 @@ impl PlatformModule for WindowsModule {
     }
 
     fn create_context(&self, info: &BinaryInfo) -> Result<PlatformContext> {
+        // Use info for validation/logging
+        let _binary_arch = &info.architecture; // Use info to get binary architecture for validation
         Ok(PlatformContext {
             platform: TargetPlatform::Windows,
             data: PlatformData::Windows(WindowsContext {

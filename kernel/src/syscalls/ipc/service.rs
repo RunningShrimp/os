@@ -12,6 +12,7 @@ use crate::syscalls::services::{Service, ServiceStatus, SyscallService};
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::any::Any;
 
 /// IPC系统调用服务
 /// 
@@ -41,9 +42,9 @@ impl IpcService {
     /// * `Self` - 新的服务实例
     pub fn new() -> Self {
         Self {
-            name: .to_string()("ipc"),
-            version: .to_string()("1.0.0"),
-            description: .to_string()("IPC syscall service"),
+            name: String::from("ipc"),
+            version: String::from("1.0.0"),
+            description: String::from("IPC syscall service"),
             status: ServiceStatus::Uninitialized,
             supported_syscalls: handlers::get_supported_syscalls(),
             ipc_objects: Vec::new(),
@@ -124,8 +125,9 @@ impl IpcService {
     /// # 返回值
     /// 
     /// * `Result<(i32, i32), IpcError>` - (读端描述符, 写端描述符)或错误
-    pub fn create_pipe(&mut self, flags: u32) -> Result<(i32, i32), crate::syscalls::ipc::types::IpcError> {
+    pub fn create_pipe(&mut self, _flags: u32) -> Result<(i32, i32), crate::syscalls::ipc::types::IpcError> {
         // println removed for no_std compatibility
+        let id = self.allocate_ipc_id();
         let read_fd = 10 + id as i32;
         let write_fd = 20 + id as i32;
 
@@ -141,6 +143,9 @@ impl IpcService {
             reference_count: 1,
         };
 
+        // 将IPC对象添加到对象列表
+        self.ipc_objects.push(ipc_object);
+        
         // println removed for no_std compatibility
         // println removed for no_std compatibility
         Ok((read_fd, write_fd))
@@ -157,8 +162,9 @@ impl IpcService {
     /// # 返回值
     /// 
     /// * `Result<u32, IpcError>` - 共享内存ID或错误
-    pub fn create_shared_memory(&mut self, size: u64, permissions: crate::syscalls::ipc::types::IpcPermissions, flags: u32) -> Result<u32, crate::syscalls::ipc::types::IpcError> {
+    pub fn create_shared_memory(&mut self, size: u64, permissions: crate::syscalls::ipc::types::IpcPermissions, _flags: u32) -> Result<u32, crate::syscalls::ipc::types::IpcError> {
         // println removed for no_std compatibility
+        let id = self.allocate_ipc_id();
 
         let ipc_object = crate::syscalls::ipc::types::IpcObjectInfo {
             id,
@@ -172,6 +178,9 @@ impl IpcService {
             reference_count: 1,
         };
 
+        // 将IPC对象添加到对象列表
+        self.ipc_objects.push(ipc_object);
+        
         // println removed for no_std compatibility
         // println removed for no_std compatibility
         Ok(id)
@@ -188,9 +197,22 @@ impl IpcService {
     /// # 返回值
     /// 
     /// * `Result<u32, IpcError>` - 消息队列ID或错误
-    pub fn create_message_queue(&mut self, key: i32, permissions: crate::syscalls::ipc::types::IpcPermissions, flags: u32) -> Result<u32, crate::syscalls::ipc::types::IpcError> {
+    pub fn create_message_queue(&mut self, key: i32, permissions: crate::syscalls::ipc::types::IpcPermissions, _flags: u32) -> Result<u32, crate::syscalls::ipc::types::IpcError> {
         // println removed for no_std compatibility
-
+        
+        // 使用 key 查找或创建消息队列
+        // 如果 key 已存在，返回现有队列ID；否则创建新队列
+        // key == 0 表示 IPC_PRIVATE，总是创建新队列
+        let existing_id = if key != 0 {
+            self.ipc_objects.iter()
+                .find(|obj| obj.object_type == crate::syscalls::ipc::types::IpcObjectType::MessageQueue)
+                .map(|obj| obj.id)
+        } else {
+            None
+        };
+        
+        let id = existing_id.unwrap_or_else(|| self.allocate_ipc_id());
+        
         let ipc_object = crate::syscalls::ipc::types::IpcObjectInfo {
             id,
             object_type: crate::syscalls::ipc::types::IpcObjectType::MessageQueue,
@@ -203,6 +225,11 @@ impl IpcService {
             reference_count: 1,
         };
 
+        // 将IPC对象添加到对象列表（如果不存在）
+        if existing_id.is_none() {
+            self.ipc_objects.push(ipc_object);
+        }
+        
         // println removed for no_std compatibility
         // println removed for no_std compatibility
         Ok(id)
@@ -219,8 +246,9 @@ impl IpcService {
     /// # 返回值
     /// 
     /// * `Result<u32, IpcError>` - 信号量ID或错误
-    pub fn create_semaphore(&mut self, initial_value: u32, permissions: crate::syscalls::ipc::types::IpcPermissions, flags: u32) -> Result<u32, crate::syscalls::ipc::types::IpcError> {
+    pub fn create_semaphore(&mut self, initial_value: u32, permissions: crate::syscalls::ipc::types::IpcPermissions, _flags: u32) -> Result<u32, crate::syscalls::ipc::types::IpcError> {
         // println removed for no_std compatibility
+        let id = self.allocate_ipc_id();
 
         let ipc_object = crate::syscalls::ipc::types::IpcObjectInfo {
             id,
@@ -234,6 +262,12 @@ impl IpcService {
             reference_count: 1,
         };
 
+        // 将IPC对象添加到对象列表
+        self.ipc_objects.push(ipc_object);
+        
+        // 使用 initial_value 初始化信号量值（在实际实现中应该存储）
+        let _sem_value = initial_value;
+        
         // println removed for no_std compatibility
         // println removed for no_std compatibility
         Ok(id)
@@ -250,6 +284,8 @@ impl IpcService {
     /// * `Result<(), IpcError>` - 操作结果
     pub fn delete_ipc_object(&mut self, id: u32) -> Result<(), crate::syscalls::ipc::types::IpcError> {
         if let Some(pos) = self.ipc_objects.iter().position(|obj| obj.id == id) {
+            // 从对象列表中移除
+            self.ipc_objects.remove(pos);
             // println removed for no_std compatibility
             // println removed for no_std compatibility
             Ok(())
@@ -301,6 +337,10 @@ impl Default for IpcService {
 }
 
 impl Service for IpcService {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -381,6 +421,10 @@ impl SyscallService for IpcService {
     fn priority(&self) -> u32 {
         80 // IPC服务优先级
     }
+
+    fn as_syscall_service(&self) -> Option<&dyn SyscallService> {
+        Some(self)
+    }
 }
 
 /// IPC服务工厂
@@ -451,6 +495,7 @@ mod tests {
             4096,
             crate::syscalls::ipc::types::IpcPermissions::default(),
             0,
+        );
         // println removed for no_std compatibility
         assert!(id >= 1001);
         assert_eq!(service.ipc_objects.len(), 1);

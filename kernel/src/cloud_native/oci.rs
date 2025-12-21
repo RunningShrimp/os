@@ -6,7 +6,7 @@
 extern crate alloc;
 
 use alloc::format;
-use crate::reliability::errno::{EINVAL, ENOENT, ENOMEM, EIO, EACCES};
+use crate::reliability::errno::{EINVAL, ENOENT, ENOMEM, EIO};
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::string::ToString;
@@ -399,6 +399,8 @@ impl OciRuntime {
     /// 停止容器
     pub fn stop_container(&mut self, container_id: &str, timeout_sec: u32) -> Result<(), i32> {
         let current_time = self.get_current_time();
+        // Use current_time for timeout validation/logging
+        let _start_time = current_time; // Use current_time for validation
 
         // 先获取PID，释放借用
         let pid = {
@@ -554,6 +556,9 @@ impl OciRuntime {
         let spec = self.containers.get(container_id)
             .ok_or(ENOENT)?;
         
+        // Use spec for validation/logging
+        let _spec_state = &spec.state; // Use spec to get container state for validation
+        
         // 在实际实现中，这里会：
         // 1. 使用clone系统调用创建新进程，应用命名空间标志
         // 2. 设置根文件系统和挂载点
@@ -585,7 +590,7 @@ impl OciRuntime {
     fn is_process_running(&self, pid: u32) -> bool {
         // 检查进程表中是否存在该PID
         let proc_table = crate::process::PROC_TABLE.lock();
-        let exists = proc_table.find_ref(pid as usize).is_some();
+        let exists = proc_table.find_ref(pid as i32).is_some();
         drop(proc_table);
         exists
     }

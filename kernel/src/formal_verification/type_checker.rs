@@ -13,7 +13,7 @@ use alloc::string::String;
 use alloc::string::ToString;
 use alloc::{format, vec};
 use alloc::boxed::Box;
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::Ordering;
 use spin::Mutex;
 use crate::compat::DefaultHasherBuilder;
 
@@ -671,7 +671,7 @@ impl TypeChecker {
 
     /// 检查单个目标
     fn check_target(&mut self, target: &VerificationTarget) -> Result<VerificationResult, &'static str> {
-        let start_time_ms = 0u64; // TODO: Implement proper timestamp
+        let _start_time_ms = 0u64; // TODO: Implement proper timestamp
 
         // 模拟类型检查过程
         let mut type_errors = Vec::new();

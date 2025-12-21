@@ -13,7 +13,7 @@ use alloc::string::String;
 use alloc::string::ToString;
 use alloc::{format, vec};
 use alloc::boxed::Box;
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::Ordering;
 use spin::Mutex;
 use crate::compat::DefaultHasherBuilder;
 
@@ -162,7 +162,7 @@ impl VerificationPipeline {
             return Err("Verification pipeline is not running");
         }
 
-        let start_time_ms = 0u64; // TODO: Implement proper timestamp
+        let _start_time_ms = 0u64; // TODO: Implement proper timestamp
         let mut all_results = Vec::new();
 
         // 按顺序执行各个验证阶段 - 使用索引避免借用冲突

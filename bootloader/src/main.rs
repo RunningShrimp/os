@@ -9,6 +9,8 @@
 #![feature(panic_info_message)]
 #![allow(unsafe_op_in_unsafe_fn)]
 
+extern crate alloc;
+
 // Core modules
 mod arch;
 mod error;
@@ -17,31 +19,27 @@ mod protocol;
 
 // Architecture-specific modules
 #[cfg(target_arch = "x86_64")]
-mod x86_64;
+use arch::x86_64;
 #[cfg(target_arch = "aarch64")]
-mod aarch64;
+use arch::aarch64;
 #[cfg(target_arch = "riscv64")]
-mod riscv64;
+use arch::riscv64;
 
 // Protocol-specific modules
 #[cfg(feature = "uefi_support")]
 mod uefi;
 #[cfg(feature = "bios_support")]
-mod bios;
+use protocol::bios;
 
 // Feature-specific modules
 #[cfg(feature = "graphics_support")]
 mod graphics;
 #[cfg(feature = "menu_support")]
-mod menu;
+mod boot_menu;
 #[cfg(feature = "network_support")]
 mod network;
 #[cfg(feature = "recovery_support")]
 mod recovery;
-
-// UEFI-specific module
-#[cfg(feature = "uefi_support")]
-mod uefi;
 
 // Boot protocol modules
 mod kernel;
@@ -174,7 +172,7 @@ fn load_and_boot_kernel(kernel_path: &str) -> Result<()> {
     let boot_info = state.protocol_manager.get_boot_info()?;
 
     // Create boot parameters for the kernel
-    let boot_params = kernel::BootParameters::new(&boot_info, &kernel_image);
+    let boot_params = kernel::KernelBootParameters::new(&boot_info, &kernel_image);
 
     println!("Kernel loaded successfully");
     println!("Entry point: {:#x}", kernel_image.entry_point);

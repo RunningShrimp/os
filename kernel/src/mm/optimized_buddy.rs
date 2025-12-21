@@ -324,7 +324,7 @@ impl OptimizedBuddyAllocator {
     /// Get allocator statistics
     pub fn stats(&self) -> AllocatorStats {
         // Calculate fragmentation
-        let mut used_memory = self.statistics.allocated - self.statistics.freed;
+        let used_memory = self.statistics.allocated - self.statistics.freed;
         let total_memory = self.heap_end - self.heap_start;
         let fragmentation = if total_memory > 0 {
             ((total_memory - used_memory) * 100) / total_memory

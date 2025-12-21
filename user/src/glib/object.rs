@@ -12,7 +12,7 @@
 
 extern crate alloc;
 
-use crate::glib::{types::*, collections::*, error::GError, g_free, g_malloc, g_malloc0, get_state_mut};
+use crate::glib::{types::*, collections::*, error::GError, g_free, g_malloc, g_malloc0};
 use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use core::ptr::{self, NonNull};
 use core::ffi::c_void;
@@ -239,7 +239,7 @@ pub fn init() -> Result<(), GError> {
 /// 注册GObject基础类型
 fn register_gobject_type() -> Result<(), GError> {
     let type_info = GObjectTypeInfo {
-        name: "GObject"String::from(),
+        name: String::from("GObject"),
         parent_type: G_TYPE_NONE,
         type_size: core::mem::size_of::<GObject>(),
         class_size: core::mem::size_of::<GObjectClass>(),

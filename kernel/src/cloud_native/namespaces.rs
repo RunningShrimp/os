@@ -6,7 +6,7 @@
 extern crate alloc;
 
 use alloc::format;
-use crate::reliability::errno::{EINVAL, ENOENT, ENOMEM, EIO, EPERM, EACCES};
+use crate::reliability::errno::{EINVAL, ENOENT, ENOMEM, EIO};
 use crate::cloud_native::oci::OciLinuxNamespaceType;
 use alloc::collections::BTreeMap;
 use alloc::string::String;

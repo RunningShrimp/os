@@ -53,7 +53,7 @@ fn sys_sigqueue(args: &[u64]) -> SyscallResult {
     };
 
     // Check permissions (simplified - in real implementation would check UID/GID)
-    if pid as usize != current_pid && pid != 0 {
+    if pid != current_pid && pid != 0 {
         // Only allow sending to self or init process (PID 0) for now
         return Err(SyscallError::PermissionDenied);
     }
@@ -177,7 +177,7 @@ fn sys_sigtimedwait(args: &[u64]) -> SyscallResult {
         Ok(info) => {
             // Copy signal info back to user space
             if info_ptr != 0 {
-                let info_data = unsafe { core::mem::transmute::<SigInfoT, [u8; 128]>(info) };
+                let info_data = unsafe { core::mem::transmute::<SigInfoT, [u8; core::mem::size_of::<SigInfoT>()]>(info) };
                 
                 unsafe {
                     match crate::mm::vm::copyout(pagetable, info_ptr, info_data.as_ptr(), info_data.len()) {
@@ -252,8 +252,8 @@ fn sys_sigwaitinfo(args: &[u64]) -> SyscallResult {
         Ok(info) => {
             // Copy signal info back to user space
             if info_ptr != 0 {
-                let info_data = unsafe { core::mem::transmute::<SigInfoT, [u8; 128]>(info) };
-                
+                let info_data = unsafe { core::mem::transmute::<SigInfoT, [u8; core::mem::size_of::<SigInfoT>()]>(info) };
+
                 unsafe {
                     match crate::mm::vm::copyout(pagetable, info_ptr, info_data.as_ptr(), info_data.len()) {
                         Ok(_) => {},
@@ -261,10 +261,12 @@ fn sys_sigwaitinfo(args: &[u64]) -> SyscallResult {
                     }
                 }
             }
-            
+
             Ok(0)
         }
         Err(SignalWaitError::ProcessNotFound) => Err(SyscallError::NotFound),
+        Err(SignalWaitError::Timeout) => Err(SyscallError::Again),
+        Err(SignalWaitError::InvalidTimeout) => Err(SyscallError::InvalidArgument),
         Err(SignalWaitError::Interrupted) => Err(SyscallError::Interrupted),
         Err(SignalWaitError::InvalidMask) => Err(SyscallError::InvalidArgument),
     }
@@ -359,6 +361,7 @@ fn sys_sigaltstack(args: &[u64]) -> SyscallResult {
         Err(SignalStackError::AllocationFailed) => Err(SyscallError::OutOfMemory),
         Err(SignalStackError::StackInUse) => Err(SyscallError::InvalidArgument),
         Err(SignalStackError::NoAlternateStack) => Err(SyscallError::BadAddress),
+        Err(SignalStackError::NotSupported) => Err(SyscallError::NotImplemented),
     }
 }
 

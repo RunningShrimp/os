@@ -12,7 +12,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::boxed::Box;
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::Ordering;
 use spin::Mutex;
 use crate::compat::DefaultHasherBuilder;
 
@@ -1124,7 +1124,7 @@ impl StaticAnalyzer {
         let mut all_results = Vec::new();
 
         for target in targets {
-            let start_time_ms = 0u64; // TODO: Implement proper timestamp
+            let _start_time_ms = 0u64; // TODO: Implement proper timestamp
 
             // 执行各种类型的分析
             let mut analysis_results = Vec::new();
@@ -1168,7 +1168,7 @@ impl StaticAnalyzer {
 
     /// 执行数据流分析
     fn perform_dataflow_analysis(&mut self, target: &VerificationTarget) -> Result<StaticAnalysisResult, &'static str> {
-        let start_time_ms = 0u64; // TODO: Implement proper timestamp
+        let _start_time_ms = 0u64; // TODO: Implement proper timestamp
 
         // 模拟数据流分析
         let mut issues = Vec::new();
@@ -1209,7 +1209,7 @@ impl StaticAnalyzer {
 
     /// 执行控制流分析
     fn perform_control_flow_analysis(&mut self, target: &VerificationTarget) -> Result<StaticAnalysisResult, &'static str> {
-        let start_time_ms = 0u64; // TODO: Implement proper timestamp
+        let _start_time_ms = 0u64; // TODO: Implement proper timestamp
 
         // 模拟控制流分析
         let mut issues = Vec::new();
@@ -1250,7 +1250,7 @@ impl StaticAnalyzer {
 
     /// 执行指针分析
     fn perform_pointer_analysis(&mut self, target: &VerificationTarget) -> Result<StaticAnalysisResult, &'static str> {
-        let start_time_ms = 0u64; // TODO: Implement proper timestamp
+        let _start_time_ms = 0u64; // TODO: Implement proper timestamp
 
         // 模拟指针分析
         let mut issues = Vec::new();
@@ -1291,7 +1291,7 @@ impl StaticAnalyzer {
 
     /// 执行安全分析
     fn perform_security_analysis(&mut self, target: &VerificationTarget) -> Result<StaticAnalysisResult, &'static str> {
-        let start_time_ms = 0u64; // TODO: Implement proper timestamp
+        let _start_time_ms = 0u64; // TODO: Implement proper timestamp
 
         // 模拟安全分析
         let mut issues = Vec::new();
@@ -1332,7 +1332,7 @@ impl StaticAnalyzer {
 
     /// 执行死代码检测
     fn perform_dead_code_detection(&mut self, target: &VerificationTarget) -> Result<StaticAnalysisResult, &'static str> {
-        let start_time_ms = 0u64; // TODO: Implement proper timestamp
+        let _start_time_ms = 0u64; // TODO: Implement proper timestamp
 
         // 模拟死代码检测
         let mut issues = Vec::new();
@@ -1373,7 +1373,7 @@ impl StaticAnalyzer {
 
     /// 执行通用分析
     fn perform_generic_analysis(&mut self, target: &VerificationTarget, analysis_type: AnalysisType) -> Result<StaticAnalysisResult, &'static str> {
-        let start_time_ms = 0u64; // TODO: Implement proper timestamp
+        let _start_time_ms = 0u64; // TODO: Implement proper timestamp
 
         let elapsed_ms = 0u64; // TODO: Implement proper timestamp
 

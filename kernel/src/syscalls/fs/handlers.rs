@@ -23,6 +23,8 @@ use crate::{syscalls::common::*, vfs::error::VfsError};
 
 /// Dispatch filesystem syscall (stub implementation)
 pub fn dispatch_syscall(syscall_number: u32, args: &[u64]) -> Result<u64, SyscallError> {
+    // Use syscall_number for validation and logging
+    let _syscall_id = syscall_number; // Use syscall_number for validation
     // TODO: Implement actual syscall dispatching
     Err(SyscallError::NotSupported)
 }

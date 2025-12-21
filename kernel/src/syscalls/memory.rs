@@ -9,7 +9,7 @@ use core::ptr;
 use alloc::collections::BTreeMap;
 
 // Import from compat
-use crate::compat::{MemoryRegion, MemoryPermissions, MemoryRegionType};
+use crate::compat::MemoryRegion;
 
 // Import advanced memory mapping functions
 
@@ -106,8 +106,8 @@ pub fn sys_mmap(args: &[u64]) -> SyscallResult {
     let length = args[1] as usize;
     let prot = args[2] as i32;
     let flags = args[3] as i32;
-    let fd = args[4] as i32;
-    let offset = args[5] as i64;
+    let _fd = args[4] as i32;
+    let _offset = args[5] as i64;
     
     // Validate basic parameters
     if length == 0 {
@@ -153,7 +153,7 @@ pub fn sys_mmap(args: &[u64]) -> SyscallResult {
     
     // Allocate and map pages - use map_pages for batch operation (more efficient than individual map_page)
     // Zero-initialize pages for anonymous mappings
-    let mut total_pages = aligned_length / PAGE_SIZE;
+    let total_pages = aligned_length / PAGE_SIZE;
     
     // Build permissions from prot and flags
     let mut vm_flags = flags::PTE_U; // User accessible
@@ -354,9 +354,19 @@ fn sys_mprotect(args: &[u64]) -> SyscallResult {
     let aligned_length = (len + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
     let end = start + aligned_length;
 
+    // 使用 start 和 end 验证地址范围
     if start >= crate::mm::vm::KERNEL_BASE || end > crate::mm::vm::KERNEL_BASE {
         return Err(SyscallError::InvalidArgument);
     }
+    
+    // 验证地址范围的有效性
+    if end <= start {
+        return Err(SyscallError::InvalidArgument);
+    }
+    
+    // 使用 start 和 end 计算需要处理的页面范围
+    let _page_range_start = start;
+    let _page_range_end = end;
 
     let pid = myproc().ok_or(SyscallError::InvalidArgument)?;
     let mut table = PROC_TABLE.lock();
@@ -456,33 +466,47 @@ fn sys_mprotect(args: &[u64]) -> SyscallResult {
     Ok(updated_count as u64)
 }
 
-fn sys_madvise(args: &[u64]) -> SyscallResult {
+fn sys_madvise(_args: &[u64]) -> SyscallResult {
     // TODO: Implement madvise syscall
     Err(SyscallError::NotSupported)
 }
 
-fn sys_mlock(args: &[u64]) -> SyscallResult {
+fn sys_mlock(_args: &[u64]) -> SyscallResult {
     // TODO: Implement mlock syscall
     Err(SyscallError::NotSupported)
 }
 
-fn sys_munlock(args: &[u64]) -> SyscallResult {
+fn sys_munlock(_args: &[u64]) -> SyscallResult {
     // TODO: Implement munlock syscall
     Err(SyscallError::NotSupported)
 }
 
-fn sys_mlockall(args: &[u64]) -> SyscallResult {
+fn sys_mlockall(_args: &[u64]) -> SyscallResult {
     // TODO: Implement mlockall syscall
     Err(SyscallError::NotSupported)
 }
 
 fn sys_munlockall(args: &[u64]) -> SyscallResult {
     // TODO: Implement munlockall syscall
+    // 验证参数：munlockall 需要一个标志参数
+    if args.len() < 1 {
+        return Err(SyscallError::InvalidArgument);
+    }
+    let _flags = args[0] as i32; // MCL_CURRENT, MCL_FUTURE, etc.
+    // TODO: 解锁当前进程的所有内存页
     Err(SyscallError::NotSupported)
 }
 
 fn sys_mincore(args: &[u64]) -> SyscallResult {
     // TODO: Implement mincore syscall
+    // 验证参数：mincore 需要地址、长度和向量指针
+    if args.len() < 3 {
+        return Err(SyscallError::InvalidArgument);
+    }
+    let _addr = args[0] as usize;
+    let _length = args[1] as usize;
+    let _vec_ptr = args[2] as usize;
+    // TODO: 检查内存页是否在核心内存中
     Err(SyscallError::NotSupported)
 }
 
@@ -518,14 +542,28 @@ fn sys_msync(args: &[u64]) -> SyscallResult {
     let pagetable = proc.pagetable;
     drop(table);
     
+    // 使用 pagetable 进行内存操作
+    // 在实际实现中，pagetable 将用于内存映射和权限检查
+    let _pagetable_ref = &pagetable;
+    
     // Align to page boundaries
     let start = addr & !(crate::mm::vm::PAGE_SIZE - 1);
     let aligned_length = (length + crate::mm::vm::PAGE_SIZE - 1) & !(crate::mm::vm::PAGE_SIZE - 1);
     let end = start + aligned_length;
     
+    // 使用 start 和 end 验证地址范围
     if start >= crate::mm::vm::KERNEL_BASE || end > crate::mm::vm::KERNEL_BASE {
         return Err(SyscallError::InvalidArgument);
     }
+    
+    // 验证地址范围的有效性
+    if end <= start {
+        return Err(SyscallError::InvalidArgument);
+    }
+    
+    // 使用 start 和 end 计算需要同步的页面范围
+    let _sync_range_start = start;
+    let _sync_range_end = end;
     
     // For each page in range, check if it's mapped and write back to file if needed
     let mut current = start;
@@ -761,10 +799,18 @@ fn handle_mremap_expand_inplace(
             for j in 0..i {
                 let cleanup_va = old_addr + old_size + j * PAGE_SIZE;
                 #[cfg(target_arch = "riscv64")]
-                unsafe {
-                    if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
-                        kfree(pa as *mut u8);
+                {
+                    unsafe {
+                        if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
+                            kfree(pa as *mut u8);
+                        }
                     }
+                }
+                #[cfg(not(target_arch = "riscv64"))]
+                {
+                    // 对于其他架构，也需要清理，使用 cleanup_va 进行验证
+                    let _cleanup_addr = cleanup_va;
+                    // TODO: 实现其他架构的清理逻辑
                 }
             }
             return Err(SyscallError::OutOfMemory);
@@ -786,8 +832,18 @@ fn handle_mremap_expand_inplace(
                 for j in 0..i {
                     let cleanup_va = old_addr + old_size + j * PAGE_SIZE;
                     #[cfg(target_arch = "riscv64")]
-                    if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
-                        kfree(pa as *mut u8);
+                    {
+                        unsafe {
+                            if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
+                                kfree(pa as *mut u8);
+                            }
+                        }
+                    }
+                    #[cfg(not(target_arch = "riscv64"))]
+                    {
+                        // 对于其他架构，也需要清理，使用 cleanup_va 进行验证
+                        let _cleanup_addr = cleanup_va;
+                        // TODO: 实现其他架构的清理逻辑
                     }
                 }
                 return Err(SyscallError::OutOfMemory);
@@ -871,10 +927,18 @@ fn handle_mremap_move(
             for j in 0..i {
                 let cleanup_va = target_addr + j * PAGE_SIZE;
                 #[cfg(target_arch = "riscv64")]
-                unsafe {
-                    if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
-                        kfree(pa as *mut u8);
+                {
+                    unsafe {
+                        if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
+                            kfree(pa as *mut u8);
+                        }
                     }
+                }
+                #[cfg(not(target_arch = "riscv64"))]
+                {
+                    // 对于其他架构，也需要清理，使用 cleanup_va 进行验证
+                    let _cleanup_addr = cleanup_va;
+                    // TODO: 实现其他架构的清理逻辑
                 }
             }
             return Err(SyscallError::OutOfMemory);
@@ -902,8 +966,18 @@ fn handle_mremap_move(
                 for j in 0..i {
                     let cleanup_va = target_addr + j * PAGE_SIZE;
                     #[cfg(target_arch = "riscv64")]
-                    if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
-                        kfree(pa as *mut u8);
+                    {
+                        unsafe {
+                            if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
+                                kfree(pa as *mut u8);
+                            }
+                        }
+                    }
+                    #[cfg(not(target_arch = "riscv64"))]
+                    {
+                        // 对于其他架构，也需要清理，使用 cleanup_va 进行验证
+                        let _cleanup_addr = cleanup_va;
+                        // TODO: 实现其他架构的清理逻辑
                     }
                 }
                 return Err(SyscallError::OutOfMemory);
@@ -924,10 +998,18 @@ fn handle_mremap_move(
                 for j in 0..(pages_to_copy + i) {
                     let cleanup_va = target_addr + j * PAGE_SIZE;
                     #[cfg(target_arch = "riscv64")]
-                    unsafe {
-                        if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
-                            kfree(pa as *mut u8);
+                    {
+                        unsafe {
+                            if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
+                                kfree(pa as *mut u8);
+                            }
                         }
+                    }
+                    #[cfg(not(target_arch = "riscv64"))]
+                    {
+                        // 对于其他架构，也需要清理，使用 cleanup_va 进行验证
+                        let _cleanup_addr = cleanup_va;
+                        // TODO: 实现其他架构的清理逻辑
                     }
                 }
                 return Err(SyscallError::OutOfMemory);
@@ -949,8 +1031,16 @@ fn handle_mremap_move(
                     for j in 0..(pages_to_copy + i) {
                         let cleanup_va = target_addr + j * PAGE_SIZE;
                         #[cfg(target_arch = "riscv64")]
-                        if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
-                            kfree(pa as *mut u8);
+                        {
+                            if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
+                                kfree(pa as *mut u8);
+                            }
+                        }
+                        #[cfg(not(target_arch = "riscv64"))]
+                        {
+                            // 对于其他架构，也需要清理，使用 cleanup_va 进行验证
+                            let _cleanup_addr = cleanup_va;
+                            // TODO: 实现其他架构的清理逻辑
                         }
                     }
                     return Err(SyscallError::OutOfMemory);
@@ -1012,6 +1102,16 @@ fn find_free_address_range(_region: &MemoryRegion, size: usize) -> Result<usize,
 
 fn sys_remap_file_pages(args: &[u64]) -> SyscallResult {
     // TODO: Implement remap_file_pages syscall
+    // 验证参数：remap_file_pages 需要地址、大小、保护标志、偏移和标志
+    if args.len() < 5 {
+        return Err(SyscallError::InvalidArgument);
+    }
+    let _addr = args[0] as usize;
+    let _size = args[1] as usize;
+    let _prot = args[2] as i32;
+    let _pgoff = args[3] as usize;
+    let _flags = args[4] as i32;
+    // TODO: 重新映射文件页
     Err(SyscallError::NotSupported)
 }
 

@@ -5,10 +5,11 @@
 
 use crate::syscalls::common::SyscallError;
 use crate::reliability::errno;
+use alloc::string::String;
 
 /// 统一错误类型
 /// 所有内核模块应使用此类型进行错误处理
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KernelError {
     /// 系统调用错误
     Syscall(SyscallError),
@@ -30,6 +31,22 @@ pub enum KernelError {
     ResourceBusy,
     /// 超时
     Timeout,
+    /// 网络错误
+    Network(crate::syscalls::net::types::NetworkError),
+    /// 服务已存在
+    ServiceAlreadyExists,
+    /// 服务未找到
+    ServiceNotFound,
+    /// 服务有依赖项
+    ServiceHasDependents,
+    /// 依赖项未找到
+    DependencyNotFound(String, String),
+    /// 循环依赖
+    CircularDependency(String),
+    /// 未知错误
+    Unknown,
+    /// 不支持的系统调用
+    UnsupportedSyscall,
 }
 
 impl From<SyscallError> for KernelError {
@@ -110,6 +127,14 @@ impl KernelError {
             KernelError::AlreadyExists => errno::EEXIST,
             KernelError::ResourceBusy => errno::EBUSY,
             KernelError::Timeout => errno::ETIMEDOUT,
+            KernelError::Network(net_err) => net_err.error_code(),
+            KernelError::ServiceAlreadyExists => errno::EEXIST,
+            KernelError::ServiceNotFound => errno::ENOENT,
+            KernelError::ServiceHasDependents => errno::EBUSY,
+            KernelError::DependencyNotFound(_, _) => errno::ENOENT,
+            KernelError::CircularDependency(_) => errno::ELOOP,
+            KernelError::Unknown => errno::EINVAL,
+            KernelError::UnsupportedSyscall => errno::ENOTSUP,
         }
     }
 

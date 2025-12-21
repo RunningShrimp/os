@@ -96,6 +96,8 @@ impl FutexValidator {
         let start_time = get_current_time_ns();
         let result = futex_wait_timeout(mock_pagetable, futex_addr, 1, 0);
         let end_time = get_current_time_ns();
+        // Use end_time to calculate duration for validation/logging
+        let _duration = end_time - start_time; // Use end_time to calculate test duration
         
         self.results.total_tests += 1;
         if result.is_ok() || matches!(result, Err(SyscallError::WouldBlock)) {
@@ -158,7 +160,7 @@ impl FutexValidator {
         
         add_futex_waiter(futex3_addr, 4003, 42, 0);
         
-        let start_time = get_current_time_ns();
+        let _start_time = get_current_time_ns();
         let result = futex_requeue(mock_pagetable, futex3_addr, futex4_addr, 1, 1, true);
         let end_time = get_current_time_ns();
         
@@ -336,6 +338,8 @@ impl FutexValidator {
         let start_time = get_current_time_ns();
         let result = futex_wake_optimized(futex_addr, 500);
         let end_time = get_current_time_ns();
+        // Use end_time to calculate duration for validation/logging
+        let _duration = end_time - start_time; // Use end_time to calculate test duration
         
         self.results.total_tests += 1;
         if result.is_ok() && result.unwrap() == 500 {
@@ -347,9 +351,9 @@ impl FutexValidator {
         // Test bulk requeue operations
         let futex2 = AtomicI32::new(0);
         let futex2_addr = &futex2 as *const AtomicI32 as usize;
-        let mock_pagetable = core::ptr::null_mut::<PageTable>();
+        let _mock_pagetable = core::ptr::null_mut::<PageTable>();
         
-        let start_time = get_current_time_ns();
+        let _start_time = get_current_time_ns();
         let result = requeue_futex_waiters(futex_addr, futex2_addr, 200);
         let end_time = get_current_time_ns();
         

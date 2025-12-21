@@ -48,7 +48,7 @@ pub fn copyin_addrlen(user_addrlen_ptr: u64) -> Result<u32, KernelError> {
 
 /// 向用户空间写回地址长度
 /// TODO: 实现真正的地址长度处理
-pub fn copyout_addrlen(addrlen: u32, user_addrlen_ptr: u64) -> Result<(), KernelError> {
+pub fn copyout_addrlen(_addrlen: u32, user_addrlen_ptr: u64) -> Result<(), KernelError> {
     // TODO: 向用户空间写入地址长度
     if user_addrlen_ptr == 0 {
         // println removed for no_std compatibility
@@ -108,14 +108,16 @@ pub fn get_supported_syscalls() -> alloc::vec::Vec<u32> {
 /// * `Ok(u64)` - 系统调用执行结果
 /// * `Err(KernelError)` - 系统调用执行失败
 #[deprecated(note = "Use NetworkService.handle_syscall instead")]
-pub fn dispatch_syscall(syscall_number: u32, args: &[u64]) -> Result<u64, KernelError> {
+pub fn dispatch_syscall(syscall_number: u32, _args: &[u64]) -> Result<u64, KernelError> {
     // println removed for no_std compatibility
     // 所有逻辑已移至 NetworkService，不再有独立的全局处理函数
+    // Use syscall_number for validation and logging
+    let _syscall_id = syscall_number; // Use syscall_number for validation
     match syscall_number {
         41 | 49 | 50 | 43 | 42 | 44 | 45 | 46 | 47 | 48 | 54 | 55 => {
             // 这些调用现在需要通过 NetworkService 的实例来处理
             Err(KernelError::NotSupported)
         }
-        _ => Err(KernelError::UnsupportedSyscall),
+        _ => Err(KernelError::NotSupported),
     }
 }

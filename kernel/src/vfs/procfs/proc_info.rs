@@ -21,7 +21,7 @@ impl ProcInfoInode {
     pub fn create_for_pid(pid: usize) -> VfsResult<Arc<dyn InodeOps>> {
         // Verify process exists
         let proc_table = crate::process::manager::PROC_TABLE.lock();
-        if proc_table.find_ref(pid).is_none() {
+        if proc_table.find_ref(pid as i32).is_none() {
             return Err(VfsError::NotFound);
         }
         drop(proc_table);
@@ -40,7 +40,7 @@ impl ProcInfoInode {
     /// Generate process status information
     fn generate_status(&self) -> String {
         let proc_table = crate::process::manager::PROC_TABLE.lock();
-        if let Some(proc) = proc_table.find_ref(self.pid) {
+        if let Some(proc) = proc_table.find_ref(self.pid as i32) {
             // Proc结构体没有name字段，使用PID作为标识
             let name = format!("process_{}", self.pid);
             let state = match proc.state {
@@ -68,7 +68,7 @@ impl ProcInfoInode {
     /// Generate process command line
     fn generate_cmdline(&self) -> String {
         let proc_table = crate::process::manager::PROC_TABLE.lock();
-        if proc_table.find_ref(self.pid).is_some() {
+        if proc_table.find_ref(self.pid as i32).is_some() {
             // Proc结构体没有name字段，使用PID作为标识
             format!("process_{}\0", self.pid)
         } else {
@@ -79,7 +79,7 @@ impl ProcInfoInode {
     /// Generate process memory information
     fn generate_statm(&self) -> String {
         let proc_table = crate::process::manager::PROC_TABLE.lock();
-        if let Some(proc) = proc_table.find_ref(self.pid) {
+        if let Some(proc) = proc_table.find_ref(self.pid as i32) {
             let size = proc.sz;
             format!("{} 0 0 0 0 0 0\n", size / 4096) // Size in pages
         } else {
@@ -92,7 +92,7 @@ impl ProcInfoInode {
 /// Linux /proc/[pid]/stat format has 52 fields separated by spaces
 fn format_proc_stat(pid: usize) -> String {
     let proc_table = crate::process::manager::PROC_TABLE.lock();
-    if let Some(proc) = proc_table.find_ref(pid) {
+    if let Some(proc) = proc_table.find_ref(pid as crate::process::Pid) {
         // Proc结构体没有name字段，使用PID作为标识
         let name = format!("process_{}", pid);
         let state = match proc.state {
@@ -177,7 +177,7 @@ impl InodeOps for ProcInfoInode {
                     pid as u64 + 20000,
                     Box::new(move || {
                         let proc_table = crate::process::manager::PROC_TABLE.lock();
-                        if let Some(proc) = proc_table.find_ref(pid) {
+                        if let Some(proc) = proc_table.find_ref(pid as crate::process::Pid) {
                             // Proc结构体没有name字段，使用PID作为标识
                             let name = format!("process_{}", pid);
                             let state = match proc.state {
@@ -208,7 +208,7 @@ impl InodeOps for ProcInfoInode {
                     pid as u64 + 20001,
                     Box::new(move || {
                         let proc_table = crate::process::manager::PROC_TABLE.lock();
-                        if proc_table.find_ref(pid).is_some() {
+                        if proc_table.find_ref(pid as crate::process::Pid).is_some() {
                             // Proc结构体没有name字段，使用PID作为标识
                             format!("process_{}\0", pid)
                         } else {
@@ -223,7 +223,7 @@ impl InodeOps for ProcInfoInode {
                     pid as u64 + 20002,
                     Box::new(move || {
                         let proc_table = crate::process::manager::PROC_TABLE.lock();
-                        if let Some(proc) = proc_table.find_ref(pid) {
+                        if let Some(proc) = proc_table.find_ref(pid as crate::process::Pid) {
                             let size = proc.sz;
                             format!("{} 0 0 0 0 0 0\n", size / 4096)
                         } else {

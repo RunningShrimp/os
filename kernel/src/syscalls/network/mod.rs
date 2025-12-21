@@ -10,13 +10,10 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, Ordering};
 use crate::sync::Mutex;
-use crate::reliability::errno::{errno_neg, EINVAL, ENOMEM, EMFILE, EBADF, ENOENT, EEXIST, ENOSYS, EOPNOTSUPP, EAGAIN, ECONNREFUSED, EISCONN, ENOTCONN};
 use crate::net::NetworkError;
 use crate::net::socket::{Socket, SocketOptions, SocketType, ProtocolFamily, TcpSocketWrapper, UdpSocketWrapper};
-use crate::net::tcp::manager::{TcpOptions, ConnectionId, TcpConnectionManager};
+use crate::net::tcp::manager::{ConnectionId, TcpConnectionManager};
 use crate::net::ipv4::Ipv4Addr;
-use crate::fs::file::FileType;
-use crate::posix::*;
 
 // Re-export interface functions
 pub use interface::{add_route, interface_up, add_interface_address, set_interface_mtu, create_veth_pair, create_bridge};
@@ -200,21 +197,23 @@ fn update_socket_in_file(fd: i32, socket: Option<Socket>) -> Result<(), NetworkE
 
 /// Convert POSIX socket type to internal type
 fn posix_to_socket_type(type_: i32) -> Option<SocketType> {
+    use crate::posix::{SOCK_STREAM, SOCK_DGRAM, SOCK_RAW, SOCK_SEQPACKET};
     match type_ {
-        SOCK_STREAM => Some(SocketType::Stream),
-        SOCK_DGRAM => Some(SocketType::Datagram),
-        SOCK_RAW => Some(SocketType::Raw),
-        SOCK_SEQPACKET => Some(SocketType::SeqPacket),
+        s if s == SOCK_STREAM => Some(SocketType::Stream),
+        s if s == SOCK_DGRAM => Some(SocketType::Datagram),
+        s if s == SOCK_RAW => Some(SocketType::Raw),
+        s if s == SOCK_SEQPACKET => Some(SocketType::SeqPacket),
         _ => None,
     }
 }
 
 /// Convert POSIX domain to protocol family
 fn posix_to_protocol_family(domain: i32) -> Option<ProtocolFamily> {
+    use crate::posix::{AF_INET, AF_INET6, AF_UNSPEC};
     match domain {
-        AF_INET => Some(ProtocolFamily::IPv4),
-        AF_INET6 => Some(ProtocolFamily::IPv6),
-        AF_UNSPEC => Some(ProtocolFamily::Unspecified),
+        d if d == AF_INET => Some(ProtocolFamily::IPv4),
+        d if d == AF_INET6 => Some(ProtocolFamily::IPv6),
+        d if d == AF_UNSPEC => Some(ProtocolFamily::Unspecified),
         _ => None,
     }
 }

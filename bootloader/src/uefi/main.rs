@@ -9,12 +9,12 @@ use crate::protocol::BootProtocol;
 use core::ptr;
 
 #[cfg(feature = "uefi_support")]
-use uefi::{prelude::*, table::{Boot, SystemTable}, Entry};
+use uefi::{prelude::*, table::Boot};
 
 /// UEFI application entry point
 #[cfg(feature = "uefi_support")]
 #[entry]
-fn efi_main(
+pub fn efi_main(
     image_handle: uefi::Handle,
     system_table: SystemTable<Boot>,
 ) -> uefi::Status {
@@ -205,7 +205,7 @@ fn load_and_boot_kernel_uefi(protocol_manager: &mut crate::protocol::ProtocolMan
                 let boot_info = protocol_manager.get_boot_info()?;
 
                 // Create boot parameters
-                let boot_params = crate::kernel::BootParameters::new(&boot_info, &kernel_image);
+                let boot_params = crate::kernel::KernelBootParameters::new(&boot_info, &kernel_image);
 
                 // Exit boot services
                 protocol_manager.exit_boot_services()?;
@@ -242,6 +242,7 @@ pub extern "C" fn efi_main() -> u32 {
     0xDEADBEEF // Error code for UEFI not supported
 }
 
+extern crate alloc;
 #[cfg(not(feature = "uefi_support"))]
 fn run_uefi_bootloader() -> Result<()> {
     Err(BootError::FeatureNotEnabled("UEFI support"))

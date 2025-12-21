@@ -141,8 +141,38 @@ pub enum ErrorType {
     TimeoutError,
     /// 取消错误
     CancellationError,
+    /// 数据错误
+    Data,
+    /// 协议错误
+    Protocol,
+    /// 未知错误
+    Unknown,
     /// 系统错误（兼容旧代码）
     SystemError,
+}
+
+impl core::fmt::Display for ErrorType {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            ErrorType::RuntimeError => write!(f, "RuntimeError"),
+            ErrorType::LogicError => write!(f, "LogicError"),
+            ErrorType::CompileError => write!(f, "CompileError"),
+            ErrorType::ConfigurationError => write!(f, "ConfigurationError"),
+            ErrorType::ResourceError => write!(f, "ResourceError"),
+            ErrorType::PermissionError => write!(f, "PermissionError"),
+            ErrorType::NetworkError => write!(f, "NetworkError"),
+            ErrorType::IOError => write!(f, "IOError"),
+            ErrorType::MemoryError => write!(f, "MemoryError"),
+            ErrorType::SystemCallError => write!(f, "SystemCallError"),
+            ErrorType::ValidationError => write!(f, "ValidationError"),
+            ErrorType::TimeoutError => write!(f, "TimeoutError"),
+            ErrorType::CancellationError => write!(f, "CancellationError"),
+            ErrorType::Data => write!(f, "Data"),
+            ErrorType::Protocol => write!(f, "Protocol"),
+            ErrorType::Unknown => write!(f, "Unknown"),
+            ErrorType::SystemError => write!(f, "SystemError"),
+        }
+    }
 }
 
 /// 恢复策略

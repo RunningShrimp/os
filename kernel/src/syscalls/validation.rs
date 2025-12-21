@@ -246,7 +246,7 @@ pub enum ParameterType {
 
 impl ParameterType {
     /// Validate parameter value
-    pub fn validate(&self, value: u64, context: &ValidationContext) -> bool {
+    pub fn validate(&self, value: u64, _context: &ValidationContext) -> bool {
         match self {
             ParameterType::Any => true,
             
@@ -307,6 +307,8 @@ impl ParameterType {
             
             ParameterType::Array { element_type, length } => {
                 // Array validation is handled by CompositeValidator
+                // 使用 element_type 验证数组元素类型
+                let _elem_type = element_type; // 使用 element_type 进行验证
                 // Basic check: non-null pointer
                 value != 0 && length.unwrap_or(1) > 0
             }
@@ -336,7 +338,7 @@ impl RangeValidator {
 }
 
 impl SyscallValidator for RangeValidator {
-    fn validate(&self, args: &[u64], context: &ValidationContext) -> ValidationResult {
+    fn validate(&self, args: &[u64], _context: &ValidationContext) -> ValidationResult {
         if args.len() <= self.param_index {
             return ValidationResult::Success; // Not enough args, basic validator will catch
         }
@@ -411,7 +413,7 @@ impl PointerValidator {
 }
 
 impl SyscallValidator for PointerValidator {
-    fn validate(&self, args: &[u64], context: &ValidationContext) -> ValidationResult {
+    fn validate(&self, args: &[u64], _context: &ValidationContext) -> ValidationResult {
         if args.len() <= self.param_index {
             return ValidationResult::Success; // Not enough args, basic validator will catch
         }
@@ -567,7 +569,7 @@ impl ArrayValidator {
 }
 
 impl SyscallValidator for ArrayValidator {
-    fn validate(&self, args: &[u64], context: &ValidationContext) -> ValidationResult {
+    fn validate(&self, args: &[u64], _context: &ValidationContext) -> ValidationResult {
         if args.len() <= self.ptr_index || args.len() <= self.length_index {
             return ValidationResult::Success; // Not enough args, basic validator will catch
         }

@@ -12,6 +12,7 @@ use crate::syscalls::services::{Service, ServiceStatus, SyscallService};
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::any::Any;
 
 /// 内存管理系统调用服务
 /// 
@@ -43,9 +44,9 @@ impl MemoryService {
     /// * `Self` - 新的服务实例
     pub fn new() -> Self {
         Self {
-            name: .to_string()("memory"),
-            version: .to_string()("1.0.0"),
-            description: .to_string()("Memory management syscall service"),
+            name: String::from("memory"),
+            version: String::from("1.0.0"),
+            description: String::from("Memory management syscall service"),
             status: ServiceStatus::Uninitialized,
             supported_syscalls: handlers::get_supported_syscalls(),
             memory_regions: Vec::new(),
@@ -61,7 +62,9 @@ impl MemoryService {
     /// * `MemoryStats` - 内存统计信息
     pub fn get_memory_stats(&self) -> crate::syscalls::mm::types::MemoryStats {
         // println removed for no_std compatibility
-        
+
+        let used_memory = self.memory_regions.iter().map(|r| r.size).sum::<u64>();
+
         crate::syscalls::mm::types::MemoryStats {
             total_memory: 0x100000000, // 4GB
             free_memory: 0x100000000 - used_memory,
@@ -115,7 +118,7 @@ impl MemoryService {
             self.next_virtual_addr
         };
 
-        let region = crate::syscalls::mm::types::MemoryRegion {
+        let _region = crate::syscalls::mm::types::MemoryRegion {
             start_address: address,
             end_address: address + params.size,
             size: params.size,
@@ -124,7 +127,7 @@ impl MemoryService {
             flags: params.flags.clone(),
             file_offset: params.offset,
             fd: params.fd,
-            name: .to_string()("allocated_region"),
+            name: String::from("allocated_region"),
         };
 
         // println removed for no_std compatibility
@@ -145,7 +148,7 @@ impl MemoryService {
     /// 
     /// * `Result<(), MemoryError>` - 操作结果
     pub fn free_memory_region(&mut self, address: u64, size: u64) -> Result<(), crate::syscalls::mm::types::MemoryError> {
-        if let Some(pos) = self.memory_regions.iter().position(|region| {
+        if let Some(_pos) = self.memory_regions.iter().position(|region| {
             region.start_address == address && region.size == size
         }) {
             // println removed for no_std compatibility
@@ -167,7 +170,7 @@ impl MemoryService {
     /// # 返回值
     /// 
     /// * `Result<(), MemoryError>` - 操作结果
-    pub fn change_memory_protection(&mut self, address: u64, size: u64, protection: crate::syscalls::mm::types::MemoryProtection) -> Result<(), crate::syscalls::mm::types::MemoryError> {
+    pub fn change_memory_protection(&mut self, address: u64, _size: u64, protection: crate::syscalls::mm::types::MemoryProtection) -> Result<(), crate::syscalls::mm::types::MemoryError> {
         if let Some(region) = self.memory_regions.iter_mut().find(|region| {
             address >= region.start_address && address < region.end_address
         }) {
@@ -243,6 +246,10 @@ impl Default for MemoryService {
 }
 
 impl Service for MemoryService {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -322,6 +329,10 @@ impl SyscallService for MemoryService {
 
     fn priority(&self) -> u32 {
         40 // 内存管理服务优先级
+    }
+
+    fn as_syscall_service(&self) -> Option<&dyn SyscallService> {
+        Some(self)
     }
 }
 

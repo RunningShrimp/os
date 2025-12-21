@@ -384,7 +384,7 @@ impl SignatureEngine {
     }
 
     /// Check if data matches a signature
-    fn matches_signature(&self, data: &[u8], signature: &Signature, context: &HashMap<String, String>) -> bool {
+    fn matches_signature(&self, data: &[u8], signature: &Signature, _context: &HashMap<String, String>) -> bool {
         match signature.pattern_type {
             PatternType::Exact => {
                 let pattern_bytes = signature.pattern.as_bytes();

@@ -5,8 +5,6 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
 use alloc::string::String;
 use super::super::{IntrusionDetection, ThreatLevel};
 

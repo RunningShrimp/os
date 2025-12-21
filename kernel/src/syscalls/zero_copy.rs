@@ -18,7 +18,6 @@
 //! - Add io_uring support for async zero-copy I/O
 
 extern crate alloc;
-use alloc::string::ToString;
 
 use super::common::{SyscallError, SyscallResult, extract_args};
 // Error codes are handled through SyscallError enum
@@ -376,7 +375,6 @@ fn sys_splice(args: &[u64]) -> SyscallResult {
         
         // VFS file to Pipe or Pipe to VFS file
         (FileType::Vfs, FileType::Pipe) | (FileType::Pipe, FileType::Vfs) => {
-            let mut file_table = FILE_TABLE.lock();
             let mut total_transferred = 0usize;
             let chunk_size = len.min(8192);
             let mut buffer = alloc::vec![0u8; chunk_size];

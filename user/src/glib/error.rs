@@ -106,7 +106,7 @@ pub mod domains {
 
     /// 自定义错误域
     pub fn g_quark_from_static_string(string: &str) -> GQuark {
-        GQuark::from_string(string)
+        g_quark_from_string(string)
     }
 }
 
@@ -222,14 +222,14 @@ mod tests {
 
     #[test]
     fn test_quark_creation() {
-        let quark1 = GQuark::from_string("test-domain");
-        let quark2 = GQuark::from_string("test-domain");
+        let quark1 = g_quark_from_string("test-domain");
+        let quark2 = g_quark_from_string("test-domain");
         assert_eq!(quark1, quark2); // 相同字符串应该产生相同的哈希值
     }
 
     #[test]
     fn test_gerror_creation() {
-        let domain = GQuark::from_string("test");
+        let domain = g_quark_from_string("test");
         let error = GError::new(domain, 1, "Test message");
         assert_eq!(error.domain, domain);
         assert_eq!(error.code, 1);
@@ -238,19 +238,19 @@ mod tests {
 
     #[test]
     fn test_error_matching() {
-        let domain = GQuark::from_string("test");
+        let domain = g_quark_from_string("test");
         let error = GError::new(domain, 1, "Test message");
 
         assert!(error.matches(domain, 1));
         assert!(!error.matches(domain, 2));
-        assert!(!error.matches(GQuark::from_string("other"), 1));
+        assert!(!error.matches(g_quark_from_string("other"), 1));
         assert!(error.matches_domain(domain));
-        assert!(!error.matches_domain(GQuark::from_string("other")));
+        assert!(!error.matches_domain(g_quark_from_string("other")));
     }
 
     #[test]
     fn test_error_copy() {
-        let domain = GQuark::from_string("test");
+        let domain = g_quark_from_string("test");
         let error1 = GError::new(domain, 1, "Test message");
         let error2 = error1.copy();
 
@@ -265,7 +265,7 @@ mod tests {
             let mut error: *mut GError = core::ptr::null_mut();
 
             // 测试设置错误
-            let domain = GQuark::from_string("test");
+            let domain = g_quark_from_string("test");
             error_utils::set_error(&mut error, domain, 1, "Test error");
             assert!(!error.is_null());
             assert_eq!((*error).domain, domain);

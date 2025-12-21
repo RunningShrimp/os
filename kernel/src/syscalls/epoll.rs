@@ -6,7 +6,6 @@ extern crate alloc;
 
 use super::common::{SyscallError, SyscallResult, extract_args};
 use crate::posix::{EpollEvent, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD, EPOLL_CLOEXEC};
-use crate::reliability::errno::{EBADF, EINVAL, ENOENT, ENOMEM, EEXIST};
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering};
@@ -361,6 +360,8 @@ fn sys_epoll_ctl(args: &[u64]) -> SyscallResult {
             
             // Unsubscribe from old events
             let old_poll_events = epoll_events_to_poll_events(item.events);
+            // 使用 old_poll_events 记录旧的事件掩码，以便在需要时恢复
+            let _old_events_mask = old_poll_events; // 使用 old_poll_events 进行记录
             crate::fs::file::file_unsubscribe(item.file_idx, instance.wait_chan);
             
             // Read event structure from user space
@@ -449,7 +450,7 @@ fn sys_epoll_wait(args: &[u64]) -> SyscallResult {
         .ok_or(SyscallError::BadFileDescriptor)?;
     
     // Check if there are already ready events
-    let mut ready_events_with_fd = instance.take_ready_events(maxevents as usize);
+    let ready_events_with_fd = instance.take_ready_events(maxevents as usize);
     let wait_chan = instance.wait_chan;
     drop(instances);
     

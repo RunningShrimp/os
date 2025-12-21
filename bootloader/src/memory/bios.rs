@@ -1,8 +1,11 @@
-//! BIOS Memory Detection and Configuration
-//!
-//! This module provides comprehensive memory detection and configuration
-//! support for BIOS bootloader, including E820 memory map scanning,
-//! A20 gate handling, and extended memory detection.
+extern crate alloc;
+use alloc::vec::Vec;
+
+// BIOS Memory Detection and Configuration
+//
+// This module provides comprehensive memory detection and configuration
+// support for BIOS bootloader, including E820 memory map scanning,
+// A20 gate handling, and extended memory detection.
 
 use crate::error::{BootError, Result};
 use crate::protocol::{MemoryMap, MemoryMapEntry, MemoryType};

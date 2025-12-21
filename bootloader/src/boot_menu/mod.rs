@@ -267,6 +267,7 @@ mod tests {
     fn test_boot_menu_state() {
         use BootMenuState::*;
 
+extern crate alloc;
         assert_ne!(Initializing, ShowingMenu);
         assert_eq!(ShowingMenu, ShowingMenu);
         assert_ne!(BootSelected, Booting);

@@ -24,6 +24,7 @@ pub mod file;
 pub mod dentry;
 pub mod mount;
 pub mod ramfs;
+pub mod tmpfs;
 pub mod ext4;
 pub mod procfs;
 pub mod sysfs;

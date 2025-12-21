@@ -317,7 +317,7 @@ impl TcpSocketWrapper {
     }
 
     /// Bind to local address
-    pub fn bind(&mut self, addr: SocketAddr) -> Result<(), SocketError> {
+    pub fn bind(&mut self, _addr: SocketAddr) -> Result<(), SocketError> {
         // Implementation would use TCP connection manager
         // For now, just update state
         Ok(())
@@ -353,7 +353,7 @@ impl TcpSocketWrapper {
     }
 
     /// Connect to remote address
-    pub fn connect(&mut self, addr: SocketAddr) -> Result<(), SocketError> {
+    pub fn connect(&mut self, _addr: SocketAddr) -> Result<(), SocketError> {
         // Implementation would use TCP connection manager
         self.state = TcpState::SynSent;
         Ok(())

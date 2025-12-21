@@ -122,7 +122,7 @@ impl ReassemblyEntry {
             let existing_end = existing_offset + existing_fragment.length;
 
             // Check for overlap
-            if (fragment.offset < existing_end && fragment_end > existing_offset) {
+            if fragment.offset < existing_end && fragment_end > existing_offset {
                 return Err(FragmentError::Overlap);
             }
         }

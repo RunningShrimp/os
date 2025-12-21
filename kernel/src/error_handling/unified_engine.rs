@@ -790,21 +790,21 @@ impl UnifiedErrorHandlingEngine {
         // 初始化各个组件
         {
             let mut classifier = self.error_classifier.lock();
-            classifier.init().map_err(|e| UnifiedError::Configuration(
+            classifier.init().map_err(|_e| UnifiedError::Configuration(
                 ConfigurationError::ConfigDependencyError
             ))?;
         }
 
         {
             let mut recovery_manager = self.recovery_manager.lock();
-            recovery_manager.init().map_err(|e| UnifiedError::Configuration(
+            recovery_manager.init().map_err(|_e| UnifiedError::Configuration(
                 ConfigurationError::ConfigDependencyError
             ))?;
         }
 
         {
             let mut diagnostic_tools = self.diagnostic_tools.lock();
-            diagnostic_tools.init().map_err(|e| UnifiedError::Configuration(
+            diagnostic_tools.init().map_err(|_e| UnifiedError::Configuration(
                 ConfigurationError::ConfigDependencyError
             ))?;
         }
@@ -864,18 +864,28 @@ impl UnifiedErrorHandlingEngine {
 
     /// 创建错误记录
     fn create_error_record(&self, error_id: u64, error: &UnifiedError, context: &EnhancedErrorContext) -> ErrorRecord {
-        let metadata = error.generate_metadata(&context.basic_context.source);
+        let source = ErrorSource {
+            module: "unknown".to_string(),
+            function: "unknown".to_string(),
+            file: "unknown".to_string(),
+            line: 0,
+            column: 0,
+            process_id: context.basic_context.process_id,
+            thread_id: context.basic_context.thread_id,
+            cpu_id: 0,
+        };
+        let metadata = error.generate_metadata(&source);
         
         ErrorRecord {
             id: error_id,
-            code: metadata.error_id,
+            code: metadata.error_id as u32,
             error_type: ErrorType::RuntimeError,
             category: error.category(),
             severity: error.severity(),
             status: ErrorStatus::New,
             message: context.basic_context.error_message.clone(),
             description: context.basic_context.error_description.clone(),
-            source: context.basic_context.source.clone(),
+            source: source,
             timestamp: context.basic_context.timestamp,
             context: ErrorContext {
                 environment_variables: context.execution_environment.environment_variables.clone(),
@@ -946,7 +956,7 @@ impl UnifiedErrorHandlingEngine {
         }
         
         classifier.classify_error(&mut record)
-            .map_err(|e| UnifiedError::Configuration(ConfigurationError::ConfigValidationFailed))
+            .map_err(|_e| UnifiedError::Configuration(ConfigurationError::ConfigValidationFailed))
     }
 
     /// 恢复错误
@@ -1010,7 +1020,7 @@ impl UnifiedErrorHandlingEngine {
         
         // 停止诊断会话
         diagnostic_tools.stop_session(&session_id)
-            .map_err(|e| UnifiedError::Interface(InterfaceError::InterfaceStateError))?;
+            .map_err(|_e| UnifiedError::Interface(InterfaceError::InterfaceStateError))?;
         
         crate::println!("[UnifiedErrorEngine] Error diagnosis completed: {}", result);
         Ok(())
@@ -1059,7 +1069,18 @@ impl UnifiedErrorHandlingEngine {
         *stats.errors_by_type.entry(error_record.error_type.to_string()).or_insert(0) += 1;
         *stats.errors_by_category.entry(error_record.category).or_insert(0) += 1;
         *stats.errors_by_severity.entry(error_record.severity).or_insert(0) += 1;
-        *stats.errors_by_priority.entry(error_record.priority).or_insert(0) += 1;
+        // Use severity as priority
+        let priority = match error_record.severity {
+            ErrorSeverity::Critical => ErrorPriority::Critical,
+            ErrorSeverity::Fatal => ErrorPriority::Fatal,
+            ErrorSeverity::Error => ErrorPriority::High,
+            ErrorSeverity::High => ErrorPriority::High,
+            ErrorSeverity::Medium => ErrorPriority::Normal,
+            ErrorSeverity::Warning => ErrorPriority::Normal,
+            ErrorSeverity::Low => ErrorPriority::Low,
+            ErrorSeverity::Info => ErrorPriority::Low,
+        };
+        *stats.errors_by_priority.entry(priority).or_insert(0) += 1;
         
         // 更新处理时间统计
         if stats.total_handled_errors == 1 {
@@ -1169,7 +1190,12 @@ impl ErrorAggregator {
         *bucket.error_severities.entry(error_record.severity).or_insert(0) += 1;
 
         // 更新最频繁错误
-        self.update_most_frequent_errors(bucket);
+        let mut errors: Vec<_> = bucket.error_types.iter().collect();
+        errors.sort_by(|a, b| b.1.cmp(a.1));
+        bucket.most_frequent_errors = errors.into_iter()
+            .take(10)
+            .map(|(k, v)| (k.clone(), *v))
+            .collect();
     }
 
     /// 更新最频繁错误
@@ -1215,7 +1241,13 @@ impl ErrorMonitor {
         let performance_metrics = self.performance_monitor.collect_performance_metrics();
         
         // 更新监控统计
-        self.monitoring_stats.health_score_history.push((current_time, health_status.score));
+        let health_score = match health_status {
+            HealthStatus::Healthy => 100.0,
+            HealthStatus::Warning => 75.0,
+            HealthStatus::Critical => 25.0,
+            HealthStatus::Unknown => 50.0,
+        };
+        self.monitoring_stats.health_score_history.push((current_time, health_score));
         self.monitoring_stats.performance_history.push((current_time, performance_metrics));
 
         self.monitoring_stats.clone()
@@ -1325,7 +1357,8 @@ pub fn create_unified_error_handling_engine() -> Arc<Mutex<UnifiedErrorHandlingE
 
 /// 初始化全局统一错误处理引擎
 pub fn init_global_unified_error_handling() -> UnifiedResult<()> {
-    let mut engine = create_unified_error_handling_engine().lock();
+    let engine_arc = create_unified_error_handling_engine();
+    let mut engine = engine_arc.lock();
     engine.init()
 }
 

@@ -684,7 +684,7 @@ impl IpcChannel {
         // 更新统计信息
         let latency = get_current_time_ns() - start_time;
         {
-            let mut stats = self.stats.lock();
+            let stats = self.stats.lock();
             stats.update_send_stats(message_size, latency);
         }
 
@@ -710,7 +710,7 @@ impl IpcChannel {
 
     /// 接收消息（优化版本）
     pub fn receive(&self, receiver_id: u64) -> Result<IpcMessage, i32> {
-        let start_time = get_current_time_ns();
+        let _start_time = get_current_time_ns();
 
         // 优先尝试无锁队列
         if let Some(message) = self.lock_free_queue.pop() {
@@ -718,7 +718,7 @@ impl IpcChannel {
 
             // 更新统计信息
             {
-                let mut stats = self.stats.lock();
+                let stats = self.stats.lock();
                 stats.update_recv_stats(message.size() as u64);
             }
 
@@ -754,7 +754,7 @@ impl IpcChannel {
 
             // 更新统计信息
             {
-                let mut stats = self.stats.lock();
+                let stats = self.stats.lock();
                 stats.update_recv_stats(msg.size() as u64);
             }
 
@@ -789,11 +789,16 @@ impl IpcChannel {
 
         // 更新统计信息
         if !messages.is_empty() {
+            // 计算批量接收的总字节数，用于批量统计优化
             let total_bytes: u64 = messages.iter().map(|m| m.size() as u64).sum();
             {
-                let mut stats = self.stats.lock();
+                let stats = self.stats.lock();
+                // 批量更新统计信息：先更新总字节数，再逐个更新消息计数
+                // 这样可以减少原子操作的次数，提高性能
+                stats.bytes_received.fetch_add(total_bytes, Ordering::Relaxed);
+                // 然后更新每个消息的计数
                 for msg in &messages {
-                    stats.update_recv_stats(msg.size() as u64);
+                    stats.messages_received.fetch_add(1, Ordering::Relaxed);
                 }
             }
         }
@@ -884,7 +889,7 @@ impl IpcChannel {
         // 更新统计信息
         let total_latency = get_current_time_ns() - start_time;
         {
-            let mut stats = self.stats.lock();
+            let stats = self.stats.lock();
             for _ in 0..sent_count {
                 stats.update_send_stats(0, total_latency / sent_count as u64);
             }
@@ -1156,7 +1161,7 @@ impl IpcService {
 
         // 更新统计信息
         {
-            let mut stats = self.stats.lock();
+            let stats = self.stats.lock();
             stats.total_channels.fetch_add(1, Ordering::Relaxed);
             stats.active_channels.fetch_add(1, Ordering::Relaxed);
         }
@@ -1217,7 +1222,7 @@ impl IpcService {
 
         // 更新统计信息
         {
-            let mut stats = self.stats.lock();
+            let stats = self.stats.lock();
             stats.total_channels.fetch_add(1, Ordering::Relaxed);
             stats.active_channels.fetch_add(1, Ordering::Relaxed);
         }
@@ -1238,7 +1243,7 @@ impl IpcService {
 
             // 更新统计信息
             {
-                let mut stats = self.stats.lock();
+                let stats = self.stats.lock();
                 stats.active_channels.fetch_sub(1, Ordering::Relaxed);
             }
 
@@ -1278,7 +1283,7 @@ impl IpcService {
 
             // 更新统计信息
             {
-                let mut stats = self.stats.lock();
+                let stats = self.stats.lock();
                 stats.total_messages.fetch_add(1, Ordering::Relaxed);
 
                 if is_zero_copy {
@@ -1318,7 +1323,7 @@ impl IpcService {
 
             // 更新统计信息
             if let Ok(count) = result {
-                let mut stats = self.stats.lock();
+                let stats = self.stats.lock();
                 stats.batch_operations.fetch_add(1, Ordering::Relaxed);
                 stats.total_messages.fetch_add(count as u64, Ordering::Relaxed);
             }
@@ -1338,7 +1343,7 @@ impl IpcService {
 
             // 更新统计信息
             {
-                let mut stats = self.stats.lock();
+                let stats = self.stats.lock();
                 stats.total_messages.fetch_add(messages.len() as u64, Ordering::Relaxed);
                 stats.batch_operations.fetch_add(1, Ordering::Relaxed);
             }

@@ -432,7 +432,7 @@ mod aarch64 {
                 core::ptr::write_bytes(new_subpt, 0, super::PAGE_SIZE);
                 
                 // Copy the intermediate PTE to the new page table
-                let pa = (old_pte & !0xFFF);
+                let pa = old_pte & !0xFFF;
                 
                 (*new_pt).entries[i] = (new_subpt as usize) | DESC_TABLE | (old_pte & 0xFFF);
                 
@@ -731,7 +731,7 @@ mod x86_64 {
                 core::ptr::write_bytes(new_subpt, 0, PAGE_SIZE);
                 
                 // Copy the intermediate PTE to the new page table
-                let pa = (old_pte & !0xFFF);
+                let pa = old_pte & !0xFFF;
                 
                 (*new_pt).entries[i] = (new_subpt as usize) | (old_pte & 0xFFF);
                 
