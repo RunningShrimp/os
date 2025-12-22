@@ -385,7 +385,7 @@ impl ForensicAnalyzer {
 
     /// 分析时间范围
     pub fn analyze_time_range(&mut self, time_range: (u64, u64)) -> Result<ForensicReport, &'static str> {
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         // 获取时间范围内的事件
         let events = self.get_events_in_time_range(time_range)?;
@@ -430,7 +430,7 @@ impl ForensicAnalyzer {
             key_events: events,
             timeline,
             recommended_actions,
-            generated_at: crate::time::get_timestamp_nanos(),
+            generated_at: crate::subsystems::time::get_timestamp_nanos(),
         };
 
         // 更新统计
@@ -443,7 +443,7 @@ impl ForensicAnalyzer {
             stats.timelines_generated += 1;
             stats.correlation_graphs_built += 1;
 
-            let elapsed = crate::time::get_timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
             stats.avg_analysis_time_us = (stats.avg_analysis_time_us + elapsed / 1000) / 2;
         }
 
@@ -586,7 +586,7 @@ impl PatternMatcher {
                 severity: AuditSeverity::Error,
                 description: "Potential brute force attack detected".to_string(),
                 related_events: events.iter().map(|e| e.id).collect(),
-                timestamp: crate::time::get_timestamp_nanos(),
+                timestamp: crate::subsystems::time::get_timestamp_nanos(),
             });
         }
 
@@ -609,7 +609,7 @@ impl PatternMatcher {
                 severity: AuditSeverity::Warning,
                 description: "Unusual pattern of critical events detected".to_string(),
                 related_events: events.iter().map(|e| e.id).collect(),
-                timestamp: crate::time::get_timestamp_nanos(),
+                timestamp: crate::subsystems::time::get_timestamp_nanos(),
             });
         }
 
@@ -632,7 +632,7 @@ impl BehaviorAnalyzer {
 
     /// 构建系统基线
     pub fn build_system_baseline(&mut self) -> Result<(), &'static str> {
-        self.system_baseline.created_at = crate::time::get_timestamp_nanos();
+        self.system_baseline.created_at = crate::subsystems::time::get_timestamp_nanos();
         Ok(())
     }
 

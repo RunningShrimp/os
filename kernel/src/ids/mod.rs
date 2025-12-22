@@ -509,7 +509,7 @@ impl IntrusionDetectionSystem {
             return Ok(Vec::new());
         }
 
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
         let mut detections = Vec::new();
 
         // 网络入侵检测
@@ -534,7 +534,7 @@ impl IntrusionDetectionSystem {
             stats.packets_processed += 1;
             stats.total_detections += detections.len() as u64;
 
-            let elapsed = crate::time::get_timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
             stats.avg_detection_time_us = (stats.avg_detection_time_us + elapsed / 1000) / 2;
         }
 
@@ -547,7 +547,7 @@ impl IntrusionDetectionSystem {
             return Ok(Vec::new());
         }
 
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
         let mut detections = Vec::new();
 
         // 主机入侵检测
@@ -571,7 +571,7 @@ impl IntrusionDetectionSystem {
             let mut stats = self.stats.lock();
             stats.total_detections += detections.len() as u64;
 
-            let elapsed = crate::time::get_timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
             stats.avg_detection_time_us = (stats.avg_detection_time_us + elapsed / 1000) / 2;
         }
 
@@ -643,7 +643,7 @@ impl IntrusionDetectionSystem {
         // 获取最近的检测结果
         let recent_detections: Vec<_> = self.detection_history
             .iter()
-            .filter(|d| crate::time::get_timestamp() - d.detected_at / 1000000000 < 3600) // 最近1小时
+            .filter(|d| crate::subsystems::time::get_timestamp() - d.detected_at / 1000000000 < 3600) // 最近1小时
             .cloned()
             .collect();
 

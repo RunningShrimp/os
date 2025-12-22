@@ -86,7 +86,7 @@ fn sys_pthread_attr_setschedpolicy(args: &[u64]) -> SyscallResult {
         let mut attr_data = [0u8; core::mem::size_of::<ThreadAttr>()];
         
         unsafe {
-            match crate::mm::vm::copyin(pagetable, attr_data.as_mut_ptr(), attr_ptr, attr_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, attr_data.as_mut_ptr(), attr_ptr, attr_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -105,7 +105,7 @@ fn sys_pthread_attr_setschedpolicy(args: &[u64]) -> SyscallResult {
                 let attr_data = unsafe { core::mem::transmute::<ThreadAttr, [u8; 168]>(attr) };
                 
                 unsafe {
-                    match crate::mm::vm::copyout(pagetable, attr_ptr, attr_data.as_ptr(), attr_data.len()) {
+                    match crate::subsystems::mm::vm::copyout(pagetable, attr_ptr, attr_data.as_ptr(), attr_data.len()) {
                         Ok(_) => {},
                         Err(_) => return Err(SyscallError::BadAddress),
                     }
@@ -163,7 +163,7 @@ fn sys_pthread_attr_getschedpolicy(args: &[u64]) -> SyscallResult {
         let mut attr_data = [0u8; core::mem::size_of::<ThreadAttr>()];
         
         unsafe {
-            match crate::mm::vm::copyin(pagetable, attr_data.as_mut_ptr(), attr_ptr, attr_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, attr_data.as_mut_ptr(), attr_ptr, attr_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -180,7 +180,7 @@ fn sys_pthread_attr_getschedpolicy(args: &[u64]) -> SyscallResult {
     // Copy policy back to user space
     if policy_ptr != 0 {
         unsafe {
-            match crate::mm::vm::copyout(pagetable, policy_ptr, &policy as *const i32 as *const u8, core::mem::size_of::<i32>()) {
+            match crate::subsystems::mm::vm::copyout(pagetable, policy_ptr, &policy as *const i32 as *const u8, core::mem::size_of::<i32>()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -229,7 +229,7 @@ fn sys_pthread_attr_setschedparam(args: &[u64]) -> SyscallResult {
         let mut attr_data = [0u8; core::mem::size_of::<ThreadAttr>()];
         
         unsafe {
-            match crate::mm::vm::copyin(pagetable, attr_data.as_mut_ptr(), attr_ptr, attr_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, attr_data.as_mut_ptr(), attr_ptr, attr_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -245,7 +245,7 @@ fn sys_pthread_attr_setschedparam(args: &[u64]) -> SyscallResult {
         let mut param_data = [0u8; core::mem::size_of::<SchedParam>()];
         
         unsafe {
-            match crate::mm::vm::copyin(pagetable, param_data.as_mut_ptr(), param_ptr, param_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, param_data.as_mut_ptr(), param_ptr, param_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -264,7 +264,7 @@ fn sys_pthread_attr_setschedparam(args: &[u64]) -> SyscallResult {
                 let attr_data = unsafe { core::mem::transmute::<ThreadAttr, [u8; 168]>(attr) };
                 
                 unsafe {
-                    match crate::mm::vm::copyout(pagetable, attr_ptr, attr_data.as_ptr(), attr_data.len()) {
+                    match crate::subsystems::mm::vm::copyout(pagetable, attr_ptr, attr_data.as_ptr(), attr_data.len()) {
                         Ok(_) => {},
                         Err(_) => return Err(SyscallError::BadAddress),
                     }
@@ -322,7 +322,7 @@ fn sys_pthread_attr_getschedparam(args: &[u64]) -> SyscallResult {
         let mut attr_data = [0u8; core::mem::size_of::<ThreadAttr>()];
         
         unsafe {
-            match crate::mm::vm::copyin(pagetable, attr_data.as_mut_ptr(), attr_ptr, attr_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, attr_data.as_mut_ptr(), attr_ptr, attr_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -341,7 +341,7 @@ fn sys_pthread_attr_getschedparam(args: &[u64]) -> SyscallResult {
         let param_data = unsafe { core::mem::transmute::<SchedParam, [u8; 4]>(param) };
         
         unsafe {
-            match crate::mm::vm::copyout(pagetable, param_ptr, param_data.as_ptr(), param_data.len()) {
+            match crate::subsystems::mm::vm::copyout(pagetable, param_ptr, param_data.as_ptr(), param_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -390,7 +390,7 @@ fn sys_pthread_attr_setinheritsched(args: &[u64]) -> SyscallResult {
         let mut attr_data = [0u8; core::mem::size_of::<ThreadAttr>()];
         
         unsafe {
-            match crate::mm::vm::copyin(pagetable, attr_data.as_mut_ptr(), attr_ptr, attr_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, attr_data.as_mut_ptr(), attr_ptr, attr_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -409,7 +409,7 @@ fn sys_pthread_attr_setinheritsched(args: &[u64]) -> SyscallResult {
                 let attr_data = unsafe { core::mem::transmute::<ThreadAttr, [u8; 168]>(attr) };
                 
                 unsafe {
-                    match crate::mm::vm::copyout(pagetable, attr_ptr, attr_data.as_ptr(), attr_data.len()) {
+                    match crate::subsystems::mm::vm::copyout(pagetable, attr_ptr, attr_data.as_ptr(), attr_data.len()) {
                         Ok(_) => {},
                         Err(_) => return Err(SyscallError::BadAddress),
                     }
@@ -467,7 +467,7 @@ fn sys_pthread_attr_getinheritsched(args: &[u64]) -> SyscallResult {
         let mut attr_data = [0u8; core::mem::size_of::<ThreadAttr>()];
         
         unsafe {
-            match crate::mm::vm::copyin(pagetable, attr_data.as_mut_ptr(), attr_ptr, attr_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, attr_data.as_mut_ptr(), attr_ptr, attr_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -484,7 +484,7 @@ fn sys_pthread_attr_getinheritsched(args: &[u64]) -> SyscallResult {
     // Copy inheritance back to user space
     if inherit_ptr != 0 {
         unsafe {
-            match crate::mm::vm::copyout(pagetable, inherit_ptr, &inherit as *const i32 as *const u8, core::mem::size_of::<i32>()) {
+            match crate::subsystems::mm::vm::copyout(pagetable, inherit_ptr, &inherit as *const i32 as *const u8, core::mem::size_of::<i32>()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -532,7 +532,7 @@ fn sys_pthread_setschedparam(args: &[u64]) -> SyscallResult {
         }
 
         unsafe {
-            match crate::mm::vm::copyin(pagetable, param_data.as_mut_ptr(), param_ptr, param_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, param_data.as_mut_ptr(), param_ptr, param_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -598,7 +598,7 @@ fn sys_pthread_getschedparam(args: &[u64]) -> SyscallResult {
                 let param_data = unsafe { core::mem::transmute::<SchedParam, [u8; 4]>(param) };
                 
                 unsafe {
-                    match crate::mm::vm::copyout(pagetable, param_ptr, param_data.as_ptr(), param_data.len()) {
+                    match crate::subsystems::mm::vm::copyout(pagetable, param_ptr, param_data.as_ptr(), param_data.len()) {
                         Ok(_) => {},
                         Err(_) => return Err(SyscallError::BadAddress),
                     }
@@ -652,7 +652,7 @@ fn sys_pthread_getcpuclockid(args: &[u64]) -> SyscallResult {
                 }
 
                 unsafe {
-                    match crate::mm::vm::copyout(pagetable, clock_id_ptr, &return_clock_id as *const ClockId as *const u8, core::mem::size_of::<ClockId>()) {
+                    match crate::subsystems::mm::vm::copyout(pagetable, clock_id_ptr, &return_clock_id as *const ClockId as *const u8, core::mem::size_of::<ClockId>()) {
                         Ok(_) => {},
                         Err(_) => return Err(SyscallError::BadAddress),
                     }
@@ -720,7 +720,7 @@ fn sys_pthread_barrier_init(args: &[u64]) -> SyscallResult {
                 let barrier_handle = &barrier as *const Barrier as *const u8;
                 
                 unsafe {
-                    match crate::mm::vm::copyout(pagetable, barrier_ptr, barrier_handle, core::mem::size_of::<usize>()) {
+                    match crate::subsystems::mm::vm::copyout(pagetable, barrier_ptr, barrier_handle, core::mem::size_of::<usize>()) {
                         Ok(_) => {},
                         Err(_) => return Err(SyscallError::BadAddress),
                     }
@@ -844,7 +844,7 @@ fn sys_pthread_spin_init(args: &[u64]) -> SyscallResult {
                 let spinlock_handle = &spinlock as *const Spinlock as *const u8;
                 
                 unsafe {
-                    match crate::mm::vm::copyout(pagetable, spin_ptr, spinlock_handle, core::mem::size_of::<usize>()) {
+                    match crate::subsystems::mm::vm::copyout(pagetable, spin_ptr, spinlock_handle, core::mem::size_of::<usize>()) {
                         Ok(_) => {},
                         Err(_) => return Err(SyscallError::BadAddress),
                     }

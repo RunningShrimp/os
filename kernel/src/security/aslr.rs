@@ -231,12 +231,11 @@ impl AslrSubsystem {
     }
 
     /// Initialize ASLR for a new process
-    pub fn init_process(&mut self, process: &Process) -> Result<(), &'static str> {
+    pub fn init_process_by_pid(&mut self, pid: u64) -> Result<(), &'static str> {
         if !self.config.enabled {
             return Ok(());
         }
 
-        let pid = process.pid();
         let seed = self.generate_seed();
 
         let process_state = ProcessAslrState {
@@ -466,7 +465,7 @@ impl AslrSubsystem {
         let event = AslrBypassEvent {
             pid,
             bypass_type,
-            timestamp: crate::time::get_ticks(),
+            timestamp: crate::subsystems::time::get_ticks(),
             source_addr,
             target_addr,
             details,
@@ -513,14 +512,14 @@ impl AslrSubsystem {
     pub fn should_rerandomize(&self) -> bool {
         let interval = self.rerandomization_interval.load(Ordering::Relaxed);
         let last_time = self.last_rerandomization.load(Ordering::Relaxed);
-        let current_time = crate::time::get_ticks();
+        let current_time = crate::subsystems::time::get_ticks();
         
         if interval == 0 {
             return false;
         }
         
         // Convert interval from seconds to ticks
-        let interval_ticks = interval as u64 * crate::time::TICK_HZ;
+        let interval_ticks = interval as u64 * crate::subsystems::time::TICK_HZ;
         current_time.saturating_sub(last_time) >= interval_ticks
     }
     
@@ -619,7 +618,7 @@ impl AslrSubsystem {
                 match self.rerandomize_process(pid) {
                     Ok(()) => {
                         rerandomized_count += 1;
-                        self.last_rerandomization.store(crate::time::get_ticks(), Ordering::Relaxed);
+                        self.last_rerandomization.store(crate::subsystems::time::get_ticks(), Ordering::Relaxed);
                     }
                     Err(_) => {
                         // Log error but continue with other processes
@@ -677,11 +676,11 @@ pub struct AslrHealthMetrics {
 
 /// High-level ASLR interface functions
 
-/// Initialize ASLR for a process
-pub fn init_process_aslr(process: &Process) -> Result<(), &'static str> {
+/// Initialize ASLR for a process by PID
+pub fn init_process_aslr_by_pid(pid: u64) -> Result<(), &'static str> {
     let mut guard = crate::security::ASLR.lock();
     if let Some(ref mut aslr) = *guard {
-        aslr.init_process(process)
+        aslr.init_process_by_pid(pid)
     } else {
         Ok(())
     }
@@ -973,7 +972,7 @@ pub enum AslrSecurityLevel {
 pub fn benchmark_aslr_performance(iterations: usize) -> Result<(u64, u64), &'static str> {
     let guard = crate::security::ASLR.lock();
     if let Some(ref aslr) = *guard {
-        let start_time = crate::time::get_ticks();
+        let start_time = crate::subsystems::time::get_ticks();
         
         // Benchmark randomization
         for _ in 0..iterations {
@@ -981,16 +980,16 @@ pub fn benchmark_aslr_performance(iterations: usize) -> Result<(u64, u64), &'sta
             let _ = aslr.randomize_region(1234, base, 4096, 4096, MemoryRegionType::Stack);
         }
         
-        let randomization_time = crate::time::get_ticks() - start_time;
+        let randomization_time = crate::subsystems::time::get_ticks() - start_time;
         
         // Benchmark validation
-        let start_time = crate::time::get_ticks();
+        let start_time = crate::subsystems::time::get_ticks();
         
         for _ in 0..iterations {
             let _ = aslr.validate_randomization(1234);
         }
         
-        let validation_time = crate::time::get_ticks() - start_time;
+        let validation_time = crate::subsystems::time::get_ticks() - start_time;
         
         Ok((randomization_time, validation_time))
     } else {

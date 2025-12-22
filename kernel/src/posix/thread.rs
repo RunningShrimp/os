@@ -9,10 +9,10 @@ use core::ptr::null_mut;
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use crate::sync::Mutex;
-use crate::sync::primitives::{MutexEnhanced, CondVar};
+use crate::subsystems::sync::Mutex;
+use crate::subsystems::sync::primitives::{MutexEnhanced, CondVar};
 use crate::process::getpid;
-use crate::mm::PAGE_SIZE;
+use crate::subsystems::mm::PAGE_SIZE;
 use crate::reliability::errno::{EINVAL, EAGAIN, ESRCH, EDEADLK, EBUSY};
 
 // ============================================================================
@@ -1304,7 +1304,7 @@ pub unsafe extern "C" fn pthread_cond_timedwait(
 
     // Get timeout time
     let timeout = &*abstime;
-    let now_ns = crate::time::get_time_ns();
+    let now_ns = crate::subsystems::time::get_time_ns();
     let timeout_ns = (timeout.tv_sec as u64) * 1_000_000_000 + (timeout.tv_nsec as u64);
 
     if timeout_ns <= now_ns {

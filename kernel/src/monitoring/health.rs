@@ -7,7 +7,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 use alloc::string::String;
 use core::sync::atomic::{AtomicU64, Ordering};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 
 /// Health check status
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,7 +53,7 @@ impl HealthChecker {
     /// Run health checks
     pub fn check_health(&self) -> Vec<HealthCheckResult> {
         let mut results = Vec::new();
-        let current_time = crate::time::hrtime_nanos();
+        let current_time = crate::subsystems::time::hrtime_nanos();
         
         // Check memory health
         let memory_check = self.check_memory();
@@ -90,7 +90,7 @@ impl HealthChecker {
             name: "memory".to_string(),
             status: HealthStatus::Healthy,
             message: "Memory usage normal".to_string(),
-            timestamp: crate::time::hrtime_nanos(),
+            timestamp: crate::subsystems::time::hrtime_nanos(),
         }
     }
     
@@ -113,7 +113,7 @@ impl HealthChecker {
             name: "processes".to_string(),
             status,
             message: format!("{} running processes", running_processes),
-            timestamp: crate::time::hrtime_nanos(),
+            timestamp: crate::subsystems::time::hrtime_nanos(),
         }
     }
     
@@ -128,7 +128,7 @@ impl HealthChecker {
             name: "cpu".to_string(),
             status: HealthStatus::Healthy,
             message: "CPU usage normal".to_string(),
-            timestamp: crate::time::hrtime_nanos(),
+            timestamp: crate::subsystems::time::hrtime_nanos(),
         }
     }
     
@@ -158,7 +158,7 @@ pub fn init_health_checker() -> Result<(), i32> {
 
 /// Get health checker
 pub fn get_health_checker() -> &'static HealthChecker {
-    static INIT_ONCE: crate::sync::Once = crate::sync::Once::new();
+    static INIT_ONCE: crate::subsystems::sync::Once = crate::subsystems::sync::Once::new();
     INIT_ONCE.call_once(|| {
         let mut checker = HEALTH_CHECKER.lock();
         if checker.is_none() {

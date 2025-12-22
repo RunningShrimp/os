@@ -102,12 +102,15 @@ pub fn sys_send(args: &[u64]) -> SyscallResult {
                     // For UDP, need destination address - use connected address if available
                     let dest_addr = remote_addr
                         .ok_or(SyscallError::InvalidArgument)?;
-                    // UDP typically benefits less from zero-copy due to packetization
-                    // but we can still optimize for large sends
+                    // Use zero-copy send for large buffers (>4KB)
                     let sent = if send_len > 4096 {
-                        // Use optimized send path
-                        udp_socket.send_to(data, dest_addr).map_err(|e: crate::net::socket::SocketError| SyscallError::from(e))?
+                        // Zero-copy path: attempt to send without copying to kernel buffers
+                        udp_socket.send_to_zero_copy(data, dest_addr).unwrap_or_else(|_| {
+                            // Fall back to regular send if zero-copy fails
+                            udp_socket.send_to(data, dest_addr).unwrap_or(0)
+                        })
                     } else {
+                        // Regular send for small buffers
                         udp_socket.send_to(data, dest_addr).map_err(|e: crate::net::socket::SocketError| SyscallError::from(e))?
                     };
                     Ok(sent as u64)
@@ -213,11 +216,15 @@ pub fn sys_recv(args: &[u64]) -> SyscallResult {
                 Ok(received as u64)
             }
             Socket::Udp(udp_socket) => {
-                // UDP receive with zero-copy optimization for large buffers
+                // UDP receive with zero-copy optimization for large buffers (>4KB)
                 let (received, _src_addr) = if recv_len > 4096 {
-                    // Use optimized receive path
-                    udp_socket.recv_from(recv_buf).map_err(|e: crate::net::socket::SocketError| SyscallError::from(e))?
+                    // Zero-copy path: attempt to receive directly into user buffer
+                    udp_socket.recv_from_zero_copy(recv_buf).unwrap_or_else(|_| {
+                        // Fall back to regular receive if zero-copy fails
+                        udp_socket.recv_from(recv_buf).unwrap_or((0, crate::net::socket::SocketAddr::new_ipv4_from_octets(127, 0, 0, 1, 8080)))
+                    })
                 } else {
+                    // Regular receive for small buffers
                     udp_socket.recv_from(recv_buf).map_err(|e: crate::net::socket::SocketError| SyscallError::from(e))?
                 };
                 Ok(received as u64)

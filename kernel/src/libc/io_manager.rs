@@ -136,9 +136,9 @@ pub struct EnhancedIOManager {
     /// 统计信息
     stats: IOStats,
     /// 打开的文件表
-    open_files: crate::sync::Mutex<Vec<Option<*mut CFile>, 256>>,
+    open_files: crate::subsystems::sync::Mutex<Vec<Option<*mut CFile>, 256>>,
     /// 缓冲区池
-    buffer_pool: crate::sync::Mutex<Vec<&'static mut [u8], 128>>,
+    buffer_pool: crate::subsystems::sync::Mutex<Vec<&'static mut [u8], 128>>,
     /// 下一个文件描述符
     next_fd: AtomicUsize,
 }
@@ -159,8 +159,8 @@ impl EnhancedIOManager {
         Self {
             config,
             stats: IOStats::default(),
-            open_files: crate::sync::Mutex::new(Vec::new()),
-            buffer_pool: crate::sync::Mutex::new(Vec::new()),
+            open_files: crate::subsystems::sync::Mutex::new(Vec::new()),
+            buffer_pool: crate::subsystems::sync::Mutex::new(Vec::new()),
             next_fd: AtomicUsize::new(3), // 从3开始，0-2是标准流
         }
     }

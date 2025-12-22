@@ -12,7 +12,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
 use crate::drivers::BlockDevice;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::subsystems::fs::fs_impl::BufCache;
 use core::hash::Hasher;
 

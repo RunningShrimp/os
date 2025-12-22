@@ -80,7 +80,7 @@ mod riscv64 {
         match scause {
             cause::SUPERVISOR_TIMER => {
                 // Timer interrupt - yield CPU
-                crate::time::timer_interrupt();
+                crate::subsystems::time::timer_interrupt();
             }
             cause::SUPERVISOR_EXTERNAL => {
                 // External interrupt (e.g., UART)
@@ -149,7 +149,7 @@ mod aarch64 {
     
     fn handle_irq() {
         // TODO: Read interrupt controller to determine source
-        crate::time::timer_interrupt();
+        crate::subsystems::time::timer_interrupt();
     }
 }
 
@@ -201,7 +201,7 @@ mod x86_64 {
                     cr2, error_code, rip);
             }
             vector::TIMER => {
-                crate::time::timer_interrupt();
+                crate::subsystems::time::timer_interrupt();
             }
             vector::GENERAL_PROTECTION => {
                 panic!("General protection fault: error={:#x} rip={:#x}",

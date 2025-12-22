@@ -11,7 +11,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicU32, AtomicU64, AtomicBool, Ordering};
-use crate::sync::{Mutex, Sleeplock};
+use crate::subsystems::sync::{Mutex, Sleeplock};
 use crate::subsystems::drivers::device_model::{
     DeviceModel, EnhancedDeviceInfo, DeviceClass, DevicePowerState, 
     DeviceCapabilities, DevicePerformanceMetrics
@@ -867,8 +867,8 @@ impl PciDeviceManager {
                             device_info.address.function),
             aliases: Vec::new(),
             tags: vec![class_name.to_string()],
-            creation_timestamp: crate::time::get_timestamp(),
-            last_modified_timestamp: crate::time::get_timestamp(),
+            creation_timestamp: crate::subsystems::time::get_timestamp(),
+            last_modified_timestamp: crate::subsystems::time::get_timestamp(),
         };
 
         // Register with device model

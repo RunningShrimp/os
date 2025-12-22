@@ -158,7 +158,7 @@ impl SyscallCache {
 
         // Check TTL if enabled
         if self.config.eviction_policy == EvictionPolicy::TTL {
-            let current_time = crate::time::timestamp_nanos() / 1000000;
+            let current_time = crate::subsystems::time::timestamp_nanos() / 1000000;
             if current_time - entry.timestamp > self.config.entry_timeout_ms {
                 self.entries.remove(key);
                 self.lru_list.retain(|k| k != key);
@@ -202,7 +202,7 @@ impl SyscallCache {
         // Create new entry
         let entry = SyscallCacheEntry {
             result,
-            timestamp: crate::time::timestamp_nanos() / 1000000,
+            timestamp: crate::subsystems::time::timestamp_nanos() / 1000000,
             ref_count: 1,
             flags: CacheEntryFlags::PURE, // Assume pure since we checked earlier
         };
@@ -299,12 +299,12 @@ pub struct CacheStats {
 }
 
 /// Global system call cache instance
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 static GLOBAL_SYSCALL_CACHE: Mutex<Option<SyscallCache>> = Mutex::new(None);
 
 /// Get or initialize the global system call cache
 fn get_or_init_cache() -> &'static Mutex<Option<SyscallCache>> {
-    use crate::sync::Once;
+    use crate::subsystems::sync::Once;
     static INIT_ONCE: Once = Once::new();
 
     INIT_ONCE.call_once(|| {

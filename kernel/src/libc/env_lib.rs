@@ -16,7 +16,7 @@ use heapless::{String, Vec};
 use crate::libc::error::set_errno;
 use crate::libc::error::errno::{EINVAL, ENOMEM};
 use crate::reliability::errno::{EPERM, EAGAIN};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 
 /// 环境变量条目
 #[derive(Debug, Clone)]
@@ -82,7 +82,7 @@ pub struct EnhancedEnvManager {
     /// 统计信息
     stats: Mutex<EnvStats>,
     /// 环境变量表
-    env_table: crate::sync::Mutex<Vec<EnvEntry, 128>>,
+    env_table: crate::subsystems::sync::Mutex<Vec<EnvEntry, 128>>,
     /// 系统环境变量前缀
     sys_prefixes: &'static [&'static str; 5],
 }
@@ -102,7 +102,7 @@ impl EnhancedEnvManager {
         Self {
             config,
             stats: Mutex::new(EnvStats::default()),
-            env_table: crate::sync::Mutex::new(Vec::new()),
+            env_table: crate::subsystems::sync::Mutex::new(Vec::new()),
             sys_prefixes: &SYSTEM_ENV_PREFIXES,
         }
     }

@@ -10,7 +10,7 @@ extern crate alloc;
 
 use crate::syscalls::SyscallResult;
 use crate::alloc::allocator::FixedSizeAllocator;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use alloc::collections::BTreeMap;
 use core::ffi::c_int;
 use core::sync::atomic::AtomicUsize;

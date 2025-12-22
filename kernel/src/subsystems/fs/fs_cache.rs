@@ -11,7 +11,7 @@ use alloc::string::String;
 use alloc::collections::{BTreeMap, HashMap, VecDeque};
 // use alloc::sync::Arc;
 // use core::sync::atomic::{AtomicU64, AtomicU32, AtomicBool, AtomicU8, Ordering};
-// use crate::sync::{Sleeplock, Mutex};
+// use crate::subsystems::sync::{Sleeplock, Mutex};
 // use crate::subsystems::fs::fs_impl::{Buf, BufFlags, BufCache, CacheKey};
 use crate::platform::drivers::BlockDevice;
 use nos_nos_error_handling::unified::KernelError;

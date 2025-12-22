@@ -36,7 +36,7 @@ impl VsyncManager {
     /// Enable VSync
     pub fn enable(&self) -> Result<(), i32> {
         self.enabled.store(true, Ordering::Release);
-        self.last_vsync_time.store(crate::time::hrtime_nanos(), Ordering::Release);
+        self.last_vsync_time.store(crate::subsystems::time::hrtime_nanos(), Ordering::Release);
         crate::println!("[vsync] VSync enabled ({} Hz)", 1_000_000_000 / self.vsync_interval_ns);
         Ok(())
     }
@@ -54,18 +54,18 @@ impl VsyncManager {
             return Ok(()); // VSync disabled - don't wait
         }
         
-        let current_time = crate::time::hrtime_nanos();
+        let current_time = crate::subsystems::time::hrtime_nanos();
         let last_vsync = self.last_vsync_time.load(Ordering::Acquire);
         let elapsed = current_time.saturating_sub(last_vsync);
         
         if elapsed < self.vsync_interval_ns {
             // Wait until next VSync
             let wait_time = self.vsync_interval_ns - elapsed;
-            crate::time::sleep_ms(wait_time / 1_000_000);
+            crate::subsystems::time::sleep_ms(wait_time / 1_000_000);
         }
         
         // Update VSync time
-        self.last_vsync_time.store(crate::time::hrtime_nanos(), Ordering::Release);
+        self.last_vsync_time.store(crate::subsystems::time::hrtime_nanos(), Ordering::Release);
         self.frame_counter.fetch_add(1, Ordering::Relaxed);
         
         Ok(())
@@ -100,7 +100,7 @@ impl VsyncManager {
     /// VSync interrupt handler (called by display driver)
     pub fn vsync_interrupt(&self) {
         if self.enabled.load(Ordering::Acquire) {
-            self.last_vsync_time.store(crate::time::hrtime_nanos(), Ordering::Release);
+            self.last_vsync_time.store(crate::subsystems::time::hrtime_nanos(), Ordering::Release);
             self.frame_counter.fetch_add(1, Ordering::Relaxed);
             
             // Wake up compositor if it's waiting

@@ -219,6 +219,11 @@ impl KernelHandoff {
     ///
     /// This function jumps to the kernel entry point and does not return.
     /// Must be called from trusted bootloader context with proper setup.
+    ///
+    /// # Architecture-specific calling conventions:
+    /// - x86_64: RDI = boot_info pointer (System V AMD64 ABI first arg)
+    /// - AArch64: x0 = boot_info pointer (first arg)
+    /// - RISC-V: a0 = boot_info pointer (first arg)
     pub unsafe fn execute(&self) -> ! {
         // SAFETY: Caller must ensure:
         // 1. Kernel is properly loaded
@@ -226,24 +231,67 @@ impl KernelHandoff {
         // 3. Entry point is valid
         // 4. Boot information is complete
 
-        let _kernel_entry = self.boot_info.kernel_entry;
-        let _boot_info_ptr = &self.boot_info as *const _ as u64;
-        log::debug!("Preparing kernel handoff with entry point");
+        // Validate boot information before handoff
+        if let Err(e) = self.boot_info.validate() {
+            // In bootloader context, we can't panic normally, so halt
+            // This should not happen if prepare() was called, but check anyway
+            crate::panic!("Kernel handoff validation failed: {}", e);
+        }
+
+        let kernel_entry = self.boot_info.kernel_entry;
+        let boot_info_ptr = &self.boot_info as *const BootInformation;
+
+        // Validate address alignment
+        // Kernel entry should be page-aligned (4KB) for most architectures
+        const PAGE_SIZE: u64 = 4096;
+        if kernel_entry % PAGE_SIZE != 0 {
+            crate::panic!("Kernel entry point {:#x} not page-aligned (must be aligned to 4KB boundary)", kernel_entry);
+        }
+
+        // Validate pointer alignment (should be 8-byte aligned for 64-bit)
+        if (boot_info_ptr as usize) % 8 != 0 {
+            crate::panic!("Boot info pointer {:#p} not properly aligned (must be 8-byte aligned)", boot_info_ptr);
+        }
+
+        // Validate kernel entry is in reasonable range
+        // For x86_64: kernel space starts at 0xFFFF800000000000
+        // For AArch64: kernel space typically starts at 0xFFFF000000000000
+        // For RISC-V: kernel space starts at 0xFFFFFFC000000000 (SV39) or 0xFFFFFFE000000000 (SV48)
+        #[cfg(target_arch = "x86_64")]
+        {
+            if kernel_entry < 0x100000 || (kernel_entry > 0x7FFFFFFFFFFF && kernel_entry < 0xFFFF800000000000) {
+                crate::panic!("Invalid kernel entry point address {:#x} (must be in valid kernel address space)", kernel_entry);
+            }
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        {
+            if kernel_entry < 0x100000 || (kernel_entry > 0xFFFFFFFFFFFF && kernel_entry < 0xFFFF000000000000) {
+                crate::panic!("Invalid kernel entry point address {:#x} (must be in valid kernel address space)", kernel_entry);
+            }
+        }
+
+        #[cfg(target_arch = "riscv64")]
+        {
+            if kernel_entry < 0x100000 || (kernel_entry > 0x3FFFFFFFFF && kernel_entry < 0xFFFFFFC000000000) {
+                crate::panic!("Invalid kernel entry point address {:#x} (must be in valid kernel address space)", kernel_entry);
+            }
+        }
+
+        // Memory barrier before kernel transition
+        core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst);
 
         // Use inline assembly for kernel handoff
-        // Set up arguments for kernel:
-        // RDI = boot information pointer (System V AMD64 ABI first arg)
-        // RAX = kernel entry point
-        // Then clear flags and jump
+        // Set up arguments for kernel according to architecture calling convention
         #[cfg(all(target_os = "none", target_arch = "x86_64"))]
         {
             unsafe {
                 core::arch::asm!(
                     "cli",                          // Disable interrupts
-                    "mov rdi, {boot_info}",        // RDI = boot_info pointer
-                    "jmp {kernel_entry}",          // Jump to kernel
-                    boot_info = in(reg) _boot_info_ptr,
-                    kernel_entry = in(reg) _kernel_entry,
+                    "mov rdi, {boot_info}",         // RDI = boot_info pointer (System V AMD64 ABI first arg)
+                    "jmp {kernel_entry}",          // Jump to kernel entry point
+                    boot_info = in(reg) boot_info_ptr as u64,
+                    kernel_entry = in(reg) kernel_entry,
                     options(noreturn, nostack, nomem)
                 );
             }
@@ -253,11 +301,11 @@ impl KernelHandoff {
         {
             unsafe {
                 core::arch::asm!(
-                    "msr daifset, #15",             // Disable interrupts (aarch64)
-                    "mov x0, {boot_info}",         // x0 = boot_info pointer (first arg)
-                    "br {kernel_entry}",            // Branch to kernel
-                    boot_info = in(reg) _boot_info_ptr,
-                    kernel_entry = in(reg) _kernel_entry,
+                    "msr daifset, #15",             // Disable interrupts (DAIF = 0b1111)
+                    "mov x0, {boot_info}",          // x0 = boot_info pointer (first arg in AArch64 ABI)
+                    "br {kernel_entry}",            // Branch to kernel entry point
+                    boot_info = in(reg) boot_info_ptr as u64,
+                    kernel_entry = in(reg) kernel_entry,
                     options(noreturn, nostack, nomem)
                 );
             }
@@ -267,11 +315,11 @@ impl KernelHandoff {
         {
             unsafe {
                 core::arch::asm!(
-                    "csrci mstatus, 8",             // Disable interrupts (riscv64)
-                    "mv a0, {boot_info}",          // a0 = boot_info pointer (first arg)
-                    "jr {kernel_entry}",            // Jump to kernel
-                    boot_info = in(reg) _boot_info_ptr,
-                    kernel_entry = in(reg) _kernel_entry,
+                    "csrci mstatus, 8",             // Disable interrupts (clear MIE bit)
+                    "mv a0, {boot_info}",          // a0 = boot_info pointer (first arg in RISC-V calling convention)
+                    "jr {kernel_entry}",            // Jump to kernel entry point
+                    boot_info = in(reg) boot_info_ptr as u64,
+                    kernel_entry = in(reg) kernel_entry,
                     options(noreturn, nostack, nomem)
                 );
             }
@@ -283,7 +331,10 @@ impl KernelHandoff {
             all(target_os = "none", target_arch = "riscv64")
         )))]
         {
-            loop {}
+            // Unsupported architecture - halt
+            loop {
+                core::hint::spin_loop();
+            }
         }
     }
 

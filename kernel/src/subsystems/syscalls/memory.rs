@@ -2,10 +2,10 @@
 
 use super::common::{SyscallError, SyscallResult, extract_args};
 use crate::process::{PROC_TABLE, myproc};
-use crate::mm::vm::{map_pages, flags, PAGE_SIZE, PageTable, map_page, flush_tlb_page, phys_to_kernel_ptr};
-use crate::mm::{kalloc, kfree};
+use crate::subsystems::mm::vm::{map_pages, flags, PAGE_SIZE, PageTable, map_page, flush_tlb_page, phys_to_kernel_ptr};
+use crate::subsystems::mm::{kalloc, kfree};
 use crate::posix;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use core::ptr;
 use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicUsize, Ordering};
@@ -148,7 +148,7 @@ fn sys_brk(args: &[u64]) -> SyscallResult {
     }
 
     // Validate address range
-    if addr >= crate::mm::vm::KERNEL_BASE {
+    if crate::arch::memory_layout::is_kernel_address(addr) {
         return Err(SyscallError::InvalidArgument);
     }
 
@@ -294,7 +294,7 @@ pub fn sys_mmap(args: &[u64]) -> SyscallResult {
         // Start searching from the heap end, which is at proc.sz
         target_addr = proc.sz;
         // Ensure we don't overlap with kernel space
-        if target_addr + aligned_length >= crate::mm::vm::KERNEL_BASE {
+        if crate::arch::memory_layout::is_kernel_address(target_addr + aligned_length) {
             return Err(SyscallError::OutOfMemory);
         }
     }
@@ -417,7 +417,7 @@ pub fn sys_munmap(args: &[u64]) -> SyscallResult {
     let aligned_length = (length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
     let end = start + aligned_length;
 
-    if start >= crate::mm::vm::KERNEL_BASE || end > crate::mm::vm::KERNEL_BASE {
+    if crate::arch::memory_layout::is_kernel_address(start) || crate::arch::memory_layout::is_kernel_address(end) {
         return Err(SyscallError::InvalidArgument);
     }
 
@@ -447,7 +447,7 @@ pub fn sys_munmap(args: &[u64]) -> SyscallResult {
         // Try to unmap the page and get physical address
         #[cfg(target_arch = "riscv64")]
         {
-            use crate::mm::vm::riscv64;
+            use crate::subsystems::mm::vm::riscv64;
             if let Some(pa) = unsafe { riscv64::unmap_page(pagetable, current) } {
                 // Free the physical page
                 kfree(pa as *mut u8);
@@ -460,7 +460,7 @@ pub fn sys_munmap(args: &[u64]) -> SyscallResult {
             // For aarch64, use the exported unmap_page function
             unsafe {
                 // Unmap the page (returns Result<(), ()>)
-                if crate::mm::vm::unmap_page(pagetable, current).is_ok() {
+                if crate::subsystems::mm::vm::unmap_page(pagetable, current).is_ok() {
                     // Note: For aarch64, we would need to track physical addresses
                     // separately. For now, we just unmap without freeing physical memory.
                     // TODO: Implement proper physical page tracking for aarch64
@@ -483,7 +483,7 @@ pub fn sys_munmap(args: &[u64]) -> SyscallResult {
     // Flush TLB for the unmapped region
     let mut current = start;
     while current < end {
-        crate::mm::vm::flush_tlb_page(current);
+        crate::subsystems::mm::vm::flush_tlb_page(current);
         current += PAGE_SIZE;
     }
 
@@ -511,7 +511,7 @@ fn sys_mprotect(args: &[u64]) -> SyscallResult {
     let aligned_length = (len + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
     let end = start + aligned_length;
 
-    if start >= crate::mm::vm::KERNEL_BASE || end > crate::mm::vm::KERNEL_BASE {
+    if crate::arch::memory_layout::is_kernel_address(start) || crate::arch::memory_layout::is_kernel_address(end) {
         return Err(SyscallError::InvalidArgument);
     }
 
@@ -545,12 +545,12 @@ fn sys_mprotect(args: &[u64]) -> SyscallResult {
             #[cfg(target_arch = "riscv64")]
             {
                 // Get current PTE
-                if let Some(pte_ptr) = crate::mm::vm::riscv64::walk(pagetable, current, false) {
-                    if *pte_ptr & crate::mm::vm::riscv64::PTE_V != 0 {
+                if let Some(pte_ptr) = crate::subsystems::mm::vm::riscv64::walk(pagetable, current, false) {
+                    if *pte_ptr & crate::subsystems::mm::vm::riscv64::PTE_V != 0 {
                         // Page is mapped, update permissions
                         let old_pte = *pte_ptr;
-                        let pa = crate::mm::vm::riscv64::pte_to_pa(old_pte);
-                        let new_pte = crate::mm::vm::riscv64::pa_to_pte(pa) | new_perm | crate::mm::vm::riscv64::PTE_V;
+                        let pa = crate::subsystems::mm::vm::riscv64::pte_to_pa(old_pte);
+                        let new_pte = crate::subsystems::mm::vm::riscv64::pa_to_pte(pa) | new_perm | crate::subsystems::mm::vm::riscv64::PTE_V;
                         *pte_ptr = new_pte;
                         updated_count += 1;
                     }
@@ -560,7 +560,7 @@ fn sys_mprotect(args: &[u64]) -> SyscallResult {
             #[cfg(target_arch = "aarch64")]
             {
                 // Use the exported walk function
-                if let Some(desc_ptr) = crate::mm::vm::walk(pagetable, current, false) {
+                if let Some(desc_ptr) = crate::subsystems::mm::vm::walk(pagetable, current, false) {
                     // Constants for aarch64 descriptor flags
                     const DESC_VALID: usize = 1 << 0;
                     const DESC_AF: usize = 1 << 10;
@@ -605,7 +605,7 @@ fn sys_mprotect(args: &[u64]) -> SyscallResult {
     let mut current = start;
     while current < end {
         unsafe {
-            crate::mm::vm::flush_tlb_page(current);
+            crate::subsystems::mm::vm::flush_tlb_page(current);
         }
         current += PAGE_SIZE;
     }
@@ -676,11 +676,11 @@ fn sys_msync(args: &[u64]) -> SyscallResult {
     drop(table);
     
     // Align to page boundaries
-    let start = addr & !(crate::mm::vm::PAGE_SIZE - 1);
-    let aligned_length = (length + crate::mm::vm::PAGE_SIZE - 1) & !(crate::mm::vm::PAGE_SIZE - 1);
+    let start = addr & !(crate::subsystems::mm::vm::PAGE_SIZE - 1);
+    let aligned_length = (length + crate::subsystems::mm::vm::PAGE_SIZE - 1) & !(crate::subsystems::mm::vm::PAGE_SIZE - 1);
     let end = start + aligned_length;
     
-    if start >= crate::mm::vm::KERNEL_BASE || end > crate::mm::vm::KERNEL_BASE {
+    if crate::arch::memory_layout::is_kernel_address(start) || crate::arch::memory_layout::is_kernel_address(end) {
         return Err(SyscallError::InvalidArgument);
     }
     
@@ -697,7 +697,7 @@ fn sys_msync(args: &[u64]) -> SyscallResult {
         // Check if page is mapped
         #[cfg(target_arch = "riscv64")]
         {
-            use crate::mm::vm::riscv64;
+            use crate::subsystems::mm::vm::riscv64;
             if let Some(pte_ptr) = unsafe { riscv64::walk(pagetable, current, false) } {
                 if *pte_ptr & riscv64::PTE_V != 0 {
                     // Page is mapped, check if it's a file-backed mapping
@@ -721,7 +721,7 @@ fn sys_msync(args: &[u64]) -> SyscallResult {
             synced_pages += 1;
         }
         
-        current += crate::mm::vm::PAGE_SIZE;
+        current += crate::subsystems::mm::vm::PAGE_SIZE;
     }
     
     // For now, we just return success
@@ -770,7 +770,7 @@ fn sys_mremap(args: &[u64]) -> SyscallResult {
         if new_addr == 0 || new_addr & (PAGE_SIZE - 1) != 0 {
             return Err(SyscallError::InvalidArgument);
         }
-        if new_addr >= crate::mm::vm::KERNEL_BASE {
+        if crate::arch::memory_layout::is_kernel_address(new_addr) {
             return Err(SyscallError::InvalidArgument);
         }
     }
@@ -794,7 +794,7 @@ fn sys_mremap(args: &[u64]) -> SyscallResult {
     let aligned_new_size = (new_size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
 
     // Check if old region is valid
-    if old_addr >= crate::mm::vm::KERNEL_BASE || old_addr + aligned_old_size > crate::mm::vm::KERNEL_BASE {
+    if crate::arch::memory_layout::is_kernel_address(old_addr) || crate::arch::memory_layout::is_kernel_address(old_addr + aligned_old_size) {
         return Err(SyscallError::InvalidArgument);
     }
 
@@ -863,14 +863,14 @@ fn handle_mremap_shrink(
 
         #[cfg(target_arch = "riscv64")]
         unsafe {
-            if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, va) {
+            if let Some(pa) = crate::subsystems::mm::vm::riscv64::unmap_page(pagetable, va) {
                 kfree(pa as *mut u8);
             }
         }
 
         #[cfg(target_arch = "aarch64")]
         unsafe {
-            if crate::mm::vm::unmap_page(pagetable, va).is_ok() {
+            if crate::subsystems::mm::vm::unmap_page(pagetable, va).is_ok() {
                 // Note: AArch64 unmap_page doesn't return PA
             }
         }
@@ -929,7 +929,7 @@ fn handle_mremap_expand_inplace(
                 let cleanup_va = old_addr + old_size + j * PAGE_SIZE;
                 #[cfg(target_arch = "riscv64")]
                 unsafe {
-                    if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
+                    if let Some(pa) = crate::subsystems::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
                         kfree(pa as *mut u8);
                     }
                 }
@@ -953,7 +953,7 @@ fn handle_mremap_expand_inplace(
                 for j in 0..i {
                     let cleanup_va = old_addr + old_size + j * PAGE_SIZE;
                     #[cfg(target_arch = "riscv64")]
-                    if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
+                    if let Some(pa) = crate::subsystems::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
                         kfree(pa as *mut u8);
                     }
                 }
@@ -1009,7 +1009,7 @@ fn handle_mremap_move(
         // Get source physical address
         #[cfg(target_arch = "riscv64")]
         let src_pa = unsafe {
-            match crate::mm::vm::riscv64::translate(pagetable, src_va) {
+            match crate::subsystems::mm::vm::riscv64::translate(pagetable, src_va) {
                 Some(pa) => pa,
                 None => continue, // Skip if not mapped
             }
@@ -1017,7 +1017,7 @@ fn handle_mremap_move(
 
         #[cfg(target_arch = "aarch64")]
         let src_pa = unsafe {
-            match crate::mm::vm::walk(pagetable, src_va, false) {
+            match crate::subsystems::mm::vm::walk(pagetable, src_va, false) {
                 Some(pte) => (*pte & !0xFFF) | (src_va & (PAGE_SIZE - 1)),
                 None => continue,
             }
@@ -1025,7 +1025,7 @@ fn handle_mremap_move(
 
         #[cfg(target_arch = "x86_64")]
         let src_pa = unsafe {
-            match crate::mm::vm::walk(pagetable, src_va, false) {
+            match crate::subsystems::mm::vm::walk(pagetable, src_va, false) {
                 Some(pte) => (*pte & !0xFFF) | (src_va & (PAGE_SIZE - 1)),
                 None => continue,
             }
@@ -1039,7 +1039,7 @@ fn handle_mremap_move(
                 let cleanup_va = target_addr + j * PAGE_SIZE;
                 #[cfg(target_arch = "riscv64")]
                 unsafe {
-                    if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
+                    if let Some(pa) = crate::subsystems::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
                         kfree(pa as *mut u8);
                     }
                 }
@@ -1069,7 +1069,7 @@ fn handle_mremap_move(
                 for j in 0..i {
                     let cleanup_va = target_addr + j * PAGE_SIZE;
                     #[cfg(target_arch = "riscv64")]
-                    if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
+                    if let Some(pa) = crate::subsystems::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
                         kfree(pa as *mut u8);
                     }
                 }
@@ -1092,7 +1092,7 @@ fn handle_mremap_move(
                     let cleanup_va = target_addr + j * PAGE_SIZE;
                     #[cfg(target_arch = "riscv64")]
                     unsafe {
-                        if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
+                        if let Some(pa) = crate::subsystems::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
                             kfree(pa as *mut u8);
                         }
                     }
@@ -1116,7 +1116,7 @@ fn handle_mremap_move(
                     for j in 0..(pages_to_copy + i) {
                         let cleanup_va = target_addr + j * PAGE_SIZE;
                         #[cfg(target_arch = "riscv64")]
-                        if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
+                        if let Some(pa) = crate::subsystems::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
                             kfree(pa as *mut u8);
                         }
                     }
@@ -1133,14 +1133,14 @@ fn handle_mremap_move(
 
             #[cfg(target_arch = "riscv64")]
             unsafe {
-                if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, va) {
+                if let Some(pa) = crate::subsystems::mm::vm::riscv64::unmap_page(pagetable, va) {
                     kfree(pa as *mut u8);
                 }
             }
 
             #[cfg(target_arch = "aarch64")]
             unsafe {
-                let _ = crate::mm::vm::unmap_page(pagetable, va);
+                let _ = crate::subsystems::mm::vm::unmap_page(pagetable, va);
             }
 
             #[cfg(target_arch = "x86_64")]
@@ -1176,7 +1176,7 @@ fn find_free_address_range(region: &MemoryRegion, size: usize) -> Result<usize, 
     // Check if the candidate range is free
     // For now, we'll use a simple check against known regions
     // In a real implementation, this would use a proper address space manager
-    let max_user_addr = crate::mm::vm::KERNEL_BASE - PAGE_SIZE;
+    let max_user_addr = crate::arch::memory_layout::user_max() - PAGE_SIZE;
     
     // Ensure we don't exceed the maximum user address
     if candidate + size > max_user_addr {
@@ -1292,9 +1292,9 @@ fn sys_optimized_alloc(args: &[u64]) -> SyscallResult {
         core::alloc::Layout::from_size_align_unchecked(size, align.max(8))
     };
     
-    // Use optimized allocator
-    use crate::memory_optimized;
-    let ptr = memory_optimized::allocate_optimized(layout, process_pid);
+    // Use unified memory allocator
+    use crate::memory;
+    let ptr = memory::kalloc(layout);
     
     if ptr.is_null() {
         Err(SyscallError::OutOfMemory)
@@ -1323,11 +1323,11 @@ fn sys_optimized_free(args: &[u64]) -> SyscallResult {
         pid
     };
     
-    // Use optimized allocator
-    use crate::memory_optimized;
+    // Use unified memory allocator
+    use crate::memory;
     // Create a dummy layout for deallocation (in a real implementation, we would track this)
     let layout = unsafe { core::alloc::Layout::from_size_align_unchecked(1, 1) };
-    memory_optimized::deallocate_optimized(ptr, layout, process_pid);
+    unsafe { memory::kfree(ptr, layout) };
     
     Ok(0)
 }
@@ -1359,9 +1359,16 @@ fn sys_optimized_realloc(args: &[u64]) -> SyscallResult {
         core::alloc::Layout::from_size_align_unchecked(new_size, align.max(8))
     };
     
-    // Use optimized allocator
-    use crate::memory_optimized;
-    let new_ptr = memory_optimized::reallocate_optimized(ptr, layout, process_pid);
+    // Use unified memory allocator (reallocation not yet supported, allocate new and copy)
+    use crate::memory;
+    let new_ptr = memory::kalloc(layout);
+    if !new_ptr.is_null() && !ptr.is_null() {
+        // Copy old data (simplified - would need to track old size)
+        unsafe {
+            core::ptr::copy_nonoverlapping(ptr, new_ptr, new_size.min(1024)); // Limit copy size
+        }
+        unsafe { memory::kfree(ptr, layout) };
+    }
     
     if new_ptr.is_null() {
         Err(SyscallError::OutOfMemory)
@@ -1384,13 +1391,12 @@ fn sys_optimized_stats(args: &[u64]) -> SyscallResult {
         pid
     };
     
-    // Get statistics from optimized allocator
-    use crate::memory_optimized;
-    let stats = memory_optimized::get_allocator_stats();
+    // Get statistics from unified allocator
+    use crate::memory;
+    let stats = memory::get_memory_stats();
     
-    // For now, return total allocated bytes as a simple statistic
-    // In a real implementation, we would return a structure with all statistics
-    Ok(stats.total_allocated as u64)
+    // Return total allocated bytes as a simple statistic
+    Ok(stats.current_allocated_bytes as u64)
 }
 
 /// Trigger defragmentation in the optimized allocator
@@ -1408,9 +1414,9 @@ fn sys_optimized_defrag(args: &[u64]) -> SyscallResult {
         pid
     };
     
-    // Trigger defragmentation
-    use crate::memory_optimized;
-    memory_optimized::defragment_memory();
+    // Defragmentation not yet supported in unified allocator
+    // TODO: Implement defragmentation in unified allocator
+    // For now, this is a no-op
     
     Ok(0)
 }
@@ -1430,11 +1436,8 @@ fn sys_optimized_pool_info(args: &[u64]) -> SyscallResult {
         pid
     };
     
-    // Get pool information
-    use crate::memory_optimized;
-    let pool_info = memory_optimized::get_pool_info(pool_type);
-    
-    // For now, return total free blocks as a simple statistic
-    // In a real implementation, we would return a structure with all pool information
-    Ok(pool_info.free_blocks as u64)
+    // Pool information not yet supported in unified allocator
+    // TODO: Implement pool information in unified allocator
+    // For now, return 0
+    Ok(0)
 }

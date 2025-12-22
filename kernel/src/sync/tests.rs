@@ -6,7 +6,8 @@
 pub mod sync_tests {
     use crate::{test_assert, test_assert_eq};
     use crate::tests::TestResult;
-    use crate::sync::{SpinLock, Mutex};
+    use crate::subsystems::sync::{SpinLock, Mutex};
+    use crate::subsystems::sync::primitives::MutexEnhanced;
     use alloc::vec::Vec;
 
     /// Test SpinLock basic operations
@@ -58,6 +59,17 @@ pub mod sync_tests {
             sl.unlock();
             test_assert!(!sl.is_locked());
             
+            Ok(())
+        }
+
+        /// Test MutexEnhanced basic locking behavior
+        pub fn test_mutex_enhanced_basic() -> TestResult {
+            let mutex = MutexEnhanced::new(0u32);
+            {
+                let mut guard = mutex.lock();
+                *guard = 42;
+            }
+            test_assert_eq!(*mutex.lock(), 42);
             Ok(())
         }
     

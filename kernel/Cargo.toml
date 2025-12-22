@@ -111,6 +111,12 @@ path = "benches/syscall_optimization_bench.rs"
 harness = false
 required-features = ["kernel_tests"]
 
+[[bench]]
+name = "performance_benchmarks"
+path = "benches/performance_benchmarks.rs"
+harness = false
+required-features = ["kernel_tests", "syscalls", "error_handling"]
+
 # Fuzz testing configuration
 [[bin]]
 name = "fuzz_testing"

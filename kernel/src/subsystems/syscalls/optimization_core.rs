@@ -1,5 +1,8 @@
 //! 优化核心模块
 //!
+//! **NOTE**: This module provides optimization infrastructure that is being integrated
+//! into the unified dispatcher. Some functionality may be deprecated.
+//!
 //! 提供系统调用优化的核心数据结构和通用功能，用于打破循环依赖
 
 use alloc::collections::BTreeMap;
@@ -276,7 +279,7 @@ impl Default for OptimizationConfig {
 
 /// 获取当前时间戳（纳秒）
 pub fn get_current_timestamp_ns() -> u64 {
-    crate::time::timestamp_nanos()
+    crate::subsystems::time::timestamp_nanos()
 }
 
 /// 通用缓存实现

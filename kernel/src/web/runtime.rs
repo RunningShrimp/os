@@ -7,7 +7,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::collections::BTreeMap;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::reliability::errno::{EINVAL, ENOMEM};
 
 /// PWA manifest
@@ -270,7 +270,7 @@ pub fn init_web_runtime_manager() -> Result<(), i32> {
 
 /// Get web runtime manager
 pub fn get_web_runtime_manager() -> &'static WebRuntimeManager {
-    static INIT_ONCE: crate::sync::Once = crate::sync::Once::new();
+    static INIT_ONCE: crate::subsystems::sync::Once = crate::subsystems::sync::Once::new();
     INIT_ONCE.call_once(|| {
         let mut manager = WEB_RUNTIME_MANAGER.lock();
         if manager.is_none() {

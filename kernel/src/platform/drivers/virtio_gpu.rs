@@ -6,7 +6,7 @@
 extern crate alloc;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::reliability::errno::{EINVAL, ENOMEM, EIO};
 // Note: Graphics types are used conceptually, actual implementation would integrate with graphics subsystem
 
@@ -267,7 +267,7 @@ pub fn init_virtio_gpu(base_addr: usize) -> Result<(), i32> {
 
 /// Get VirtIO GPU device
 pub fn get_virtio_gpu() -> Option<&'static VirtioGpuDevice> {
-    static INIT_ONCE: crate::sync::Once = crate::sync::Once::new();
+    static INIT_ONCE: crate::subsystems::sync::Once = crate::subsystems::sync::Once::new();
     INIT_ONCE.call_once(|| {
         // Try to initialize GPU if not already initialized
         // In real implementation, this would probe for VirtIO GPU device

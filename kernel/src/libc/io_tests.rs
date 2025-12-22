@@ -316,7 +316,7 @@ fn test_format_specifiers(libc: &SimpleCLib) {
 fn test_buffered_io_performance(libc: &SimpleCLib) {
     crate::println!("\n🧪 测试缓冲区I/O性能...");
 
-    let start_time = crate::time::get_time_ns();
+    let start_time = crate::subsystems::time::get_time_ns();
     let write_count = 1000;
 
     unsafe {
@@ -339,7 +339,7 @@ fn test_buffered_io_performance(libc: &SimpleCLib) {
 
             libc.fclose(file);
 
-            let end_time = crate::time::get_time_ns();
+            let end_time = crate::subsystems::time::get_time_ns();
             let elapsed = end_time - start_time;
 
             crate::println!("  📊 性能测试结果:");

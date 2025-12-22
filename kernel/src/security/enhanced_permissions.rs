@@ -4,7 +4,7 @@
 //! 能力安全(capabilities)和强制访问控制(MAC)。
 
 use core::sync::atomic::{AtomicU64, Ordering};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;

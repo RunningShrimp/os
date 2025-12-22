@@ -294,7 +294,7 @@ impl TestAutomationSystem {
     /// Create a new test job
     pub fn create_job(&self, name: String, description: String, test_suites: Vec<String>, config: TestJobConfig) -> u64 {
         let job_id = self.next_job_id.fetch_add(1, Ordering::SeqCst);
-        let current_time = crate::time::get_ticks();
+        let current_time = crate::subsystems::time::get_ticks();
 
         let job = TestJob {
             id: job_id,
@@ -359,7 +359,7 @@ impl TestAutomationSystem {
             let mut jobs = self.jobs.lock();
             if let Some(job) = jobs.iter_mut().find(|j| j.id == job_id) {
                 job.status = TestJobStatus::Running;
-                job.started_at = Some(crate::time::get_ticks());
+                job.started_at = Some(crate::subsystems::time::get_ticks());
             } else {
                 return Err("Job not found".to_string());
             }
@@ -382,7 +382,7 @@ impl TestAutomationSystem {
                     Ok(_) => TestJobStatus::Completed,
                     Err(_) => TestJobStatus::Failed,
                 };
-                job.completed_at = Some(crate::time::get_ticks());
+                job.completed_at = Some(crate::subsystems::time::get_ticks());
             }
         }
 
@@ -422,7 +422,7 @@ impl TestAutomationSystem {
         let mut tests_failed = 0;
         let mut tests_skipped = 0;
         let mut suite_results = Vec::new();
-        let start_time = crate::time::get_ticks();
+        let start_time = crate::subsystems::time::get_ticks();
 
         for suite_name in &job.test_suites {
             // In a real implementation, this would execute the actual test suite
@@ -444,7 +444,7 @@ impl TestAutomationSystem {
             suite_results.push(suite_result);
         }
 
-        let end_time = crate::time::get_ticks();
+        let end_time = crate::subsystems::time::get_ticks();
         let execution_time_ms = end_time - start_time;
 
         // Create job result
@@ -497,12 +497,12 @@ impl TestAutomationSystem {
                 match job.status {
                     TestJobStatus::Pending => {
                         job.status = TestJobStatus::Cancelled;
-                        job.completed_at = Some(crate::time::get_ticks());
+                        job.completed_at = Some(crate::subsystems::time::get_ticks());
                     }
                     TestJobStatus::Running => {
                         // In a real implementation, this would interrupt the running job
                         job.status = TestJobStatus::Cancelled;
-                        job.completed_at = Some(crate::time::get_ticks());
+                        job.completed_at = Some(crate::subsystems::time::get_ticks());
                     }
                     _ => {
                         return Err("Cannot cancel completed job".to_string());
@@ -548,7 +548,7 @@ impl TestAutomationSystem {
 
     /// Process scheduled jobs
     pub fn process_scheduled_jobs(&self) -> Result<Vec<u64>, String> {
-        let current_time = crate::time::get_ticks();
+        let current_time = crate::subsystems::time::get_ticks();
         let mut triggered_jobs = Vec::new();
 
         {
@@ -693,14 +693,14 @@ impl TestAutomationReport {
                 crate::println!("    Description: {}", job.description);
                 crate::println!("    Test suites: {:?}", job.test_suites);
                 crate::println!("    Priority: {:?}", job.priority);
-                crate::println!("    Created: {}ms ago", crate::time::get_ticks() - job.created_at);
+                crate::println!("    Created: {}ms ago", crate::subsystems::time::get_ticks() - job.created_at);
                 
                 if let Some(started_at) = job.started_at {
-                    crate::println!("    Started: {}ms ago", crate::time::get_ticks() - started_at);
+                    crate::println!("    Started: {}ms ago", crate::subsystems::time::get_ticks() - started_at);
                 }
                 
                 if let Some(completed_at) = job.completed_at {
-                    crate::println!("    Completed: {}ms ago", crate::time::get_ticks() - completed_at);
+                    crate::println!("    Completed: {}ms ago", crate::subsystems::time::get_ticks() - completed_at);
                 }
                 
                 if let Some(ref error) = job.error_message {
@@ -721,11 +721,11 @@ impl TestAutomationReport {
                 crate::println!("    Job template: {}", schedule.job_template.name);
                 
                 if let Some(last_run) = schedule.last_run {
-                    crate::println!("    Last run: {}ms ago", crate::time::get_ticks() - last_run);
+                    crate::println!("    Last run: {}ms ago", crate::subsystems::time::get_ticks() - last_run);
                 }
                 
                 if let Some(next_run) = schedule.next_run {
-                    crate::println!("    Next run: in {}ms", next_run - crate::time::get_ticks());
+                    crate::println!("    Next run: in {}ms", next_run - crate::subsystems::time::get_ticks());
                 }
                 
                 crate::println!();

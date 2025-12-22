@@ -6,7 +6,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use nos_perf::monitoring::{get_perf_stats};
 use nos_perf::core::{UnifiedSyscallStats, SyscallStatsSnapshot};
-use crate::sync::{Mutex, Sleeplock};
+use crate::subsystems::sync::{Mutex, Sleeplock};
 use crate::process;
 use crate::posix;
 use crate::ipc::pipe::Pipe;

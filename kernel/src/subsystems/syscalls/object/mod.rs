@@ -10,7 +10,7 @@ extern crate alloc;
 // - 引用计数管理
 
 use crate::syscalls::SyscallResult;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use alloc::collections::BTreeMap;
 use core::ffi::{c_int, c_void};
 use core::sync::atomic::{AtomicUsize, Ordering};

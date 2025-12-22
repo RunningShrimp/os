@@ -9,8 +9,8 @@
 use nos_nos_error_handling::unified::{KernelError, KernelResult};
 // use crate::syscalls::mm::types::*;
 use crate::process::{PROC_TABLE, myproc};
-use crate::mm::vm::{flags, PAGE_SIZE, map_page, flush_tlb_page};
-use crate::mm::{kalloc, kfree};
+use crate::subsystems::mm::vm::{flags, PAGE_SIZE, map_page, flush_tlb_page};
+use crate::subsystems::mm::{kalloc, kfree};
 use core::ptr;
 // use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
@@ -85,7 +85,7 @@ pub fn handle_mmap(args: &[u64]) -> KernelResult<u64> {
         // Start searching from the heap end, which is at proc.sz
         target_addr = proc.sz;
         // Ensure we don't overlap with kernel space
-        if target_addr + aligned_length >= crate::mm::vm::KERNEL_BASE {
+        if target_addr + aligned_length >= crate::subsystems::mm::vm::KERNEL_BASE {
             return Err(KernelError::OutOfMemory);
         }
     }
@@ -221,7 +221,7 @@ pub fn handle_munmap(args: &[u64]) -> KernelResult<u64> {
     let aligned_length = (length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
     let end = start + aligned_length;
 
-    if start >= crate::mm::vm::KERNEL_BASE || end > crate::mm::vm::KERNEL_BASE {
+    if start >= crate::subsystems::mm::vm::KERNEL_BASE || end > crate::subsystems::mm::vm::KERNEL_BASE {
         return Err(KernelError::InvalidArgument);
     }
 
@@ -242,7 +242,7 @@ pub fn handle_munmap(args: &[u64]) -> KernelResult<u64> {
         // Try to unmap the page and get physical address
         #[cfg(target_arch = "riscv64")]
         {
-            use crate::mm::vm::riscv64;
+            use crate::subsystems::mm::vm::riscv64;
             if let Some(pa) = unsafe { riscv64::unmap_page(pagetable, current) } {
                 // Free the physical page
                 kfree(pa as *mut u8);
@@ -255,7 +255,7 @@ pub fn handle_munmap(args: &[u64]) -> KernelResult<u64> {
             // For aarch64, use the exported unmap_page function
             unsafe {
                 // Unmap the page (returns Result<(), ()>)
-                if crate::mm::vm::unmap_page(pagetable, current).is_ok() {
+                if crate::subsystems::mm::vm::unmap_page(pagetable, current).is_ok() {
                     // Note: For aarch64, we would need to track physical addresses
                     // separately. For now, we just unmap without freeing physical memory.
                     // TODO: Implement proper physical page tracking for aarch64
@@ -321,7 +321,7 @@ pub fn handle_mprotect(args: &[u64]) -> KernelResult<u64> {
     let aligned_length = (len + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
     let end = start + aligned_length;
 
-    if start >= crate::mm::vm::KERNEL_BASE || end > crate::mm::vm::KERNEL_BASE {
+    if start >= crate::subsystems::mm::vm::KERNEL_BASE || end > crate::subsystems::mm::vm::KERNEL_BASE {
         return Err(KernelError::InvalidArgument);
     }
 
@@ -355,12 +355,12 @@ pub fn handle_mprotect(args: &[u64]) -> KernelResult<u64> {
             #[cfg(target_arch = "riscv64")]
             {
                 // Get current PTE
-                if let Some(pte_ptr) = crate::mm::vm::riscv64::walk(pagetable, current, false) {
-                    if *pte_ptr & crate::mm::vm::riscv64::PTE_V != 0 {
+                if let Some(pte_ptr) = crate::subsystems::mm::vm::riscv64::walk(pagetable, current, false) {
+                    if *pte_ptr & crate::subsystems::mm::vm::riscv64::PTE_V != 0 {
                         // Page is mapped, update permissions
                         let old_pte = *pte_ptr;
-                        let pa = crate::mm::vm::riscv64::pte_to_pa(old_pte);
-                        let new_pte = crate::mm::vm::riscv64::pa_to_pte(pa) | new_perm | crate::mm::vm::riscv64::PTE_V;
+                        let pa = crate::subsystems::mm::vm::riscv64::pte_to_pa(old_pte);
+                        let new_pte = crate::subsystems::mm::vm::riscv64::pa_to_pte(pa) | new_perm | crate::subsystems::mm::vm::riscv64::PTE_V;
                         *pte_ptr = new_pte;
                         updated_count += 1;
                     }
@@ -370,7 +370,7 @@ pub fn handle_mprotect(args: &[u64]) -> KernelResult<u64> {
             #[cfg(target_arch = "aarch64")]
             {
                 // Use the exported walk function
-                if let Some(desc_ptr) = crate::mm::vm::walk(pagetable, current, false) {
+                if let Some(desc_ptr) = crate::subsystems::mm::vm::walk(pagetable, current, false) {
                     // Constants for aarch64 descriptor flags
                     const DESC_VALID: usize = 1 << 0;
                     const DESC_AF: usize = 1 << 10;
@@ -415,7 +415,7 @@ pub fn handle_mprotect(args: &[u64]) -> KernelResult<u64> {
     let mut current = start;
     while current < end {
         unsafe {
-            crate::mm::vm::flush_tlb_page(current);
+            crate::subsystems::mm::vm::flush_tlb_page(current);
         }
         current += PAGE_SIZE;
     }
@@ -466,11 +466,11 @@ pub fn handle_msync(args: &[u64]) -> KernelResult<u64> {
     drop(table);
 
     // Align to page boundaries
-    let start = addr & !(crate::mm::vm::PAGE_SIZE - 1);
-    let aligned_length = (length + crate::mm::vm::PAGE_SIZE - 1) & !(crate::mm::vm::PAGE_SIZE - 1);
+    let start = addr & !(crate::subsystems::mm::vm::PAGE_SIZE - 1);
+    let aligned_length = (length + crate::subsystems::mm::vm::PAGE_SIZE - 1) & !(crate::subsystems::mm::vm::PAGE_SIZE - 1);
     let end = start + aligned_length;
 
-    if start >= crate::mm::vm::KERNEL_BASE || end > crate::mm::vm::KERNEL_BASE {
+    if start >= crate::subsystems::mm::vm::KERNEL_BASE || end > crate::subsystems::mm::vm::KERNEL_BASE {
         return Err(KernelError::InvalidArgument);
     }
 
@@ -482,7 +482,7 @@ pub fn handle_msync(args: &[u64]) -> KernelResult<u64> {
         // Check if page is mapped
         #[cfg(target_arch = "riscv64")]
         {
-            use crate::mm::vm::riscv64;
+            use crate::subsystems::mm::vm::riscv64;
             if let Some(pte_ptr) = unsafe { riscv64::walk(pagetable, current, false) } {
                 if *pte_ptr & riscv64::PTE_V != 0 {
                     // Page is mapped, check if it's a file-backed mapping
@@ -506,7 +506,7 @@ pub fn handle_msync(args: &[u64]) -> KernelResult<u64> {
             synced_pages += 1;
         }
 
-        current += crate::mm::vm::PAGE_SIZE;
+        current += crate::subsystems::mm::vm::PAGE_SIZE;
     }
 
     // For now, we just return success
@@ -549,7 +549,7 @@ pub fn handle_mlock(args: &[u64]) -> KernelResult<u64> {
     let aligned_length = (length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
     let end = start + aligned_length;
 
-    if start >= crate::mm::vm::KERNEL_BASE || end > crate::mm::vm::KERNEL_BASE {
+    if start >= crate::subsystems::mm::vm::KERNEL_BASE || end > crate::subsystems::mm::vm::KERNEL_BASE {
         return Err(KernelError::InvalidArgument);
     }
 
@@ -608,7 +608,7 @@ pub fn handle_munlock(args: &[u64]) -> KernelResult<u64> {
     let aligned_length = (length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
     let end = start + aligned_length;
 
-    if start >= crate::mm::vm::KERNEL_BASE || end > crate::mm::vm::KERNEL_BASE {
+    if start >= crate::subsystems::mm::vm::KERNEL_BASE || end > crate::subsystems::mm::vm::KERNEL_BASE {
         return Err(KernelError::InvalidArgument);
     }
 
@@ -669,7 +669,7 @@ pub fn handle_brk(args: &[u64]) -> KernelResult<u64> {
     }
 
     // Validate address range
-    if addr >= crate::mm::vm::KERNEL_BASE {
+    if addr >= crate::subsystems::mm::vm::KERNEL_BASE {
         return Err(KernelError::InvalidArgument);
     }
 
@@ -736,7 +736,7 @@ pub fn handle_sbrk(args: &[u64]) -> KernelResult<u64> {
 
     if increment > 0 {
         let new_end = old_heap_end.wrapping_add(increment as usize);
-        if new_end >= crate::mm::vm::KERNEL_BASE {
+        if new_end >= crate::subsystems::mm::vm::KERNEL_BASE {
             return Err(KernelError::OutOfMemory);
         }
         proc.sz = new_end;
@@ -858,7 +858,7 @@ pub fn handle_mincore(args: &[u64]) -> KernelResult<u64> {
     let end = start + aligned_length;
     let page_count = aligned_length / PAGE_SIZE;
 
-    if start >= crate::mm::vm::KERNEL_BASE || end > crate::mm::vm::KERNEL_BASE {
+    if start >= crate::subsystems::mm::vm::KERNEL_BASE || end > crate::subsystems::mm::vm::KERNEL_BASE {
         return Err(KernelError::InvalidArgument);
     }
 
@@ -929,7 +929,7 @@ pub fn handle_remap_file_pages(args: &[u64]) -> KernelResult<u64> {
     let aligned_size = (size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
     let end = start + aligned_size;
 
-    if start >= crate::mm::vm::KERNEL_BASE || end > crate::mm::vm::KERNEL_BASE {
+    if start >= crate::subsystems::mm::vm::KERNEL_BASE || end > crate::subsystems::mm::vm::KERNEL_BASE {
         return Err(KernelError::InvalidArgument);
     }
 
@@ -1104,7 +1104,7 @@ pub fn handle_madvise(args: &[u64]) -> KernelResult<u64> {
     let aligned_length = (length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
     let end = start + aligned_length;
 
-    if start >= crate::mm::vm::KERNEL_BASE || end > crate::mm::vm::KERNEL_BASE {
+    if start >= crate::subsystems::mm::vm::KERNEL_BASE || end > crate::subsystems::mm::vm::KERNEL_BASE {
         return Err(KernelError::InvalidArgument);
     }
 
@@ -1205,7 +1205,7 @@ pub fn handle_mbind(args: &[u64]) -> KernelResult<u64> {
     let aligned_length = (length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
     let end = start + aligned_length;
 
-    if start >= crate::mm::vm::KERNEL_BASE || end > crate::mm::vm::KERNEL_BASE {
+    if start >= crate::subsystems::mm::vm::KERNEL_BASE || end > crate::subsystems::mm::vm::KERNEL_BASE {
         return Err(KernelError::InvalidArgument);
     }
 
@@ -1280,7 +1280,7 @@ pub fn handle_get_mempolicy(args: &[u64]) -> KernelResult<u64> {
 
     // If MPOL_F_ADDR is set, validate the address
     if (flags & MPOL_F_ADDR) != 0 {
-        if addr == 0 || addr >= crate::mm::vm::KERNEL_BASE {
+        if addr == 0 || addr >= crate::subsystems::mm::vm::KERNEL_BASE {
             return Err(KernelError::InvalidArgument);
         }
     }

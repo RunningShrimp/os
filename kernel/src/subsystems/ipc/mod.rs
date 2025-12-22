@@ -5,14 +5,14 @@
 //! - Message queues (msg_*)
 //! - Semaphores (sem_*)
 //!
-//! **Note**: For microkernel service communication, use `crate::microkernel::ipc`.
+//! **Note**: For microkernel service communication, use `crate::subsystems::microkernel::ipc`.
 //! For high-performance IPC, use `crate::services::ipc`.
 
 extern crate alloc;
 
 use alloc::vec::Vec;
 
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 
 // ============================================================================
 // Constants
@@ -120,12 +120,39 @@ impl MessageQueue {
 }
 
 /// Initialize IPC subsystem
-pub fn init() {
+///
+/// This function initializes all IPC components including:
+/// - Shared memory pools
+/// - Message queues
+/// - POSIX message queues
+pub fn init() -> nos_api::Result<()> {
     // Initialize shared memory and message queue pools
     crate::println!("ipc: initialized");
     
     // Initialize POSIX message queues
-    mqueue::init();
+    // Note: mqueue::init() returns Result<(), &'static str>, convert to nos_api::Result
+    if let Err(e) = mqueue::init() {
+        return Err(nos_api::Error::ConfigError(e.into()));
+    }
+    
+    crate::println!("[ipc] IPC subsystem initialized");
+    Ok(())
+}
+
+/// Shutdown IPC subsystem
+///
+/// This function cleans up IPC resources:
+/// - Clean up shared memory regions
+/// - Close message queues
+/// - Release IPC resources
+pub fn shutdown() -> nos_api::Result<()> {
+    // TODO: Implement graceful shutdown
+    // - Clean up all shared memory regions
+    // - Close all message queues
+    // - Release IPC resources
+    
+    crate::println!("[ipc] IPC subsystem shutdown");
+    Ok(())
 }
 
 /// Create shared memory region
@@ -137,7 +164,7 @@ pub fn shm_create(size: usize, permissions: u32) -> Option<u32> {
     
     // Allocate memory for shared region
     // Round up to page size
-    let page_size = crate::mm::PAGE_SIZE;
+    let page_size = crate::subsystems::mm::PAGE_SIZE;
     let aligned_size = (size + page_size - 1) & !(page_size - 1);
     
     // Allocate pages
@@ -145,13 +172,13 @@ pub fn shm_create(size: usize, permissions: u32) -> Option<u32> {
     let mut base_addr = 0usize;
     
     for i in 0..pages_needed {
-        let page = crate::mm::kalloc();
+        let page = crate::subsystems::mm::kalloc();
         if page.is_null() {
             // Cleanup on failure
             for j in 0..i {
                 let cleanup_addr = base_addr + j * page_size;
                 unsafe {
-                    crate::mm::kfree(cleanup_addr as *mut u8);
+                    crate::subsystems::mm::kfree(cleanup_addr as *mut u8);
                 }
             }
             return None;
@@ -234,12 +261,12 @@ pub fn shm_delete(shm_id: u32) -> bool {
     }
     
     // Free the memory
-    let page_size = crate::mm::PAGE_SIZE;
+    let page_size = crate::subsystems::mm::PAGE_SIZE;
     let pages = shm.size / page_size;
     for i in 0..pages {
         let addr = shm.base_addr + i * page_size;
         unsafe {
-            crate::mm::kfree(addr as *mut u8);
+            crate::subsystems::mm::kfree(addr as *mut u8);
         }
     }
     

@@ -328,7 +328,7 @@ impl WebEngineManager {
 }
 
 /// Global web engine manager instance
-static WEB_ENGINE_MANAGER: crate::sync::Mutex<Option<WebEngineManager>> = crate::sync::Mutex::new(None);
+static WEB_ENGINE_MANAGER: crate::subsystems::sync::Mutex<Option<WebEngineManager>> = crate::subsystems::sync::Mutex::new(None);
 
 /// Initialize web engine manager
 pub fn init_web_engine_manager() -> Result<(), i32> {
@@ -341,8 +341,8 @@ pub fn init_web_engine_manager() -> Result<(), i32> {
 }
 
 /// Get web engine manager
-pub fn get_web_engine_manager() -> &'static crate::sync::Mutex<WebEngineManager> {
-    static INIT_ONCE: crate::sync::Once = crate::sync::Once::new();
+pub fn get_web_engine_manager() -> &'static crate::subsystems::sync::Mutex<WebEngineManager> {
+    static INIT_ONCE: crate::subsystems::sync::Once = crate::subsystems::sync::Once::new();
     INIT_ONCE.call_once(|| {
         let mut manager = WEB_ENGINE_MANAGER.lock();
         if manager.is_none() {
@@ -351,7 +351,7 @@ pub fn get_web_engine_manager() -> &'static crate::sync::Mutex<WebEngineManager>
     });
     
     unsafe {
-        &*(WEB_ENGINE_MANAGER.lock().as_ref().unwrap() as *const WebEngineManager as *const crate::sync::Mutex<WebEngineManager>)
+        &*(WEB_ENGINE_MANAGER.lock().as_ref().unwrap() as *const WebEngineManager as *const crate::subsystems::sync::Mutex<WebEngineManager>)
     }
 }
 

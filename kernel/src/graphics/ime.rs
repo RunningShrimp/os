@@ -7,7 +7,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 use alloc::string::{String, ToString};
 use alloc::collections::BTreeMap;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::reliability::errno::{EINVAL, ENOMEM};
 
 /// IME state
@@ -295,7 +295,7 @@ pub fn init_ime_manager() -> Result<(), i32> {
 
 /// Get IME manager
 pub fn get_ime_manager() -> &'static ImeManager {
-    static INIT_ONCE: crate::sync::Once = crate::sync::Once::new();
+    static INIT_ONCE: crate::subsystems::sync::Once = crate::subsystems::sync::Once::new();
     INIT_ONCE.call_once(|| {
         let mut manager = IME_MANAGER.lock();
         if manager.is_none() {

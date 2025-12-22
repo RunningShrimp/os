@@ -26,6 +26,10 @@ pub mod common;
 pub mod types;
 pub mod security;
 pub mod fast_path;
+pub mod timerfd;
+pub mod eventfd;
+pub mod signalfd;
+pub mod posix_fd;
 
 // 重新导出主要接口
 pub use core::*;

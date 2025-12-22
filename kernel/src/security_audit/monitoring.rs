@@ -692,13 +692,13 @@ impl RateLimiter {
             time_window,
             max_count,
             current_count: 0,
-            window_start: crate::time::get_timestamp(),
+            window_start: crate::subsystems::time::get_timestamp(),
         }
     }
 
     /// 检查是否允许
     pub fn allow(&mut self) -> bool {
-        let now = crate::time::get_timestamp();
+        let now = crate::subsystems::time::get_timestamp();
 
         // 重置时间窗口
         if now - self.window_start >= self.time_window {
@@ -762,7 +762,7 @@ impl AuditMonitor {
 
     /// 监控周期
     fn monitoring_cycle(&mut self) -> Result<(), &'static str> {
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         // 性能监控
         let performance_issues = self.performance_monitor.lock().check_performance()?;
@@ -789,7 +789,7 @@ impl AuditMonitor {
             stats.dashboard_updates += 1;
             stats.alerts_triggered += alerts_triggered as u64;
 
-            let elapsed = crate::time::get_timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
             stats.avg_cycle_time_us = (stats.avg_cycle_time_us + elapsed / 1000) / 2;
         }
 
@@ -856,7 +856,7 @@ impl AlertManager {
                     },
                     title: rule.name.clone(),
                     message: rule.message.clone(),
-                    timestamp: crate::time::get_timestamp_nanos(),
+                    timestamp: crate::subsystems::time::get_timestamp_nanos(),
                     status: AlertStatus::Active,
                     related_metrics: Vec::new(),
                     labels: BTreeMap::new(),
@@ -908,7 +908,7 @@ impl PerformanceMonitor {
 
     pub fn check_performance(&mut self) -> Result<Vec<String>, &'static str> {
         let mut issues = Vec::new();
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         // 简化的性能检查
         let cpu_usage = 45.0; // 模拟数据
@@ -934,7 +934,7 @@ impl PerformanceMonitor {
                 self.stats.performance_alerts += 1;
             }
 
-            let elapsed = crate::time::get_timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
             self.stats.avg_monitor_time_us = (self.stats.avg_monitor_time_us + elapsed / 1000) / 2;
         }
 
@@ -959,16 +959,16 @@ impl HealthChecker {
 
     pub fn run_health_checks(&mut self) -> Result<Vec<HealthCheckResult>, &'static str> {
         let mut results = Vec::new();
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         for check in &self.config.health_checks {
-            let check_start = crate::time::get_timestamp_nanos();
+            let check_start = crate::subsystems::time::get_timestamp_nanos();
             let (status, message) = self.perform_health_check(*check);
-            let duration = (crate::time::get_timestamp_nanos() - check_start) / 1000000; // Convert to milliseconds
+            let duration = (crate::subsystems::time::get_timestamp_nanos() - check_start) / 1000000; // Convert to milliseconds
 
             let result = HealthCheckResult {
                 check: *check,
-                timestamp: crate::time::get_timestamp_nanos(),
+                timestamp: crate::subsystems::time::get_timestamp_nanos(),
                 status,
                 message,
                 duration_ms: duration,
@@ -986,7 +986,7 @@ impl HealthChecker {
             self.stats.successful_checks += successful as u64;
             self.stats.failed_checks += (results.len() - successful) as u64;
 
-            let elapsed = crate::time::get_timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
             self.stats.avg_check_time_us = (self.stats.avg_check_time_us + elapsed / 1000) / 2;
         }
 
@@ -1030,11 +1030,11 @@ impl MetricsCollector {
     }
 
     pub fn collect_metrics(&mut self) -> Result<usize, &'static str> {
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
         let mut metrics_count = 0;
 
         // 简化的指标收集
-        let current_time = crate::time::get_timestamp_nanos();
+        let current_time = crate::subsystems::time::get_timestamp_nanos();
 
         for metric_type in &self.config.metric_types {
             let metric_name = format!("{:?}", metric_type);
@@ -1056,7 +1056,7 @@ impl MetricsCollector {
             self.stats.successful_collections += 1;
             self.stats.metrics_collected += metrics_count as u64;
 
-            let elapsed = crate::time::get_timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
             self.stats.avg_collection_time_us = (self.stats.avg_collection_time_us + elapsed / 1000) / 2;
         }
 
@@ -1111,7 +1111,7 @@ impl DashboardGenerator {
     fn generate_dashboard(&mut self, dashboard_type: DashboardType) -> Result<(), &'static str> {
         let dashboard = Dashboard {
             dashboard_type,
-            generated_at: crate::time::get_timestamp_nanos(),
+            generated_at: crate::subsystems::time::get_timestamp_nanos(),
             visualizations: self.generate_visualizations(dashboard_type)?,
             summary: DashboardSummary {
                 total_events: 10000,

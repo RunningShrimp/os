@@ -665,7 +665,7 @@ fn sys_vmsplice(args: &[u64]) -> SyscallResult {
         
         // Copy iovec structure from user space
         unsafe {
-            match crate::mm::vm::copyin(pagetable, iovec_buf.as_mut_ptr(), iovec_addr, iovec_size) {
+            match crate::subsystems::mm::vm::copyin(pagetable, iovec_buf.as_mut_ptr(), iovec_addr, iovec_size) {
                 Ok(_) => {},
                 Err(_) => break,
             }
@@ -687,7 +687,7 @@ fn sys_vmsplice(args: &[u64]) -> SyscallResult {
         
         // Copy data from user space
         unsafe {
-            match crate::mm::vm::copyin(pagetable, buffer.as_mut_ptr(), ptr as usize, chunk_size) {
+            match crate::subsystems::mm::vm::copyin(pagetable, buffer.as_mut_ptr(), ptr as usize, chunk_size) {
                 Ok(_) => {},
                 Err(_) => break,
             }

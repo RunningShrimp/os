@@ -594,7 +594,7 @@ impl NetworkIds {
 
     /// 分析网络包
     pub fn analyze_packet(&mut self, packet: &NetworkPacket) -> Result<Vec<IntrusionDetection>, &'static str> {
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         // 更新流量统计
         self.update_traffic_stats(packet);
@@ -632,7 +632,7 @@ impl NetworkIds {
             stats.total_packets_processed += 1;
             stats.total_detections += all_detections.len() as u64;
 
-            let elapsed = crate::time::get_timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
             stats.avg_processing_time_us = (stats.avg_processing_time_us + elapsed / 1000) / 2;
         }
 
@@ -652,7 +652,7 @@ impl NetworkIds {
             detection_type: DetectionType::AnomalyBehavior,
             threat_level: ThreatLevel::Medium,
             confidence: 0.7,
-            detected_at: crate::time::get_timestamp_nanos(),
+            detected_at: crate::subsystems::time::get_timestamp_nanos(),
             source: DetectionSource {
                 source_type: super::SourceType::NetworkPacket,
                 source_id: format!("{}:{}", packet.src_ip, packet.src_port),
@@ -680,7 +680,7 @@ impl NetworkIds {
                     id: 1,
                     evidence_type: super::EvidenceType::PacketCapture,
                     content: format!("Anomalous packet: {}", packet.protocol),
-                    collected_at: crate::time::get_timestamp_nanos(),
+                    collected_at: crate::subsystems::time::get_timestamp_nanos(),
                     reliability: 0.8,
                     source: String::from("NetworkIds"),
                 }
@@ -783,8 +783,8 @@ impl DetectionEngine {
             ],
             priority: 5,
             enabled: true,
-            created_at: crate::time::get_timestamp(),
-            updated_at: crate::time::get_timestamp(),
+            created_at: crate::subsystems::time::get_timestamp(),
+            updated_at: crate::subsystems::time::get_timestamp(),
         };
 
         self.add_rule(port_scan_rule)?;
@@ -849,7 +849,7 @@ impl DetectionEngine {
     /// 分析包
     pub fn analyze_packet(&mut self, packet: &NetworkPacket, protocol_events: &[ProtocolEvent]) -> Result<Vec<IntrusionDetection>, &'static str> {
         let mut detections = Vec::new();
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         for rule in &self.enabled_rules {
             if !rule.enabled {
@@ -863,9 +863,9 @@ impl DetectionEngine {
                 // 更新规则统计
                 if let Some(stats) = self.rule_stats.get_mut(&rule.id) {
                     stats.matches += 1;
-                    stats.last_match = crate::time::get_timestamp_nanos();
+                    stats.last_match = crate::subsystems::time::get_timestamp_nanos();
 
-                    let elapsed = crate::time::get_timestamp_nanos() - start_time;
+                    let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
                     stats.avg_processing_time_us = (stats.avg_processing_time_us + elapsed / 1000) / 2;
                 }
             }
@@ -933,7 +933,7 @@ impl DetectionEngine {
             detection_type: DetectionType::NetworkIntrusion,
             threat_level: self.determine_threat_level(rule.priority),
             confidence: 0.8,
-            detected_at: crate::time::get_timestamp_nanos(),
+            detected_at: crate::subsystems::time::get_timestamp_nanos(),
             source: DetectionSource {
                 source_type: super::SourceType::NetworkPacket,
                 source_id: format!("{}:{}", packet.src_ip, packet.src_port),
@@ -961,7 +961,7 @@ impl DetectionEngine {
                     id: 1,
                     evidence_type: super::EvidenceType::PacketCapture,
                     content: format!("Rule '{}' triggered by packet", rule.name),
-                    collected_at: crate::time::get_timestamp_nanos(),
+                    collected_at: crate::subsystems::time::get_timestamp_nanos(),
                     reliability: 0.9,
                     source: String::from("NetworkIds"),
                 }
@@ -1012,7 +1012,7 @@ impl RuleManager {
 
         // 记录更新历史
         self.update_history.push(RuleUpdate {
-            timestamp: crate::time::get_timestamp(),
+            timestamp: crate::subsystems::time::get_timestamp(),
             update_type: UpdateType::Added,
             description: format!("Rule '{}' added", self.rules.last().unwrap().name),
         });
@@ -1041,7 +1041,7 @@ impl RuleManager {
 
         // 记录更新历史
         self.update_history.push(RuleUpdate {
-            timestamp: crate::time::get_timestamp(),
+            timestamp: crate::subsystems::time::get_timestamp(),
             update_type: UpdateType::Deleted,
             description: format!("Rule '{}' removed", rule_name),
         });
@@ -1086,14 +1086,14 @@ impl TrafficAnalyzer {
     /// 初始化流量分析器
     pub fn init(&mut self) -> Result<(), &'static str> {
         // 初始化基线数据
-        self.baseline.updated_at = crate::time::get_timestamp();
+        self.baseline.updated_at = crate::subsystems::time::get_timestamp();
         Ok(())
     }
 
     /// 检测异常
     pub fn detect_anomalies(&mut self, _packet: &NetworkPacket) -> Result<bool, &'static str> {
         // 简化的异常检测逻辑
-        let current_time = crate::time::get_timestamp();
+        let current_time = crate::subsystems::time::get_timestamp();
 
         // 如果距离上次基线更新超过1小时，更新基线
         if current_time - self.baseline.updated_at > 3600 {
@@ -1106,7 +1106,7 @@ impl TrafficAnalyzer {
 
     /// 更新基线
     fn update_baseline(&mut self) {
-        self.baseline.updated_at = crate::time::get_timestamp();
+        self.baseline.updated_at = crate::subsystems::time::get_timestamp();
     }
 }
 
@@ -1156,7 +1156,7 @@ impl StateTracker {
             protocol: self.parse_protocol(&packet.protocol),
         };
 
-        let now = crate::time::get_timestamp();
+        let now = crate::subsystems::time::get_timestamp();
 
         let state = self.connections.entry(key).or_insert_with(|| ConnectionState {
             state: ConnectionStateType::New,
@@ -1192,7 +1192,7 @@ impl StateTracker {
 
     /// 清理过期连接
     pub fn cleanup_expired_connections(&mut self) {
-        let now = crate::time::get_timestamp();
+        let now = crate::subsystems::time::get_timestamp();
         let timeout = self.timeouts.tcp_connection_timeout;
 
         self.connections.retain(|_, state| {

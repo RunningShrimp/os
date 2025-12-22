@@ -13,10 +13,10 @@ extern crate alloc;
 
 use super::common::{SyscallError, SyscallResult, extract_args};
 use crate::process::{PROC_TABLE, myproc};
-use crate::mm::vm::{map_pages, flags, PAGE_SIZE, flush_tlb_page, flush_tlb_all};
-use crate::mm::{kalloc, kfree};
+use crate::subsystems::mm::vm::{map_pages, flags, PAGE_SIZE, flush_tlb_page, flush_tlb_all};
+use crate::subsystems::mm::{kalloc, kfree};
 use crate::posix;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use core::ptr;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
@@ -236,7 +236,7 @@ pub fn sys_mmap_advanced(args: &[u64]) -> SyscallResult {
     };
 
     // Check if region is available
-    if va >= crate::mm::vm::KERNEL_BASE || va + aligned_length >= crate::mm::vm::KERNEL_BASE {
+    if va >= crate::subsystems::mm::vm::KERNEL_BASE || va + aligned_length >= crate::subsystems::mm::vm::KERNEL_BASE {
         return Err(SyscallError::InvalidArgument);
     }
 
@@ -391,7 +391,7 @@ fn find_free_address_range(proc: &crate::process::Proc, size: usize, page_size: 
     candidate = (candidate + page_size - 1) & !(page_size - 1);
     
     // Search for free space
-    while candidate + size < crate::mm::vm::KERNEL_BASE {
+    while candidate + size < crate::subsystems::mm::vm::KERNEL_BASE {
         let mut found = true;
         
         for region in regions.values() {
@@ -451,7 +451,7 @@ pub fn sys_mlock(args: &[u64]) -> SyscallResult {
         
         #[cfg(target_arch = "riscv64")]
         {
-            use crate::mm::vm::riscv64;
+            use crate::subsystems::mm::vm::riscv64;
             if let Some(pte_ptr) = unsafe { riscv64::walk(proc.pagetable, current, false) } {
                 if *pte_ptr & riscv64::PTE_V != 0 {
                     let pa = riscv64::pte_to_pa(*pte_ptr);
@@ -507,7 +507,7 @@ pub fn sys_munlock(args: &[u64]) -> SyscallResult {
         
         #[cfg(target_arch = "riscv64")]
         {
-            use crate::mm::vm::riscv64;
+            use crate::subsystems::mm::vm::riscv64;
             if let Some(pte_ptr) = unsafe { riscv64::walk(proc.pagetable, current, false) } {
                 if *pte_ptr & riscv64::PTE_V != 0 {
                     let pa = riscv64::pte_to_pa(*pte_ptr);
@@ -568,7 +568,7 @@ pub fn sys_mlockall(args: &[u64]) -> SyscallResult {
                 while current < end {
                     #[cfg(target_arch = "riscv64")]
                     {
-                        use crate::mm::vm::riscv64;
+                        use crate::subsystems::mm::vm::riscv64;
                         if let Some(pte_ptr) = unsafe { riscv64::walk(proc.pagetable, current, false) } {
                             if *pte_ptr & riscv64::PTE_V != 0 {
                                 let pa = riscv64::pte_to_pa(*pte_ptr);
@@ -609,7 +609,7 @@ pub fn sys_munlockall(_args: &[u64]) -> SyscallResult {
             while current < end {
                 #[cfg(target_arch = "riscv64")]
                     {
-                        use crate::mm::vm::riscv64;
+                        use crate::subsystems::mm::vm::riscv64;
                         if let Some(pte_ptr) = unsafe { riscv64::walk(proc.pagetable, current, false) } {
                             if *pte_ptr & riscv64::PTE_V != 0 {
                                 let pa = riscv64::pte_to_pa(*pte_ptr);
@@ -637,8 +637,8 @@ pub fn sys_munlockall(_args: &[u64]) -> SyscallResult {
 }
 
 // Track pinned pages using a set
-static PINNED_PAGES: crate::sync::Mutex<alloc::collections::BTreeSet<usize>> = 
-    crate::sync::Mutex::new(alloc::collections::BTreeSet::new());
+static PINNED_PAGES: crate::subsystems::sync::Mutex<alloc::collections::BTreeSet<usize>> = 
+    crate::subsystems::sync::Mutex::new(alloc::collections::BTreeSet::new());
 
 /// Lock a single memory page
 fn lock_memory_page(va: usize, pa: *mut u8, size: usize) -> Result<bool, SyscallError> {
@@ -647,7 +647,7 @@ fn lock_memory_page(va: usize, pa: *mut u8, size: usize) -> Result<bool, Syscall
     }
     
     let pa_usize = pa as usize;
-    let page_addr = pa_usize & !(crate::mm::PAGE_SIZE - 1);
+    let page_addr = pa_usize & !(crate::subsystems::mm::PAGE_SIZE - 1);
     
     // Pin the page - add to pinned set and increment reference
     let mut pinned = PINNED_PAGES.lock();
@@ -658,7 +658,7 @@ fn lock_memory_page(va: usize, pa: *mut u8, size: usize) -> Result<bool, Syscall
     }
     
     // Check memory limits before pinning
-    let total_pinned = pinned.len() * crate::mm::PAGE_SIZE;
+    let total_pinned = pinned.len() * crate::subsystems::mm::PAGE_SIZE;
     let max_locked = 64 * 1024 * 1024; // 64MB max locked memory
     
     if total_pinned + size > max_locked {
@@ -669,7 +669,7 @@ fn lock_memory_page(va: usize, pa: *mut u8, size: usize) -> Result<bool, Syscall
     pinned.insert(page_addr);
     
     // Increment page reference to prevent freeing
-    crate::mm::vm::page_ref_inc(pa_usize);
+    crate::subsystems::mm::vm::page_ref_inc(pa_usize);
     
     let _ = va; // VA is used for tracking but not needed for pinning
     
@@ -683,14 +683,14 @@ fn unlock_memory_page(va: usize, pa: *mut u8, size: usize) {
     }
     
     let pa_usize = pa as usize;
-    let page_addr = pa_usize & !(crate::mm::PAGE_SIZE - 1);
+    let page_addr = pa_usize & !(crate::subsystems::mm::PAGE_SIZE - 1);
     
     // Remove from pinned set
     let mut pinned = PINNED_PAGES.lock();
     
     if pinned.remove(&page_addr) {
         // Decrement page reference
-        crate::mm::vm::page_ref_dec(pa_usize);
+        crate::subsystems::mm::vm::page_ref_dec(pa_usize);
     }
     
     let _ = (va, size); // Not needed for unpinning
@@ -848,7 +848,7 @@ pub fn sys_mincore(args: &[u64]) -> SyscallResult {
 
         #[cfg(target_arch = "riscv64")]
         {
-            use crate::mm::vm::riscv64;
+            use crate::subsystems::mm::vm::riscv64;
             if let Some(pte_ptr) = unsafe { riscv64::walk(proc.pagetable, page_va, false) } {
                 let pte = *pte_ptr;
                 if pte & riscv64::PTE_V != 0 {

@@ -78,7 +78,7 @@ pub extern "C" fn sys_glib_async_read(
         user_data,
         callback,
         timeout,
-        created_timestamp: crate::time::get_timestamp() as u64,
+        created_timestamp: crate::subsystems::time::get_timestamp() as u64,
         completed_timestamp: 0,
     };
 
@@ -175,7 +175,7 @@ pub extern "C" fn sys_glib_async_write(
         user_data,
         callback,
         timeout,
-        created_timestamp: crate::time::get_timestamp() as u64,
+        created_timestamp: crate::subsystems::time::get_timestamp() as u64,
         completed_timestamp: 0,
     };
 
@@ -225,7 +225,7 @@ pub extern "C" fn sys_glib_async_cancel(operation_id: u64) -> SyscallResult {
                 match operation_info.status {
                     AsyncOperationStatus::Submitted | AsyncOperationStatus::InProgress => {
                         operation_info.status = AsyncOperationStatus::Cancelled;
-                        operation_info.completed_timestamp = crate::time::get_timestamp() as u64;
+                        operation_info.completed_timestamp = crate::subsystems::time::get_timestamp() as u64;
                         operation_info.error_code = -125; // ECANCELED
                         crate::println!("[glib_async] 操作已取消: {}", operation_id);
                     }
@@ -339,7 +339,7 @@ pub extern "C" fn sys_glib_async_complete(
             Some(operation_info) => {
                 operation_info.bytes_completed.store(bytes_transferred, Ordering::SeqCst);
                 operation_info.error_code = error_code;
-                operation_info.completed_timestamp = crate::time::get_timestamp() as u64;
+                operation_info.completed_timestamp = crate::subsystems::time::get_timestamp() as u64;
 
                 if error_code == 0 {
                     operation_info.status = AsyncOperationStatus::Completed;
@@ -394,7 +394,7 @@ pub extern "C" fn sys_glib_async_wait(operation_id: u64, timeout: u32) -> Syscal
         return -22; // EINVAL
     }
 
-    let start_time = crate::time::get_timestamp();
+    let start_time = crate::subsystems::time::get_timestamp();
     let timeout_ms = if timeout == 0 { u64::MAX } else { timeout as u64 };
 
     loop {
@@ -420,7 +420,7 @@ pub extern "C" fn sys_glib_async_wait(operation_id: u64, timeout: u32) -> Syscal
         }
 
         // 检查超时
-        let elapsed = crate::time::get_timestamp() - start_time;
+        let elapsed = crate::subsystems::time::get_timestamp() - start_time;
         if elapsed >= timeout_ms {
             crate::println!("[glib_async] 等待超时: ID={}, elapsed={}ms", operation_id, elapsed);
             return -62; // ETIMEDOUT
@@ -428,7 +428,7 @@ pub extern "C" fn sys_glib_async_wait(operation_id: u64, timeout: u32) -> Syscal
 
         // 简单的等待实现（实际应该使用更高效的等待机制）
         // 这里可以使用epoll或其他事件机制来改进
-        crate::time::sleep(core::time::Duration::from_millis(10));
+        crate::subsystems::time::sleep(core::time::Duration::from_millis(10));
     }
 }
 

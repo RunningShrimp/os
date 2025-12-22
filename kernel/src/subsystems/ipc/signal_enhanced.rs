@@ -10,7 +10,7 @@ use alloc::collections::VecDeque;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use super::signal::*;
 
 /// Enhanced signal state with POSIX-compliant semantics
@@ -226,7 +226,7 @@ impl EnhancedSignalState {
             signal: sig,
             info,
             priority,
-            timestamp: crate::time::timestamp_nanos(),
+            timestamp: crate::subsystems::time::timestamp_nanos(),
             source_pid,
             is_realtime,
         };
@@ -409,7 +409,7 @@ impl EnhancedSignalState {
                         signal: def_signal.signal,
                         info: def_signal.info,
                         priority: self.calculate_signal_priority(def_signal.signal, &def_signal.info),
-                        timestamp: crate::time::timestamp_nanos(),
+                        timestamp: crate::subsystems::time::timestamp_nanos(),
                         source_pid: def_signal.info.pid,
                         is_realtime: def_signal.signal >= SIGRTMIN && def_signal.signal <= SIGRTMAX,
                     };
@@ -546,7 +546,7 @@ impl EnhancedSignalState {
             stats.total_delivered += 1;
             
             // Update latency statistics
-            let now = crate::time::timestamp_nanos();
+            let now = crate::subsystems::time::timestamp_nanos();
             let latency_us = (now - delivery.timestamp) / 1000;
             stats.avg_delivery_latency_us = 
                 (stats.avg_delivery_latency_us * (stats.total_delivered - 1) as f64 + latency_us as f64) 
@@ -585,7 +585,7 @@ impl EnhancedSignalState {
             handler_mask,
             use_siginfo: (action.flags.0 & SigActionFlags::SA_SIGINFO) != 0,
             restart_syscalls: (action.flags.0 & SigActionFlags::SA_RESTART) != 0,
-            entry_timestamp: crate::time::timestamp_nanos(),
+            entry_timestamp: crate::subsystems::time::timestamp_nanos(),
         };
         
         // Store handler context

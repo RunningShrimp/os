@@ -11,7 +11,7 @@ use core::ptr::{null_mut};
 use core::sync::atomic::{AtomicUsize, AtomicPtr, AtomicBool, Ordering};
 use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use super::phys::{PAGE_SIZE, page_round_up, page_round_down};
 
 /// Page order (log2 of number of pages)
@@ -600,7 +600,7 @@ impl OptimizedPageAllocator {
             descriptor.flags.allocated = allocated;
             
             if allocated {
-                descriptor.last_access.store(crate::time::get_ticks(), Ordering::Relaxed);
+                descriptor.last_access.store(crate::subsystems::time::get_ticks(), Ordering::Relaxed);
             }
         }
     }

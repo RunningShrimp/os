@@ -66,6 +66,7 @@ pub mod context;
 pub mod service_lifecycle;
 pub mod collections;
 pub mod fmt_utils;
+pub mod boot;
 
 // Performance monitoring and optimization (from nos-perf)
 pub mod perf;

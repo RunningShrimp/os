@@ -23,31 +23,31 @@ impl GicV2 {
     }
 
     pub fn enable(&self) {
-        crate::mm::mmio_write32(self.d32(0x000), 1);
-        crate::mm::mmio_write32(self.c32(0x000), 1);
-        crate::mm::mmio_write32(self.c32(0x004), 0xFF);
+        crate::subsystems::mm::mmio_write32(self.d32(0x000), 1);
+        crate::subsystems::mm::mmio_write32(self.c32(0x000), 1);
+        crate::subsystems::mm::mmio_write32(self.c32(0x004), 0xFF);
     }
 
     pub fn disable(&self) {
-        crate::mm::mmio_write32(self.c32(0x000), 0);
-        crate::mm::mmio_write32(self.d32(0x000), 0);
+        crate::subsystems::mm::mmio_write32(self.c32(0x000), 0);
+        crate::subsystems::mm::mmio_write32(self.d32(0x000), 0);
     }
 
     pub fn set_enable(&self, irq: usize) {
         let reg = 0x100 + ((irq / 32) * 4);
         let bit = 1u32 << (irq % 32);
-        let v = crate::mm::mmio_read32(self.d32(reg) as *const u32);
-        crate::mm::mmio_write32(self.d32(reg), v | bit);
+        let v = crate::subsystems::mm::mmio_read32(self.d32(reg) as *const u32);
+        crate::subsystems::mm::mmio_write32(self.d32(reg), v | bit);
     }
 
     pub fn clear_enable(&self, irq: usize) {
         let reg = 0x180 + ((irq / 32) * 4);
         let bit = 1u32 << (irq % 32);
-        crate::mm::mmio_write32(self.d32(reg), bit);
+        crate::subsystems::mm::mmio_write32(self.d32(reg), bit);
     }
 
     pub fn cpu_enable(&self) {
-        crate::mm::mmio_write32(self.c32(0x000), 1);
-        crate::mm::mmio_write32(self.c32(0x004), 0xFF);
+        crate::subsystems::mm::mmio_write32(self.c32(0x000), 1);
+        crate::subsystems::mm::mmio_write32(self.c32(0x004), 0xFF);
     }
 }

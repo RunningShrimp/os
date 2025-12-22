@@ -4,7 +4,7 @@
 //! It implements dependency injection to replace global state and break circular dependencies.
 
 use alloc::sync::Arc;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::api::syscall::{SyscallDispatcher, SyscallContext};
 use crate::api::process::{ProcessManager, ThreadManager};
 use crate::api::memory::{MemoryManager, ProcessMemoryManager};

@@ -456,7 +456,7 @@ impl SmapSmepSubsystem {
 
     /// Get current timestamp
     fn get_timestamp(&self) -> u64 {
-        crate::time::get_timestamp()
+        crate::subsystems::time::get_timestamp()
     }
 
     /// Add allowed memory region for cross-space access

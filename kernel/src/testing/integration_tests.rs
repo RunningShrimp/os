@@ -267,13 +267,13 @@ impl IntegrationTestSystem {
 
     /// Run a single integration test case
     pub fn run_integration_test_case(&self, test_case: &IntegrationTestCase) -> IntegrationTestResult {
-        let start_time = crate::time::get_ticks();
+        let start_time = crate::subsystems::time::get_ticks();
         let start_memory = self.get_memory_usage();
         
         // Run integration test
         let mut result = (test_case.test_fn)();
         
-        let end_time = crate::time::get_ticks();
+        let end_time = crate::subsystems::time::get_ticks();
         let end_memory = self.get_memory_usage();
         
         result.execution_time_ms = end_time - start_time;

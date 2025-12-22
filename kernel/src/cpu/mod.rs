@@ -76,7 +76,7 @@ impl CpuInfo {
     
     /// Update load statistics
     pub fn update_load_stats(&mut self, is_idle: bool) {
-        let current_tick = crate::time::get_ticks();
+        let current_tick = crate::subsystems::time::get_ticks();
         let elapsed = current_tick.saturating_sub(self.load_stats.last_update);
         
         if is_idle {

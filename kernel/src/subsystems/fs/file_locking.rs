@@ -91,7 +91,7 @@ impl LockRequest {
             lock_type,
             range,
             blocking,
-            timestamp: crate::time::get_timestamp(),
+            timestamp: crate::subsystems::time::get_timestamp(),
             request_id: next_request_id(),
         }
     }
@@ -125,7 +125,7 @@ impl ActiveLock {
             pid,
             lock_type,
             range,
-            acquired_at: crate::time::get_timestamp(),
+            acquired_at: crate::subsystems::time::get_timestamp(),
             lock_id: next_lock_id(),
         }
     }
@@ -362,7 +362,7 @@ impl LockManager {
                 stats.successful_acquisitions += 1;
                 
                 // Update wait time
-                let wait_time = crate::time::get_timestamp() - request.timestamp;
+                let wait_time = crate::subsystems::time::get_timestamp() - request.timestamp;
                 stats.avg_wait_time = (stats.avg_wait_time + wait_time) / 2;
             }
         }
@@ -609,4 +609,4 @@ pub fn release_lock(file_lock: FileLock, pid: ProcessId) -> Result<(), LockError
     }
 }
 
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;

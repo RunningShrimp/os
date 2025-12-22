@@ -5,7 +5,7 @@
 
 extern crate alloc;
 use alloc::vec::Vec;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use nos_nos_error_handling::unified::KernelError;
 
 // Re-export existing ICMP functionality
@@ -1335,7 +1335,7 @@ impl EnhancedIcmpProcessor {
         let mut ttl = 1;
 
         while ttl <= max_hops {
-            let start_time = crate::time::get_monotonic_time();
+            let start_time = crate::subsystems::time::get_monotonic_time();
 
             // Create echo request with specific TTL
             let packet = EnhancedIcmpPacket::echo_request(
@@ -1359,7 +1359,7 @@ impl EnhancedIcmpProcessor {
                         let hop = TracerouteHop {
                             ttl,
                             address: reply.get_source(),
-                            rtt_ms: (crate::time::get_monotonic_time() - start_time) * 1000,
+                            rtt_ms: (crate::subsystems::time::get_monotonic_time() - start_time) * 1000,
                             hostname: None,
                         };
                         hops.push(hop);
@@ -1368,7 +1368,7 @@ impl EnhancedIcmpProcessor {
                         let hop = TracerouteHop {
                             ttl,
                             address: reply.get_source(),
-                            rtt_ms: (crate::time::get_monotonic_time() - start_time) * 1000,
+                            rtt_ms: (crate::subsystems::time::get_monotonic_time() - start_time) * 1000,
                             hostname: None,
                         };
                         hops.push(hop);
@@ -1404,7 +1404,7 @@ impl EnhancedIcmpProcessor {
         let mut max_rtt = 0u64;
 
         for i in 0..count {
-            let start_time = crate::time::get_monotonic_time();
+            let start_time = crate::subsystems::time::get_monotonic_time();
 
             // Create echo request
             let packet = EnhancedIcmpPacket::echo_request(
@@ -1428,7 +1428,7 @@ impl EnhancedIcmpProcessor {
                     if reply.get_type() == IcmpType::EchoReply && 
                        reply.get_identifier() == 0 && 
                        reply.get_sequence_number() == i as u16 {
-                        let rtt = (crate::time::get_monotonic_time() - start_time) * 1000;
+                        let rtt = (crate::subsystems::time::get_monotonic_time() - start_time) * 1000;
                         results.push(PingReply {
                             sequence: i,
                             rtt_ms: rtt,
@@ -1454,7 +1454,7 @@ impl EnhancedIcmpProcessor {
 
             // Wait for interval before next ping
             if i < count - 1 {
-                crate::time::sleep(interval_ms);
+                crate::subsystems::time::sleep(interval_ms);
             }
         }
 
@@ -1477,7 +1477,7 @@ impl EnhancedIcmpProcessor {
     fn receive_packet_with_timeout(&self, timeout_ms: u64) -> Option<EnhancedIcmpPacket> {
         // This would interface with the network stack to receive packets
         // For now, return None as a placeholder
-        crate::time::sleep(timeout_ms);
+        crate::subsystems::time::sleep(timeout_ms);
         None
     }
 
@@ -1506,7 +1506,7 @@ impl EnhancedIcmpProcessor {
         }
 
         let mut stats = self.stats.lock();
-        let current_time = crate::time::get_monotonic_time();
+        let current_time = crate::subsystems::time::get_monotonic_time();
         
         // Simple rate limiting implementation
         // In a real implementation, this would use a token bucket or similar algorithm

@@ -21,9 +21,15 @@ pub fn shutdown() -> crate::error::UnifiedResult<()> {
 
 // Re-export submodules
 pub mod unified;
-// TODO: Implement errno and recovery submodules
-// pub mod errno;
-// pub mod recovery;
+pub mod unified_mapping;
+pub mod panic_handler;
+pub mod recovery;
+
+// Re-export unified mapping
+pub use unified_mapping::{
+    Errno, UnifiedErrorMapper, init_error_mapper, get_error_mapper,
+    unified_error_to_errno, api_syscall_error_to_errno,
+};
 
 // Re-export main types for convenience
 pub use unified::{
@@ -84,10 +90,15 @@ impl ErrorManager {
         self.handlers.push(handler);
     }
     
-    /// Handle an error
+    /// Handle an error (with recovery integration)
     pub fn handle_error(&self, error: UnifiedError, context: &str) -> ErrorAction {
+        // Record error for recovery statistics
+        if let Some(recovery_mgr) = recovery::get_recovery_manager() {
+            recovery_mgr.record_error(&error);
+        }
+        
         // Create error context
-        let error_context = ErrorContext::new(error, context);
+        let error_context = ErrorContext::new(error.clone(), context);
         
         // Increment error counters
         self.error_count.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
@@ -99,14 +110,48 @@ impl ErrorManager {
         // Try to find a handler that can handle this error
         for handler in &self.handlers {
             if handler.can_handle(&error) {
-                return handler.handle_error(&error_context);
+                let action = handler.handle_error(&error_context);
+                
+                // If handler suggests recovery, integrate with recovery manager
+                if action == ErrorAction::Recover {
+                    if let Some(recovery_action) = recovery::determine_recovery_action(&error, &error_context) {
+                        let recovery_result = recovery::execute_recovery(recovery_action, &error, &error_context);
+                        match recovery_result {
+                            recovery::RecoveryResult::Success => {
+                                recovery::record_recovery_success(&error);
+                                return ErrorAction::Ignore;
+                            }
+                            recovery::RecoveryResult::Failed | recovery::RecoveryResult::Timeout => {
+                                recovery::record_recovery_failure(&error);
+                                return ErrorAction::Propagate;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                
+                return action;
             }
         }
         
-        // Default action based on severity
+        // Default action based on severity (with recovery support)
         match error_context.severity {
             ErrorSeverity::Info | ErrorSeverity::Warning => ErrorAction::Log,
-            ErrorSeverity::Error => ErrorAction::Propagate,
+            ErrorSeverity::Error => {
+                // For errors, try recovery if available
+                if let Some(recovery_action) = recovery::determine_recovery_action(&error, &error_context) {
+                    let recovery_result = recovery::execute_recovery(recovery_action, &error, &error_context);
+                    match recovery_result {
+                        recovery::RecoveryResult::Success => {
+                            recovery::record_recovery_success(&error);
+                            ErrorAction::Ignore
+                        }
+                        _ => ErrorAction::Propagate
+                    }
+                } else {
+                    ErrorAction::Propagate
+                }
+            }
             ErrorSeverity::Critical | ErrorSeverity::Fatal => ErrorAction::Panic,
         }
     }
@@ -144,9 +189,32 @@ pub fn get_error_manager() -> &'static mut ErrorManager {
     }
 }
 
-/// Handle an error with context
+/// Handle an error with context (with recovery support)
 pub fn handle_error(error: UnifiedError, context: &str) -> ErrorAction {
-    get_error_manager().handle_error(error, context)
+    let action = get_error_manager().handle_error(error.clone(), context);
+    
+    // If action is Recover, try to execute recovery
+    if action == ErrorAction::Recover {
+        let error_context = ErrorContext::new(error.clone(), context);
+        if let Some(recovery_action) = recovery::determine_recovery_action(&error, &error_context) {
+            let recovery_result = recovery::execute_recovery(recovery_action, &error, &error_context);
+            match recovery_result {
+                recovery::RecoveryResult::Success => {
+                    recovery::record_recovery_success(&error);
+                    return ErrorAction::Ignore; // Recovery succeeded, ignore error
+                }
+                recovery::RecoveryResult::Failed | recovery::RecoveryResult::Timeout => {
+                    recovery::record_recovery_failure(&error);
+                    return ErrorAction::Propagate; // Recovery failed, propagate error
+                }
+                recovery::RecoveryResult::NotApplicable => {
+                    // No recovery available, use original action
+                }
+            }
+        }
+    }
+    
+    action
 }
 
 /// Handle an error with file and line context

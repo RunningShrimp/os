@@ -40,7 +40,7 @@ impl ErrorContext {
             pagetable,
             args: Vec::new(),
             additional_context: BTreeMap::new(),
-            timestamp_ns: crate::time::timestamp_nanos(),
+            timestamp_ns: crate::subsystems::time::timestamp_nanos(),
         }
     }
     
@@ -396,7 +396,7 @@ impl ErrorHandler for NoopErrorHandler {
 }
 
 /// Global error handler instance (lazy initialization)
-use crate::sync::{Once, Mutex};
+use crate::subsystems::sync::{Once, Mutex};
 
 static INIT_ONCE: Once = Once::new();
 static GLOBAL_ERROR_HANDLER: Mutex<Option<Box<dyn ErrorHandler>>> = Mutex::new(None);

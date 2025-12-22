@@ -203,8 +203,8 @@ fn load_and_boot_kernel_uefi(protocol_manager: &mut crate::protocol::ProtocolMan
                 // Get boot information
                 let boot_info = protocol_manager.get_boot_info()?;
 
-                // Create boot parameters
-                let boot_params = crate::kernel::BootParameters::new(&boot_info, &kernel_image);
+                // Create boot parameters using unified structure
+                let boot_params = crate::arch::create_boot_parameters(&boot_info, &kernel_image);
 
                 // Exit boot services
                 protocol_manager.exit_boot_services()?;
@@ -212,7 +212,7 @@ fn load_and_boot_kernel_uefi(protocol_manager: &mut crate::protocol::ProtocolMan
                 // Jump to kernel
                 println!("[boot] Jumping to kernel...");
                 unsafe {
-                    crate::arch::jump_to_kernel(kernel_image.entry_point, &boot_params.into_struct());
+                    crate::arch::jump_to_kernel(kernel_image.entry_point, &boot_params);
                 }
 
                 unreachable!();

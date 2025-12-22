@@ -2,7 +2,7 @@ extern crate alloc;
 use alloc::string::String;
 use alloc::vec::Vec;
 use alloc::format;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 static INIT: AtomicBool = AtomicBool::new(false);
@@ -17,7 +17,7 @@ fn ensure_init() {
 
 pub fn record(label: &'static str) {
     ensure_init();
-    let ts = crate::time::get_time_ns();
+    let ts = crate::subsystems::time::get_time_ns();
     unsafe {
         if let Some(ref v) = EVENTS {
             v.lock().push((ts, label));

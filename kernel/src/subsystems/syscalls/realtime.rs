@@ -77,7 +77,7 @@ fn sys_sched_setscheduler(args: &[u64]) -> SyscallResult {
         }
 
         unsafe {
-            match crate::mm::vm::copyin(pagetable, param_data.as_mut_ptr(), param_ptr, param_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, param_data.as_mut_ptr(), param_ptr, param_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -178,7 +178,7 @@ fn sys_sched_setparam(args: &[u64]) -> SyscallResult {
         }
 
         unsafe {
-            match crate::mm::vm::copyin(pagetable, param_data.as_mut_ptr(), param_ptr, param_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, param_data.as_mut_ptr(), param_ptr, param_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -249,7 +249,7 @@ fn sys_sched_getparam(args: &[u64]) -> SyscallResult {
                 }
 
                 unsafe {
-                    match crate::mm::vm::copyout(pagetable, param_ptr, param_data.as_ptr(), param_data.len()) {
+                    match crate::subsystems::mm::vm::copyout(pagetable, param_ptr, param_data.as_ptr(), param_data.len()) {
                         Ok(_) => {},
                         Err(_) => return Err(SyscallError::BadAddress),
                     }
@@ -355,7 +355,7 @@ fn sys_sched_rr_get_interval(args: &[u64]) -> SyscallResult {
                 }
 
                 unsafe {
-                    match crate::mm::vm::copyout(pagetable, ts_ptr, ts_data.as_ptr(), ts_data.len()) {
+                    match crate::subsystems::mm::vm::copyout(pagetable, ts_ptr, ts_data.as_ptr(), ts_data.len()) {
                         Ok(_) => {},
                         Err(_) => return Err(SyscallError::BadAddress),
                     }
@@ -416,7 +416,7 @@ fn sys_sched_setaffinity(args: &[u64]) -> SyscallResult {
         }
 
         unsafe {
-            match crate::mm::vm::copyin(pagetable, mask_data.as_mut_ptr(), mask_ptr, cpusetsize) {
+            match crate::subsystems::mm::vm::copyin(pagetable, mask_data.as_mut_ptr(), mask_ptr, cpusetsize) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -489,7 +489,7 @@ fn sys_sched_getaffinity(args: &[u64]) -> SyscallResult {
                 }
 
                 unsafe {
-                    match crate::mm::vm::copyout(pagetable, mask_ptr, mask_data.as_ptr(), copy_size) {
+                    match crate::subsystems::mm::vm::copyout(pagetable, mask_ptr, mask_data.as_ptr(), copy_size) {
                         Ok(_) => {},
                         Err(_) => return Err(SyscallError::BadAddress),
                     }

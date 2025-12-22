@@ -4,7 +4,7 @@
 
 use crate::fs::file::{FILE_TABLE, FileType, file_alloc, file_close, file_read, file_write, file_stat, file_lseek, file_unsubscribe};
 use crate::syscalls::common::{SyscallError, SyscallResult, extract_args};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use alloc::string::ToString;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
@@ -137,7 +137,7 @@ pub fn sys_open(path: *const u8, flags: i32, mode: u32) -> isize {
     };
 
     let path_len = unsafe {
-        match crate::mm::vm::copyinstr(pagetable,
+        match crate::subsystems::mm::vm::copyinstr(pagetable,
                                      path as usize,
                                      path_buf.as_mut_ptr(),
                                      MAX_PATH_LEN) {
@@ -302,7 +302,7 @@ fn sys_open_impl(args: &[u64]) -> SyscallResult {
     };
 
     let path_len = unsafe {
-        crate::mm::vm::copyinstr(pagetable,
+        crate::subsystems::mm::vm::copyinstr(pagetable,
                                 path_ptr as usize,
                                 path_buf.as_mut_ptr(),
                                 MAX_PATH_LEN)
@@ -532,7 +532,7 @@ fn sys_stat_impl(args: &[u64]) -> SyscallResult {
     };
 
     let path_len = unsafe {
-        crate::mm::vm::copyinstr(pagetable,
+        crate::subsystems::mm::vm::copyinstr(pagetable,
                                 path_ptr as usize,
                                 path_buf.as_mut_ptr(),
                                 MAX_PATH_LEN)

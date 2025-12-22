@@ -5,7 +5,7 @@ pub mod exec;
 pub mod elf;
 pub mod dynamic_linker;
 pub mod fd_cache;
-pub mod lock_optimized;
+pub mod lock_optimized; // Optional: Optimized locking with RW locks and fine-grained locks
 pub mod rcu_table;
 pub mod context_switch;
 
@@ -61,4 +61,40 @@ pub fn getegid() -> gid_t {
         }
     }
     0
+}
+
+/// Initialize process management subsystem
+///
+/// This function initializes all process management components including:
+/// - Process table
+/// - Thread subsystem
+/// - Context switching
+/// - Process manager
+pub fn init() -> nos_api::Result<()> {
+    // Initialize process manager
+    manager::init();
+    
+    // Initialize thread subsystem
+    thread::init();
+    
+    // Initialize context switching
+    context_switch::init();
+    
+    crate::println!("[process] Process management subsystem initialized");
+    Ok(())
+}
+
+/// Shutdown process management subsystem
+///
+/// This function cleans up process management resources.
+/// Note: In a production system, this should gracefully terminate all processes.
+pub fn shutdown() -> nos_api::Result<()> {
+    // TODO: Implement graceful shutdown
+    // - Terminate all user processes
+    // - Wait for processes to exit
+    // - Clean up process table
+    // - Release resources
+    
+    crate::println!("[process] Process management subsystem shutdown");
+    Ok(())
 }

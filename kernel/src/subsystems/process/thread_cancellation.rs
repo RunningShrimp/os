@@ -260,7 +260,7 @@ impl ThreadCancellationState {
             
             // Update latency statistics
             if let Some(ref request) = self.cancellation_request {
-                let now = crate::time::timestamp_nanos();
+                let now = crate::subsystems::time::timestamp_nanos();
                 let latency_us = (now - request.timestamp) / 1000;
                 stats.avg_cancellation_latency_us = 
                     (stats.avg_cancellation_latency_us * (stats.total_successful - 1) as f64 + latency_us as f64) 
@@ -356,7 +356,7 @@ impl ThreadCancellationManager {
             target_tid,
             requester_tid,
             cancel_type: CancelType::Deferred, // Default to deferred
-            timestamp: crate::time::timestamp_nanos(),
+            timestamp: crate::subsystems::time::timestamp_nanos(),
             delivered: false,
         };
 
@@ -379,7 +379,7 @@ impl ThreadCancellationManager {
             target_tid,
             requester_tid,
             cancel_type,
-            timestamp: crate::time::timestamp_nanos(),
+            timestamp: crate::subsystems::time::timestamp_nanos(),
             delivered: false,
         };
 

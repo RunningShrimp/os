@@ -36,9 +36,9 @@ impl KernelReadiness {
     }
 }
 
-/// Boot parameter validation
+/// Boot parameter validation (internal to bootloader)
 #[derive(Debug, Clone)]
-pub struct BootParameters {
+pub struct BootPreparationParams {
     kernel_address: u64,
     entry_address: u64,
     memory_map_address: u64,
@@ -47,7 +47,7 @@ pub struct BootParameters {
     command_line: &'static str,
 }
 
-impl BootParameters {
+impl BootPreparationParams {
     /// Create boot parameters
     pub fn new(kernel_address: u64, entry_address: u64) -> Self {
         Self {
@@ -118,7 +118,7 @@ impl BootParameters {
 
 /// Boot preparation and validation
 pub struct BootPreparation {
-    parameters: Option<BootParameters>,
+    parameters: Option<BootPreparationParams>,
     kernel_readiness: KernelReadiness,
     boot_info: Option<BootInformation>,
     memory_layout: Option<BootMemoryLayout>,
@@ -136,7 +136,7 @@ impl BootPreparation {
     }
 
     /// Set boot parameters
-    pub fn set_parameters(&mut self, params: BootParameters) -> Result<(), &'static str> {
+    pub fn set_parameters(&mut self, params: BootPreparationParams) -> Result<(), &'static str> {
         params.validate()?;
         self.parameters = Some(params);
         Ok(())
@@ -188,7 +188,7 @@ impl BootPreparation {
     }
 
     /// Get boot parameters
-    pub fn parameters(&self) -> Option<&BootParameters> {
+    pub fn parameters(&self) -> Option<&BootPreparationParams> {
         self.parameters.as_ref()
     }
 
@@ -244,7 +244,7 @@ impl BootHandoff {
         checksum: u32,
     ) -> Result<(), &'static str> {
         // Set parameters
-        let params = BootParameters::new(kernel_address, kernel_address + 0x1000);
+        let params = BootPreparationParams::new(kernel_address, kernel_address + 0x1000);
         self.preparation.set_parameters(params)?;
 
         // Validate kernel
@@ -290,14 +290,14 @@ mod tests {
 
     #[test]
     fn test_boot_parameters_creation() {
-        let params = BootParameters::new(0x100000, 0x101000);
+        let params = BootPreparationParams::new(0x100000, 0x101000);
         assert_eq!(params.kernel_address(), 0x100000);
         assert_eq!(params.entry_address(), 0x101000);
     }
 
     #[test]
     fn test_boot_parameters_builder() {
-        let params = BootParameters::new(0x100000, 0x101000)
+        let params = BootPreparationParams::new(0x100000, 0x101000)
             .with_memory_map(0x2000)
             .with_module_count(1);
 
@@ -307,13 +307,13 @@ mod tests {
 
     #[test]
     fn test_boot_parameters_validate() {
-        let params = BootParameters::new(0x100000, 0x101000);
+        let params = BootPreparationParams::new(0x100000, 0x101000);
         assert!(params.validate().is_ok());
     }
 
     #[test]
     fn test_boot_parameters_validate_zero_kernel() {
-        let params = BootParameters::new(0, 0x101000);
+        let params = BootPreparationParams::new(0, 0x101000);
         assert!(params.validate().is_err());
     }
 

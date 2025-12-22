@@ -17,7 +17,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::collections::BTreeMap;
 use crate::drivers::BlockDevice;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::subsystems::fs::fs_impl::BufCache;
 
 use crate::subsystems::fs::journaling_fs::{JournalingFileSystem, JournalEntry, JournalTransaction};
@@ -655,6 +655,19 @@ pub struct Ext4MountOptions {
     pub extents_support_enabled: bool,
     /// 64-bit support enabled
     pub _64bit_support_enabled_flag: bool,
+    /// Runtime write policy (latency vs durability)
+    pub write_policy: Ext4WritePolicy,
+}
+
+/// Runtime write policy for balancing latency vs durability.
+#[derive(Debug, Clone, Copy)]
+pub enum Ext4WritePolicy {
+    /// Balanced policy (default): moderate batching and latency.
+    Balanced,
+    /// Latency-optimized: more aggressive write combining / delayed flush.
+    LatencyOptimized,
+    /// Durability-optimized: smaller batches, faster flush.
+    Durability,
 }
 
 impl Default for Ext4MountOptions {
@@ -733,6 +746,7 @@ impl Default for Ext4MountOptions {
             meta_bg_support_enabled: true,
             extents_support_enabled: true,
             _64bit_support_enabled_flag: true,
+            write_policy: Ext4WritePolicy::Balanced,
         }
     }
 }

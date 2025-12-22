@@ -324,7 +324,7 @@ pub fn test_concurrent_operations() -> TestResult {
 
 /// Performance benchmark for network operations
 pub fn benchmark_network_operations() -> TestResult {
-    let start_time = crate::time::get_ticks();
+    let start_time = crate::subsystems::time::get_ticks();
 
     // Create and destroy sockets rapidly
     for _ in 0..100 {
@@ -334,7 +334,7 @@ pub fn benchmark_network_operations() -> TestResult {
         // Socket is automatically dropped
     }
 
-    let end_time = crate::time::get_ticks();
+    let end_time = crate::subsystems::time::get_ticks();
     let elapsed = end_time - start_time;
 
     // Should complete reasonably quickly

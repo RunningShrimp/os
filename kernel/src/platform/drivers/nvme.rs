@@ -639,7 +639,7 @@ impl NvmeController {
 
         // 等待CSTS寄存器的READY位为0
         let mut timeout = Duration::from_millis(self.config.timeout_ms as u64);
-        let start_time = crate::time::timestamp_millis();
+        let start_time = crate::subsystems::time::timestamp_millis();
 
         while timeout.as_millis() > 0 {
             let status = self.read_register(NvmeRegister::Status);
@@ -647,7 +647,7 @@ impl NvmeController {
                 break;
             }
 
-            let elapsed = crate::time::timestamp_millis() - start_time;
+            let elapsed = crate::subsystems::time::timestamp_millis() - start_time;
             if elapsed >= self.config.timeout_ms as u64 {
                 return Err(NvmeError::TimeoutError);
             }
@@ -674,14 +674,14 @@ impl NvmeController {
         self.write_register(NvmeRegister::Config, cc);
 
         // 等待READY位
-        let start_time = crate::time::timestamp_millis();
+        let start_time = crate::subsystems::time::timestamp_millis();
         while timeout.as_millis() > 0 {
             let status = self.read_register(NvmeRegister::Status);
             if (status & 0x1) != 0 {
                 break;
             }
 
-            let elapsed = crate::time::timestamp_millis() - start_time;
+            let elapsed = crate::subsystems::time::timestamp_millis() - start_time;
             if elapsed >= self.config.timeout_ms as u64 {
                 return Err(NvmeError::TimeoutError);
             }
@@ -711,7 +711,7 @@ impl NvmeController {
         self.write_register(NvmeRegister::Config, cc);
 
         // 等待SHST位
-        let start_time = crate::time::timestamp_millis();
+        let start_time = crate::subsystems::time::timestamp_millis();
         let timeout = Duration::from_millis(self.config.timeout_ms as u64);
 
         while timeout.as_millis() > 0 {
@@ -721,7 +721,7 @@ impl NvmeController {
                 break; // Shutdown complete
             }
 
-            let elapsed = crate::time::timestamp_millis() - start_time;
+            let elapsed = crate::subsystems::time::timestamp_millis() - start_time;
             if elapsed >= self.config.timeout_ms as u64 {
                 return Err(NvmeError::TimeoutError);
             }

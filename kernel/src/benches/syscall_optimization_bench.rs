@@ -14,7 +14,7 @@ use core::time::Duration;
 
 use crate::benchmark::syscall_benchmarks::{benchmark_syscall, print_benchmark_result, SyscallBenchmarkResult};
 use crate::process::fd_cache::{ExtendedFdCache, FdCacheStats};
-use crate::mm::copy_optimized::{OptimizedCopier, CopyStats};
+use crate::subsystems::mm::copy_optimized::{OptimizedCopier, CopyStats};
 use crate::syscalls::batch::{batch_syscalls, get_batch_stats, reset_batch_stats, BatchStatsSnapshot};
 use crate::process::lock_optimized::{get_lock_stats, reset_lock_stats, LockStatsSnapshot};
 
@@ -76,17 +76,17 @@ pub fn benchmark_fd_cache() -> OptimizationBenchmarkResult {
     crate::println!("[benchmark] 开始文件描述符缓存性能测试...");
     
     // 测试基准实现（线性搜索）
-    let baseline_start = crate::time::hrtime_nanos();
+    let baseline_start = crate::subsystems::time::hrtime_nanos();
     for _ in 0..ITERATIONS {
         for &fd in TEST_FDS {
             // 模拟线性搜索文件描述符
             crate::process::manager::fdlookup(fd);
         }
     }
-    let baseline_time = crate::time::hrtime_nanos() - baseline_start;
+    let baseline_time = crate::subsystems::time::hrtime_nanos() - baseline_start;
     
     // 测试优化实现（扩展缓存）
-    let optimized_start = crate::time::hrtime_nanos();
+    let optimized_start = crate::subsystems::time::hrtime_nanos();
     let mut cache = ExtendedFdCache::new();
     
     // 预热缓存
@@ -108,7 +108,7 @@ pub fn benchmark_fd_cache() -> OptimizationBenchmarkResult {
             cache.get(fd);
         }
     }
-    let optimized_time = crate::time::hrtime_nanos() - optimized_start;
+    let optimized_time = crate::subsystems::time::hrtime_nanos() - optimized_start;
     
     let cache_stats = cache.get_stats();
     
@@ -158,11 +158,11 @@ pub fn benchmark_copy_operations() -> OptimizationBenchmarkResult {
     
     for &size in BUFFER_SIZES {
         // 测试基准实现
-        let baseline_start = crate::time::hrtime_nanos();
+        let baseline_start = crate::subsystems::time::hrtime_nanos();
         for _ in 0..ITERATIONS {
             let mut buffer = vec![0u8; size];
             // 模拟标准copyout操作
-            crate::mm::vm::copyout(
+            crate::subsystems::mm::vm::copyout(
                 crate::process::manager::PROC_TABLE.lock()
                     .find(crate::process::getpid())
                     .unwrap()
@@ -172,10 +172,10 @@ pub fn benchmark_copy_operations() -> OptimizationBenchmarkResult {
                 size,
             ).unwrap();
         }
-        baseline_total_time += crate::time::hrtime_nanos() - baseline_start;
+        baseline_total_time += crate::subsystems::time::hrtime_nanos() - baseline_start;
         
         // 测试优化实现
-        let optimized_start = crate::time::hrtime_nanos();
+        let optimized_start = crate::subsystems::time::hrtime_nanos();
         let mut copier = OptimizedCopier::with_defaults();
         for _ in 0..ITERATIONS {
             let mut buffer = vec![0u8; size];
@@ -190,10 +190,10 @@ pub fn benchmark_copy_operations() -> OptimizationBenchmarkResult {
                 size,
             ).unwrap();
         }
-        optimized_total_time += crate::time::hrtime_nanos() - optimized_start;
+        optimized_total_time += crate::subsystems::time::hrtime_nanos() - optimized_start;
     }
     
-    let copy_stats = crate::mm::copy_optimized::get_copy_stats();
+    let copy_stats = crate::subsystems::mm::copy_optimized::get_copy_stats();
     
     let baseline_metrics = PerformanceMetrics {
         avg_latency_ns: baseline_total_time / (ITERATIONS * BUFFER_SIZES.len()) as u64,
@@ -240,15 +240,15 @@ pub fn benchmark_batch_processing() -> OptimizationBenchmarkResult {
     reset_batch_stats();
     
     // 测试单个系统调用
-    let baseline_start = crate::time::hrtime_nanos();
+    let baseline_start = crate::subsystems::time::hrtime_nanos();
     for _ in 0..ITERATIONS {
         // 模拟单个系统调用
         crate::syscalls::dispatch(0x2002, &[0, 0x10000000, 64, 0, 0, 0]); // read
     }
-    let baseline_time = crate::time::hrtime_nanos() - baseline_start;
+    let baseline_time = crate::subsystems::time::hrtime_nanos() - baseline_start;
     
     // 测试批处理系统调用（使用批处理模块）
-    let optimized_start = crate::time::hrtime_nanos();
+    let optimized_start = crate::subsystems::time::hrtime_nanos();
     for _ in 0..ITERATIONS {
         // 准备批处理请求
         let mut batch_syscalls = Vec::with_capacity(BATCH_SIZE);
@@ -263,10 +263,10 @@ pub fn benchmark_batch_processing() -> OptimizationBenchmarkResult {
         // 执行批处理
         let _ = crate::syscalls::batch::batch_syscalls(batch_syscalls);
     }
-    let optimized_time = crate::time::hrtime_nanos() - optimized_start;
+    let optimized_time = crate::subsystems::time::hrtime_nanos() - optimized_start;
     
     // 测试批处理快速路径（使用SYS_BATCH系统调用）
-    let fast_path_start = crate::time::hrtime_nanos();
+    let fast_path_start = crate::subsystems::time::hrtime_nanos();
     for _ in 0..ITERATIONS {
         // 准备批处理请求
         let mut batch_syscalls = Vec::with_capacity(BATCH_SIZE);
@@ -296,7 +296,7 @@ pub fn benchmark_batch_processing() -> OptimizationBenchmarkResult {
         // 使用批处理快速路径
         let _ = crate::syscalls::dispatch(crate::syscalls::SYS_BATCH as usize, &[batch_req_ptr]);
     }
-    let fast_path_time = crate::time::hrtime_nanos() - fast_path_start;
+    let fast_path_time = crate::subsystems::time::hrtime_nanos() - fast_path_start;
     
     let batch_stats = get_batch_stats();
     
@@ -349,24 +349,24 @@ pub fn benchmark_lock_optimization() -> OptimizationBenchmarkResult {
     reset_lock_stats();
     
     // 测试基准实现（互斥锁）
-    let baseline_start = crate::time::hrtime_nanos();
+    let baseline_start = crate::subsystems::time::hrtime_nanos();
     for _ in 0..ITERATIONS {
         // 模拟获取进程表锁
         let _table = crate::process::manager::PROC_TABLE.lock();
         // 模拟一些操作
         crate::process::getpid();
     }
-    let baseline_time = crate::time::hrtime_nanos() - baseline_start;
+    let baseline_time = crate::subsystems::time::hrtime_nanos() - baseline_start;
     
     // 测试优化实现（读写锁）
-    let optimized_start = crate::time::hrtime_nanos();
+    let optimized_start = crate::subsystems::time::hrtime_nanos();
     for _ in 0..ITERATIONS {
         // 模拟获取进程表读锁
         let _read_lock = crate::process::lock_optimized::convenience::lock_main_table_read();
         // 模拟一些操作
         crate::process::getpid();
     }
-    let optimized_time = crate::time::hrtime_nanos() - optimized_start;
+    let optimized_time = crate::subsystems::time::hrtime_nanos() - optimized_start;
     
     let lock_stats = get_lock_stats();
     

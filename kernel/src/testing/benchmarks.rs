@@ -455,9 +455,9 @@ macro_rules! benchmark_suite {
 #[macro_export]
 macro_rules! benchmark_time {
     ($block:block) => {{
-        let start = $crate::time::get_ticks();
+        let start = $crate::subsystems::time::get_ticks();
         let _result = $block;
-        let end = $crate::time::get_ticks();
+        let end = $crate::subsystems::time::get_ticks();
         $crate::testing::benchmarks::BenchmarkMeasurement {
             value: (end - start) as f64,
             unit: "ms".to_string(),
@@ -470,11 +470,11 @@ macro_rules! benchmark_time {
 #[macro_export]
 macro_rules! benchmark_ops_per_sec {
     ($iterations:expr, $block:block) => {{
-        let start = $crate::time::get_ticks();
+        let start = $crate::subsystems::time::get_ticks();
         for _ in 0..$iterations {
             $block;
         }
-        let end = $crate::time::get_ticks();
+        let end = $crate::subsystems::time::get_ticks();
         let elapsed_ms = end - start;
         let ops_per_sec = ($iterations as f64) / (elapsed_ms as f64 / 1000.0);
         $crate::testing::benchmarks::BenchmarkMeasurement {
@@ -489,9 +489,9 @@ macro_rules! benchmark_ops_per_sec {
 #[macro_export]
 macro_rules! benchmark_throughput {
     ($bytes:expr, $block:block) => {{
-        let start = $crate::time::get_ticks();
+        let start = $crate::subsystems::time::get_ticks();
         $block;
-        let end = $crate::time::get_ticks();
+        let end = $crate::subsystems::time::get_ticks();
         let elapsed_ms = end - start;
         let throughput_mb_per_sec = ($bytes as f64) / (elapsed_ms as f64 / 1000.0) / (1024.0 * 1024.0);
         $crate::testing::benchmarks::BenchmarkMeasurement {

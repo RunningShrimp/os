@@ -8,7 +8,7 @@ extern crate alloc;
 use alloc::{string::{String, ToString}, sync::Arc, vec::Vec, collections::BTreeMap};
 use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::drivers::BlockDevice;
 
 use super::{

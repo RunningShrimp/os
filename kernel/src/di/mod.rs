@@ -112,7 +112,7 @@ impl ServiceEvent {
         Box::new(ServiceRegisteredEvent {
             metadata: EventMetadata {
                 id: None,
-                timestamp: crate::time::get_time_ns(),
+                timestamp: crate::subsystems::time::get_time_ns(),
                 source: "di_container".to_string(),
                 category: EventType::System,
                 priority: EventPriority::Normal,
@@ -131,7 +131,7 @@ impl ServiceEvent {
         Box::new(ServiceResolvedEvent {
             metadata: EventMetadata {
                 id: None,
-                timestamp: crate::time::get_time_ns(),
+                timestamp: crate::subsystems::time::get_time_ns(),
                 source: "di_container".to_string(),
                 category: EventType::System,
                 priority: EventPriority::Normal,
@@ -150,7 +150,7 @@ impl ServiceEvent {
         Box::new(ServiceCreatedEvent {
             metadata: EventMetadata {
                 id: None,
-                timestamp: crate::time::get_time_ns(),
+                timestamp: crate::subsystems::time::get_time_ns(),
                 source: "di_container".to_string(),
                 category: EventType::System,
                 priority: EventPriority::Normal,
@@ -169,7 +169,7 @@ impl ServiceEvent {
         Box::new(ServiceDisposedEvent {
             metadata: EventMetadata {
                 id: None,
-                timestamp: crate::time::get_time_ns(),
+                timestamp: crate::subsystems::time::get_time_ns(),
                 source: "di_container".to_string(),
                 category: EventType::System,
                 priority: EventPriority::Normal,

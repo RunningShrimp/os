@@ -162,6 +162,8 @@ pub mod primitives;
 #[cfg(feature = "realtime")]
 pub mod realtime;
 
+pub mod rcu;
+
 #[cfg(feature = "kernel_tests")]
 pub mod tests;
 

@@ -3,7 +3,7 @@
 //! 本模块提供完整的POSIX兼容网络功能，包括TCP、UDP、原始套接字等。
 
 use core::sync::atomic::{AtomicU64, Ordering};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use alloc::string::String;

@@ -544,7 +544,7 @@ impl SymbolTableManager {
 
     /// 添加符号
     pub fn add_symbol(&self, symbol: DebugSymbol) -> Result<(), SymbolError> {
-        let start_time = crate::time::timestamp_nanos();
+        let start_time = crate::subsystems::time::timestamp_nanos();
 
         // 检查符号是否已存在
         let mut global_symbols = self.global_symbols.lock();
@@ -582,7 +582,7 @@ impl SymbolTableManager {
         };
         self.statistics.total_symbols.fetch_add(1, Ordering::SeqCst);
 
-        let lookup_time = crate::time::timestamp_nanos() - start_time;
+        let lookup_time = crate::subsystems::time::timestamp_nanos() - start_time;
         self.statistics.total_lookup_time.fetch_add(lookup_time, Ordering::SeqCst);
 
         Ok(())
@@ -590,14 +590,14 @@ impl SymbolTableManager {
 
     /// 查找符号
     pub fn lookup_symbol(&self, name: &str) -> Result<SymbolLookupResult, SymbolError> {
-        let start_time = crate::time::timestamp_nanos();
+        let start_time = crate::subsystems::time::timestamp_nanos();
 
         // 首先检查缓存
         {
             let cache = self.symbol_cache.lock();
             if let Some(cached_symbol) = cache.get(name) {
                 self.statistics.cache_hits.fetch_add(1, Ordering::SeqCst);
-                let lookup_time = crate::time::timestamp_nanos() - start_time;
+                let lookup_time = crate::subsystems::time::timestamp_nanos() - start_time;
                 return Ok(SymbolLookupResult {
                     symbol: Some(cached_symbol.clone()),
                     exact_match: true,
@@ -628,7 +628,7 @@ impl SymbolTableManager {
         }
 
         self.statistics.lookups.fetch_add(1, Ordering::SeqCst);
-        let lookup_time = crate::time::timestamp_nanos() - start_time;
+        let lookup_time = crate::subsystems::time::timestamp_nanos() - start_time;
         self.statistics.total_lookup_time.fetch_add(lookup_time, Ordering::SeqCst);
 
         Ok(SymbolLookupResult {
@@ -641,7 +641,7 @@ impl SymbolTableManager {
 
     /// 反向查找（地址到符号）
     pub fn reverse_lookup(&self, address: usize) -> Result<ReverseLookupResult, SymbolError> {
-        let start_time = crate::time::timestamp_nanos();
+        let start_time = crate::subsystems::time::timestamp_nanos();
 
         // 在地址到符号的映射中查找
         let address_map = self.address_to_symbol.lock();
@@ -663,7 +663,7 @@ impl SymbolTableManager {
         // 查找包含的函数
         let containing_function = self.find_containing_function(address);
 
-        let lookup_time = crate::time::timestamp_nanos() - start_time;
+        let lookup_time = crate::subsystems::time::timestamp_nanos() - start_time;
 
         Ok(ReverseLookupResult {
             symbol,

@@ -87,7 +87,7 @@ pub extern "C" fn sys_glib_object_type_register(
         type_id,
         is_abstract,
         is_final,
-        created_timestamp: crate::time::get_timestamp() as u64,
+        created_timestamp: crate::subsystems::time::get_timestamp() as u64,
         instance_count: AtomicUsize::new(0),
     };
 

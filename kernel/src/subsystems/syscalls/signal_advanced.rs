@@ -76,7 +76,7 @@ fn sys_kill(args: &[u64]) -> SyscallResult {
 /// Returns: 0 on success, error on failure
 fn sys_sigaction(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::{copyin, copyout};
+    use crate::subsystems::mm::vm::{copyin, copyout};
     use crate::ipc::signal::{SigAction, SIG_DFL, SIG_IGN};
     
     let args = extract_args(args, 3)?;
@@ -123,7 +123,7 @@ fn sys_sigaction(args: &[u64]) -> SyscallResult {
         // Validate action
         let handler = new_action.handler;
         if handler != SIG_DFL && handler != SIG_IGN &&
-           (handler as usize) < crate::mm::vm::USER_BASE {
+           (handler as usize) < crate::subsystems::mm::vm::USER_BASE {
             return Err(SyscallError::InvalidArgument);
         }
         
@@ -183,7 +183,7 @@ fn sys_signal(args: &[u64]) -> SyscallResult {
             mask: crate::ipc::signal::SigSet::empty(),
             restorer: 0,
         }
-    } else if handler < crate::mm::vm::USER_BASE {
+    } else if handler < crate::subsystems::mm::vm::USER_BASE {
         SigAction {
             handler,
             flags: SigActionFlags::default(),
@@ -207,7 +207,7 @@ fn sys_signal(args: &[u64]) -> SyscallResult {
 /// Returns: 0 on success, error on failure
 fn sys_sigprocmask(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::{copyin, copyout};
+    use crate::subsystems::mm::vm::{copyin, copyout};
     use crate::ipc::signal::{SigSet, SIG_BLOCK, SIG_UNBLOCK, SIG_SETMASK};
     
     let args = extract_args(args, 3)?;
@@ -283,7 +283,7 @@ fn sys_sigprocmask(args: &[u64]) -> SyscallResult {
 /// Returns: 0 on success, error on failure
 fn sys_sigpending(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::copyout;
+    use crate::subsystems::mm::vm::copyout;
     use crate::ipc::signal::SigSet;
     
     let args = extract_args(args, 1)?;
@@ -321,7 +321,7 @@ fn sys_sigpending(args: &[u64]) -> SyscallResult {
 
 fn sys_sigsuspend(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::copyin;
+    use crate::subsystems::mm::vm::copyin;
     use crate::ipc::signal::SigSet;
 
     let args = extract_args(args, 1)?;
@@ -379,7 +379,7 @@ fn sys_sigsuspend(args: &[u64]) -> SyscallResult {
 
 fn sys_sigaltstack(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::{copyin, copyout};
+    use crate::subsystems::mm::vm::{copyin, copyout};
 
     // Define stack_t structure for signal alternate stack
     #[repr(C)]
@@ -472,7 +472,7 @@ fn sys_pause(_args: &[u64]) -> SyscallResult {
 
 fn sys_rt_sigaction(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::{copyin, copyout};
+    use crate::subsystems::mm::vm::{copyin, copyout};
     use crate::ipc::signal::{SigAction, SigActionFlags, SIG_DFL, SIG_IGN};
 
     let args = extract_args(args, 4)?;
@@ -525,7 +525,7 @@ fn sys_rt_sigaction(args: &[u64]) -> SyscallResult {
         // Validate action
         let handler = new_action.handler;
         if handler != SIG_DFL && handler != SIG_IGN &&
-           (handler as usize) < crate::mm::vm::USER_BASE {
+           (handler as usize) < crate::subsystems::mm::vm::USER_BASE {
             return Err(SyscallError::InvalidArgument);
         }
 
@@ -547,7 +547,7 @@ fn sys_rt_sigaction(args: &[u64]) -> SyscallResult {
 
 fn sys_rt_sigprocmask(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::{copyin, copyout};
+    use crate::subsystems::mm::vm::{copyin, copyout};
     use crate::ipc::signal::{SigSet, SIG_BLOCK, SIG_UNBLOCK, SIG_SETMASK};
 
     let args = extract_args(args, 4)?;
@@ -626,7 +626,7 @@ fn sys_rt_sigprocmask(args: &[u64]) -> SyscallResult {
 
 fn sys_rt_sigpending(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::copyout;
+    use crate::subsystems::mm::vm::copyout;
     use crate::ipc::signal::SigSet;
 
     let args = extract_args(args, 2)?;
@@ -670,7 +670,7 @@ fn sys_rt_sigpending(args: &[u64]) -> SyscallResult {
 
 fn sys_rt_sigtimedwait(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::{copyin, copyout};
+    use crate::subsystems::mm::vm::{copyin, copyout};
     use crate::ipc::signal::{SigSet, SigInfo};
 
     let args = extract_args(args, 4)?;
@@ -735,7 +735,7 @@ fn sys_rt_sigtimedwait(args: &[u64]) -> SyscallResult {
             copyin(pagetable, core::ptr::addr_of_mut!(timeout) as *mut u8, timeout_ptr as usize, core::mem::size_of::<crate::posix::Timespec>())
                 .map_err(|_| SyscallError::BadAddress)?;
         }
-        let now = crate::time::timestamp_nanos();
+        let now = crate::subsystems::time::timestamp_nanos();
         let timeout_ns = timeout.tv_sec as u64 * 1_000_000_000 + timeout.tv_nsec as u64;
         Some(now + timeout_ns)
     } else {
@@ -746,7 +746,7 @@ fn sys_rt_sigtimedwait(args: &[u64]) -> SyscallResult {
     loop {
         // Check for timeout
         if let Some(dl) = deadline {
-            if crate::time::timestamp_nanos() >= dl {
+            if crate::subsystems::time::timestamp_nanos() >= dl {
                 return Err(SyscallError::TimedOut);
             }
         }
@@ -784,7 +784,7 @@ fn sys_rt_sigtimedwait(args: &[u64]) -> SyscallResult {
 
 fn sys_rt_sigqueueinfo(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::copyin;
+    use crate::subsystems::mm::vm::copyin;
     use crate::ipc::signal::SigInfo;
 
     let args = extract_args(args, 3)?;
@@ -839,7 +839,7 @@ fn sys_rt_sigqueueinfo(args: &[u64]) -> SyscallResult {
 
 fn sys_rt_sigsuspend(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::copyin;
+    use crate::subsystems::mm::vm::copyin;
     use crate::ipc::signal::SigSet;
 
     let args = extract_args(args, 2)?;

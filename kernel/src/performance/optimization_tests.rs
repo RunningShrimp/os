@@ -12,8 +12,8 @@ extern crate alloc;
 
 use alloc::{string::String, vec::Vec, collections::BTreeMap};
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use crate::sync::{Mutex, SpinLock};
-use crate::mm::optimized_memory_manager::get_optimized_memory_stats;
+use crate::subsystems::sync::{Mutex, SpinLock};
+use crate::subsystems::mm::optimized_memory_manager::get_optimized_memory_stats;
 use crate::vfs::optimized_filesystem::get_optimized_fs_stats;
 use crate::io::optimized_io_manager::get_optimized_io_stats;
 use crate::performance::monitoring::{get_performance_report, update_perf_metric};
@@ -143,7 +143,7 @@ impl PerformanceTestFramework {
     /// 运行内存分配测试
     pub fn run_memory_allocation_test(&self) -> TestResult {
         let test_id = self.current_test_id.fetch_add(1, Ordering::SeqCst);
-        let start_time = crate::time::get_time_ns();
+        let start_time = crate::subsystems::time::get_time_ns();
         
         crate::println!("[perf_test] Starting memory allocation test {}", test_id);
         
@@ -153,7 +153,7 @@ impl PerformanceTestFramework {
         let mut total_allocated_bytes = 0u64;
         
         for i in 0..self.config.iterations {
-            let iter_start = crate::time::get_time_ns();
+            let iter_start = crate::subsystems::time::get_time_ns();
             
             // 测试分配性能
             for _ in 0..self.config.concurrency {
@@ -166,14 +166,14 @@ impl PerformanceTestFramework {
                 }
             }
             
-            total_time += crate::time::get_time_ns() - iter_start;
+            total_time += crate::subsystems::time::get_time_ns() - iter_start;
             
             if self.config.verbose_logging {
                 crate::println!("[perf_test] Memory allocation iteration {} completed", i);
             }
         }
         
-        let end_time = crate::time::get_time_ns();
+        let end_time = crate::subsystems::time::get_time_ns();
         let duration_ns = end_time - start_time;
         
         // 计算分数
@@ -211,7 +211,7 @@ impl PerformanceTestFramework {
     /// 测试分配性能
     fn test_allocation_performance(&self) -> usize {
         // 简化实现：测试分配指定大小的数据
-        let start_time = crate::time::get_time_ns();
+        let start_time = crate::subsystems::time::get_time_ns();
         
         // 尝试使用优化的内存管理器
         if let Some(memory_stats) = get_optimized_memory_stats() {
@@ -220,20 +220,20 @@ impl PerformanceTestFramework {
             
             if pressure < 50 {
                 // 低压力：快速分配
-                crate::mm::optimized_memory_manager::optimized_alloc_page()
+                crate::subsystems::mm::optimized_memory_manager::optimized_alloc_page()
             } else if pressure < 80 {
                 // 中等压力：正常分配
-                crate::mm::optimized_memory_manager::optimized_alloc_page()
+                crate::subsystems::mm::optimized_memory_manager::optimized_alloc_page()
             } else {
                 // 高压力：谨慎分配
-                crate::mm::optimized_memory_manager::optimized_alloc_page()
+                crate::subsystems::mm::optimized_memory_manager::optimized_alloc_page()
             }
         } else {
             // 回退到标准分配
-            crate::mm::kalloc();
+            crate::subsystems::mm::kalloc();
         }
         
-        let end_time = crate::time::get_time_ns();
+        let end_time = crate::subsystems::time::get_time_ns();
         
         if self.config.verbose_logging {
             let allocation_time = end_time - start_time;
@@ -246,7 +246,7 @@ impl PerformanceTestFramework {
     /// 运行文件系统缓存测试
     pub fn run_filesystem_cache_test(&self) -> TestResult {
         let test_id = self.current_test_id.fetch_add(1, Ordering::SeqCst);
-        let start_time = crate::time::get_time_ns();
+        let start_time = crate::subsystems::time::get_time_ns();
         
         crate::println!("[perf_test] Starting filesystem cache test {}", test_id);
         
@@ -255,7 +255,7 @@ impl PerformanceTestFramework {
         let mut total_operations = 0u64;
         
         for i in 0..self.config.iterations {
-            let iter_start = crate::time::get_time_ns();
+            let iter_start = crate::subsystems::time::get_time_ns();
             
             // 测试文件系统缓存性能
             for _ in 0..100 {
@@ -274,14 +274,14 @@ impl PerformanceTestFramework {
                 }
             }
             
-            total_operations += crate::time::get_time_ns() - iter_start;
+            total_operations += crate::subsystems::time::get_time_ns() - iter_start;
             
             if self.config.verbose_logging {
                 crate::println!("[perf_test] Filesystem cache iteration {} completed", i);
             }
         }
         
-        let end_time = crate::time::get_time_ns();
+        let end_time = crate::subsystems::time::get_time_ns();
         let duration_ns = end_time - start_time;
         
         // 计算分数
@@ -316,7 +316,7 @@ impl PerformanceTestFramework {
     /// 运行I/O吞吐量测试
     pub fn run_io_throughput_test(&self) -> TestResult {
         let test_id = self.current_test_id.fetch_add(1, Ordering::SeqCst);
-        let start_time = crate::time::get_time_ns();
+        let start_time = crate::subsystems::time::get_time_ns();
         
         crate::println!("[perf_test] Starting I/O throughput test {}", test_id);
         
@@ -324,7 +324,7 @@ impl PerformanceTestFramework {
         let mut total_time = 0u64;
         
         for i in 0..self.config.iterations {
-            let iter_start = crate::time::get_time_ns();
+            let iter_start = crate::subsystems::time::get_time_ns();
             
             // 测试I/O吞吐量
             for _ in 0..self.config.concurrency {
@@ -332,14 +332,14 @@ impl PerformanceTestFramework {
                 total_bytes += bytes_transferred as u64;
             }
             
-            total_time += crate::time::get_time_ns() - iter_start;
+            total_time += crate::subsystems::time::get_time_ns() - iter_start;
             
             if self.config.verbose_logging {
                 crate::println!("[perf_test] I/O throughput iteration {} completed", i);
             }
         }
         
-        let end_time = crate::time::get_time_ns();
+        let end_time = crate::subsystems::time::get_time_ns();
         let duration_ns = end_time - start_time;
         
         // 计算分数
@@ -372,22 +372,22 @@ impl PerformanceTestFramework {
     /// 测试I/O吞吐量性能
     fn test_io_throughput_performance(&self) -> usize {
         // 简化实现：模拟I/O传输
-        let start_time = crate::time::get_time_ns();
+        let start_time = crate::subsystems::time::get_time_ns();
         
         // 提交I/O请求
         let request_id = crate::io::submit_optimized_io_request(
             crate::io::IoOperationType::Write,
             1, // fd
-            crate::mm::vm::PAGE_SIZE as *mut u8,
+            crate::subsystems::mm::vm::PAGE_SIZE as *mut u8,
             self.config.data_size,
             0, // offset
             crate::io::IoPriority::Normal,
         );
         
         // 等待完成（简化实现）
-        crate::time::delay_ms(10); // 模拟I/O延迟
+        crate::subsystems::time::delay_ms(10); // 模拟I/O延迟
         
-        let end_time = crate::time::get_time_ns();
+        let end_time = crate::subsystems::time::get_time_ns();
         
         if self.config.verbose_logging {
             let io_time = end_time - start_time;
@@ -400,7 +400,7 @@ impl PerformanceTestFramework {
     /// 运行综合性能测试
     pub fn run_comprehensive_test(&self) -> PerformanceBenchmark {
         let benchmark_id = self.benchmark_counter.fetch_add(1, Ordering::SeqCst);
-        let start_time = crate::time::get_time_ns();
+        let start_time = crate::subsystems::time::get_time_ns();
         
         crate::println!("[perf_test] Starting comprehensive performance benchmark {}", benchmark_id);
         
@@ -411,7 +411,7 @@ impl PerformanceTestFramework {
         results.push(self.run_filesystem_cache_test());
         results.push(self.run_io_throughput_test());
         
-        let end_time = crate::time::get_time_ns();
+        let end_time = crate::subsystems::time::get_time_ns();
         let duration_ns = end_time - start_time;
         
         // 计算综合分数
@@ -446,7 +446,7 @@ impl PerformanceTestFramework {
     /// 运行回归测试
     pub fn run_regression_test(&self, baseline_score: f64) -> TestResult {
         let test_id = self.current_test_id.fetch_add(1, Ordering::SeqCst);
-        let start_time = crate::time::get_time_ns();
+        let start_time = crate::subsystems::time::get_time_ns();
         
         crate::println!("[perf_test] Starting regression test {} against baseline {:.2}", test_id, baseline_score);
         
@@ -454,7 +454,7 @@ impl PerformanceTestFramework {
         let benchmark = self.run_comprehensive_test();
         let current_score = benchmark.current_score;
         
-        let end_time = crate::time::get_time_ns();
+        let end_time = crate::subsystems::time::get_time_ns();
         let duration_ns = end_time - start_time;
         
         // 检查是否回归
@@ -492,7 +492,7 @@ impl PerformanceTestFramework {
 
     /// 生成性能报告
     pub fn generate_performance_report(&self) -> String {
-        let current_time = crate::time::get_time_ms();
+        let current_time = crate::subsystems::time::get_time_ms();
         
         // 获取性能监控数据
         let perf_report = get_performance_report();

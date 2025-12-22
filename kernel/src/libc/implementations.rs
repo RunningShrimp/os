@@ -458,7 +458,7 @@ impl CLibInterface for UnifiedCLib {
     }
 
     fn sleep(&self, seconds: c_uint) -> c_uint {
-        crate::time::sleep_ms(seconds as u64 * 1000);
+        crate::subsystems::time::sleep_ms(seconds as u64 * 1000);
         0
     }
 

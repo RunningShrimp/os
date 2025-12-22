@@ -457,7 +457,7 @@ impl BatchProcessor {
 
     /// 执行批处理请求
     pub fn execute_batch(&self, request: BatchRequest) -> BatchResponse {
-        let start_time = crate::time::hrtime_nanos();
+        let start_time = crate::subsystems::time::hrtime_nanos();
         self.stats.record_batch_start();
 
         // 验证批处理请求
@@ -476,7 +476,7 @@ impl BatchProcessor {
             self.execute_normal_batch(&request)
         };
 
-        let end_time = crate::time::hrtime_nanos();
+        let end_time = crate::subsystems::time::hrtime_nanos();
         let total_time = end_time - start_time;
 
         // 更新统计信息
@@ -597,13 +597,13 @@ impl BatchProcessor {
 
     /// 执行单个系统调用
     fn execute_single_syscall(&self, syscall: &BatchSyscall) -> BatchSyscallResult {
-        let start_time = crate::time::hrtime_nanos();
+        let start_time = crate::subsystems::time::hrtime_nanos();
         
         // 调用实际的系统调用分发器
         let args_usize: [usize; 6] = syscall.args.map(|arg| arg as usize);
         let result = crate::syscalls::dispatch(syscall.syscall_num as usize, &args_usize);
         
-        let end_time = crate::time::hrtime_nanos();
+        let end_time = crate::subsystems::time::hrtime_nanos();
         let execution_time = end_time - start_time;
 
         // Handle the result from dispatch which returns isize directly

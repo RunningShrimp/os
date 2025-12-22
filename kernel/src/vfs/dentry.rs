@@ -3,7 +3,7 @@ extern crate alloc;
 use alloc::{string::String, sync::Arc, collections::BTreeMap};
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 
 use super::{
     fs::InodeOps,

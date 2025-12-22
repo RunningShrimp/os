@@ -194,9 +194,9 @@ pub struct EnhancedSystemInfo {
     /// 统计信息
     stats: SystemInfoStats,
     /// 缓存的系统名称信息
-    cached_utsname: crate::sync::Mutex<Option<UtsName>>,
+    cached_utsname: crate::subsystems::sync::Mutex<Option<UtsName>>,
     /// 缓存的系统信息
-    cached_sysinfo: crate::sync::Mutex<Option<SysInfo>>,
+    cached_sysinfo: crate::subsystems::sync::Mutex<Option<SysInfo>>,
     /// 缓存时间戳
     cache_timestamp: core::sync::atomic::AtomicU64,
 }
@@ -207,8 +207,8 @@ impl EnhancedSystemInfo {
         Self {
             config,
             stats: SystemInfoStats::default(),
-            cached_utsname: crate::sync::Mutex::new(None),
-            cached_sysinfo: crate::sync::Mutex::new(None),
+            cached_utsname: crate::subsystems::sync::Mutex::new(None),
+            cached_sysinfo: crate::subsystems::sync::Mutex::new(None),
             cache_timestamp: core::sync::atomic::AtomicU64::new(0),
         }
     }
@@ -255,7 +255,7 @@ impl EnhancedSystemInfo {
             if let Some(mut cached) = self.cached_utsname.try_lock() {
                 *cached = Some(utsname_clone);
                 self.cache_timestamp.store(
-                    crate::time::get_timestamp() as u64,
+                    crate::subsystems::time::get_timestamp() as u64,
                     core::sync::atomic::Ordering::SeqCst
                 );
             }
@@ -306,7 +306,7 @@ impl EnhancedSystemInfo {
             if let Some(mut cached) = self.cached_sysinfo.try_lock() {
                 *cached = Some(sysinfo_clone);
                 self.cache_timestamp.store(
-                    crate::time::get_timestamp() as u64,
+                    crate::subsystems::time::get_timestamp() as u64,
                     core::sync::atomic::Ordering::SeqCst
                 );
             }
@@ -466,7 +466,7 @@ impl EnhancedSystemInfo {
 
     /// 检查缓存是否有效
     fn is_cache_valid(&self) -> bool {
-        let current_time = crate::time::get_timestamp() as u64;
+        let current_time = crate::subsystems::time::get_timestamp() as u64;
         let cache_time = self.cache_timestamp.load(core::sync::atomic::Ordering::SeqCst);
 
         cache_time > 0 && (current_time - cache_time) < self.config.cache_timeout as u64
@@ -487,7 +487,7 @@ impl EnhancedSystemInfo {
     /// 收集系统统计信息
     fn collect_sysinfo(&self) -> SysInfo {
         // 模拟系统信息收集
-        let uptime = crate::time::get_timestamp() as c_long;
+        let uptime = crate::subsystems::time::get_timestamp() as c_long;
 
         SysInfo {
             uptime,

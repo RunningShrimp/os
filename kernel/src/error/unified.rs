@@ -546,14 +546,14 @@ impl From<crate::subsystems::fs::api::error::FsError> for UnifiedError {
     }
 }
 
-impl From<crate::mm::api::AllocError> for UnifiedError {
-    fn from(err: crate::mm::api::AllocError) -> Self {
+impl From<crate::subsystems::mm::api::AllocError> for UnifiedError {
+    fn from(err: crate::subsystems::mm::api::AllocError) -> Self {
         UnifiedError::MemoryError(MemoryError::from(err))
     }
 }
 
-impl From<crate::mm::api::VmError> for UnifiedError {
-    fn from(err: crate::mm::api::VmError) -> Self {
+impl From<crate::subsystems::mm::api::VmError> for UnifiedError {
+    fn from(err: crate::subsystems::mm::api::VmError) -> Self {
         UnifiedError::MemoryError(MemoryError::from(err))
     }
 }
@@ -616,27 +616,27 @@ impl From<crate::subsystems::fs::api::error::FsError> for FileSystemError {
 }
 
 /// 从内存分配错误转换为统一错误中的内存错误
-impl From<crate::mm::api::AllocError> for MemoryError {
-    fn from(err: crate::mm::api::AllocError) -> Self {
+impl From<crate::subsystems::mm::api::AllocError> for MemoryError {
+    fn from(err: crate::subsystems::mm::api::AllocError) -> Self {
         match err {
-            crate::mm::api::AllocError::OutOfMemory => MemoryError::OutOfMemory,
-            crate::mm::api::AllocError::InvalidAlignment => MemoryError::InvalidAlignment,
-            crate::mm::api::AllocError::InvalidSize => MemoryError::InvalidSize,
-            crate::mm::api::AllocError::CorruptedAllocator => MemoryError::CorruptedAllocator,
-            crate::mm::api::AllocError::TooFragmented => MemoryError::TooFragmented,
+            crate::subsystems::mm::api::AllocError::OutOfMemory => MemoryError::OutOfMemory,
+            crate::subsystems::mm::api::AllocError::InvalidAlignment => MemoryError::InvalidAlignment,
+            crate::subsystems::mm::api::AllocError::InvalidSize => MemoryError::InvalidSize,
+            crate::subsystems::mm::api::AllocError::CorruptedAllocator => MemoryError::CorruptedAllocator,
+            crate::subsystems::mm::api::AllocError::TooFragmented => MemoryError::TooFragmented,
         }
     }
 }
 
 /// 从虚拟内存错误转换为统一错误中的内存错误
-impl From<crate::mm::api::VmError> for MemoryError {
-    fn from(err: crate::mm::api::VmError) -> Self {
+impl From<crate::subsystems::mm::api::VmError> for MemoryError {
+    fn from(err: crate::subsystems::mm::api::VmError) -> Self {
         match err {
-            crate::mm::api::VmError::InvalidAddress => MemoryError::InvalidAddress,
-            crate::mm::api::VmError::InvalidSize => MemoryError::InvalidSize,
-            crate::mm::api::VmError::InvalidProtection => MemoryError::InvalidProtection,
-            crate::mm::api::VmError::MappingFailed => MemoryError::MappingFailed,
-            crate::mm::api::VmError::UnmappingFailed => MemoryError::UnmappingFailed,
+            crate::subsystems::mm::api::VmError::InvalidAddress => MemoryError::InvalidAddress,
+            crate::subsystems::mm::api::VmError::InvalidSize => MemoryError::InvalidSize,
+            crate::subsystems::mm::api::VmError::InvalidProtection => MemoryError::InvalidProtection,
+            crate::subsystems::mm::api::VmError::MappingFailed => MemoryError::MappingFailed,
+            crate::subsystems::mm::api::VmError::UnmappingFailed => MemoryError::UnmappingFailed,
             _ => MemoryError::InvalidAddress,
         }
     }

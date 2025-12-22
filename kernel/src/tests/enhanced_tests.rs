@@ -95,14 +95,14 @@ impl EnhancedTestRunner {
         for (name, test_fn) in &self.tests {
             crate::print!("  {}: ", name);
             
-            let start_time = crate::time::hrtime_nanos();
+            let start_time = crate::subsystems::time::hrtime_nanos();
             let start_memory = self.get_memory_usage();
             let start_cycles = self.get_cpu_cycles();
 
             match test_fn() {
                 Ok(()) => {
                     passed += 1;
-                    let duration = crate::time::hrtime_nanos() - start_time;
+                    let duration = crate::subsystems::time::hrtime_nanos() - start_time;
                     let memory_used = self.get_memory_usage().saturating_sub(start_memory);
                     let cycles = self.get_cpu_cycles().saturating_sub(start_cycles);
                     
@@ -119,7 +119,7 @@ impl EnhancedTestRunner {
                 }
                 Err(error) => {
                     failed += 1;
-                    let duration = crate::time::hrtime_nanos() - start_time;
+                    let duration = crate::subsystems::time::hrtime_nanos() - start_time;
                     let memory_used = self.get_memory_usage().saturating_sub(start_memory);
                     let cycles = self.get_cpu_cycles().saturating_sub(start_cycles);
                     

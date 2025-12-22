@@ -2,7 +2,7 @@
 
 use super::common::{SyscallError, SyscallResult};
 // use crate::libc::time_lib::{Timespec, Timezone};
-use crate::mm::vm::copyin;
+use crate::subsystems::mm::vm::copyin;
 
 /// Dispatch time-related syscalls
 pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
@@ -46,7 +46,7 @@ mod tests {
 
 fn sys_time(_args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::copyout;
+    use crate::subsystems::mm::vm::copyout;
     use crate::libc::interface::time_t;
 
     // time(tloc) - one argument (pointer) which may be NULL
@@ -58,7 +58,7 @@ fn sys_time(_args: &[u64]) -> SyscallResult {
     let tloc = args[0] as *mut time_t;
 
     // Get current time in seconds (using nanosecond timestamp source)
-    let ns = crate::time::timestamp_nanos();
+    let ns = crate::subsystems::time::timestamp_nanos();
     let seconds = (ns / 1_000_000_000) as u64;
 
     // If caller provided a pointer, copy the value into user space
@@ -93,7 +93,7 @@ fn sys_time(_args: &[u64]) -> SyscallResult {
 /// Returns: 0 on success, error on failure
 fn sys_gettimeofday(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::copyout;
+    use crate::subsystems::mm::vm::copyout;
     use crate::posix::Timeval;
     use crate::libc::time_lib::Timezone;
     
@@ -117,7 +117,7 @@ fn sys_gettimeofday(args: &[u64]) -> SyscallResult {
     }
     
     // Get current time in nanoseconds
-    let ns = crate::time::timestamp_nanos();
+    let ns = crate::subsystems::time::timestamp_nanos();
     
     // Convert to timeval (seconds and microseconds)
     let tv = Timeval {
@@ -136,7 +136,7 @@ fn sys_gettimeofday(args: &[u64]) -> SyscallResult {
 
 fn sys_settimeofday(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::copyin;
+    use crate::subsystems::mm::vm::copyin;
     use crate::posix::Timeval;
     
     let args = extract_args(args, 2)?;
@@ -183,7 +183,7 @@ fn sys_settimeofday(args: &[u64]) -> SyscallResult {
 /// Returns: 0 on success, error on failure
 fn sys_clock_gettime(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::copyout;
+    use crate::subsystems::mm::vm::copyout;
     use crate::posix::Timespec;
     
     let args = extract_args(args, 2)?;
@@ -209,19 +209,19 @@ fn sys_clock_gettime(args: &[u64]) -> SyscallResult {
     let (tv_sec, tv_nsec) = match clockid {
         0 => { // CLOCK_REALTIME
             // For now, use monotonic time (real implementation would track wall clock)
-            let ns = crate::time::timestamp_nanos();
+            let ns = crate::subsystems::time::timestamp_nanos();
             (ns / 1_000_000_000, (ns % 1_000_000_000) as i64)
         }
         1 => { // CLOCK_MONOTONIC
-            let ns = crate::time::timestamp_nanos();
+            let ns = crate::subsystems::time::timestamp_nanos();
             (ns / 1_000_000_000, (ns % 1_000_000_000) as i64)
         }
         4 => { // CLOCK_MONOTONIC_RAW
-            let ns = crate::time::timestamp_nanos();
+            let ns = crate::subsystems::time::timestamp_nanos();
             (ns / 1_000_000_000, (ns % 1_000_000_000) as i64)
         }
         7 => { // CLOCK_REALTIME_ALARM
-            let ns = crate::time::timestamp_nanos();
+            let ns = crate::subsystems::time::timestamp_nanos();
             (ns / 1_000_000_000, (ns % 1_000_000_000) as i64)
         }
         _ => {
@@ -245,7 +245,7 @@ fn sys_clock_gettime(args: &[u64]) -> SyscallResult {
 
 fn sys_clock_settime(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::copyin;
+    use crate::subsystems::mm::vm::copyin;
     use crate::posix::Timespec;
     
     let args = extract_args(args, 2)?;
@@ -298,7 +298,7 @@ fn sys_clock_settime(args: &[u64]) -> SyscallResult {
 /// Returns: 0 on success, error on failure
 fn sys_clock_getres(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::copyout;
+    use crate::subsystems::mm::vm::copyout;
     use crate::posix::Timespec;
     
     let args = extract_args(args, 2)?;
@@ -353,7 +353,7 @@ fn sys_clock_getres(args: &[u64]) -> SyscallResult {
 /// Real-time aware: Uses high-precision timer for accurate sleep duration
 fn sys_nanosleep(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::copyout;
+    use crate::subsystems::mm::vm::copyout;
     use crate::posix::Timespec;
     
     let args = extract_args(args, 2)?;
@@ -389,33 +389,33 @@ fn sys_nanosleep(args: &[u64]) -> SyscallResult {
     
     // Calculate target time in nanoseconds
     let sleep_ns = (req.tv_sec as u64) * 1_000_000_000 + (req.tv_nsec as u64);
-    let start_ns = crate::time::hrtime_nanos();
+    let start_ns = crate::subsystems::time::hrtime_nanos();
     let target_ns = start_ns + sleep_ns;
     
     // High-precision sleep using busy-wait for very short durations
     // For longer sleeps, use the timer sleep-queue + process sleep/wakeup
     if sleep_ns < 1_000_000 {
         // Less than 1ms: use busy-wait for precision
-        while crate::time::hrtime_nanos() < target_ns {
+        while crate::subsystems::time::hrtime_nanos() < target_ns {
             core::hint::spin_loop();
         }
     } else {
         // Longer sleep: compute target tick and sleep on channel == pid
         // Convert nanoseconds to ticks (tick period = 1s / TIMER_FREQ)
-        let tick_ns = 1_000_000_000u64 / crate::time::TIMER_FREQ;
+        let tick_ns = 1_000_000_000u64 / crate::subsystems::time::TIMER_FREQ;
         let ticks = (sleep_ns + tick_ns - 1) / tick_ns; // ceil
 
         // Register with timer as a sleeper and block the current process
         let chan = pid as usize;
-        let wake_tick = crate::time::get_ticks().saturating_add(ticks);
-        crate::time::add_sleeper(wake_tick, chan);
+        let wake_tick = crate::subsystems::time::get_ticks().saturating_add(ticks);
+        crate::subsystems::time::add_sleeper(wake_tick, chan);
 
         // Block current process until wakeup_sleepers wakes it
         crate::process::sleep(chan);
     }
     
     // Check if interrupted (simplified - real implementation would check signals)
-    let elapsed_ns = crate::time::hrtime_nanos().saturating_sub(start_ns);
+    let elapsed_ns = crate::subsystems::time::hrtime_nanos().saturating_sub(start_ns);
     if elapsed_ns < sleep_ns && rem_ptr.is_null() == false {
         // Sleep was interrupted - calculate remaining time
         let remaining_ns = sleep_ns - elapsed_ns;
@@ -436,7 +436,7 @@ fn sys_nanosleep(args: &[u64]) -> SyscallResult {
 
 fn sys_clock_nanosleep(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::{copyin, copyout};
+    use crate::subsystems::mm::vm::{copyin, copyout};
     use crate::posix::Timespec;
     
     let args = extract_args(args, 4)?;
@@ -479,7 +479,7 @@ fn sys_clock_nanosleep(args: &[u64]) -> SyscallResult {
     }
     
     const TIMER_ABSTIME: i32 = 1;
-    let start_ns = crate::time::hrtime_nanos();
+    let start_ns = crate::subsystems::time::hrtime_nanos();
     
     let target_ns = if (flags & TIMER_ABSTIME) != 0 {
         // Absolute time
@@ -494,23 +494,23 @@ fn sys_clock_nanosleep(args: &[u64]) -> SyscallResult {
     if sleep_ns > 0 {
         if sleep_ns < 1_000_000 {
             // Less than 1ms: busy-wait
-            while crate::time::hrtime_nanos() < target_ns {
+            while crate::subsystems::time::hrtime_nanos() < target_ns {
                 core::hint::spin_loop();
             }
         } else {
             // Use timer-based sleep
-            let tick_ns = 1_000_000_000u64 / crate::time::TIMER_FREQ;
+            let tick_ns = 1_000_000_000u64 / crate::subsystems::time::TIMER_FREQ;
             let ticks = (sleep_ns + tick_ns - 1) / tick_ns;
             
             let chan = my_pid as usize;
-            let wake_tick = crate::time::get_ticks().saturating_add(ticks);
-            crate::time::add_sleeper(wake_tick, chan);
+            let wake_tick = crate::subsystems::time::get_ticks().saturating_add(ticks);
+            crate::subsystems::time::add_sleeper(wake_tick, chan);
             crate::process::sleep(chan);
         }
     }
     
     // Check for remaining time (on interruption)
-    let end_ns = crate::time::hrtime_nanos();
+    let end_ns = crate::subsystems::time::hrtime_nanos();
     if end_ns < target_ns && remain_ptr != 0 && (flags & TIMER_ABSTIME) == 0 {
         let remaining = target_ns - end_ns;
         let rem = Timespec {
@@ -539,7 +539,7 @@ fn sys_alarm(args: &[u64]) -> SyscallResult {
     static ALARM_TIME: AtomicU64 = AtomicU64::new(0);
     
     // Get the previous alarm value
-    let current_ns = crate::time::timestamp_nanos();
+    let current_ns = crate::subsystems::time::timestamp_nanos();
     let old_alarm = ALARM_TIME.load(Ordering::SeqCst);
     let remaining = if old_alarm > current_ns {
         ((old_alarm - current_ns) / 1_000_000_000) as u64
@@ -578,7 +578,7 @@ const ITIMER_PROF: i32 = 2;
 
 fn sys_setitimer(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::{copyin, copyout};
+    use crate::subsystems::mm::vm::{copyin, copyout};
     
     let args = extract_args(args, 3)?;
     let which = args[0] as i32;
@@ -639,7 +639,7 @@ fn sys_setitimer(args: &[u64]) -> SyscallResult {
 
 fn sys_getitimer(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::copyout;
+    use crate::subsystems::mm::vm::copyout;
     
     let args = extract_args(args, 2)?;
     let which = args[0] as i32;
@@ -681,7 +681,7 @@ fn sys_getitimer(args: &[u64]) -> SyscallResult {
 /// Returns: 0 on success, error on failure
 fn sys_timer_create(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::{copyin, copyout};
+    use crate::subsystems::mm::vm::{copyin, copyout};
     use crate::posix::{SigEvent, SIGEV_SIGNAL};
     
     let args = extract_args(args, 3)?;
@@ -762,7 +762,7 @@ fn sys_timer_create(args: &[u64]) -> SyscallResult {
 /// Returns: 0 on success, error on failure
 fn sys_timer_settime(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::{copyin, copyout};
+    use crate::subsystems::mm::vm::{copyin, copyout};
     use crate::posix::{Itimerspec, TIMER_ABSTIME};
     
     let args = extract_args(args, 4)?;
@@ -834,7 +834,7 @@ fn sys_timer_settime(args: &[u64]) -> SyscallResult {
 
 fn sys_timer_gettime(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::copyout;
+    use crate::subsystems::mm::vm::copyout;
     use crate::posix::Itimerspec;
     
     let args = extract_args(args, 2)?;

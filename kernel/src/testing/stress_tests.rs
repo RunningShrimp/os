@@ -269,7 +269,7 @@ impl StressTestSystem {
 
     /// Run a single stress test case
     pub fn run_stress_test_case(&self, test_case: &StressTestCase) -> StressTestResult {
-        let start_time = crate::time::get_ticks();
+        let start_time = crate::subsystems::time::get_ticks();
         
         // Start resource monitoring
         {
@@ -286,7 +286,7 @@ impl StressTestSystem {
             monitor.stop_monitoring()
         };
         
-        let end_time = crate::time::get_ticks();
+        let end_time = crate::subsystems::time::get_ticks();
         result.execution_time_ms = end_time - start_time;
         result.peak_resource_usage = peak_usage;
         result.average_resource_usage = average_usage;
@@ -358,7 +358,7 @@ impl ResourceMonitor {
 
     /// Start monitoring
     pub fn start_monitoring(&mut self) {
-        self.start_time = crate::time::get_ticks();
+        self.start_time = crate::subsystems::time::get_ticks();
         self.current_usage = self.get_current_usage();
         self.peak_usage = self.current_usage.clone();
         self.usage_samples.clear();

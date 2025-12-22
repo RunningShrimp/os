@@ -76,7 +76,7 @@ fn sys_sigqueue(args: &[u64]) -> SyscallResult {
         }
 
         unsafe {
-            match crate::mm::vm::copyin(pagetable, value_data.as_mut_ptr(), value_ptr, value_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, value_data.as_mut_ptr(), value_ptr, value_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -138,7 +138,7 @@ fn sys_sigtimedwait(args: &[u64]) -> SyscallResult {
         let mut mask_data = [0u8; core::mem::size_of::<SigSet>()];
         
         unsafe {
-            match crate::mm::vm::copyin(pagetable, mask_data.as_mut_ptr(), sigmask_ptr, mask_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, mask_data.as_mut_ptr(), sigmask_ptr, mask_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -154,7 +154,7 @@ fn sys_sigtimedwait(args: &[u64]) -> SyscallResult {
         let mut timeout_data = [0u8; core::mem::size_of::<Timespec>()];
         
         unsafe {
-            match crate::mm::vm::copyin(pagetable, timeout_data.as_mut_ptr(), timeout_ptr, timeout_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, timeout_data.as_mut_ptr(), timeout_ptr, timeout_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -180,7 +180,7 @@ fn sys_sigtimedwait(args: &[u64]) -> SyscallResult {
                 let info_data = unsafe { core::mem::transmute::<SigInfoT, [u8; core::mem::size_of::<SigInfoT>()]>(info) };
                 
                 unsafe {
-                    match crate::mm::vm::copyout(pagetable, info_ptr, info_data.as_ptr(), info_data.len()) {
+                    match crate::subsystems::mm::vm::copyout(pagetable, info_ptr, info_data.as_ptr(), info_data.len()) {
                         Ok(_) => {},
                         Err(_) => return Err(SyscallError::BadAddress),
                     }
@@ -237,7 +237,7 @@ fn sys_sigwaitinfo(args: &[u64]) -> SyscallResult {
         let mut mask_data = [0u8; core::mem::size_of::<SigSet>()];
         
         unsafe {
-            match crate::mm::vm::copyin(pagetable, mask_data.as_mut_ptr(), sigmask_ptr, mask_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, mask_data.as_mut_ptr(), sigmask_ptr, mask_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -256,7 +256,7 @@ fn sys_sigwaitinfo(args: &[u64]) -> SyscallResult {
                 let info_data = unsafe { core::mem::transmute::<SigInfoT, [u8; 128]>(info) };
                 
                 unsafe {
-                    match crate::mm::vm::copyout(pagetable, info_ptr, info_data.as_ptr(), info_data.len()) {
+                    match crate::subsystems::mm::vm::copyout(pagetable, info_ptr, info_data.as_ptr(), info_data.len()) {
                         Ok(_) => {},
                         Err(_) => return Err(SyscallError::BadAddress),
                     }
@@ -312,7 +312,7 @@ fn sys_sigaltstack(args: &[u64]) -> SyscallResult {
         let mut stack_data = [0u8; core::mem::size_of::<StackT>()];
         
         unsafe {
-            match crate::mm::vm::copyin(pagetable, stack_data.as_mut_ptr(), new_stack_ptr, stack_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, stack_data.as_mut_ptr(), new_stack_ptr, stack_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -348,7 +348,7 @@ fn sys_sigaltstack(args: &[u64]) -> SyscallResult {
                 let old_stack_data = unsafe { core::mem::transmute::<StackT, [u8; 24]>(old_stack) };
                 
                 unsafe {
-                    match crate::mm::vm::copyout(pagetable, old_stack_ptr, old_stack_data.as_ptr(), old_stack_data.len()) {
+                    match crate::subsystems::mm::vm::copyout(pagetable, old_stack_ptr, old_stack_data.as_ptr(), old_stack_data.len()) {
                         Ok(_) => {},
                         Err(_) => return Err(SyscallError::BadAddress),
                     }
@@ -412,7 +412,7 @@ fn sys_pthread_sigmask(args: &[u64]) -> SyscallResult {
         let mut mask_data = [0u8; core::mem::size_of::<SigSet>()];
         
         unsafe {
-            match crate::mm::vm::copyin(pagetable, mask_data.as_mut_ptr(), new_mask_ptr, mask_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, mask_data.as_mut_ptr(), new_mask_ptr, mask_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -434,7 +434,7 @@ fn sys_pthread_sigmask(args: &[u64]) -> SyscallResult {
                 let old_mask_data = unsafe { core::mem::transmute::<SigSet, [u8; 8]>(old_mask) };
                 
                 unsafe {
-                    match crate::mm::vm::copyout(pagetable, old_mask_ptr, old_mask_data.as_ptr(), old_mask_data.len()) {
+                    match crate::subsystems::mm::vm::copyout(pagetable, old_mask_ptr, old_mask_data.as_ptr(), old_mask_data.len()) {
                         Ok(_) => {},
                         Err(_) => return Err(SyscallError::BadAddress),
                     }

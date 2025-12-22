@@ -275,12 +275,12 @@ impl SecurityTestSystem {
 
     /// Run a single security test case
     pub fn run_security_test_case(&self, test_case: &SecurityTestCase) -> SecurityTestResult {
-        let start_time = crate::time::get_ticks();
+        let start_time = crate::subsystems::time::get_ticks();
         
         // Run the security test
         let mut result = (test_case.test_fn)();
         
-        let end_time = crate::time::get_ticks();
+        let end_time = crate::subsystems::time::get_ticks();
         result.execution_time_ms = end_time - start_time;
         
         // Update global statistics

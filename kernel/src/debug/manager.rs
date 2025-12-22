@@ -128,7 +128,7 @@ impl DebugManager {
     /// 开始调试会话
     pub fn start_debug_session(&mut self, session_name: &str, session_type: DebugSessionType, config: Option<SessionConfig>) -> Result<String, &'static str> {
         let session_id = format!("debug_{}", self.session_counter.fetch_add(1, Ordering::SeqCst));
-        let start_time = crate::time::get_timestamp();
+        let start_time = crate::subsystems::time::get_timestamp();
 
         let session_config = config.unwrap_or_else(|| SessionConfig::default());
 
@@ -152,7 +152,7 @@ impl DebugManager {
         // 添加启动事件
         if let Some(session) = self.active_sessions.get_mut(&session_id) {
             let event = DebugEvent {
-                id: format!("event_{}", crate::time::get_timestamp()),
+                id: format!("event_{}", crate::subsystems::time::get_timestamp()),
                 timestamp: start_time,
                 event_type: DebugEventType::InfoEvent,
                 level: DebugLevel::Info,
@@ -170,7 +170,7 @@ impl DebugManager {
 
     /// 停止调试会话
     pub fn stop_debug_session(&mut self, session_id: &str) -> Result<(), &'static str> {
-        let end_time = crate::time::get_timestamp();
+        let end_time = crate::subsystems::time::get_timestamp();
         
         // 先获取需要的信息，避免同时持有多个借用
         let (session_name, start_time) = {
@@ -225,7 +225,7 @@ impl DebugManager {
             condition: None,
             hit_count: 0,
             description: description.unwrap_or_else(|| format!("Breakpoint at 0x{:x}", address)),
-            created_at: crate::time::get_timestamp(),
+            created_at: crate::subsystems::time::get_timestamp(),
             last_hit: None,
             source_location: None,
             original_instruction: Vec::new(),
@@ -253,7 +253,7 @@ impl DebugManager {
     /// 创建内存快照
     pub fn create_memory_snapshot(&mut self, process_id: u32, thread_id: u32) -> Result<u64, &'static str> {
         let snapshot_id = self.memory_analyzer.memory_snapshots.len() as u64 + 1;
-        let timestamp = crate::time::get_timestamp();
+        let timestamp = crate::subsystems::time::get_timestamp();
 
         let snapshot = MemorySnapshot {
             id: snapshot_id,
@@ -357,8 +357,8 @@ impl DebugManager {
 
     /// 创建性能采样
     pub fn create_performance_sample(&mut self, process_id: u32, _thread_id: u32) -> Result<String, &'static str> {
-        let sample_id = format!("sample_{}", crate::time::get_timestamp());
-        let timestamp = crate::time::get_timestamp();
+        let sample_id = format!("sample_{}", crate::subsystems::time::get_timestamp());
+        let timestamp = crate::subsystems::time::get_timestamp();
 
         let sample_data: BTreeMap<String, f64> = BTreeMap::new();
         let system_state = self.collect_system_state();

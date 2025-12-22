@@ -8,7 +8,7 @@ extern crate alloc;
 use alloc::sync::Arc;
 use alloc::collections::BTreeMap;
 use alloc::boxed::Box;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::reliability::errno::{EOK, EINVAL, ENOENT, EAGAIN};
 use crate::posix::SemT;
 
@@ -17,7 +17,7 @@ struct SemaphoreDescriptor {
     /// Semaphore name (for named semaphores)
     name: Option<alloc::string::String>,
     /// Internal semaphore implementation
-    internal: Arc<crate::sync::primitives::Semaphore>,
+    internal: Arc<crate::subsystems::sync::primitives::Semaphore>,
     /// Reference count
     ref_count: core::sync::atomic::AtomicUsize,
     /// Process permissions
@@ -73,7 +73,7 @@ pub unsafe extern "C" fn sem_init(
     }
 
     // Create semaphore with initial value
-    let internal = crate::sync::primitives::Semaphore::new(value);
+    let internal = crate::subsystems::sync::primitives::Semaphore::new(value);
     let semaphore = Box::into_raw(Box::new(SemaphoreDescriptor {
         name: None,
         internal: Arc::new(internal),
@@ -303,7 +303,7 @@ pub unsafe extern "C" fn sem_open(
             return SemT { sem_internal: core::ptr::null_mut() };
         }
 
-        let internal = crate::sync::primitives::Semaphore::new(value);
+        let internal = crate::subsystems::sync::primitives::Semaphore::new(value);
         let semaphore = Arc::new(SemaphoreDescriptor {
             name: Some(name_str.clone()),
             internal: Arc::new(internal),

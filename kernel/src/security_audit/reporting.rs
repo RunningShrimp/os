@@ -662,7 +662,7 @@ impl ReportGenerator {
 
     /// 生成报告
     pub fn generate_report(&mut self, report_type: ReportType) -> Result<String, &'static str> {
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         // 收集数据
         let report_data = self.collect_report_data(report_type)?;
@@ -681,7 +681,7 @@ impl ReportGenerator {
             *stats.reports_by_format.entry(*self.config.formats.first().unwrap()).or_insert(0) += 1;
             stats.successful_generations += 1;
 
-            let elapsed = crate::time::get_timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
             stats.avg_generation_time_us = (stats.avg_generation_time_us + elapsed / 1000) / 2;
         }
 
@@ -704,7 +704,7 @@ impl ReportGenerator {
                 id: report_id,
                 title: format!("{:?} Report", report_type),
                 report_type,
-                generated_at: crate::time::get_timestamp_nanos(),
+                generated_at: crate::subsystems::time::get_timestamp_nanos(),
                 time_range,
                 generator: "NOS Security Audit".to_string(),
                 version: "1.0.0".to_string(),
@@ -719,7 +719,7 @@ impl ReportGenerator {
 
     /// 获取报告类型的时间范围
     fn get_time_range_for_report_type(&self, report_type: ReportType) -> (u64, u64) {
-        let now = crate::time::get_timestamp();
+        let now = crate::subsystems::time::get_timestamp();
         let start_time = match report_type {
             ReportType::RealTime => now - 3600,      // 1 hour
             ReportType::Daily => now - 86400,       // 1 day
@@ -805,7 +805,7 @@ impl ReportGenerator {
                 "Implement additional sensors".to_string(),
             ],
             assignee: Some("Security Team".to_string()),
-            due_date: Some(crate::time::get_timestamp() + 604800), // 1 week
+            due_date: Some(crate::subsystems::time::get_timestamp() + 604800), // 1 week
         });
 
         Ok(recommendations)
@@ -914,7 +914,7 @@ impl DataCollector {
 
     /// 收集数据
     pub fn collect_data(&mut self, time_range: (u64, u64)) -> Result<CollectedData, &'static str> {
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
         let mut content = BTreeMap::new();
 
         // 从各个数据源收集数据
@@ -935,8 +935,8 @@ impl DataCollector {
             id: self.cache.len() as u64 + 1,
             name: format!("Report Data for {} to {}", time_range.0, time_range.1),
             content,
-            collected_at: crate::time::get_timestamp_nanos(),
-            expires_at: crate::time::get_timestamp_nanos() + 3600000000000, // 1 hour
+            collected_at: crate::subsystems::time::get_timestamp_nanos(),
+            expires_at: crate::subsystems::time::get_timestamp_nanos() + 3600000000000, // 1 hour
         };
 
         // 更新统计
@@ -944,7 +944,7 @@ impl DataCollector {
             self.stats.total_collections += 1;
             self.stats.successful_collections += 1;
 
-            let elapsed = crate::time::get_timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
             self.stats.avg_collection_time_us = (self.stats.avg_collection_time_us + elapsed / 1000) / 2;
         }
 
@@ -976,8 +976,8 @@ impl DataCollector {
             id: 0,
             name: source.name.clone(),
             content,
-            collected_at: crate::time::get_timestamp_nanos(),
-            expires_at: crate::time::get_timestamp_nanos() + 1800000000000, // 30 minutes
+            collected_at: crate::subsystems::time::get_timestamp_nanos(),
+            expires_at: crate::subsystems::time::get_timestamp_nanos() + 1800000000000, // 30 minutes
         })
     }
 }
@@ -1045,9 +1045,9 @@ impl ReportFormatter for HtmlFormatter {
 </html>"#,
             data.metadata.title,
             data.metadata.title,
-            crate::time::format_timestamp(data.metadata.generated_at),
-            crate::time::format_timestamp(data.metadata.time_range.0),
-            crate::time::format_timestamp(data.metadata.time_range.1),
+            crate::subsystems::time::format_timestamp(data.metadata.generated_at),
+            crate::subsystems::time::format_timestamp(data.metadata.time_range.0),
+            crate::subsystems::time::format_timestamp(data.metadata.time_range.1),
             data.content.executive_summary,
             self.format_findings(&data.content.key_findings),
             self.format_recommendations(&data.content.recommendations)

@@ -1,5 +1,8 @@
 //! 统一性能优化框架
 //!
+//! **NOTE**: This module is being integrated into the unified dispatcher.
+//! Some functionality may be deprecated in favor of UnifiedSyscallDispatcher.
+//!
 //! 本模块提供统一的性能优化框架，包括：
 //! - 自适应优化策略
 //! - 动态性能调优
@@ -12,7 +15,10 @@ use alloc::string::String;
 use crate::syscalls::optimization_core::{
     UnifiedSyscallStats, OptimizationConfig
 };
-use crate::syscalls::unified_dispatcher::{UnifiedDispatcher, SyscallHandler};
+// DEPRECATED: This module references old unified_dispatcher
+// TODO: Update to use new unified dispatcher from dispatch::unified
+// use crate::subsystems::syscalls::dispatch::unified::{UnifiedSyscallDispatcher};
+use crate::syscalls::optimization_core::UnifiedSyscallStats;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -476,7 +482,7 @@ impl UnifiedOptimizationManager {
     
     /// 获取当前时间戳
     fn get_current_timestamp(&self) -> u64 {
-        crate::time::hrtime_nanos()
+        crate::subsystems::time::hrtime_nanos()
     }
 }
 

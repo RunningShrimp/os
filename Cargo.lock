@@ -641,6 +641,7 @@ dependencies = [
  "hashbrown 0.14.5",
  "itoa",
  "log",
+ "nos-api",
  "riscv",
  "smoltcp",
  "spin 0.9.8",

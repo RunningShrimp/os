@@ -7,11 +7,11 @@ use crate::posix::{CLONE_VM, CLONE_FILES, CLONE_FS, CLONE_SIGHAND, CLONE_THREAD,
                    CLONE_PARENT_SETTID, CLONE_CHILD_SETTID, CLONE_CHILD_CLEARTID,
                    CLONE_NEWNS, CLONE_NEWUTS, CLONE_NEWIPC, CLONE_NEWNET,
                    CLONE_NEWPID, CLONE_NEWUSER};
-use crate::mm::vm::copyin;
+use crate::subsystems::mm::vm::copyin;
 use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 
 // ============================================================================
 // Futex Support Structures
@@ -235,7 +235,7 @@ fn sys_clone(args: &[u64]) -> SyscallResult {
                 if !namespace_configs.is_empty() {
                     // Get namespace manager instance
                     use crate::cloud_native::namespaces::NamespaceManager;
-                    static NS_MANAGER: crate::sync::Mutex<Option<NamespaceManager>> = crate::sync::Mutex::new(None);
+                    static NS_MANAGER: crate::subsystems::sync::Mutex<Option<NamespaceManager>> = crate::subsystems::sync::Mutex::new(None);
 
                     let mut manager_guard = NS_MANAGER.lock();
                     let manager = manager_guard.get_or_insert_with(|| NamespaceManager::new());
@@ -257,10 +257,26 @@ fn sys_clone(args: &[u64]) -> SyscallResult {
                         match manager.create_namespace(ns_type, config) {
                             Ok(ns_id) => {
                                 // Associate namespace with child process
-                                // TODO: Store namespace in process structure
-                                crate::println!("[clone] Created namespace {:?} (ID: {}) for child process {}", ns_type, ns_id, child_pid);
+                                // Store namespace in process structure
+                                let mut table = crate::subsystems::process::manager::PROC_TABLE.lock();
+                                if let Some(child_proc) = table.find(child_pid) {
+                                    child_proc.namespaces.insert(ns_type, ns_id);
+                                    
+                                    // Add process to namespace
+                                    if let Some(namespace) = manager.get_namespace(ns_id) {
+                                        let mut ns = namespace.lock();
+                                        if let Err(e) = ns.add_process(child_pid as u32) {
+                                            crate::println!("[clone] Warning: Failed to add process {} to namespace {}: {}", child_pid, ns_id, e);
+                                        }
+                                    }
+                                    
+                                    crate::println!("[clone] Created namespace {:?} (ID: {}) for child process {}", ns_type, ns_id, child_pid);
+                                } else {
+                                    crate::println!("[clone] Warning: Child process {} not found when storing namespace", child_pid);
+                                }
                             }
-                            Err(_) => {
+                            Err(e) => {
+                                crate::println!("[clone] Failed to create namespace {:?}: {}", ns_type, e);
                                 return Err(SyscallError::InvalidArgument);
                             }
                         }
@@ -318,7 +334,7 @@ fn sys_vfork(_args: &[u64]) -> SyscallResult {
 
 fn sys_execve(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::copyin;
+    use crate::subsystems::mm::vm::copyin;
     
     let args = extract_args(args, 3)?;
     let path_ptr = args[0] as usize;
@@ -376,7 +392,7 @@ fn sys_exit(args: &[u64]) -> SyscallResult {
 
 fn sys_wait4(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::copyout;
+    use crate::subsystems::mm::vm::copyout;
     
     let args = extract_args(args, 4)?;
     let wait_pid = args[0] as i32;
@@ -480,7 +496,7 @@ fn sys_unshare(args: &[u64]) -> SyscallResult {
     // Create new namespaces for current process
     // Get namespace manager instance
     use crate::cloud_native::namespaces::NamespaceManager;
-    static NS_MANAGER: crate::sync::Mutex<Option<NamespaceManager>> = crate::sync::Mutex::new(None);
+    static NS_MANAGER: crate::subsystems::sync::Mutex<Option<NamespaceManager>> = crate::subsystems::sync::Mutex::new(None);
     
     let mut manager_guard = NS_MANAGER.lock();
     let manager = manager_guard.get_or_insert_with(|| NamespaceManager::new());
@@ -764,9 +780,9 @@ pub fn requeue_futex_waiters(src_uaddr: usize, dst_uaddr: usize, max_requeue: i3
 }
 
 /// Enhanced futex requeue operation implementation
-pub fn futex_requeue(pagetable: *mut crate::mm::vm::PageTable, uaddr: usize, uaddr2: usize,
+pub fn futex_requeue(pagetable: *mut crate::subsystems::mm::vm::PageTable, uaddr: usize, uaddr2: usize,
                 nr_wake: i32, nr_requeue: i32, cmp: bool) -> SyscallResult {
-    use crate::mm::vm::copyin;
+    use crate::subsystems::mm::vm::copyin;
     
     // For CMP_REQUEUE, check if values match
     if cmp {
@@ -795,8 +811,8 @@ pub fn futex_requeue(pagetable: *mut crate::mm::vm::PageTable, uaddr: usize, uad
 }
 
 /// Priority inheritance futex lock implementation
-pub fn futex_lock_pi(pagetable: *mut crate::mm::vm::PageTable, uaddr: usize, timeout: usize) -> SyscallResult {
-    use crate::mm::vm::copyin;
+pub fn futex_lock_pi(pagetable: *mut crate::subsystems::mm::vm::PageTable, uaddr: usize, timeout: usize) -> SyscallResult {
+    use crate::subsystems::mm::vm::copyin;
     
     // Read current value
     let mut current_val = 0i32;
@@ -846,8 +862,8 @@ pub fn futex_lock_pi(pagetable: *mut crate::mm::vm::PageTable, uaddr: usize, tim
 }
 
 /// Priority inheritance futex unlock implementation
-pub fn futex_unlock_pi(pagetable: *mut crate::mm::vm::PageTable, uaddr: usize) -> SyscallResult {
-    use crate::mm::vm::copyin;
+pub fn futex_unlock_pi(pagetable: *mut crate::subsystems::mm::vm::PageTable, uaddr: usize) -> SyscallResult {
+    use crate::subsystems::mm::vm::copyin;
     
     // Read current value
     let mut current_val = 0i32;
@@ -878,8 +894,8 @@ pub fn futex_unlock_pi(pagetable: *mut crate::mm::vm::PageTable, uaddr: usize) -
 }
 
 /// Priority inheritance futex trylock implementation
-pub fn futex_trylock_pi(pagetable: *mut crate::mm::vm::PageTable, uaddr: usize) -> SyscallResult {
-    use crate::mm::vm::copyin;
+pub fn futex_trylock_pi(pagetable: *mut crate::subsystems::mm::vm::PageTable, uaddr: usize) -> SyscallResult {
+    use crate::subsystems::mm::vm::copyin;
     
     // Read current value
     let mut current_val = 0i32;
@@ -905,9 +921,9 @@ pub fn futex_trylock_pi(pagetable: *mut crate::mm::vm::PageTable, uaddr: usize) 
 }
 
 /// Enhanced futex wait with timeout support
-pub fn futex_wait_timeout(pagetable: *mut crate::mm::vm::PageTable, uaddr: usize,
+pub fn futex_wait_timeout(pagetable: *mut crate::subsystems::mm::vm::PageTable, uaddr: usize,
                         expected_val: i32, timeout: usize) -> SyscallResult {
-    use crate::mm::vm::copyin;
+    use crate::subsystems::mm::vm::copyin;
     
     let current_tid = crate::process::thread::thread_self();
     let timeout_ns = if timeout != 0 {
@@ -1020,7 +1036,7 @@ fn sys_set_robust_list(args: &[u64]) -> SyscallResult {
 }
 
 fn sys_get_robust_list(args: &[u64]) -> SyscallResult {
-    use crate::mm::vm::copyout;
+    use crate::subsystems::mm::vm::copyout;
     
     let args = extract_args(args, 3)?;
     let pid = args[0] as usize;
@@ -1078,7 +1094,7 @@ fn sys_sched_yield(_args: &[u64]) -> SyscallResult {
 }
 
 fn sys_sched_getaffinity(args: &[u64]) -> SyscallResult {
-    use crate::mm::vm::copyout;
+    use crate::subsystems::mm::vm::copyout;
     
     let args = extract_args(args, 3)?;
     let pid = args[0] as usize;
@@ -1117,7 +1133,7 @@ fn sys_sched_getaffinity(args: &[u64]) -> SyscallResult {
 }
 
 fn sys_sched_setaffinity(args: &[u64]) -> SyscallResult {
-    use crate::mm::vm::copyin;
+    use crate::subsystems::mm::vm::copyin;
     
     let args = extract_args(args, 3)?;
     let pid = args[0] as usize;

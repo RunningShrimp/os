@@ -27,36 +27,36 @@ impl GicV3 {
         }
 
         // Wake redistributor (clear Sleep bit) and wait ChildrenAsleep==0
-        let mut waker = crate::mm::mmio_read32(self.r32(0x0014) as *const u32);
-        crate::mm::mmio_write32(self.r32(0x0014), waker & !(1 << 1));
+        let mut waker = crate::subsystems::mm::mmio_read32(self.r32(0x0014) as *const u32);
+        crate::subsystems::mm::mmio_write32(self.r32(0x0014), waker & !(1 << 1));
         loop {
-            waker = crate::mm::mmio_read32(self.r32(0x0014) as *const u32);
+            waker = crate::subsystems::mm::mmio_read32(self.r32(0x0014) as *const u32);
             if (waker & (1 << 2)) == 0 { break; }
             core::hint::spin_loop();
         }
 
         // Enable distributor for Group1NS
-        crate::mm::mmio_write32(self.d32(0x000), 0x2);
+        crate::subsystems::mm::mmio_write32(self.d32(0x000), 0x2);
     }
 
     pub fn disable(&self) {
         unsafe {
             core::arch::asm!("msr icc_igrpen1_el1, {}", in(reg) 0u64);
         }
-        crate::mm::mmio_write32(self.d32(0x000), 0x0);
+        crate::subsystems::mm::mmio_write32(self.d32(0x000), 0x0);
     }
 
     pub fn set_enable(&self, irq: usize) {
         let reg = 0x100 + ((irq / 32) * 4);
         let bit = 1u32 << (irq % 32);
-        let v = crate::mm::mmio_read32(self.d32(reg) as *const u32);
-        crate::mm::mmio_write32(self.d32(reg), v | bit);
+        let v = crate::subsystems::mm::mmio_read32(self.d32(reg) as *const u32);
+        crate::subsystems::mm::mmio_write32(self.d32(reg), v | bit);
     }
 
     pub fn clear_enable(&self, irq: usize) {
         let reg = 0x180 + ((irq / 32) * 4);
         let bit = 1u32 << (irq % 32);
-        crate::mm::mmio_write32(self.d32(reg), bit);
+        crate::subsystems::mm::mmio_write32(self.d32(reg), bit);
     }
 
     pub fn cpu_enable(&self) {

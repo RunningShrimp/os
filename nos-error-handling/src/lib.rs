@@ -1,34 +1,27 @@
-//! NOS Error Handling
+//! NOS Error Handling - Interface Definition Layer
 //!
-//! This crate provides comprehensive error handling and recovery framework for NOS operating system.
-//! It includes error classification, recovery strategies, diagnostic tools, and health monitoring.
+//! This crate provides trait definitions and type definitions for error handling
+//! in the NOS operating system. Actual implementations are in kernel/src/error.
 //!
 //! # Architecture
 //!
-//! The error handling module is organized into several functional domains:
-//!
-//! - **Core**: Core error handling infrastructure
-//! - **Registry**: Error registration and lookup
-//! - **Classifier**: Error classification and analysis
-//! - **Recovery**: Error recovery strategies
-//! - **Diagnostics**: Error diagnostic tools
-//! - **Reporting**: Error reporting and logging
-//! - **Health**: System health monitoring
+//! This crate serves as an interface definition layer:
+//! - Defines traits for error handlers, recovery strategies, and health monitoring
+//! - Provides type definitions for error records, severity levels, etc.
+//! - Does NOT contain actual implementations (those are in kernel/src/error)
 //!
 //! # Usage
 //!
 //! ```rust
-//! use nos_error_handling::{ErrorHandlingEngine, ErrorRecord, ErrorSeverity};
+//! use nos_error_handling::{ErrorHandler, ErrorAction, ErrorSeverity};
 //!
-//! // Create an error handling engine
-//! let mut engine = ErrorHandlingEngine::new(Default::default());
-//! engine.init()?;
-//!
-//! // Record an error
-//! let error = ErrorRecord {
-//!     // ... error details
-//! };
-//! let error_id = engine.record_error(error)?;
+//! // Implement the ErrorHandler trait in kernel code
+//! struct MyErrorHandler;
+//! impl ErrorHandler for MyErrorHandler {
+//!     fn handle_error(&self, error: &ErrorContext) -> ErrorAction {
+//!         // Implementation in kernel
+//!     }
+//! }
 //! ```
 
 #![no_std]
@@ -39,48 +32,70 @@ extern crate alloc;
 // Import and re-export Result and Error from nos_api
 pub use nos_api::error::{Error, Result};
 
-// Core modules
-pub mod core;
-pub mod registry;
-pub mod classifier;
-pub mod recovery;
-pub mod diagnostics;
-pub mod reporting;
-pub mod health;
+// Core trait definitions only
+pub mod core {
+    // Core traits for error handling
+    pub mod traits;
+}
+
+// Type definitions
 pub mod types;
 pub mod common;
 
-// Kernel integration module
+// Kernel integration types (deprecated - use kernel/src/error instead)
+#[deprecated(note = "Implementation should be in kernel/src/error, not here")]
 pub mod kernel_integration;
 
-// Re-export commonly used items
-// Instead of using glob exports, explicitly re-export items to avoid conflicts
-// Registry
-pub use registry::{ErrorRegistry, init_registry, get_registry, shutdown_registry};
+// Note: The following modules contain implementation details that should be
+// moved to kernel/src/error. They are kept here temporarily for backward
+// compatibility but will be deprecated.
+#[deprecated(note = "Implementation should be in kernel/src/error, not here")]
+pub mod registry;
 
-// Classifier
-pub use classifier::{ErrorClassifier, get_classifier};
+#[deprecated(note = "Implementation should be in kernel/src/error, not here")]
+pub mod classifier;
 
-// Recovery
-pub use recovery::{RecoveryManager, apply_recovery_strategy, get_manager, recovery_get_stats};
+#[deprecated(note = "Implementation should be in kernel/src/error, not here")]
+pub mod recovery;
 
-// Diagnostics
-pub use diagnostics::{DiagnosticAnalyzer, analyze_error, get_analyzer, diagnostics_get_stats};
+#[deprecated(note = "Implementation should be in kernel/src/error, not here")]
+pub mod diagnostics;
 
-// Reporting
-pub use reporting::{ErrorReporter, ReportDestination, ReportLevel, ReportingStats, report_error, generate_report, get_reporter, reporting_get_stats};
+#[deprecated(note = "Implementation should be in kernel/src/error, not here")]
+pub mod reporting;
 
-// Health
-pub use health::{HealthMonitor, HealthMetric, HealthThreshold, HealthLevel, HealthSeverity, HealthStats, get_current_status, get_monitor, health_get_stats};
+#[deprecated(note = "Implementation should be in kernel/src/error, not here")]
+pub mod health;
 
-// Kernel integration
-// Note: register_kernel_handlers, unregister_kernel_handlers, and KernelErrorHandler are not available in this module
+// Re-export trait definitions
+pub use core::traits::{
+    ErrorHandler, ErrorAction, ErrorContext,
+    RecoveryStrategy, RecoveryResult,
+    ErrorClassifier, HealthMonitor, HealthStatus
+};
 
-// Common
+// Re-export type definitions
+pub use types::*;
 pub use common::{get_timestamp, validate_error_record, format_error_message};
 
-// Types
-pub use types::*;
+// Deprecated: Implementation exports (should use kernel/src/error instead)
+#[deprecated(note = "Use kernel/src/error implementations instead")]
+pub use registry::{ErrorRegistry, init_registry, get_registry, shutdown_registry};
+
+#[deprecated(note = "Use kernel/src/error implementations instead")]
+pub use classifier::{ErrorClassifier as ImplErrorClassifier, get_classifier};
+
+#[deprecated(note = "Use kernel/src/error implementations instead")]
+pub use recovery::{RecoveryManager, apply_recovery_strategy, get_manager, recovery_get_stats};
+
+#[deprecated(note = "Use kernel/src/error implementations instead")]
+pub use diagnostics::{DiagnosticAnalyzer, analyze_error, get_analyzer, diagnostics_get_stats};
+
+#[deprecated(note = "Use kernel/src/error implementations instead")]
+pub use reporting::{ErrorReporter, ReportDestination, ReportLevel, ReportingStats, report_error, generate_report, get_reporter, reporting_get_stats};
+
+#[deprecated(note = "Use kernel/src/error implementations instead")]
+pub use health::{HealthMonitor as ImplHealthMonitor, HealthMetric, HealthThreshold, HealthLevel, HealthSeverity, HealthStats, get_current_status, get_monitor, health_get_stats};
 
 /// Initialize error handling subsystem
 ///

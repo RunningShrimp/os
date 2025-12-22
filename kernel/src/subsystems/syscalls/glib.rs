@@ -1,7 +1,7 @@
 //! GLib extensions and related syscalls
 
 use super::common::{SyscallError, SyscallResult};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use alloc::{collections::VecDeque, string::String, vec::Vec};
 use core::sync::atomic::{AtomicU32, Ordering};
 
@@ -368,8 +368,8 @@ impl TimerFdInstance {
 
         // Get current time based on clock
         let current_ns = match self.clock_id {
-            crate::posix::CLOCK_REALTIME => crate::time::timestamp_nanos(),
-            crate::posix::CLOCK_MONOTONIC => crate::time::hrtime_nanos(),
+            crate::posix::CLOCK_REALTIME => crate::subsystems::time::timestamp_nanos(),
+            crate::posix::CLOCK_MONOTONIC => crate::subsystems::time::hrtime_nanos(),
             _ => return Err(SyscallError::InvalidArgument),
         };
 
@@ -793,11 +793,11 @@ impl MemFdInstance {
         let mut bytes_read = 0;
 
         while bytes_read < bytes_to_read {
-            let page_idx = (offset + bytes_read) / crate::mm::PAGE_SIZE;
-            let page_offset = (offset + bytes_read) % crate::mm::PAGE_SIZE;
+            let page_idx = (offset + bytes_read) / crate::subsystems::mm::PAGE_SIZE;
+            let page_offset = (offset + bytes_read) % crate::subsystems::mm::PAGE_SIZE;
             let chunk_size = core::cmp::min(
                 bytes_to_read - bytes_read,
-                crate::mm::PAGE_SIZE - page_offset,
+                crate::subsystems::mm::PAGE_SIZE - page_offset,
             );
 
             if page_idx >= self.pages.len() {
@@ -812,7 +812,7 @@ impl MemFdInstance {
                 }
             } else {
                 unsafe {
-                    let page_ptr = crate::mm::vm::phys_to_kernel_ptr(page_addr);
+                    let page_ptr = crate::subsystems::mm::vm::phys_to_kernel_ptr(page_addr);
                     let src = page_ptr.add(page_offset);
                     let dst = buf.as_mut_ptr().add(bytes_read);
                     core::ptr::copy_nonoverlapping(src, dst, chunk_size);
@@ -844,29 +844,29 @@ impl MemFdInstance {
         }
 
         // Ensure pages are allocated
-        let required_pages = (offset + buf.len() + crate::mm::PAGE_SIZE - 1) / crate::mm::PAGE_SIZE;
+        let required_pages = (offset + buf.len() + crate::subsystems::mm::PAGE_SIZE - 1) / crate::subsystems::mm::PAGE_SIZE;
         while self.pages.len() < required_pages {
-            let page = unsafe { crate::mm::kalloc() };
+            let page = unsafe { crate::subsystems::mm::kalloc() };
             if page.is_null() {
                 return Err(SyscallError::OutOfMemory);
             }
-            unsafe { core::ptr::write_bytes(page, 0, crate::mm::PAGE_SIZE); }
+            unsafe { core::ptr::write_bytes(page, 0, crate::subsystems::mm::PAGE_SIZE); }
             let page_addr = page as usize;
             self.pages.push(page_addr);
         }
 
         let mut bytes_written = 0;
         while bytes_written < buf.len() {
-            let page_idx = (offset + bytes_written) / crate::mm::PAGE_SIZE;
-            let page_offset = (offset + bytes_written) % crate::mm::PAGE_SIZE;
+            let page_idx = (offset + bytes_written) / crate::subsystems::mm::PAGE_SIZE;
+            let page_offset = (offset + bytes_written) % crate::subsystems::mm::PAGE_SIZE;
             let chunk_size = core::cmp::min(
                 buf.len() - bytes_written,
-                crate::mm::PAGE_SIZE - page_offset,
+                crate::subsystems::mm::PAGE_SIZE - page_offset,
             );
 
             let page_addr = self.pages[page_idx];
             unsafe {
-                let page_ptr = crate::mm::vm::phys_to_kernel_ptr(page_addr);
+                let page_ptr = crate::subsystems::mm::vm::phys_to_kernel_ptr(page_addr);
                 let src = buf.as_ptr().add(bytes_written);
                 let dst = page_ptr.add(page_offset);
                 core::ptr::copy_nonoverlapping(src, dst, chunk_size);
@@ -952,7 +952,7 @@ impl Drop for MemFdInstance {
         // Free all allocated pages
         for page_addr in &self.pages {
             if *page_addr != 0 {
-                unsafe { crate::mm::kfree(*page_addr as *mut u8) };
+                unsafe { crate::subsystems::mm::kfree(*page_addr as *mut u8) };
             }
         }
         self.pages.clear();
@@ -1028,7 +1028,7 @@ pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
 
 fn sys_getrandom(args: &[u64]) -> SyscallResult {
     use super::common::extract_args;
-    use crate::mm::vm::copyout;
+    use crate::subsystems::mm::vm::copyout;
     
     let args = extract_args(args, 3)?;
     let buf_ptr = args[0] as usize;
@@ -1058,7 +1058,7 @@ fn sys_getrandom(args: &[u64]) -> SyscallResult {
     // Generate pseudo-random bytes using a simple LFSR-based RNG
     // In a real kernel, this would use hardware RNG if available
     let mut rand_bytes = [0u8; 256];
-    let seed = crate::time::timestamp_nanos() as u64;
+    let seed = crate::subsystems::time::timestamp_nanos() as u64;
     let mut state = seed;
     
     for i in 0..actual_len {
@@ -1111,7 +1111,7 @@ fn sys_memfd_create(args: &[u64]) -> SyscallResult {
     const MAX_NAME_LEN: usize = 256;
     let mut name_buf = [0u8; MAX_NAME_LEN];
     let name_len = unsafe {
-        crate::mm::vm::copyinstr(pagetable, name_ptr, name_buf.as_mut_ptr(), MAX_NAME_LEN)
+        crate::subsystems::mm::vm::copyinstr(pagetable, name_ptr, name_buf.as_mut_ptr(), MAX_NAME_LEN)
             .map_err(|_| SyscallError::BadAddress)?
     };
 
@@ -1328,7 +1328,7 @@ fn sys_timerfd_settime(args: &[u64]) -> SyscallResult {
     // Read new timer value from user space
     let mut new_value = crate::posix::Itimerspec::default();
     unsafe {
-        crate::mm::vm::copyin(pagetable, core::ptr::addr_of_mut!(new_value) as *mut u8, new_value_ptr, core::mem::size_of::<crate::posix::Itimerspec>())
+        crate::subsystems::mm::vm::copyin(pagetable, core::ptr::addr_of_mut!(new_value) as *mut u8, new_value_ptr, core::mem::size_of::<crate::posix::Itimerspec>())
             .map_err(|_| SyscallError::BadAddress)?;
     }
 
@@ -1344,7 +1344,7 @@ fn sys_timerfd_settime(args: &[u64]) -> SyscallResult {
         // Copy old value back to user space if requested
         if old_value_ptr != 0 {
             unsafe {
-                crate::mm::vm::copyout(pagetable, old_value_ptr, core::ptr::addr_of!(old_value) as *const u8, core::mem::size_of::<crate::posix::Itimerspec>())
+                crate::subsystems::mm::vm::copyout(pagetable, old_value_ptr, core::ptr::addr_of!(old_value) as *const u8, core::mem::size_of::<crate::posix::Itimerspec>())
                     .map_err(|_| SyscallError::BadAddress)?;
             }
         }
@@ -1400,7 +1400,7 @@ fn sys_timerfd_gettime(args: &[u64]) -> SyscallResult {
 
         // Copy current value to user space
         unsafe {
-            crate::mm::vm::copyout(pagetable, curr_value_ptr, core::ptr::addr_of!(curr_value) as *const u8, core::mem::size_of::<crate::posix::Itimerspec>())
+            crate::subsystems::mm::vm::copyout(pagetable, curr_value_ptr, core::ptr::addr_of!(curr_value) as *const u8, core::mem::size_of::<crate::posix::Itimerspec>())
                 .map_err(|_| SyscallError::BadAddress)?;
         }
 
@@ -1452,7 +1452,7 @@ fn sys_signalfd4(args: &[u64]) -> SyscallResult {
     // Read signal mask from user space
     let mut mask = crate::ipc::signal::SigSet::empty();
     unsafe {
-        crate::mm::vm::copyin(pagetable, core::ptr::addr_of_mut!(mask) as *mut u8, mask_ptr, core::mem::size_of::<crate::ipc::signal::SigSet>())
+        crate::subsystems::mm::vm::copyin(pagetable, core::ptr::addr_of_mut!(mask) as *mut u8, mask_ptr, core::mem::size_of::<crate::ipc::signal::SigSet>())
             .map_err(|_| SyscallError::BadAddress)?;
     }
 
@@ -1653,7 +1653,7 @@ fn sys_inotify_add_watch(args: &[u64]) -> SyscallResult {
     const MAX_PATH_LEN: usize = 512;
     let mut path_buf = [0u8; MAX_PATH_LEN];
     let path_len = unsafe {
-        crate::mm::vm::copyinstr(pagetable, pathname_ptr, path_buf.as_mut_ptr(), MAX_PATH_LEN)
+        crate::subsystems::mm::vm::copyinstr(pagetable, pathname_ptr, path_buf.as_mut_ptr(), MAX_PATH_LEN)
             .map_err(|_| SyscallError::BadAddress)?
     };
 

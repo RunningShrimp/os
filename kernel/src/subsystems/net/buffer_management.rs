@@ -628,14 +628,14 @@ impl NetworkBufferManager {
         // Allocate memory
         let addr = if flags.dma_capable {
             // Allocate DMA-capable memory
-            crate::mm::kalloc_dma(size).ok_or(BufferError::OutOfMemory)?
+            crate::subsystems::mm::kalloc_dma(size).ok_or(BufferError::OutOfMemory)?
         } else {
-            crate::mm::kalloc(size).ok_or(BufferError::OutOfMemory)?
+            crate::subsystems::mm::kalloc(size).ok_or(BufferError::OutOfMemory)?
         };
 
         // Get physical address for DMA buffers
         let phys_addr = if flags.dma_capable {
-            crate::mm::virt_to_phys(addr)
+            crate::subsystems::mm::virt_to_phys(addr)
         } else {
             None
         };
@@ -715,9 +715,9 @@ impl NetworkBufferManager {
         // Free memory
         unsafe {
             if buffer.metadata.flags.dma_capable {
-                crate::mm::kfree_dma(buffer.addr, buffer.metadata.size);
+                crate::subsystems::mm::kfree_dma(buffer.addr, buffer.metadata.size);
             } else {
-                crate::mm::kfree(buffer.addr, buffer.metadata.size);
+                crate::subsystems::mm::kfree(buffer.addr, buffer.metadata.size);
             }
         }
 

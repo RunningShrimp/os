@@ -11,7 +11,7 @@ use core::ptr::{null_mut, NonNull};
 use core::sync::atomic::{AtomicUsize, Ordering};
 use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
-use crate::sync::SpinLock;
+use crate::subsystems::sync::SpinLock;
 use nos_api::{Result, Error};
 
 /// Maximum number of arguments for a system call

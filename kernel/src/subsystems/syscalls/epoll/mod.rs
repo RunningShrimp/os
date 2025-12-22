@@ -9,7 +9,7 @@ extern crate alloc;
 //! - 超时和定时器支持
 
 use crate::syscalls::SyscallResult;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::fs::epoll::{EpollManager, EpollEvent, EPOLLIN, EPOLLOUT, EPOLLERR, EPOLLHUP};
 use alloc::collections::BTreeMap;
 use core::ffi::{c_int, c_void};

@@ -9,7 +9,7 @@
 //! - setreuid() / setregid() - Set real/effective user/group ID
 
 use crate::posix::{Uid, Gid, Pid, Mode};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::string::ToString;

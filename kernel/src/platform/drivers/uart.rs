@@ -29,12 +29,12 @@ mod imp {
 
     #[inline]
     fn read_reg(offset: usize) -> u8 {
-        crate::mm::mmio_read8(reg(offset))
+        crate::subsystems::mm::mmio_read8(reg(offset))
     }
 
     #[inline]
     fn write_reg(offset: usize, val: u8) {
-        crate::mm::mmio_write8(reg(offset), val)
+        crate::subsystems::mm::mmio_write8(reg(offset), val)
     }
 
     /// Initialize UART
@@ -135,12 +135,12 @@ mod imp {
 
     #[inline]
     fn read_reg(offset: usize) -> u32 {
-        crate::mm::mmio_read32(reg(offset))
+        crate::subsystems::mm::mmio_read32(reg(offset))
     }
 
     #[inline]
     fn write_reg(offset: usize, val: u32) {
-        crate::mm::mmio_write32(reg(offset), val)
+        crate::subsystems::mm::mmio_write32(reg(offset), val)
     }
 
     /// Initialize UART

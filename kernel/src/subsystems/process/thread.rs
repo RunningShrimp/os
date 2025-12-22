@@ -12,9 +12,9 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use crate::sync::{Mutex, Once};
+use crate::subsystems::sync::{Mutex, Once};
 use crate::process::{Pid, Context, TrapFrame};
-use crate::mm::{kalloc, kfree, PAGE_SIZE};
+use crate::subsystems::mm::{kalloc, kfree, PAGE_SIZE};
 use crate::ipc::signal::SignalState;
 
 // ============================================================================
@@ -865,7 +865,7 @@ pub fn thread_exit(retval: *mut u8) -> ! {
                             // Clear the child TID pointer (set to 0)
                             unsafe {
                                 let zero_val = 0i32;
-                                let _ = crate::mm::vm::copyin(pagetable, thread.child_tid_ptr as *mut u8, thread.child_tid_ptr, core::mem::size_of::<i32>());
+                                let _ = crate::subsystems::mm::vm::copyin(pagetable, thread.child_tid_ptr as *mut u8, thread.child_tid_ptr, core::mem::size_of::<i32>());
                             }
                         }
                     }
@@ -990,20 +990,22 @@ pub fn schedule() {
     ensure_main_threads();
 
     // Check real-time scheduler first
-    let current_time = crate::time::timestamp_nanos();
+    let current_time = crate::subsystems::time::timestamp_nanos();
     let mut next_tid = None;
     
     if let Some(rt_scheduler) = crate::subsystems::scheduler::get_rt_scheduler() {
         next_tid = rt_scheduler.pick_next_rt_task(current_time);
     }
     
-    // If no RT thread found, fall back to normal scheduling
+    // If no RT thread found, fall back to unified scheduler
     if next_tid.is_none() {
-        // Find next runnable thread TID
-        let mut start_idx = current_tid.unwrap_or(0) + 1;
-
-        // Search for runnable thread
-        {
+        // Use unified scheduler with priority queues (O(log n) instead of O(n))
+        use crate::subsystems::scheduler::unified::unified_schedule;
+        if let Some(tid) = unified_schedule() {
+            next_tid = Some(tid);
+        } else {
+            // Fallback to old linear search if unified scheduler not initialized
+            let mut start_idx = current_tid.unwrap_or(0) + 1;
             let table = thread_table();
             for _ in 0..MAX_THREADS {
                 if start_idx >= MAX_THREADS {
@@ -1306,8 +1308,8 @@ pub fn thread_setschedparam(
                 deadline_ms: param.timeslice * 2, // Default: 2x timeslice
                 bandwidth_percent: (param.priority as u32 * 10).min(80), // Scale priority to bandwidth
                 active: true,
-                creation_time: crate::time::timestamp_nanos(),
-                next_activation: crate::time::timestamp_nanos(),
+                creation_time: crate::subsystems::time::timestamp_nanos(),
+                next_activation: crate::subsystems::time::timestamp_nanos(),
                 absolute_deadline: 0,
                 remaining_time: param.timeslice,
                 timeslice_ms: param.timeslice,
@@ -1338,7 +1340,7 @@ pub fn thread_getschedparam(tid: Tid) -> Result<(SchedPolicy, SchedParam), Threa
 /// Activate a real-time task
 pub fn activate_rt_task(tid: Tid) -> Result<(), ThreadError> {
     if let Some(rt_scheduler) = crate::subsystems::scheduler::get_rt_scheduler() {
-        let current_time = crate::time::timestamp_nanos();
+        let current_time = crate::subsystems::time::timestamp_nanos();
         rt_scheduler.activate_task(tid, current_time)
             .map_err(|_| ThreadError::InvalidOperation)
     } else {
@@ -1359,7 +1361,7 @@ pub fn deactivate_rt_task(tid: Tid) -> Result<(), ThreadError> {
 /// Update real-time task execution time
 pub fn update_rt_task_execution(tid: Tid, elapsed_ms: u32) -> Result<(), ThreadError> {
     if let Some(rt_scheduler) = crate::subsystems::scheduler::get_rt_scheduler() {
-        let current_time = crate::time::timestamp_nanos();
+        let current_time = crate::subsystems::time::timestamp_nanos();
         rt_scheduler.update_task_execution(tid, elapsed_ms, current_time);
         Ok(())
     } else {

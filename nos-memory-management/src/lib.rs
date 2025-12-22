@@ -15,6 +15,7 @@ pub mod physical;
 pub mod virtual_mem;
 pub mod page_table;
 pub mod allocator;
+pub mod layout;
 
 // Re-export commonly used types and functions
 // Note: We don't re-export initialize()/shutdown() functions directly to avoid name conflicts
@@ -22,11 +23,13 @@ pub use physical::{PhysAddr, PAGE_SIZE, PAGE_SHIFT, page_round_up, page_round_do
 pub use virtual_mem::{VirtAddr};
 pub use page_table::*;
 pub use allocator::{buddy, slab, mempool};
+pub use layout::{AddressSpaceLayout, AslrRegionType, kernel_base, user_base, user_stack_top, user_max, page_size, is_kernel_address, is_user_address, phys_to_virt, virt_to_phys, apply_aslr_offset, apply_aslr_offset_enhanced};
 
 // Re-export allocator types for convenience
 pub use allocator::buddy::OptimizedBuddyAllocator;
 pub use allocator::slab::OptimizedSlabAllocator;
 pub use allocator::mempool::MemoryPool;
+pub use allocator::tiered::{TieredMemoryAllocator, MemoryUsage, AllocatorStats as TieredAllocatorStats};
 
 /// Memory management initialization
 ///

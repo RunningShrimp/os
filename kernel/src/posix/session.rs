@@ -3,7 +3,7 @@
 //! 仅提供占位实现与数据结构，后续需与进程表、TTY 层正式对接。
 
 use crate::process::manager::Pid;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use alloc::collections::BTreeMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

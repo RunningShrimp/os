@@ -692,7 +692,7 @@ impl ValidatorRegistry {
 }
 
 /// Global validator registry instance (lazy initialization)
-use crate::sync::{Once, Mutex};
+use crate::subsystems::sync::{Once, Mutex};
 
 static INIT_ONCE: Once = Once::new();
 static GLOBAL_VALIDATOR_REGISTRY: Mutex<Option<ValidatorRegistry>> = Mutex::new(None);

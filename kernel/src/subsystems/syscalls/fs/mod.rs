@@ -9,6 +9,7 @@ pub mod handlers;
 pub mod journaling_handlers;
 pub mod service;
 pub mod types;
+pub mod dispatch;
 
 /// 文件系统系统调用处理器
 pub struct FsSyscallHandler {

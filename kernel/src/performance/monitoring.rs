@@ -11,8 +11,8 @@ extern crate alloc;
 
 use alloc::{string::String, vec::Vec, collections::BTreeMap};
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use crate::sync::{Mutex, SpinLock};
-use crate::mm::optimized_memory_manager::MemoryStats;
+use crate::subsystems::sync::{Mutex, SpinLock};
+use crate::subsystems::mm::optimized_memory_manager::MemoryStats;
 use crate::vfs::optimized_filesystem::FileSystemStatsSnapshot;
 use crate::io::optimized_io_manager::IoPerformanceStatsSnapshot;
 
@@ -307,7 +307,7 @@ impl PerformanceMonitor {
     /// 启动性能监控
     pub fn start(&self) {
         self.enabled.store(1, Ordering::Relaxed);
-        self.next_sample_time.store(crate::time::get_time_ms(), Ordering::Relaxed);
+        self.next_sample_time.store(crate::subsystems::time::get_time_ms(), Ordering::Relaxed);
         
         crate::println!("[perf_monitor] Performance monitoring started");
     }
@@ -325,7 +325,7 @@ impl PerformanceMonitor {
             return;
         }
         
-        let current_time = crate::time::get_time_ms();
+        let current_time = crate::subsystems::time::get_time_ms();
         
         // 更新指标
         {
@@ -409,7 +409,7 @@ impl PerformanceMonitor {
     fn create_alert(&self, metric_type: MetricType, alert_type: AlertType, 
                    current_value: f64, threshold: f64) {
         let alert_id = self.next_alert_id.fetch_add(1, Ordering::SeqCst);
-        let current_time = crate::time::get_time_ms();
+        let current_time = crate::subsystems::time::get_time_ms();
         
         let metric_name = match metric_type {
             MetricType::CpuUsage => "CPU Usage",
@@ -507,7 +507,7 @@ impl PerformanceMonitor {
                 0.0
             };
             
-            let predicted_time = crate::time::get_time_ms() + (future_steps * self.sample_interval as usize) as u64;
+            let predicted_time = crate::subsystems::time::get_time_ms() + (future_steps * self.sample_interval as usize) as u64;
             
             let trend = PerformanceTrend {
                 metric_type,
@@ -536,7 +536,7 @@ impl PerformanceMonitor {
             return;
         }
         
-        let current_time = crate::time::get_time_ms();
+        let current_time = crate::subsystems::time::get_time_ms();
         let next_sample_time = self.next_sample_time.load(Ordering::Relaxed);
         
         if current_time < next_sample_time {
@@ -569,7 +569,7 @@ impl PerformanceMonitor {
     /// 采样内存使用率
     fn sample_memory_usage(&self) {
         // 获取内存统计
-        if let Some(memory_stats) = crate::mm::optimized_memory_manager::get_optimized_memory_stats() {
+        if let Some(memory_stats) = crate::subsystems::mm::optimized_memory_manager::get_optimized_memory_stats() {
             // 计算内存压力
             let memory_usage = memory_stats.memory_pressure as f64;
             self.update_metric(MetricType::MemoryUsage, memory_usage);
@@ -615,7 +615,7 @@ impl PerformanceMonitor {
         let trends = self.trends.lock();
         
         PerformanceReport {
-            timestamp: crate::time::get_time_ms(),
+            timestamp: crate::subsystems::time::get_time_ms(),
             metrics: metrics.values().cloned().collect(),
             alerts: alerts.clone(),
             trends: trends.clone(),
@@ -627,7 +627,7 @@ impl PerformanceMonitor {
         // 清理旧的告警
         {
             let mut alerts = self.active_alerts.lock();
-            let current_time = crate::time::get_time_ms();
+            let current_time = crate::subsystems::time::get_time_ms();
             
             // 移除超过1小时的告警
             alerts.retain(|alert| current_time - alert.alert_time < 3_600_000);
@@ -636,7 +636,7 @@ impl PerformanceMonitor {
         // 清理旧的趋势
         {
             let mut trends = self.trends.lock();
-            let current_time = crate::time::get_time_ms();
+            let current_time = crate::subsystems::time::get_time_ms();
             
             // 移除过期的趋势
             trends.retain(|trend| trend.predicted_time > current_time);

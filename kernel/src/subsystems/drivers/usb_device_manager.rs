@@ -11,7 +11,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicU32, AtomicU64, AtomicBool, Ordering};
-use crate::sync::{Mutex, Sleeplock};
+use crate::subsystems::sync::{Mutex, Sleeplock};
 use crate::subsystems::drivers::device_model::{
     DeviceModel, EnhancedDeviceInfo, DeviceClass, DevicePowerState, 
     DeviceCapabilities, DevicePerformanceMetrics
@@ -525,7 +525,7 @@ impl UsbDeviceManager {
             current_configuration: None,
             device_class,
             parent_address: None,
-            connection_time: crate::time::get_timestamp(),
+            connection_time: crate::subsystems::time::get_timestamp(),
         };
         
         // Register device
@@ -884,7 +884,7 @@ impl UsbDeviceManager {
             aliases: Vec::new(),
             tags: vec![class_name.to_string(), format!("usb{}", device_info.speed as u8)],
             creation_timestamp: device_info.connection_time,
-            last_modified_timestamp: crate::time::get_timestamp(),
+            last_modified_timestamp: crate::subsystems::time::get_timestamp(),
         };
 
         // Register with device model

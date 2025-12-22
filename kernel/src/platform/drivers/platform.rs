@@ -1,6 +1,6 @@
 /// Platform probing for memory and MMIO via DTB/firmware (stub)
 use crate::mm;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 extern crate alloc;
 use alloc::vec::Vec;
 use core::slice;

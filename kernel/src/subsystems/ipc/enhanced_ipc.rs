@@ -13,7 +13,7 @@ use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 
 // ============================================================================
 // Constants
@@ -436,7 +436,7 @@ pub fn create_shared_memory(size: usize, owner_pid: u32, permissions: u32) -> Re
     }
     
     // Allocate memory for shared region
-    let page_size = crate::mm::PAGE_SIZE;
+    let page_size = crate::subsystems::mm::PAGE_SIZE;
     let aligned_size = (size + page_size - 1) & !(page_size - 1);
     
     // Allocate pages
@@ -444,13 +444,13 @@ pub fn create_shared_memory(size: usize, owner_pid: u32, permissions: u32) -> Re
     let mut base_addr = 0usize;
     
     for i in 0..pages_needed {
-        let page = crate::mm::kalloc();
+        let page = crate::subsystems::mm::kalloc();
         if page.is_null() {
             // Cleanup on failure
             for j in 0..i {
                 let cleanup_addr = base_addr + j * page_size;
                 unsafe {
-                    crate::mm::kfree(cleanup_addr as *mut u8);
+                    crate::subsystems::mm::kfree(cleanup_addr as *mut u8);
                 }
             }
             return Err(IpcError::SystemError);
@@ -512,12 +512,12 @@ pub fn delete_shared_memory(shm_id: u32, pid: u32) -> Result<(), IpcError> {
     }
     
     // Free memory
-    let page_size = crate::mm::PAGE_SIZE;
+    let page_size = crate::subsystems::mm::PAGE_SIZE;
     let pages = shm.size / page_size;
     for i in 0..pages {
         let addr = shm.base_addr + i * page_size;
         unsafe {
-            crate::mm::kfree(addr as *mut u8);
+            crate::subsystems::mm::kfree(addr as *mut u8);
         }
     }
     

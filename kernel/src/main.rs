@@ -21,16 +21,12 @@ use core::sync::atomic::{AtomicBool, Ordering};
 mod platform;
 mod subsystems;
 mod services_unified; // Unified services module
-mod memory_unified; // Unified memory management module
-mod memory_optimized; // Optimized memory management module
 mod security; // Security module
 
 // Re-exports for compatibility with existing code in main.rs
 use platform::{arch, boot, drivers, trap};
 use subsystems::{fs, ipc, process, vfs};
 use services_unified as services; // Use unified services module
-use memory_unified as memory; // Use unified memory module
-use memory_optimized as memory_opt; // Use optimized memory module
 use security::enhanced_permissions as permissions; // Use enhanced permissions
 
 // Use nos-syscalls crate when feature is enabled
@@ -43,14 +39,10 @@ use subsystems::net;
 mod cpu; // cpu was missed in previous edit
 
 
-#[cfg(feature = "cloud_native")]
-mod cloud_native; // This is conditional, maybe still in root? No, I didn't move it.
 mod compat;
 mod security;
 #[cfg(feature = "security_audit")]
 mod security_audit;
-#[cfg(feature = "formal_verification")]
-mod formal_verification;
 // Use nos-error-handling crate when feature is enabled
 #[cfg(feature = "error_handling")]
 use nos_error_handling as error_handling;
@@ -68,11 +60,8 @@ mod benchmark;
 #[cfg(feature = "observability")]
 mod monitoring;
 
-// mm is special, it was modified but not moved to subsystems completely (mod.rs remains)
-mod mm;
-mod sync; // sync was not moved
-mod time; // time was not moved
-mod microkernel; // microkernel was not moved
+// Legacy infrastructure modules have been migrated to subsystems/
+// Access them via crate::subsystems::mm, crate::subsystems::sync, crate::subsystems::time
 
 #[cfg(feature = "kernel_tests")]
 mod tests;
@@ -105,283 +94,21 @@ pub extern "C" fn rust_main(boot_params: *const boot::BootParameters) -> ! {
 /// Called from bootloader with boot information
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParameters) -> ! {
-    monitoring::timeline::record("boot_start");
     // Initialize boot information if provided
-    if !boot_params.is_null() {
-        boot::init_from_boot_parameters(boot_params);
-    }
-
-    // Early hardware initialization (UART, etc.)
-    arch::early_init();
-    monitoring::timeline::record("early_init");
-
-    crate::println!();
-    crate::println!("NOS kernel v0.1.0 booting on {}...", ARCH);
-    crate::println!();
-
-    // Print boot information
-    boot::print_boot_info();
-
-    // Initialize boot CPU
-    cpu::init_boot_cpu();
-    crate::println!("[boot] boot CPU initialized");
-
-    // Initialize trap handling early
-    trap::init();
-    crate::println!("[boot] trap handlers initialized");
-
-    // Initialize memory management from boot info or fall back to legacy
-    boot::init_memory_from_boot_info();
-    if !boot::is_bootloader_boot() {
-        memory::init_global_allocator()
-        .expect("Failed to initialize global memory allocator");
-        
-        // Initialize optimized memory allocator for better performance
-        memory_opt::init_optimized_allocator()
-        .expect("Failed to initialize optimized memory allocator");
-    }
-    crate::println!("[boot] physical memory initialized");
-
-    // Initialize kernel heap allocator
-    // (allocator::init is called in mm::init())
-    crate::println!("[boot] kernel heap ready");
-
-    // Initialize framebuffer if available from bootloader
-    boot::init_framebuffer_from_boot_info();
-
-    // Initialize ACPI if available from bootloader
-    boot::init_acpi_from_boot_info();
-
-    // Initialize device tree if available from bootloader
-    boot::init_device_tree_from_boot_info();
-
-    // Initialize virtual memory / page tables
-    mm::vm::init();
-    crate::println!("[boot] virtual memory initialized");
-    monitoring::timeline::record("vm_init");
-
-    // Initialize timer
-    time::init();
-    crate::println!("[boot] timer initialized");
-
-    // Initialize drivers
-    drivers::init();
-    crate::println!("[boot] drivers initialized");
-    monitoring::timeline::record("drivers_init");
-
-    // Initialize and mount VFS root (ramfs)
-    vfs::ramfs::init();
-    vfs::ext4::init();
-    vfs::procfs::fs::init();
-    vfs::sysfs::fs::init();
-    
-    // Try to mount ramfs first, fall back to tmpfs if it fails
-    let root_mounted = match vfs::mount("ramfs", "/", None, 0) {
-        Ok(()) => {
-            crate::println!("[boot] VFS root mounted (ramfs)");
-            true
-        }
-        Err(e) => {
-            crate::println!("[boot] ramfs mount failed: {:?}, trying tmpfs...", e);
-            match vfs::mount("tmpfs", "/", None, 0) {
-                Ok(()) => {
-                    crate::println!("[boot] VFS root mounted (tmpfs)");
-                    true
-                }
-                Err(e2) => {
-                    crate::println!("[boot] tmpfs mount also failed: {:?}", e2);
-                    false
-                }
-            }
-        }
-    };
-    
-    // Verify root file system is accessible
-    if root_mounted {
-        match vfs::verify_root() {
-            Ok(()) => {
-                if let Ok(attr) = vfs::vfs().stat("/") {
-                    crate::println!("[vfs] root verified: ino={} mode={:#o} size={}B", 
-                        attr.ino, attr.mode.permissions(), attr.size);
-                }
-            }
-            Err(e) => {
-                crate::println!("[boot] WARNING: Root file system verification failed: {:?}", e);
-                crate::println!("[boot] System may not function correctly without a root file system");
-            }
+    let boot_params_ref = if !boot_params.is_null() {
+        unsafe {
+            boot::init_from_boot_parameters(boot_params);
+            Some(&*boot_params)
         }
     } else {
-        crate::println!("[boot] ERROR: Failed to mount root file system!");
-        crate::println!("[boot] System cannot continue without a root file system");
-        // In a production system, this should be fatal, but for development we continue
-    }
+        None
+    };
 
-    // Initialize file system with journaling support
-    #[cfg(feature = "journaling_fs")]
-    {
-        if fs::init_fs_with_journaling(crate::drivers::RamDisk) {
-            crate::println!("[boot] journaling filesystem initialized");
-        } else {
-            crate::println!("[boot] falling back to regular filesystem");
-            fs::init();
-        }
-    }
-    
-    #[cfg(not(feature = "journaling_fs"))]
-    {
-        fs::init();
-    }
-    
-    crate::println!("[boot] filesystem initialized");
-    monitoring::timeline::record("fs_init");
-
-    // Initialize C standard library (newlib)
-    libc::init().expect("C standard library initialization failed");
-    crate::println!("[boot] C standard library initialized");
-
-    // Initialize AIO subsystem
-    syscalls::aio::init().expect("AIO subsystem initialization failed");
-    crate::println!("[boot] AIO subsystem initialized");
-    
-    // Initialize advanced memory mapping subsystem
-    crate::println!("[boot] Advanced memory mapping subsystem initialized");
-
-    // Initialize process subsystem
-    process::init();
-    crate::println!("[boot] process subsystem initialized");
-
-    // Initialize IPC subsystem
-    ipc::init();
-    crate::println!("[boot] IPC subsystem initialized");
-
-    #[cfg(all(not(feature = "lazy_init"), feature = "net_stack"))]
-    {
-        net::init();
-        crate::println!("[boot] network stack initialized");
-    }
-
-    // Initialize threading subsystem
-    process::thread::init();
-    crate::println!("[boot] threading subsystem initialized");
-
-    // Initialize microkernel core (required for hybrid architecture)
-    microkernel::init_microkernel().expect("Microkernel initialization failed");
-    crate::println!("[boot] microkernel core initialized");
-
-    // Initialize service layer
-    services::init().expect("Service layer initialization failed");
-    crate::println!("[boot] service layer initialized");
-    monitoring::timeline::record("services_init");
-    
-    // Initialize enhanced permission system
-    permissions::init_permission_manager();
-    crate::println!("[security] Enhanced permission system initialized");
-
-    #[cfg(feature = "cloud_native")]
-    {
-        cloud_native::init().expect("Cloud native features initialization failed");
-        crate::println!("[boot] cloud native features initialized");
-    }
-
-    // Initialize security subsystem
-    match security::init_security_subsystem() {
-        Ok(()) => {
-            crate::println!("[boot] security subsystem initialized");
-        }
-        Err(e) => {
-            crate::println!("[boot] WARNING: Security subsystem initialization failed: {:?}", e);
-            crate::println!("[boot] System will continue with reduced security features");
-        }
-    }
-
-    #[cfg(feature = "security_audit")]
-    {
-        security_audit::init_security_audit().expect("Security audit initialization failed");
-        crate::println!("[boot] security audit initialized");
-    }
-
-    #[cfg(feature = "formal_verification")]
-    {
-        formal_verification::init_formal_verification().expect("Formal verification initialization failed");
-        crate::println!("[boot] formal verification system initialized");
-    }
-
-    // Initialize error handling system
-    error_handling::init_error_handling().expect("Error handling initialization failed");
-    crate::println!("[boot] error handling system initialized");
-
-    // Initialize fault diagnosis system
-    debug::fault_diagnosis::create_fault_diagnosis_engine().lock().init().expect("Fault diagnosis initialization failed");
-    crate::println!("[boot] fault diagnosis system initialized");
-
-    // Initialize graceful degradation system
-    reliability::graceful_degradation::create_graceful_degradation_manager().lock().init().expect("Graceful degradation initialization failed");
-    crate::println!("[boot] graceful degradation system initialized");
-
-    #[cfg(feature = "debug_subsystems")]
-    {
-        debug::init().expect("Debugging system initialization failed");
-        crate::println!("[boot] debugging system initialized");
-
-        debug::monitoring::init().expect("Monitoring system initialization failed");
-        crate::println!("[boot] monitoring system initialized");
-
-        debug::profiling::init().expect("Profiling system initialization failed");
-        crate::println!("[boot] profiling system initialized");
-
-        debug::tracing::init().expect("Tracing system initialization failed");
-        crate::println!("[boot] tracing system initialized");
-
-        debug::metrics::init().expect("Metrics system initialization failed");
-        crate::println!("[boot] metrics system initialized");
-
-        debug::symbols::init().expect("Debug symbols system initialization failed");
-        crate::println!("[boot] debug symbols system initialized");
-    }
-
-    // Initialize cross-platform compatibility layer
-    compat::init().expect("Cross-platform compatibility layer initialization failed");
-    crate::println!("[boot] cross-platform compatibility layer initialized");
-
-    // Initialize device manager system
-    drivers::device_manager::init().expect("Device manager system initialization failed");
-    crate::println!("[boot] device manager system initialized");
-
-    #[cfg(all(not(feature = "lazy_init"), feature = "graphics_subsystem"))]
-    {
-        graphics::init();
-        crate::println!("[boot] graphics subsystem initialized");
-    }
-
-    #[cfg(all(not(feature = "lazy_init"), feature = "web_engine"))]
-    {
-        web::init();
-        crate::println!("[boot] web engine subsystem initialized");
-    }
-
-    #[cfg(feature = "observability")]
-    {
-        monitoring::metrics::init_metrics_collector().expect("Metrics collector initialization failed");
-        monitoring::health::init_health_checker().expect("Health checker initialization failed");
-        monitoring::alerting::init_alert_manager().expect("Alert manager initialization failed");
-        crate::println!("[boot] monitoring system initialized");
-    }
-
-    // Initialize benchmark system (optional, for performance testing)
-    // benchmark::syscall::run_all_syscall_benchmarks(); // Uncomment to run benchmarks at boot
-
-    // Start other CPUs
-    cpu::start_aps();
-    cpu::boot_complete();
-    crate::println!("[boot] SMP initialization complete ({} CPUs)", cpu::ncpus());
-    monitoring::timeline::record("boot_complete");
+    // Call core initialization function
+    core::init::init_kernel_core(boot_params_ref);
 
     // Mark boot complete
     STARTED.store(true, Ordering::SeqCst);
-
-    crate::println!();
-    crate::println!("xv6-rust kernel ready!");
-    crate::println!();
 
     // Run self-tests in debug builds
     #[cfg(debug_assertions)]
@@ -594,23 +321,6 @@ fn test_paths_relative() {
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
-    // Disable interrupts
-    arch::intr_off();
-
-    crate::println!();
-    crate::println!("!!! KERNEL PANIC !!!");
-    
-    if let Some(location) = info.location() {
-        crate::println!("at {}:{}:{}", location.file(), location.line(), location.column());
-    }
-    
-    crate::println!("{}", info.message());
-
-    crate::println!();
-    crate::println!("System halted.");
-
-    // Halt the CPU
-    loop {
-        arch::wfi();
-    }
+    // Use enhanced panic handler
+    crate::error::panic_handler::enhanced_panic_handler(info)
 }

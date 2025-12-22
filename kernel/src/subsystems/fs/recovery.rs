@@ -9,9 +9,9 @@ use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use core::sync::atomic::{AtomicU64, AtomicU32, AtomicBool, Ordering};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 // Sleeplock在当前文件中未使用，暂时注释掉
-// use crate::sync::Sleeplock;
+// use crate::subsystems::sync::Sleeplock;
 // use crate::subsystems::fs::journaling_fs::{JournalTransaction, JournalEntry, JfsError};
 // JournalingFileSystem在当前文件中未使用，暂时注释掉
 // use crate::subsystems::fs::journaling_fs::JournalingFileSystem;

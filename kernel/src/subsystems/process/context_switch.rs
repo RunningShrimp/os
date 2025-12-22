@@ -54,7 +54,7 @@ impl ContextSwitchStats {
 
 /// Global context switch statistics
 static mut CONTEXT_SWITCH_STATS: Option<ContextSwitchStats> = None;
-static CONTEXT_SWITCH_STATS_INIT: crate::sync::Once = crate::sync::Once::new();
+static CONTEXT_SWITCH_STATS_INIT: crate::subsystems::sync::Once = crate::subsystems::sync::Once::new();
 
 /// Get context switch statistics
 pub fn get_context_switch_stats() -> &'static mut ContextSwitchStats {
@@ -90,7 +90,7 @@ pub unsafe fn context_switch(current: &mut Context, next: &Context) -> Result<()
     }
     
     // Record start time for statistics
-    let start_time = crate::time::timestamp_nanos();
+    let start_time = crate::subsystems::time::timestamp_nanos();
     
     // Perform architecture-specific context switch
     #[cfg(target_arch = "x86_64")]
@@ -109,7 +109,7 @@ pub unsafe fn context_switch(current: &mut Context, next: &Context) -> Result<()
     }
     
     // Record statistics
-    let elapsed = crate::time::timestamp_nanos().saturating_sub(start_time);
+    let elapsed = crate::subsystems::time::timestamp_nanos().saturating_sub(start_time);
     let stats = get_context_switch_stats();
     stats.record_switch(elapsed, false); // Full context switch is slow path
     
@@ -140,7 +140,7 @@ pub unsafe fn fast_context_switch(
     }
     
     // Record start time for statistics
-    let start_time = crate::time::timestamp_nanos();
+    let start_time = crate::subsystems::time::timestamp_nanos();
     
     // Perform optimized context switch
     #[cfg(target_arch = "x86_64")]
@@ -159,7 +159,7 @@ pub unsafe fn fast_context_switch(
     }
     
     // Record statistics
-    let elapsed = crate::time::timestamp_nanos().saturating_sub(start_time);
+    let elapsed = crate::subsystems::time::timestamp_nanos().saturating_sub(start_time);
     let stats = get_context_switch_stats();
     stats.record_switch(elapsed, true); // Fast path switch
     

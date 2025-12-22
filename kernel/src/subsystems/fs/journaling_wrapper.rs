@@ -9,9 +9,9 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 
 use crate::drivers::{BlockDevice, RamDisk};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 // Sleeplock在当前文件中未使用，暂时注释掉
-// use crate::sync::Sleeplock;
+// use crate::subsystems::sync::Sleeplock;
 use crate::subsystems::fs::{
     BSIZE, SuperBlock, InodeType, DiskInode, Dirent, BufFlags,
     Fs, Inode, NINODE, NDIRECT, IPB, DIRSIZ, ROOTINO, FS_MAGIC,

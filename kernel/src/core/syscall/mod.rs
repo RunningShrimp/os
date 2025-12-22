@@ -6,7 +6,7 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::api::syscall::{SyscallDispatcher, SyscallHandler, SyscallError, SyscallResult, get_syscall_category};
 use crate::api::context::get_kernel_context;
 use crate::api::error::KernelError;

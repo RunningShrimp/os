@@ -6,10 +6,10 @@ extern crate alloc;
 
 use alloc::sync::Arc;
 use alloc::collections::BTreeMap;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::reliability::errno::{EOK, EINVAL, ENOENT};
 use crate::posix::{ShmidDs, IpcPerm, Mode, Pid, Size};
-use crate::mm::vm;
+use crate::subsystems::mm::vm;
 
 /// Shared memory segment
 #[derive(Debug)]

@@ -9,11 +9,11 @@
 
 use crate::posix::{SigSet, SigInfoT, SigVal, Pid, Uid, SIGRTMIN, SIGRTMAX};
 use crate::process::{Pid as ProcessId};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use crate::microkernel::scheduler;
+use crate::subsystems::microkernel::scheduler;
 
 /// Maximum number of pending signals per process
 pub const MAX_PENDING_SIGNALS: usize = 64;
@@ -43,7 +43,7 @@ impl QueuedSignal {
     pub fn new(info: SigInfoT) -> Self {
         Self {
             info,
-            timestamp: crate::time::get_timestamp(),
+            timestamp: crate::subsystems::time::get_timestamp(),
             delivered: false,
         }
     }
@@ -559,7 +559,7 @@ pub fn sigtimedwait(
             return Err(SignalWaitError::InvalidTimeout);
         }
         
-        let current_time = crate::time::get_timestamp();
+        let current_time = crate::subsystems::time::get_timestamp();
         let timeout_ns = to.tv_sec as u64 * 1_000_000_000 + to.tv_nsec as u64;
         Some(current_time + timeout_ns)
     } else {
@@ -575,7 +575,7 @@ pub fn sigtimedwait(
 
         // Check timeout
         if let Some(deadline) = deadline {
-            let current_time = crate::time::get_timestamp();
+            let current_time = crate::subsystems::time::get_timestamp();
             if current_time >= deadline {
                 return Err(SignalWaitError::Timeout);
             }

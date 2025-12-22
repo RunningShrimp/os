@@ -9,7 +9,7 @@
 //! - Time management (gettimeofday, clock_gettime, nanosleep, timer_create/timer_settime)
 
 use super::common::{SyscallError, SyscallResult};
-use crate::mm::vm::{copyout, copyin};
+use crate::subsystems::mm::vm::{copyout, copyin};
 use crate::posix::{stat, Timespec, Timeval, SigAction, SigSet, Itimerspec, SigEvent, O_CREAT, O_WRONLY};
 use alloc::vec::Vec;
 
@@ -682,7 +682,7 @@ pub fn test_kill() -> TestResult {
             if child_pid == 0 {
                 // In child process, loop indefinitely
                 loop {
-                    crate::time::sleep_ms(100);
+                    crate::subsystems::time::sleep_ms(100);
                 }
             } else {
                 // In parent process
@@ -1036,14 +1036,14 @@ pub fn test_nanosleep() -> TestResult {
         tv_nsec: 10_000_000, // 10ms
     };
     
-    let start_ns = crate::time::timestamp_nanos();
+    let start_ns = crate::subsystems::time::timestamp_nanos();
     
     match crate::syscalls::time::dispatch(0x6006, &[
         &req as u64,
         0 // rem_ptr
     ]) {
         Ok(_) => {
-            let elapsed_ns = crate::time::timestamp_nanos() - start_ns;
+            let elapsed_ns = crate::subsystems::time::timestamp_nanos() - start_ns;
             
             // Check if we slept for approximately the right amount
             if elapsed_ns < 5_000_000 {

@@ -3,7 +3,7 @@
 extern crate alloc;
 use alloc::string::String;
 use alloc::vec::Vec;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 
 use crate::syscalls::common::{SyscallError, SyscallResult};
 
@@ -82,7 +82,7 @@ pub fn sys_ifconfig(args: &[u64]) -> SyscallResult {
 /// Get network interface information
 pub fn sys_ifinfo(args: &[u64]) -> SyscallResult {
     use crate::syscalls::common::extract_args;
-    use crate::mm::vm::copyout;
+    use crate::subsystems::mm::vm::copyout;
     
     let args = extract_args(args, 2)?;
     let if_index = args[0] as u32;
@@ -123,7 +123,7 @@ pub fn sys_ifinfo(args: &[u64]) -> SyscallResult {
 /// List network interfaces
 pub fn sys_iflist(args: &[u64]) -> SyscallResult {
     use crate::syscalls::common::extract_args;
-    use crate::mm::vm::copyout;
+    use crate::subsystems::mm::vm::copyout;
     
     let args = extract_args(args, 2)?;
     let buf_ptr = args[0] as usize;

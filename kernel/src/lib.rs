@@ -75,6 +75,7 @@ pub mod error;
 mod kernel_factory;
 
 // Include necessary internal modules for library
+pub mod arch;
 pub mod subsystems;
 pub mod platform;
 
@@ -99,6 +100,9 @@ pub use subsystems::fs;
 pub use subsystems::vfs;
 pub use subsystems::ipc;
 pub use subsystems::process;
+pub use subsystems::mm;
+pub use subsystems::sync;
+pub use subsystems::time;
 
 // Re-export external crates when features are enabled
 #[cfg(feature = "syscalls")]
@@ -167,8 +171,6 @@ pub use platform::boot;
 pub use platform::drivers;
 pub use platform::trap;
 
-#[cfg(feature = "cloud_native")]
-mod cloud_native;
 mod compat;
 mod collections;
 mod syscall_interface;
@@ -176,13 +178,11 @@ mod types;
 mod cpu;
 #[cfg(feature = "debug_subsystems")]
 mod debug;
-#[cfg(feature = "formal_verification")]
-mod formal_verification;
 mod event;
 mod di;
 mod ids;
 mod libc;
-mod microkernel;
+// Legacy modules - now accessed through subsystems
 mod mm;
 mod sched;
 mod monitoring;
@@ -224,6 +224,8 @@ mod cloud_native {
 ///
 /// This function initializes all kernel subsystems and prepares the system
 /// for operation.
+/// It uses the same core initialization logic as `rust_main_with_boot_info`,
+/// ensuring consistency between bootloader-based and library-based startup.
 ///
 /// # Arguments
 ///
@@ -233,53 +235,9 @@ mod cloud_native {
 ///
 /// * `nos_api::Result<()>` - Success or error
 pub fn init_kernel(boot_params: BootParameters) -> nos_api::Result<()> {
-    // Initialize core subsystems
-    platform::init_platform(&boot_params)?;
-    
-    // Initialize memory management
-    mm::init_advanced_memory_management()?;
-    
-    // Initialize process management
-    // subsystems::process::init_process_management()?; // Function not found
-    
-    // Initialize file system
-    // subsystems::fs::init_file_system()?; // Function not found
-    
-    // Initialize IPC
-    // subsystems::ipc::init_ipc()?; // Function not found
-    
-    // Initialize system calls (if enabled)
-    #[cfg(feature = "syscalls")]
-    {
-        // nos_syscalls::init_syscalls()?; // Function gated behind alloc feature
-    }
-    
-    // Initialize services (if enabled)
-    #[cfg(feature = "services")]
-    {
-        nos_services::init_services()?;
-    }
-    
-    // Initialize error handling (if enabled)
-    #[cfg(feature = "error_handling")]
-    {
-        nos_error_handling::init_error_handling()?;
-    }
-    
-    // Initialize network stack (if enabled)
-    #[cfg(feature = "net_stack")]
-    {
-        // subsystems::net::init_network_stack()?; // Function name mismatch
-    }
-    
-    // Initialize security
-    security::init_security_subsystem()?;
-    
-    // Initialize scheduler
-    // sched::init_advanced_scheduler()?; // Function not found
-    
-    // Initialize performance monitoring
-    perf::init_performance_monitor()?;
+    // Use the same core initialization function as bootloader entry
+    // This ensures consistency between different entry points
+    core::init::init_kernel_core(Some(&boot_params));
     
     log_info!("NOS Kernel initialized successfully");
     

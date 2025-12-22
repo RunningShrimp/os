@@ -7,10 +7,10 @@ extern crate alloc;
 use alloc::vec::Vec;
 use core::alloc::{GlobalAlloc, Layout};
 
-use crate::mm::allocator::HybridAllocator;
-use crate::sync::{Once, Mutex};
+use crate::subsystems::mm::allocator::HybridAllocator;
+use crate::subsystems::sync::{Once, Mutex};
 use crate::arch::cpu_id;
-use crate::sync::SpinLock;
+use crate::subsystems::sync::SpinLock;
 use core::ptr::NonNull;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
@@ -210,7 +210,7 @@ impl PerCpuLocalAllocator {
             self.add_to_freelist(ptr, size);
         } else {
             // 大块直接返回给全局分配器
-            crate::mm::allocator::get_global_allocator().dealloc(ptr, layout);
+            crate::subsystems::mm::allocator::get_global_allocator().dealloc(ptr, layout);
         }
     }
     
@@ -239,7 +239,7 @@ impl PerCpuLocalAllocator {
     
     /// 从全局分配器分配
     pub unsafe fn alloc_from_global(&self, layout: Layout) -> *mut u8 {
-        let ptr = crate::mm::allocator::get_global_allocator().alloc(layout);
+        let ptr = crate::subsystems::mm::allocator::get_global_allocator().alloc(layout);
         if !ptr.is_null() {
             self.allocated_count.fetch_add(1, Ordering::Relaxed);
         }

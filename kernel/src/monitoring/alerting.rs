@@ -7,7 +7,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::collections::BTreeMap;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 
 /// Alert severity
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -130,7 +130,7 @@ impl AlertManager {
             name: name.to_string(),
             severity,
             message: message.to_string(),
-            timestamp: crate::time::hrtime_nanos(),
+            timestamp: crate::subsystems::time::hrtime_nanos(),
             acknowledged: false,
         };
         
@@ -183,7 +183,7 @@ pub fn init_alert_manager() -> Result<(), i32> {
 
 /// Get alert manager
 pub fn get_alert_manager() -> &'static AlertManager {
-    static INIT_ONCE: crate::sync::Once = crate::sync::Once::new();
+    static INIT_ONCE: crate::subsystems::sync::Once = crate::subsystems::sync::Once::new();
     INIT_ONCE.call_once(|| {
         let mut manager = ALERT_MANAGER.lock();
         if manager.is_none() {

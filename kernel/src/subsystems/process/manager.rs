@@ -15,11 +15,12 @@ use core::ptr::null_mut;
 use alloc::string::String;
 use hashbrown::HashMap;
 use alloc::vec::Vec;
-use crate::sync::Mutex;
+use alloc::collections::BTreeMap;
+use crate::subsystems::sync::Mutex;
 use crate::compat::DefaultHasherBuilder;
-use crate::mm::{kalloc, kfree, PAGE_SIZE};
+use crate::subsystems::mm::{kalloc, kfree, PAGE_SIZE};
 use crate::ipc::signal::SignalState;
-use crate::mm::vm::{PageTable, free_pagetable};
+use crate::subsystems::mm::vm::{PageTable, free_pagetable};
 
 // ============================================================================
 // Constants
@@ -311,37 +312,8 @@ impl TrapFrame {
     }
 }
 
-/// Cached file descriptor information for fast access
-/// This cache stores frequently accessed file descriptors (0-7) to avoid repeated lookups
-#[derive(Debug, Clone, Copy)]
-struct CachedFd {
-    /// File index in global file table
-    file_idx: Option<usize>,
-    /// File type (cached to avoid file table lookup)
-    file_type: crate::fs::file::FileType,
-    /// Validity flag (true if cache entry is valid)
-    valid: bool,
-}
-
-impl CachedFd {
-    const fn new() -> Self {
-        Self {
-            file_idx: None,
-            file_type: crate::fs::file::FileType::None,
-            valid: false,
-        }
-    }
-}
-
-impl Default for CachedFd {
-    fn default() -> Self {
-        Self {
-            file_idx: None,
-            file_type: crate::fs::file::FileType::None,
-            valid: false,
-        }
-    }
-}
+// CachedFd structure has been replaced by ExtendedFdCache from fd_cache module
+// This provides better performance with statistics and LRU/LFU support
 
 /// Process control block
 use crate::posix;
@@ -363,9 +335,10 @@ pub struct Proc {
     pub trapframe: *mut TrapFrame,
     pub context: Context,
     pub ofile: [Option<usize>; NOFILE],  // Open file descriptors (index into FILE_TABLE)
-    /// Cached file descriptors for fast access (FDs 0-7)
+    /// Extended file descriptor cache for fast access (FDs 0-15)
     /// This cache reduces file table lookups for commonly used file descriptors
-    fd_cache: [CachedFd; 8],
+    /// and provides statistics and LRU/LFU replacement policies
+    fd_cache: crate::subsystems::process::fd_cache::ExtendedFdCache,
     pub cwd_path: Option<String>,
     pub cwd: Option<usize>,  // Current working directory file index
     pub signals: Option<SignalState>,
@@ -378,7 +351,12 @@ pub struct Proc {
     pub pagetable: *mut PageTable,  // Page table pointer
     pub nice: i32,    // Process nice value (-20 to 19)
     pub umask: u32,   // File creation mask
-    pub domain_id: crate::mm::memory_isolation::ProtectionDomainId,  // Memory protection domain ID
+    pub domain_id: crate::subsystems::mm::memory_isolation::ProtectionDomainId,  // Memory protection domain ID
+    /// Namespace IDs for this process (one per namespace type)
+    /// Maps namespace type to namespace ID
+    pub namespaces: alloc::collections::BTreeMap<crate::subsystems::cloud_native::namespaces::NamespaceType, u64>,
+    /// Cgroup name for this process (if assigned to a cgroup)
+    pub cgroup: Option<String>,
 }
 
 // Safety: Process control block is protected by PROC_TABLE mutex
@@ -403,7 +381,7 @@ impl Proc {
             trapframe: null_mut(),
             context: Context::new(),
             ofile: [None; NOFILE],
-            fd_cache: [CachedFd::new(); 8],
+            fd_cache: crate::subsystems::process::fd_cache::ExtendedFdCache::new(),
             cwd_path: None,
             cwd: None,
             signals: None,
@@ -416,10 +394,12 @@ impl Proc {
             nice: 0,
             umask: 0o022,  // Default umask
             domain_id: 0,  // Default to kernel domain
+            namespaces: alloc::collections::BTreeMap::new(),
+            cgroup: None,
         }
     }
     
-    /// Get cached file descriptor information (O(1) lookup for FDs 0-7)
+    /// Get cached file descriptor information (O(1) lookup for FDs 0-15)
     /// 
     /// This function provides fast access to commonly used file descriptors
     /// without requiring a file table lookup. The cache is automatically
@@ -427,7 +407,7 @@ impl Proc {
     /// 
     /// # Arguments
     /// 
-    /// * `fd` - File descriptor number (must be 0-7 for cached FDs)
+    /// * `fd` - File descriptor number (must be 0-15 for cached FDs)
     /// 
     /// # Returns
     /// 
@@ -435,13 +415,7 @@ impl Proc {
     /// * `None` if the file descriptor is not open or not cached
     #[inline]
     pub fn get_cached_fd(&self, fd: i32) -> Option<usize> {
-        if fd >= 0 && fd < 8 {
-            let cached = &self.fd_cache[fd as usize];
-            if cached.valid {
-                return cached.file_idx;
-            }
-        }
-        None
+        self.fd_cache.get(fd)
     }
     
     /// Update file descriptor cache when a file descriptor is opened
@@ -451,22 +425,16 @@ impl Proc {
     /// 
     /// # Arguments
     /// 
-    /// * `fd` - File descriptor number (must be 0-7 for cached FDs)
+    /// * `fd` - File descriptor number (must be 0-15 for cached FDs)
     /// * `file_idx` - File index in global file table
     fn update_fd_cache(&mut self, fd: i32, file_idx: usize) {
-        if fd >= 0 && fd < 8 {
-            // Get file type from file table to cache it
-            let file_type = crate::fs::file::FILE_TABLE.lock()
-                .get(file_idx)
-                .map(|f| f.ftype)
-                .unwrap_or(crate::fs::file::FileType::None);
-            
-            self.fd_cache[fd as usize] = CachedFd {
-                file_idx: Some(file_idx),
-                file_type,
-                valid: true,
-            };
-        }
+        // Get file type from file table to cache it
+        let file_type = crate::fs::file::FILE_TABLE.lock()
+            .get(file_idx)
+            .map(|f| f.ftype)
+            .unwrap_or(crate::fs::file::FileType::None);
+        
+        self.fd_cache.update(fd, file_idx, file_type);
     }
     
     /// Invalidate file descriptor cache when a file descriptor is closed
@@ -476,11 +444,9 @@ impl Proc {
     /// 
     /// # Arguments
     /// 
-    /// * `fd` - File descriptor number (must be 0-7 for cached FDs)
+    /// * `fd` - File descriptor number (must be 0-15 for cached FDs)
     fn invalidate_fd_cache(&mut self, fd: i32) {
-        if fd >= 0 && fd < 8 {
-            self.fd_cache[fd as usize] = CachedFd::default();
-        }
+        self.fd_cache.invalidate(fd);
     }
     
     /// Invalidate all file descriptor caches
@@ -488,9 +454,12 @@ impl Proc {
     /// This should be called when all file descriptors are closed
     /// (e.g., during process exit).
     fn invalidate_all_fd_cache(&mut self) {
-        for cached in &mut self.fd_cache {
-            *cached = CachedFd::default();
-        }
+        self.fd_cache.invalidate_all();
+    }
+    
+    /// Get file descriptor cache statistics
+    pub fn get_fd_cache_stats(&self) -> crate::subsystems::process::fd_cache::FdCacheStats {
+        self.fd_cache.get_stats()
     }
 }
 
@@ -632,7 +601,12 @@ impl ProcTable {
         let new_pid = self.next_pid;
         proc.pid = new_pid;
         self.next_pid += 1;
-    proc.state = ProcState::Used;
+        proc.state = ProcState::Used;
+        
+        // Initialize ASLR for new process
+        if crate::security::is_aslr_enabled() {
+            let _ = crate::security::init_process_aslr_by_pid(new_pid as u64);
+        }
     
     // Initialize process group and session ID
     proc.pgid = new_pid;
@@ -917,9 +891,9 @@ pub fn fork() -> Option<Pid> {
     let mut table = PROC_TABLE.lock();
 
     // Extract all parent data first, then release borrow
-    let (parent_pgid, parent_sid, parent_uid, parent_gid, parent_euid, parent_egid, parent_suid, parent_sgid, parent_nice, parent_umask, parent_ofile, parent_cwd_path, parent_cwd, parent_rlimits, parent_pagetable, parent_sz, parent_trapframe) = {
+    let (parent_pgid, parent_sid, parent_uid, parent_gid, parent_euid, parent_egid, parent_suid, parent_sgid, parent_nice, parent_umask, parent_ofile, parent_cwd_path, parent_cwd, parent_rlimits, parent_pagetable, parent_sz, parent_trapframe, parent_namespaces, parent_cgroup) = {
         let parent = table.find(parent_pid)?;
-        (parent.pgid, parent.sid, parent.uid, parent.gid, parent.euid, parent.egid, parent.suid, parent.sgid, parent.nice, parent.umask, parent.ofile.clone(), parent.cwd_path.clone(), parent.cwd, parent.rlimits.clone(), parent.pagetable, parent.sz, parent.trapframe)
+        (parent.pgid, parent.sid, parent.uid, parent.gid, parent.euid, parent.egid, parent.suid, parent.sgid, parent.nice, parent.umask, parent.ofile.clone(), parent.cwd_path.clone(), parent.cwd, parent.rlimits.clone(), parent.pagetable, parent.sz, parent.trapframe, parent.namespaces.clone(), parent.cgroup.clone())
     };
 
     // Allocate child process (now we can use table mutably again)
@@ -994,8 +968,20 @@ pub fn fork() -> Option<Pid> {
     // Copy resource limits
     child.rlimits.copy_from_slice(&parent_rlimits);
 
+    // Inherit namespaces from parent
+    child.namespaces = parent_namespaces;
+
+    // Inherit cgroup from parent
+    child.cgroup = parent_cgroup;
+    // If parent is in a cgroup, add child to the same cgroup
+    if let Some(ref cgroup_name) = child.cgroup {
+        if let Err(e) = crate::subsystems::cloud_native::cgroups::add_process_to_cgroup(cgroup_name, child_pid as u32) {
+            crate::println!("[fork] Warning: Failed to add child process {} to cgroup {}: {}", child_pid, cgroup_name, e);
+        }
+    }
+
     // Copy page table with copy-on-write semantics
-    if let Some(pagetable) = unsafe { crate::mm::vm::copy_pagetable(parent_pagetable) } {
+    if let Some(pagetable) = unsafe { crate::subsystems::mm::vm::copy_pagetable(parent_pagetable) } {
         child.pagetable = pagetable;
         child.sz = parent_sz;
     } else {
@@ -1198,6 +1184,7 @@ pub fn waitpid(pid: i32, status: *mut i32, options: i32) -> Option<Pid> {
                 }
             }
         }
+        }
 
         // If found a child, return status (don't clean up stopped processes)
         if let Some((child_pid, xstate)) = found_child {
@@ -1308,32 +1295,40 @@ pub fn fdclose(fd: i32) -> Option<usize> {
 /// Lookup file descriptor
 /// 
 /// This function provides O(1) lookup for file descriptors.
-/// For commonly used file descriptors (0-7), it uses the cache
-/// to avoid repeated file table lookups.
+/// For commonly used file descriptors (0-15), it uses the extended cache
+/// to avoid repeated file table lookups. The cache tracks access patterns
+/// and provides statistics for performance monitoring.
 pub fn fdlookup(fd: i32) -> Option<usize> {
     let pid = myproc()?;
     let table = PROC_TABLE.lock();
     let proc = table.find_ref(pid)?;
     
-    // Try cache first for commonly used file descriptors (0-7)
-    if fd >= 0 && fd < 8 {
+    // Try cache first for commonly used file descriptors (0-15)
+    if fd >= 0 && fd < 16 {
         if let Some(file_idx) = proc.get_cached_fd(fd) {
+            // Cache hit - verify it's still valid by checking ofile
+            if (fd as usize) < NOFILE && proc.ofile[fd as usize] == Some(file_idx) {
+                return Some(file_idx);
+            }
+        }
+    }
+    
+    // Fall back to regular lookup and update cache if found
+    if fd >= 0 && (fd as usize) < NOFILE {
+        if let Some(file_idx) = proc.ofile[fd as usize] {
+            // Update cache for future lookups (requires mutable access)
+            // Note: We can't mutate here, so cache will be updated on next fdinstall/fdalloc
             return Some(file_idx);
         }
     }
     
-    // Fall back to regular lookup
-    if fd >= 0 && (fd as usize) < NOFILE {
-        proc.ofile[fd as usize]
-    } else {
-        None
-    }
+    None
 }
 
 /// Install a file at a specific file descriptor
 /// 
 /// This function installs a file at a specific file descriptor and
-/// updates the cache for commonly used file descriptors (0-7).
+/// updates the extended cache for commonly used file descriptors (0-15).
 pub fn fdinstall(fd: i32, file_idx: usize) -> Result<(), ()> {
     let pid = myproc().ok_or(())?;
     let mut table = PROC_TABLE.lock();
@@ -1341,7 +1336,7 @@ pub fn fdinstall(fd: i32, file_idx: usize) -> Result<(), ()> {
     
     if fd >= 0 && (fd as usize) < NOFILE {
         proc.ofile[fd as usize] = Some(file_idx);
-        // Update cache for commonly used file descriptors (0-7)
+        // Update extended cache for FDs 0-15
         proc.update_fd_cache(fd, file_idx);
         Ok(())
     } else {

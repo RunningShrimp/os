@@ -499,7 +499,7 @@ pub extern "C" fn mq_send(
     let message = Message {
         priority: msg_prio,
         data: msg_data,
-        timestamp: crate::time::get_timestamp(),
+        timestamp: crate::subsystems::time::get_timestamp(),
     };
     
     // Add to queue

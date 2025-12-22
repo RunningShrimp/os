@@ -11,7 +11,7 @@ extern crate alloc;
 use alloc::collections::VecDeque;
 use core::sync::atomic::{AtomicU64, Ordering};
 
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 
 // ============================================================================
 // Signal Numbers (POSIX compatible)

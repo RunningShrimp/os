@@ -95,7 +95,7 @@ fn sys_capget(args: &[u64]) -> SyscallResult {
     let mut header_data = [0u8; core::mem::size_of::<CapHeader>()];
     if header_ptr != 0 {
         unsafe {
-            match crate::mm::vm::copyin(pagetable, header_data.as_mut_ptr(), header_ptr, header_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, header_data.as_mut_ptr(), header_ptr, header_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -106,7 +106,7 @@ fn sys_capget(args: &[u64]) -> SyscallResult {
     let mut data_data = [0u8; core::mem::size_of::<CapData>()];
     if data_ptr != 0 {
         unsafe {
-            match crate::mm::vm::copyin(pagetable, data_data.as_mut_ptr(), data_ptr, data_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, data_data.as_mut_ptr(), data_ptr, data_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -181,7 +181,7 @@ fn sys_capset(args: &[u64]) -> SyscallResult {
     let mut header_data = [0u8; core::mem::size_of::<CapHeader>()];
     if header_ptr != 0 {
         unsafe {
-            match crate::mm::vm::copyin(pagetable, header_data.as_mut_ptr(), header_ptr, header_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, header_data.as_mut_ptr(), header_ptr, header_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -192,7 +192,7 @@ fn sys_capset(args: &[u64]) -> SyscallResult {
     let mut data_data = [0u8; core::mem::size_of::<CapData>()];
     if data_ptr != 0 {
         unsafe {
-            match crate::mm::vm::copyin(pagetable, data_data.as_mut_ptr(), data_ptr, data_data.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, data_data.as_mut_ptr(), data_ptr, data_data.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -246,7 +246,7 @@ fn sys_getpwnam(args: &[u64]) -> SyscallResult {
     let mut name_data = [0u8; 256];
     let name_len = if name_ptr != 0 {
         unsafe {
-            match crate::mm::vm::copyinstr(pagetable, name_ptr, &mut name_data as *mut u8, MAX_NAME_LEN) {
+            match crate::subsystems::mm::vm::copyinstr(pagetable, name_ptr, &mut name_data as *mut u8, MAX_NAME_LEN) {
                 Ok(len) => len,
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -334,7 +334,7 @@ fn sys_getpwnam(args: &[u64]) -> SyscallResult {
                     }
                     
                     unsafe {
-                        match crate::mm::vm::copyout(pagetable, pwd_ptr, entry_bytes.as_ptr(), entry_bytes.len()) {
+                        match crate::subsystems::mm::vm::copyout(pagetable, pwd_ptr, entry_bytes.as_ptr(), entry_bytes.len()) {
                             Ok(_) => {},
                             Err(_) => return Err(SyscallError::BadAddress),
                         };
@@ -455,7 +455,7 @@ fn sys_getpwuid(args: &[u64]) -> SyscallResult {
                     }
                     
                     unsafe {
-                        match crate::mm::vm::copyout(pagetable, pwd_ptr, entry_bytes.as_ptr(), entry_bytes.len()) {
+                        match crate::subsystems::mm::vm::copyout(pagetable, pwd_ptr, entry_bytes.as_ptr(), entry_bytes.len()) {
                             Ok(_) => {},
                             Err(_) => return Err(SyscallError::BadAddress),
                         };
@@ -507,7 +507,7 @@ fn sys_getgrnam(args: &[u64]) -> SyscallResult {
     let mut name_data = [0u8; 256];
     let name_len = if name_ptr != 0 {
         unsafe {
-            match crate::mm::vm::copyinstr(pagetable, name_ptr, &mut name_data as *mut u8, MAX_NAME_LEN) {
+            match crate::subsystems::mm::vm::copyinstr(pagetable, name_ptr, &mut name_data as *mut u8, MAX_NAME_LEN) {
                 Ok(len) => len,
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -574,7 +574,7 @@ fn sys_getgrnam(args: &[u64]) -> SyscallResult {
                     }
                     
                     unsafe {
-                        match crate::mm::vm::copyout(pagetable, grp_ptr, entry_bytes.as_ptr(), entry_bytes.len()) {
+                        match crate::subsystems::mm::vm::copyout(pagetable, grp_ptr, entry_bytes.as_ptr(), entry_bytes.len()) {
                             Ok(_) => {},
                             Err(_) => return Err(SyscallError::BadAddress),
                         };
@@ -674,7 +674,7 @@ fn sys_getgrgid(args: &[u64]) -> SyscallResult {
                     }
                     
                     unsafe {
-                        match crate::mm::vm::copyout(pagetable, grp_ptr, entry_bytes.as_ptr(), entry_bytes.len()) {
+                        match crate::subsystems::mm::vm::copyout(pagetable, grp_ptr, entry_bytes.as_ptr(), entry_bytes.len()) {
                             Ok(_) => {},
                             Err(_) => return Err(SyscallError::BadAddress),
                         };

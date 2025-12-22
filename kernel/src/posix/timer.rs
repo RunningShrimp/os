@@ -7,7 +7,7 @@ extern crate alloc;
 
 use alloc::sync::Arc;
 use alloc::collections::BTreeMap;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::reliability::errno::{EOK, EINVAL, ENOENT, EPERM, EAGAIN};
 use crate::posix::{TimerT, ClockId, SigEvent, Itimerspec, Timespec, Pid};
 
@@ -28,7 +28,7 @@ mod tests {
         let mut timer = Timer::new(1, crate::posix::CLOCK_MONOTONIC, SigEvent::default(), 1, None);
 
         // Set expiry a short time in the future
-        let now_ns = crate::time::timestamp_nanos();
+        let now_ns = crate::subsystems::time::timestamp_nanos();
         let future_ns = now_ns + 2_000_000_000; // 2 seconds
         timer.expiry_time = Timespec { tv_sec: (future_ns / 1_000_000_000) as i64, tv_nsec: (future_ns % 1_000_000_000) as i64 };
         timer.state = TimerState::Armed;
@@ -106,7 +106,7 @@ impl Timer {
 
         // Calculate remaining time (expiry_time - now)
         // Use the system time source (ns) and convert to Timespec
-        let now_ns = crate::time::timestamp_nanos();
+        let now_ns = crate::subsystems::time::timestamp_nanos();
         let now = Timespec {
             tv_sec: (now_ns / 1_000_000_000) as i64,
             tv_nsec: (now_ns % 1_000_000_000) as i64,

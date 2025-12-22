@@ -13,7 +13,7 @@ use core::sync::atomic::{AtomicU32, AtomicU64, AtomicBool, Ordering};
 use core::mem;
 
 use crate::drivers::BlockDevice;
-use crate::sync::{Mutex, Sleeplock};
+use crate::subsystems::sync::{Mutex, Sleeplock};
 use crate::subsystems::fs::{BSIZE, SuperBlock, InodeType, DiskInode, Dirent, BufFlags};
 
 /// Enhanced journaling constants
@@ -158,7 +158,7 @@ impl EnhancedJournalTransaction {
             entries: Vec::new(),
             original_data: BTreeMap::new(),
             new_data: BTreeMap::new(),
-            timestamp: crate::time::get_timestamp(),
+            timestamp: crate::subsystems::time::get_timestamp(),
             priority: 0,
             flags: 0,
             block_count: 0,
@@ -606,7 +606,7 @@ impl EnhancedJournalingFileSystem {
 
     /// Recover from a crash with enhanced recovery
     fn recover(&self) -> Result<(), EnhancedJfsError> {
-        let recovery_start = crate::time::get_timestamp();
+        let recovery_start = crate::subsystems::time::get_timestamp();
         self.recovery_mode.store(1, Ordering::SeqCst);
         
         let mut stats = self.stats.lock();
@@ -634,7 +634,7 @@ impl EnhancedJournalingFileSystem {
         self.write_journal_superblock()?;
         
         // Update recovery time
-        let recovery_time = crate::time::get_timestamp() - recovery_start;
+        let recovery_time = crate::subsystems::time::get_timestamp() - recovery_start;
         let mut performance = self.performance.lock();
         performance.recovery_time_us = recovery_time * 1000; // Convert to microseconds
         drop(performance);
@@ -836,7 +836,7 @@ impl EnhancedJournalingFileSystem {
             data_length: 0,
             checksum: 0,
             flags: 0,
-            timestamp: crate::time::get_timestamp(),
+            timestamp: crate::subsystems::time::get_timestamp(),
         };
         
         self.write_journal_entry(&begin_entry)?;
@@ -904,7 +904,7 @@ impl EnhancedJournalingFileSystem {
             data_length: new_data.len() as u32,
             checksum: self.calculate_checksum(new_data),
             flags: 0,
-            timestamp: crate::time::get_timestamp(),
+            timestamp: crate::subsystems::time::get_timestamp(),
         };
         
         drop(transactions);
@@ -945,7 +945,7 @@ impl EnhancedJournalingFileSystem {
 
     /// Commit an enhanced transaction
     pub fn commit_transaction(&self, tx_id: u64) -> Result<(), EnhancedJfsError> {
-        let commit_start = crate::time::get_timestamp();
+        let commit_start = crate::subsystems::time::get_timestamp();
         
         let mut transactions = self.transactions.lock();
         let tx = transactions.get_mut(&tx_id).ok_or(EnhancedJfsError::TransactionNotFound)?;
@@ -962,7 +962,7 @@ impl EnhancedJournalingFileSystem {
             data_length: 0,
             checksum: 0,
             flags: 0,
-            timestamp: crate::time::get_timestamp(),
+            timestamp: crate::subsystems::time::get_timestamp(),
         };
         
         drop(transactions);
@@ -987,13 +987,13 @@ impl EnhancedJournalingFileSystem {
         {
             let mut sb = self.journal_sb.lock();
             sb.active_transactions = sb.active_transactions.saturating_sub(1);
-            sb.last_commit = crate::time::get_timestamp();
+            sb.last_commit = crate::subsystems::time::get_timestamp();
             sb.committed_transactions += 1;
         }
         self.write_journal_superblock()?;
         
         // Update statistics
-        let commit_time = crate::time::get_timestamp() - commit_start;
+        let commit_time = crate::subsystems::time::get_timestamp() - commit_start;
         let mut stats = self.stats.lock();
         stats.total_transactions += 1;
         stats.committed_transactions += 1;

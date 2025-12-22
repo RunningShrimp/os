@@ -5,7 +5,7 @@
 use core::ffi::c_int;
 use core::sync::atomic::{AtomicI32, Ordering};
 use heapless::Vec;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 
 /// 全局errno变量
 ///

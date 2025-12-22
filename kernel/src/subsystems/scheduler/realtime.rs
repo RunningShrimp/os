@@ -507,7 +507,7 @@ impl RealtimeScheduler {
         let mut stats = self.stats.lock();
         
         // Calculate CPU utilization
-        let current_time = crate::time::timestamp_nanos();
+        let current_time = crate::subsystems::time::timestamp_nanos();
         let last_switch = self.last_switch_time.load(Ordering::Relaxed);
         
         if current_time > last_switch {

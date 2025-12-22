@@ -21,7 +21,7 @@ use crate::posix;
 pub fn test_filesystem_syscalls(results: &mut PosixTestResults) {
     crate::println!("  📁 文件系统系统调用测试:");
     
-    let start_time = crate::time::get_time_ns();
+    let start_time = crate::subsystems::time::get_time_ns();
     
     // 测试stat系列系统调用
     test_stat_syscalls(results);
@@ -38,7 +38,7 @@ pub fn test_filesystem_syscalls(results: &mut PosixTestResults) {
     // 测试文件权限操作
     test_file_permissions(results);
     
-    let execution_time = crate::time::get_time_ns() - start_time;
+    let execution_time = crate::subsystems::time::get_time_ns() - start_time;
     results.record_performance(PerformanceMetric {
         test_name: "filesystem_syscalls".to_string(),
         execution_time_ns: execution_time,
@@ -1077,7 +1077,7 @@ fn test_umask(results: &mut PosixTestResults) {
 pub fn test_process_syscalls(results: &mut PosixTestResults) {
     crate::println!("  ⚙️ 进程管理系统调用测试:");
     
-    let start_time = crate::time::get_time_ns();
+    let start_time = crate::subsystems::time::get_time_ns();
     
     // 测试fork/vfork
     test_fork_vfork(results);
@@ -1100,7 +1100,7 @@ pub fn test_process_syscalls(results: &mut PosixTestResults) {
     // 测试会话相关
     test_session_management(results);
     
-    let execution_time = crate::time::get_time_ns() - start_time;
+    let execution_time = crate::subsystems::time::get_time_ns() - start_time;
     results.record_performance(PerformanceMetric {
         test_name: "process_syscalls".to_string(),
         execution_time_ns: execution_time,
@@ -1540,7 +1540,7 @@ fn test_setsid(results: &mut PosixTestResults) {
 pub fn test_memory_syscalls(results: &mut PosixTestResults) {
     crate::println!("  💾 内存管理系统调用测试:");
     
-    let start_time = crate::time::get_time_ns();
+    let start_time = crate::subsystems::time::get_time_ns();
     
     // 测试mmap系列
     test_mmap_series(results);
@@ -1557,7 +1557,7 @@ pub fn test_memory_syscalls(results: &mut PosixTestResults) {
     // 测试brk/sbrk
     test_brk_sbrk(results);
     
-    let execution_time = crate::time::get_time_ns() - start_time;
+    let execution_time = crate::subsystems::time::get_time_ns() - start_time;
     results.record_performance(PerformanceMetric {
         test_name: "memory_syscalls".to_string(),
         execution_time_ns: execution_time,
@@ -2033,7 +2033,7 @@ fn test_brk_sbrk(results: &mut PosixTestResults) {
 pub fn test_network_syscalls(results: &mut PosixTestResults) {
     crate::println!("  🌐 网络系统调用测试:");
     
-    let start_time = crate::time::get_time_ns();
+    let start_time = crate::subsystems::time::get_time_ns();
     
     // 测试socket系列
     test_socket_series(results);
@@ -2050,7 +2050,7 @@ pub fn test_network_syscalls(results: &mut PosixTestResults) {
     // 测试shutdown
     test_shutdown(results);
     
-    let execution_time = crate::time::get_time_ns() - start_time;
+    let execution_time = crate::subsystems::time::get_time_ns() - start_time;
     results.record_performance(PerformanceMetric {
         test_name: "network_syscalls".to_string(),
         execution_time_ns: execution_time,

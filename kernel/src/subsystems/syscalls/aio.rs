@@ -30,8 +30,8 @@ use super::common::{SyscallError, SyscallResult, extract_args};
 use crate::fs::file::FILE_TABLE;
 use crate::process::{myproc, NOFILE};
 use crate::posix::{off_t, aiocb, AioOffsetT, aio_reqprio_t, aio_sigevent_t, AIO_CANCELED, AIO_NOTCANCELED, AIO_ALLDONE, LIO_READ, LIO_WRITE, SIGEV_SIGNAL};
-use crate::sync::Mutex;
-use crate::mm::vm;
+use crate::subsystems::sync::Mutex;
+use crate::subsystems::mm::vm;
 
 // ============================================================================
 // Constants and Types
@@ -213,7 +213,7 @@ fn find_pending_operation() -> Option<usize> {
 
 /// Process an AIO operation
 fn process_aio_operation(operation_id: usize, worker_id: usize) {
-    let start_time = crate::time::get_time_ns();
+    let start_time = crate::subsystems::time::get_time_ns();
     
     // Get operation details
     let (user_aiocb, operation, fd, file_idx) = {
@@ -240,7 +240,7 @@ fn process_aio_operation(operation_id: usize, worker_id: usize) {
         }
     };
     
-    let end_time = crate::time::get_time_ns();
+    let end_time = crate::subsystems::time::get_time_ns();
     
     // Update operation status
     {
@@ -685,7 +685,7 @@ fn queue_aio_operation(aiocb_ptr: *mut aiocb, operation: AioOperation, pid: usiz
         file_idx,
         pid,
         worker_tid: None,
-        queue_time: crate::time::get_time_ns(),
+        queue_time: crate::subsystems::time::get_time_ns(),
         completion_time: None,
     };
     
@@ -726,7 +726,7 @@ fn create_list_operation(aiocb_ptr: *mut aiocb, mode: i32, list_ptr: *const *mut
         file_idx: 0,
         pid,
         worker_tid: None,
-        queue_time: crate::time::get_time_ns(),
+        queue_time: crate::subsystems::time::get_time_ns(),
         completion_time: None,
     };
     
@@ -890,7 +890,7 @@ fn execute_aio_list(operation_id: usize, aiocb_ptr: *mut aiocb) -> Result<isize,
 
 /// Wait for list operations to complete
 fn wait_for_list_completion(list_operation_id: usize, total_operations: usize) {
-    let start_time = crate::time::get_time_ns();
+    let start_time = crate::subsystems::time::get_time_ns();
     let timeout_ns = 30_000_000_000; // 30 seconds timeout
     
     loop {
@@ -910,12 +910,12 @@ fn wait_for_list_completion(list_operation_id: usize, total_operations: usize) {
         }
         
         // Check timeout
-        if crate::time::get_time_ns() - start_time > timeout_ns {
+        if crate::subsystems::time::get_time_ns() - start_time > timeout_ns {
             break;
         }
         
         // Yield CPU
-        if let Some(_scheduler) = crate::microkernel::scheduler::get_scheduler() {
+        if let Some(_scheduler) = crate::subsystems::microkernel::scheduler::get_scheduler() {
             let _ = _scheduler.schedule(0);
         }
     }
@@ -978,7 +978,7 @@ fn queue_aio_operation_internal(aiocb_ptr: *mut aiocb) -> Result<usize, i32> {
         file_idx,
         pid,
         worker_tid: None,
-        queue_time: crate::time::get_time_ns(),
+        queue_time: crate::subsystems::time::get_time_ns(),
         completion_time: None,
     };
     

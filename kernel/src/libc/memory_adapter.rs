@@ -5,8 +5,8 @@
 
 use core::ffi::c_void;
 use core::alloc::Layout;
-use crate::mm::traits::{UnifiedAllocator, CAllocator};
-use crate::mm::allocator::HybridAllocator;
+use crate::subsystems::mm::traits::{UnifiedAllocator, CAllocator};
+use crate::subsystems::mm::allocator::HybridAllocator;
 
 /// libc memory allocator adapter
 /// 
@@ -28,7 +28,7 @@ impl LibcMemoryAdapter {
     /// Create a new libc memory adapter
     pub fn new() -> Self {
         Self {
-            allocator: crate::mm::allocator::get_global_allocator(),
+            allocator: crate::subsystems::mm::allocator::get_global_allocator(),
         }
     }
 

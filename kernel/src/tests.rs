@@ -113,7 +113,7 @@ impl KernelTestRunner {
     
     /// Run all test suites
     pub fn run_all(&self) -> TestResult {
-        let start_time = crate::time::timestamp_nanos();
+        let start_time = crate::subsystems::time::timestamp_nanos();
         let mut total_result = TestResult::default();
         
         crate::println!("[kernel_test] Starting kernel test suite...");
@@ -137,7 +137,7 @@ impl KernelTestRunner {
             }
         }
         
-        let end_time = crate::time::timestamp_nanos();
+        let end_time = crate::subsystems::time::timestamp_nanos();
         total_result.execution_time_ns = end_time - start_time;
         
         self.print_summary(&total_result);
@@ -192,7 +192,7 @@ impl TestSuite for FutexIntegrationTestSuite {
         let mut result = TestResult::default();
         
         // Run basic futex tests
-        if let Err(_) = crate::sync::futex_tests::run_futex_tests() {
+        if let Err(_) = crate::subsystems::sync::futex_tests::run_futex_tests() {
             result.failed_tests += 1;
         } else {
             result.passed_tests += 1;
@@ -200,7 +200,7 @@ impl TestSuite for FutexIntegrationTestSuite {
         result.total_tests += 1;
         
         // Run futex validation
-        if let Err(_) = crate::sync::futex_validation::run_futex_validation() {
+        if let Err(_) = crate::subsystems::sync::futex_validation::run_futex_validation() {
             result.failed_tests += 1;
         } else {
             result.passed_tests += 1;
@@ -209,7 +209,7 @@ impl TestSuite for FutexIntegrationTestSuite {
         
         // Run performance benchmarks if enabled
         if config.enable_benchmarks {
-            if let Err(_) = crate::sync::futex_validation::run_futex_performance_benchmark() {
+            if let Err(_) = crate::subsystems::sync::futex_validation::run_futex_performance_benchmark() {
                 result.failed_tests += 1;
             } else {
                 result.passed_tests += 1;

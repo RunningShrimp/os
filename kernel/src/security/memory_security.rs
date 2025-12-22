@@ -12,7 +12,7 @@ extern crate alloc;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, Ordering};
-use crate::mm::memory_isolation::{
+use crate::subsystems::mm::memory_isolation::{
     ProtectionDomainId, MemoryRegionId, 
     DomainPermissions, MemoryRegionType, AccessValidationResult,
     get_memory_isolation_manager, init_memory_isolation
@@ -565,11 +565,11 @@ pub enum SecurityError {
     /// Secure region operation failed
     SecureRegionOperationFailed,
     /// Memory isolation error
-    MemoryIsolationError(crate::mm::memory_isolation::MemoryIsolationError),
+    MemoryIsolationError(crate::subsystems::mm::memory_isolation::MemoryIsolationError),
 }
 
 /// Global security manager instance
-static SECURITY_MANAGER: crate::sync::Mutex<SecurityManager> = crate::sync::Mutex::new(SecurityManager::new());
+static SECURITY_MANAGER: crate::subsystems::sync::Mutex<SecurityManager> = crate::subsystems::sync::Mutex::new(SecurityManager::new());
 
 /// Initialize security system
 pub fn init_security() -> Result<(), SecurityError> {
@@ -579,7 +579,7 @@ pub fn init_security() -> Result<(), SecurityError> {
 }
 
 /// Get security manager
-pub fn get_security_manager() -> &'static crate::sync::Mutex<SecurityManager> {
+pub fn get_security_manager() -> &'static crate::subsystems::sync::Mutex<SecurityManager> {
     &SECURITY_MANAGER
 }
 

@@ -10,10 +10,10 @@ use core::ptr;
 
 use crate::process::elf::{ElfLoader, ElfError, AuxEntry, AuxType, PT_INTERP, PT_DYNAMIC};
 use crate::process::dynamic_linker::DynamicLinker;
-use crate::mm::{kalloc, kfree, PAGE_SIZE};
+use crate::subsystems::mm::{kalloc, kfree, PAGE_SIZE};
 use crate::process::{myproc, TrapFrame, PROC_TABLE};
-use crate::mm::vm::arch::PageTable;
-use crate::mm::vm::{activate, map_pages, flags, copyout, PTE_COUNT};
+use crate::subsystems::mm::vm::arch::PageTable;
+use crate::subsystems::mm::vm::{activate, map_pages, flags, copyout, PTE_COUNT};
 use crate::reliability::errno::{errno_neg, ENOENT};
 use alloc::string::String as AString;
 
@@ -91,6 +91,11 @@ pub fn exec(elf_data: &[u8], argv: &[&[u8]], envp: &[&[u8]], execfn: Option<&[u8
     // Get current process PID
     let pid = myproc().ok_or(ExecError::NoProcess)?;
     
+    // Initialize ASLR for this process if not already initialized
+    if crate::security::is_aslr_enabled() {
+        let _ = crate::security::init_process_aslr_by_pid(pid as u64);
+    }
+    
     // Create new page table
     let new_pagetable = create_user_pagetable()?;
     
@@ -118,8 +123,27 @@ pub fn exec(elf_data: &[u8], argv: &[&[u8]], envp: &[&[u8]], execfn: Option<&[u8
         Some(pa)
     })?;
     
+    // Randomize stack base address if ASLR is enabled
+    let stack_top = if crate::security::is_aslr_enabled() {
+        // Get architecture-specific user stack top
+        let base_stack_top = crate::arch::memory_layout::user_stack_top();
+        // Randomize stack top address
+        match crate::security::randomize_memory_region(
+            pid as u64,
+            crate::types::stubs::VirtAddr::new(base_stack_top),
+            USER_STACK_SIZE,
+            PAGE_SIZE,
+            crate::security::aslr::MemoryRegionType::Stack,
+        ) {
+            Ok(randomized_addr) => randomized_addr.as_usize(),
+            Err(_) => base_stack_top, // Fallback to base address
+        }
+    } else {
+        USER_STACK_TOP
+    };
+    
     // Set up user stack pages
-    let stack_bottom = USER_STACK_TOP - USER_STACK_SIZE;
+    let stack_bottom = stack_top - USER_STACK_SIZE;
     for offset in (0..USER_STACK_SIZE).step_by(PAGE_SIZE) {
         let pa = kalloc();
         if pa.is_null() { return Err(ExecError::OutOfMemory); }
@@ -179,7 +203,28 @@ pub fn exec(elf_data: &[u8], argv: &[&[u8]], envp: &[&[u8]], execfn: Option<&[u8
         // Copy PHDR bytes
         unsafe { copyout(new_pagetable, phdr_addr, elf_data.as_ptr().add(hdr.e_phoff as usize), phdr_size).map_err(|_| ExecError::OutOfMemory)?; }
     }
-    let dynbase = if hdr.e_type as u16 == crate::process::elf::ET_DYN || elf_info.interp.is_some() { 0x400000usize } else { elf_info.base };
+    // Randomize executable base address if ASLR is enabled and it's a PIE or dynamic executable
+    let dynbase = if hdr.e_type as u16 == crate::process::elf::ET_DYN || elf_info.interp.is_some() {
+        let base_addr = 0x400000usize; // Default base for PIE executables
+        if crate::security::is_aslr_enabled() {
+            // Randomize PIE executable base address
+            match crate::security::randomize_memory_region(
+                pid as u64,
+                crate::types::stubs::VirtAddr::new(base_addr),
+                0x2000000, // 32MB range for randomization
+                PAGE_SIZE,
+                crate::security::aslr::MemoryRegionType::Executable,
+            ) {
+                Ok(randomized_addr) => randomized_addr.as_usize(),
+                Err(_) => base_addr, // Fallback to base address
+            }
+        } else {
+            base_addr
+        }
+    } else {
+        // Static executable - use original base
+        elf_info.base
+    };
     let mut auxv = [
         AuxEntry::new(AuxType::Pagesz, PAGE_SIZE),
         AuxEntry::new(AuxType::Entry, hdr.e_entry as usize),
@@ -187,7 +232,7 @@ pub fn exec(elf_data: &[u8], argv: &[&[u8]], envp: &[&[u8]], execfn: Option<&[u8
         AuxEntry::new(AuxType::Phent, hdr.e_phentsize as usize),
         AuxEntry::new(AuxType::Phdr, phdr_addr),
         AuxEntry::new(AuxType::Base, dynbase),
-        AuxEntry::new(AuxType::Clktck, crate::time::TIMER_FREQ as usize),
+        AuxEntry::new(AuxType::Clktck, crate::subsystems::time::TIMER_FREQ as usize),
         AuxEntry::new(AuxType::Random, 0),
         AuxEntry::new(AuxType::Platform, 0),
         AuxEntry::new(AuxType::Hwcap, hwcap()),
@@ -196,8 +241,8 @@ pub fn exec(elf_data: &[u8], argv: &[&[u8]], envp: &[&[u8]], execfn: Option<&[u8
         AuxEntry::new(AuxType::Execfn, 0),
         AuxEntry::null(),
     ];
-    // Push arguments onto actual user stack memory
-    let (sp, argc, argv_ptr) = write_args_to_stack(new_pagetable, USER_STACK_TOP, argv, &mut auxv, envp, execfn, Some(platform_bytes()))?;
+    // Push arguments onto actual user stack memory (use randomized stack_top)
+    let (sp, argc, argv_ptr) = write_args_to_stack(new_pagetable, stack_top, argv, &mut auxv, envp, execfn, Some(platform_bytes()))?;
     
     let entry = elf_info.entry;
     
@@ -213,7 +258,7 @@ pub fn exec(elf_data: &[u8], argv: &[&[u8]], envp: &[&[u8]], execfn: Option<&[u8
             
             // Install new page table
             proc.pagetable = new_pagetable;
-            proc.sz = USER_STACK_TOP;
+            proc.sz = stack_top;
             
             // Set up trapframe for return to user
             let tf = proc.trapframe;
@@ -327,7 +372,7 @@ unsafe fn free_user_pages_recursive(pt: *mut PageTable, level: usize, max_level:
 
         // Check if PTE is valid
         #[cfg(target_arch = "riscv64")]
-        let valid = (pte & crate::mm::vm::flags::PTE_V) != 0;
+        let valid = (pte & crate::subsystems::mm::vm::flags::PTE_V) != 0;
 
         #[cfg(target_arch = "aarch64")]
         let valid = (pte & (1 << 0)) != 0; // DESC_VALID
@@ -341,7 +386,7 @@ unsafe fn free_user_pages_recursive(pt: *mut PageTable, level: usize, max_level:
 
         // Check if this is a user page (not kernel)
         #[cfg(target_arch = "riscv64")]
-        let is_user = (pte & crate::mm::vm::flags::PTE_U) != 0;
+        let is_user = (pte & crate::subsystems::mm::vm::flags::PTE_U) != 0;
 
         #[cfg(target_arch = "aarch64")]
         let is_user = (pte & (1 << 6)) != 0; // DESC_AP_USER
@@ -356,7 +401,7 @@ unsafe fn free_user_pages_recursive(pt: *mut PageTable, level: usize, max_level:
         if level == max_level {
             // This is a leaf PTE pointing to a page - free it
             #[cfg(target_arch = "riscv64")]
-            let pa = crate::mm::vm::riscv64::pte_to_pa(pte);
+            let pa = crate::subsystems::mm::vm::riscv64::pte_to_pa(pte);
 
             #[cfg(not(target_arch = "riscv64"))]
             let pa = pte & !0xFFF;
@@ -367,7 +412,7 @@ unsafe fn free_user_pages_recursive(pt: *mut PageTable, level: usize, max_level:
         } else {
             // This is an intermediate PTE - recurse
             #[cfg(target_arch = "riscv64")]
-            let next_pt = crate::mm::vm::riscv64::pte_to_pa(pte) as *mut PageTable;
+            let next_pt = crate::subsystems::mm::vm::riscv64::pte_to_pa(pte) as *mut PageTable;
 
             #[cfg(not(target_arch = "riscv64"))]
             let next_pt = (pte & !0xFFF) as *mut PageTable;

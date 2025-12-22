@@ -396,6 +396,32 @@ impl Packet {
         // payload and size already set by from_bytes
         Ok(p)
     }
+
+    /// Construct a packet directly from an existing buffer (zero-copy handoff)
+    pub fn from_buffer(buffer: PacketBuffer, packet_type: PacketType) -> Self {
+        Self {
+            buffer,
+            packet_type,
+            interface_id: None,
+            timestamp: 0,
+            protocol: match packet_type {
+                PacketType::Ethernet => alloc::string::String::from("ETHERNET"),
+                PacketType::Arp => alloc::string::String::from("ARP"),
+                PacketType::Ipv4 => alloc::string::String::from("IPv4"),
+                PacketType::Icmp => alloc::string::String::from("ICMP"),
+                PacketType::Udp => alloc::string::String::from("UDP"),
+                PacketType::Tcp => alloc::string::String::from("TCP"),
+                PacketType::Raw => alloc::string::String::from("RAW"),
+            },
+            src_ip: alloc::string::String::from("0.0.0.0"),
+            dst_ip: alloc::string::String::from("0.0.0.0"),
+            src_port: 0,
+            dst_port: 0,
+            tcp_flags: alloc::string::String::new(),
+            payload: Vec::new(),
+            size: buffer.len(),
+        }
+    }
 }
 
 impl core::fmt::Debug for Packet {
@@ -488,6 +514,32 @@ impl PacketPool {
             self.free_buffers.push(buffer);
         }
         // If pool is full, buffer will be dropped and memory freed
+    }
+
+    /// Allocate a batch of packet buffers
+    pub fn allocate_batch(&mut self, count: usize) -> Result<Vec<PacketBuffer>, PacketError> {
+        let mut out = Vec::with_capacity(count);
+        for _ in 0..count {
+            match self.allocate() {
+                Ok(buf) => out.push(buf),
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(out)
+    }
+
+    /// Return a batch of packet buffers to the pool
+    pub fn deallocate_batch(&mut self, buffers: Vec<PacketBuffer>) {
+        for buf in buffers {
+            self.deallocate(buf);
+        }
+    }
+
+    /// Allocate a DMA-capable buffer and expose its raw pointer/len for zero-copy fill.
+    pub fn allocate_dma(&mut self) -> Result<(PacketBuffer, *mut u8, usize), PacketError> {
+        let mut buf = self.allocate()?;
+        let (ptr, len) = buf.as_dma_buffer();
+        Ok((buf, ptr, len))
     }
 
     /// Get pool statistics

@@ -291,7 +291,7 @@ impl SyscallService for FilesystemService {
         self.update_stats(operation);
 
         // Dispatch to appropriate handler
-        super::dispatch(syscall_number, args).map_err(|e| KernelError::Syscall(e))
+        super::dispatch::dispatch(syscall_number, args)
     }
 
     fn priority(&self) -> u32 {

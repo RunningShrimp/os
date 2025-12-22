@@ -5,10 +5,10 @@ extern crate alloc;
 /// This module implements signature-based intrusion detection using
 /// pattern matching and rule-based detection.
 
-use crate::sync::{SpinLock, Mutex};
+use crate::subsystems::sync::{SpinLock, Mutex};
 use crate::collections::HashMap;
 use crate::compat::DefaultHasherBuilder;
-use crate::time::{SystemTime, UNIX_EPOCH};
+use crate::subsystems::time::{SystemTime, UNIX_EPOCH};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use alloc::string::String;

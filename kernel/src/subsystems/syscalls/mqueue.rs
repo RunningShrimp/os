@@ -69,7 +69,7 @@ fn sys_mq_open(args: &[u64]) -> SyscallResult {
     
     let mut name_bytes = vec![0u8; name_len];
     unsafe {
-        match crate::mm::vm::copyin(pagetable, name_bytes.as_mut_ptr(), name_ptr as usize, name_len) {
+        match crate::subsystems::mm::vm::copyin(pagetable, name_bytes.as_mut_ptr(), name_ptr as usize, name_len) {
             Ok(_) => {},
             Err(_) => return Err(SyscallError::BadAddress),
         }
@@ -87,7 +87,7 @@ fn sys_mq_open(args: &[u64]) -> SyscallResult {
         // Copy attributes from user space
         let mut attr_bytes = [0u8; core::mem::size_of::<MqAttr>()];
         unsafe {
-            match crate::mm::vm::copyin(pagetable, attr_bytes.as_mut_ptr(), attr_ptr as usize, attr_bytes.len()) {
+            match crate::subsystems::mm::vm::copyin(pagetable, attr_bytes.as_mut_ptr(), attr_ptr as usize, attr_bytes.len()) {
                 Ok(_) => {},
                 Err(_) => return Err(SyscallError::BadAddress),
             }
@@ -248,7 +248,7 @@ fn sys_mq_timedsend(args: &[u64]) -> SyscallResult {
     // Copy timeout from user space
     let mut timeout_bytes = [0u8; core::mem::size_of::<crate::posix::Timespec>()];
     unsafe {
-        match crate::mm::vm::copyin(pagetable, timeout_bytes.as_mut_ptr(), timeout_ptr as usize, timeout_bytes.len()) {
+        match crate::subsystems::mm::vm::copyin(pagetable, timeout_bytes.as_mut_ptr(), timeout_ptr as usize, timeout_bytes.len()) {
             Ok(_) => {},
             Err(_) => return Err(SyscallError::BadAddress),
         }
@@ -355,7 +355,7 @@ fn sys_mq_timedreceive(args: &[u64]) -> SyscallResult {
     // Copy timeout from user space
     let mut timeout_bytes = [0u8; core::mem::size_of::<crate::posix::Timespec>()];
     unsafe {
-        match crate::mm::vm::copyin(pagetable, timeout_bytes.as_mut_ptr(), timeout_ptr as usize, timeout_bytes.len()) {
+        match crate::subsystems::mm::vm::copyin(pagetable, timeout_bytes.as_mut_ptr(), timeout_ptr as usize, timeout_bytes.len()) {
             Ok(_) => {},
             Err(_) => return Err(SyscallError::BadAddress),
         }
@@ -492,7 +492,7 @@ fn sys_mq_notify(args: &[u64]) -> SyscallResult {
     // Copy notification from user space
     let mut notify_bytes = [0u8; core::mem::size_of::<MqNotify>()];
     unsafe {
-        match crate::mm::vm::copyin(pagetable, notify_bytes.as_mut_ptr(), notify_ptr as usize, notify_bytes.len()) {
+        match crate::subsystems::mm::vm::copyin(pagetable, notify_bytes.as_mut_ptr(), notify_ptr as usize, notify_bytes.len()) {
             Ok(_) => {},
             Err(_) => return Err(SyscallError::BadAddress),
         }

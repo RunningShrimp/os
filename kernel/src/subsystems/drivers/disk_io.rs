@@ -11,7 +11,7 @@ use alloc::string::String;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicU64, AtomicU32, AtomicBool, AtomicU8, Ordering};
-use crate::sync::{Sleeplock, Mutex};
+use crate::subsystems::sync::{Sleeplock, Mutex};
 use crate::subsystems::drivers::{
     Driver, DriverInfo, DriverStatus, DeviceInfo, DeviceType, DeviceStatus,
     DeviceId, IoOperation, IoResult, InterruptInfo, DeviceResources,

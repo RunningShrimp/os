@@ -7,7 +7,7 @@ use alloc::string::String;
 use alloc::collections::BTreeMap;
 use core::hash::{Hash, Hasher};
 use crate::drivers::{BlockDevice, RamDisk};
-use crate::sync::{Sleeplock, Mutex};
+use crate::subsystems::sync::{Sleeplock, Mutex};
 
 /// Block size in bytes
 pub const BSIZE: usize = 1024;

@@ -92,7 +92,7 @@ impl WebNotificationApi {
     
     /// Show notification
     pub fn show(&mut self, title: &str, body: &str, icon: Option<&str>) -> Result<String, i32> {
-        let id = alloc::format!("notif-{}", crate::time::hrtime_nanos());
+        let id = alloc::format!("notif-{}", crate::subsystems::time::hrtime_nanos());
         let notification = Notification {
             id: id.clone(),
             title: title.to_string(),
@@ -143,7 +143,7 @@ impl WebSystemApi {
 }
 
 /// Global web system API instance
-static WEB_SYSTEM_API: crate::sync::Mutex<Option<WebSystemApi>> = crate::sync::Mutex::new(None);
+static WEB_SYSTEM_API: crate::subsystems::sync::Mutex<Option<WebSystemApi>> = crate::subsystems::sync::Mutex::new(None);
 
 /// Initialize web system API
 pub fn init_web_system_api() -> Result<(), i32> {
@@ -156,8 +156,8 @@ pub fn init_web_system_api() -> Result<(), i32> {
 }
 
 /// Get web system API
-pub fn get_web_system_api() -> &'static crate::sync::Mutex<WebSystemApi> {
-    static INIT_ONCE: crate::sync::Once = crate::sync::Once::new();
+pub fn get_web_system_api() -> &'static crate::subsystems::sync::Mutex<WebSystemApi> {
+    static INIT_ONCE: crate::subsystems::sync::Once = crate::subsystems::sync::Once::new();
     INIT_ONCE.call_once(|| {
         let mut api = WEB_SYSTEM_API.lock();
         if api.is_none() {
@@ -166,7 +166,7 @@ pub fn get_web_system_api() -> &'static crate::sync::Mutex<WebSystemApi> {
     });
     
     unsafe {
-        &*(WEB_SYSTEM_API.lock().as_ref().unwrap() as *const WebSystemApi as *const crate::sync::Mutex<WebSystemApi>)
+        &*(WEB_SYSTEM_API.lock().as_ref().unwrap() as *const WebSystemApi as *const crate::subsystems::sync::Mutex<WebSystemApi>)
     }
 }
 

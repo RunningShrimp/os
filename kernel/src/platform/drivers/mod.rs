@@ -12,7 +12,7 @@ pub mod nvme;
 pub mod usb;
 pub mod virtio_gpu;
 
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::posix;
 
 // Re-export driver manager functions
@@ -108,7 +108,7 @@ impl VirtioBlk {
     /// Probe for VirtIO device
     pub fn probe(base: usize) -> bool {
         // Check magic number
-        let magic = crate::mm::mmio_read32(base as *const u32);
+        let magic = crate::subsystems::mm::mmio_read32(base as *const u32);
         magic == 0x74726976 // "virt"
     }
 }

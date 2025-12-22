@@ -268,7 +268,7 @@ impl FilePermissions {
     /// Create new file permissions with default values
     pub fn new(uid: u32, gid: u32, is_directory: bool) -> Self {
         let mode = if is_directory { DEFAULT_DIR_PERMS } else { DEFAULT_FILE_PERMS };
-        let now = crate::time::get_timestamp();
+        let now = crate::subsystems::time::get_timestamp();
         
         Self {
             uid,
@@ -391,12 +391,12 @@ impl FilePermissions {
 
     /// Update access time
     pub fn update_access_time(&mut self) {
-        self.access_time = crate::time::get_timestamp();
+        self.access_time = crate::subsystems::time::get_timestamp();
     }
 
     /// Update modification time
     pub fn update_modification_time(&mut self) {
-        self.modification_time = crate::time::get_timestamp();
+        self.modification_time = crate::subsystems::time::get_timestamp();
     }
 
     /// Set permissions
@@ -786,4 +786,4 @@ pub fn can_delete_file(perms: &FilePermissions, parent_perms: &FilePermissions) 
     true
 }
 
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;

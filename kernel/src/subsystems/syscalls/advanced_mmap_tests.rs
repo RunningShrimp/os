@@ -5,7 +5,7 @@ mod tests {
     use super::*;
     use crate::syscalls::common::SyscallError;
     use crate::posix;
-    use crate::mm::vm::PAGE_SIZE;
+    use crate::subsystems::mm::vm::PAGE_SIZE;
 
     #[test]
     fn test_advanced_mmap_basic() {

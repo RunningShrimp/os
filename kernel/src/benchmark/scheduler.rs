@@ -5,7 +5,7 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use crate::time::hrtime_nanos;
+use crate::subsystems::time::hrtime_nanos;
 
 /// Scheduler benchmark results
 #[derive(Debug, Clone)]

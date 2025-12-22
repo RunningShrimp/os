@@ -10,7 +10,7 @@ use alloc::vec::Vec;
 use alloc::boxed::Box;
 use core::sync::atomic::{AtomicUsize, AtomicU64, AtomicPtr, Ordering};
 use core::cell::UnsafeCell;
-use crate::sync::{Mutex, RawSpinLock};
+use crate::subsystems::sync::{Mutex, RawSpinLock};
 use core::ops::{Deref, DerefMut};
 use core::ptr::null_mut;
 use core::time::Duration;
@@ -57,7 +57,8 @@ impl MutexState {
             waiters: UnsafeCell::new(0),
             priority_ceiling: 0,
             recursive: false,
-            debug_mode: false,
+            // Enable deadlock detection by default in debug builds
+            debug_mode: cfg!(debug_assertions),
         }
     }
 }

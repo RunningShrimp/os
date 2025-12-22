@@ -39,13 +39,13 @@ pub fn test_syscall_performance_comparison() -> TestResult {
     let args_empty = [];
     
     // Test getpid performance (has fast path)
-    let start_time = crate::time::get_ticks();
+    let start_time = crate::subsystems::time::get_ticks();
     
     for _ in 0..iterations {
         let _ = dispatch(SYS_GETPID as usize, &args_empty);
     }
     
-    let end_time = crate::time::get_ticks();
+    let end_time = crate::subsystems::time::get_ticks();
     let elapsed = end_time - start_time;
     let avg_time_getpid = elapsed / iterations;
     
@@ -56,13 +56,13 @@ pub fn test_syscall_performance_comparison() -> TestResult {
     // but we can test the fast path rejection behavior
     let args_read = [0usize, 0x10000000, 1024];
     
-    let start_time = crate::time::get_ticks();
+    let start_time = crate::subsystems::time::get_ticks();
     
     for _ in 0..iterations {
         let _ = dispatch(SYS_READ as usize, &args_read);
     }
     
-    let end_time = crate::time::get_ticks();
+    let end_time = crate::subsystems::time::get_ticks();
     let elapsed = end_time - start_time;
     let avg_time_read = elapsed / iterations;
     
@@ -118,7 +118,7 @@ pub fn test_syscall_stress() -> TestResult {
     let args = [];
     
     // Test with getpid (fast path)
-    let start_time = crate::time::get_ticks();
+    let start_time = crate::subsystems::time::get_ticks();
     
     for i in 0..iterations {
         let _ = dispatch(SYS_GETPID as usize, &args);
@@ -129,7 +129,7 @@ pub fn test_syscall_stress() -> TestResult {
         }
     }
     
-    let end_time = crate::time::get_ticks();
+    let end_time = crate::subsystems::time::get_ticks();
     let total_time = end_time - start_time;
     
     crate::println!("Stress test completed: {} iterations in {} ticks (avg: {} ticks/syscall)", 

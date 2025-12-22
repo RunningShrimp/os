@@ -403,7 +403,7 @@ impl TcpSocketWrapper {
         // Send via TCP connection if available
         if let Some(ref _connection) = self.connection {
             // Mutex在当前作用域中未使用，暂时注释掉
-            // use crate::sync::Mutex;
+            // use crate::subsystems::sync::Mutex;
             // Get mutable access to connection
             // Note: This requires proper synchronization in real implementation
             // For now, we'll use the regular send path but with optimized buffer
@@ -451,7 +451,7 @@ impl TcpSocketWrapper {
         // Receive from TCP connection if available
         if let Some(ref _connection) = self.connection {
             // Mutex在当前作用域中未使用，暂时注释掉
-            // use crate::sync::Mutex;
+            // use crate::subsystems::sync::Mutex;
             
             // In a real zero-copy implementation:
             // 1. Prepare user buffer for DMA
@@ -817,7 +817,7 @@ impl SocketEntry {
 /// Get global socket manager
 pub fn socket_manager() -> &'static mut TcpConnectionManager {
     static mut MANAGER: Option<TcpConnectionManager> = None;
-    static INIT: crate::sync::Once = crate::sync::Once::new();
+    static INIT: crate::subsystems::sync::Once = crate::subsystems::sync::Once::new();
 
     unsafe {
         INIT.call_once(|| {

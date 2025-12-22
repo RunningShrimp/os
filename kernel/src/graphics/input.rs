@@ -7,7 +7,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicU32, AtomicBool, Ordering};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::reliability::errno::{EINVAL, ENOMEM};
 use crate::graphics::surface::SurfaceId;
 
@@ -291,7 +291,7 @@ pub fn init_input_manager() -> Result<(), i32> {
 
 /// Get input manager
 pub fn get_input_manager() -> &'static InputManager {
-    static INIT_ONCE: crate::sync::Once = crate::sync::Once::new();
+    static INIT_ONCE: crate::subsystems::sync::Once = crate::subsystems::sync::Once::new();
     INIT_ONCE.call_once(|| {
         let mut manager = INPUT_MANAGER.lock();
         if manager.is_none() {

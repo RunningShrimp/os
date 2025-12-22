@@ -7,8 +7,8 @@ extern crate alloc;
 use alloc::sync::Arc;
 use alloc::collections::BTreeMap;
 
-use crate::mm::PAGE_SIZE;
-use crate::sync::Sleeplock;
+use crate::subsystems::mm::PAGE_SIZE;
+use crate::subsystems::sync::Sleeplock;
 use crate::fs::file::{FileType, FILE_TABLE};
 
 /// Pipe buffer size

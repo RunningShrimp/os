@@ -4,6 +4,9 @@
 
 use nos_api::Result;
 
+/// Kernel initialization module
+pub mod init;
+
 /// 内核版本信息
 pub const KERNEL_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const KERNEL_NAME: &str = "NOS";
@@ -82,7 +85,7 @@ pub fn initialize_kernel() -> Result<()> {
     crate::trap::initialize()?;
     
     // 初始化同步原语
-    crate::sync::initialize()?;
+    crate::subsystems::sync::initialize()?;
     
     Ok(())
 }

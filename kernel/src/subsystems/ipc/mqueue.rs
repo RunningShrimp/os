@@ -129,14 +129,14 @@ impl MessageQueue {
             stats: Mutex::new(MqStats::default()),
             waiting_senders: Mutex::new(Vec::new()),
             waiting_receivers: Mutex::new(Vec::new()),
-            last_activity: AtomicU64::new(crate::time::timestamp_nanos()),
+            last_activity: AtomicU64::new(crate::subsystems::time::timestamp_nanos()),
         }
     }
 
     /// Send a message to the queue
     pub fn send(&self, msg: MqMessage, timeout_ms: u32) -> Result<(), MqError> {
         // Update last activity
-        self.last_activity.store(crate::time::timestamp_nanos(), Ordering::Relaxed);
+        self.last_activity.store(crate::subsystems::time::timestamp_nanos(), Ordering::Relaxed);
 
         // Check if queue is open
         if !self.open.load(Ordering::Relaxed) {
@@ -165,7 +165,7 @@ impl MessageQueue {
                 drop(messages);
 
                 // Wait for space or timeout
-                let start_time = crate::time::timestamp_nanos();
+                let start_time = crate::subsystems::time::timestamp_nanos();
                 loop {
                     // Check if space is available
                     {
@@ -178,7 +178,7 @@ impl MessageQueue {
                     }
 
                     // Check timeout
-                    let elapsed = (crate::time::timestamp_nanos() - start_time) / 1000000;
+                    let elapsed = (crate::subsystems::time::timestamp_nanos() - start_time) / 1000000;
                     if elapsed >= timeout_ms as u64 {
                         // Remove from waiting senders
                         self.waiting_senders.lock().retain(|&pid| pid != current_pid);
@@ -226,7 +226,7 @@ impl MessageQueue {
     /// Receive a message from the queue
     pub fn receive(&self, max_size: usize, timeout_ms: u32) -> Result<MqMessage, MqError> {
         // Update last activity
-        self.last_activity.store(crate::time::timestamp_nanos(), Ordering::Relaxed);
+        self.last_activity.store(crate::subsystems::time::timestamp_nanos(), Ordering::Relaxed);
 
         // Check if queue is open
         if !self.open.load(Ordering::Relaxed) {
@@ -234,7 +234,7 @@ impl MessageQueue {
         }
 
         // Wait for message if queue is empty
-        let start_time = crate::time::timestamp_nanos();
+        let start_time = crate::subsystems::time::timestamp_nanos();
         let msg = loop {
             {
                 let mut messages = self.messages.lock();
@@ -249,7 +249,7 @@ impl MessageQueue {
                         stats.total_messages_received += 1;
                         
                         // Update wait time statistics
-                        let wait_time = (crate::time::timestamp_nanos() - start_time) / 1000;
+                        let wait_time = (crate::subsystems::time::timestamp_nanos() - start_time) / 1000;
                         stats.total_wait_time_us += wait_time;
                         stats.max_wait_time_us = stats.max_wait_time_us.max(wait_time);
                     }
@@ -271,7 +271,7 @@ impl MessageQueue {
             }
 
             // Check timeout
-            let elapsed = (crate::time::timestamp_nanos() - start_time) / 1000000;
+            let elapsed = (crate::subsystems::time::timestamp_nanos() - start_time) / 1000000;
             if elapsed >= timeout_ms as u64 {
                 // Remove from waiting receivers
                 let current_pid = crate::process::myproc().unwrap_or(0);

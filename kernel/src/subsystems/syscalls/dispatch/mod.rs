@@ -7,7 +7,8 @@
 //! # Architecture
 //!
 //! The dispatch layer consists of:
-//! - Main dispatcher implementation
+//! - Unified dispatcher (recommended, consolidates all features)
+//! - Legacy dispatcher implementations (deprecated, will be removed)
 //! - Fast path for common syscalls
 //! - Performance monitoring
 //! - Error handling and recovery
@@ -19,15 +20,29 @@
 //! - **Monitoring**: Track performance and errors
 //! - **Resilience**: Graceful error handling
 
+// Unified dispatcher (recommended)
+pub mod unified;
+
+// Legacy dispatcher implementations (deprecated, will be removed)
+pub mod dispatcher;
+pub mod registry;
+pub mod traits;
+
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 
 use super::interface::{
     SyscallDispatcher, SyscallHandler, SyscallContext, SyscallError,
     SyscallResult, SyscallCategory, get_syscall_category,
+};
+
+// Re-export unified dispatcher as the default
+pub use unified::{
+    UnifiedSyscallDispatcher, UnifiedDispatcherConfig, DispatchStats,
+    init_unified_dispatcher, get_unified_dispatcher, unified_batch_dispatch,
 };
 
 /// Dispatcher configuration
@@ -305,13 +320,22 @@ impl SyscallDispatcherImpl {
             return None;
         }
         
+        // Use fast-path registry for hot syscalls
+        use crate::subsystems::syscalls::fast_path::hot_syscalls;
+        hot_syscalls::init_fast_path_registry();
+        
+        if let Some(result) = hot_syscalls::dispatch_fast_path(syscall_number, args) {
+            self.stats.record_success(10); // Fast path is very fast
+            return Some(result);
+        }
+        
+        // Fallback to inline fast paths for specific syscalls
         match syscall_number {
-            // Fast path for getpid
+            // Fast path for getpid (fallback if not in registry)
             0x1004 => {
-                self.stats.record_success(10); // Assume 10ns
+                self.stats.record_success(10);
                 Some(Ok(self.context.get_pid() as u64))
             }
-            // Add more fast path syscalls here
             _ => None,
         }
     }

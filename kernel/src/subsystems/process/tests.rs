@@ -23,7 +23,7 @@ pub mod process_tests {
         use crate::process::PROC_TABLE;
 
         // Test that process allocation is O(1)
-        let start_time = crate::time::get_ticks();
+        let start_time = crate::subsystems::time::get_ticks();
         let mut ptable = PROC_TABLE.lock();
 
         // Simulate allocation (actual allocation would require more setup)
@@ -33,7 +33,7 @@ pub mod process_tests {
             test_assert!(result.is_some());
         }
 
-        let end_time = crate::time::get_ticks();
+        let end_time = crate::subsystems::time::get_ticks();
         let duration = end_time - start_time;
 
         // Should be very fast (<100 ticks on test hardware)

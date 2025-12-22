@@ -10,7 +10,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::collections::BTreeMap;
 use crate::drivers::BlockDevice;
-// use crate::sync::{Sleeplock, Mutex};
+// use crate::subsystems::sync::{Sleeplock, Mutex};
 // use crate::subsystems::fs::fs_impl::{BSIZE, BufFlags, Buf, BufCache, CacheKey};
 // use crate::subsystems::fs::ext4::{Ext4SuperBlock, Ext4GroupDesc, Ext4Inode, EXT4_MAGIC};
 // use crate::subsystems::fs::ext4_enhanced::*;
@@ -384,8 +384,37 @@ impl Ext4Persistence {
     
     /// Get current time
     fn get_current_time(&self) -> u64 {
-        // In a real implementation, this would return the current time
-        0
+        // TODO: wire to real time source; for now use monotonic ticks
+        crate::subsystems::time::get_timestamp()
+    }
+
+    /// Apply mount write policy to writeback knobs (interval, thresholds, etc.).
+    fn apply_write_policy(&self) {
+        use crate::subsystems::fs::ext4_enhanced::Ext4WritePolicy;
+        let policy = self.mount_options.write_policy;
+        let mut wb = self.writeback_control.lock();
+        match policy {
+            Ext4WritePolicy::Balanced => {
+                wb.interval = 5;
+                wb.dirty_timeout = 30;
+                wb.max_dirty_blocks = 1024;
+                wb.priority = 5;
+            }
+            Ext4WritePolicy::LatencyOptimized => {
+                // 更激进的合并：更长的超时&更大的批量
+                wb.interval = 10;
+                wb.dirty_timeout = 60;
+                wb.max_dirty_blocks = 4096;
+                wb.priority = 3;
+            }
+            Ext4WritePolicy::Durability => {
+                // 更保守：更短的超时&更小的批量
+                wb.interval = 2;
+                wb.dirty_timeout = 5;
+                wb.max_dirty_blocks = 256;
+                wb.priority = 8;
+            }
+        }
     }
     
     /// Calculate checksum for data
@@ -400,6 +429,8 @@ impl Ext4Persistence {
     
     /// Writeback dirty blocks
     pub fn writeback_dirty_blocks(&self) -> Result<(), &'static str> {
+        // Ensure policy is applied before each cycle (policy may be changed at runtime)
+        self.apply_write_policy();
         let mut wb = self.writeback_control.lock();
         
         if wb.in_progress || wb.dirty_blocks == 0 {
@@ -412,13 +443,26 @@ impl Ext4Persistence {
         
         // Get dirty blocks
         let mut dirty_blocks = self.dirty_blocks.lock();
-        let blocks_to_write: Vec<_> = dirty_blocks
+        // 先按块号排序，便于底层设备做顺序写合并
+        let mut blocks_vec: Vec<_> = dirty_blocks
             .iter()
-            .filter(|(_, block)| {
-                block.dirty && (current_time - block.timestamp) >= wb.dirty_timeout as u64
-            })
+            .filter(|(_, block)| block.dirty)
             .map(|(num, block)| (*num, block.clone()))
             .collect();
+
+        blocks_vec.sort_by_key(|(num, _)| *num);
+
+        // 根据超时和 max_dirty_blocks 选择本轮要刷的子集
+        let mut blocks_to_write = Vec::new();
+        for (num, block) in blocks_vec.into_iter() {
+            if (current_time - block.timestamp) < wb.dirty_timeout as u64 {
+                continue;
+            }
+            blocks_to_write.push((num, block));
+            if blocks_to_write.len() as u32 >= wb.max_dirty_blocks {
+                break;
+            }
+        }
         
         // Release lock before writing
         drop(dirty_blocks);

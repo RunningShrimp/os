@@ -55,7 +55,7 @@ pub extern "C" fn sys_glib_object_instance_create(
         type_id,
         ref_count: AtomicUsize::new(1), // 初始引用计数为1
         object_ptr,
-        created_timestamp: crate::time::get_timestamp() as u64,
+        created_timestamp: crate::subsystems::time::get_timestamp() as u64,
         properties: BTreeMap::new(),
     };
 

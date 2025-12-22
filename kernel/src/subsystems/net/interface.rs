@@ -8,7 +8,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use alloc::string::{String, ToString};
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 
 use super::device::{NetworkDevice, NetworkDeviceType, MacAddr, DeviceError};
 use super::packet::{Packet, PacketType};

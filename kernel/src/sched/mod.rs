@@ -11,7 +11,7 @@ extern crate alloc;
 
 use alloc::collections::VecDeque;
 use core::sync::atomic::{AtomicUsize, AtomicU32, AtomicU64, Ordering};
-use crate::sync::SpinLock;
+use crate::subsystems::sync::SpinLock;
 use crate::arch::cpu_id;
 
 /// 默认时间片（单位：ticks）
@@ -116,7 +116,7 @@ pub mod syscall {
     use super::O1Scheduler;
     use crate::process::thread::Tid;
     use crate::syscalls::common::{SyscallError, SyscallResult};
-    use crate::time::get_time_ns;
+    use crate::subsystems::time::get_time_ns;
     use crate::arch::cpu_id;
 
     /// 用户态 hint 调度：tid, prio, cpu_hint

@@ -1,7 +1,7 @@
 extern crate alloc;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 #[cfg(feature = "posix_layer")]
 use crate::posix;
 
@@ -59,7 +59,7 @@ struct EpollEvent { events: u32, data: u64 }
 pub fn epoll_wait(epfd: i32, events_ptr: usize, maxevents: i32, timeout: i32) -> isize {
     if maxevents <= 0 { return crate::syscalls::E_BADARG; }
     let mut ready = 0;
-    let start = crate::time::get_ticks();
+    let start = crate::subsystems::time::get_ticks();
     loop {
         ready = 0;
         let mut out: Vec<EpollEvent> = Vec::new();
@@ -91,11 +91,11 @@ pub fn epoll_wait(epfd: i32, events_ptr: usize, maxevents: i32, timeout: i32) ->
         }
         if timeout == 0 { return 0; }
         if timeout > 0 {
-            let elapsed = (crate::time::get_ticks() - start) as i32;
+            let elapsed = (crate::subsystems::time::get_ticks() - start) as i32;
             if elapsed >= timeout { return 0; }
         }
-        let target = crate::time::get_ticks() + 1;
-        crate::time::add_sleeper(target, crate::syscalls::POLL_WAKE_CHAN);
+        let target = crate::subsystems::time::get_ticks() + 1;
+        crate::subsystems::time::add_sleeper(target, crate::syscalls::POLL_WAKE_CHAN);
         crate::process::sleep(crate::syscalls::POLL_WAKE_CHAN);
     }
 }

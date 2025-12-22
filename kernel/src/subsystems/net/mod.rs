@@ -13,23 +13,23 @@ pub mod device;
 pub mod arp;
 pub mod ipv4;
 pub mod icmp;
-pub mod icmp_enhanced;
+pub mod icmp_enhanced; // Enhanced ICMP features (optional: extended ICMP types, traceroute, ping)
 pub mod udp;
 pub mod tcp;
+pub mod tcp_enhanced; // Enhanced TCP features (optional: advanced options, SACK, window scaling)
 pub mod route;
-pub mod routing_enhanced;
 pub mod buffer_management;
 pub mod fragment;
 pub mod processor;
 pub mod socket;
 pub mod zero_copy;
-pub mod enhanced_network;
+pub mod enhanced_network; // POSIX-compatible network API (required for socket syscalls)
 
 // 只在需要的地方使用日志系统
 // use crate::{log_info, log_error};
 
 // Import packet pool and other essential types
-use packet::PacketPool;
+use packet::{PacketPool, PacketBuffer, PacketType};
 
 use core::sync::atomic::{AtomicU32, Ordering};
 
@@ -106,6 +106,49 @@ impl NetworkStack {
 
         // Send the packet
         interface.send_packet(packet).map_err(|e| NetworkError::from(e))
+    }
+
+    /// Send a batch of packets; stops on first error and returns number successfully queued.
+    pub fn send_packets_batch(
+        &mut self,
+        packets: &mut [Packet],
+        dest_ip: Ipv4Addr,
+    ) -> Result<usize, NetworkError> {
+        let mut sent = 0usize;
+        for pkt in packets.iter_mut() {
+            // move out packet to avoid double free on error
+            let mut to_send = Packet::new(PacketType::Raw).unwrap_or_else(|_| pkt.clone());
+            core::mem::swap(pkt, &mut to_send);
+            match self.send_packet(to_send, dest_ip) {
+                Ok(_) => sent += 1,
+                Err(e) => return Ok(sent), // caller can retry remaining
+            }
+        }
+        Ok(sent)
+    }
+
+    /// Allocate a DMA-capable TX buffer for zero-copy style fill.
+    pub fn allocate_tx_buffer(&mut self) -> Result<(PacketBuffer, *mut u8, usize), NetworkError> {
+        self.packet_pool
+            .allocate_dma()
+            .map_err(|_| NetworkError::BufferExhausted)
+    }
+
+    /// Send a DMA-prepared buffer as a packet without extra copies.
+    pub fn send_tx_buffer(
+        &mut self,
+        mut buffer: PacketBuffer,
+        packet_type: PacketType,
+        len: usize,
+        dest_ip: Ipv4Addr,
+    ) -> Result<(), NetworkError> {
+        if len > buffer.capacity() {
+            return Err(NetworkError::PacketTooLarge);
+        }
+        unsafe { buffer.set_length(len); }
+        let mut packet = Packet::from_buffer(buffer, packet_type);
+        packet.size = len;
+        self.send_packet(packet, dest_ip)
     }
 
     /// Find the best interface for a destination IP
@@ -313,19 +356,11 @@ pub use self::tcp::{
 };
 pub use self::tcp::state::TcpStateMachine;
 pub use self::tcp::manager::{TcpConnection, TcpConnectionManager};
-pub use self::tcp_ENHANCED::{
+pub use self::tcp_enhanced::{
     EnhancedTcp, TcpConfig, EnhancedTcpStats, TcpOption, TcpOptionKind,
     MssOption, WindowScaleOption, TimestampOption, SackOption, SackBlock
 };
 pub use self::route::{RouteEntry, RoutingTable, RouteManager, RouteLookupResult, RoutingTableStats};
-pub use self::routing_enhanced::{
-    EnhancedRouteEntry, EnhancedRoutingTable, EnhancedRouteManager, RouteSource,
-    RoutePreferences, TrafficEngineeringAttributes, QoSClass, RouteStats,
-    PolicyRoute, MatchCondition, AggregationRule, RedistributionRule,
-    RoutingProtocol, RoutingProtocolError, RoutingProtocolStats, ProtocolState,
-    RedistributionManager, RouteChangeNotification, RouteChangeType,
-    RouteChangeListener, RouteChangeNotifier, RouteSummary
-};
 pub use self::fragment::{FragmentReassembler, Fragmenter, ReassemblyEntry};
 pub use self::processor::{NetworkProcessor, PacketResult};
 pub use self::socket::{
@@ -346,7 +381,7 @@ pub use self::enhanced_network::{
 use alloc::sync::Arc;
 use alloc::string::String;
 use alloc::vec::Vec;
-use crate::sync::Once;
+use crate::subsystems::sync::Once;
 
 // Forward declarations (will be implemented in submodules)
 pub struct Route;
@@ -357,6 +392,7 @@ pub enum NetworkError {
     InvalidPacket,
     BufferExhausted,
     DeviceError,
+    PacketTooLarge,
 }
 
 // Conversion from InterfaceError to NetworkError

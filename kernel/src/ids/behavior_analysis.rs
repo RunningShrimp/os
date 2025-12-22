@@ -5,10 +5,10 @@ extern crate alloc;
 /// This module implements behavioral analysis to detect unusual system
 /// and user behavior that may indicate security threats.
 
-use crate::sync::{SpinLock, Mutex};
+use crate::subsystems::sync::{SpinLock, Mutex};
 use crate::collections::HashMap;
 use crate::compat::DefaultHasherBuilder;
-use crate::time::{SystemTime, UNIX_EPOCH};
+use crate::subsystems::time::{SystemTime, UNIX_EPOCH};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use alloc::string::String;

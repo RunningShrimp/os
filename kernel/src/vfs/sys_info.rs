@@ -4,7 +4,7 @@
 
 extern crate alloc;
 use alloc::{boxed::Box, string::String, sync::Arc};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::vfs::{
     error::*,
     types::*,
@@ -52,10 +52,17 @@ pub fn create_loadavg() -> VfsResult<Arc<dyn InodeOps>> {
     }))))
 }
 
+/// Create /proc/metrics file
+pub fn create_metrics() -> VfsResult<Arc<dyn InodeOps>> {
+    Ok(Arc::new(ProcFsInode::new_file(1006, Box::new(|| {
+        format_metrics()
+    }))))
+}
+
 /// Format /proc/meminfo content
 fn format_meminfo() -> String {
     // Get memory statistics
-    let (free_pages, total_pages) = crate::mm::phys::mem_stats();
+    let (free_pages, total_pages) = crate::subsystems::mm::phys::mem_stats();
     let used_pages = total_pages.saturating_sub(free_pages);
     
     // Convert to KB (assuming page size 4KB)
@@ -135,7 +142,7 @@ fn format_version() -> String {
 /// Format /proc/uptime content
 fn format_uptime() -> String {
     // Get uptime in seconds (convert from milliseconds)
-    let uptime_ms = crate::time::uptime_ms();
+    let uptime_ms = crate::subsystems::time::uptime_ms();
     let uptime_secs = uptime_ms as f64 / 1000.0;
     let uptime_idle = 0.0; // Idle time
     
@@ -158,5 +165,104 @@ fn format_loadavg() -> String {
     drop(proc_table);
     
     format!("{:.2} {:.2} {:.2} {}/{} 0\n", load1, load5, load15, running_procs, total_procs)
+}
+
+/// Format /proc/metrics content
+fn format_metrics() -> String {
+    use crate::monitoring::metrics::get_metrics_collector;
+    
+    let collector = get_metrics_collector();
+    collector.update_system_metrics();
+    let metrics = collector.collect_metrics();
+    
+    // Get error statistics
+    let error_stats = crate::error::get_error_stats();
+    
+    // Get process statistics
+    let proc_table = crate::subsystems::process::manager::PROC_TABLE.lock();
+    let total_processes = proc_table.iter().count();
+    let running_processes = proc_table.iter()
+        .filter(|p| p.state == crate::subsystems::process::manager::ProcState::Running)
+        .count();
+    let sleeping_processes = proc_table.iter()
+        .filter(|p| p.state == crate::subsystems::process::manager::ProcState::Sleeping)
+        .count();
+    let zombie_processes = proc_table.iter()
+        .filter(|p| p.state == crate::subsystems::process::manager::ProcState::Zombie)
+        .count();
+    drop(proc_table);
+    
+    // Get memory statistics
+    let (free_pages, total_pages) = crate::subsystems::mm::phys::mem_stats();
+    let used_pages = total_pages.saturating_sub(free_pages);
+    let page_size = 4096;
+    let total_bytes = total_pages * page_size;
+    let free_bytes = free_pages * page_size;
+    let used_bytes = used_pages * page_size;
+    
+    // Get CPU statistics
+    let cpu_count = crate::cpu::ncpus();
+    
+    // Format metrics in Prometheus-like format
+    let mut output = String::new();
+    
+    // System metrics
+    output.push_str("# HELP system_processes_total Total number of processes\n");
+    output.push_str("# TYPE system_processes_total gauge\n");
+    output.push_str(&format!("system_processes_total {}\n", total_processes));
+    
+    output.push_str("# HELP system_processes_running Number of running processes\n");
+    output.push_str("# TYPE system_processes_running gauge\n");
+    output.push_str(&format!("system_processes_running {}\n", running_processes));
+    
+    output.push_str("# HELP system_processes_sleeping Number of sleeping processes\n");
+    output.push_str("# TYPE system_processes_sleeping gauge\n");
+    output.push_str(&format!("system_processes_sleeping {}\n", sleeping_processes));
+    
+    output.push_str("# HELP system_processes_zombie Number of zombie processes\n");
+    output.push_str("# TYPE system_processes_zombie gauge\n");
+    output.push_str(&format!("system_processes_zombie {}\n", zombie_processes));
+    
+    // Memory metrics
+    output.push_str("# HELP system_memory_total_bytes Total memory in bytes\n");
+    output.push_str("# TYPE system_memory_total_bytes gauge\n");
+    output.push_str(&format!("system_memory_total_bytes {}\n", total_bytes));
+    
+    output.push_str("# HELP system_memory_free_bytes Free memory in bytes\n");
+    output.push_str("# TYPE system_memory_free_bytes gauge\n");
+    output.push_str(&format!("system_memory_free_bytes {}\n", free_bytes));
+    
+    output.push_str("# HELP system_memory_used_bytes Used memory in bytes\n");
+    output.push_str("# TYPE system_memory_used_bytes gauge\n");
+    output.push_str(&format!("system_memory_used_bytes {}\n", used_bytes));
+    
+    // CPU metrics
+    output.push_str("# HELP system_cpu_count Number of CPUs\n");
+    output.push_str("# TYPE system_cpu_count gauge\n");
+    output.push_str(&format!("system_cpu_count {}\n", cpu_count));
+    
+    // Error metrics
+    output.push_str("# HELP system_errors_total Total number of errors\n");
+    output.push_str("# TYPE system_errors_total counter\n");
+    output.push_str(&format!("system_errors_total {}\n", error_stats.total_errors));
+    
+    output.push_str("# HELP system_errors_critical_total Total number of critical errors\n");
+    output.push_str("# TYPE system_errors_critical_total counter\n");
+    output.push_str(&format!("system_errors_critical_total {}\n", error_stats.critical_errors));
+    
+    // Metrics from collector
+    for (name, value) in metrics.iter() {
+        output.push_str(&format!("# HELP {} Metric from metrics collector\n", name));
+        output.push_str(&format!("# TYPE {} gauge\n", name));
+        output.push_str(&format!("{} {}\n", name, value));
+    }
+    
+    // Uptime
+    let uptime_secs = crate::subsystems::time::uptime_ms() as f64 / 1000.0;
+    output.push_str("# HELP system_uptime_seconds System uptime in seconds\n");
+    output.push_str("# TYPE system_uptime_seconds gauge\n");
+    output.push_str(&format!("system_uptime_seconds {:.2}\n", uptime_secs));
+    
+    output
 }
 

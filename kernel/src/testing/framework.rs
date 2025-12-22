@@ -316,14 +316,14 @@ impl TestFramework {
     /// Run specific test suites
     fn run_test_suites(&mut self, suites: Vec<TestSuite>) -> TestFrameworkReport {
         let mut report = TestFrameworkReport::new();
-        let start_time = crate::time::get_ticks();
+        let start_time = crate::subsystems::time::get_ticks();
 
         for suite in suites {
             let suite_report = self.run_test_suite(suite);
             report.add_suite_report(suite_report);
         }
 
-        let end_time = crate::time::get_ticks();
+        let end_time = crate::subsystems::time::get_ticks();
         report.total_execution_time_ms = end_time - start_time;
         report.finalize_report();
 
@@ -338,7 +338,7 @@ impl TestFramework {
     /// Run a single test suite
     fn run_test_suite(&mut self, suite: TestSuite) -> TestSuiteReport {
         let mut suite_report = TestSuiteReport::new(suite.name.clone());
-        let start_time = crate::time::get_ticks();
+        let start_time = crate::subsystems::time::get_ticks();
 
         // Run setup function
         if let Some(setup_fn) = suite.setup_fn {
@@ -361,7 +361,7 @@ impl TestFramework {
             }
         }
 
-        let end_time = crate::time::get_ticks();
+        let end_time = crate::subsystems::time::get_ticks();
         suite_report.execution_time_ms = end_time - start_time;
 
         suite_report
@@ -369,7 +369,7 @@ impl TestFramework {
 
     /// Run a single test case
     fn run_test_case(&mut self, test_case: &TestCase) -> TestResult {
-        let start_time = crate::time::get_ticks();
+        let start_time = crate::subsystems::time::get_ticks();
         let start_memory = self.get_memory_usage();
         let mut metrics = TestMetrics::default();
 
@@ -383,7 +383,7 @@ impl TestFramework {
         // Run the test with timeout
         let result = self.run_with_timeout(test_case.test_fn, timeout);
 
-        let end_time = crate::time::get_ticks();
+        let end_time = crate::subsystems::time::get_ticks();
         let end_memory = self.get_memory_usage();
 
         let execution_time_ms = end_time - start_time;

@@ -30,7 +30,7 @@ pub extern "C" fn sys_glib_epoll_create() -> EpollResult<c_int> {
         epfd,
         source_count: AtomicUsize::new(0),
         max_sources: 1024, // 默认最大1024个事件源
-        created_timestamp: crate::time::get_timestamp() as u64,
+        created_timestamp: crate::subsystems::time::get_timestamp() as u64,
         total_waits: AtomicUsize::new(0),
         total_events: AtomicUsize::new(0),
     };
@@ -221,9 +221,9 @@ pub extern "C" fn sys_glib_epoll_wait(
     };
 
     // 等待事件
-    let start_time = crate::time::get_timestamp();
+    let start_time = crate::subsystems::time::get_timestamp();
     let result = EpollManager::wait(epfd, event_slice, timeout as i32);
-    let wait_time = crate::time::get_timestamp() - start_time;
+    let wait_time = crate::subsystems::time::get_timestamp() - start_time;
 
     // 更新统计信息
     {
@@ -394,7 +394,7 @@ pub extern "C" fn sys_glib_epoll_close(epfd: c_int) -> SyscallResult {
         }
     };
 
-    let uptime = crate::time::get_timestamp() as u64 - created_timestamp;
+    let uptime = crate::subsystems::time::get_timestamp() as u64 - created_timestamp;
 
     crate::println!("[glib_epoll] 实例统计: 总等待={}, 总事件={}, 运行时间={}ms",
         total_waits, total_events, uptime);

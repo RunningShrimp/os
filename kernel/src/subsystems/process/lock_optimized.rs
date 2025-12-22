@@ -1,14 +1,18 @@
-//! 优化的进程表锁定策略
+//! Optimized Process Table Locking Strategy
 //!
-//! 提供高效的进程表锁定机制，包括：
-//! - 减少进程表锁的粒度
-//! - 实现读写锁替代互斥锁
-//! - 优化锁竞争和并发性能
-//! - 支持细粒度锁定
+//! This module provides optimized locking mechanisms for the process table:
+//! - Reduced lock granularity
+//! - Read-write locks instead of mutexes
+//! - Optimized lock contention and concurrency
+//! - Fine-grained locking support
+//!
+//! **Note**: This is an optional optimization module. The main process table
+//! (PROC_TABLE) currently uses Mutex. This module can be used for performance
+//! analysis or future integration if lock contention becomes a bottleneck.
 
 extern crate alloc;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use crate::sync::RwLock;
+use crate::subsystems::sync::RwLock;
 
 /// 锁定统计信息
 #[derive(Debug)]
@@ -241,7 +245,7 @@ impl OptimizedProcessLockManager {
     /// 获取细粒度读锁
     #[inline]
     pub fn acquire_fine_grained_read_lock(&self, lock_type: FineGrainedLockType) -> FineGrainedReadLockGuard {
-        let start_time = crate::time::hrtime_nanos();
+        let start_time = crate::subsystems::time::hrtime_nanos();
         
         let lock = match lock_type {
             FineGrainedLockType::ProcessInfo => &self.fine_grained_locks[0],
@@ -255,7 +259,7 @@ impl OptimizedProcessLockManager {
         // 尝试获取读锁
         let guard = lock.read();
         
-        let end_time = crate::time::hrtime_nanos();
+        let end_time = crate::subsystems::time::hrtime_nanos();
         let wait_time = end_time.saturating_sub(start_time);
         
         if wait_time > 0 {
@@ -274,7 +278,7 @@ impl OptimizedProcessLockManager {
     /// 获取细粒度写锁
     #[inline]
     pub fn acquire_fine_grained_write_lock(&self, lock_type: FineGrainedLockType) -> FineGrainedWriteLockGuard {
-        let start_time = crate::time::hrtime_nanos();
+        let start_time = crate::subsystems::time::hrtime_nanos();
         
         let lock = match lock_type {
             FineGrainedLockType::ProcessInfo => &self.fine_grained_locks[0],
@@ -288,7 +292,7 @@ impl OptimizedProcessLockManager {
         // 尝试获取写锁
         let guard = lock.write();
         
-        let end_time = crate::time::hrtime_nanos();
+        let end_time = crate::subsystems::time::hrtime_nanos();
         let wait_time = end_time.saturating_sub(start_time);
         
         if wait_time > 0 {
@@ -307,11 +311,11 @@ impl OptimizedProcessLockManager {
     /// 获取主表读锁
     #[inline]
     pub fn acquire_main_table_read_lock(&self) -> MainTableReadLockGuard {
-        let start_time = crate::time::hrtime_nanos();
+        let start_time = crate::subsystems::time::hrtime_nanos();
         
         let guard = self.main_table_lock.read();
         
-        let end_time = crate::time::hrtime_nanos();
+        let end_time = crate::subsystems::time::hrtime_nanos();
         let wait_time = end_time.saturating_sub(start_time);
         
         if wait_time > 0 {
@@ -329,11 +333,11 @@ impl OptimizedProcessLockManager {
     /// 获取主表写锁
     #[inline]
     pub fn acquire_main_table_write_lock(&self) -> MainTableWriteLockGuard {
-        let start_time = crate::time::hrtime_nanos();
+        let start_time = crate::subsystems::time::hrtime_nanos();
         
         let guard = self.main_table_lock.write();
         
-        let end_time = crate::time::hrtime_nanos();
+        let end_time = crate::subsystems::time::hrtime_nanos();
         let wait_time = end_time.saturating_sub(start_time);
         
         if wait_time > 0 {
@@ -355,7 +359,7 @@ impl OptimizedProcessLockManager {
             return None; // 已有锁升级在进行
         }
 
-        let start_time = crate::time::hrtime_nanos();
+        let start_time = crate::subsystems::time::hrtime_nanos();
         
         // 释放读锁并尝试获取写锁
         let lock = match read_guard.lock_type {
@@ -373,7 +377,7 @@ impl OptimizedProcessLockManager {
         // 获取写锁
         let write_guard = lock.write();
         
-        let end_time = crate::time::hrtime_nanos();
+        let end_time = crate::subsystems::time::hrtime_nanos();
         let wait_time = end_time.saturating_sub(start_time);
         
         if wait_time > self.config.lock_upgrade_timeout_ns {
@@ -412,7 +416,7 @@ impl OptimizedProcessLockManager {
 
 /// 细粒度读锁守卫
 pub struct FineGrainedReadLockGuard<'a> {
-    _guard: crate::sync::RwLockReadGuard<'a, ()>,
+    _guard: crate::subsystems::sync::RwLockReadGuard<'a, ()>,
     lock_type: FineGrainedLockType,
     stats: &'a LockStats,
 }
@@ -425,7 +429,7 @@ impl<'a> Drop for FineGrainedReadLockGuard<'a> {
 
 /// 细粒度写锁守卫
 pub struct FineGrainedWriteLockGuard<'a> {
-    _guard: crate::sync::RwLockWriteGuard<'a, ()>,
+    _guard: crate::subsystems::sync::RwLockWriteGuard<'a, ()>,
     lock_type: FineGrainedLockType,
     stats: &'a LockStats,
 }
@@ -438,7 +442,7 @@ impl<'a> Drop for FineGrainedWriteLockGuard<'a> {
 
 /// 主表读锁守卫
 pub struct MainTableReadLockGuard<'a> {
-    _guard: crate::sync::RwLockReadGuard<'a, ()>,
+    _guard: crate::subsystems::sync::RwLockReadGuard<'a, ()>,
     stats: &'a LockStats,
 }
 
@@ -450,7 +454,7 @@ impl<'a> Drop for MainTableReadLockGuard<'a> {
 
 /// 主表写锁守卫
 pub struct MainTableWriteLockGuard<'a> {
-    _guard: crate::sync::RwLockWriteGuard<'a, ()>,
+    _guard: crate::subsystems::sync::RwLockWriteGuard<'a, ()>,
     stats: &'a LockStats,
 }
 

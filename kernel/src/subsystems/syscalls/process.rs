@@ -1,25 +1,34 @@
 // Process management syscalls
 
 use crate::syscalls::common::{SyscallError, SyscallResult, extract_args};
-use crate::mm::vm::copyinstr;
+use crate::subsystems::mm::vm::copyinstr;
 use crate::process::{myproc, PROC_TABLE};
 use alloc::string::String;
 use alloc::vec::Vec;
 
 /// Dispatch process management syscalls
 pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
+    // Try fast-path first for hot syscalls
+    // Note: Fast-path registry is initialized once at system startup,
+    // so we don't need to call init_fast_path_registry() here
+    use crate::subsystems::syscalls::fast_path::hot_syscalls;
+    
+    if let Some(result) = hot_syscalls::dispatch_fast_path(syscall_id, args) {
+        return result;
+    }
+    
     match syscall_id {
         // Process creation and management
         0x1000 => sys_fork(args),           // fork
         0x1001 => sys_execve(args),         // execve
         0x1002 => sys_waitpid(args),        // waitpid
         0x1003 => sys_exit(args),           // exit
-        0x1004 => sys_getpid(args),         // getpid
-        0x1005 => sys_getppid(args),        // getppid
+        0x1004 => sys_getpid(args),         // getpid (fallback if fast-path not available)
+        0x1005 => sys_getppid(args),        // getppid (fallback if fast-path not available)
         0x1006 => sys_setuid(args),         // setuid
-        0x1007 => sys_getuid(args),         // getuid
+        0x1007 => sys_getuid(args),         // getuid (fallback if fast-path not available)
         0x1008 => sys_setgid(args),         // setgid
-        0x1009 => sys_getgid(args),         // getgid
+        0x1009 => sys_getgid(args),         // getgid (fallback if fast-path not available)
         0x100A => sys_setsid(args),         // setsid
         0x100B => sys_getsid(args),         // getsid
         0x100C => sys_nice(args),           // nice
@@ -212,7 +221,7 @@ fn sys_waitpid(args: &[u64]) -> SyscallResult {
                                 &exit_status as *const i32 as *mut u8,
                                 core::mem::size_of::<i32>()
                             );
-                            crate::mm::vm::copyout(pagetable, status_ptr, status_slice.as_ptr(), status_slice.len())
+                            crate::subsystems::mm::vm::copyout(pagetable, status_ptr, status_slice.as_ptr(), status_slice.len())
                                 .map_err(|_| SyscallError::BadAddress)?;
                         }
                     }
@@ -260,7 +269,7 @@ fn sys_getppid(_args: &[u64]) -> SyscallResult {
 }
 
 /// Helper function to read argv array from user space
-fn read_user_argv_array(pagetable: *mut crate::mm::vm::PageTable, addr: usize) -> Option<Vec<Vec<u8>>> {
+fn read_user_argv_array(pagetable: *mut crate::subsystems::mm::vm::PageTable, addr: usize) -> Option<Vec<Vec<u8>>> {
     if addr == 0 {
         return None;
     }
@@ -278,7 +287,7 @@ fn read_user_argv_array(pagetable: *mut crate::mm::vm::PageTable, addr: usize) -
 
             // Read pointer to argument string
             let mut arg_ptr_bytes = [0u8; core::mem::size_of::<usize>()];
-            crate::mm::vm::copyin(pagetable, arg_ptr_bytes.as_mut_ptr(), ptr, core::mem::size_of::<usize>())
+            crate::subsystems::mm::vm::copyin(pagetable, arg_ptr_bytes.as_mut_ptr(), ptr, core::mem::size_of::<usize>())
                 .ok()?;
 
             let arg_ptr = usize::from_le_bytes(arg_ptr_bytes);
@@ -532,7 +541,7 @@ pub fn kill_process(pid: u64, signal: i32) -> Result<(), i32> {
 }
 
 // Global hostname storage
-static HOSTNAME: crate::sync::Mutex<[u8; 256]> = crate::sync::Mutex::new([0u8; 256]);
+static HOSTNAME: crate::subsystems::sync::Mutex<[u8; 256]> = crate::subsystems::sync::Mutex::new([0u8; 256]);
 static HOSTNAME_LEN: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(9);
 
 /// Set hostname for a process (stores system-wide)
@@ -727,7 +736,7 @@ fn sys_sched_setparam(args: &[u64]) -> SyscallResult {
 }
 
 fn sys_sched_getparam(args: &[u64]) -> SyscallResult {
-    use crate::mm::vm::copyout;
+    use crate::subsystems::mm::vm::copyout;
     
     let args = extract_args(args, 2)?;
     let target_pid = args[0] as usize;
@@ -760,7 +769,7 @@ fn sys_sched_getparam(args: &[u64]) -> SyscallResult {
 }
 
 fn sys_sched_setaffinity(args: &[u64]) -> SyscallResult {
-    use crate::mm::vm::copyin;
+    use crate::subsystems::mm::vm::copyin;
     
     let args = extract_args(args, 3)?;
     let target_pid = args[0] as usize;
@@ -803,7 +812,7 @@ fn sys_sched_setaffinity(args: &[u64]) -> SyscallResult {
 }
 
 fn sys_sched_getaffinity(args: &[u64]) -> SyscallResult {
-    use crate::mm::vm::copyout;
+    use crate::subsystems::mm::vm::copyout;
     
     let args = extract_args(args, 3)?;
     let target_pid = args[0] as usize;
@@ -876,7 +885,7 @@ fn sys_prctl(args: &[u64]) -> SyscallResult {
                     // Write null byte to indicate empty name
                     let name: [u8; 16] = [0; 16];
                     unsafe {
-                        crate::mm::vm::copyout(pagetable, arg2 as usize, 
+                        crate::subsystems::mm::vm::copyout(pagetable, arg2 as usize, 
                             name.as_ptr(), 16)
                             .map_err(|_| SyscallError::BadAddress)?;
                     }
@@ -901,7 +910,7 @@ fn sys_prctl(args: &[u64]) -> SyscallResult {
 }
 
 fn sys_capget(args: &[u64]) -> SyscallResult {
-    use crate::mm::vm::{copyin, copyout};
+    use crate::subsystems::mm::vm::{copyin, copyout};
     
     let args = extract_args(args, 2)?;
     let hdrp = args[0] as usize;
@@ -1021,33 +1030,33 @@ fn sys_sbrk(args: &[u64]) -> SyscallResult {
     };
 
     // Validate new break address
-    if new_sz >= crate::mm::vm::KERNEL_BASE {
+    if new_sz >= crate::subsystems::mm::vm::KERNEL_BASE {
         return Err(SyscallError::InvalidArgument);
     }
 
     // Check if we need to extend or shrink the heap
     if new_sz > old_sz {
         // Extend heap: allocate and map new pages
-        let pages_needed = ((new_sz - old_sz + crate::mm::vm::PAGE_SIZE - 1) / crate::mm::vm::PAGE_SIZE).max(1);
+        let pages_needed = ((new_sz - old_sz + crate::subsystems::mm::vm::PAGE_SIZE - 1) / crate::subsystems::mm::vm::PAGE_SIZE).max(1);
 
         for i in 0..pages_needed {
-            let va = old_sz + i * crate::mm::vm::PAGE_SIZE;
+            let va = old_sz + i * crate::subsystems::mm::vm::PAGE_SIZE;
 
             // Allocate physical page
-            let page = crate::mm::kalloc();
+            let page = crate::subsystems::mm::kalloc();
             if page.is_null() {
                 // Clean up already allocated pages on failure
                 for j in 0..i {
-                    let cleanup_va = old_sz + j * crate::mm::vm::PAGE_SIZE;
+                    let cleanup_va = old_sz + j * crate::subsystems::mm::vm::PAGE_SIZE;
                     #[cfg(target_arch = "riscv64")]
                     unsafe {
-                        if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
-                            crate::mm::kfree(pa as *mut u8);
+                        if let Some(pa) = crate::subsystems::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
+                            crate::subsystems::mm::kfree(pa as *mut u8);
                         }
                     }
                     #[cfg(target_arch = "aarch64")]
                     unsafe {
-                        if crate::mm::vm::unmap_page(pagetable, cleanup_va).is_ok() {
+                        if crate::subsystems::mm::vm::unmap_page(pagetable, cleanup_va).is_ok() {
                             // Note: AArch64 unmap_page doesn't return PA, so we can't free here
                             // TODO: Implement proper physical page tracking for aarch64
                         }
@@ -1062,19 +1071,19 @@ fn sys_sbrk(args: &[u64]) -> SyscallResult {
             }
 
             // Zero the page
-            unsafe { core::ptr::write_bytes(page, 0, crate::mm::vm::PAGE_SIZE); }
+            unsafe { core::ptr::write_bytes(page, 0, crate::subsystems::mm::vm::PAGE_SIZE); }
 
             // Map page with read/write permissions
-            let perm = crate::mm::vm::flags::PTE_R | crate::mm::vm::flags::PTE_W | crate::mm::vm::flags::PTE_U;
+            let perm = crate::subsystems::mm::vm::flags::PTE_R | crate::subsystems::mm::vm::flags::PTE_W | crate::subsystems::mm::vm::flags::PTE_U;
             unsafe {
-                if crate::mm::vm::map_page(pagetable, va, page as usize, perm).is_err() {
-                    crate::mm::kfree(page);
+                if crate::subsystems::mm::vm::map_page(pagetable, va, page as usize, perm).is_err() {
+                    crate::subsystems::mm::kfree(page);
                     // Clean up already allocated pages
                     for j in 0..i {
-                        let cleanup_va = old_sz + j * crate::mm::vm::PAGE_SIZE;
+                        let cleanup_va = old_sz + j * crate::subsystems::mm::vm::PAGE_SIZE;
                         #[cfg(target_arch = "riscv64")]
-                        if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
-                            crate::mm::kfree(pa as *mut u8);
+                        if let Some(pa) = crate::subsystems::mm::vm::riscv64::unmap_page(pagetable, cleanup_va) {
+                            crate::subsystems::mm::kfree(pa as *mut u8);
                         }
                     }
                     return Err(SyscallError::OutOfMemory);
@@ -1083,22 +1092,22 @@ fn sys_sbrk(args: &[u64]) -> SyscallResult {
         }
     } else if new_sz < old_sz {
         // Shrink heap: unmap and free pages
-        let pages_to_free = (old_sz - new_sz + crate::mm::vm::PAGE_SIZE - 1) / crate::mm::vm::PAGE_SIZE;
+        let pages_to_free = (old_sz - new_sz + crate::subsystems::mm::vm::PAGE_SIZE - 1) / crate::subsystems::mm::vm::PAGE_SIZE;
 
         for i in 0..pages_to_free {
-            let va = new_sz + i * crate::mm::vm::PAGE_SIZE;
+            let va = new_sz + i * crate::subsystems::mm::vm::PAGE_SIZE;
 
             // Unmap page and get physical address
             #[cfg(target_arch = "riscv64")]
             unsafe {
-                if let Some(pa) = crate::mm::vm::riscv64::unmap_page(pagetable, va) {
-                    crate::mm::kfree(pa as *mut u8);
+                if let Some(pa) = crate::subsystems::mm::vm::riscv64::unmap_page(pagetable, va) {
+                    crate::subsystems::mm::kfree(pa as *mut u8);
                 }
             }
 
             #[cfg(target_arch = "aarch64")]
             unsafe {
-                if crate::mm::vm::unmap_page(pagetable, va).is_ok() {
+                if crate::subsystems::mm::vm::unmap_page(pagetable, va).is_ok() {
                     // Note: AArch64 unmap_page doesn't return PA, so we can't free here
                     // TODO: Implement proper physical page tracking for aarch64
                 }
@@ -1113,8 +1122,8 @@ fn sys_sbrk(args: &[u64]) -> SyscallResult {
 
         // Flush TLB for the unmapped region
         for i in 0..pages_to_free {
-            let va = new_sz + i * crate::mm::vm::PAGE_SIZE;
-            crate::mm::vm::flush_tlb_page(va);
+            let va = new_sz + i * crate::subsystems::mm::vm::PAGE_SIZE;
+            crate::subsystems::mm::vm::flush_tlb_page(va);
         }
     }
 
@@ -1139,8 +1148,8 @@ fn sys_sleep(_args: &[u64]) -> SyscallResult {
     let pid = crate::process::myproc().ok_or(SyscallError::InvalidArgument)?;
     let chan = pid as usize;
 
-    let wake_tick = crate::time::get_ticks().saturating_add(ticks);
-    crate::time::add_sleeper(wake_tick, chan);
+    let wake_tick = crate::subsystems::time::get_ticks().saturating_add(ticks);
+    crate::subsystems::time::add_sleeper(wake_tick, chan);
     crate::process::sleep(chan);
 
     // Simplified: we don't implement signal interruptions here — return 0 on success
@@ -1170,7 +1179,7 @@ mod tests {
 
 fn sys_uptime(_args: &[u64]) -> SyscallResult {
     // Return system uptime in ticks
-    let ticks = crate::time::get_ticks();
+    let ticks = crate::subsystems::time::get_ticks();
     Ok(ticks as u64)
 }
 
@@ -1230,7 +1239,7 @@ fn sys_getpgid(args: &[u64]) -> SyscallResult {
 }
 
 fn sys_getrlimit(args: &[u64]) -> SyscallResult {
-    use crate::mm::vm::copyout;
+    use crate::subsystems::mm::vm::copyout;
     use crate::posix::{Rlimit, RLIM_INFINITY, RLIMIT_NOFILE, RLIMIT_STACK, RLIMIT_AS};
     
     let args = extract_args(args, 2)?;
@@ -1282,7 +1291,7 @@ fn sys_getrlimit(args: &[u64]) -> SyscallResult {
 }
 
 fn sys_setrlimit(args: &[u64]) -> SyscallResult {
-    use crate::mm::vm::copyin;
+    use crate::subsystems::mm::vm::copyin;
     use crate::posix::Rlimit;
     
     let args = extract_args(args, 2)?;
@@ -1336,7 +1345,7 @@ fn sys_setrlimit(args: &[u64]) -> SyscallResult {
 }
 
 fn sys_prlimit64(args: &[u64]) -> SyscallResult {
-    use crate::mm::vm::{copyin, copyout};
+    use crate::subsystems::mm::vm::{copyin, copyout};
     use crate::posix::Rlimit;
     
     let args = extract_args(args, 4)?;
@@ -1408,7 +1417,7 @@ fn sys_prlimit64(args: &[u64]) -> SyscallResult {
 }
 
 // Global domain name storage
-static DOMAINNAME: crate::sync::Mutex<[u8; 256]> = crate::sync::Mutex::new([0u8; 256]);
+static DOMAINNAME: crate::subsystems::sync::Mutex<[u8; 256]> = crate::subsystems::sync::Mutex::new([0u8; 256]);
 static DOMAINNAME_LEN: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
 
 /// Set domain name

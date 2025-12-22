@@ -80,11 +80,11 @@ pub fn test_syscall_dispatch_performance() -> TestResult {
     let args = [0u64; 6];
     let iterations = 1000;
     
-    let start_time = crate::time::get_ticks();
+    let start_time = crate::subsystems::time::get_ticks();
     for _ in 0..iterations {
         let _ = crate::syscalls::dispatch(0x1004, &args); // getpid (fast path)
     }
-    let end_time = crate::time::get_ticks();
+    let end_time = crate::subsystems::time::get_ticks();
     
     let elapsed = end_time - start_time;
     let avg_time = elapsed / iterations;
@@ -380,13 +380,13 @@ pub mod fork_tests {
     /// Test fork performance characteristics
     pub fn test_fork_performance() -> TestResult {
         let iterations = 10; // Reduced for test environment
-        let start_time = crate::time::get_ticks();
+        let start_time = crate::subsystems::time::get_ticks();
 
         for _ in 0..iterations {
             let _ = syscalls::dispatch(0x1000, &[]);
         }
 
-        let end_time = crate::time::get_ticks();
+        let end_time = crate::subsystems::time::get_ticks();
         let elapsed = end_time - start_time;
         let avg_time = elapsed / iterations;
 
@@ -765,14 +765,14 @@ pub mod memory_tests {
     /// Test memory management performance
     pub fn test_memory_performance() -> TestResult {
         let iterations = 10;
-        let start_time = crate::time::get_ticks();
+        let start_time = crate::subsystems::time::get_ticks();
 
         for _ in 0..iterations {
             // Quick sbrk operations
             let _ = syscalls::dispatch(0x1019, &[0u64]); // Just get current break
         }
 
-        let end_time = crate::time::get_ticks();
+        let end_time = crate::subsystems::time::get_ticks();
         let elapsed = end_time - start_time;
         let avg_time = elapsed / iterations;
 

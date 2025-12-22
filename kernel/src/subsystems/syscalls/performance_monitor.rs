@@ -11,7 +11,7 @@
 // use crate::syscalls::process_optimized::{get_proc_stats, ProcStats};
 // use crate::syscalls::memory_optimized::{get_mem_stats, MemStats};
 // use crate::syscalls::signal_optimized::{get_signal_stats, SignalStats};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use alloc::string::String;
 use core::sync::atomic::{AtomicU64, Ordering};
 

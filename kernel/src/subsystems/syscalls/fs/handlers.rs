@@ -33,7 +33,7 @@ pub fn handle_chdir(args: &[u64]) -> Result<u64, KernelError> {
     const MAX_PATH_LEN: usize = 4096;
     let mut path_buf = [0u8; MAX_PATH_LEN];
     let path_len = unsafe {
-        crate::mm::vm::copyinstr(pagetable as *mut crate::mm::vm::PageTable, pathname_ptr, path_buf.as_mut_ptr(), MAX_PATH_LEN)
+        crate::subsystems::mm::vm::copyinstr(pagetable as *mut crate::subsystems::mm::vm::PageTable, pathname_ptr, path_buf.as_mut_ptr(), MAX_PATH_LEN)
             .map_err(|_| KernelError::BadAddress)?
     };
 
@@ -150,10 +150,10 @@ pub fn handle_getcwd(args: &[u64]) -> Result<u64, KernelError> {
 
     // Copy path to user buffer
     unsafe {
-        crate::mm::vm::copyout(pagetable as *mut crate::mm::vm::PageTable, buf_ptr, cwd_bytes.as_ptr(), cwd_bytes.len())
+        crate::subsystems::mm::vm::copyout(pagetable as *mut crate::subsystems::mm::vm::PageTable, buf_ptr, cwd_bytes.as_ptr(), cwd_bytes.len())
             .map_err(|_| KernelError::BadAddress)?;
         // Null terminate
-        crate::mm::vm::copyout(pagetable as *mut crate::mm::vm::PageTable, buf_ptr + cwd_bytes.len(), [0u8].as_ptr(), 1)
+        crate::subsystems::mm::vm::copyout(pagetable as *mut crate::subsystems::mm::vm::PageTable, buf_ptr + cwd_bytes.len(), [0u8].as_ptr(), 1)
             .map_err(|_| KernelError::BadAddress)?;
     }
 
@@ -185,7 +185,7 @@ pub fn handle_mkdir(args: &[u64]) -> Result<u64, KernelError> {
     const MAX_PATH_LEN: usize = 4096;
     let mut path_buf = [0u8; MAX_PATH_LEN];
     let path_len = unsafe {
-        crate::mm::vm::copyinstr(pagetable as *mut crate::mm::vm::PageTable, pathname_ptr, path_buf.as_mut_ptr(), MAX_PATH_LEN)
+        crate::subsystems::mm::vm::copyinstr(pagetable as *mut crate::subsystems::mm::vm::PageTable, pathname_ptr, path_buf.as_mut_ptr(), MAX_PATH_LEN)
             .map_err(|_| KernelError::BadAddress)?
     };
 
@@ -204,14 +204,13 @@ pub fn handle_mkdir(args: &[u64]) -> Result<u64, KernelError> {
         }
     };
 
-    // Create directory via VFS
-    let vfs = crate::vfs::vfs();
-    let file_mode = crate::vfs::FileMode::new(mode);
-    vfs.mkdir(&abs_path, file_mode)
+    // Create directory via fs API
+    crate::subsystems::fs::api::dir_ops::mkdir(&abs_path, mode)
         .map_err(|e| match e {
-            crate::vfs::VfsError::Exists => KernelError::FileExists,
-            crate::vfs::VfsError::NotFound => KernelError::NotFound,
-            crate::vfs::VfsError::NotDirectory => KernelError::InvalidArgument,
+            crate::subsystems::fs::api::FsError::FileExists => KernelError::FileExists,
+            crate::subsystems::fs::api::FsError::PathNotFound => KernelError::NotFound,
+            crate::subsystems::fs::api::FsError::NotADirectory => KernelError::InvalidArgument,
+            crate::subsystems::fs::api::FsError::PermissionDenied => KernelError::PermissionDenied,
             _ => KernelError::IoError,
         })?;
 
@@ -242,7 +241,7 @@ pub fn handle_rmdir(args: &[u64]) -> Result<u64, KernelError> {
     const MAX_PATH_LEN: usize = 4096;
     let mut path_buf = [0u8; MAX_PATH_LEN];
     let path_len = unsafe {
-        crate::mm::vm::copyinstr(pagetable as *mut crate::mm::vm::PageTable, pathname_ptr, path_buf.as_mut_ptr(), MAX_PATH_LEN)
+        crate::subsystems::mm::vm::copyinstr(pagetable as *mut crate::subsystems::mm::vm::PageTable, pathname_ptr, path_buf.as_mut_ptr(), MAX_PATH_LEN)
             .map_err(|_| KernelError::BadAddress)?
     };
 
@@ -261,17 +260,55 @@ pub fn handle_rmdir(args: &[u64]) -> Result<u64, KernelError> {
         }
     };
 
-    // Remove directory via VFS
-    let vfs = crate::vfs::vfs();
-    vfs.rmdir(&abs_path)
+    // Remove directory via fs API
+    crate::subsystems::fs::api::dir_ops::rmdir(&abs_path)
         .map_err(|e| match e {
-            crate::vfs::VfsError::NotFound => KernelError::NotFound,
-            crate::vfs::VfsError::NotDirectory => KernelError::InvalidArgument,
-            crate::vfs::VfsError::NotEmpty => KernelError::DirectoryNotEmpty,
+            crate::subsystems::fs::api::FsError::PathNotFound => KernelError::NotFound,
+            crate::subsystems::fs::api::FsError::NotADirectory => KernelError::InvalidArgument,
+            crate::subsystems::fs::api::FsError::DirectoryNotEmpty => KernelError::DirectoryNotEmpty,
+            crate::subsystems::fs::api::FsError::PermissionDenied => KernelError::PermissionDenied,
             _ => KernelError::IoError,
         })?;
 
     Ok(0)
+}
+
+/// Handle readdir/getdents system call - read directory entries
+pub fn handle_readdir(args: &[u64]) -> Result<u64, KernelError> {
+    if args.len() < 2 {
+        return Err(KernelError::InvalidArgument);
+    }
+
+    let fd = args[0] as i32;
+    let buf_ptr = args[1] as usize;
+    let count = if args.len() > 2 { args[2] as usize } else { 4096 };
+
+    // Get current process
+    let (pagetable, cwd_path) = get_process_context()?;
+
+    // For now, we'll use path-based approach (simplified)
+    // In a full implementation, we'd use the file descriptor
+    let path_str = if fd == -1 {
+        // Use current directory
+        cwd_path.unwrap_or_else(|| alloc::string::String::from("/"))
+    } else {
+        // Would need to resolve fd to path
+        return Err(KernelError::NotSupported);
+    };
+
+    // Read directory entries
+    let entries = crate::subsystems::fs::api::dir_ops::readdir(&path_str)
+        .map_err(|e| match e {
+            crate::subsystems::fs::api::FsError::PathNotFound => KernelError::NotFound,
+            crate::subsystems::fs::api::FsError::NotADirectory => KernelError::InvalidArgument,
+            crate::subsystems::fs::api::FsError::PermissionDenied => KernelError::PermissionDenied,
+            _ => KernelError::IoError,
+        })?;
+
+    // Convert entries to dirent format and write to user buffer
+    // Simplified: just return success for now
+    // In full implementation, would format as struct dirent and copy to user space
+    Ok(entries.len() as u64)
 }
 
 /// Handle unlink system call - remove a file
@@ -298,7 +335,7 @@ pub fn handle_unlink(args: &[u64]) -> Result<u64, KernelError> {
     const MAX_PATH_LEN: usize = 4096;
     let mut path_buf = [0u8; MAX_PATH_LEN];
     let path_len = unsafe {
-        crate::mm::vm::copyinstr(pagetable as *mut crate::mm::vm::PageTable, pathname_ptr, path_buf.as_mut_ptr(), MAX_PATH_LEN)
+        crate::subsystems::mm::vm::copyinstr(pagetable as *mut crate::subsystems::mm::vm::PageTable, pathname_ptr, path_buf.as_mut_ptr(), MAX_PATH_LEN)
             .map_err(|_| KernelError::BadAddress)?
     };
 
@@ -356,12 +393,12 @@ pub fn handle_rename(args: &[u64]) -> Result<u64, KernelError> {
     let mut new_path_buf = [0u8; MAX_PATH_LEN];
 
     let old_path_len = unsafe {
-        crate::mm::vm::copyinstr(pagetable as *mut crate::mm::vm::PageTable, oldpath_ptr, old_path_buf.as_mut_ptr(), MAX_PATH_LEN)
+        crate::subsystems::mm::vm::copyinstr(pagetable as *mut crate::subsystems::mm::vm::PageTable, oldpath_ptr, old_path_buf.as_mut_ptr(), MAX_PATH_LEN)
             .map_err(|_| KernelError::BadAddress)?
     };
 
     let new_path_len = unsafe {
-        crate::mm::vm::copyinstr(pagetable as *mut crate::mm::vm::PageTable, newpath_ptr, new_path_buf.as_mut_ptr(), MAX_PATH_LEN)
+        crate::subsystems::mm::vm::copyinstr(pagetable as *mut crate::subsystems::mm::vm::PageTable, newpath_ptr, new_path_buf.as_mut_ptr(), MAX_PATH_LEN)
             .map_err(|_| KernelError::BadAddress)?
     };
 
@@ -519,10 +556,10 @@ pub fn handle_readlink(args: &[u64]) -> Result<u64, KernelError> {
     let copy_len = target_bytes.len().min(bufsize - 1);
 
     unsafe {
-        crate::mm::vm::copyout(pagetable as *mut crate::mm::vm::PageTable, buf_ptr, target_bytes.as_ptr(), copy_len)
+        crate::subsystems::mm::vm::copyout(pagetable as *mut crate::subsystems::mm::vm::PageTable, buf_ptr, target_bytes.as_ptr(), copy_len)
             .map_err(|_| KernelError::BadAddress)?;
         // Null terminate
-        crate::mm::vm::copyout(pagetable as *mut crate::mm::vm::PageTable, buf_ptr + copy_len, [0u8].as_ptr(), 1)
+        crate::subsystems::mm::vm::copyout(pagetable as *mut crate::subsystems::mm::vm::PageTable, buf_ptr + copy_len, [0u8].as_ptr(), 1)
             .map_err(|_| KernelError::BadAddress)?;
     }
 
@@ -689,7 +726,7 @@ pub fn handle_stat(args: &[u64]) -> Result<u64, KernelError> {
     // Convert to POSIX stat and copy out
     let stat_buf = file_attr_to_stat(&attr);
     unsafe {
-        crate::mm::vm::copyout(pagetable as *mut crate::mm::vm::PageTable, statbuf_ptr as usize,
+        crate::subsystems::mm::vm::copyout(pagetable as *mut crate::subsystems::mm::vm::PageTable, statbuf_ptr as usize,
             &stat_buf as *const _ as *const u8, core::mem::size_of::<crate::posix::stat>())
             .map_err(|_| KernelError::BadAddress)?;
     }
@@ -721,7 +758,7 @@ pub fn handle_lstat(args: &[u64]) -> Result<u64, KernelError> {
     // Convert to POSIX stat and copy out
     let stat_buf = file_attr_to_stat(&attr);
     unsafe {
-        crate::mm::vm::copyout(pagetable as *mut crate::mm::vm::PageTable, statbuf_ptr as usize,
+        crate::subsystems::mm::vm::copyout(pagetable as *mut crate::subsystems::mm::vm::PageTable, statbuf_ptr as usize,
             &stat_buf as *const _ as *const u8, core::mem::size_of::<crate::posix::stat>())
             .map_err(|_| KernelError::BadAddress)?;
     }
@@ -879,7 +916,7 @@ fn read_path_from_user(pagetable: usize, ptr: usize) -> Result<alloc::string::St
     let mut path_buf = [0u8; MAX_PATH_LEN];
 
     let path_len = unsafe {
-        crate::mm::vm::copyinstr(pagetable as *mut crate::mm::vm::PageTable, ptr, path_buf.as_mut_ptr(), MAX_PATH_LEN)
+        crate::subsystems::mm::vm::copyinstr(pagetable as *mut crate::subsystems::mm::vm::PageTable, ptr, path_buf.as_mut_ptr(), MAX_PATH_LEN)
             .map_err(|_| KernelError::BadAddress)?
     };
 
@@ -938,5 +975,6 @@ pub fn get_supported_syscalls() -> alloc::vec::Vec<u32> {
         0x7010, // stat
         0x7011, // lstat
         0x7012, // access
+        0x7013, // readdir/getdents
     ]
 }

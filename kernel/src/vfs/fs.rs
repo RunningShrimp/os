@@ -5,7 +5,7 @@ use alloc::{string::String, string::ToString, sync::Arc, vec::Vec, collections::
 use crate::vfs::types::FileType;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 
 use super::{
     devices,

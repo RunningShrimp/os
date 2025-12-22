@@ -1,0 +1,8 @@
+//! Architecture abstraction layer
+//!
+//! This module provides architecture-specific implementations and abstractions
+//! for different CPU architectures, allowing the kernel to support multiple
+//! architectures with a unified interface.
+
+pub mod memory_layout;
+

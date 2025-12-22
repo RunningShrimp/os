@@ -7,7 +7,7 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::reliability::errno::{EINVAL, ENOMEM};
 
 /// Buffer handle
@@ -95,9 +95,9 @@ impl GraphicsBuffer {
         // For scanout buffers, we might use special memory regions
         let addr = if flags.scanout {
             // Allocate from scanout memory pool (if available)
-            crate::mm::kalloc(size).ok_or(ENOMEM)?
+            crate::subsystems::mm::kalloc(size).ok_or(ENOMEM)?
         } else {
-            crate::mm::kalloc(size).ok_or(ENOMEM)?
+            crate::subsystems::mm::kalloc(size).ok_or(ENOMEM)?
         };
         
         Ok(Self {
@@ -126,7 +126,7 @@ impl GraphicsBuffer {
         if count == 1 {
             // Last reference - free the buffer
             unsafe {
-                crate::mm::kfree(self.addr, self.size);
+                crate::subsystems::mm::kfree(self.addr, self.size);
             }
             true
         } else {
@@ -191,7 +191,7 @@ impl BufferManager {
         format: crate::graphics::surface::SurfaceFormat,
         buffer_type: BufferType,
         flags: BufferFlags,
-        gpu_device: &crate::sync::Mutex<crate::drivers::virtio_gpu::VirtioGpuDevice>,
+        gpu_device: &crate::subsystems::sync::Mutex<crate::drivers::virtio_gpu::VirtioGpuDevice>,
     ) -> Result<BufferHandle, i32> {
         // Convert format to VirtIO GPU format
         let gpu_format = match format {
@@ -210,7 +210,7 @@ impl BufferManager {
         let bytes_per_pixel = format.bytes_per_pixel();
         let stride = (width as usize * bytes_per_pixel).next_multiple_of(64);
         let size = stride * height as usize;
-        let addr = crate::mm::kalloc(size).ok_or(crate::reliability::errno::ENOMEM)?;
+        let addr = crate::subsystems::mm::kalloc(size).ok_or(crate::reliability::errno::ENOMEM)?;
         
         // Attach backing pages to GPU resource
         // In real implementation, we'd get physical pages and attach them
@@ -322,7 +322,7 @@ pub fn init_buffer_manager() -> Result<(), i32> {
 
 /// Get buffer manager
 pub fn get_buffer_manager() -> &'static BufferManager {
-    static INIT_ONCE: crate::sync::Once = crate::sync::Once::new();
+    static INIT_ONCE: crate::subsystems::sync::Once = crate::subsystems::sync::Once::new();
     INIT_ONCE.call_once(|| {
         let mut manager = BUFFER_MANAGER.lock();
         if manager.is_none() {

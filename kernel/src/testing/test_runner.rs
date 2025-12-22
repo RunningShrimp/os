@@ -152,7 +152,7 @@ impl TestRunner {
 
     /// Run all tests according to configuration
     pub fn run_all_tests(&mut self) -> TestRunnerResult {
-        let start_time = crate::time::get_ticks();
+        let start_time = crate::subsystems::time::get_ticks();
         let mut result = TestRunnerResult {
             execution_timestamp: start_time,
             total_execution_time_ms: 0,
@@ -242,7 +242,7 @@ impl TestRunner {
             result.test_automation_results = Some(automation_report);
         }
 
-        let end_time = crate::time::get_ticks();
+        let end_time = crate::subsystems::time::get_ticks();
         result.total_execution_time_ms = end_time - start_time;
 
         // Calculate test summary

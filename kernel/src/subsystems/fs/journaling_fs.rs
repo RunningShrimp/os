@@ -11,7 +11,7 @@ use alloc::collections::BTreeMap;
 // use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 // use crate::drivers::BlockDevice;
-// use crate::sync::{Mutex, Sleeplock};
+// use crate::subsystems::sync::{Mutex, Sleeplock};
 use crate::subsystems::fs::{BSIZE, SuperBlock, InodeType, DiskInode, Dirent, BufFlags};
 
 /// Journaling file system constants
@@ -102,7 +102,7 @@ impl JournalTransaction {
             modified_blocks: Vec::new(),
             entries: Vec::new(),
             original_data: BTreeMap::new(),
-            timestamp: crate::time::get_timestamp(),
+            timestamp: crate::subsystems::time::get_timestamp(),
         }
     }
 

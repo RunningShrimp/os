@@ -11,7 +11,7 @@ use heapless::String as HeaplessString;
 pub use crate::microkernel::service_registry::{
     ServiceId
 };
-pub use crate::microkernel::ipc::IpcMessage as Message;
+pub use crate::subsystems::microkernel::ipc::IpcMessage as Message;
 
 /// Message type for IPC communication
 /// Maps to the message_type field in IpcMessage
@@ -37,7 +37,7 @@ impl Message {
     /// Create a new message with the given type and data
     pub fn new_with_type(message_type: MessageType, data: Vec<u8>) -> Self {
         // Use a default sender/receiver ID (0 means system)
-        crate::microkernel::ipc::IpcMessage::new(0, 0, message_type.as_u32(), data)
+        crate::subsystems::microkernel::ipc::IpcMessage::new(0, 0, message_type.as_u32(), data)
     }
     
     /// Create a new request message
@@ -58,7 +58,7 @@ impl Message {
 
 // IPC function implementations using real IPC system
 pub fn send_message(service_id: ServiceId, message: Message) -> Result<(), ()> {
-    use crate::microkernel::ipc;
+    use crate::subsystems::microkernel::ipc;
     
     // Get the IPC manager instance
     let manager = match ipc::get_ipc_manager() {
@@ -80,7 +80,7 @@ pub fn send_message(service_id: ServiceId, message: Message) -> Result<(), ()> {
 }
 
 pub fn receive_message() -> Result<Message, ()> {
-    use crate::microkernel::ipc;
+    use crate::subsystems::microkernel::ipc;
     
     // Get the IPC manager instance
     let manager = match ipc::get_ipc_manager() {
@@ -115,7 +115,7 @@ pub const AF_UNIX_CONST: AfUnix = 1;
 
 // Service registry - using real implementation
 // TODO: Re-enable when service registry is fully implemented
-// pub use crate::microkernel::service_registry::{ServiceRegistry, get_service_registry};
+// pub use crate::subsystems::microkernel::service_registry::{ServiceRegistry, get_service_registry};
 
 // Process stubs - Use real Process type from process module when possible
 // For compatibility, keep a minimal stub but prefer using crate::process::Proc

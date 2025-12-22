@@ -76,23 +76,24 @@ pub fn handle_raise(args: &[u64]) -> Result<u64, KernelError> {
 /// * `Ok(u64)` - 0表示成功
 /// * `Err(KernelError)` - 系统调用执行失败
 pub fn handle_sigaction(args: &[u64]) -> Result<u64, KernelError> {
-    if args.len() != 3 {
-        return Err(KernelError::InvalidArgument);
-    }
-
-    let signum = args[0] as i32;
-    let act_ptr = args[1];
-    let oldact_ptr = args[2];
-
-    // TODO: 实现sigaction逻辑
-    crate::log_debug!("sigaction syscall called: signum={}, act_ptr={:#x}, oldact_ptr={:#x}", 
-                signum, act_ptr, oldact_ptr);
+    // Delegate to signal_advanced implementation
+    use crate::subsystems::syscalls::signal_advanced::sys_sigaction;
+    use crate::subsystems::syscalls::common::SyscallResult;
     
-    // 临时返回值
-    Ok(0)
+    match sys_sigaction(args) {
+        Ok(_) => Ok(0),
+        Err(e) => Err(match e {
+            crate::subsystems::syscalls::common::SyscallError::InvalidArgument => KernelError::InvalidArgument,
+            crate::subsystems::syscalls::common::SyscallError::BadAddress => KernelError::BadAddress,
+            crate::subsystems::syscalls::common::SyscallError::NotFound => KernelError::NotFound,
+            _ => KernelError::InvalidArgument,
+        }),
+    }
 }
 
 /// sigprocmask系统调用处理函数
+/// 
+/// 实现信号掩码的修改，支持SIG_BLOCK、SIG_UNBLOCK和SIG_SETMASK操作
 /// 
 /// 设置信号掩码。
 /// 
@@ -105,20 +106,15 @@ pub fn handle_sigaction(args: &[u64]) -> Result<u64, KernelError> {
 /// * `Ok(u64)` - 旧的信号掩码
 /// * `Err(KernelError)` - 系统调用执行失败
 pub fn handle_sigprocmask(args: &[u64]) -> Result<u64, KernelError> {
-    if args.len() != 3 {
-        return Err(KernelError::InvalidArgument);
+    // Use implementation from signal_advanced module
+    use crate::subsystems::syscalls::signal_advanced::sys_sigprocmask;
+    match sys_sigprocmask(args) {
+        Ok(result) => Ok(result),
+        Err(e) => {
+            // Convert SyscallError to KernelError
+            Err(KernelError::InvalidArgument)
+        }
     }
-
-    let how = args[0] as i32;
-    let set_ptr = args[1];
-    let oldset_ptr = args[2];
-
-    // TODO: 实现sigprocmask逻辑
-    crate::log_debug!("sigprocmask syscall called: how={}, set_ptr={:#x}, oldset_ptr={:#x}", 
-                how, set_ptr, oldset_ptr);
-    
-    // 临时返回值
-    Ok(0)
 }
 
 /// sigpending系统调用处理函数
@@ -134,17 +130,12 @@ pub fn handle_sigprocmask(args: &[u64]) -> Result<u64, KernelError> {
 /// * `Ok(u64)` - 挂起的信号数
 /// * `Err(KernelError)` - 系统调用执行失败
 pub fn handle_sigpending(args: &[u64]) -> Result<u64, KernelError> {
-    if args.len() != 1 {
-        return Err(KernelError::InvalidArgument);
+    // Use implementation from signal_advanced module
+    use crate::subsystems::syscalls::signal_advanced::sys_sigpending;
+    match sys_sigpending(args) {
+        Ok(result) => Ok(result),
+        Err(e) => Err(KernelError::InvalidArgument)
     }
-
-    let set_ptr = args[0];
-
-    // TODO: 实现sigpending逻辑
-    crate::log_debug!("sigpending syscall called: set_ptr={:#x}", set_ptr);
-    
-    // 临时返回值
-    Ok(0)
 }
 
 /// sigsuspend系统调用处理函数
@@ -160,17 +151,13 @@ pub fn handle_sigpending(args: &[u64]) -> Result<u64, KernelError> {
 /// * `Ok(u64)` - 0表示成功
 /// * `Err(KernelError)` - 系统调用执行失败
 pub fn handle_sigsuspend(args: &[u64]) -> Result<u64, KernelError> {
-    if args.len() != 1 {
-        return Err(KernelError::InvalidArgument);
+    // Use implementation from signal_advanced module
+    // Note: sigsuspend always returns EINTR, so we expect an error
+    use crate::subsystems::syscalls::signal_advanced::sys_sigsuspend;
+    match sys_sigsuspend(args) {
+        Ok(_) => Ok(0), // Should not happen
+        Err(_) => Err(KernelError::Interrupted) // Expected: sigsuspend always returns EINTR
     }
-
-    let mask_ptr = args[0];
-
-    // TODO: 实现sigsuspend逻辑
-    crate::log_debug!("sigsuspend syscall called: mask_ptr={:#x}", mask_ptr);
-    
-    // 临时返回值
-    Ok(0)
 }
 
 /// sigwait系统调用处理函数

@@ -9,7 +9,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicU64, AtomicU32, AtomicBool, Ordering};
-use crate::sync::{Mutex, Sleeplock};
+use crate::subsystems::sync::{Mutex, Sleeplock};
 use crate::subsystems::drivers::driver_manager::{
     Driver, DeviceId, DriverId, DeviceType, DeviceStatus, DriverStatus,
     DeviceInfo, DriverInfo, DeviceResources, IoOperation, IoResult, InterruptInfo,

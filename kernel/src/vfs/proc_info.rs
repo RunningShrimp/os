@@ -2,7 +2,7 @@
 
 extern crate alloc;
 use alloc::{boxed::Box, string::String, string::ToString, sync::Arc, vec::Vec};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::vfs::{
     error::*,
     types::*,

@@ -81,7 +81,7 @@ impl EventProcessor {
             return Err("Event processor not running");
         }
 
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         // 应用处理规则
         self.apply_rules(event)?;
@@ -93,7 +93,7 @@ impl EventProcessor {
             *stats.events_by_type.entry(event.event_type).or_insert(0) += 1;
             *stats.events_by_severity.entry(event.severity).or_insert(0) += 1;
 
-            let elapsed = crate::time::get_timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
             stats.avg_processing_time_us = (stats.avg_processing_time_us + elapsed / 1000) / 2;
         }
 
@@ -425,7 +425,7 @@ impl EventAggregator {
                     filtered_events.iter().map(|e| e.timestamp).min().unwrap_or(0),
                     filtered_events.iter().map(|e| e.timestamp).max().unwrap_or(0),
                 ),
-                generated_at: crate::time::get_timestamp_nanos(),
+                generated_at: crate::subsystems::time::get_timestamp_nanos(),
                 triggered_rule: rule.id,
             };
 
