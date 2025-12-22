@@ -8,15 +8,15 @@
 //! - 命令行参数解析
 //! - 配置文件处理
 
-#![no_std]
+
 
 extern crate alloc;
 
-use crate::glib::{types::*, g_free, g_malloc, g_malloc0, g_realloc, error::GError};
+use crate::glib::{g_free, g_malloc, g_malloc0, g_realloc, error::GError, gchar, gpointer, gboolean};
 use alloc::string::String;
 use alloc::vec::Vec;
-use core::ptr::{self, NonNull};
-use core::ffi::{c_char, c_int, c_void};
+use core::ptr;
+use core::ffi::{c_void, c_int};
 use core::str;
 
 
@@ -301,13 +301,15 @@ impl GString {
 
     /// 转换为Rust字符串（需要调用者确保生命周期安全）
     pub unsafe fn as_str(gstring: *const GString) -> &'static str {
-        if gstring.is_null() || (*gstring).str.is_null() {
+        if gstring.is_null() || unsafe { (*gstring).str.is_null() } {
             return "";
         }
-        str::from_utf8_unchecked(core::slice::from_raw_parts(
-            (*gstring).str as *const u8,
-            (*gstring).len,
-        ))
+        unsafe {
+            str::from_utf8_unchecked(core::slice::from_raw_parts(
+                (*gstring).str as *const u8,
+                (*gstring).len,
+            ))
+        }
     }
 }
 
@@ -481,6 +483,13 @@ pub fn g_ascii_strcasecmp(str1: *const gchar, str2: *const gchar) -> c_int {
     }
 }
 
+/// 辅助宏：将字符串字面量转换为*const gchar
+macro_rules! c_str {
+    ($s:expr) => {
+        core::mem::transmute::<*const u8, *const gchar>($s.as_ptr())
+    };
+}
+
 /// 复制字符串
 pub fn g_strdup(str_data: *const gchar) -> *mut gchar {
     if str_data.is_null() {
@@ -545,7 +554,7 @@ pub fn g_strdup_printf(format: *const gchar, _args: *mut c_void) -> *mut gchar {
 /// 字符串连接
 pub fn g_strconcat(str1: *const gchar, str2: *const gchar) -> *mut gchar {
     if str1.is_null() && str2.is_null() {
-        return g_strdup(b"".as_ptr() as *const c_char);
+        return unsafe { g_strdup(c_str!("")) };
     }
 
     unsafe {
@@ -589,8 +598,8 @@ pub fn g_strconcat(str1: *const gchar, str2: *const gchar) -> *mut gchar {
 /// 路径处理：获取目录名
 pub fn g_path_dirname(file_path: *const gchar) -> *mut gchar {
     if file_path.is_null() {
-        return g_strdup(b".".as_ptr() as *const c_char);
-    }
+            return unsafe { g_strdup(c_str!("")) };
+        }
 
     unsafe {
         let mut len = 0;
@@ -599,7 +608,7 @@ pub fn g_path_dirname(file_path: *const gchar) -> *mut gchar {
         }
 
         if len == 0 {
-            return g_strdup(b".".as_ptr() as *const c_char);
+            return g_strdup(c_str!(""));
         }
 
         // 查找最后一个路径分隔符
@@ -612,12 +621,12 @@ pub fn g_path_dirname(file_path: *const gchar) -> *mut gchar {
         }
 
         if last_slash == 0 {
-            return g_strdup(b"/".as_ptr() as *const c_char);
+            return g_strdup(c_str!(""));
         }
 
         if last_slash == len {
             // 没有找到分隔符
-            return g_strdup(b".".as_ptr() as *const c_char);
+            return g_strdup(c_str!(""));
         }
 
         g_strndup(file_path, last_slash)
@@ -627,7 +636,7 @@ pub fn g_path_dirname(file_path: *const gchar) -> *mut gchar {
 /// 路径处理：获取文件名
 pub fn g_path_basename(file_path: *const gchar) -> *mut gchar {
     if file_path.is_null() {
-        return g_strdup(b".".as_ptr() as *const c_char);
+        return unsafe { g_strdup(c_str!("")) };
     }
 
     unsafe {
@@ -637,7 +646,7 @@ pub fn g_path_basename(file_path: *const gchar) -> *mut gchar {
         }
 
         if len == 0 {
-            return g_strdup(b".".as_ptr() as *const c_char);
+            return g_strdup(c_str!(""));
         }
 
         // 查找最后一个路径分隔符
@@ -655,7 +664,7 @@ pub fn g_path_basename(file_path: *const gchar) -> *mut gchar {
         }
 
         if last_slash + 1 >= len {
-            return g_strdup(b"/".as_ptr() as *const c_char);
+            return g_strdup(c_str!(""));
         }
 
         g_strdup(file_path.add(last_slash + 1))
@@ -753,7 +762,7 @@ pub fn g_option_context_parse(
     context: *mut GOptionContext,
     argc: *mut c_int,
     argv: *mut *mut *mut gchar,
-    error: *mut *mut GError,
+    _error: *mut *mut GError,
 ) -> gboolean {
     // 简化实现：总是返回成功
     if !context.is_null() && !argc.is_null() && !argv.is_null() {
@@ -767,9 +776,7 @@ pub fn g_option_context_parse(
 /// 释放选项上下文
 pub fn g_option_context_free(context: *mut GOptionContext) {
     if !context.is_null() {
-        unsafe {
-            g_free(context as gpointer);
-        }
+        g_free(context as gpointer);
     }
 }
 

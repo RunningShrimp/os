@@ -851,7 +851,7 @@ macro_rules! trace_event {
                     trace_id: String::new(),
                     event_type: $crate::debug::tracing::TraceEventType::Custom,
                     level: $level,
-                    timestamp: $crate::time::timestamp_nanos(),
+                    timestamp: $crate::subsystems::time::timestamp_nanos(),
                     duration: None,
                     thread_id: 1,
                     process_id: 1,

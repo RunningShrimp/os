@@ -100,7 +100,7 @@ impl GuiBackend for SlintBackend {
                 self.swap_buffers(surface_id)?;
             }
             // Sleep to avoid busy-waiting
-            crate::time::sleep_ms(16); // ~60 FPS
+            crate::subsystems::time::sleep_ms(16); // ~60 FPS
         }
     }
 }
@@ -165,7 +165,7 @@ impl GuiBackend for IcedBackend {
             if let Some(surface_id) = self.main_surface {
                 self.swap_buffers(surface_id)?;
             }
-            crate::time::sleep_ms(16); // ~60 FPS
+            crate::subsystems::time::sleep_ms(16); // ~60 FPS
         }
     }
 }
@@ -220,7 +220,7 @@ impl GuiManager {
 }
 
 /// Global GUI manager instance
-static GUI_MANAGER: crate::sync::Mutex<Option<GuiManager>> = crate::sync::Mutex::new(None);
+static GUI_MANAGER: crate::subsystems::sync::Mutex<Option<GuiManager>> = crate::subsystems::sync::Mutex::new(None);
 
 /// Initialize GUI manager
 pub fn init_gui_manager() -> Result<(), i32> {
@@ -233,8 +233,8 @@ pub fn init_gui_manager() -> Result<(), i32> {
 }
 
 /// Get GUI manager
-pub fn get_gui_manager() -> &'static crate::sync::Mutex<GuiManager> {
-    static INIT_ONCE: crate::sync::Once = crate::sync::Once::new();
+pub fn get_gui_manager() -> &'static crate::subsystems::sync::Mutex<GuiManager> {
+    static INIT_ONCE: crate::subsystems::sync::Once = crate::subsystems::sync::Once::new();
     INIT_ONCE.call_once(|| {
         let mut manager = GUI_MANAGER.lock();
         if manager.is_none() {
@@ -243,7 +243,7 @@ pub fn get_gui_manager() -> &'static crate::sync::Mutex<GuiManager> {
     });
     
     unsafe {
-        &*(GUI_MANAGER.lock().as_ref().unwrap() as *const GuiManager as *const crate::sync::Mutex<GuiManager>)
+        &*(GUI_MANAGER.lock().as_ref().unwrap() as *const GuiManager as *const crate::subsystems::sync::Mutex<GuiManager>)
     }
 }
 

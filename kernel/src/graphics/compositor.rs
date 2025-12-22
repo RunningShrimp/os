@@ -8,7 +8,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::reliability::errno::{EINVAL, ENOMEM};
 use crate::graphics::surface::{Surface, SurfaceId, SurfaceManager, DirtyRect};
 use crate::graphics::surface::get_surface_manager;
@@ -52,7 +52,7 @@ impl Compositor {
         let size = stride * height as usize;
         
         // Allocate framebuffer
-        let framebuffer_addr = crate::mm::kalloc(size).ok_or(ENOMEM)?;
+        let framebuffer_addr = crate::subsystems::mm::kalloc(size).ok_or(ENOMEM)?;
         
         // Initialize framebuffer to black
         unsafe {
@@ -93,7 +93,7 @@ impl Compositor {
             return Ok(()); // Compositor not running
         }
         
-        let start_time = crate::time::hrtime_nanos();
+        let start_time = crate::subsystems::time::hrtime_nanos();
         
         // Get all surfaces, sorted by z-order
         let surface_manager = get_surface_manager();
@@ -138,7 +138,7 @@ impl Compositor {
         self.vsync.wait_for_vsync()?;
         
         // Update frame statistics
-        let frame_time = crate::time::hrtime_nanos() - start_time;
+        let frame_time = crate::subsystems::time::hrtime_nanos() - start_time;
         self.frame_count.fetch_add(1, Ordering::Relaxed);
         self.last_frame_time.store(frame_time as u32, Ordering::Relaxed);
         

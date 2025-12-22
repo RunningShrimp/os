@@ -11,11 +11,12 @@ extern crate alloc;
 
 use alloc::format;
 use core::ffi::{c_char, c_int};
-use crate::libc::interface::{size_t, c_long, c_longlong, time_t};
-pub type suseconds_t = i64;
-use crate::libc::error::{get_errno, set_errno};
+use crate::libc::interface::{size_t, c_long, time_t};
+pub type SusecondsT = i64;
+#[allow(non_camel_case_types)]
+pub type suseconds_t = SusecondsT;
+use crate::libc::error::set_errno;
 use crate::libc::error::errno::EINVAL;
-use crate::drivers::console;
 
 /// 时间常量
 pub mod time_constants {
@@ -402,21 +403,21 @@ impl EnhancedTimeLib {
     fn get_system_time(&self) -> time_t {
         // 这里应该调用系统时间获取函数
         // 暂时返回一个模拟的时间戳
-        crate::time::get_timestamp() as time_t
+        crate::subsystems::time::get_timestamp() as time_t
     }
 
     /// 获取微秒部分
     fn get_microseconds(&self) -> u32 {
         // 这里应该调用高精度时间获取函数
         // 暂时返回模拟值
-        (crate::time::get_timestamp() % 1_000_000) as u32
+        (crate::subsystems::time::get_timestamp() % 1_000_000) as u32
     }
 
     /// 获取纳秒部分
     fn get_nanoseconds(&self) -> u64 {
         // 这里应该调用高精度时间获取函数
         // 暂时返回模拟值
-        (crate::time::get_timestamp() % 1_000_000_000) as u64
+        (crate::subsystems::time::get_timestamp() % 1_000_000_000) as u64
     }
 
     /// 将时间戳转换为tm结构

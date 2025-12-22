@@ -16,9 +16,9 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::collections::vec_deque::VecDeque;
-use alloc::sync::Arc;
 
-use core::ptr;
+use crate::libc::error::errno;
+
 use core::sync::atomic::{AtomicUsize, Ordering};
 use spin::Mutex;
 
@@ -156,21 +156,21 @@ pub const MQ_NAME_MAX: usize = 255;
 /// Validate message queue name
 fn validate_mq_name(name: &str) -> Result<(), i32> {
     if name.is_empty() {
-        return Err(crate::reliability::errno::EINVAL);
+        return Err(errno::EINVAL);
     }
     
     if name.len() > MQ_NAME_MAX {
-        return Err(crate::reliability::errno::ENAMETOOLONG);
+        return Err(errno::ENAMETOOLONG);
     }
     
     // Name must start with '/'
     if !name.starts_with('/') {
-        return Err(crate::reliability::errno::EINVAL);
+        return Err(errno::EINVAL);
     }
     
     // Name cannot end with '/' unless it's just "/"
     if name.len() > 1 && name.ends_with('/') {
-        return Err(crate::reliability::errno::EINVAL);
+        return Err(errno::EINVAL);
     }
     
     Ok(())
@@ -257,7 +257,7 @@ fn send_notification(mq: &MessageQueue) {
 /// # Returns
 /// * Message queue descriptor on success
 /// * -1 on error
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn mq_open(
     name: *const i8,
     oflag: i32,
@@ -266,7 +266,7 @@ pub extern "C" fn mq_open(
 ) -> i32 {
     // Convert name to string
     let name_str = if name.is_null() {
-        return -(crate::reliability::errno::EINVAL as i32);
+        return -(errno::EINVAL as i32);
     } else {
         unsafe {
             let mut len = 0;
@@ -286,11 +286,11 @@ pub extern "C" fn mq_open(
     let read_only = match oflag & 3 {
         O_RDONLY => true,
         O_WRONLY => {
-            return -(crate::reliability::errno::EINVAL as i32);
+            return -(errno::EINVAL as i32);
         }
         O_RDWR => false,
         _ => {
-            return -(crate::reliability::errno::EINVAL as i32);
+            return -(errno::EINVAL as i32);
         }
     };
     
@@ -302,11 +302,11 @@ pub extern "C" fn mq_open(
         crate::println!("[DEBUG] Found existing queue '{}' with Arc<MessageQueue>", name_str);
         // Queue exists, check O_EXCL flag
         if oflag & O_EXCL != 0 {
-            return -(crate::reliability::errno::EEXIST as i32);
+            return -(errno::EEXIST as i32);
         }
         
         // Increment reference count - FIXED: Use Arc clone instead of mutable borrow
-        let mq_clone = mq_arc.clone();
+    let _mq_clone = mq_arc.clone();
         // Note: ref_count is now handled by Arc's internal reference counting
         
         // Generate descriptor
@@ -319,7 +319,7 @@ pub extern "C" fn mq_open(
     
     // Queue doesn't exist, check O_CREAT flag
     if oflag & O_CREAT == 0 {
-        return -(crate::reliability::errno::ENOENT as i32);
+        return -(errno::ENOENT as i32);
     }
     
     // Create new queue
@@ -331,7 +331,7 @@ pub extern "C" fn mq_open(
     
     // Validate attributes
     if queue_attr.mq_maxmsg <= 0 || queue_attr.mq_msgsize <= 0 {
-        return -(crate::reliability::errno::EINVAL as i32);
+        return -(errno::EINVAL as i32);
     }
     
     // Create message queue
@@ -369,16 +369,16 @@ pub extern "C" fn mq_open(
 /// # Returns
 /// * 0 on success
 /// * -1 on error
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn mq_close(mqd: i32) -> i32 {
     if mqd < 0 {
-        return -(crate::reliability::errno::EBADF as i32);
+        return -(errno::EBADF as i32);
     }
     
     // Find queue in descriptor table
-    let mq_ptr = match find_mq_by_mqd(mqd as usize) {
+    let _mq_ptr = match find_mq_by_mqd(mqd as usize) {
         Some(ptr) => ptr,
-        None => return -(crate::reliability::errno::EBADF as i32),
+        None => return -(errno::EBADF as i32),
     };
     
     // Decrement reference count is handled by Arc when it's dropped
@@ -398,11 +398,11 @@ pub extern "C" fn mq_close(mqd: i32) -> i32 {
 /// # Returns
 /// * 0 on success
 /// * -1 on error
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn mq_unlink(name: *const i8) -> i32 {
     // Convert name to string
     let name_str = if name.is_null() {
-        return -(crate::reliability::errno::EINVAL as i32);
+        return -(errno::EINVAL as i32);
     } else {
         unsafe {
             let mut len = 0;
@@ -428,7 +428,7 @@ pub extern "C" fn mq_unlink(name: *const i8) -> i32 {
         for (_, table_mq) in table.iter() {
             // Compare queue names to check if it's the same queue
             if table_mq.name == name_str {
-                return -(crate::reliability::errno::EBUSY as i32);
+                return -(errno::EBUSY as i32);
             }
         }
         // If not in use, remove it from registry
@@ -438,7 +438,7 @@ pub extern "C" fn mq_unlink(name: *const i8) -> i32 {
         0
     } else {
         // Queue doesn't exist
-        -(crate::reliability::errno::ENOENT as i32)
+        -(errno::ENOENT as i32)
     }
 }
 
@@ -453,7 +453,7 @@ pub extern "C" fn mq_unlink(name: *const i8) -> i32 {
 /// # Returns
 /// * 0 on success
 /// * -1 on error
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn mq_send(
     mqd: i32,
     msg_ptr: *const core::ffi::c_void,
@@ -461,18 +461,18 @@ pub extern "C" fn mq_send(
     msg_prio: u32,
 ) -> i32 {
     if mqd < 0 || msg_ptr.is_null() || msg_len == 0 {
-        return -(crate::reliability::errno::EINVAL as i32);
+        return -(errno::EINVAL as i32);
     }
     
     // Find queue
     let mq = match find_mq_by_mqd(mqd as usize) {
         Some(mq) => mq,
-        None => return -(crate::reliability::errno::EBADF as i32),
+        None => return -(errno::EBADF as i32),
     };
     
     // Check if queue is read-only
     if mq.read_only {
-        return -(crate::reliability::errno::EACCES as i32);
+        return -(errno::EACCES as i32);
     }
     
     // Check message size
@@ -481,7 +481,7 @@ pub extern "C" fn mq_send(
     drop(attr);
     
     if msg_len > max_msg_size {
-        return -(crate::reliability::errno::EMSGSIZE as i32);
+        return -(errno::EMSGSIZE as i32);
     }
     
     // Copy message from user space
@@ -499,7 +499,7 @@ pub extern "C" fn mq_send(
     let message = Message {
         priority: msg_prio,
         data: msg_data,
-        timestamp: crate::time::get_timestamp(),
+        timestamp: crate::subsystems::time::get_timestamp(),
     };
     
     // Add to queue
@@ -511,7 +511,7 @@ pub extern "C" fn mq_send(
     drop(attr);
     
     if messages.len() >= max_msg_count {
-        return -(crate::reliability::errno::EAGAIN as i32);
+        return -(errno::EAGAIN as i32);
     }
     
     // Insert message in priority order (lower priority value = higher priority)
@@ -550,7 +550,7 @@ pub extern "C" fn mq_send(
 /// # Returns
 /// * Message length on success
 /// * -1 on error
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn mq_receive(
     mqd: i32,
     msg_ptr: *mut core::ffi::c_void,
@@ -558,20 +558,20 @@ pub extern "C" fn mq_receive(
     msg_prio: *mut u32,
 ) -> isize {
     if mqd < 0 || msg_ptr.is_null() || msg_len == 0 {
-        return -(crate::reliability::errno::EINVAL as isize);
+        return -(errno::EINVAL as isize);
     }
     
     // Find queue
     let mq = match find_mq_by_mqd(mqd as usize) {
         Some(mq) => mq,
-        None => return -(crate::reliability::errno::EBADF as isize),
+        None => return -(errno::EBADF as isize),
     };
     
     // Get message from queue
     let mut messages = mq.messages.lock();
     
     if messages.is_empty() {
-        return -(crate::reliability::errno::EAGAIN as isize);
+        return -(errno::EAGAIN as isize);
     }
     
     // Remove highest priority message (first in queue)
@@ -584,7 +584,7 @@ pub extern "C" fn mq_receive(
     
     // Check if message fits in buffer
     if message.data.len() > msg_len {
-        return -(crate::reliability::errno::EMSGSIZE as isize);
+        return -(errno::EMSGSIZE as isize);
     }
     
     // Copy message to user space
@@ -616,16 +616,16 @@ pub extern "C" fn mq_receive(
 /// # Returns
 /// * 0 on success
 /// * -1 on error
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn mq_getattr(mqd: i32, attr: *mut MqAttr) -> i32 {
     if mqd < 0 || attr.is_null() {
-        return -(crate::reliability::errno::EINVAL as i32);
+        return -(errno::EINVAL as i32);
     }
     
     // Find queue
     let mq = match find_mq_by_mqd(mqd as usize) {
         Some(mq) => mq,
-        None => return -(crate::reliability::errno::EBADF as i32),
+        None => return -(errno::EBADF as i32),
     };
     
     // Create attributes with current message count
@@ -657,29 +657,29 @@ pub extern "C" fn mq_getattr(mqd: i32, attr: *mut MqAttr) -> i32 {
 /// # Returns
 /// * 0 on success
 /// * -1 on error
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn mq_setattr(mqd: i32, attr: *const MqAttr) -> i32 {
     if mqd < 0 || attr.is_null() {
-        return -(crate::reliability::errno::EINVAL as i32);
+        return -(errno::EINVAL as i32);
     }
     
     // Find queue
     let mq = match find_mq_by_mqd(mqd as usize) {
         Some(mq) => mq,
-        None => return -(crate::reliability::errno::EBADF as i32),
+        None => return -(errno::EBADF as i32),
     };
     
     let new_attr = unsafe { *attr };
     
     // Validate new attributes
     if new_attr.mq_maxmsg <= 0 || new_attr.mq_msgsize <= 0 {
-        return -(crate::reliability::errno::EINVAL as i32);
+        return -(errno::EINVAL as i32);
     }
     
     // Check if trying to reduce maxmsg below current count
     let current_count = mq.current_count.load(Ordering::SeqCst);
     if new_attr.mq_maxmsg < current_count as i64 {
-        return -(crate::reliability::errno::EINVAL as i32);
+        return -(errno::EINVAL as i32);
     }
     
     // Update attributes
@@ -703,16 +703,16 @@ pub extern "C" fn mq_setattr(mqd: i32, attr: *const MqAttr) -> i32 {
 /// # Returns
 /// * 0 on success
 /// * -1 on error
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn mq_notify(mqd: i32, notification: *const MqNotify) -> i32 {
     if mqd < 0 || notification.is_null() {
-        return -(crate::reliability::errno::EINVAL as i32);
+        return -(errno::EINVAL as i32);
     }
     
     // Find queue
     let mq = match find_mq_by_mqd(mqd as usize) {
         Some(mq) => mq,
-        None => return -(crate::reliability::errno::EBADF as i32),
+        None => return -(errno::EBADF as i32),
     };
     
     let notify_info = unsafe { *notification };
@@ -720,7 +720,7 @@ pub extern "C" fn mq_notify(mqd: i32, notification: *const MqNotify) -> i32 {
     // Validate notification method
     match notify_info.notify_method {
         MQ_SIGNAL | MQ_PIPE => {},
-        _ => return -(crate::reliability::errno::EINVAL as i32),
+        _ => return -(errno::EINVAL as i32),
     }
     
     // Register notification
@@ -767,7 +767,7 @@ pub fn get_stats() -> (usize, usize, usize) {
     // DEBUG: Type mismatch issue at line 777
     crate::println!("[DEBUG] Type mismatch issue: trying to get &mq_ptr from Arc<MessageQueue>");
     for (_, mq_arc) in queues.iter() {
-        let mq = unsafe { &**mq_arc }; // This is the correct way to deref Arc
+        let mq = &**mq_arc;
         total_messages += mq.current_count.load(Ordering::SeqCst);
     }
     

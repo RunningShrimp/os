@@ -142,7 +142,7 @@ pub fn performance_benchmark() {
     let allocations = 1000;
     let test_size = 256;
 
-    let start_time = crate::time::uptime_ms();
+    let start_time = crate::subsystems::time::uptime_ms();
     let mut ptrs = Vec::new();
 
     // 分配阶段
@@ -153,15 +153,15 @@ pub fn performance_benchmark() {
         }
     }
 
-    let alloc_time = crate::time::uptime_ms() - start_time;
+    let alloc_time = crate::subsystems::time::uptime_ms() - start_time;
 
     // 释放阶段
-    let release_start = crate::time::uptime_ms();
+    let release_start = crate::subsystems::time::uptime_ms();
     for ptr in ptrs {
         unsafe { libc.free(ptr) };
     }
 
-    let release_time = crate::time::uptime_ms() - release_start;
+    let release_time = crate::subsystems::time::uptime_ms() - release_start;
 
     // 打印性能结果
     crate::println!("[perf_benchmark] 性能测试结果:");

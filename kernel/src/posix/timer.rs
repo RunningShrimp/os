@@ -7,7 +7,7 @@ extern crate alloc;
 
 use alloc::sync::Arc;
 use alloc::collections::BTreeMap;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::reliability::errno::{EOK, EINVAL, ENOENT, EPERM, EAGAIN};
 use crate::posix::{TimerT, ClockId, SigEvent, Itimerspec, Timespec, Pid};
 
@@ -28,7 +28,7 @@ mod tests {
         let mut timer = Timer::new(1, crate::posix::CLOCK_MONOTONIC, SigEvent::default(), 1, None);
 
         // Set expiry a short time in the future
-        let now_ns = crate::time::timestamp_nanos();
+        let now_ns = crate::subsystems::time::timestamp_nanos();
         let future_ns = now_ns + 2_000_000_000; // 2 seconds
         timer.expiry_time = Timespec { tv_sec: (future_ns / 1_000_000_000) as i64, tv_nsec: (future_ns % 1_000_000_000) as i64 };
         timer.state = TimerState::Armed;
@@ -106,7 +106,7 @@ impl Timer {
 
         // Calculate remaining time (expiry_time - now)
         // Use the system time source (ns) and convert to Timespec
-        let now_ns = crate::time::timestamp_nanos();
+        let now_ns = crate::subsystems::time::timestamp_nanos();
         let now = Timespec {
             tv_sec: (now_ns / 1_000_000_000) as i64,
             tv_nsec: (now_ns % 1_000_000_000) as i64,
@@ -173,9 +173,7 @@ impl Timer {
         match self.sigevent.sigev_notify {
             crate::posix::SIGEV_SIGNAL => {
                 // Send signal to process
-                unsafe {
-                    let _ = crate::ipc::signal::kill(self.owner_pid as usize, self.sigevent.sigev_signo as u32);
-                }
+                let _ = crate::ipc::signal::kill(self.owner_pid as usize, self.sigevent.sigev_signo as u32);
             }
             crate::posix::SIGEV_THREAD => {
                 // Lightweight thread notification: in full implementation we would
@@ -257,7 +255,7 @@ pub unsafe extern "C" fn timer_create(
     let id = NEXT_TIMER_ID.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
 
     // Create timer
-    let timer = Timer::new(id, clock_id, sigevent, current_pid, current_tid);
+    let timer = Timer::new(id, clock_id, sigevent, current_pid.try_into().unwrap(), current_tid);
     let timer = Arc::new(Mutex::new(timer));
 
     // Register timer
@@ -265,7 +263,7 @@ pub unsafe extern "C" fn timer_create(
 
     // Check timer limit per process
     let timer_count = registry.values()
-        .filter(|t| t.lock().owner_pid == current_pid)
+        .filter(|t| t.lock().owner_pid as i32 == current_pid)
         .count();
 
     if timer_count >= TIMER_MAX {

@@ -1,0 +1,10 @@
+[target.x86_64-unknown-none]
+linker = "rust-lld"
+ar = "llvm-ar"
+
+[build]
+target = "x86_64-unknown-none"
+
+# [unstable]
+# build-std = ["core", "compiler_builtins"]
+# build-std-features = ["compiler-builtins-mem"]

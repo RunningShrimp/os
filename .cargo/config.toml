@@ -9,6 +9,9 @@ k-x86_64 = "run -p xtask -- kernel x86_64"
 u-aarch64 = "run -p xtask -- user aarch64"
 u-riscv64 = "run -p xtask -- user riscv64"
 u-x86_64 = "run -p xtask -- user x86_64"
+k-dev = "build -p kernel --features observability,debug_subsystems,lazy_init"
+k-perf = "build -p kernel --features fast_syscall,zero_copy,batch_syscalls,net_opt,sched_opt"
+k-min = "build -p kernel --features observability"
 
 [target."targets/riscv64-nostd.json"]
 linker = "rust-lld"

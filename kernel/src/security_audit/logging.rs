@@ -175,7 +175,7 @@ impl LogManager {
             return Err("Log manager not running");
         }
 
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         // 序列化事件
         let serialized = self.serialize_event(event)?;
@@ -225,7 +225,7 @@ impl LogManager {
             stats.total_events_written += 1;
             stats.total_bytes_written += encrypted_data.len() as u64;
 
-            let elapsed = crate::time::get_timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
             stats.avg_write_time_us = (stats.avg_write_time_us + elapsed / 1000) / 2;
         }
 
@@ -264,7 +264,7 @@ impl LogManager {
     fn compress_data(&self, data: &[u8]) -> Result<Vec<u8>, &'static str> {
         // 简化的压缩实现
         // 实际实现会使用专业的压缩库
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         // 模拟压缩（实际会使用zlib/gzip等）
         let compressed = if data.len() > 100 {
@@ -277,7 +277,7 @@ impl LogManager {
             data.to_vec()
         };
 
-        let elapsed = crate::time::get_timestamp_nanos() - start_time;
+        let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
 
         // 更新压缩统计
         {
@@ -300,7 +300,7 @@ impl LogManager {
     fn encrypt_data(&self, data: &[u8]) -> Result<Vec<u8>, &'static str> {
         // 简化的加密实现
         // 实际实现会使用AES等安全加密算法
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         // 简单的XOR加密（仅用于演示）
         let key = self.storage_config.encryption.key.as_bytes();
@@ -311,7 +311,7 @@ impl LogManager {
             encrypted.push(byte ^ key_byte);
         }
 
-        let elapsed = crate::time::get_timestamp_nanos() - start_time;
+        let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
 
         // 更新加密统计
         {
@@ -393,7 +393,7 @@ impl FileSystemWriter {
     /// 创建新日志文件
     fn create_new_file(&mut self) -> Result<(), &'static str> {
         // 简化的文件创建逻辑
-        let timestamp = crate::time::get_timestamp();
+        let timestamp = crate::subsystems::time::get_timestamp();
         let file_name = format!("audit_{}.log", timestamp);
         self.current_file_path = format!("{}/{}", self.config.storage_path, file_name);
         self.current_file_size = 0;
@@ -425,7 +425,7 @@ impl LogWriter for FileSystemWriter {
         // 序列化事件（简化实现）
         let event_str = format!(
             "[{}] {}:{} {} {}\n",
-            crate::time::format_timestamp(event.timestamp),
+            crate::subsystems::time::format_timestamp(event.timestamp),
             event.pid,
             event.uid,
             format!("{:?}", event.event_type),
@@ -439,7 +439,7 @@ impl LogWriter for FileSystemWriter {
         // 更新统计
         self.stats.events_written += 1;
         self.stats.bytes_written += bytes_written;
-        self.stats.last_write_time = crate::time::get_timestamp_nanos();
+        self.stats.last_write_time = crate::subsystems::time::get_timestamp_nanos();
 
         crate::println!("[FileSystemWriter] Wrote {} bytes to {}", bytes_written, self.current_file_path);
         Ok(())
@@ -489,7 +489,7 @@ impl LogWriter for DatabaseWriter {
         // 更新统计
         self.stats.events_written += 1;
         self.stats.bytes_written += 128; // 估算大小
-        self.stats.last_write_time = crate::time::get_timestamp_nanos();
+        self.stats.last_write_time = crate::subsystems::time::get_timestamp_nanos();
 
         Ok(())
     }
@@ -538,7 +538,7 @@ impl LogWriter for RemoteLogWriter {
         // 更新统计
         self.stats.events_written += 1;
         self.stats.bytes_written += 256; // 网络传输估算
-        self.stats.last_write_time = crate::time::get_timestamp_nanos();
+        self.stats.last_write_time = crate::subsystems::time::get_timestamp_nanos();
 
         Ok(())
     }
@@ -604,7 +604,7 @@ impl LogWriter for MemoryWriter {
         // 更新统计
         self.stats.events_written += 1;
         self.stats.bytes_written += 64; // 估算大小
-        self.stats.last_write_time = crate::time::get_timestamp_nanos();
+        self.stats.last_write_time = crate::subsystems::time::get_timestamp_nanos();
         self.stats.buffer_usage = self.buffer.len();
 
         Ok(())
@@ -655,7 +655,7 @@ mod tests {
         let event = AuditEvent {
             id: 1,
             event_type: AuditEventType::SecurityViolation,
-            timestamp: crate::time::get_timestamp_nanos(),
+            timestamp: crate::subsystems::time::get_timestamp_nanos(),
             pid: 1234,
             uid: 1000,
             gid: 1000,
@@ -683,7 +683,7 @@ mod tests {
         let event = AuditEvent {
             id: 1,
             event_type: AuditEventType::SecurityViolation,
-            timestamp: crate::time::get_timestamp_nanos(),
+            timestamp: crate::subsystems::time::get_timestamp_nanos(),
             pid: 1234,
             uid: 1000,
             gid: 1000,

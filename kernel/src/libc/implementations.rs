@@ -17,9 +17,8 @@ use alloc::boxed::Box;
 
 use crate::libc::CLibInterface;
 use crate::libc::interface::{size_t, DivT, LDivT, CLibResult, CLibStats, c_long};
-use crate::libc::memory_adapter::get_libc_adapter;
-use core::ffi::{c_int, c_char, c_void, c_uint, c_double, c_ulong};
-use alloc::alloc::{alloc, Layout};
+use core::ffi::{c_int, c_char, c_void, c_uint, c_double};
+
 
 // 导入增强库模块
 use crate::libc::string_lib::EnhancedStringLib;
@@ -39,14 +38,7 @@ pub enum ImplementationType {
     Unified,
 }
 
-// 重新导出类型以保持向后兼容
-pub mod simple {
-    pub use crate::libc::implementations::UnifiedCLib;
-}
 
-pub mod minimal {
-    pub use crate::libc::implementations::UnifiedCLib;
-}
 
 /// 统一的C标准库实现
 /// 
@@ -466,7 +458,7 @@ impl CLibInterface for UnifiedCLib {
     }
 
     fn sleep(&self, seconds: c_uint) -> c_uint {
-        crate::time::sleep_ms(seconds as u64 * 1000);
+        crate::subsystems::time::sleep_ms(seconds as u64 * 1000);
         0
     }
 
@@ -500,6 +492,14 @@ impl CLibInterface for UnifiedCLib {
         let _error_number = errnum; // 使用 errnum 进行验证
         static ERROR_MSG: &[u8] = b"Unknown error\0";
         ERROR_MSG.as_ptr() as *const c_char
+    }
+
+    fn error_type(&self) -> c_int {
+        0
+    }
+
+    fn error_code(&self) -> c_int {
+        0
     }
 
     // 环境变量函数 - 使用增强环境变量管理器

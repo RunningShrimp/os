@@ -4,8 +4,9 @@
 //! CPU architectures, allowing the bootloader to support x86_64, AArch64,
 //! and RISC-V with a unified interface.
 
-use crate::error::{BootError, Result};
+use crate::utils::error::{BootError, Result};
 use core::arch::asm;
+use crate::println;
 
 // Architecture-specific modules
 #[cfg(target_arch = "x86_64")]
@@ -78,7 +79,7 @@ impl Architecture {
     }
 
     /// Get architecture-specific CPU features
-    pub fn cpu_features(self) -> CpuFeatures {
+    pub fn cpu_features(self) -> u64 {
         match self {
             #[cfg(target_arch = "x86_64")]
             Architecture::X86_64 => x86_64::get_cpu_features(),
@@ -90,7 +91,7 @@ impl Architecture {
             Architecture::RiscV64 => riscv64::get_cpu_features(),
 
             #[allow(unreachable_patterns)]
-            _ => CpuFeatures::default(),
+            _ => 0,
         }
     }
 }
@@ -183,65 +184,61 @@ impl MemoryLayout {
     }
 }
 
-/// Boot parameters passed to the kernel
-#[derive(Debug)]
-#[repr(C)]
-pub struct BootParameters {
-    /// Magic number to identify valid boot parameters
-    pub magic: u64,
-    /// Version of the boot parameter structure
-    pub version: u32,
-    /// Architecture type
-    pub architecture: u32,
-    /// Boot protocol type
-    pub boot_protocol: u32,
-    /// Memory map information
-    pub memory_map: usize,
-    pub memory_map_size: usize,
-    /// Framebuffer information (if available)
-    pub framebuffer: usize,
-    /// ACPI RSDP (if available)
-    pub acpi_rsdp: usize,
-    /// Device tree blob (if available)
-    pub device_tree: usize,
-    /// Command line arguments
-    pub command_line: usize,
-    pub command_line_size: usize,
-    /// Boot timestamp
-    pub timestamp: u64,
-    /// Reserved fields for future expansion
-    pub reserved: [u64; 8],
-}
+// Re-export unified boot parameters from nos-api
+pub use nos_api::boot::BootParameters;
 
-impl BootParameters {
-    /// Create new boot parameters
-    pub fn new(boot_info: &crate::protocol::BootInfo, kernel_image: &crate::protocol::KernelImage) -> Self {
-        Self {
-            magic: 0x4E4F5342_4F4F5452, // "NOS_BOOT"
-            version: 1,
-            architecture: match boot_info.protocol_type {
-                crate::protocol::ProtocolType::UEFI => 1,
-                crate::protocol::ProtocolType::BIOS => 2,
-                crate::protocol::ProtocolType::Multiboot2 => 3,
-                _ => 0,
-            },
-            boot_protocol: match boot_info.protocol_type {
-                crate::protocol::ProtocolType::UEFI => 1,
-                crate::protocol::ProtocolType::BIOS => 2,
-                crate::protocol::ProtocolType::Multiboot2 => 3,
-                _ => 0,
-            },
-            memory_map: 0, // Will be filled in by architecture-specific code
-            memory_map_size: 0,
-            framebuffer: 0, // Will be filled in if framebuffer is available
-            acpi_rsdp: boot_info.acpi_rsdp.unwrap_or(0),
-            device_tree: boot_info.device_tree.unwrap_or(0),
-            command_line: 0, // Will be filled in if command line is available
-            command_line_size: 0,
-            timestamp: boot_info.boot_timestamp,
-            reserved: [0; 8],
-        }
+// Helper function to create boot parameters from boot info
+pub fn create_boot_parameters(
+    boot_info: &crate::protocol::BootInfo,
+    kernel_image: &crate::protocol::KernelImage,
+) -> BootParameters {
+    let mut params = BootParameters::new();
+    
+    // Set architecture
+    params.architecture = match boot_info.protocol_type {
+        crate::protocol::BootProtocolType::Uefi => 0, // x86_64
+        crate::protocol::BootProtocolType::Bios => 0,  // x86_64
+        crate::protocol::BootProtocolType::Multiboot2 => 0, // x86_64
+    };
+    
+    // Set boot protocol
+    params.boot_protocol = match boot_info.protocol_type {
+        crate::protocol::BootProtocolType::Uefi => nos_api::boot::BootProtocolType::UEFI as u32,
+        crate::protocol::BootProtocolType::Bios => nos_api::boot::BootProtocolType::BIOS as u32,
+        crate::protocol::BootProtocolType::Multiboot2 => nos_api::boot::BootProtocolType::Multiboot2 as u32,
+    };
+    
+    // Set memory map (will be filled in by architecture-specific code)
+    params.memory_map = nos_api::boot::MemoryMap {
+        entry_count: 0,
+        entries: 0,
+    };
+    
+    // Set framebuffer if available
+    if let Some(fb) = &boot_info.framebuffer {
+        params.framebuffer = nos_api::boot::FramebufferInfo {
+            address: fb.address as u64,
+            width: fb.width,
+            height: fb.height,
+            bytes_per_pixel: fb.bpp,
+            stride: fb.pitch,
+            pixel_format: 0, // RGB
+        };
     }
+    
+    // Set ACPI RSDP
+    params.acpi_rsdp = boot_info.acpi_rsdp.unwrap_or(0);
+    
+    // Set device tree
+    params.device_tree = boot_info.device_tree.unwrap_or(0);
+    
+    // Set command line (will be filled in by architecture-specific code)
+    params.command_line = 0;
+    
+    // Set timestamp
+    params.timestamp = boot_info.boot_timestamp;
+    
+    params
 }
 
 /// Early architecture-specific initialization
@@ -386,13 +383,13 @@ pub unsafe fn jump_to_kernel(entry_point: usize, boot_params: &BootParameters) -
 
     match Architecture::current() {
         #[cfg(target_arch = "x86_64")]
-        Architecture::X86_64 => x86_64::jump_to_kernel(entry_point, boot_params),
+        Architecture::X86_64 => x86_64::jump_to_kernel(entry_point),
 
         #[cfg(target_arch = "aarch64")]
-        Architecture::AArch64 => aarch64::jump_to_kernel(entry_point, boot_params),
+        Architecture::AArch64 => aarch64::jump_to_kernel(entry_point),
 
         #[cfg(target_arch = "riscv64")]
-        Architecture::RiscV64 => riscv64::jump_to_kernel(entry_point, boot_params),
+        Architecture::RiscV64 => riscv64::jump_to_kernel(entry_point),
 
         #[allow(unreachable_patterns)]
         _ => panic!("Unsupported architecture"),

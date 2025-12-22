@@ -9,9 +9,9 @@ use heapless::String as HeaplessString;
 
 // Microkernel IPC types - using real implementations
 pub use crate::microkernel::service_registry::{
-    ServiceId, ServiceCategory, ServiceInfo, InterfaceVersion, ServiceStatus, ServicePriority
+    ServiceId
 };
-pub use crate::microkernel::ipc::IpcMessage as Message;
+pub use crate::subsystems::microkernel::ipc::IpcMessage as Message;
 
 /// Message type for IPC communication
 /// Maps to the message_type field in IpcMessage
@@ -37,7 +37,7 @@ impl Message {
     /// Create a new message with the given type and data
     pub fn new_with_type(message_type: MessageType, data: Vec<u8>) -> Self {
         // Use a default sender/receiver ID (0 means system)
-        crate::microkernel::ipc::IpcMessage::new(0, 0, message_type.as_u32(), data)
+        crate::subsystems::microkernel::ipc::IpcMessage::new(0, 0, message_type.as_u32(), data)
     }
     
     /// Create a new request message
@@ -58,7 +58,7 @@ impl Message {
 
 // IPC function implementations using real IPC system
 pub fn send_message(service_id: ServiceId, message: Message) -> Result<(), ()> {
-    use crate::microkernel::ipc;
+    use crate::subsystems::microkernel::ipc;
     
     // Get the IPC manager instance
     let manager = match ipc::get_ipc_manager() {
@@ -80,7 +80,7 @@ pub fn send_message(service_id: ServiceId, message: Message) -> Result<(), ()> {
 }
 
 pub fn receive_message() -> Result<Message, ()> {
-    use crate::microkernel::ipc;
+    use crate::subsystems::microkernel::ipc;
     
     // Get the IPC manager instance
     let manager = match ipc::get_ipc_manager() {
@@ -106,15 +106,16 @@ pub fn receive_message() -> Result<Message, ()> {
 use crate::posix::{Pid, Uid, Gid};
 
 // Re-export POSIX types (use posix module types if available)
-pub type pid_t = crate::posix::Pid;
-pub type uid_t = crate::posix::Uid;
-pub type gid_t = crate::posix::Gid;
-pub type AF_UNIX = i32;
+pub type PidT = crate::posix::Pid;
+pub type UidT = crate::posix::Uid;
+pub type GidT = crate::posix::Gid;
+pub type AfUnix = i32;
 
-pub const AF_UNIX_CONST: AF_UNIX = 1;
+pub const AF_UNIX_CONST: AfUnix = 1;
 
 // Service registry - using real implementation
-pub use crate::microkernel::service_registry::{ServiceRegistry, get_service_registry};
+// TODO: Re-enable when service registry is fully implemented
+// pub use crate::subsystems::microkernel::service_registry::{ServiceRegistry, get_service_registry};
 
 // Process stubs - Use real Process type from process module when possible
 // For compatibility, keep a minimal stub but prefer using crate::process::Proc
@@ -226,7 +227,8 @@ pub const SOCK_DGRAM: i32 = 2;
 pub const SOCK_RAW: i32 = 3;
 
 // Additional type stubs for re-exporting core atomic types
-pub use core::sync::atomic::AtomicU32;
+// TODO: Re-enable when atomic types are needed
+// pub use core::sync::atomic::{AtomicU32, AtomicU64};
 
 // Device driver trait stubs
 pub trait BlockDevice {

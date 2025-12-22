@@ -3,21 +3,20 @@
 //! This module provides the UEFI application entry point that initializes
 //! the bootloader and runs the main boot logic.
 
-use crate::error::{BootError, Result};
-use crate::protocol::uefi::{UefiProtocol, set_active_protocol};
+use crate::utils::error::{BootError, Result};
 use crate::protocol::BootProtocol;
+use crate::protocol::uefi::{UefiProtocol, set_active_protocol, init_uefi_panic_handler};
 use core::ptr;
 
 #[cfg(feature = "uefi_support")]
-use uefi::{prelude::*, table::Boot};
+use uefi::{Handle, Status};
+#[cfg(feature = "uefi_support")]
+use uefi_raw::table::system::SystemTable;
 
 /// UEFI application entry point
 #[cfg(feature = "uefi_support")]
-#[entry]
-pub fn efi_main(
-    image_handle: uefi::Handle,
-    system_table: SystemTable<Boot>,
-) -> uefi::Status {
+#[no_mangle]
+pub extern "C" fn efi_main(image_handle: Handle, system_table: *const SystemTable) -> Status {
     // Initialize panic handler early
     init_uefi_panic_handler();
 
@@ -25,9 +24,9 @@ pub fn efi_main(
     let mut uefi_protocol = UefiProtocol::new();
 
     // Initialize with the system table
-    if let Err(e) = uefi_protocol.initialize_with_system_table(&system_table) {
+    if let Err(e) = uefi_protocol.initialize_with_system_table(system_table) {
         println!("Failed to initialize UEFI protocol: {:?}", e);
-        return uefi::Status::ABORTED;
+        return Status::ABORTED;
     }
 
     // Set the active protocol for global access
@@ -36,11 +35,11 @@ pub fn efi_main(
     // Run the main bootloader logic
     if let Err(e) = run_uefi_bootloader() {
         println!("Bootloader failed: {:?}", e);
-        return uefi::Status::ABORTED;
+        return Status::ABORTED;
     }
 
     // If we get here, something went wrong
-    uefi::Status::ABORTED
+    Status::ABORTED
 }
 
 /// Run the UEFI bootloader main logic
@@ -204,8 +203,8 @@ fn load_and_boot_kernel_uefi(protocol_manager: &mut crate::protocol::ProtocolMan
                 // Get boot information
                 let boot_info = protocol_manager.get_boot_info()?;
 
-                // Create boot parameters
-                let boot_params = crate::kernel::KernelBootParameters::new(&boot_info, &kernel_image);
+                // Create boot parameters using unified structure
+                let boot_params = crate::arch::create_boot_parameters(&boot_info, &kernel_image);
 
                 // Exit boot services
                 protocol_manager.exit_boot_services()?;
@@ -213,7 +212,7 @@ fn load_and_boot_kernel_uefi(protocol_manager: &mut crate::protocol::ProtocolMan
                 // Jump to kernel
                 println!("[boot] Jumping to kernel...");
                 unsafe {
-                    crate::arch::jump_to_kernel(kernel_image.entry_point, &boot_params.into_struct());
+                    crate::arch::jump_to_kernel(kernel_image.entry_point, &boot_params);
                 }
 
                 unreachable!();
@@ -242,7 +241,6 @@ pub extern "C" fn efi_main() -> u32 {
     0xDEADBEEF // Error code for UEFI not supported
 }
 
-extern crate alloc;
 #[cfg(not(feature = "uefi_support"))]
 fn run_uefi_bootloader() -> Result<()> {
     Err(BootError::FeatureNotEnabled("UEFI support"))

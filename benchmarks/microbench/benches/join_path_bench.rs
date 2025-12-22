@@ -22,14 +22,14 @@ fn join_path(base: &str, rel: &str) -> String {
 fn bench_join_path(c: &mut Criterion) {
     c.bench_function("join_path_deep", |b| {
         b.iter(|| {
-            let base = black_box("/usr/local/lib/rust");
+            let base = std::hint::black_box("/usr/local/lib/rust");
             let rel = black_box("../../bin/../share/doc/./examples");
             let _ = join_path(base, rel);
         });
     });
     c.bench_function("join_path_abs", |b| {
         b.iter(|| {
-            let base = black_box("/var/log");
+            let base = std::hint::black_box("/var/log");
             let rel = black_box("/etc/../etc/systemd");
             let _ = join_path(base, rel);
         });

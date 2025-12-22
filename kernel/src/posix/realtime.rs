@@ -8,9 +8,9 @@
 //! - sched_setaffinity() / sched_getaffinity() - CPU affinity management
 
 use crate::posix::Pid;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use alloc::collections::BTreeMap;
-use core::sync::atomic::{AtomicU32, Ordering};
+
 
 /// Scheduling policies
 pub const SCHED_NORMAL: i32 = 0;    // Normal (non-real-time) scheduling
@@ -185,7 +185,7 @@ impl ProcessSchedInfo {
             param: SchedParam::default(),
             affinity: CpuSet::all(),
             rr_timeslice: 10_000_000, // 10ms default
-            last_scheduled: crate::time::get_timestamp(),
+            last_scheduled: crate::subsystems::time::get_timestamp(),
             cpu_time: 0,
         }
     }
@@ -202,7 +202,7 @@ impl ProcessSchedInfo {
             param,
             affinity: CpuSet::all(),
             rr_timeslice: 10_000_000,
-            last_scheduled: crate::time::get_timestamp(),
+            last_scheduled: crate::subsystems::time::get_timestamp(),
             cpu_time: 0,
         })
     }
@@ -215,7 +215,7 @@ impl ProcessSchedInfo {
 
         self.policy = policy;
         self.param = param;
-        self.last_scheduled = crate::time::get_timestamp();
+        self.last_scheduled = crate::subsystems::time::get_timestamp();
         Ok(())
     }
 
@@ -226,7 +226,7 @@ impl ProcessSchedInfo {
         }
 
         self.param = param;
-        self.last_scheduled = crate::time::get_timestamp();
+        self.last_scheduled = crate::subsystems::time::get_timestamp();
         Ok(())
     }
 

@@ -6,7 +6,7 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use crate::time::hrtime_nanos;
+use crate::subsystems::time::hrtime_nanos;
 
 /// System call benchmark results
 #[derive(Debug, Clone)]

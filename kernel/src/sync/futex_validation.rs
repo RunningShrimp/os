@@ -6,10 +6,7 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
-use alloc::collections::BTreeMap;
-use core::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
-use crate::sync::Mutex;
+use core::sync::atomic::{AtomicI32, Ordering};
 use crate::syscalls::thread::{
     FutexWaiter, PiFutexData, FUTEX_WAIT_QUEUE,
     futex_wait_timeout, futex_wake_optimized, futex_requeue,
@@ -18,7 +15,7 @@ use crate::syscalls::thread::{
     requeue_futex_waiters, get_current_time_ns, is_timeout_expired
 };
 use crate::syscalls::common::SyscallError;
-use crate::mm::vm::PageTable;
+use crate::subsystems::mm::vm::PageTable;
 
 /// Validation test results
 #[derive(Debug, Default)]

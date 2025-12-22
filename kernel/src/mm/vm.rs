@@ -8,12 +8,338 @@
 extern crate alloc;
 
 use core::ptr;
-use crate::mm::{kalloc, kfree};
+use core::sync::atomic::{AtomicU32, Ordering};
+use core::ops::Range;
+use alloc::collections::BTreeMap;
+use alloc::vec::Vec;
+use crate::subsystems::mm::{kalloc, kfree};
 
 // Re-export PAGE_SIZE for other modules
-pub use crate::mm::PAGE_SIZE;
+pub use crate::subsystems::mm::PAGE_SIZE;
 use crate::drivers::platform;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
+
+// ============================================================================
+// VMA 区间管理（mmap 基础骨架）
+// ============================================================================
+
+/// 虚拟区间权限
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VmPerm {
+    pub read: bool,
+    pub write: bool,
+    pub exec: bool,
+    pub user: bool,
+}
+
+impl VmPerm {
+    pub const fn rw() -> Self {
+        Self {
+            read: true,
+            write: true,
+            exec: false,
+            user: true,
+        }
+    }
+
+    pub const fn r() -> Self {
+        Self {
+            read: true,
+            write: false,
+            exec: false,
+            user: true,
+        }
+    }
+
+    pub const fn rx() -> Self {
+        Self {
+            read: true,
+            write: false,
+            exec: true,
+            user: true,
+        }
+    }
+
+    pub fn to_pte_flags(&self) -> usize {
+        let mut flags = flags::PTE_V;
+        if self.read {
+            flags |= flags::PTE_R;
+        }
+        if self.write {
+            flags |= flags::PTE_W;
+        }
+        if self.exec {
+            flags |= flags::PTE_X;
+        }
+        if self.user {
+            flags |= flags::PTE_U;
+        }
+        flags
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VmError {
+    InvalidRange,
+    Overlap,
+    NotFound,
+    NotPinned,
+    NoMemory,
+    MapFailed,
+}
+
+#[derive(Debug, Clone)]
+pub struct VmArea {
+    pub range: Range<usize>,
+    pub perm: VmPerm,
+    pub file_backed: bool,
+    pub file_offset: usize,
+    pub lazy: bool,
+    pub cow: bool,
+}
+
+impl VmArea {
+    pub fn len(&self) -> usize {
+        self.range.end.saturating_sub(self.range.start)
+    }
+}
+
+/// 简单 VMA 树，后续可替换为平衡树/区间树。
+#[derive(Default, Debug)]
+pub struct VmSpace {
+    areas: BTreeMap<usize, VmArea>,
+}
+
+impl VmSpace {
+    fn overlap(range: &Range<usize>, other: &Range<usize>) -> bool {
+        range.start < other.end && other.start < range.end
+    }
+
+    pub fn map(
+        &mut self,
+        start: usize,
+        length: usize,
+        perm: VmPerm,
+        file_backed: bool,
+        file_offset: usize,
+    ) -> Result<usize, VmError> {
+        if length == 0 {
+            return Err(VmError::InvalidRange);
+        }
+        let start_aligned = start & !(PAGE_SIZE - 1);
+        let end_aligned = (start_aligned + length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+        if end_aligned <= start_aligned {
+            return Err(VmError::InvalidRange);
+        }
+
+        let new_range = start_aligned..end_aligned;
+        for area in self.areas.values() {
+            if Self::overlap(&new_range, &area.range) {
+                return Err(VmError::Overlap);
+            }
+        }
+
+        self.areas.insert(
+            start_aligned,
+            VmArea {
+                range: new_range.clone(),
+                perm,
+                file_backed,
+                file_offset,
+                lazy: false,
+                cow: false,
+            },
+        );
+        Ok(start_aligned)
+    }
+
+    pub fn mmap_anonymous(&mut self, hint: usize, length: usize, perm: VmPerm) -> Result<usize, VmError> {
+        let start = if hint == 0 {
+            self.find_free_area(length).ok_or(VmError::InvalidRange)?
+        } else {
+            hint
+        };
+        self.map(start, length, perm, false, 0)
+    }
+
+    pub fn unmap(&mut self, start: usize, length: usize) -> Result<(), VmError> {
+        let start_aligned = start & !(PAGE_SIZE - 1);
+        let end_aligned = (start_aligned + length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+        let target = start_aligned..end_aligned;
+
+        let key = self
+            .areas
+            .iter()
+            .find(|(_, area)| area.range == target)
+            .map(|(k, _)| *k)
+            .ok_or(VmError::NotFound)?;
+
+        self.areas.remove(&key);
+        Ok(())
+    }
+
+    pub fn find_free_area(&self, length: usize) -> Option<usize> {
+        let length_aligned = (length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+        let mut cursor = PAGE_SIZE; // 保留低地址
+        for area in self.areas.values() {
+            if cursor + length_aligned <= area.range.start {
+                return Some(cursor);
+            }
+            cursor = area.range.end;
+        }
+        Some(cursor)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &VmArea> {
+        self.areas.values()
+    }
+
+    /// 针对懒分配：调用者提供映射回调
+    pub fn fault_in<F>(
+        &mut self,
+        va: usize,
+        map_fn: F,
+    ) -> Result<(), VmError>
+    where
+        F: FnOnce(&VmArea) -> Result<(), VmError>,
+    {
+        let page_base = va & !(PAGE_SIZE - 1);
+        let area = self
+            .areas
+            .iter_mut()
+            .find(|(_, a)| a.range.start <= page_base && page_base < a.range.end)
+            .ok_or(VmError::NotFound)?
+            .1;
+        if !area.lazy {
+            return Err(VmError::MapFailed);
+        }
+        map_fn(area)?;
+        area.lazy = false;
+        Ok(())
+    }
+
+    /// 针对 COW：调用者提供复制+映射回调
+    pub fn handle_cow<F>(
+        &mut self,
+        va: usize,
+        copy_map_fn: F,
+    ) -> Result<(), VmError>
+    where
+        F: FnOnce(&VmArea) -> Result<(), VmError>,
+    {
+        let page_base = va & !(PAGE_SIZE - 1);
+        let area = self
+            .areas
+            .iter_mut()
+            .find(|(_, a)| a.range.start <= page_base && page_base < a.range.end)
+            .ok_or(VmError::NotFound)?
+            .1;
+        if !area.cow {
+            return Err(VmError::MapFailed);
+        }
+        copy_map_fn(area)?;
+        area.cow = false;
+        Ok(())
+    }
+
+    /// 将区间标记为懒分配
+    pub fn mark_lazy(&mut self, start: usize, length: usize) -> Result<(), VmError> {
+        let start_aligned = start & !(PAGE_SIZE - 1);
+        let end_aligned = (start_aligned + length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+        let target = start_aligned..end_aligned;
+        let (_, area) = self
+            .areas
+            .iter_mut()
+            .find(|(_, area)| area.range == target)
+            .ok_or(VmError::NotFound)?;
+        area.lazy = true;
+        Ok(())
+    }
+
+    /// 标记区间为 COW
+    pub fn mark_cow(&mut self, start: usize, length: usize) -> Result<(), VmError> {
+        let start_aligned = start & !(PAGE_SIZE - 1);
+        let end_aligned = (start_aligned + length + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+        let target = start_aligned..end_aligned;
+        let (_, area) = self
+            .areas
+            .iter_mut()
+            .find(|(_, area)| area.range == target)
+            .ok_or(VmError::NotFound)?;
+        area.cow = true;
+        Ok(())
+    }
+}
+
+// ============================================================================
+// Page Reference Counting for COW
+// ============================================================================
+
+/// Maximum number of pages to track (configurable based on memory size)
+const MAX_TRACKED_PAGES: usize = 65536;
+
+/// Page reference counts (indexed by page frame number)
+static PAGE_REFCOUNTS: Mutex<BTreeMap<usize, u32>> = Mutex::new(BTreeMap::new());
+
+/// Increment reference count for a page
+pub fn page_ref_inc(pa: usize) {
+    let pfn = pa / PAGE_SIZE;
+    let mut refcounts = PAGE_REFCOUNTS.lock();
+    let count = refcounts.entry(pfn).or_insert(0);
+    *count = count.saturating_add(1);
+}
+
+/// Decrement reference count for a page and free if zero
+/// Returns true if the page was freed
+pub fn page_ref_dec(pa: usize) -> bool {
+    let pfn = pa / PAGE_SIZE;
+    let mut refcounts = PAGE_REFCOUNTS.lock();
+    
+    if let Some(count) = refcounts.get_mut(&pfn) {
+        *count = count.saturating_sub(1);
+        if *count == 0 {
+            refcounts.remove(&pfn);
+            // Free the page
+            unsafe { kfree(pa as *mut u8); }
+            return true;
+        }
+    }
+    false
+}
+
+/// Get reference count for a page
+pub fn page_ref_count(pa: usize) -> u32 {
+    let pfn = pa / PAGE_SIZE;
+    let refcounts = PAGE_REFCOUNTS.lock();
+    *refcounts.get(&pfn).unwrap_or(&1)
+}
+
+// ============================================================================
+// 用户页 pin/unpin（零拷贝基础）
+// ============================================================================
+
+/// 固定用户页，返回物理页帧列表（占位实现）
+pub fn pin_user_pages(_pagetable: *mut PageTable, addrs: &[usize]) -> Result<Vec<usize>, VmError> {
+    // TODO: walk pagetable, increase refcount and mark pinned
+    let mut frames = Vec::with_capacity(addrs.len());
+    for &va in addrs {
+        // 对齐到页
+        let pa = va & !(PAGE_SIZE - 1);
+        frames.push(pa);
+        page_ref_inc(pa);
+    }
+    Ok(frames)
+}
+
+/// 解除固定用户页（占位实现）
+pub fn unpin_user_pages(frames: &[usize]) -> Result<(), VmError> {
+    for &pa in frames {
+        if !page_ref_dec(pa) {
+            // 未真正减少到零也视为成功
+        }
+    }
+    Ok(())
+}
 
 // ============================================================================
 // Architecture-specific page table definitions
@@ -171,6 +497,75 @@ mod riscv64 {
 
         *pte = pa_to_pte(pa) | flags;
         Ok(())
+    }
+    
+    /// Map a huge page (2MB or 1GB) for RISC-V Sv39
+    pub unsafe fn map_huge_page(
+        pagetable: *mut PageTable,
+        va: usize,
+        pa: usize,
+        size: usize,
+        perm: usize,
+    ) -> Result<(), ()> {
+        use crate::subsystems::mm::hugepage::{HPAGE_2MB, HPAGE_1GB};
+        
+        if size == HPAGE_2MB {
+            // 2MB huge page: use level 1 PTE (superpage)
+            let mut pt = pagetable;
+            
+            // Walk to level 2
+            let vpn2 = (va >> (PAGE_OFFSET_BITS + VPN_BITS)) & 0x1FF;
+            let pte2 = &mut (*pt).entries[vpn2];
+            
+            if *pte2 & PTE_V == 0 {
+                // Allocate level 2 page table if needed
+                let new_pt = kalloc();
+                if new_pt.is_null() {
+                    return Err(());
+                }
+                ptr::write_bytes(new_pt, 0, PAGE_SIZE);
+                *pte2 = pa_to_pte(new_pt as usize) | PTE_V;
+                pt = new_pt as *mut PageTable;
+            } else {
+                pt = pte_to_pa(*pte2) as *mut PageTable;
+            }
+            
+            // Set level 1 PTE for 2MB page
+            let vpn1 = (va >> PAGE_OFFSET_BITS) & 0x1FF;
+            let pte1 = &mut (*pt).entries[vpn1];
+            
+            if *pte1 & PTE_V != 0 {
+                return Err(()); // Already mapped
+            }
+            
+            let mut flags = perm | PTE_V;
+            if perm & PTE_DEV != 0 {
+                const PTE_PBMT_IO: usize = 1 << 62;
+                flags |= PTE_PBMT_IO;
+            }
+            
+            *pte1 = pa_to_pte(pa) | flags;
+            Ok(())
+        } else if size == HPAGE_1GB {
+            // 1GB huge page: use level 2 PTE directly (megapage)
+            let vpn2 = (va >> (PAGE_OFFSET_BITS + VPN_BITS)) & 0x1FF;
+            let pte2 = &mut (*pagetable).entries[vpn2];
+            
+            if *pte2 & PTE_V != 0 {
+                return Err(()); // Already mapped
+            }
+            
+            let mut flags = perm | PTE_V;
+            if perm & PTE_DEV != 0 {
+                const PTE_PBMT_IO: usize = 1 << 62;
+                flags |= PTE_PBMT_IO;
+            }
+            
+            *pte2 = pa_to_pte(pa) | flags;
+            Ok(())
+        } else {
+            Err(()) // Unsupported huge page size
+        }
     }
     
     /// Unmap a virtual address
@@ -350,6 +745,85 @@ mod aarch64 {
         Ok(())
     }
     
+    /// Map a huge page (2MB or 1GB) for AArch64
+    pub unsafe fn map_huge_page(
+        pagetable: *mut PageTable,
+        va: usize,
+        pa: usize,
+        size: usize,
+        perm: usize,
+    ) -> Result<(), ()> {
+        use crate::subsystems::mm::hugepage::{HPAGE_2MB, HPAGE_1GB};
+        
+        if size == HPAGE_2MB {
+            // 2MB huge page: use level 2 descriptor
+            let mut pt = pagetable;
+            
+            // Walk to level 1
+            let idx1 = va_index(va, 1);
+            let pte1 = &mut (*pt).entries[idx1];
+            
+            if *pte1 & DESC_VALID == 0 {
+                // Allocate level 1 page table if needed
+                let new_pt = kalloc();
+                if new_pt.is_null() {
+                    return Err(());
+                }
+                ptr::write_bytes(new_pt, 0, PAGE_SIZE);
+                *pte1 = (new_pt as usize) | DESC_TABLE | DESC_VALID;
+                pt = new_pt as *mut PageTable;
+            } else {
+                pt = ((*pte1) & !0xFFF) as *mut PageTable;
+            }
+            
+            // Set level 2 descriptor for 2MB page
+            let idx2 = va_index(va, 2);
+            let pte2 = &mut (*pt).entries[idx2];
+            
+            if *pte2 & DESC_VALID != 0 {
+                return Err(()); // Already mapped
+            }
+            
+            let mut flags = DESC_VALID | DESC_AF;
+            if perm & PTE_W == 0 {
+                flags |= DESC_AP_RO;
+            }
+            if perm & PTE_U != 0 {
+                flags |= DESC_AP_USER;
+            }
+            if perm & PTE_X == 0 {
+                flags |= DESC_UXN | DESC_PXN;
+            }
+            
+            *pte2 = (pa & !0x1FFFFF) | flags; // 2MB alignment
+            Ok(())
+        } else if size == HPAGE_1GB {
+            // 1GB huge page: use level 1 descriptor directly
+            let idx1 = va_index(va, 1);
+            let pte1 = &mut (*pagetable).entries[idx1];
+            
+            if *pte1 & DESC_VALID != 0 {
+                return Err(()); // Already mapped
+            }
+            
+            let mut flags = DESC_VALID | DESC_AF;
+            if perm & PTE_W == 0 {
+                flags |= DESC_AP_RO;
+            }
+            if perm & PTE_U != 0 {
+                flags |= DESC_AP_USER;
+            }
+            if perm & PTE_X == 0 {
+                flags |= DESC_UXN | DESC_PXN;
+            }
+            
+            *pte1 = (pa & !0x3FFFFFFF) | flags; // 1GB alignment
+            Ok(())
+        } else {
+            Err(()) // Unsupported huge page size
+        }
+    }
+    
     /// Unmap a page
     pub unsafe fn unmap_page(pagetable: *mut PageTable, va: usize) -> Result<(), ()> {
         let pte = walk(pagetable, va, false).ok_or(())?;
@@ -380,6 +854,85 @@ mod aarch64 {
         let tcr: u64 = (16u64) | (0b00u64 << 14) | (0b11u64 << 12) | (0b01u64 << 8) | (0b01u64 << 10);
         core::arch::asm!("msr tcr_el1, {}", in(reg) tcr);
         core::arch::asm!("isb");
+    }
+    
+    /// Map a huge page (2MB or 1GB) for AArch64
+    pub unsafe fn map_huge_page(
+        pagetable: *mut PageTable,
+        va: usize,
+        pa: usize,
+        size: usize,
+        perm: usize,
+    ) -> Result<(), ()> {
+        use crate::subsystems::mm::hugepage::{HPAGE_2MB, HPAGE_1GB};
+        
+        if size == HPAGE_2MB {
+            // 2MB huge page: use level 2 descriptor
+            let mut pt = pagetable;
+            
+            // Walk to level 1
+            let idx1 = va_index(va, 1);
+            let pte1 = &mut (*pt).entries[idx1];
+            
+            if *pte1 & DESC_VALID == 0 {
+                // Allocate level 1 page table if needed
+                let new_pt = kalloc();
+                if new_pt.is_null() {
+                    return Err(());
+                }
+                ptr::write_bytes(new_pt, 0, PAGE_SIZE);
+                *pte1 = (new_pt as usize) | DESC_TABLE | DESC_VALID;
+                pt = new_pt as *mut PageTable;
+            } else {
+                pt = ((*pte1) & !0xFFF) as *mut PageTable;
+            }
+            
+            // Set level 2 descriptor for 2MB page
+            let idx2 = va_index(va, 2);
+            let pte2 = &mut (*pt).entries[idx2];
+            
+            if *pte2 & DESC_VALID != 0 {
+                return Err(()); // Already mapped
+            }
+            
+            let mut flags = DESC_VALID | DESC_AF;
+            if perm & PTE_W == 0 {
+                flags |= DESC_AP_RO;
+            }
+            if perm & PTE_U != 0 {
+                flags |= DESC_AP_USER;
+            }
+            if perm & PTE_X == 0 {
+                flags |= DESC_UXN | DESC_PXN;
+            }
+            
+            *pte2 = (pa & !0x1FFFFF) | flags; // 2MB alignment
+            Ok(())
+        } else if size == HPAGE_1GB {
+            // 1GB huge page: use level 1 descriptor directly
+            let idx1 = va_index(va, 1);
+            let pte1 = &mut (*pagetable).entries[idx1];
+            
+            if *pte1 & DESC_VALID != 0 {
+                return Err(()); // Already mapped
+            }
+            
+            let mut flags = DESC_VALID | DESC_AF;
+            if perm & PTE_W == 0 {
+                flags |= DESC_AP_RO;
+            }
+            if perm & PTE_U != 0 {
+                flags |= DESC_AP_USER;
+            }
+            if perm & PTE_X == 0 {
+                flags |= DESC_UXN | DESC_PXN;
+            }
+            
+            *pte1 = (pa & !0x3FFFFFFF) | flags; // 1GB alignment
+            Ok(())
+        } else {
+            Err(()) // Unsupported huge page size
+        }
     }
     
     pub unsafe fn activate_pt(pagetable: *mut PageTable) {
@@ -539,6 +1092,85 @@ mod x86_64 {
         Ok(())
     }
     
+    /// Map a huge page (2MB or 1GB) for x86_64
+    pub unsafe fn map_huge_page(
+        pagetable: *mut PageTable,
+        va: usize,
+        pa: usize,
+        size: usize,
+        perm: usize,
+    ) -> Result<(), ()> {
+        use crate::subsystems::mm::hugepage::{HPAGE_2MB, HPAGE_1GB};
+        
+        if size == HPAGE_2MB {
+            // 2MB huge page: use level 1 PTE (PDE with PS bit set)
+            let mut pt = pagetable;
+            
+            // Walk to level 2
+            let idx2 = va_index(va, 2);
+            let pte2 = &mut (*pt).entries[idx2];
+            
+            if *pte2 & PTE_P == 0 {
+                // Allocate level 2 page table if needed
+                let new_pt = kalloc();
+                if new_pt.is_null() {
+                    return Err(());
+                }
+                ptr::write_bytes(new_pt, 0, PAGE_SIZE);
+                *pte2 = (new_pt as usize) | PTE_P | PTE_RW | PTE_US;
+                pt = new_pt as *mut PageTable;
+            } else {
+                pt = ((*pte2) & !0xFFF) as *mut PageTable;
+            }
+            
+            // Set level 1 PTE for 2MB page (with PS bit = 1)
+            let idx1 = va_index(va, 1);
+            let pte1 = &mut (*pt).entries[idx1];
+            
+            if *pte1 & PTE_P != 0 {
+                return Err(()); // Already mapped
+            }
+            
+            let mut flags = PTE_P | (1 << 7); // PS bit for 2MB page
+            if perm & PTE_W != 0 {
+                flags |= PTE_RW;
+            }
+            if perm & PTE_U != 0 {
+                flags |= PTE_US;
+            }
+            if perm & PTE_X == 0 {
+                flags |= PTE_NX;
+            }
+            
+            *pte1 = (pa & !0x1FFFFF) | flags; // 2MB alignment
+            Ok(())
+        } else if size == HPAGE_1GB {
+            // 1GB huge page: use level 2 PTE (PDPTE with PS bit set)
+            let idx2 = va_index(va, 2);
+            let pte2 = &mut (*pagetable).entries[idx2];
+            
+            if *pte2 & PTE_P != 0 {
+                return Err(()); // Already mapped
+            }
+            
+            let mut flags = PTE_P | (1 << 7); // PS bit for 1GB page
+            if perm & PTE_W != 0 {
+                flags |= PTE_RW;
+            }
+            if perm & PTE_U != 0 {
+                flags |= PTE_US;
+            }
+            if perm & PTE_X == 0 {
+                flags |= PTE_NX;
+            }
+            
+            *pte2 = (pa & !0x3FFFFFFF) | flags; // 1GB alignment
+            Ok(())
+        } else {
+            Err(()) // Unsupported huge page size
+        }
+    }
+    
     /// Activate page table
     pub unsafe fn activate_pt(pagetable: *mut PageTable) {
         core::arch::asm!("mov cr3, {}", in(reg) pagetable);
@@ -582,9 +1214,9 @@ mod x86_64 {
         core::arch::asm!("wrmsr", in("ecx") def_msr, in("eax") def_lo, in("edx") def_hi);
         let mut idx = 0usize;
         let mut regions: alloc::vec::Vec<(usize, usize, u8)> = alloc::vec::Vec::new();
-        for (b, s) in crate::mm::mmio_regions_strong() { regions.push((b, s, 2)); }
-        for (b, s) in crate::mm::mmio_regions_wc() { regions.push((b, s, 1)); }
-        for (b, s) in crate::mm::mmio_regions() { regions.push((b, s, 0)); }
+        for (b, s) in crate::subsystems::mm::mmio_regions_strong() { regions.push((b, s, 2)); }
+        for (b, s) in crate::subsystems::mm::mmio_regions_wc() { regions.push((b, s, 1)); }
+        for (b, s) in crate::subsystems::mm::mmio_regions() { regions.push((b, s, 0)); }
         regions.sort_by(|a, b| {
             match b.2.cmp(&a.2) {
                 core::cmp::Ordering::Equal => b.1.cmp(&a.1),
@@ -620,8 +1252,8 @@ mod x86_64 {
             if idx >= var_cnt { break; }
         }
         let left = total.saturating_sub(covered);
-        crate::mm::mmio_record_mtrr_usage(idx.min(var_cnt), var_cnt, covered, left);
-        let (prev_used, prev_total, prev_cov, prev_left) = crate::mm::mmio_last_usage();
+        crate::subsystems::mm::mmio_record_mtrr_usage(idx.min(var_cnt), var_cnt, covered, left);
+        let (prev_used, prev_total, prev_cov, prev_left) = crate::subsystems::mm::mmio_last_usage();
         crate::println!("[mtrr] covered={} bytes, left={} bytes (prev: used={}/{} covered={} left={})", covered, left, prev_used, prev_total, prev_cov, prev_left);
     }
 
@@ -650,7 +1282,7 @@ mod x86_64 {
         def_lo = (def_lo & !0xFF) | 0x06;
         def_lo |= 1 << 11;
         core::arch::asm!("wrmsr", in("ecx") def_msr, in("eax") def_lo, in("edx") def_hi);
-        let mut stats = crate::mm::mmio_stats_take();
+        let mut stats = crate::subsystems::mm::mmio_stats_take();
         stats.sort_by(|a, b| {
             match b.2.cmp(&a.2) {
                 core::cmp::Ordering::Equal => b.3.cmp(&a.3),
@@ -687,11 +1319,11 @@ mod x86_64 {
             if idx >= var_cnt { break; }
         }
         let left = total.saturating_sub(covered);
-        let (prev_used, prev_total, prev_cov, prev_left) = crate::mm::mmio_last_usage();
-        crate::mm::mmio_record_mtrr_usage(idx.min(var_cnt), var_cnt, covered, left);
+        let (prev_used, prev_total, prev_cov, prev_left) = crate::subsystems::mm::mmio_last_usage();
+        crate::subsystems::mm::mmio_record_mtrr_usage(idx.min(var_cnt), var_cnt, covered, left);
         crate::println!("[mtrr] refresh covered={} bytes, left={} bytes (prev: used={}/{} covered={} left={})", covered, left, prev_used, prev_total, prev_cov, prev_left);
-        let now = crate::time::get_ticks();
-        crate::mm::mmio_cooldown_all(now);
+        let now = crate::subsystems::time::get_ticks();
+        crate::subsystems::mm::mmio_cooldown_all(now);
     }
     
     /// Copy an x86_64 page table level recursively
@@ -772,36 +1404,83 @@ pub fn init() {
 
     // Probe platform for memory/MMIO via DTB/firmware (stub)
     platform::probe_dtb();
-    crate::mm::mmio_stats_init();
+    crate::subsystems::mm::mmio_stats_init();
     
     #[cfg(target_arch = "aarch64")]
     unsafe { aarch64::setup_mair(); aarch64::setup_tcr(); }
 
+    // Get ASLR offset from boot parameters
+    let aslr_offset = crate::platform::boot::get_aslr_offset();
+    let aslr_enabled = crate::platform::boot::is_aslr_enabled();
+    
+    if aslr_enabled {
+        crate::println!("[vm] ASLR enabled with offset: {:#x}", aslr_offset);
+    }
+
     // Map kernel memory regions - create linear PhysMap for kernel access
+    // Use separate physical mapping region to avoid conflicts with kernel code
     let pt = kernel_pagetable();
     let phys_start = 0usize;
-    let phys_end = crate::mm::phys_end();
+    let phys_end = crate::subsystems::mm::phys_end();
     let size = phys_end - phys_start;
+    
+    // Get physical mapping base from memory layout (separate from kernel code)
+    // Apply ASLR offset if enabled
+    let base_phys_map = crate::arch::memory_layout::MemoryLayout::current()
+        .phys_map_base
+        .expect("Physical memory mapping not supported on this architecture");
+    
+    let phys_map_base = if aslr_enabled {
+        // Use layout module's apply_aslr_offset function
+        use nos_memory_management::layout::AddressSpaceLayout;
+        AddressSpaceLayout::current().apply_aslr_offset(base_phys_map, aslr_offset)
+    } else {
+        base_phys_map
+    };
+    
+    // Verify memory layout doesn't have conflicts
+    let layout = crate::arch::memory_layout::MemoryLayout::current();
+    if let Err(e) = layout.verify_memory_layout() {
+        panic!("vm::init: Memory layout verification failed: {}", e);
+    }
+    
+    // Verify ASLR offset doesn't cause conflicts
+    if aslr_enabled {
+        // Check that ASLR-adjusted addresses don't overlap with kernel regions
+        let layout = crate::arch::memory_layout::MemoryLayout::current();
+        if phys_map_base >= layout.kernel_code_base && 
+           phys_map_base < layout.kernel_code_base + 0x1000_0000 {
+            panic!("vm::init: ASLR-adjusted phys_map_base overlaps with kernel code region");
+        }
+    }
+    
     #[cfg(any(target_arch = "riscv64", target_arch = "aarch64"))]
-    unsafe { let _ = map_pages(pt, phys_start, phys_start, size, flags::PTE_R | flags::PTE_W); }
+    unsafe { 
+        // For RISC-V and AArch64, map at phys_map_base
+        let _ = map_pages(pt, phys_map_base + phys_start, phys_start, size, flags::PTE_R | flags::PTE_W); 
+    }
     #[cfg(target_arch = "x86_64")]
-    unsafe { let _ = map_pages(pt, KERNEL_BASE + phys_start, phys_start, size, flags::PTE_R | flags::PTE_W); x86_64::setup_pat(); }
+    unsafe { 
+        // For x86_64, use phys_map_base instead of KERNEL_BASE to avoid conflicts
+        let _ = map_pages(pt, phys_map_base + phys_start, phys_start, size, flags::PTE_R | flags::PTE_W); 
+        x86_64::setup_pat(); 
+    }
 
     // Map MMIO device regions (kernel only, no U, no X)
-    for (base, size) in crate::mm::mmio_regions() {
+    for (base, size) in crate::subsystems::mm::mmio_regions() {
         #[cfg(any(target_arch = "riscv64", target_arch = "aarch64"))]
         unsafe { let _ = map_pages(pt, base, base, size, flags::PTE_R | flags::PTE_W | flags::PTE_DEV); }
         #[cfg(target_arch = "x86_64")]
         unsafe { let _ = map_pages(pt, KERNEL_BASE + base, base, size, flags::PTE_R | flags::PTE_W | flags::PTE_DEV); }
     }
-    for (base, size) in crate::mm::mmio_regions_strong() {
+    for (base, size) in crate::subsystems::mm::mmio_regions_strong() {
         #[cfg(any(target_arch = "riscv64", target_arch = "aarch64"))]
         unsafe { let _ = map_pages(pt, base, base, size, flags::PTE_R | flags::PTE_W | flags::PTE_DEV | flags::PTE_DEV_STRONG); }
         #[cfg(target_arch = "x86_64")]
         unsafe { let _ = map_pages(pt, KERNEL_BASE + base, base, size, flags::PTE_R | flags::PTE_W | flags::PTE_DEV); }
     }
     #[cfg(target_arch = "x86_64")]
-    for (base, size) in crate::mm::mmio_regions_wc() {
+    for (base, size) in crate::subsystems::mm::mmio_regions_wc() {
         unsafe { let _ = map_pages(pt, KERNEL_BASE + base, base, size, flags::PTE_R | flags::PTE_W | flags::PTE_DEV_WC); }
     }
     #[cfg(target_arch = "x86_64")]
@@ -833,8 +1512,40 @@ pub unsafe fn free_pagetable(pagetable: *mut PageTable) {
         return;
     }
     
-    // TODO: Recursively free page table pages
-    unsafe { kfree(pagetable as *mut u8); }
+    // Recursively free page table pages
+    let pt = &*pagetable;
+    
+    // Iterate through top-level page table entries
+    for i in 0..512 {
+        let pte = pt.entries[i];
+        if pte != 0 && (pte & flags::PTE_V) != 0 {
+            // Check if this is a leaf page or points to another page table
+            // On RISC-V, if it's not a leaf (R/W/X bits are not set), it's a page table
+            #[cfg(target_arch = "riscv64")]
+            let is_page_table = (pte & (flags::PTE_R | flags::PTE_W | flags::PTE_X)) == 0;
+            
+            #[cfg(target_arch = "aarch64")]
+            let is_page_table = (pte & 0x3) == 0x3; // Table descriptor
+            
+            #[cfg(target_arch = "x86_64")]
+            let is_page_table = (pte & (1 << 7)) == 0; // Not a huge page
+            
+            #[cfg(not(any(target_arch = "riscv64", target_arch = "aarch64", target_arch = "x86_64")))]
+            let is_page_table = false;
+            
+            if is_page_table {
+                // Extract physical address of next level page table
+                let next_pt = ((pte >> 10) << 12) as *mut PageTable;
+                if !next_pt.is_null() {
+                    // Recursively free
+                    free_pagetable(next_pt);
+                }
+            }
+        }
+    }
+    
+    // Free this page table page
+    kfree(pagetable as *mut u8);
 }
 
 /// Map pages in a page table
@@ -845,11 +1556,70 @@ pub unsafe fn map_pages(
     size: usize,
     perm: usize,
 ) -> Result<(), ()> {
+    // Check if we can use huge pages for this mapping
+    use crate::subsystems::mm::hugepage::{HPAGE_2MB, HPAGE_1GB};
+    
     let mut va = va & !(PAGE_SIZE - 1);
     let mut pa = pa & !(PAGE_SIZE - 1);
     let end = (va + size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
     
+    // Try to use huge pages for large mappings
     while va < end {
+        let remaining = end - va;
+        
+        // Try 1GB huge page first (if size and alignment allow)
+        if remaining >= HPAGE_1GB 
+            && (va & (HPAGE_1GB - 1)) == 0 
+            && (pa & (HPAGE_1GB - 1)) == 0 {
+            #[cfg(target_arch = "riscv64")]
+            if riscv64::map_huge_page(pagetable, va, pa, HPAGE_1GB, perm).is_ok() {
+                va += HPAGE_1GB;
+                pa += HPAGE_1GB;
+                continue;
+            }
+            
+            #[cfg(target_arch = "aarch64")]
+            if aarch64::map_huge_page(pagetable, va, pa, HPAGE_1GB, perm).is_ok() {
+                va += HPAGE_1GB;
+                pa += HPAGE_1GB;
+                continue;
+            }
+            
+            #[cfg(target_arch = "x86_64")]
+            if x86_64::map_huge_page(pagetable, va, pa, HPAGE_1GB, perm).is_ok() {
+                va += HPAGE_1GB;
+                pa += HPAGE_1GB;
+                continue;
+            }
+        }
+        
+        // Try 2MB huge page (if size and alignment allow)
+        if remaining >= HPAGE_2MB 
+            && (va & (HPAGE_2MB - 1)) == 0 
+            && (pa & (HPAGE_2MB - 1)) == 0 {
+            #[cfg(target_arch = "riscv64")]
+            if riscv64::map_huge_page(pagetable, va, pa, HPAGE_2MB, perm).is_ok() {
+                va += HPAGE_2MB;
+                pa += HPAGE_2MB;
+                continue;
+            }
+            
+            #[cfg(target_arch = "aarch64")]
+            if aarch64::map_huge_page(pagetable, va, pa, HPAGE_2MB, perm).is_ok() {
+                va += HPAGE_2MB;
+                pa += HPAGE_2MB;
+                continue;
+            }
+            
+            #[cfg(target_arch = "x86_64")]
+            if x86_64::map_huge_page(pagetable, va, pa, HPAGE_2MB, perm).is_ok() {
+                va += HPAGE_2MB;
+                pa += HPAGE_2MB;
+                continue;
+            }
+        }
+        
+        // Fall back to regular 4KB pages
         #[cfg(target_arch = "riscv64")]
         unsafe { riscv64::map_page(pagetable, va, pa, perm)?; }
         
@@ -884,8 +1654,8 @@ pub fn refresh_mtrr_hot() {
 }
 
 pub fn idle_maintenance() {
-    let t = crate::time::get_ticks();
-    crate::mm::mmio_stats_periodic(t);
+    let t = crate::subsystems::time::get_ticks();
+    crate::subsystems::mm::mmio_stats_periodic(t);
 }
 
 /// Map a page (module-level wrapper)
@@ -1024,7 +1794,7 @@ pub unsafe fn copyout(
         return Err(());
     }
     // Validate user mapping and permissions
-    if dst >= KERNEL_BASE { return Err(()); }
+    if is_kernel_address(dst) { return Err(()); }
     user_range_check(pagetable, dst, len, true, false)?;
     let mut copied = 0usize;
     while copied < len {
@@ -1055,7 +1825,7 @@ pub unsafe fn copyin(
     if dst.is_null() || src == 0 || len == 0 {
         return Err(());
     }
-    if src >= KERNEL_BASE { return Err(()); }
+    if is_kernel_address(src) { return Err(()); }
     user_range_check(pagetable, src, len, false, false)?;
     let mut copied = 0usize;
     while copied < len {
@@ -1085,7 +1855,7 @@ pub unsafe fn copyinstr(
     max: usize,
 ) -> Result<usize, ()> {
     if dst.is_null() || src == 0 || max == 0 { return Err(()); }
-    if src >= KERNEL_BASE { return Err(()); }
+    if is_kernel_address(src) { return Err(()); }
     
     // Cache line size (typically 64 bytes)
     const CACHE_LINE_SIZE: usize = 64;
@@ -1211,7 +1981,7 @@ pub unsafe fn handle_page_fault(
     let va = fault_addr & !(PAGE_SIZE - 1);
     
     // Check if address is in valid range for user
-    if is_user && va >= KERNEL_BASE {
+    if is_user && is_kernel_address(va) {
         crate::println!("Page fault: user access to kernel space at {:#x}", fault_addr);
         return PageFaultResult::SegFault;
     }
@@ -1236,7 +2006,6 @@ pub unsafe fn handle_page_fault(
             }
             
             // Check for lazy allocation (valid VMA but not yet allocated)
-            // For now, treat unmapped pages in user space as potential lazy alloc
             if (pte & flags::PTE_V) == 0 && is_user {
                 unsafe { return handle_lazy_alloc(pagetable, va, true, true, false); }
             }
@@ -1274,6 +2043,15 @@ unsafe fn handle_cow_fault(
     #[cfg(not(target_arch = "riscv64"))]
     let old_pa = (old_pte & !0xFFF) as usize;
     
+    // Check reference count - if this is the only reference, just make it writable
+    if page_ref_count(old_pa) == 1 {
+        // Only one reference, make page writable without copying
+        let new_pte = (old_pte & !flags::PTE_COW) | flags::PTE_W;
+        unsafe { *pte_ptr = new_pte; }
+        flush_tlb_page(va);
+        return PageFaultResult::Handled;
+    }
+    
     // Allocate a new page
     let new_page = kalloc();
     if new_page.is_null() {
@@ -1305,7 +2083,8 @@ unsafe fn handle_cow_fault(
     // Flush TLB for this address
     flush_tlb_page(va);
     
-    // TODO: Decrement reference count on old page and free if zero
+    // Decrement reference count on old page (may free it if count reaches 0)
+    page_ref_dec(old_pa);
     let _ = pagetable;
     
     PageFaultResult::Handled
@@ -1420,14 +2199,15 @@ pub fn flush_tlb_all() {
     }
 }
 
-/// Kernel base address
-pub const KERNEL_BASE: usize = 0xFFFF_FFFF_8000_0000;
-
-/// User base address
-pub const USER_BASE: usize = 0x0000_0000_1000_0000;
-
-/// User stack top address
-pub const USER_STACK_TOP: usize = 0x0000_7FFF_FFFF_F000;
+// Re-export memory layout constants from architecture abstraction layer
+pub use crate::arch::memory_layout::{
+    kernel_base as KERNEL_BASE,
+    user_base as USER_BASE,
+    user_stack_top as USER_STACK_TOP,
+    user_max as USER_MAX,
+    is_kernel_address,
+    is_user_address,
+};
 /// Check user-space mapping and permissions for a range [va, va+len)
 fn user_range_check(pagetable: *mut PageTable, va: usize, len: usize, need_write: bool, need_exec: bool) -> Result<(), ()> {
     if len == 0 { return Err(()); }
@@ -1472,25 +2252,57 @@ fn user_range_check(pagetable: *mut PageTable, va: usize, len: usize, need_write
 }
 #[inline]
 pub fn phys_to_kernel_ptr(pa: usize) -> *mut u8 {
-    #[cfg(any(target_arch = "riscv64", target_arch = "aarch64"))]
-    { pa as *mut u8 }
-    #[cfg(target_arch = "x86_64")]
-    { (KERNEL_BASE + pa) as *mut u8 }
+    crate::arch::memory_layout::phys_to_virt(pa)
+        .map(|virt| virt as *mut u8)
+        .unwrap_or_else(|| {
+            // Fallback for architectures without direct mapping
+            // Use phys_map_base instead of KERNEL_BASE to avoid conflicts
+            let phys_map_base = crate::arch::memory_layout::MemoryLayout::current()
+                .phys_map_base
+                .unwrap_or(0);
+            #[cfg(any(target_arch = "riscv64", target_arch = "aarch64"))]
+            { (phys_map_base + pa) as *mut u8 }
+            #[cfg(target_arch = "x86_64")]
+            { (phys_map_base + pa) as *mut u8 }
+            #[cfg(not(any(target_arch = "riscv64", target_arch = "aarch64", target_arch = "x86_64")))]
+            { pa as *mut u8 }
+        })
 }
 
 #[inline]
 fn phys_to_kernel_const_ptr(pa: usize) -> *const u8 {
-    #[cfg(any(target_arch = "riscv64", target_arch = "aarch64"))]
-    { pa as *const u8 }
-    #[cfg(target_arch = "x86_64")]
-    { (KERNEL_BASE + pa) as *const u8 }
+    crate::arch::memory_layout::phys_to_virt(pa)
+        .map(|virt| virt as *const u8)
+        .unwrap_or_else(|| {
+            // Fallback for architectures without direct mapping
+            // Use phys_map_base instead of KERNEL_BASE to avoid conflicts
+            let phys_map_base = crate::arch::memory_layout::MemoryLayout::current()
+                .phys_map_base
+                .unwrap_or(0);
+            #[cfg(any(target_arch = "riscv64", target_arch = "aarch64"))]
+            { (phys_map_base + pa) as *const u8 }
+            #[cfg(target_arch = "x86_64")]
+            { (phys_map_base + pa) as *const u8 }
+            #[cfg(not(any(target_arch = "riscv64", target_arch = "aarch64", target_arch = "x86_64")))]
+            { pa as *const u8 }
+        })
 }
 /// Convert physical address to kernel virtual address
 pub fn phys_to_virt(pa: usize) -> usize {
-    #[cfg(any(target_arch = "riscv64", target_arch = "aarch64"))]
-    { pa }
-    #[cfg(target_arch = "x86_64")]
-    { KERNEL_BASE + pa }
+    crate::arch::memory_layout::phys_to_virt(pa)
+        .unwrap_or_else(|| {
+            // Fallback for architectures without direct mapping
+            // Use phys_map_base instead of KERNEL_BASE to avoid conflicts
+            let phys_map_base = crate::arch::memory_layout::MemoryLayout::current()
+                .phys_map_base
+                .unwrap_or(0);
+            #[cfg(any(target_arch = "riscv64", target_arch = "aarch64"))]
+            { phys_map_base + pa }
+            #[cfg(target_arch = "x86_64")]
+            { phys_map_base + pa }
+            #[cfg(not(any(target_arch = "riscv64", target_arch = "aarch64", target_arch = "x86_64")))]
+            { pa }
+        })
 }
 
 // Re-export architecture-specific functions
@@ -1505,5 +2317,5 @@ pub use x86_64::walk;
 // Prefetch integration
 pub fn vm_prefetch_page(addr: usize) {
     // Call the adaptive prefetch module
-    crate::mm::prefetch::process_memory_access(addr, crate::mm::PAGE_SIZE, crate::mm::prefetch::AccessType::Read);
+    crate::subsystems::mm::prefetch::process_memory_access(addr, crate::subsystems::mm::PAGE_SIZE, crate::subsystems::mm::prefetch::AccessType::Read);
 }

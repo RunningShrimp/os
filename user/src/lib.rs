@@ -5,36 +5,13 @@
 
 use core::arch::asm;
 
-/// 检查函数指针是否为空的辅助函数
-#[inline]
-pub fn is_null_func<T>(f: *const T) -> bool {
-    f.is_null()
-}
-
 // Include GLib modules
 pub mod glib;
-
-// POSIX compatibility layer
-pub mod posix;
 
 // Print utilities for GLib use
 pub mod print {
     pub use super::puts;
     pub use super::println;
-}
-
-// Time utilities
-pub mod time {
-    /// Get current timestamp in seconds since Unix epoch
-    pub fn get_timestamp() -> u64 {
-        // Simplified implementation - return a fixed timestamp
-        1640995200 // 2022-01-01 00:00:00 UTC
-    }
-
-    /// Sleep for the specified duration
-    pub fn sleep(_duration: core::time::Duration) {
-        // Simplified implementation - do nothing
-    }
 }
 
 // ============================================================================
@@ -79,17 +56,17 @@ pub const SYS_EXECVE: usize = 44;
 // Low-level syscall interface
 // ============================================================================
 
-/// Generic syscall function that takes a slice of arguments
+/// Generic syscall function for user-space
 #[inline(always)]
-pub fn syscall(num: usize, args: &[usize]) -> isize {
-    match args.len() {
+pub fn syscall(num: usize, args: [usize; 5]) -> isize {
+    match num {
         0 => syscall0(num),
         1 => syscall1(num, args[0]),
         2 => syscall2(num, args[0], args[1]),
         3 => syscall3(num, args[0], args[1], args[2]),
         4 => syscall4(num, args[0], args[1], args[2], args[3]),
         5 => syscall5(num, args[0], args[1], args[2], args[3], args[4]),
-        _ => panic!("Too many syscall arguments"),
+        _ => -1, // Invalid syscall number
     }
 }
 
@@ -154,15 +131,15 @@ pub fn syscall3(num: usize, arg0: usize, arg1: usize, arg2: usize) -> isize {
 
 #[cfg(target_arch = "riscv64")]
 #[inline(always)]
-pub fn syscall4(num: usize, arg0: usize, arg1: usize, arg2: usize, arg3: usize) -> isize {
+pub fn syscall4(num: usize, a0: usize, a1: usize, a2: usize, a3: usize) -> isize {
     let ret: isize;
     unsafe {
         asm!(
             "ecall",
-            inlateout("a0") arg0 => ret,
-            in("a1") arg1,
-            in("a2") arg2,
-            in("a3") arg3,
+            inlateout("a0") a0 => ret,
+            in("a1") a1,
+            in("a2") a2,
+            in("a3") a3,
             in("a7") num,
         );
     }
@@ -248,15 +225,15 @@ pub fn syscall3(num: usize, arg0: usize, arg1: usize, arg2: usize) -> isize {
 
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]
-pub fn syscall4(num: usize, arg0: usize, arg1: usize, arg2: usize, arg3: usize) -> isize {
+pub fn syscall4(num: usize, a0: usize, a1: usize, a2: usize, a3: usize) -> isize {
     let ret: isize;
     unsafe {
         asm!(
             "svc #0",
-            inlateout("x0") arg0 => ret,
-            in("x1") arg1,
-            in("x2") arg2,
-            in("x3") arg3,
+            inlateout("x0") a0 => ret,
+            in("x1") a1,
+            in("x2") a2,
+            in("x3") a3,
             in("x8") num,
         );
     }
@@ -334,23 +311,6 @@ pub fn syscall3(num: usize, arg0: usize, arg1: usize, arg2: usize) -> isize {
             in("rdi") arg0,
             in("rsi") arg1,
             in("rdx") arg2,
-        );
-    }
-    ret
-}
-
-#[cfg(target_arch = "x86_64")]
-#[inline(always)]
-pub fn syscall4(num: usize, arg0: usize, arg1: usize, arg2: usize, arg3: usize) -> isize {
-    let ret: isize;
-    unsafe {
-        asm!(
-            "syscall",
-            inlateout("rax") num => ret,
-            in("rdi") arg0,
-            in("rsi") arg1,
-            in("rdx") arg2,
-            in("r10") arg3,
         );
     }
     ret

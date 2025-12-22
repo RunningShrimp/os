@@ -17,7 +17,7 @@ use alloc::sync::Arc;
 use spin::Mutex;
 
 use crate::compat::*;
-use crate::mm::vm;
+use crate::subsystems::mm::vm;
 use crate::mm;
 
 /// Memory layout manager for cross-platform processes

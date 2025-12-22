@@ -15,7 +15,7 @@ use spin::Mutex;
 use crate::arch;
 // TODO: Implement X86Feature and X86Cpu in arch module
 // use crate::arch::{self, X86Feature, X86Cpu};
-use crate::types::stubs::*;
+use crate::types::stubs::VirtAddr;
 
 /// SMAP/SMEP configuration
 #[derive(Debug, Clone)]
@@ -429,7 +429,7 @@ impl SmapSmepSubsystem {
     /// Kill a process
     fn kill_process(&self, pid: u64) {
         // Send SIGKILL to the process
-        crate::syscalls::signal::kill_process(pid, 9);
+        crate::syscalls::signal::kill_process(pid as usize, 9);
     }
 
     /// Log a violation
@@ -456,7 +456,7 @@ impl SmapSmepSubsystem {
 
     /// Get current timestamp
     fn get_timestamp(&self) -> u64 {
-        crate::time::get_timestamp()
+        crate::subsystems::time::get_timestamp()
     }
 
     /// Add allowed memory region for cross-space access

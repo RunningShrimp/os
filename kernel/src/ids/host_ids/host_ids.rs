@@ -8,17 +8,14 @@ extern crate alloc;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use alloc::format;
 use alloc::string::String;
-use core::sync::atomic::Ordering;
 use spin::Mutex;
 
-use crate::types::Process;
 use crate::security::audit::{AuditEvent, AuditEventType, AuditSeverity};
 use super::super::{
-    IntrusionDetection, DetectionType, ThreatLevel, DetectionSource, TargetInfo,
-    AttackInfo, Evidence, ResponseAction, HostIdsConfig
+    IntrusionDetection, ThreatLevel, HostIdsConfig
 };
+use super::types::HostIdsStats;
 
 /// 主机入侵检测系统
 pub struct HostIds {
@@ -1491,34 +1488,7 @@ pub enum ClassificationModel {
 
 /// 主机入侵检测统计
 #[derive(Debug, Clone, Default)]
-pub struct HostIdsStats {
-    /// 总监控事件数
-    pub total_monitored_events: u64,
-    /// 系统调用分析数
-    pub syscalls_analyzed: u64,
-    /// 文件事件数
-    pub file_events: u64,
-    /// 进程监控数
-    pub processes_monitored: u64,
-    /// 检测到的异常数
-    pub anomalies_detected: u64,
-    /// 恶意软件检测数
-    pub malware_detected: u64,
-    /// 特权提升检测数
-    pub privilege_escalations: u64,
-    /// 注册表变化数
-    pub registry_changes: u64,
-    /// 网络连接监控数
-    pub network_connections_monitored: u64,
-    /// 用户活动监控数
-    pub user_activities_monitored: u64,
-    /// 完整性检查数
-    pub integrity_checks: u64,
-    /// 平均处理时间（微秒）
-    pub avg_processing_time_us: u64,
-    /// 内存使用量
-    pub memory_usage_bytes: usize,
-}
+
 
 impl HostIds {
     /// 创建新的主机入侵检测系统
@@ -1558,7 +1528,7 @@ impl HostIds {
 
     /// 分析系统调用
     pub fn analyze_syscall(&mut self, event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
-        let start_time = crate::time::timestamp_nanos();
+        let start_time = crate::subsystems::time::timestamp_nanos();
 
         let detections = self.syscall_monitor.lock().analyze_syscall(event)?;
 
@@ -1568,7 +1538,7 @@ impl HostIds {
             stats.syscalls_analyzed += 1;
             stats.total_monitored_events += 1;
 
-            let elapsed = crate::time::timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::timestamp_nanos() - start_time;
             stats.avg_processing_time_us = (stats.avg_processing_time_us + elapsed / 1000) / 2;
         }
 
@@ -1577,7 +1547,7 @@ impl HostIds {
 
     /// 分析文件事件
     pub fn analyze_file_event(&mut self, event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
-        let start_time = crate::time::timestamp_nanos();
+        let start_time = crate::subsystems::time::timestamp_nanos();
 
         let detections = self.file_monitor.lock().analyze_file_event(event)?;
 
@@ -1587,7 +1557,7 @@ impl HostIds {
             stats.file_events += 1;
             stats.total_monitored_events += 1;
 
-            let elapsed = crate::time::timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::timestamp_nanos() - start_time;
             stats.avg_processing_time_us = (stats.avg_processing_time_us + elapsed / 1000) / 2;
         }
 
@@ -1596,7 +1566,7 @@ impl HostIds {
 
     /// 分析进程事件
     pub fn analyze_process_event(&mut self, event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
-        let start_time = crate::time::timestamp_nanos();
+        let start_time = crate::subsystems::time::timestamp_nanos();
 
         let detections = self.process_monitor.lock().analyze_process_event(event)?;
 
@@ -1606,7 +1576,7 @@ impl HostIds {
             stats.processes_monitored += 1;
             stats.total_monitored_events += 1;
 
-            let elapsed = crate::time::timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::timestamp_nanos() - start_time;
             stats.avg_processing_time_us = (stats.avg_processing_time_us + elapsed / 1000) / 2;
         }
 
@@ -1615,7 +1585,7 @@ impl HostIds {
 
     /// 分析注册表变化
     pub fn analyze_registry_change(&mut self, event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
-        let start_time = crate::time::timestamp_nanos();
+        let start_time = crate::subsystems::time::timestamp_nanos();
 
         let detections = self.registry_monitor.lock().analyze_registry_change(event)?;
 
@@ -1625,7 +1595,7 @@ impl HostIds {
             stats.registry_changes += 1;
             stats.total_monitored_events += 1;
 
-            let elapsed = crate::time::timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::timestamp_nanos() - start_time;
             stats.avg_processing_time_us = (stats.avg_processing_time_us + elapsed / 1000) / 2;
         }
 
@@ -1634,7 +1604,7 @@ impl HostIds {
 
     /// 分析网络连接
     pub fn analyze_network_connection(&mut self, event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
-        let start_time = crate::time::timestamp_nanos();
+        let start_time = crate::subsystems::time::timestamp_nanos();
 
         let detections = self.network_monitor.lock().analyze_network_connection(event)?;
 
@@ -1644,7 +1614,7 @@ impl HostIds {
             stats.network_connections_monitored += 1;
             stats.total_monitored_events += 1;
 
-            let elapsed = crate::time::timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::timestamp_nanos() - start_time;
             stats.avg_processing_time_us = (stats.avg_processing_time_us + elapsed / 1000) / 2;
         }
 
@@ -1653,7 +1623,7 @@ impl HostIds {
 
     /// 分析用户活动
     pub fn analyze_user_activity(&mut self, event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
-        let start_time = crate::time::timestamp_nanos();
+        let start_time = crate::subsystems::time::timestamp_nanos();
 
         let detections = self.user_monitor.lock().analyze_user_activity(event)?;
 
@@ -1663,7 +1633,7 @@ impl HostIds {
             stats.user_activities_monitored += 1;
             stats.total_monitored_events += 1;
 
-            let elapsed = crate::time::timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::timestamp_nanos() - start_time;
             stats.avg_processing_time_us = (stats.avg_processing_time_us + elapsed / 1000) / 2;
         }
 
@@ -1686,7 +1656,7 @@ impl HostIds {
 
     /// 执行完整性检查
     pub fn perform_integrity_check(&mut self) -> Result<Vec<IntrusionDetection>, &'static str> {
-        let start_time = crate::time::timestamp_nanos();
+        let start_time = crate::subsystems::time::timestamp_nanos();
 
         let detections = self.integrity_checker.lock().perform_integrity_check()?;
 
@@ -1696,7 +1666,7 @@ impl HostIds {
             stats.integrity_checks += 1;
             stats.total_monitored_events += 1;
 
-            let elapsed = crate::time::timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::timestamp_nanos() - start_time;
             stats.avg_processing_time_us = (stats.avg_processing_time_us + elapsed / 1000) / 2;
         }
 
@@ -1705,7 +1675,7 @@ impl HostIds {
 
     /// 执行恶意软件扫描
     pub fn perform_malware_scan(&mut self) -> Result<Vec<IntrusionDetection>, &'static str> {
-        let start_time = crate::time::timestamp_nanos();
+        let start_time = crate::subsystems::time::timestamp_nanos();
 
         let detections = self.malware_scanner.lock().perform_scan()?;
 
@@ -1715,7 +1685,7 @@ impl HostIds {
             stats.malware_detected += detections.len() as u64;
             stats.total_monitored_events += 1;
 
-            let elapsed = crate::time::timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::timestamp_nanos() - start_time;
             stats.avg_processing_time_us = (stats.avg_processing_time_us + elapsed / 1000) / 2;
         }
 

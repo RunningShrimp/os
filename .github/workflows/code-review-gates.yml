@@ -1,0 +1,402 @@
+name: Code Review Gates
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+      - develop
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # 代码质量门禁
+  quality-gates:
+    name: Code Quality Gates
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy, rustfmt
+
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        key: quality-gates-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Check formatting
+      run: |
+        echo "Checking code formatting..."
+        cargo fmt --all -- --check
+        if [ $? -ne 0 ]; then
+          echo "❌ Code formatting check failed"
+          echo "Please run 'cargo fmt --all' to fix formatting issues"
+          exit 1
+        fi
+        echo "✅ Code formatting check passed"
+
+    - name: Run clippy
+      run: |
+        echo "Running clippy checks..."
+        # 检查 bootloader 项目
+        cargo clippy -p bootloader --all-targets --all-features -- -D warnings
+        if [ $? -ne 0 ]; then
+          echo "❌ Clippy check failed for bootloader"
+          exit 1
+        fi
+        
+        # 检查 kernel 项目
+        cargo clippy -p kernel --all-targets --all-features -- -D warnings
+        if [ $? -ne 0 ]; then
+          echo "❌ Clippy check failed for kernel"
+          exit 1
+        fi
+        
+        echo "✅ Clippy checks passed"
+
+    - name: Run unit tests
+      run: |
+        echo "Running unit tests..."
+        cargo test --workspace --lib
+        if [ $? -ne 0 ]; then
+          echo "❌ Unit tests failed"
+          exit 1
+        fi
+        echo "✅ Unit tests passed"
+
+    - name: Check documentation
+      run: |
+        echo "Checking documentation..."
+        # 检查文档是否可以生成
+        cargo doc --workspace --no-deps --document-private-items
+        if [ $? -ne 0 ]; then
+          echo "❌ Documentation check failed"
+          exit 1
+        fi
+        echo "✅ Documentation check passed"
+
+  # 安全审计门禁
+  security-gates:
+    name: Security Gates
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install cargo-audit
+      run: cargo install cargo-audit --locked
+
+    - name: Run security audit
+      run: |
+        echo "Running security audit..."
+        cargo audit
+        if [ $? -ne 0 ]; then
+          echo "❌ Security audit failed"
+          echo "Please review and fix security vulnerabilities"
+          exit 1
+        fi
+        echo "✅ Security audit passed"
+
+    - name: Check for unsafe code
+      run: |
+        echo "Checking for unsafe code..."
+        # 查找不安全代码块
+        UNSAFE_COUNT=$(find . -name "*.rs" -exec grep -l "unsafe" {} \; | wc -l)
+        echo "Found $UNSAFE_COUNT files with unsafe code"
+        
+        # 检查不安全代码是否有文档
+        for file in $(find . -name "*.rs" -exec grep -l "unsafe" {} \;); do
+          echo "Checking unsafe code documentation in $file"
+          if ! grep -q "# Safety" "$file"; then
+            echo "❌ Unsafe code in $file lacks safety documentation"
+            exit 1
+          fi
+        done
+        echo "✅ Unsafe code documentation check passed"
+
+  # 性能门禁
+  performance-gates:
+    name: Performance Gates
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install cargo-criterion
+      run: cargo install cargo-criterion --locked
+
+    - name: Cache baseline data
+      uses: actions/cache@v3
+      with:
+        path: .baselines
+        key: performance-baselines-${{ github.base_ref }}
+        restore-keys: |
+          performance-baselines-main
+          performance-baselines-develop
+
+    - name: Run benchmarks
+      run: |
+        echo "Running performance benchmarks..."
+        # 运行关键组件基准测试
+        cargo bench -p bootloader -- --save-baseline current
+        cargo bench -p kernel -- --save-baseline current
+        
+        echo "✅ Benchmarks completed"
+
+    - name: Check for performance regressions
+      run: |
+        echo "Checking for performance regressions..."
+        chmod +x scripts/check-performance-regression.sh
+        
+        if [ -d ".baselines/${{ github.base_ref }}" ]; then
+          echo "Comparing with ${{ github.base_ref }} baseline"
+          ./scripts/check-performance-regression.sh ${{ github.base_ref }} 10
+          if [ $? -ne 0 ]; then
+            echo "❌ Performance regression detected"
+            exit 1
+          fi
+        else
+          echo "No baseline found for ${{ github.base_ref }}, skipping regression check"
+        fi
+        echo "✅ Performance regression check passed"
+
+    - name: Check binary size
+      run: |
+        echo "Checking binary size..."
+        # 构建发布版本
+        cargo build --release --target x86_64-unknown-none-elf
+        
+        # 检查二进制大小
+        BOOTLOADER_SIZE=$(stat -c%s target/x86_64-unknown-none-elf/release/bootloader)
+        KERNEL_SIZE=$(stat -c%s target/x86_64-unknown-none-elf/release/kernel)
+        
+        echo "Bootloader size: $BOOTLOADER_SIZE bytes"
+        echo "Kernel size: $KERNEL_SIZE bytes"
+        
+        # 检查大小限制（可根据实际情况调整）
+        MAX_BOOTLOADER_SIZE=1048576  # 1MB
+        MAX_KERNEL_SIZE=2097152      # 2MB
+        
+        if [ $BOOTLOADER_SIZE -gt $MAX_BOOTLOADER_SIZE ]; then
+          echo "❌ Bootloader size exceeds limit ($MAX_BOOTLOADER_SIZE bytes)"
+          exit 1
+        fi
+        
+        if [ $KERNEL_SIZE -gt $MAX_KERNEL_SIZE ]; then
+          echo "❌ Kernel size exceeds limit ($MAX_KERNEL_SIZE bytes)"
+          exit 1
+        fi
+        
+        echo "✅ Binary size check passed"
+
+  # 测试覆盖率门禁
+  coverage-gates:
+    name: Coverage Gates
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install cargo-tarpaulin
+      run: cargo install cargo-tarpaulin --locked
+
+    - name: Run coverage analysis
+      run: |
+        echo "Running coverage analysis..."
+        # 运行覆盖率分析（排除无法在主机上运行的模块）
+        cargo tarpaulin --workspace --exclude bootloader --exclude kernel --out Lcov --output-dir coverage/ --timeout 300
+        if [ $? -ne 0 ]; then
+          echo "❌ Coverage analysis failed"
+          exit 1
+        fi
+        echo "✅ Coverage analysis completed"
+
+    - name: Check coverage threshold
+      run: |
+        echo "Checking coverage threshold..."
+        # 获取覆盖率百分比
+        COVERAGE=$(cargo tarpaulin --workspace --exclude bootloader --exclude kernel --out Stdout --timeout 300 | grep -oP '\d+\.\d+%' | head -1 | sed 's/%//')
+        echo "Current coverage: ${COVERAGE}%"
+        
+        # 检查覆盖率是否达到阈值
+        MIN_COVERAGE=80
+        if (( $(echo "$COVERAGE < $MIN_COVERAGE" | bc -l) )); then
+          echo "❌ Coverage ${COVERAGE}% is below threshold of ${MIN_COVERAGE}%"
+          exit 1
+        fi
+        echo "✅ Coverage threshold check passed (${COVERAGE}% >= ${MIN_COVERAGE}%)"
+
+    - name: Upload coverage report
+      uses: codecov/codecov-action@v3
+      with:
+        directory: coverage/
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  # 架构一致性门禁
+  architecture-gates:
+    name: Architecture Gates
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Check DDD architecture compliance
+      run: |
+        echo "Checking DDD architecture compliance..."
+        chmod +x scripts/check-architecture-compliance.sh
+        
+        ./scripts/check-architecture-compliance.sh
+        if [ $? -ne 0 ]; then
+          echo "❌ Architecture compliance check failed"
+          exit 1
+        fi
+        echo "✅ Architecture compliance check passed"
+
+    - name: Check module boundaries
+      run: |
+        echo "Checking module boundaries..."
+        chmod +x scripts/check-module-boundaries.sh
+        
+        ./scripts/check-module-boundaries.sh
+        if [ $? -ne 0 ]; then
+          echo "❌ Module boundaries check failed"
+          exit 1
+        fi
+        echo "✅ Module boundaries check passed"
+
+    - name: Check dependency directions
+      run: |
+        echo "Checking dependency directions..."
+        chmod +x scripts/check-dependency-directions.sh
+        
+        ./scripts/check-dependency-directions.sh
+        if [ $? -ne 0 ]; then
+          echo "❌ Dependency directions check failed"
+          exit 1
+        fi
+        echo "✅ Dependency directions check passed"
+
+  # 图形功能特殊检查
+  graphics-gates:
+    name: Graphics Special Checks
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Check graphics module safety
+      run: |
+        echo "Checking graphics module safety..."
+        chmod +x scripts/check-graphics-safety.sh
+        
+        ./scripts/check-graphics-safety.sh
+        if [ $? -ne 0 ]; then
+          echo "❌ Graphics safety check failed"
+          exit 1
+        fi
+        echo "✅ Graphics safety check passed"
+
+    - name: Check VBE compliance
+      run: |
+        echo "Checking VBE compliance..."
+        chmod +x scripts/check-vbe-compliance.sh
+        
+        ./scripts/check-vbe-compliance.sh
+        if [ $? -ne 0 ]; then
+          echo "❌ VBE compliance check failed"
+          exit 1
+        fi
+        echo "✅ VBE compliance check passed"
+
+    - name: Check graphics performance
+      run: |
+        echo "Checking graphics performance..."
+        chmod +x scripts/check-graphics-performance.sh
+        
+        ./scripts/check-graphics-performance.sh
+        if [ $? -ne 0 ]; then
+          echo "❌ Graphics performance check failed"
+          exit 1
+        fi
+        echo "✅ Graphics performance check passed"
+
+  # 综合门禁状态
+  gate-status:
+    name: Gate Status
+    runs-on: ubuntu-latest
+    needs: [quality-gates, security-gates, performance-gates, coverage-gates, architecture-gates, graphics-gates]
+    if: always()
+    steps:
+    - name: Check gate status
+      run: |
+        echo "Checking all gate statuses..."
+        
+        # 检查所有门禁是否通过
+        QUALITY_STATUS="${{ needs.quality-gates.result }}"
+        SECURITY_STATUS="${{ needs.security-gates.result }}"
+        PERFORMANCE_STATUS="${{ needs.performance-gates.result }}"
+        COVERAGE_STATUS="${{ needs.coverage-gates.result }}"
+        ARCHITECTURE_STATUS="${{ needs.architecture-gates.result }}"
+        GRAPHICS_STATUS="${{ needs.graphics-gates.result }}"
+        
+        echo "Quality Gates: $QUALITY_STATUS"
+        echo "Security Gates: $SECURITY_STATUS"
+        echo "Performance Gates: $PERFORMANCE_STATUS"
+        echo "Coverage Gates: $COVERAGE_STATUS"
+        echo "Architecture Gates: $ARCHITECTURE_STATUS"
+        echo "Graphics Gates: $GRAPHICS_STATUS"
+        
+        # 如果有任何门禁失败，则整体失败
+        if [ "$QUALITY_STATUS" != "success" ] || \
+           [ "$SECURITY_STATUS" != "success" ] || \
+           [ "$PERFORMANCE_STATUS" != "success" ] || \
+           [ "$COVERAGE_STATUS" != "success" ] || \
+           [ "$ARCHITECTURE_STATUS" != "success" ] || \
+           [ "$GRAPHICS_STATUS" != "success" ]; then
+          echo "❌ One or more gates failed"
+          exit 1
+        fi
+        
+        echo "✅ All gates passed successfully"

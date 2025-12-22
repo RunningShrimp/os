@@ -5,11 +5,11 @@ extern crate alloc;
 /// This module implements machine learning-based anomaly detection
 /// to identify unusual patterns that may indicate security threats.
 
-use crate::sync::{SpinLock, Mutex};
+use crate::subsystems::sync::{SpinLock, Mutex};
 use crate::collections::VecDeque;
 use crate::collections::HashMap;
 use crate::compat::DefaultHasherBuilder;
-use crate::time::{SystemTime, UNIX_EPOCH};
+use crate::subsystems::time::{SystemTime, UNIX_EPOCH};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use alloc::string::String;

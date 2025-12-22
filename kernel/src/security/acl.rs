@@ -14,7 +14,7 @@ use alloc::string::ToString;
 use core::sync::atomic::{AtomicU64, Ordering};
 use spin::Mutex;
 
-use crate::types::stubs::*;
+
 use crate::vfs::{FileMode};
 use crate::reliability::errno::{EACCES, EPERM};
 
@@ -321,7 +321,7 @@ impl AclSubsystem {
 
     /// Check access permissions
     pub fn check_access(&self, request: &AccessRequest) -> AccessDecision {
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         let decision = if !self.config.enabled {
             AccessDecision::Granted
@@ -343,7 +343,7 @@ impl AclSubsystem {
                 AccessDecision::GrantedAudit => stats.audit_granted += 1,
             }
 
-            let elapsed = crate::time::get_timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
             stats.avg_check_time_ns = (stats.avg_check_time_ns + elapsed) / 2;
         }
 

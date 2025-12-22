@@ -6,10 +6,10 @@ extern crate alloc;
 
 use alloc::sync::Arc;
 use alloc::collections::BTreeMap;
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::reliability::errno::{EOK, EINVAL, ENOENT};
 use crate::posix::{ShmidDs, IpcPerm, Mode, Pid, Size};
-use crate::mm::vm;
+use crate::subsystems::mm::vm;
 
 /// Shared memory segment
 #[derive(Debug)]
@@ -145,7 +145,7 @@ pub unsafe extern "C" fn shmget(key: i32, size: Size, shmflg: i32) -> i32 {
             pages,
             perm,
             nattch: 0,
-            creator_pid: crate::process::getpid() as i32,
+            creator_pid: crate::process::getpid(),
             last_attach_pid: 0,
             last_detach_time: 0,
             creation_time: 0, // TODO: Get current time
@@ -265,7 +265,7 @@ pub unsafe extern "C" fn shmat(shmid: i32, shmaddr: *mut u8, shmflg: i32) -> *mu
 
     // Update segment statistics
     seg_guard.nattch += 1;
-    seg_guard.last_attach_pid = current_pid as i32;
+    seg_guard.last_attach_pid = current_pid;
 
     virt_addr as *mut u8
 }
@@ -314,11 +314,9 @@ pub unsafe extern "C" fn shmdt(shmaddr: *mut u8) -> i32 {
             // Try to find a mapping for this address
             let table = crate::process::manager::PROC_TABLE.lock();
             if let Some(proc) = table.find_ref(current_pid) {
-                unsafe {
-                    if vm::get_page_mapping(proc as *const crate::process::manager::Proc, vaddr).is_some() {
-                        found_segment = Some(segment.clone());
-                        break;
-                    }
+                if vm::get_page_mapping(proc as *const crate::process::manager::Proc, vaddr).is_some() {
+                    found_segment = Some(segment.clone());
+                    break;
                 }
             }
         }
@@ -337,12 +335,10 @@ pub unsafe extern "C" fn shmdt(shmaddr: *mut u8) -> i32 {
     let num_pages = seg_guard.size / vm::PAGE_SIZE;
     let mut unmapped_pages = 0;
 
-    unsafe {
-        for i in 0..num_pages {
-            let page_vaddr = vaddr + (i * vm::PAGE_SIZE);
-            if vm::unmap_page(pagetable, page_vaddr).is_ok() {
-                unmapped_pages += 1;
-            }
+    for i in 0..num_pages {
+        let page_vaddr = vaddr + (i * vm::PAGE_SIZE);
+        if vm::unmap_page(pagetable, page_vaddr).is_ok() {
+            unmapped_pages += 1;
         }
     }
 

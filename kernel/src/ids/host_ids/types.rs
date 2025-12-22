@@ -2,7 +2,7 @@
 //!
 //! 主机入侵检测系统共享类型定义
 
-use super::super::{ThreatLevel, Evidence};
+
 
 /// 主机入侵检测统计
 #[derive(Debug, Clone, Default)]

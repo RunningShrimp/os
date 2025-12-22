@@ -1,5 +1,4 @@
 //! Directory entry for VFS
-
 extern crate alloc;
 
 use super::types::FileType;

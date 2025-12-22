@@ -162,7 +162,7 @@ impl PosixTestSuite {
     pub fn new() -> Self {
         Self {
             results: PosixTestResults::new(),
-            start_time_ns: crate::time::get_time_ns(),
+            start_time_ns: crate::subsystems::time::get_time_ns(),
         }
     }
 
@@ -183,7 +183,7 @@ impl PosixTestSuite {
         self.run_performance_stress_tests();
 
         // 计算总执行时间
-        self.results.execution_time_ns = crate::time::get_time_ns() - self.start_time_ns;
+        self.results.execution_time_ns = crate::subsystems::time::get_time_ns() - self.start_time_ns;
 
         // 打印最终报告
         self.results.print_report();

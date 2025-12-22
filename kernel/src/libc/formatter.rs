@@ -8,9 +8,7 @@
 //! - 自定义格式化支持
 //! - 性能优化的格式化算法
 
-use core::ffi::{c_char, c_int, c_void, c_uint};
-use core::ptr::null_mut;
-use crate::drivers::console;
+use core::ffi::{c_char, c_int, c_void};
 use crate::libc::io_manager::CFile;
 
 // 模拟 va_list 类型

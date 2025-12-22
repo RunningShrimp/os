@@ -7,8 +7,8 @@
 //! - Barrier synchronization primitives
 //! - Spinlock synchronization primitives
 
-use crate::posix::{Pid, ClockId, Timespec};
-use crate::sync::Mutex;
+use crate::posix::{Pid, ClockId};
+use crate::subsystems::sync::Mutex;
 use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicUsize, AtomicU64, Ordering};
 use core::ptr;
@@ -186,6 +186,16 @@ pub struct Barrier {
     pub state: AtomicUsize,
     /// Mutex for barrier operations
     pub mutex: Mutex<()>,
+}
+
+impl core::fmt::Debug for Barrier {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Barrier")
+            .field("required", &self.required)
+            .field("waiting", &self.waiting)
+            .field("state", &self.state)
+            .finish()
+    }
 }
 
 impl Barrier {
@@ -399,7 +409,7 @@ pub struct ThreadClock {
 impl ThreadClock {
     /// Create a new thread clock
     pub fn new(thread_id: Pid, clock_id: ClockId) -> Self {
-        let current_time = crate::time::get_timestamp();
+        let current_time = crate::subsystems::time::get_timestamp();
         Self {
             thread_id,
             clock_id,
@@ -417,7 +427,7 @@ impl ThreadClock {
     /// Update the CPU time
     pub fn update_time(&self, delta_ns: u64) {
         let old_time = self.cpu_time.fetch_add(delta_ns, Ordering::SeqCst);
-        let current_time = crate::time::get_timestamp();
+        let current_time = crate::subsystems::time::get_timestamp();
         self.last_update.store(current_time, Ordering::SeqCst);
         
         // Log significant time updates

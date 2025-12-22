@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion, black_box};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 // Mock mmap/munmap implementation for benchmarking
 // In a real scenario, this would call the actual syscalls

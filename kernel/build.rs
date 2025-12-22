@@ -24,9 +24,6 @@ fn main() {
     }
 
     println!("cargo:rerun-if-changed={}", ld);
-    println!("cargo:rerun-if-changed=start-riscv64.S");
-    println!("cargo:rerun-if-changed=start-aarch64.S");
-    println!("cargo:rerun-if-changed=start-x86_64.S");
 
     // Rerun if test files change
     println!("cargo:rerun-if-changed=tests/");

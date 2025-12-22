@@ -3,7 +3,13 @@
 //! This module provides architecture-specific functionality for x86_64 systems,
 //! including CPU detection, memory management, and low-level hardware access.
 
-use crate::error::{BootError, Result};
+use crate::utils::error::{BootError, Result};
+
+pub mod cpuid;
+pub mod gdt;
+pub mod idt;
+pub mod long_mode;
+pub mod msr;
 
 #[cfg(feature = "bios_support")]
 pub mod bios;

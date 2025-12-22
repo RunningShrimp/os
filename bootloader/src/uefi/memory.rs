@@ -3,13 +3,12 @@
 //! This module provides UEFI-specific memory management utilities,
 //! including memory allocation, pool management, and memory map handling.
 
-use crate::error::{BootError, Result};
+use crate::utils::error::{BootError, Result};
 use crate::memory::MemoryRegionType;
 use core::ptr;
 use alloc::vec::Vec;
 
-#[cfg(feature = "uefi_support")]
-use uefi::table::boot::{BootServices, MemoryType};
+
 
 /// UEFI Memory Manager
 #[cfg(feature = "uefi_support")]

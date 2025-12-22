@@ -143,7 +143,7 @@ pub struct ModulePerformanceMetrics {
 impl ComprehensiveTestReport {
     pub fn new(test_suite: String) -> Self {
         Self {
-            timestamp: crate::time::hrtime_nanos(),
+            timestamp: crate::subsystems::time::hrtime_nanos(),
             test_suite,
             summary: TestSummary {
                 total_tests: 0,

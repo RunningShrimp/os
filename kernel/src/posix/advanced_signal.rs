@@ -8,18 +8,18 @@
 //! - Real-time signal support (SIGRTMIN-SIGRTMAX)
 
 use crate::posix::{SigSet, SigInfoT, SigVal, Pid, Uid, SIGRTMIN, SIGRTMAX};
-use crate::process::{Proc as Process, Pid as ProcessId};
-use crate::sync::Mutex;
+use crate::process::{Pid as ProcessId};
+use crate::subsystems::sync::Mutex;
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use crate::microkernel::scheduler;
+use crate::subsystems::microkernel::scheduler;
 
 /// Maximum number of pending signals per process
 pub const MAX_PENDING_SIGNALS: usize = 64;
 
 /// Signal queue entry for queued signals
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct QueuedSignal {
     /// Signal information
     pub info: SigInfoT,
@@ -29,12 +29,21 @@ pub struct QueuedSignal {
     pub delivered: bool,
 }
 
+impl core::fmt::Debug for QueuedSignal {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("QueuedSignal")
+            .field("timestamp", &self.timestamp)
+            .field("delivered", &self.delivered)
+            .finish()
+    }
+}
+
 impl QueuedSignal {
     /// Create a new queued signal
     pub fn new(info: SigInfoT) -> Self {
         Self {
             info,
-            timestamp: crate::time::get_timestamp(),
+            timestamp: crate::subsystems::time::get_timestamp(),
             delivered: false,
         }
     }
@@ -68,6 +77,14 @@ pub struct SignalQueue {
     sigmask: Mutex<SigSet>,
     /// Number of signals in queue
     count: AtomicUsize,
+}
+
+impl core::fmt::Debug for SignalQueue {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("SignalQueue")
+            .field("count", &self.count)
+            .finish()
+    }
 }
 
 impl SignalQueue {
@@ -165,35 +182,6 @@ impl SignalQueue {
         let mut pending = self.pending.lock();
         pending.clear();
         self.count.store(0, Ordering::Release);
-    }
-
-    /// Set the signal mask
-    pub fn set_mask(&self, how: i32, new_mask: &SigSet, old_mask: Option<&mut SigSet>) -> Result<(), SignalMaskError> {
-        let mut current_mask = self.sigmask.lock();
-
-        // Save old mask if requested
-        if let Some(old) = old_mask {
-            *old = *current_mask;
-        }
-
-        // Apply new mask based on how
-        match how {
-            crate::posix::SIG_BLOCK => {
-                // Add signals to current mask
-                current_mask.bits |= new_mask.bits;
-            }
-            crate::posix::SIG_UNBLOCK => {
-                // Remove signals from current mask
-                current_mask.bits &= !new_mask.bits;
-            }
-            crate::posix::SIG_SETMASK => {
-                // Replace current mask
-                *current_mask = *new_mask;
-            }
-            _ => return Err(SignalMaskError::InvalidHow),
-        }
-
-        Ok(())
     }
 
     /// Get statistics about the signal queue
@@ -332,8 +320,6 @@ pub enum SignalStackError {
     StackInUse,
     /// No alternate stack configured
     NoAlternateStack,
-    /// Feature not supported
-    NotSupported,
 }
 
 /// Thread signal mask management
@@ -357,7 +343,7 @@ impl ThreadSignalMask {
     }
 
     /// Set the signal mask
-    pub fn set_mask(&mut self, how: i32, new_mask: &SigSet, old_mask: Option<&mut SigSet>) -> Result<(), SignalMaskError> {
+    pub fn set_mask(&self, how: i32, new_mask: &SigSet, old_mask: Option<&mut SigSet>) -> Result<(), SignalMaskError> {
         let mut current_mask = self.mask.lock();
         
         // Save old mask if requested
@@ -440,6 +426,7 @@ pub enum SignalMaskError {
 pub static SIGNAL_QUEUE_REGISTRY: Mutex<SignalQueueRegistry> = Mutex::new(SignalQueueRegistry::new());
 
 /// Signal queue registry for managing per-process signal queues
+#[derive(Debug)]
 pub struct SignalQueueRegistry {
     /// Map from process ID to signal queue
     queues: alloc::collections::BTreeMap<ProcessId, Arc<SignalQueue>>,
@@ -527,9 +514,14 @@ pub fn sigqueue(pid: Pid, sig: i32, value: SigVal) -> Result<(), SignalQueueErro
         None => return Err(SignalQueueError::ProcessNotFound),
     };
 
-    // For now, use root UID (0) as current UID
-    // In a full implementation, this would come from process credentials
-    let current_uid = 0 as Uid;
+    let current_uid = {
+        let proc_table = crate::process::manager::PROC_TABLE.lock();
+        let proc = match proc_table.find_ref(current_pid) {
+            Some(p) => p,
+            None => return Err(SignalQueueError::ProcessNotFound),
+        };
+        proc.uid as Uid
+    };
 
     // Create queued signal
     let signal = QueuedSignal::from_sigqueue(sig, current_pid, current_uid, value);
@@ -567,7 +559,7 @@ pub fn sigtimedwait(
             return Err(SignalWaitError::InvalidTimeout);
         }
         
-        let current_time = crate::time::get_timestamp();
+        let current_time = crate::subsystems::time::get_timestamp();
         let timeout_ns = to.tv_sec as u64 * 1_000_000_000 + to.tv_nsec as u64;
         Some(current_time + timeout_ns)
     } else {
@@ -583,7 +575,7 @@ pub fn sigtimedwait(
 
         // Check timeout
         if let Some(deadline) = deadline {
-            let current_time = crate::time::get_timestamp();
+            let current_time = crate::subsystems::time::get_timestamp();
             if current_time >= deadline {
                 return Err(SignalWaitError::Timeout);
             }
@@ -600,9 +592,51 @@ pub fn sigwaitinfo(sigmask: &SigSet) -> Result<SigInfoT, SignalWaitError> {
 }
 
 /// Set alternate signal stack (sigaltstack implementation)
-pub fn sigaltstack(_new_stack: Option<&crate::posix::StackT>, _old_stack: Option<&mut crate::posix::StackT>) -> Result<(), SignalStackError> {
-    // Alternate signal stack is not implemented in this simplified version
-    Err(SignalStackError::NotSupported)
+pub fn sigaltstack(new_stack: Option<&crate::posix::StackT>, old_stack: Option<&mut crate::posix::StackT>) -> Result<(), SignalStackError> {
+    // Get current process
+    let pid = match crate::process::myproc() {
+        Some(p) => p,
+        None => return Err(SignalStackError::NoAlternateStack),
+    };
+
+    let mut proc_table = crate::process::manager::PROC_TABLE.lock();
+    let proc = match proc_table.find(pid) {
+        Some(p) => p,
+        None => return Err(SignalStackError::NoAlternateStack),
+    };
+
+    // Save old stack if requested
+    if let Some(old) = old_stack {
+        if let Some(ref alt_stack) = proc.alt_signal_stack {
+            *old = *alt_stack;
+        } else {
+            *old = crate::posix::StackT::default();
+        }
+    }
+
+    // Set new stack if provided
+    if let Some(new) = new_stack {
+        // Validate new stack
+        if new.ss_flags & crate::posix::SS_ONSTACK != 0 {
+            return Err(SignalStackError::StackInUse);
+        }
+
+        if new.ss_flags & crate::posix::SS_DISABLE != 0 {
+            // Disable alternate stack
+            proc.alt_signal_stack = None;
+        } else {
+            // Validate stack size
+            if new.ss_size < crate::posix::MINSIGSTKSZ {
+                return Err(SignalStackError::StackTooSmall);
+            }
+
+            // Create new alternate stack
+            let alt_stack = AlternateSignalStack::new(new.ss_size)?;
+            proc.alt_signal_stack = Some(alt_stack.as_stackt());
+        }
+    }
+
+    Ok(())
 }
 
 /// Set thread signal mask (pthread_sigmask implementation)
@@ -617,18 +651,11 @@ pub fn pthread_sigmask(
         None => return Err(SignalMaskError::InvalidSignal),
     };
 
-    // Get or create thread signal mask
-    let thread_mask = {
-        let mut registry = SIGNAL_QUEUE_REGISTRY.lock();
-        // For simplicity, we use process ID as thread ID for now
-        // In a real implementation, we'd have a separate thread registry
-        registry.get_or_create_queue(thread_id as i32)
-    };
+    // Create a thread signal mask instance
+    let thread_mask = ThreadSignalMask::new(thread_id);
 
     // Set the mask
-    thread_mask.set_mask(how, new_mask, old_mask)?;
-
-    Ok(())
+    thread_mask.set_mask(how, new_mask, old_mask)
 }
 
 /// Check if a signal is a real-time signal

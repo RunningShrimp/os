@@ -666,7 +666,7 @@ pub fn test_linux_performance() -> TestResult {
     crate::println!("Testing Linux-specific syscall performance...");
 
     let iterations = 100;
-    let start_time = crate::time::get_ticks();
+    let start_time = crate::subsystems::time::get_ticks();
 
     // Test eventfd creation performance
     for _ in 0..iterations {
@@ -676,7 +676,7 @@ pub fn test_linux_performance() -> TestResult {
         }
     }
 
-    let end_time = crate::time::get_ticks();
+    let end_time = crate::subsystems::time::get_ticks();
     let elapsed = end_time - start_time;
     let avg_time = elapsed / iterations;
 

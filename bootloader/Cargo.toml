@@ -7,7 +7,7 @@ description = "Modern UEFI and BIOS bootloader for NOS operating system"
 
 [lib]
 name = "nos_bootloader"
-crate-type = ["staticlib"]
+crate-type = ["staticlib", "rlib"]
 
 [[bin]]
 name = "bootloader"
@@ -16,18 +16,25 @@ path = "src/main.rs"
 [dependencies]
 # Core dependencies
 arrayvec = { version = "0.7", default-features = false }
-bitflags = { version = "2.4", default-features = false }
+bitflags = { version = "2.10", default-features = false }
+spin = { version = "0.9", default-features = false, features = ["spin_mutex", "once", "rwlock"] }
+log = { version = "0.4", default-features = false }
+hashbrown = { version = "0.14", default-features = false, features = ["inline-more"] }
+itoa = { version = "1.0", default-features = false }
+
+# NOS API for unified boot parameters
+nos-api = { workspace = true, default-features = false }
 
 # UEFI dependencies (feature-gated)
-uefi = { version = "0.28", default-features = false, optional = true }
-uefi-services = { version = "0.25", default-features = false, optional = true }
+uefi = { version = "0.36", default-features = false, optional = true }
+uefi-raw = { version = "0.13", default-features = false, optional = true }
 
 # Graphics dependencies (feature-gated)
 embedded-graphics = { version = "0.8", default-features = false, optional = true }
-tinybmp = { version = "0.5", default-features = false, optional = true }
+tinybmp = { version = "0.6", default-features = false, optional = true }
 
 # Network dependencies (feature-gated)
-smoltcp = { version = "0.11", default-features = false, optional = true }
+smoltcp = { version = "0.12", default-features = false, optional = true }
 
 # Architecture-specific dependencies
 [target.'cfg(target_arch = "x86_64")'.dependencies]
@@ -35,14 +42,14 @@ x86_64 = { version = "0.15", default-features = false }
 x86 = { version = "0.52", default-features = false }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-aarch64-cpu = { version = "9.4", default-features = false }
+aarch64-cpu = { version = "11.2", default-features = false }
 
 [target.'cfg(target_arch = "riscv64")'.dependencies]
-riscv = { version = "0.11", default-features = false }
+riscv = { version = "0.15", default-features = false }
 
 [features]
 default = ["uefi_support", "bios_support"]
-uefi_support = ["uefi", "uefi-services"]
+uefi_support = ["uefi", "uefi-raw"]
 bios_support = []
 multiboot2_support = []
 vbe_support = ["graphics_support"]
@@ -50,6 +57,7 @@ graphics_support = ["embedded-graphics", "tinybmp"]
 network_support = ["smoltcp"]
 menu_support = ["graphics_support"]
 recovery_support = ["graphics_support", "menu_support"]
+deferred_init = []
 
 # BIOS-specific features
 bios_real_mode = ["bios_support"]
@@ -87,20 +95,10 @@ x86_64 = []
 aarch64 = []
 riscv64 = []
 
-[profile.dev]
-panic = "abort"
-debug = true
-
-[profile.release]
-panic = "abort"
-debug-assertions = false
-overflow-checks = false
-lto = true
-codegen-units = 1
-opt-level = "s"
+# Profile configurations are moved to workspace root to avoid warnings
 
 [build-dependencies]
-cc = "1.0"
+cc = "1.2"
 
 [package.metadata.bootloader]
 # Bootloader build configuration

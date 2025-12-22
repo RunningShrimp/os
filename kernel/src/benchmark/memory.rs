@@ -5,7 +5,7 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use crate::time::hrtime_nanos;
+use crate::subsystems::time::hrtime_nanos;
 
 /// Memory benchmark results
 #[derive(Debug, Clone)]
@@ -31,7 +31,7 @@ pub fn benchmark_allocation(size: usize, count: usize) -> MemoryBenchmarkResult 
     let mut allocations = Vec::with_capacity(count);
     for _ in 0..count {
         let alloc_start = hrtime_nanos();
-        let ptr = crate::mm::kalloc(size);
+        let ptr = crate::subsystems::mm::kalloc(size);
         let alloc_end = hrtime_nanos();
         
         if let Some(addr) = ptr {
@@ -42,7 +42,7 @@ pub fn benchmark_allocation(size: usize, count: usize) -> MemoryBenchmarkResult 
     // Free allocations
     for (addr, _) in &allocations {
         unsafe {
-            crate::mm::kfree(*addr, size);
+            crate::subsystems::mm::kfree(*addr, size);
         }
     }
     
@@ -65,7 +65,7 @@ pub fn benchmark_allocation(size: usize, count: usize) -> MemoryBenchmarkResult 
 /// Benchmark memory access patterns
 pub fn benchmark_memory_access(size: usize, iterations: usize) -> MemoryBenchmarkResult {
     // Allocate buffer
-    let buf = crate::mm::kalloc(size).expect("Failed to allocate");
+    let buf = crate::subsystems::mm::kalloc(size).expect("Failed to allocate");
     
     let start_time = hrtime_nanos();
     
@@ -91,7 +91,7 @@ pub fn benchmark_memory_access(size: usize, iterations: usize) -> MemoryBenchmar
     
     // Free buffer
     unsafe {
-        crate::mm::kfree(buf, size);
+        crate::subsystems::mm::kfree(buf, size);
     }
     
     let total_bytes = (iterations * core::mem::size_of::<u8>()) as u64;

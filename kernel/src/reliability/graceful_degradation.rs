@@ -18,7 +18,7 @@ use spin::Mutex;
 // Import println macro
 #[allow(unused_imports)]
 use crate::println;
-use crate::error_handling::{error_recovery::ExecutionStatus, diagnostic_tools::LogLevel, fault_tolerance::ConditionType};
+use nos_error_handling::{error_recovery::ExecutionStatus, diagnostic_tools::LogLevel, fault_tolerance::ConditionType};
 
 /// 优雅降级管理器
 pub struct GracefulDegradationManager {
@@ -1158,7 +1158,7 @@ impl GracefulDegradationManager {
                     available_capacity: 100.0,
                     load_percentage: 0.0,
                     load_level: LoadLevel::Low,
-                    last_updated: crate::time::get_timestamp(),
+                    last_updated: crate::subsystems::time::get_timestamp(),
                 },
                 load_history: Vec::new(),
             },
@@ -1209,7 +1209,7 @@ impl GracefulDegradationManager {
         }
 
         let session_id = format!("degradation_{}", self.session_counter.fetch_add(1, Ordering::SeqCst));
-        let start_time = crate::time::get_timestamp();
+        let start_time = crate::subsystems::time::get_timestamp();
 
         // 创建降级会话
         let session = DegradationSession {
@@ -1267,11 +1267,11 @@ impl GracefulDegradationManager {
     /// 执行降级行动
     fn execute_degradation_actions(&mut self, session_id: &str, strategy: &DegradationStrategy, service_name: &str) -> Result<(), &'static str> {
         for action in &strategy.degradation_actions {
-            let execution_start = crate::time::get_timestamp();
+            let execution_start = crate::subsystems::time::get_timestamp();
 
             // 执行具体动作
             let result = self.execute_degradation_action(action, service_name);
-            let execution_end = crate::time::get_timestamp();
+            let execution_end = crate::subsystems::time::get_timestamp();
 
             // 记录执行的动作
             let executed_action = ExecutedDegradationAction {
@@ -1507,7 +1507,7 @@ impl GracefulDegradationManager {
             if recovery_success {
                 session_mut.status = DegradationStatus::Recovered;
                 session_mut.recovery_status = RecoveryStatus::Completed;
-                session_mut.end_time = Some(crate::time::get_timestamp());
+                session_mut.end_time = Some(crate::subsystems::time::get_timestamp());
             } else {
                 session_mut.status = DegradationStatus::Degraded;
                 session_mut.recovery_status = RecoveryStatus::Failed;
@@ -1692,8 +1692,8 @@ impl GracefulDegradationManager {
     fn add_session_log(&mut self, session_id: &str, level: LogLevel, message: &str, source: &str) {
         if let Some(session) = self.active_degradations.get_mut(session_id) {
             let log = SessionLog {
-                id: format!("log_{}", crate::time::get_timestamp()),
-                timestamp: crate::time::get_timestamp(),
+                id: format!("log_{}", crate::subsystems::time::get_timestamp()),
+                timestamp: crate::subsystems::time::get_timestamp(),
                 level,
                 message: message.to_string(),
                 details: None,
@@ -1984,7 +1984,7 @@ impl GracefulDegradationManager {
                         target_value: 100.0,
                         unit: "ms".to_string(),
                         weight: 0.4,
-                        last_updated: crate::time::get_timestamp(),
+                        last_updated: crate::subsystems::time::get_timestamp(),
                     });
                     metrics.insert("throughput".to_string(), QualityMetric {
                         name: "Throughput".to_string(),
@@ -1993,7 +1993,7 @@ impl GracefulDegradationManager {
                         target_value: 500.0,
                         unit: "req/s".to_string(),
                         weight: 0.3,
-                        last_updated: crate::time::get_timestamp(),
+                        last_updated: crate::subsystems::time::get_timestamp(),
                     });
                     metrics.insert("error_rate".to_string(), QualityMetric {
                         name: "Error Rate".to_string(),
@@ -2002,7 +2002,7 @@ impl GracefulDegradationManager {
                         target_value: 1.0,
                         unit: "%".to_string(),
                         weight: 0.3,
-                        last_updated: crate::time::get_timestamp(),
+                        last_updated: crate::subsystems::time::get_timestamp(),
                     });
                     metrics
                 },

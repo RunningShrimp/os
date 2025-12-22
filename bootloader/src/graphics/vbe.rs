@@ -3,9 +3,12 @@
 //! This module provides VESA graphics interface support for BIOS bootloader,
 //! enabling high-resolution graphics modes and framebuffer access.
 
-use crate::error::{BootError, Result};
+use crate::utils::error::{BootError, Result};
 use crate::protocol::FramebufferInfo;
-use core::ptr;
+use crate::infrastructure::graphics_backend::PixelFormat;
+use alloc::vec::Vec;
+#[cfg(feature = "uefi_support")]
+use uefi::println;
 
 /// VBE Controller Info structure
 #[derive(Debug, Clone, Copy)]
@@ -91,27 +94,39 @@ pub enum VbeMemoryModel {
 }
 
 /// Common VBE modes
-pub const VBE_MODE_640x480x8: u16 = 0x101;
-pub const VBE_MODE_640x480x16: u16 = 0x110;
-pub const VBE_MODE_640x480x24: u16 = 0x111;
-pub const VBE_MODE_640x480x32: u16 = 0x112;
-pub const VBE_MODE_800x600x8: u16 = 0x103;
-pub const VBE_MODE_800x600x16: u16 = 0x113;
-pub const VBE_MODE_800x600x24: u16 = 0x114;
-pub const VBE_MODE_800x600x32: u16 = 0x115;
-pub const VBE_MODE_1024x768x8: u16 = 0x105;
-pub const VBE_MODE_1024x768x16: u16 = 0x117;
-pub const VBE_MODE_1024x768x24: u16 = 0x118;
-pub const VBE_MODE_1024x768x32: u16 = 0x119;
-pub const VBE_MODE_1280x1024x8: u16 = 0x107;
-pub const VBE_MODE_1280x1024x16: u16 = 0x11A;
-pub const VBE_MODE_1280x1024x24: u16 = 0x11B;
-pub const VBE_MODE_1280x1024x32: u16 = 0x11C;
+pub const VBE_MODE_640X480X8: u16 = 0x101;
+pub const VBE_MODE_640X480X16: u16 = 0x110;
+pub const VBE_MODE_640X480X24: u16 = 0x111;
+pub const VBE_MODE_640X480X32: u16 = 0x112;
+pub const VBE_MODE_800X600X8: u16 = 0x103;
+pub const VBE_MODE_800X600X16: u16 = 0x113;
+pub const VBE_MODE_800X600X24: u16 = 0x114;
+pub const VBE_MODE_800X600X32: u16 = 0x115;
+pub const VBE_MODE_1024X768X8: u16 = 0x105;
+pub const VBE_MODE_1024X768X16: u16 = 0x117;
+pub const VBE_MODE_1024X768X24: u16 = 0x118;
+pub const VBE_MODE_1024X768X32: u16 = 0x119;
+pub const VBE_MODE_1280X1024X8: u16 = 0x107;
+pub const VBE_MODE_1280X1024X16: u16 = 0x11A;
+pub const VBE_MODE_1280X1024X24: u16 = 0x11B;
+pub const VBE_MODE_1280X1024X32: u16 = 0x11C;
 
-/// VBE Controller Interface
+/// VBE Mode cache entry
+#[derive(Debug, Clone, Copy)]
+pub struct CachedModeInfo {
+    pub mode_id: u16,
+    pub width: u16,
+    pub height: u16,
+    pub bpp: u8,
+    pub info: VbeModeInfo,
+    pub valid: bool,
+}
+
+/// VBE Controller Interface with mode caching
 pub struct VbeController {
     controller_info: Option<VbeControllerInfo>,
     supported_modes: Vec<u16>,
+    mode_cache: Vec<CachedModeInfo>, // Vector for storing mode info
     initialized: bool,
 }
 
@@ -121,8 +136,34 @@ impl VbeController {
         Self {
             controller_info: None,
             supported_modes: Vec::new(),
+            mode_cache: Vec::new(), // Initialize empty vector for mode caching
             initialized: false,
         }
+    }
+
+    /// Get cached mode info or None if not cached
+    pub fn get_cached_mode(&self, mode_id: u16) -> Option<CachedModeInfo> {
+        self.mode_cache.iter()
+            .find(|cached| cached.mode_id == mode_id && cached.valid)
+            .cloned()
+    }
+
+    /// Cache mode info to avoid repeated hardware queries
+    pub fn cache_mode(&mut self, info: CachedModeInfo) -> Result<()> {
+        // Check if the mode is already cached
+        if let Some(index) = self.mode_cache.iter().position(|cached| cached.mode_id == info.mode_id) {
+            // Update existing cache entry
+            self.mode_cache[index] = info;
+        } else {
+            // Add new cache entry
+            self.mode_cache.push(info);
+        }
+        Ok(())
+    }
+
+    /// Clear the mode cache
+    pub fn clear_cache(&mut self) {
+        self.mode_cache.clear();
     }
 
     /// Initialize VBE controller
@@ -172,6 +213,9 @@ impl VbeController {
 
         // Enumerate supported modes
         self.enumerate_modes()?;
+        
+        // Preload common VBE modes to improve performance later
+        self.preload_common_modes()?;
 
         Ok(())
     }
@@ -184,8 +228,8 @@ impl VbeController {
             regs.es = 0x0000;
             regs.di = info as *mut VbeControllerInfo as u16;
 
-            // Set VBE signature in the structure
-            (*(&mut regs.di as *mut VbeControllerInfo)).signature = [b'V', b'E', b'S', b'A'];
+            // Set VBE signature directly in the provided structure
+            info.signature = [b'V', b'E', b'S', b'A'];
 
             self.vbe_interrupt(0x10, &mut regs)
         };
@@ -359,7 +403,7 @@ impl VbeController {
     }
 
     /// Get detailed mode information
-    fn get_mode_info_details(&self, mode: u16) -> Result<VbeModeInfo> {
+    pub fn get_mode_info_details(&self, mode: u16) -> Result<VbeModeInfo> {
         let mut mode_info = unsafe { core::mem::zeroed::<VbeModeInfo>() };
 
         let result = self.get_mode_info(mode, &mut mode_info)?;
@@ -368,6 +412,56 @@ impl VbeController {
         }
 
         Ok(mode_info)
+    }
+
+    /// Preload common VBE modes to avoid repeated hardware queries
+    pub fn preload_common_modes(&mut self) -> Result<()> {
+        // List of common VBE modes to preload
+        let common_modes = [
+            VBE_MODE_640X480X8,
+            VBE_MODE_640X480X16,
+            VBE_MODE_640X480X24,
+            VBE_MODE_640X480X32,
+            VBE_MODE_800X600X8,
+            VBE_MODE_800X600X16,
+            VBE_MODE_800X600X24,
+            VBE_MODE_800X600X32,
+            VBE_MODE_1024X768X8,
+            VBE_MODE_1024X768X16,
+            VBE_MODE_1024X768X24,
+            VBE_MODE_1024X768X32,
+            VBE_MODE_1280X1024X8,
+            VBE_MODE_1280X1024X16,
+            VBE_MODE_1280X1024X24,
+            VBE_MODE_1280X1024X32,
+        ];
+        
+        // Try to preload each common mode
+        for &mode in &common_modes {
+            // Check if the mode is in the supported modes list to avoid unnecessary hardware calls
+            if self.supported_modes.contains(&mode) {
+                match self.get_mode_info_details(mode) {
+                    Ok(mode_info) => {
+                        // Cache the mode info
+                        let cached = CachedModeInfo {
+                            mode_id: mode,
+                            width: mode_info.x_resolution,
+                            height: mode_info.y_resolution,
+                            bpp: mode_info.bits_per_pixel,
+                            info: mode_info,
+                            valid: true,
+                        };
+                        
+                        self.cache_mode(cached)?;
+                    }
+                    Err(_) => {
+                        // Ignore modes that can't be preloaded
+                    }
+                }
+            }
+        }
+        
+        Ok(())
     }
 
     /// Set graphics mode and return framebuffer info
@@ -389,30 +483,36 @@ impl VbeController {
             return Err(BootError::HardwareError("Failed to set VBE mode"));
         }
 
-        println!("[vbe] Set VBE mode: 0x{:04X}", mode);
-        println!("[vbe] Resolution: {}x{}", mode_info.x_resolution, mode_info.y_resolution);
-        println!("[vbe] BPP: {}", mode_info.bits_per_pixel);
-        println!("[vbe] Framebuffer address: {:#08X}", mode_info.phys_base_ptr);
+        // Copy values to local variables to avoid unaligned references
+        let mode_val = mode;
+        let x_res = mode_info.x_resolution;
+        let y_res = mode_info.y_resolution;
+        let bpp_val = mode_info.bits_per_pixel;
+        let fb_addr = mode_info.phys_base_ptr;
+        
+        println!("[vbe] Set VBE mode: 0x{:04X}", mode_val);
+        println!("[vbe] Resolution: {}x{}", x_res, y_res);
+        println!("[vbe] BPP: {}", bpp_val);
+        println!("[vbe] Framebuffer address: {:#08X}", fb_addr);
 
         // Create framebuffer info
         let fb_info = FramebufferInfo {
             address: mode_info.phys_base_ptr as usize,
             width: mode_info.x_resolution as u32,
             height: mode_info.y_resolution as u32,
-            bytes_per_pixel: (mode_info.bits_per_pixel / 8) as u32,
-            stride: mode_info.bytes_per_scanline as u32,
-            pixel_format: self.determine_pixel_format(&mode_info),
+            bpp: (mode_info.bits_per_pixel / 8) as u32,
+            pitch: mode_info.bytes_per_scanline as u32,
         };
 
         Ok(fb_info)
     }
 
     /// Determine pixel format from VBE mode info
-    fn determine_pixel_format(&self, mode_info: &VbeModeInfo) -> crate::protocol::PixelFormat {
+    pub fn determine_pixel_format(&self, mode_info: &VbeModeInfo) -> PixelFormat {
         match (mode_info.red_field_position, mode_info.blue_field_position) {
-            (16, 0) => crate::protocol::PixelFormat::BGR,
-            (0, 16) => crate::protocol::PixelFormat::RGB,
-            _ => crate::protocol::PixelFormat::RGBReserved,
+            (16, 0) => PixelFormat::BGR,
+            (0, 16) => PixelFormat::RGB,
+            _ => PixelFormat::RGB,
         }
     }
 
@@ -421,8 +521,8 @@ impl VbeController {
         &self.supported_modes
     }
 
-    /// Get controller info
-    pub fn get_controller_info(&self) -> Option<&VbeControllerInfo> {
+    /// Get cached controller info
+    pub fn get_cached_controller_info(&self) -> Option<&VbeControllerInfo> {
         self.controller_info.as_ref()
     }
 
@@ -432,21 +532,39 @@ impl VbeController {
     }
 
     /// VESA BIOS interrupt call
-    unsafe fn vbe_interrupt(&self, interrupt: u8, regs: &mut VbeRegisters) -> VbeRegisters {
-        // This is a simplified VBE interrupt implementation
-        // In a real BIOS environment, this would trigger BIOS interrupt 0x10
-        // For now, we'll simulate the call
-
-        // In real implementation, this would be:
-        // asm volatile ("int $0x10" : "=*{regs}"(regs) : "{ax}"(regs.ax), "{bx}"(regs.bx),
-        //               "{cx}"(regs.cx), "{dx}"(regs.dx), "{di}"(regs.di), "{si}"(regs.si),
-        //               "{es}"(regs.es) : "memory");
-
-        // Simulate successful VBE call
-        let mut result_regs = *regs;
-        result_regs.ax = 0x004F; // Success
-
-        result_regs
+    unsafe fn vbe_interrupt(&self, _interrupt: u8, regs: &mut VbeRegisters) -> VbeRegisters {
+        log::debug!("Executing VBE interrupt call");
+        // Real BIOS interrupt implementation for VBE
+        // We use inline assembly with constraints to set and get registers
+        
+        let result = VbeRegisters {
+            ax: regs.ax,
+            bx: regs.bx,
+            cx: regs.cx,
+            dx: regs.dx,
+            si: regs.si,
+            di: regs.di,
+            es: regs.es,
+        };
+        
+        // Execute BIOS interrupt 0x10 for VBE calls
+        #[cfg(target_arch = "x86")]
+        asm!(
+            "int $0x10",
+            inout("ax") result.ax,
+            inout("bx") result.bx,
+            inout("cx") result.cx,
+            inout("dx") result.dx,
+            inout("si") result.si,
+            inout("di") result.di,
+            inout("es") result.es,
+            options(nostack),
+        );
+        
+        #[cfg(not(target_arch = "x86"))]
+        {}
+        
+        result
     }
 }
 
@@ -552,8 +670,8 @@ mod tests {
 
     #[test]
     fn test_vbe_constants() {
-        assert_eq!(VBE_MODE_640x480x8, 0x101);
-        assert_eq!(VBE_MODE_1024x768x32, 0x119);
+        assert_eq!(VBE_MODE_640X480X8, 0x101);
+        assert_eq!(VBE_MODE_1024X768X32, 0x119);
     }
 
     #[test]
@@ -565,7 +683,7 @@ mod tests {
 
     #[test]
     fn test_vbe_graphics_manager() {
-        let mut manager = VbeGraphicsManager::new();
+        let manager = VbeGraphicsManager::new();
         assert!(!manager.is_graphics_mode_set());
         assert!(manager.get_current_mode().is_none());
     }

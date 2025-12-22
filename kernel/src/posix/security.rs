@@ -9,11 +9,12 @@
 //! - setreuid() / setregid() - Set real/effective user/group ID
 
 use crate::posix::{Uid, Gid, Pid, Mode};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
+use alloc::string::ToString;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU32, Ordering};
+
 
 /// POSIX capability structure
 #[derive(Debug, Clone, Copy)]
@@ -102,13 +103,13 @@ impl PasswdEntry {
     /// Create a new password entry
     pub fn new(name: &str, uid: Uid, gid: Gid) -> Self {
         Self {
-            pw_name: name.into(),
-            pw_passwd: "x".into(), // Shadow password indicator
+            pw_name: name.to_string(),
+            pw_passwd: "x".to_string(), // Shadow password indicator
             pw_uid: uid,
             pw_gid: gid,
-            pw_gecos: "".into(),
+            pw_gecos: "".to_string(),
             pw_dir: format!("/home/{}", name),
-            pw_shell: "/bin/sh".into(),
+            pw_shell: "/bin/sh".to_string(),
         }
     }
 
@@ -145,8 +146,8 @@ impl GroupEntry {
     /// Create a new group entry
     pub fn new(name: &str, gid: Gid) -> Self {
         Self {
-            gr_name: name.into(),
-            gr_passwd: "x".into(), // Shadow password indicator
+            gr_name: name.to_string(),
+            gr_passwd: "x".to_string(), // Shadow password indicator
             gr_gid: gid,
             gr_mem: Vec::new(),
         }
@@ -160,7 +161,7 @@ impl GroupEntry {
     /// Create a wheel group entry
     pub fn wheel() -> Self {
         let mut entry = Self::new("wheel", 1);
-        entry.gr_mem.push("root".into());
+        entry.gr_mem.push("root".to_string());
         entry
     }
 
@@ -171,8 +172,8 @@ impl GroupEntry {
 
     /// Add a member to the group
     pub fn add_member(&mut self, username: &str) {
-        if !self.gr_mem.contains(&username.into()) {
-            self.gr_mem.push(username.into());
+        if !self.gr_mem.contains(&username.to_string()) {
+            self.gr_mem.push(username.to_string());
         }
     }
 }
@@ -312,14 +313,14 @@ impl SecurityRegistry {
     /// Initialize the registry with default entries
     pub fn init(&mut self) {
         // Add default password entries
-        self.password_db.insert("root".into(), PasswdEntry::root());
-        self.password_db.insert("guest".into(), PasswdEntry::guest());
-        self.password_db.insert("nobody".into(), PasswdEntry::nobody());
+        self.password_db.insert("root".to_string(), PasswdEntry::root());
+        self.password_db.insert("guest".to_string(), PasswdEntry::guest());
+        self.password_db.insert("nobody".to_string(), PasswdEntry::nobody());
         
         // Add default group entries
-        self.group_db.insert("root".into(), GroupEntry::root());
-        self.group_db.insert("wheel".into(), GroupEntry::wheel());
-        self.group_db.insert("nogroup".into(), GroupEntry::nobody());
+        self.group_db.insert("root".to_string(), GroupEntry::root());
+        self.group_db.insert("wheel".to_string(), GroupEntry::wheel());
+        self.group_db.insert("nogroup".to_string(), GroupEntry::nobody());
         
         crate::println!("[security] Security registry initialized with default users and groups");
     }
@@ -359,7 +360,7 @@ impl SecurityRegistry {
 
     /// Get password entry by name
     pub fn getpwnam(&self, name: &str) -> Option<&PasswdEntry> {
-        self.password_db.get(&String::from(name))
+        self.password_db.get(&name.to_string())
     }
 
     /// Get password entry by UID
@@ -369,7 +370,7 @@ impl SecurityRegistry {
 
     /// Get group entry by name
     pub fn getgrnam(&self, name: &str) -> Option<&GroupEntry> {
-        self.group_db.get(&String::from(name))
+        self.group_db.get(&name.to_string())
     }
 
     /// Get group entry by GID
@@ -424,7 +425,7 @@ pub struct SecurityStats {
 
 /// Get process capabilities
 pub fn capget(pid: Pid, header: &mut CapHeader, data: &mut CapData) -> Result<(), SecurityError> {
-    let registry = SECURITY_REGISTRY.lock();
+    let mut registry = SECURITY_REGISTRY.lock();
     
     // Get process credentials
     let creds = registry.get_process_credentials(pid)
@@ -520,11 +521,12 @@ pub fn setuid(ruid: Uid, euid: Uid) -> Result<(), SecurityError> {
     
     // Get or create process credentials
     if !registry.process_credentials.contains_key(&current_pid) {
-        let creds = ProcessCredentials::new();
+        let mut creds = ProcessCredentials::new();
+        creds.set_uids(ruid, euid);
         registry.set_process_credentials(current_pid, creds).unwrap();
     }
-
     let creds = registry.process_credentials.get_mut(&current_pid).unwrap();
+    
     creds.set_uids(ruid, euid);
     Ok(())
 }
@@ -540,11 +542,12 @@ pub fn setgid(rgid: Gid, egid: Gid) -> Result<(), SecurityError> {
     
     // Get or create process credentials
     if !registry.process_credentials.contains_key(&current_pid) {
-        let creds = ProcessCredentials::new();
+        let mut creds = ProcessCredentials::new();
+        creds.set_gids(rgid, egid);
         registry.set_process_credentials(current_pid, creds).unwrap();
     }
-
     let creds = registry.process_credentials.get_mut(&current_pid).unwrap();
+    
     creds.set_gids(rgid, egid);
     Ok(())
 }
@@ -560,11 +563,12 @@ pub fn seteuid(euid: Uid) -> Result<(), SecurityError> {
     
     // Get or create process credentials
     if !registry.process_credentials.contains_key(&current_pid) {
-        let creds = ProcessCredentials::new();
+        let mut creds = ProcessCredentials::new();
+        creds.effective_uid = euid;
         registry.set_process_credentials(current_pid, creds).unwrap();
     }
-
     let creds = registry.process_credentials.get_mut(&current_pid).unwrap();
+    
     creds.effective_uid = euid;
     Ok(())
 }
@@ -579,13 +583,14 @@ pub fn setegid(egid: Gid) -> Result<(), SecurityError> {
     let mut registry = SECURITY_REGISTRY.lock();
     
     // Get or create process credentials
-    let mut creds = if registry.process_credentials.contains_key(&current_pid) {
-        registry.process_credentials.get(&current_pid).unwrap().clone()
-    } else {
-        ProcessCredentials::new()
-    };
+    if !registry.process_credentials.contains_key(&current_pid) {
+        let mut creds = ProcessCredentials::new();
+        creds.effective_gid = egid;
+        registry.set_process_credentials(current_pid, creds).unwrap();
+    }
+    let creds = registry.process_credentials.get_mut(&current_pid).unwrap();
+    
     creds.effective_gid = egid;
-    registry.set_process_credentials(current_pid, creds).unwrap();
     Ok(())
 }
 
@@ -599,14 +604,15 @@ pub fn setreuid(ruid: Uid, euid: Uid) -> Result<(), SecurityError> {
     let mut registry = SECURITY_REGISTRY.lock();
     
     // Get or create process credentials
-    let mut creds = if registry.process_credentials.contains_key(&current_pid) {
-        registry.process_credentials.get(&current_pid).unwrap().clone()
-    } else {
-        ProcessCredentials::new()
-    };
+    if !registry.process_credentials.contains_key(&current_pid) {
+        let mut creds = ProcessCredentials::new();
+        creds.set_uids(ruid, euid);
+        creds.save_ids();
+        registry.set_process_credentials(current_pid, creds).unwrap();
+    }
+    let creds = registry.process_credentials.get_mut(&current_pid).unwrap();
+    
     creds.set_uids(ruid, euid);
-    creds.save_ids();
-    registry.set_process_credentials(current_pid, creds).unwrap();
     Ok(())
 }
 
@@ -620,14 +626,15 @@ pub fn setregid(rgid: Gid, egid: Gid) -> Result<(), SecurityError> {
     let mut registry = SECURITY_REGISTRY.lock();
     
     // Get or create process credentials
-    let mut creds = if registry.process_credentials.contains_key(&current_pid) {
-        registry.process_credentials.get(&current_pid).unwrap().clone()
-    } else {
-        ProcessCredentials::new()
-    };
+    if !registry.process_credentials.contains_key(&current_pid) {
+        let mut creds = ProcessCredentials::new();
+        creds.set_gids(rgid, egid);
+        creds.save_ids();
+        registry.set_process_credentials(current_pid, creds).unwrap();
+    }
+    let creds = registry.process_credentials.get_mut(&current_pid).unwrap();
+    
     creds.set_gids(rgid, egid);
-    creds.save_ids();
-    registry.set_process_credentials(current_pid, creds).unwrap();
     Ok(())
 }
 

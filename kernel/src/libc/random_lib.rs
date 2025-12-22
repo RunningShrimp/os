@@ -10,8 +10,6 @@
 extern crate alloc;
 use core::ffi::{c_int, c_uint, c_double};
 use alloc::vec::Vec;
-use crate::libc::error::{get_errno, set_errno};
-use crate::libc::error::errno::EINVAL;
 
 /// 随机数生成器类型
 #[derive(Debug, Clone, Copy)]
@@ -87,7 +85,7 @@ impl SystemEntropy {
     pub fn get_entropy(&self) -> u64 {
         // 这里应该调用真正的系统熵源
         // 暂时使用时间戳和系统状态的组合
-        let timestamp = crate::time::get_timestamp() as u64;
+        let timestamp = crate::subsystems::time::get_timestamp() as u64;
         let system_state = self.get_system_state() as u64;
 
         // 组合多个熵源

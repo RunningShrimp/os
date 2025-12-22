@@ -220,7 +220,7 @@ impl AuditSubsystem {
             return Ok(());
         }
 
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         // Add event to buffer
         if self.event_count < self.events.capacity() {
@@ -240,7 +240,7 @@ impl AuditSubsystem {
             *stats.events_by_severity.entry(event.severity).or_insert(0) += 1;
             *stats.events_by_process.entry(event.pid).or_insert(0) += 1;
 
-            let elapsed = crate::time::get_timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
             stats.avg_processing_time_ns = (stats.avg_processing_time_ns + elapsed) / 2;
         }
 
@@ -434,7 +434,7 @@ pub fn create_audit_event(
     AuditEvent {
         id: event_id,
         event_type,
-        timestamp: crate::time::get_timestamp_nanos(),
+        timestamp: crate::subsystems::time::get_timestamp_nanos(),
         pid,
         uid,
         gid: 0, // Would be populated from process

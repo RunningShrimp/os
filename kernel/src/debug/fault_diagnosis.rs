@@ -943,7 +943,7 @@ impl FaultDiagnosisEngine {
     /// 开始诊断会话
     pub fn start_diagnosis(&mut self, input_data: DiagnosisInput) -> Result<u64, &'static str> {
         let session_id = self.session_counter.fetch_add(1, Ordering::SeqCst);
-        let start_time = crate::time::get_timestamp();
+        let start_time = crate::subsystems::time::get_timestamp();
 
         let session = DiagnosisSession {
             id: session_id,
@@ -964,7 +964,7 @@ impl FaultDiagnosisEngine {
         // 更新会话
         let mut updated_session = session;
         updated_session.diagnosis_results = results.clone();
-        updated_session.end_time = Some(crate::time::get_timestamp());
+        updated_session.end_time = Some(crate::subsystems::time::get_timestamp());
         updated_session.status = SessionStatus::Completed;
         updated_session.confidence = self.calculate_overall_confidence(&results);
 
@@ -1188,7 +1188,7 @@ impl FaultDiagnosisEngine {
 
     /// 生成诊断结果
     fn generate_diagnosis_result(&self, rule: &DiagnosisRule, input_data: &DiagnosisInput) -> Result<DiagnosisResult, &'static str> {
-        let result_id = format!("diagnosis_{}", crate::time::get_timestamp());
+        let result_id = format!("diagnosis_{}", crate::subsystems::time::get_timestamp());
 
         // 生成根本原因分析
         let root_cause_analysis = self.analyze_root_causes(rule, input_data)?;
@@ -1215,14 +1215,14 @@ impl FaultDiagnosisEngine {
             impact_assessment,
             recommended_actions,
             prediction_info,
-            generated_at: crate::time::get_timestamp(),
+            generated_at: crate::subsystems::time::get_timestamp(),
             summary: format!("Diagnosis completed using rule: {}", rule.name),
         })
     }
 
     /// 生成模式诊断结果
     fn generate_pattern_diagnosis_result(&self, pattern: &FaultPattern, input_data: &DiagnosisInput) -> Result<DiagnosisResult, &'static str> {
-        let result_id = format!("pattern_diagnosis_{}", crate::time::get_timestamp());
+        let result_id = format!("pattern_diagnosis_{}", crate::subsystems::time::get_timestamp());
 
         let prediction_info = if self.config.enable_prediction {
             Some(self.generate_pattern_prediction_info(pattern, input_data)?)
@@ -1239,7 +1239,7 @@ impl FaultDiagnosisEngine {
             impact_assessment: pattern.impact_scope.clone(),
             recommended_actions: pattern.remediation_recommendations.clone(),
             prediction_info,
-            generated_at: crate::time::get_timestamp(),
+            generated_at: crate::subsystems::time::get_timestamp(),
             summary: format!("Diagnosis completed for pattern: {}", pattern.name),
         })
     }
@@ -1308,7 +1308,7 @@ impl FaultDiagnosisEngine {
     fn generate_prediction_info(&self, _rule: &DiagnosisRule, _input_data: &DiagnosisInput) -> Result<PredictionInfo, &'static str> {
         Ok(PredictionInfo {
             predicted_fault_probability: 0.15,
-            predicted_fault_time: Some(crate::time::get_timestamp() + 3600 * 4), // 4小时后
+            predicted_fault_time: Some(crate::subsystems::time::get_timestamp() + 3600 * 4), // 4小时后
             predicted_impact_scope: "Service degradation expected".to_string(),
             prediction_confidence: 0.7,
         })
@@ -1318,7 +1318,7 @@ impl FaultDiagnosisEngine {
     fn generate_pattern_prediction_info(&self, pattern: &FaultPattern, _input_data: &DiagnosisInput) -> Result<PredictionInfo, &'static str> {
         Ok(PredictionInfo {
             predicted_fault_probability: pattern.frequency,
-            predicted_fault_time: Some(crate::time::get_timestamp() + 3600 * 6), // 6小时后
+            predicted_fault_time: Some(crate::subsystems::time::get_timestamp() + 3600 * 6), // 6小时后
             predicted_impact_scope: format!("Impact: {:?}", pattern.category),
             prediction_confidence: pattern.detection_confidence,
         })
@@ -1389,7 +1389,7 @@ impl FaultDiagnosisEngine {
                     predicted_impact_scope: "Predicted by model".to_string(),
                     prediction_confidence: model.accuracy,
                 }),
-                generated_at: crate::time::get_timestamp(),
+                generated_at: crate::subsystems::time::get_timestamp(),
                 summary: format!("Fault predicted by model: {}", model.name),
             }))
         } else {
@@ -1663,7 +1663,7 @@ impl FaultDiagnosisEngine {
                 model_parameters: BTreeMap::new(),
                 training_dataset: "historical_fault_data".to_string(),
                 accuracy: 0.75,
-                last_trained: crate::time::get_timestamp(),
+                last_trained: crate::subsystems::time::get_timestamp(),
                 prediction_window_hours: 24,
             },
         ];

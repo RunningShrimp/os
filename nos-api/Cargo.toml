@@ -1,0 +1,53 @@
+[package]
+name = "nos-api"
+version = "0.1.0"
+edition = "2024"
+authors = ["NOS Developers"]
+description = "NOS API - Core interfaces and types for the NOS operating system"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/nos/nos-api"
+keywords = ["nos", "api", "kernel", "os"]
+categories = ["os", "no-std"]
+
+[dependencies]
+# Core dependencies
+bitflags = { workspace = true }
+spin = { workspace = true }
+lazy_static = { workspace = true }
+
+# Optional dependencies
+log = { workspace = true, optional = true }
+criterion = { workspace = true, optional = true }
+
+# Collections for no_std
+hashbrown = { workspace = true, optional = true }
+
+# Dependencies from nos-perf
+static_assertions = { workspace = true }
+
+[features]
+default = ["alloc"]
+std = []
+alloc = ["hashbrown"]
+log = ["dep:log"]
+debug_subsystems = []
+formal_verification = []
+security_audit = []
+
+# Feature flags for conditional compilation
+minimal = []
+embedded = ["alloc"]
+server = ["alloc", "log"]
+desktop = ["alloc", "log"]
+
+[lib]
+name = "nos_api"
+path = "src/lib.rs"
+
+[[bench]]
+name = "api_benchmarks"
+harness = false
+
+[[test]]
+name = "api_tests"
+path = "tests/api_tests.rs"

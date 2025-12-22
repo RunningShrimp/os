@@ -7,7 +7,7 @@ extern crate alloc;
 use alloc::{string::{String, ToString}, sync::Arc, vec::Vec, collections::BTreeMap};
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 
 use super::{
     error::*,

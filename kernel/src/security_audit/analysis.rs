@@ -525,7 +525,7 @@ impl EventAnalyzer {
 
     /// 分析事件
     pub fn analyze_event(&mut self, event: &AuditEvent) -> Result<(), &'static str> {
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         // 异常检测
         if self.config.analysis_types.contains(&AnalysisType::AnomalyDetection) {
@@ -546,7 +546,7 @@ impl EventAnalyzer {
             let mut stats = self.stats.lock();
             stats.total_analyses += 1;
 
-            let elapsed = crate::time::get_timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
             stats.avg_analysis_time_us = (stats.avg_analysis_time_us + elapsed / 1000) / 2;
         }
 
@@ -673,7 +673,7 @@ impl AnomalyDetector {
                 anomaly_type: AnomalyType::Statistical,
                 detection_algorithm: "Statistical".to_string(),
                 confidence: 0.9,
-                detected_at: crate::time::get_timestamp_nanos(),
+                detected_at: crate::subsystems::time::get_timestamp_nanos(),
             };
 
             self.detection_history.push(detection.clone());
@@ -750,7 +750,7 @@ impl BehaviorAnalyzer {
             risk_level,
             behavior_classification,
             matched_patterns: Vec::new(),
-            analyzed_at: crate::time::get_timestamp_nanos(),
+            analyzed_at: crate::subsystems::time::get_timestamp_nanos(),
         };
 
         self.analysis_cache.insert(event.id, analysis.clone());
@@ -763,7 +763,7 @@ impl BehaviorAnalyzer {
         let mut score = 0.5; // 基础分数
 
         // 基于时间模式
-        let current_hour = (crate::time::get_timestamp() / 3600) % 24;
+        let current_hour = (crate::subsystems::time::get_timestamp() / 3600) % 24;
         if current_hour >= 9 && current_hour <= 17 {
             score += 0.1; // 工作时间内正常
         } else {
@@ -845,7 +845,7 @@ impl TrendAnalyzer {
                     id: predictions.len() as u64 + 1,
                     predicted_value,
                     confidence_interval: (predicted_value * 0.9, predicted_value * 1.1),
-                    predicted_time: crate::time::get_timestamp() + 86400, // 1 day ahead
+                    predicted_time: crate::subsystems::time::get_timestamp() + 86400, // 1 day ahead
                     model_id: 1,
                     accuracy: 0.85,
                 };
@@ -888,7 +888,7 @@ impl CorrelationAnalyzer {
                         event_pairs: vec![(events[i].id, events[j].id)],
                         correlation_strength,
                         correlation_type: CorrelationType::Positive,
-                        analyzed_at: crate::time::get_timestamp_nanos(),
+                        analyzed_at: crate::subsystems::time::get_timestamp_nanos(),
                     };
 
                     results.push(result);

@@ -791,7 +791,7 @@ impl SecurityAuditSubsystem {
             return Err("Security audit subsystem not initialized");
         }
 
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         // 应用事件过滤器
         if !self.apply_event_filters(&event) {
@@ -821,7 +821,7 @@ impl SecurityAuditSubsystem {
             *stats.events_by_process.entry(event.pid).or_insert(0) += 1;
             *stats.events_by_user.entry(event.uid).or_insert(0) += 1;
 
-            let elapsed = crate::time::get_timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
             stats.avg_processing_time_us = (stats.avg_processing_time_us + elapsed / 1000) / 2;
         }
 

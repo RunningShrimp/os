@@ -7,8 +7,8 @@ use alloc::vec::Vec;
 // support for BIOS bootloader, including E820 memory map scanning,
 // A20 gate handling, and extended memory detection.
 
-use crate::error::{BootError, Result};
-use crate::protocol::{MemoryMap, MemoryMapEntry, MemoryType};
+use crate::utils::error::{BootError, Result};
+use crate::protocol::bios::{MemoryMap, MemoryMapEntry, MemoryType};
 use core::ptr;
 
 /// E820 Memory Map Entry Structure

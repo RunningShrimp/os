@@ -8,7 +8,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 use alloc::string::String;
 use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
-use crate::sync::Mutex;
+use crate::subsystems::sync::Mutex;
 use crate::reliability::errno::{EINVAL, ENOMEM, ENOENT};
 
 /// Surface ID type
@@ -82,7 +82,7 @@ impl SurfaceBuffer {
         
         // Allocate shared memory for the buffer
         // In real implementation, this would use shared memory allocation
-        let addr = crate::mm::kalloc(size).ok_or(ENOMEM)?;
+        let addr = crate::subsystems::mm::kalloc(size).ok_or(ENOMEM)?;
         
         Ok(Self {
             addr,
@@ -106,7 +106,7 @@ impl SurfaceBuffer {
         if count == 1 {
             // Last reference - free the buffer
             unsafe {
-                crate::mm::kfree(self.addr, self.size);
+                crate::subsystems::mm::kfree(self.addr, self.size);
             }
             true
         } else {
@@ -341,7 +341,7 @@ pub fn init_surface_manager() -> Result<(), i32> {
 
 /// Get surface manager
 pub fn get_surface_manager() -> &'static SurfaceManager {
-    static INIT_ONCE: crate::sync::Once = crate::sync::Once::new();
+    static INIT_ONCE: crate::subsystems::sync::Once = crate::subsystems::sync::Once::new();
     INIT_ONCE.call_once(|| {
         let mut manager = SURFACE_MANAGER.lock();
         if manager.is_none() {

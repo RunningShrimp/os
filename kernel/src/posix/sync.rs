@@ -5,7 +5,7 @@
 
 extern crate alloc;
 
-use crate::sync::primitives::{MutexEnhanced, CondVar, RwLockEnhanced};
+use crate::subsystems::sync::primitives::{MutexEnhanced, CondVar, RwLockEnhanced};
 use core::ptr::null_mut;
 use core::cell::UnsafeCell;
 use alloc::boxed::Box;
@@ -152,7 +152,7 @@ pub type PthreadBarrierT = *mut PthreadBarrierInternal;
 #[repr(C)]
 pub struct PthreadBarrierInternal {
     /// Enhanced barrier implementation
-    barrier: crate::sync::primitives::Barrier,
+    barrier: crate::subsystems::sync::primitives::Barrier,
     /// Barrier attributes
     attrs: PthreadBarrierAttrT,
     /// Is initialized
@@ -800,7 +800,7 @@ pub unsafe extern "C" fn pthread_barrier_init(
     };
 
     let internal = Box::into_raw(Box::new(PthreadBarrierInternal {
-        barrier: crate::sync::primitives::Barrier::new(count as usize),
+        barrier: crate::subsystems::sync::primitives::Barrier::new(count as usize),
         attrs,
         initialized: true,
     }));

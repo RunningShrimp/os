@@ -5,24 +5,42 @@
 
 use core::ffi::{c_char, c_int, c_void, c_uint};
 
-pub type size_t = usize;
+pub type SizeT = usize;
+#[allow(non_camel_case_types)]
+pub type size_t = SizeT;
 /// Signed size type
-pub type ssize_t = isize;
+pub type SsizeT = isize;
+#[allow(non_camel_case_types)]
+pub type ssize_t = SsizeT;
 
 /// 长整型类型
-pub type c_long = isize;
+pub type CLong = isize;
+#[allow(non_camel_case_types)]
+pub type c_long = CLong;
 /// 无符号长整型类型
-pub type c_ulong = usize;
+pub type CUlong = usize;
+#[allow(non_camel_case_types)]
+pub type c_ulong = CUlong;
 /// 短整型类型
-pub type c_short = i16;
+pub type CShort = i16;
+#[allow(non_camel_case_types)]
+pub type c_short = CShort;
 /// 无符号短整型类型
-pub type c_ushort = u16;
+pub type CUshort = u16;
+#[allow(non_camel_case_types)]
+pub type c_ushort = CUshort;
 /// time_t类型
-pub type time_t = i64;
+pub type TimeT = i64;
+#[allow(non_camel_case_types)]
+pub type time_t = TimeT;
 /// suseconds_t类型（微秒）
-pub type suseconds_t = i64;
+pub type SusecondsT = i64;
+#[allow(non_camel_case_types)]
+pub type suseconds_t = SusecondsT;
 /// time_t类型（用于sysinfo）
-pub type c_longlong = i64;
+pub type CLonglong = i64;
+#[allow(non_camel_case_types)]
+pub type c_longlong = CLonglong;
 
 /// div_t结构体（整数除法结果）
 #[repr(C)]
@@ -36,8 +54,8 @@ pub struct DivT {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct LDivT {
-    pub quot: c_long,
-    pub rem: c_long,
+    pub quot: CLong,
+    pub rem: CLong,
 }
 
 /// C标准库核心接口
@@ -512,6 +530,18 @@ pub trait CLibInterface {
     /// * 返回指向错误消息字符串的指针
     fn strerror(&self, errnum: c_int) -> *const c_char;
 
+    /// 获取错误类型
+    ///
+    /// # 返回值
+    /// * 返回错误类型代码
+    fn error_type(&self) -> c_int;
+
+    /// 获取错误代码
+    ///
+    /// # 返回值
+    /// * 返回具体错误代码
+    fn error_code(&self) -> c_int;
+
     // === 环境变量函数 ===
 
     /// 获取环境变量值
@@ -774,7 +804,6 @@ pub fn is_c_lib_initialized() -> bool {
 ///
 /// 提供常用的C库宏和常量定义
 pub mod macros {
-    use super::*;
     use core::ffi::{c_void, c_int};
     
     /// NULL指针定义

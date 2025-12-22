@@ -266,7 +266,7 @@ impl ComplianceChecker {
                 description: "All security events must be logged".to_string(),
                 condition: ComplianceCondition::EventCount {
                     event_type: AuditEventType::SecurityViolation,
-                    time_range: (0, crate::time::get_timestamp()),
+                    time_range: (0, crate::subsystems::time::get_timestamp()),
                     operator: ComparisonOperator::GreaterThan,
                     threshold: 0,
                 },
@@ -283,7 +283,7 @@ impl ComplianceChecker {
                 description: "Access control events must be logged".to_string(),
                 condition: ComplianceCondition::EventCount {
                     event_type: AuditEventType::Authentication,
-                    time_range: (0, crate::time::get_timestamp()),
+                    time_range: (0, crate::subsystems::time::get_timestamp()),
                     operator: ComparisonOperator::GreaterThan,
                     threshold: 0,
                 },
@@ -342,7 +342,7 @@ impl ComplianceChecker {
                 description: "Systems must be monitored for security events".to_string(),
                 condition: ComplianceCondition::EventCount {
                     event_type: AuditEventType::KernelEvent,
-                    time_range: (0, crate::time::get_timestamp()),
+                    time_range: (0, crate::subsystems::time::get_timestamp()),
                     operator: ComparisonOperator::GreaterThan,
                     threshold: 0,
                 },
@@ -407,7 +407,7 @@ impl ComplianceChecker {
                 description: "Security incidents must be responded to".to_string(),
                 condition: ComplianceCondition::EventCount {
                     event_type: AuditEventType::SecurityViolation,
-                    time_range: (0, crate::time::get_timestamp()),
+                    time_range: (0, crate::subsystems::time::get_timestamp()),
                     operator: ComparisonOperator::GreaterThan,
                     threshold: 0,
                 },
@@ -430,7 +430,7 @@ impl ComplianceChecker {
                 description: "Financial transactions must be auditable".to_string(),
                 condition: ComplianceCondition::EventCount {
                     event_type: AuditEventType::Process,
-                    time_range: (0, crate::time::get_timestamp()),
+                    time_range: (0, crate::subsystems::time::get_timestamp()),
                     operator: ComparisonOperator::GreaterThan,
                     threshold: 0,
                 },
@@ -503,7 +503,7 @@ impl ComplianceChecker {
 
     /// 执行合规检查
     fn execute_compliance_check(&mut self, rule: &ComplianceRule, event: &AuditEvent) -> Result<(), &'static str> {
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         let result = match &rule.condition {
             ComplianceCondition::EventCount { event_type, time_range, operator, threshold } => {
@@ -535,7 +535,7 @@ impl ComplianceChecker {
             status,
             details: format!("Compliance check for rule '{}' on event {}", rule.name, event.id),
             recommendations: self.generate_recommendations(rule, status),
-            timestamp: crate::time::get_timestamp_nanos(),
+            timestamp: crate::subsystems::time::get_timestamp_nanos(),
         };
 
         // 更新统计
@@ -552,7 +552,7 @@ impl ComplianceChecker {
                 ComplianceStatus::Unknown => {}
             }
 
-            let elapsed = crate::time::get_timestamp_nanos() - start_time;
+            let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
             stats.avg_check_time_us = (stats.avg_check_time_us + elapsed / 1000) / 2;
         }
 
@@ -672,7 +672,7 @@ impl ComplianceChecker {
                     status: check_result.status,
                     details: check_result.details,
                     recommendations: check_result.recommendations,
-                    timestamp: crate::time::get_timestamp_nanos(),
+                    timestamp: crate::subsystems::time::get_timestamp_nanos(),
                 };
 
                 results.push(compliance_result);
@@ -690,7 +690,7 @@ impl ComplianceChecker {
 
     /// 执行规则检查
     fn execute_rule_check(&self, rule: &ComplianceRule) -> Result<ComplianceCheckResult, &'static str> {
-        let start_time = crate::time::get_timestamp_nanos();
+        let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         let result = match &rule.condition {
             ComplianceCondition::SystemConfig { config_key, expected_value } => {
@@ -711,7 +711,7 @@ impl ComplianceChecker {
             Err(_) => ComplianceStatus::Unknown,
         };
 
-        let elapsed = crate::time::get_timestamp_nanos() - start_time;
+        let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
 
         Ok(ComplianceCheckResult {
             status,

@@ -4,15 +4,16 @@
 //! entry points and provides the interface between low-level assembly
 //! and high-level Rust bootloader code.
 
-use crate::error::{BootError, Result};
+use crate::utils::error::{BootError, Result};
 use crate::memory::bios::BiosMemoryManager;
-use crate::protocol::{ProtocolManager, ProtocolType};
+use crate::protocol_manager::ProtocolManager;
+use crate::protocol::BootProtocolType;
 use crate::boot_menu;
 use core::panic::PanicInfo;
 use core::ptr;
 
 /// External assembly symbols
-extern "C" {
+unsafe extern "C" {
     static bss_start: u8;
     static bss_end: u8;
     static saved_sp: u32;
@@ -140,7 +141,7 @@ fn bootloader_main_protected(state: &mut BootloaderState) -> Result<()> {
             framebuffer_info[0] = fb_info.address as u64;
             framebuffer_info[1] = fb_info.width as u64;
             framebuffer_info[2] = fb_info.height as u64;
-            framebuffer_info[3] = fb_info.bytes_per_pixel as u64;
+            framebuffer_info[3] = fb_info.bpp as u64;
             framebuffer_info[4] = fb_info.stride as u64;
         }
     }
@@ -162,7 +163,7 @@ fn bootloader_main_protected(state: &mut BootloaderState) -> Result<()> {
             address: unsafe { framebuffer_info[0] as usize },
             width: unsafe { framebuffer_info[1] as u32 },
             height: unsafe { framebuffer_info[2] as u32 },
-            bytes_per_pixel: unsafe { framebuffer_info[3] as u32 },
+            bpp: unsafe { framebuffer_info[3] as u32 },
             stride: unsafe { framebuffer_info[4] as u32 },
             pixel_format: crate::protocol::PixelFormat::RGB,
         })
@@ -210,10 +211,25 @@ fn bootloader_main_protected(state: &mut BootloaderState) -> Result<()> {
 }
 
 /// Prepare to boot the selected kernel entry
-fn prepare_kernel_boot(_state: &BootloaderState, entry: &boot_menu::BootMenuEntry) -> Result<()> {
+fn prepare_kernel_boot(state: &BootloaderState, entry: &boot_menu::BootMenuEntry) -> Result<()> {
     println!("[rust] Preparing to boot kernel: {}", entry.name);
     println!("[rust] Kernel path: {}", entry.kernel_path);
     println!("[rust] Command line: {}", entry.cmdline);
+    
+    // Log bootloader state information
+    log::info!("Bootloader state - protocol: {:?}", state.protocol_type);
+    log::debug!("Memory map entries available: {}", state.memory_map.len());
+    
+    // Validate boot entry
+    if entry.name.is_empty() {
+        log::error!("Invalid boot entry: empty name");
+        return Err(crate::Error::InvalidBootEntry);
+    }
+    
+    if entry.kernel_path.is_empty() {
+        log::error!("Invalid boot entry: empty kernel path");
+        return Err(crate::Error::InvalidBootEntry);
+    }
 
     // In a real implementation, this would:
     // 1. Load the kernel from the specified path
@@ -321,11 +337,12 @@ pub fn bootloader_reboot() -> ! {
 }
 
 /// Custom panic handler for the bootloader
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    println!("[rust] PANIC: {}", info);
-    bootloader_halt();
-}
+/// NOTE: Disabled - panic_handler is defined in lib.rs
+// #[panic_handler]
+// fn panic(info: &PanicInfo) -> ! {
+//     println!("[rust] PANIC: {}", info);
+//     bootloader_halt();
+// }
 
 /// Debug output function
 #[no_mangle]

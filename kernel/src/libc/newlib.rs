@@ -440,7 +440,7 @@ impl MemoryManager {
         let block = MemoryBlock {
             ptr,
             size,
-            alloc_time: crate::time::timestamp_millis(),
+            alloc_time: crate::subsystems::time::timestamp_millis(),
             backtrace: self.capture_backtrace(),
         };
 
@@ -1205,7 +1205,7 @@ pub mod libc_funcs {
         }
 
         fn time(tloc: *mut c_long) -> c_long {
-            let current_time = crate::time::timestamp() as c_long;
+            let current_time = crate::subsystems::time::timestamp() as c_long;
             if !tloc.is_null() {
                 unsafe {
                     *tloc = current_time;
