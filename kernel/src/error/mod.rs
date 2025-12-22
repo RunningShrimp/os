@@ -39,6 +39,16 @@ pub use unified::{
     create_error, return_error,
 };
 
+// Re-export framework types
+pub mod unified_framework;
+pub use unified_framework::{
+    FrameworkError, FrameworkResult, IntoFrameworkError,
+    FrameworkErrorHandler, FrameworkErrorManager,
+    ErrorRecovery, DefaultErrorRecovery,
+    ErrorContextBuilder,
+    init_framework, shutdown_framework,
+};
+
 // TODO: Implement and re-export errno types
 // pub use errno::{Errno, set_errno, get_errno};
 

@@ -8,7 +8,8 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 use crate::types::stubs::{pid_t, uid_t, gid_t};
-use crate::api::error::KernelError;
+use crate::error::unified_framework::{FrameworkError, IntoFrameworkError, FrameworkResult};
+use crate::error::unified::UnifiedError;
 
 /// Memory manager trait
 ///
@@ -429,22 +430,40 @@ pub enum MemoryError {
     Unknown,
 }
 
-impl From<MemoryError> for KernelError {
-    fn from(error: MemoryError) -> Self {
-        match error {
-            MemoryError::OutOfMemory => KernelError::OutOfMemory,
-            MemoryError::InvalidAddress => KernelError::InvalidAddress,
-            MemoryError::InvalidSize => KernelError::InvalidArgument,
-            MemoryError::InvalidFlags => KernelError::InvalidArgument,
-            MemoryError::PermissionDenied => KernelError::PermissionDenied,
-            MemoryError::AlreadyMapped => KernelError::AlreadyExists,
-            MemoryError::NotMapped => KernelError::NotFound,
-            MemoryError::MappingConflict => KernelError::InvalidState,
-            MemoryError::ResourceBusy => KernelError::ResourceBusy,
-            MemoryError::ResourceUnavailable => KernelError::ResourceUnavailable,
-            MemoryError::InvalidArgument => KernelError::InvalidArgument,
-            MemoryError::NotSupported => KernelError::NotSupported,
-            MemoryError::Unknown => KernelError::Unknown,
+impl IntoFrameworkError for MemoryError {
+    fn into_framework_error(self) -> FrameworkError {
+        match self {
+            MemoryError::OutOfMemory => UnifiedError::OutOfMemory.into_framework_error(),
+            MemoryError::InvalidAddress => UnifiedError::InvalidAddress.into_framework_error(),
+            MemoryError::InvalidSize => UnifiedError::InvalidArgument.into_framework_error(),
+            MemoryError::InvalidFlags => UnifiedError::InvalidArgument.into_framework_error(),
+            MemoryError::PermissionDenied => UnifiedError::PermissionDenied.into_framework_error(),
+            MemoryError::AlreadyMapped => UnifiedError::AlreadyExists.into_framework_error(),
+            MemoryError::NotMapped => UnifiedError::NotFound.into_framework_error(),
+            MemoryError::MappingConflict => UnifiedError::InvalidState.into_framework_error(),
+            MemoryError::ResourceBusy => UnifiedError::ResourceBusy.into_framework_error(),
+            MemoryError::ResourceUnavailable => UnifiedError::ResourceUnavailable.into_framework_error(),
+            MemoryError::InvalidArgument => UnifiedError::InvalidArgument.into_framework_error(),
+            MemoryError::NotSupported => UnifiedError::NotSupported.into_framework_error(),
+            MemoryError::Unknown => UnifiedError::Unknown.into_framework_error(),
+        }
+    }
+    
+    fn with_context(self, context: &str, location: &str) -> FrameworkError {
+        match self {
+            MemoryError::OutOfMemory => UnifiedError::OutOfMemory.with_context(context, location),
+            MemoryError::InvalidAddress => UnifiedError::InvalidAddress.with_context(context, location),
+            MemoryError::InvalidSize => UnifiedError::InvalidArgument.with_context(context, location),
+            MemoryError::InvalidFlags => UnifiedError::InvalidArgument.with_context(context, location),
+            MemoryError::PermissionDenied => UnifiedError::PermissionDenied.with_context(context, location),
+            MemoryError::AlreadyMapped => UnifiedError::AlreadyExists.with_context(context, location),
+            MemoryError::NotMapped => UnifiedError::NotFound.with_context(context, location),
+            MemoryError::MappingConflict => UnifiedError::InvalidState.with_context(context, location),
+            MemoryError::ResourceBusy => UnifiedError::ResourceBusy.with_context(context, location),
+            MemoryError::ResourceUnavailable => UnifiedError::ResourceUnavailable.with_context(context, location),
+            MemoryError::InvalidArgument => UnifiedError::InvalidArgument.with_context(context, location),
+            MemoryError::NotSupported => UnifiedError::NotSupported.with_context(context, location),
+            MemoryError::Unknown => UnifiedError::Unknown.with_context(context, location),
         }
     }
 }

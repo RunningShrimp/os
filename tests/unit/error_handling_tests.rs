@@ -15,11 +15,13 @@ extern crate alloc;
 
 use nos_syscalls::common::{TestUtils, TestFixture, IntegrationTestResult};
 use nos_syscalls::common::{integration_test_assert, integration_test_assert_eq};
-use crate::syscalls::common::{SyscallError, syscall_error_to_errno};
+use crate::error::FrameworkError;
+use crate::error::UnifiedError;
+use crate::error::KernelErrorExt;
 use nos_syscalls;
 use crate::reliability::errno::*;
 
-/// Test POSIX error code conversion for all SyscallError variants
+/// Test POSIX error code conversion for all UnifiedError variants
 #[test]
 fn test_posix_error_code_conversion() -> IntegrationTestResult {
     let fixture = TestFixture::new("posix_error_conversion")
@@ -27,16 +29,16 @@ fn test_posix_error_code_conversion() -> IntegrationTestResult {
         .with_cleanup(TestUtils::cleanup);
 
     fixture.run_test(|| {
-        // Test all SyscallError variants map to correct POSIX errno values
-        integration_test_assert_eq!(syscall_error_to_errno(SyscallError::InvalidSyscall), ENOSYS);
-        integration_test_assert_eq!(syscall_error_to_errno(SyscallError::PermissionDenied), EPERM);
-        integration_test_assert_eq!(syscall_error_to_errno(SyscallError::InvalidArgument), EINVAL);
-        integration_test_assert_eq!(syscall_error_to_errno(SyscallError::NotFound), ENOENT);
-        integration_test_assert_eq!(syscall_error_to_errno(SyscallError::OutOfMemory), ENOMEM);
-        integration_test_assert_eq!(syscall_error_to_errno(SyscallError::Interrupted), EINTR);
-        integration_test_assert_eq!(syscall_error_to_errno(SyscallError::IoError), EIO);
-        integration_test_assert_eq!(syscall_error_to_errno(SyscallError::WouldBlock), EAGAIN);
-        integration_test_assert_eq!(syscall_error_to_errno(SyscallError::NotSupported), EOPNOTSUPP);
+        // Test all UnifiedError variants map to correct POSIX errno values
+        integration_test_assert_eq!(UnifiedError::InvalidSyscall.into_framework_error().to_errno(), ENOSYS);
+        integration_test_assert_eq!(UnifiedError::PermissionDenied.into_framework_error().to_errno(), EPERM);
+        integration_test_assert_eq!(UnifiedError::InvalidArgument.into_framework_error().to_errno(), EINVAL);
+        integration_test_assert_eq!(UnifiedError::NotFound.into_framework_error().to_errno(), ENOENT);
+        integration_test_assert_eq!(UnifiedError::OutOfMemory.into_framework_error().to_errno(), ENOMEM);
+        integration_test_assert_eq!(UnifiedError::Interrupted.into_framework_error().to_errno(), EINTR);
+        integration_test_assert_eq!(UnifiedError::IoError.into_framework_error().to_errno(), EIO);
+        integration_test_assert_eq!(UnifiedError::WouldBlock.into_framework_error().to_errno(), EAGAIN);
+        integration_test_assert_eq!(UnifiedError::NotSupported.into_framework_error().to_errno(), EOPNOTSUPP);
 
         Ok(())
     })
@@ -105,10 +107,17 @@ fn test_error_context_preservation() -> IntegrationTestResult {
         .with_cleanup(TestUtils::cleanup);
 
     fixture.run_test(|| {
-        // Test that errors from lower layers are properly propagated with context
-        let args = [0u64; 6];
+        // Test context preservation with FrameworkError
+        let error = UnifiedError::PermissionDenied.with_context("test context", "test_location");
+        integration_test_assert_eq!(error.to_errno(), EPERM, "Context should not affect errno conversion");
+
+        // Test that context is preserved in error message
+        let error_str = format!("{:?}", error);
+        integration_test_assert!(error_str.contains("test context"), "Context should be preserved in error message");
+        integration_test_assert!(error_str.contains("test_location"), "Location should be preserved in error message");
 
         // Test invalid syscall - should preserve InvalidSyscall error
+        let args = [0u64; 6];
         let result = syscalls::dispatch(0xFFFF, &args);
         integration_test_assert_eq!(result, -1, "Invalid syscall should return -1 (InvalidSyscall -> errno conversion)");
 
@@ -133,7 +142,7 @@ fn test_edge_case_error_conditions() -> IntegrationTestResult {
 
         // Test syscall number 0 (boundary)
         let result = syscalls::dispatch(0, &args);
-        integration_test_assert_eq!(result, -1, "Syscall 0 should be invalid");
+        integration_test_assert_eq!(result, -ENOSYS as isize, "Syscall 0 should return ENOSYS error");
 
         // Test maximum valid syscall in each range
         let result = syscalls::dispatch(0x1FFF, &args); // Last process syscall
@@ -148,8 +157,7 @@ fn test_edge_case_error_conditions() -> IntegrationTestResult {
         // Test with maximum u64 values in arguments
         let max_args = [u64::MAX; 6];
         let result = syscalls::dispatch(0x3000, &max_args); // mmap with max values
-        // Should not panic, even with extreme values
-        integration_test_assert!(true, "Syscall with max u64 args should not panic");
+        integration_test_assert!(result < 0, "Mmap with maximum u64 arguments should fail with error");
 
         Ok(())
     })
@@ -192,6 +200,37 @@ fn test_unified_error_handling_norms() -> IntegrationTestResult {
             }
         }
 
+        Ok(())
+    })
+}
+
+/// Test error chaining functionality
+#[test]
+fn test_error_chaining() -> IntegrationTestResult {
+    let fixture = TestFixture::new("error_chaining")
+        .with_setup(TestUtils::setup)
+        .with_cleanup(TestUtils::cleanup);
+
+    fixture.run_test(|| {
+        // Test error chaining with multiple layers
+        let inner_error = UnifiedError::InvalidArgument.into_framework_error();
+        let outer_error = UnifiedError::PermissionDenied.chain(inner_error);
+        
+        // Verify errno conversion works for chained errors
+        integration_test_assert_eq!(outer_error.to_errno(), EPERM, "Chained error should return outer error's errno");
+        
+        // Verify error chain is preserved in debug output
+        let error_str = format!("{:?}", outer_error);
+        integration_test_assert!(error_str.contains("PermissionDenied"), "Outer error should be preserved in chain");
+        integration_test_assert!(error_str.contains("InvalidArgument"), "Inner error should be preserved in chain");
+        
+        // Test multiple chained errors
+        let error1 = UnifiedError::NotFound.into_framework_error();
+        let error2 = UnifiedError::IoError.chain(error1);
+        let error3 = UnifiedError::PermissionDenied.chain(error2);
+        
+        integration_test_assert_eq!(error3.to_errno(), EPERM, "Multiple chained errors should return top error's errno");
+        
         Ok(())
     })
 }

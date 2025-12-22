@@ -5,38 +5,86 @@
 
 pub use nos_api::syscall::interface::{SyscallDispatcher, SyscallHandler};
 pub use nos_api::syscall::types::{SyscallNumber, SyscallArgs, SyscallResult};
-pub use nos_api::core::types::KernelError;
+use crate::error::unified_framework::{FrameworkError, IntoFrameworkError, FrameworkResult};
+use crate::error::unified::UnifiedError;
 
-// Re-export or define SyscallError for compatibility
-// Ideally we should migrate to KernelError
-pub type SyscallError = KernelError;
+// Migrated to unified error framework
+pub type KernelError = FrameworkError;
+pub type SyscallError = FrameworkError;
 
 pub trait KernelErrorExt {
     fn to_errno(&self) -> i32;
 }
 
-impl KernelErrorExt for KernelError {
+impl KernelErrorExt for FrameworkError {
     fn to_errno(&self) -> i32 {
         match self {
-            KernelError::PermissionDenied => 13,
-            KernelError::NotFound => 2,
-            KernelError::IoError => 5,
-            KernelError::NoDevice => 19,
-            KernelError::InvalidArgument => 22,
-            KernelError::OutOfMemory => 12,
-            KernelError::Busy => 16,
-            KernelError::WouldBlock => 11,
-            KernelError::AlreadyInProgress => 114,
-            KernelError::ConnectionReset => 104,
-            KernelError::ConnectionAborted => 103,
-            KernelError::NoProcess => 3,
-            KernelError::Interrupted => 4,
-            KernelError::BadFileDescriptor => 9,
-            KernelError::NotSupported => 95,
-            KernelError::TimedOut => 110,
-            KernelError::OutOfSpace => 28,
-            KernelError::QuotaExceeded => 122,
-            KernelError::Unknown(code) => *code,
+            FrameworkError::Unified(e) => match e {
+                UnifiedError::PermissionDenied => 13,
+                UnifiedError::NotFound => 2,
+                UnifiedError::IoError => 5,
+                UnifiedError::NoDevice => 19,
+                UnifiedError::InvalidArgument => 22,
+                UnifiedError::OutOfMemory => 12,
+                UnifiedError::Busy => 16,
+                UnifiedError::WouldBlock => 11,
+                UnifiedError::AlreadyInProgress => 114,
+                UnifiedError::ConnectionReset => 104,
+                UnifiedError::ConnectionAborted => 103,
+                UnifiedError::NoProcess => 3,
+                UnifiedError::Interrupted => 4,
+                UnifiedError::BadFileDescriptor => 9,
+                UnifiedError::NotSupported => 95,
+                UnifiedError::TimedOut => 110,
+                UnifiedError::OutOfSpace => 28,
+                UnifiedError::QuotaExceeded => 122,
+                UnifiedError::Unknown(code) => *code,
+                _ => 255, // Unknown error
+            },
+            FrameworkError::Contextual { error, .. } => match error {
+                UnifiedError::PermissionDenied => 13,
+                UnifiedError::NotFound => 2,
+                UnifiedError::IoError => 5,
+                UnifiedError::NoDevice => 19,
+                UnifiedError::InvalidArgument => 22,
+                UnifiedError::OutOfMemory => 12,
+                UnifiedError::Busy => 16,
+                UnifiedError::WouldBlock => 11,
+                UnifiedError::AlreadyInProgress => 114,
+                UnifiedError::ConnectionReset => 104,
+                UnifiedError::ConnectionAborted => 103,
+                UnifiedError::NoProcess => 3,
+                UnifiedError::Interrupted => 4,
+                UnifiedError::BadFileDescriptor => 9,
+                UnifiedError::NotSupported => 95,
+                UnifiedError::TimedOut => 110,
+                UnifiedError::OutOfSpace => 28,
+                UnifiedError::QuotaExceeded => 122,
+                UnifiedError::Unknown(code) => *code,
+                _ => 255, // Unknown error
+            },
+            FrameworkError::Chain { error, .. } => match error {
+                UnifiedError::PermissionDenied => 13,
+                UnifiedError::NotFound => 2,
+                UnifiedError::IoError => 5,
+                UnifiedError::NoDevice => 19,
+                UnifiedError::InvalidArgument => 22,
+                UnifiedError::OutOfMemory => 12,
+                UnifiedError::Busy => 16,
+                UnifiedError::WouldBlock => 11,
+                UnifiedError::AlreadyInProgress => 114,
+                UnifiedError::ConnectionReset => 104,
+                UnifiedError::ConnectionAborted => 103,
+                UnifiedError::NoProcess => 3,
+                UnifiedError::Interrupted => 4,
+                UnifiedError::BadFileDescriptor => 9,
+                UnifiedError::NotSupported => 95,
+                UnifiedError::TimedOut => 110,
+                UnifiedError::OutOfSpace => 28,
+                UnifiedError::QuotaExceeded => 122,
+                UnifiedError::Unknown(code) => *code,
+                _ => 255, // Unknown error
+            },
         }
     }
 }
