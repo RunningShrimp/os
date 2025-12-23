@@ -2,19 +2,15 @@
 //!
 //! This module provides file system related system calls.
 
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
-#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 use nos_api::Result;
-use crate::core::traits::SyscallHandler;
+use crate::SyscallHandler;
 #[cfg(feature = "log")]
 use log;
-#[cfg(feature = "alloc")]
-use crate::core::dispatcher::SyscallDispatcher;
+use crate::SyscallDispatcher;
 
 /// Register file system system call handlers
-#[cfg(feature = "alloc")]
 pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     // Register read system call
     dispatcher.register_handler(
@@ -60,10 +56,7 @@ impl SyscallHandler for ReadHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 3 {
-            #[cfg(feature = "alloc")]
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
-            #[cfg(not(feature = "alloc"))]
-            return Err(nos_api::Error::InvalidArgument("Insufficient arguments".into()));
         }
         
         let fd = args[0] as i32;
@@ -105,10 +98,7 @@ impl SyscallHandler for WriteHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 3 {
-            #[cfg(feature = "alloc")]
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
-            #[cfg(not(feature = "alloc"))]
-            return Err(nos_api::Error::InvalidArgument("Insufficient arguments".into()));
         }
         
         let fd = args[0] as i32;
@@ -150,10 +140,7 @@ impl SyscallHandler for OpenHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 3 {
-            #[cfg(feature = "alloc")]
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
-            #[cfg(not(feature = "alloc"))]
-            return Err(nos_api::Error::InvalidArgument("Insufficient arguments".into()));
         }
         
         let pathname = args[0] as *const u8;
@@ -195,10 +182,7 @@ impl SyscallHandler for CloseHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 1 {
-            #[cfg(feature = "alloc")]
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
-            #[cfg(not(feature = "alloc"))]
-            return Err(nos_api::Error::InvalidArgument("Insufficient arguments".into()));
         }
         
         let fd = args[0] as i32;

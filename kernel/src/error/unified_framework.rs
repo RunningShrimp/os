@@ -50,19 +50,7 @@ pub trait IntoFrameworkError {
 }
 
 /// Error conversion implementation for UnifiedError
-impl IntoFrameworkError for UnifiedError {
-    fn into_framework_error(self) -> FrameworkError {
-        FrameworkError::Unified(self)
-    }
-    
-    fn with_context(self, context: &str, location: &str) -> FrameworkError {
-        FrameworkError::Contextual {
-            error: self,
-            context: context.to_string(),
-            location: location.to_string(),
-        }
-    }
-}
+
 
 /// Error conversion implementation for &str
 impl IntoFrameworkError for &str {
@@ -134,6 +122,7 @@ pub trait FrameworkErrorHandler: Send + Sync + 'static {
 pub struct FrameworkErrorManager {
     inner: super::ErrorManager,
     handlers: alloc::vec::Vec<Box<dyn FrameworkErrorHandler>>,
+    recovery_strategies: alloc::vec::Vec<Box<dyn ErrorRecovery>>,
 }
 
 impl FrameworkErrorManager {
@@ -142,12 +131,18 @@ impl FrameworkErrorManager {
         Self {
             inner: super::ErrorManager::new(),
             handlers: alloc::vec::Vec::new(),
+            recovery_strategies: alloc::vec::Vec::new(),
         }
     }
     
     /// Add a framework error handler
     pub fn add_framework_handler(&mut self, handler: Box<dyn FrameworkErrorHandler>) {
         self.handlers.push(handler);
+    }
+    
+    /// Add an error recovery strategy
+    pub fn add_recovery_strategy(&mut self, strategy: Box<dyn ErrorRecovery>) {
+        self.recovery_strategies.push(strategy);
     }
     
     /// Handle an error using the framework
@@ -162,6 +157,13 @@ impl FrameworkErrorManager {
             }
         }
         
+        // Try recovery strategies
+        for strategy in &self.recovery_strategies {
+            if strategy.recover(&error) {
+                return ErrorAction::Recover;
+            }
+        }
+        
         // Fall back to inner error manager
         match &error {
             FrameworkError::Unified(e) => {
@@ -170,8 +172,9 @@ impl FrameworkErrorManager {
             FrameworkError::Contextual { error, context, location } => {
                 self.inner.handle_error(error.clone(), &format!("{} at {}", context, location))
             }
-            FrameworkError::Chain { error, cause: _ } => {
-                self.inner.handle_error(error.clone(), "")
+            FrameworkError::Chain { error, cause } => {
+                let context = format!("caused by: {}", cause);
+                self.inner.handle_error(error.clone(), &context)
             }
         }
     }
@@ -273,8 +276,9 @@ impl fmt::Display for FrameworkError {
 impl core::error::Error for FrameworkError {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
-            FrameworkError::Chain { cause, .. } => Some(cause),
-            _ => None,
+            FrameworkError::Chain { cause, .. } => Some(cause.as_ref()),
+            FrameworkError::Contextual { error, .. } => Some(error),
+            FrameworkError::Unified(e) => Some(e),
         }
     }
 }
@@ -288,7 +292,8 @@ pub fn init_framework() -> FrameworkResult<()> {
     
     // Add default recovery strategy
     let recovery = DefaultErrorRecovery;
-    // TODO: Register recovery strategy
+    let mut manager = super::get_error_manager();
+    manager.add_recovery_strategy(Box::new(recovery));
     
     Ok(())
 }

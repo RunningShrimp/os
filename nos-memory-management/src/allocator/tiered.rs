@@ -295,11 +295,15 @@ impl MemoryPool {
             block.mark_free();
             
             // Try to merge with adjacent blocks
-            self.try_merge(block_header);
+            unsafe {
+                self.try_merge(block_header);
+            }
             
             // Add to free list
             let mut free_blocks = self.free_blocks.lock();
-            free_blocks.push(NonNull::new_unchecked(block_header));
+            unsafe {
+                free_blocks.push(NonNull::new_unchecked(block_header));
+            }
             drop(free_blocks);
             
             // Update statistics
@@ -315,15 +319,15 @@ impl MemoryPool {
     
     /// Try to merge adjacent free blocks
     unsafe fn try_merge(&self, block: *mut BlockHeader) {
-        let current_size = (*block).size;
+        let current_size = unsafe { (*block).size };
         
         // Check previous block
-        if let Some(prev) = (*block).prev {
+        if let Some(prev) = unsafe { (*block).prev } {
             let prev_ptr = prev.as_ptr();
-            if (*prev_ptr).is_free() {
-                let prev_size = (*prev_ptr).size;
+            if unsafe { (*prev_ptr).is_free() } {
+                let prev_size = unsafe { (*prev_ptr).size };
                 // Merge previous block
-                (*prev_ptr).size = current_size + prev_size;
+                unsafe { (*prev_ptr).size = current_size + prev_size; }
                 
                 // Remove previous block from free list
                 let mut free_blocks = self.free_blocks.lock();
@@ -338,12 +342,12 @@ impl MemoryPool {
         }
         
         // Check next block
-        if let Some(next) = (*block).next {
+        if let Some(next) = unsafe { (*block).next } {
             let next_ptr = next.as_ptr();
-            if (*next_ptr).is_free() {
-                let next_size = (*next_ptr).size;
+            if unsafe { (*next_ptr).is_free() } {
+                let next_size = unsafe { (*next_ptr).size };
                 // Merge next block
-                (*block).size = current_size + next_size;
+                unsafe { (*block).size = current_size + next_size; }
                 
                 // Remove next block from free list
                 let mut free_blocks = self.free_blocks.lock();
@@ -659,7 +663,7 @@ impl TieredMemoryAllocator {
         let size = layout.size();
         
         // Update statistics
-        let mut stats = self.stats.lock();
+        let stats = self.stats.lock();
         stats.total_deallocations.fetch_add(1, Ordering::SeqCst);
         stats.total_freed_bytes.fetch_add(size as u64, Ordering::SeqCst);
         stats.current_allocated_bytes.fetch_sub(size as u64, Ordering::SeqCst);

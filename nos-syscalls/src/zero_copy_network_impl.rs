@@ -3,27 +3,20 @@
 //! This module provides a comprehensive zero-copy network I/O implementation
 //! for high-performance networking in the NOS operating system.
 
-#[cfg(feature = "alloc")]
-use alloc::{
-    collections::BTreeMap,
-    sync::Arc,
-    vec::Vec,
-    string::ToString,
-    boxed::Box,
+use {
+    alloc::{
+        collections::BTreeMap,
+        sync::Arc,
+        vec::Vec,
+        string::ToString,
+        boxed::Box,
+        format,
+    },
+    spin::Mutex,
 };
-#[cfg(feature = "alloc")]
-use spin::Mutex;
-
-// Import format macro globally to make it available in all contexts
-#[cfg(feature = "alloc")]
-use alloc::format;
 use nos_api::Result;
-use crate::core::traits::SyscallHandler;
-#[cfg(feature = "alloc")]
-use crate::core::dispatcher::SyscallDispatcher;
+use crate::SyscallDispatcher;
 use core::sync::atomic::{AtomicU64, Ordering};
-#[cfg(feature = "log")]
-use log;
 
 /// Network buffer descriptor for zero-copy operations
 #[derive(Debug, Clone)]
@@ -74,7 +67,6 @@ pub mod buffer_flags {
 }
 
 /// Zero-copy network manager
-#[cfg(feature = "alloc")]
 pub struct ZeroCopyNetworkManager {
     /// Active network connections
     connections: Mutex<BTreeMap<i32, Arc<NetworkConnection>>>,
@@ -84,7 +76,6 @@ pub struct ZeroCopyNetworkManager {
     next_conn_id: AtomicU64,
 }
 
-#[cfg(feature = "alloc")]
 impl ZeroCopyNetworkManager {
     /// Create a new zero-copy network manager
     pub fn new() -> Result<Self> {
@@ -138,7 +129,6 @@ impl ZeroCopyNetworkManager {
 
 /// Network connection for zero-copy operations
 #[derive(Debug)]
-#[cfg(feature = "alloc")]
 pub struct NetworkConnection {
     /// File descriptor
     pub fd: i32,
@@ -147,9 +137,9 @@ pub struct NetworkConnection {
     /// Connection state
     pub state: ConnectionState,
     /// Pending send buffers
-    pending_sends: Vec<NetworkBuffer>,
+    pending_sends: spin::Mutex<Vec<NetworkBuffer>>,
     /// Pending receive buffers
-    pending_recvs: Vec<NetworkBuffer>,
+    pending_recvs: spin::Mutex<Vec<NetworkBuffer>>,
 }
 
 /// Connection states
@@ -165,7 +155,6 @@ pub enum ConnectionState {
     Closed,
 }
 
-#[cfg(feature = "alloc")]
 impl NetworkConnection {
     /// Create a new network connection
     pub fn new(fd: i32, conn_id: u64) -> Self {
@@ -173,8 +162,8 @@ impl NetworkConnection {
             fd,
             conn_id,
             state: ConnectionState::Connecting,
-            pending_sends: Vec::new(),
-            pending_recvs: Vec::new(),
+            pending_sends: spin::Mutex::new(Vec::new()),
+            pending_recvs: spin::Mutex::new(Vec::new()),
         }
     }
     
@@ -189,41 +178,44 @@ impl NetworkConnection {
     }
     
     /// Add a pending send buffer
-    pub fn add_pending_send(&mut self, buffer_id: u64) {
+    pub fn add_pending_send(&self, buffer_id: u64) {
         // Create a placeholder buffer with just the ID
-        self.pending_sends.push(NetworkBuffer { id: buffer_id, addr: 0, size: 0, flags: 0 });
+        let mut pending_sends = self.pending_sends.lock();
+        pending_sends.push(NetworkBuffer { id: buffer_id, addr: 0, size: 0, flags: 0 });
     }
     
     /// Add a pending receive buffer
-    pub fn add_pending_recv(&mut self, buffer_id: u64) {
+    pub fn add_pending_recv(&self, buffer_id: u64) {
         // Create a placeholder buffer with just the ID
-        self.pending_recvs.push(NetworkBuffer { id: buffer_id, addr: 0, size: 0, flags: 0 });
+        let mut pending_recvs = self.pending_recvs.lock();
+        pending_recvs.push(NetworkBuffer { id: buffer_id, addr: 0, size: 0, flags: 0 });
     }
     
     /// Get pending send buffers
-    pub fn pending_sends(&self) -> &[NetworkBuffer] {
-        &self.pending_sends
+    pub fn pending_sends(&self) -> spin::MutexGuard<'_, Vec<NetworkBuffer>> {
+        self.pending_sends.lock()
     }
     
     /// Get pending receive buffers
-    pub fn pending_recvs(&self) -> &[NetworkBuffer] {
-        &self.pending_recvs
+    pub fn pending_recvs(&self) -> spin::MutexGuard<'_, Vec<NetworkBuffer>> {
+        self.pending_recvs.lock()
     }
     
     /// Clear completed send buffers
-    pub fn clear_completed_sends(&mut self) {
-        self.pending_sends.clear();
+    pub fn clear_completed_sends(&self) {
+        let mut pending_sends = self.pending_sends.lock();
+        pending_sends.clear();
     }
     
     /// Clear completed receive buffers
-    pub fn clear_completed_recvs(&mut self) {
-        self.pending_recvs.clear();
+    pub fn clear_completed_recvs(&self) {
+        let mut pending_recvs = self.pending_recvs.lock();
+        pending_recvs.clear();
     }
 }
 
 /// Zero-copy send system call handler
 pub struct ZeroCopySendHandler {
-    #[cfg(feature = "alloc")]
     manager: Arc<ZeroCopyNetworkManager>,
 }
 
@@ -233,7 +225,6 @@ impl ZeroCopySendHandler {
         Self::default()
     }
     
-    #[cfg(feature = "alloc")]
     pub fn new_with_manager(manager: Arc<ZeroCopyNetworkManager>) -> Self {
         Self { manager }
     }
@@ -241,39 +232,60 @@ impl ZeroCopySendHandler {
 
 impl Default for ZeroCopySendHandler {
     fn default() -> Self {
-        #[cfg(feature = "alloc")]
-        {
-            Self {
-                manager: Arc::new(ZeroCopyNetworkManager::new().expect("Failed to create ZeroCopyNetworkManager")),
-            }
-        }
-        #[cfg(not(feature = "alloc"))]
-        {
-            Self {}
+        Self {
+            manager: Arc::new(ZeroCopyNetworkManager::new().expect("Failed to create ZeroCopyNetworkManager")),
         }
     }
 }
 
-impl SyscallHandler for ZeroCopySendHandler {
-    fn execute(&self, _args: &[usize]) -> Result<isize> {
-        // Simplified implementation for now
-        #[cfg(feature = "log")]
-        log::trace!("zero_copy_send called");
-        Ok(0)
+impl crate::SyscallHandler for ZeroCopySendHandler {
+    fn id(&self) -> u32 {
+        crate::types::SYS_ZERO_COPY_SEND
     }
-
+    
     fn name(&self) -> &str {
         "zero_copy_send"
     }
-
-    fn id(&self) -> u32 {
-        crate::types::SYS_ZERO_COPY_SEND
+    
+    fn execute(&self, args: &[usize]) -> Result<isize> {
+        if args.len() < 4 {
+            return Err(nos_api::Error::InvalidArgument(
+                "Insufficient arguments for zero-copy send".to_string()
+            ));
+        }
+        
+        let fd = args[0] as i32;
+        let buffer_addr = args[1];
+        let buffer_size = args[2];
+        let flags = args[3] as u32;
+        
+        // Create a network buffer descriptor
+        let mut buffer = NetworkBuffer::new(buffer_addr, buffer_size);
+        buffer.set_flags(flags | buffer_flags::IN_USE);
+        
+        // In alloc environment, use the manager
+        // Get the connection first
+        if let Some(connection) = self.manager.get_connection(fd) {
+            // Register the buffer
+            let buffer_id = self.manager.register_buffer(&buffer);
+            
+            // Safely modify the connection using Mutex lock
+            let conn = connection;
+            conn.add_pending_send(buffer_id);
+            
+            // In a real implementation, this would trigger DMA transfer
+            // For now, just return the buffer ID
+            Ok(buffer_id as isize)
+        } else {
+            Err(nos_api::Error::NotFound(
+                format!("Connection not found for fd: {}", fd)
+            ))
+        }
     }
 }
 
 /// Zero-copy receive system call handler
 pub struct ZeroCopyRecvHandler {
-    #[cfg(feature = "alloc")]
     manager: Arc<ZeroCopyNetworkManager>,
 }
 
@@ -283,7 +295,6 @@ impl ZeroCopyRecvHandler {
         Self::default()
     }
     
-    #[cfg(feature = "alloc")]
     pub fn new_with_manager(manager: Arc<ZeroCopyNetworkManager>) -> Self {
         Self { manager }
     }
@@ -291,38 +302,60 @@ impl ZeroCopyRecvHandler {
 
 impl Default for ZeroCopyRecvHandler {
     fn default() -> Self {
-        #[cfg(feature = "alloc")]
-        {
-            Self {
-                manager: Arc::new(ZeroCopyNetworkManager::new().expect("Failed to create ZeroCopyNetworkManager")),
-            }
-        }
-        #[cfg(not(feature = "alloc"))]
-        {
-            Self {}
+        Self {
+            manager: Arc::new(ZeroCopyNetworkManager::new().expect("Failed to create ZeroCopyNetworkManager")),
         }
     }
 }
 
-impl SyscallHandler for ZeroCopyRecvHandler {
-    fn execute(&self, _args: &[usize]) -> Result<isize> {
-        // Simplified implementation for now
-        #[cfg(feature = "log")]
-        log::trace!("zero_copy_recv called");
-        Ok(0)
+impl crate::SyscallHandler for ZeroCopyRecvHandler {
+    fn id(&self) -> u32 {
+        crate::types::SYS_ZERO_COPY_RECV
     }
-
+    
     fn name(&self) -> &str {
         "zero_copy_recv"
     }
-
-    fn id(&self) -> u32 {
-        crate::types::SYS_ZERO_COPY_RECV
+    
+    fn execute(&self, args: &[usize]) -> Result<isize> {
+        if args.len() < 3 {
+            return Err(nos_api::Error::InvalidArgument(
+                "Insufficient arguments for zero-copy receive".to_string()
+            ));
+        }
+        
+        let fd = args[0] as i32;
+        let buffer_addr = args[1];
+        let buffer_size = args[2];
+        
+        // Create a network buffer descriptor
+        let mut buffer = NetworkBuffer::new(buffer_addr, buffer_size);
+        buffer.set_flags(buffer_flags::WRITE_ONLY | buffer_flags::IN_USE);
+        
+        // In alloc environment, use the manager
+        // Get the connection first
+        if let Some(connection) = self.manager.get_connection(fd) {
+            // Register the buffer
+            let buffer_id = self.manager.register_buffer(&buffer);
+            
+            // Add buffer to pending receives
+            let conn = Arc::as_ref(&connection) as *const NetworkConnection as *mut NetworkConnection;
+            unsafe {
+                (*conn).add_pending_recv(buffer_id);
+            }
+            
+            // In a real implementation, this would trigger DMA transfer
+            // For now, just return the buffer ID
+            Ok(buffer_id as isize)
+        } else {
+            Err(nos_api::Error::NotFound(
+                format!("Connection not found for fd: {}", fd)
+            ))
+        }
     }
 }
 
 /// Register zero-copy network I/O system call handlers
-#[cfg(feature = "alloc")]
 pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     // Register zero-copy send system call
     dispatcher.register_handler(
@@ -336,13 +369,5 @@ pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
         Box::new(ZeroCopyRecvHandler::new())
     );
     
-    Ok(())
-}
-
-/// Register zero-copy network I/O system call handlers (no-alloc version)
-#[cfg(not(feature = "alloc"))]
-pub fn register_handlers(_dispatcher: &mut SyscallDispatcher) -> Result<()> {
-    // In no-alloc environments, handlers would need to be registered differently
-    // For now, just return success
     Ok(())
 }

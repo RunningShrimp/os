@@ -20,7 +20,6 @@ pub fn validate_error_record(error_record: &crate::types::ErrorRecord) -> bool {
 }
 
 /// Format error message
-#[cfg(feature = "alloc")]
 pub fn format_error_message(error_record: &crate::types::ErrorRecord) -> alloc::string::String {
     alloc::format!(
         "Error #{}{} ({:?}:{:?}) - {}",
@@ -30,20 +29,6 @@ pub fn format_error_message(error_record: &crate::types::ErrorRecord) -> alloc::
         error_record.severity,
         error_record.message
     )
-}
-
-/// Format error message (non-alloc version)
-#[cfg(not(feature = "alloc"))]
-pub fn format_error_message(error_record: &crate::types::ErrorRecord) -> &'static str {
-    // In non-alloc mode, we return a static string but use error_record for basic validation
-    match error_record.severity {
-        crate::types::ErrorSeverity::Info => "Info error",
-        crate::types::ErrorSeverity::Warning => "Warning error",
-        crate::types::ErrorSeverity::Error => "Error",
-        crate::types::ErrorSeverity::Critical => "Critical error",
-        crate::types::ErrorSeverity::Fatal => "Fatal error",
-        _ => "Unknown error",
-    }
 }
 
 /// Calculate error hash
@@ -72,7 +57,6 @@ pub fn compare_error_records(a: &crate::types::ErrorRecord, b: &crate::types::Er
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(feature = "alloc")]
     use alloc::string::ToString;
 
     #[test]

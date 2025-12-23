@@ -21,7 +21,6 @@ log = { workspace = true, optional = true }
 [features]
 default = []
 std = []
-alloc = []
 log = ["dep:log"]
 debug_subsystems = []
 formal_verification = []
@@ -29,9 +28,9 @@ security_audit = []
 
 # Feature flags for conditional compilation
 minimal = []
-embedded = ["alloc"]
-server = ["alloc", "log"]
-desktop = ["alloc", "log"]
+embedded = []
+server = ["log"]
+desktop = ["log"]
 
 [lib]
 name = "nos_services"

@@ -154,13 +154,15 @@ pub fn warmup_caches(cpu_id: usize, count: usize) {
             
             let allocator = &allocators[cpu_id];
     
-    // 预分配一些小块到缓存
-    for _ in 0..count {
-        unsafe {
-            let layout = Layout::from_size_align(64, 8).unwrap();
-            let ptr = allocator.alloc_from_global(layout);
-            if !ptr.is_null() {
-                allocator.add_to_freelist(ptr, 64);
+            // 预分配一些小块到缓存
+            for _ in 0..count {
+                unsafe {
+                    let layout = Layout::from_size_align(64, 8).unwrap();
+                    let ptr = allocator.alloc_from_global(layout);
+                    if !ptr.is_null() {
+                        allocator.add_to_freelist(ptr, 64);
+                    }
+                }
             }
         }
     }
@@ -219,11 +221,10 @@ pub struct PerCpuLocalAllocator {
 
 impl PerCpuLocalAllocator {
     pub fn new() -> Self {
-        const NULL: SpinLock<Option<NonNull<FreeBlock>>> = SpinLock::new(None);
         Self {
             freelist_head: SpinLock::new(None),
             allocated_count: AtomicUsize::new(0),
-            size_class_freelists: [NULL; 9],
+            size_class_freelists: [SpinLock::new(None); 9],
             size_class_counts: [const { AtomicUsize::new(0) }; 9],
             cache_hits: AtomicUsize::new(0),
             cache_misses: AtomicUsize::new(0),

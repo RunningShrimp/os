@@ -2,38 +2,30 @@
 //!
 //! This module provides the core system call dispatch mechanism.
 
-#[cfg(feature = "alloc")]
-use alloc::string::ToString;
-#[cfg(feature = "alloc")]
-use alloc::boxed::Box;
-#[cfg(feature = "alloc")]
-use alloc::collections::BTreeMap;
-#[cfg(feature = "alloc")]
-use alloc::format;
-
-#[cfg(feature = "alloc")]
-use nos_api::Error;
-#[cfg(feature = "alloc")]
-use spin::Mutex;
-#[cfg(feature = "alloc")]
-use super::traits::SyscallHandler;
+use {
+    alloc::{
+        boxed::Box,
+        collections::BTreeMap,
+        format,
+    },
+    nos_api::Error,
+    crate::{SyscallHandler, SyscallStats},
+};
 
 /// System call dispatcher
-#[cfg(feature = "alloc")]
 pub struct SyscallDispatcher {
     /// Registered system call handlers
     handlers: BTreeMap<u32, Box<dyn SyscallHandler>>,
     /// System call statistics
-    stats: Mutex<SyscallStats>,
+    stats: spin::RwLock<SyscallStats>,
 }
 
-#[cfg(feature = "alloc")]
 impl SyscallDispatcher {
     /// Create a new system call dispatcher
     pub fn new() -> Self {
         Self {
             handlers: BTreeMap::new(),
-            stats: Mutex::new(SyscallStats::default()),
+            stats: spin::RwLock::new(SyscallStats::default()),
         }
     }
 
@@ -54,17 +46,14 @@ impl SyscallDispatcher {
         // Get the handler
         let handler = self.handlers.get(&id)
             .ok_or_else(|| {
-                #[cfg(feature = "alloc")]
-                return Error::NotFound(format!("System call {} not found", id));
-                #[cfg(not(feature = "alloc"))]
-                return Error::NotFound("System call not found".into());
+                Error::NotFound(format!("System call {} not found", id))
             })?;
         
         // Execute the handler
         let result = handler.execute(args);
         
         // Update statistics
-        let mut stats = self.stats.lock();
+        let mut stats = self.stats.write();
         stats.total_calls += 1;
         *stats.calls_by_type.entry(id).or_insert(0) += 1;
         
@@ -81,93 +70,50 @@ impl SyscallDispatcher {
 
     /// Get system call statistics
     pub fn get_stats(&self) -> SyscallStats {
-        self.stats.lock().clone()
+        self.stats.read().clone()
     }
 }
 
 
 
-/// System call statistics
-#[derive(Debug, Clone)]
-#[cfg(feature = "alloc")]
-pub struct SyscallStats {
-    /// Total number of system calls
-    pub total_calls: u64,
-    /// Number of calls by type
-    pub calls_by_type: BTreeMap<u32, u64>,
-    /// Average execution time (microseconds)
-    pub avg_execution_time: u64,
-    /// Number of errors
-    pub error_count: u64,
-}
 
-#[cfg(feature = "alloc")]
-impl Default for SyscallStats {
-    fn default() -> Self {
-        Self {
-            total_calls: 0,
-            calls_by_type: BTreeMap::new(),
-            avg_execution_time: 0,
-            error_count: 0,
-        }
-    }
-}
 
-/// /// Global system call dispatcher
-#[cfg(feature = "alloc")]
-static mut GLOBAL_DISPATCHER: Option<SyscallDispatcher> = None;
-static DISPATCHER_INIT: spin::Once = spin::Once::new();
+/// Global system call dispatcher
+static GLOBAL_DISPATCHER: spin::Mutex<Option<SyscallDispatcher>> = spin::Mutex::new(None);
 
 /// Initialize the global system call dispatcher
-#[cfg(feature = "alloc")]
 pub fn init_dispatcher() -> nos_api::Result<()> {
-    DISPATCHER_INIT.call_once(|| {
-        unsafe {
-            GLOBAL_DISPATCHER = Some(SyscallDispatcher::new());
-        }
-    });
+    let mut dispatcher = GLOBAL_DISPATCHER.lock();
+    if dispatcher.is_none() {
+        *dispatcher = Some(SyscallDispatcher::new());
+    }
     Ok(())
 }
 
 /// Get the global system call dispatcher
-#[cfg(feature = "alloc")]
-pub fn get_dispatcher() -> &'static SyscallDispatcher {
-    // SAFETY: We've initialized the dispatcher in init_dispatcher
-    // and we're only creating a shared reference
-    unsafe {
-        GLOBAL_DISPATCHER.as_ref().unwrap()
-    }
+pub fn get_dispatcher() -> spin::MutexGuard<'static, Option<SyscallDispatcher>> {
+    // Ensure dispatcher is initialized before accessing
+    init_dispatcher().unwrap();
+    GLOBAL_DISPATCHER.lock()
 }
 
 /// Get mutable access to the global system call dispatcher
-/// 
-/// # Safety
-/// 
-/// This function is unsafe because it allows mutable access to a global static variable.
-/// Callers must ensure that there are no concurrent accesses to the dispatcher while using
-/// the mutable reference.
-#[cfg(feature = "alloc")]
-pub unsafe fn get_dispatcher_mut() -> &'static mut SyscallDispatcher {
-    // SAFETY: The dispatcher must be initialized before calling this function
-    // and callers must ensure no concurrent access
-    unsafe { GLOBAL_DISPATCHER.as_mut().unwrap() }
+pub fn get_dispatcher_mut() -> spin::MutexGuard<'static, Option<SyscallDispatcher>> {
+    // Ensure dispatcher is initialized before accessing
+    init_dispatcher().unwrap();
+    GLOBAL_DISPATCHER.lock()
 }
 
 /// Shutdown the global system call dispatcher
-#[cfg(feature = "alloc")]
 pub fn shutdown_dispatcher() -> nos_api::Result<()> {
     // With MaybeUninit, we can't easily reset it, so we'll just leave it as-is
     Ok(())
 }
 
 /// Register all system call handlers
-#[cfg(feature = "alloc")]
 pub fn register_handlers() -> nos_api::Result<()> {
-    // SAFETY: We're the only ones modifying the dispatcher during initialization
-    // and we've already initialized it in init_dispatcher
-    let dispatcher = unsafe {
-        get_dispatcher_mut()
-    };
+    let mut dispatcher = get_dispatcher_mut();
+    let dispatcher = dispatcher.as_mut().unwrap();
     
     // Register core system calls
     crate::fs::register_handlers(dispatcher)?;
@@ -191,11 +137,8 @@ pub fn register_handlers() -> nos_api::Result<()> {
     // Register advanced system calls
     #[cfg(feature = "advanced_syscalls")]
     {
-        #[cfg(feature = "alloc")]
         crate::advanced_mmap::register_syscalls(dispatcher)?;
-        #[cfg(feature = "alloc")]
         crate::async_ops::register_syscalls(dispatcher)?;
-        #[cfg(feature = "alloc")]
         crate::epoll::register_syscalls(dispatcher)?;
     }
     
@@ -203,9 +146,9 @@ pub fn register_handlers() -> nos_api::Result<()> {
 }
 
 /// Get system call statistics
-#[cfg(feature = "alloc")]
 pub fn get_stats() -> super::super::SyscallStats {
-    let dispatcher_stats = get_dispatcher().get_stats();
+    let dispatcher = get_dispatcher();
+    let dispatcher_stats = dispatcher.as_ref().unwrap().get_stats();
     super::super::SyscallStats {
         total_calls: dispatcher_stats.total_calls,
         calls_by_type: dispatcher_stats.calls_by_type,
@@ -215,7 +158,6 @@ pub fn get_stats() -> super::super::SyscallStats {
 }
 
 #[cfg(test)]
-#[cfg(feature = "alloc")]
 mod tests {
     use super::*;
 

@@ -1184,7 +1184,6 @@ pub fn waitpid(pid: i32, status: *mut i32, options: i32) -> Option<Pid> {
                 }
             }
         }
-        }
 
         // If found a child, return status (don't clean up stopped processes)
         if let Some((child_pid, xstate)) = found_child {

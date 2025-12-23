@@ -2,38 +2,25 @@
 //!
 //! This module provides network related services.
 
-#[cfg(feature = "alloc")]
 use nos_api::Result;
-#[cfg(feature = "alloc")]
 use crate::core::{Service, ServiceStatus};
-#[cfg(feature = "alloc")]
 use alloc::string::String;
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
-#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 
 /// Network service
-#[cfg(feature = "alloc")]
 pub struct NetworkService {
     name: String,
     interface: String,
     status: ServiceStatus,
 }
 
-#[cfg(feature = "alloc")]
 impl NetworkService {
     /// Create a new network service
     pub fn new(name: &str, interface: &str) -> Self {
         Self {
-            #[cfg(feature = "alloc")]
             name: name.to_string(),
-            #[cfg(not(feature = "alloc"))]
-            name: name.into(),
-            #[cfg(feature = "alloc")]
             interface: interface.to_string(),
-            #[cfg(not(feature = "alloc"))]
-            interface: interface.into(),
             status: ServiceStatus::Stopped,
         }
     }
@@ -44,7 +31,6 @@ impl NetworkService {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl Service for NetworkService {
     fn start(&self) -> Result<()> {
         // TODO: Implement actual network service start
@@ -70,7 +56,6 @@ impl Service for NetworkService {
 }
 
 /// Register network services
-#[cfg(feature = "alloc")]
 pub fn register_network_services() -> Result<()> {
     use crate::registry;
     

@@ -10,6 +10,8 @@ use alloc::vec::Vec;
 /// Initialize error handling subsystem
 pub fn init() -> crate::error::UnifiedResult<()> {
     crate::log_info!("Error handling subsystem initialized");
+    init_health_monitor()?;
+    init_framework()?;
     Ok(())
 }
 
@@ -47,6 +49,14 @@ pub use unified_framework::{
     ErrorRecovery, DefaultErrorRecovery,
     ErrorContextBuilder,
     init_framework, shutdown_framework,
+};
+
+// Health monitoring
+pub mod health;
+pub use health::{
+    HealthLevel, HealthSeverity, HealthMetric, HealthThreshold,
+    HealthStatus, HealthStats, HealthMonitor,
+    init_health_monitor, get_health_monitor,
 };
 
 // TODO: Implement and re-export errno types

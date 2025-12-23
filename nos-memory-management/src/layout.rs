@@ -77,6 +77,62 @@ pub struct AddressSpaceLayout {
     pub aslr_offset_range: usize,
 }
 
+impl AddressSpaceLayout {
+    /// Check if an address is in kernel space
+    #[inline]
+    pub fn is_kernel_address(&self, addr: usize) -> bool {
+        addr >= self.kernel_base
+    }
+    
+    /// Check if an address is in user space
+    #[inline]
+    pub fn is_user_address(&self, addr: usize) -> bool {
+        addr < self.user_max && addr >= self.user_base
+    }
+    
+    /// Check if an address is in kernel code region
+    #[inline]
+    pub fn is_kernel_code(&self, addr: usize) -> bool {
+        addr >= self.kernel_code_base && 
+        addr < self.kernel_code_base + self.kernel_code_size
+    }
+    
+    /// Check if an address is in kernel data region
+    #[inline]
+    pub fn is_kernel_data(&self, addr: usize) -> bool {
+        addr >= self.kernel_data_base && 
+        addr < self.kernel_data_base + self.kernel_data_size
+    }
+    
+    /// Check if an address is in kernel heap region
+    #[inline]
+    pub fn is_kernel_heap(&self, addr: usize) -> bool {
+        addr >= self.kernel_heap_base && 
+        addr < self.kernel_heap_base + self.kernel_heap_size
+    }
+    
+    /// Convert physical address to kernel virtual address (if direct mapping supported)
+    #[inline]
+    pub fn phys_to_virt(&self, phys: usize) -> Option<usize> {
+        self.phys_map_base.map(|base| base + phys)
+    }
+    
+    /// Convert kernel virtual address to physical address (if direct mapping supported)
+    #[inline]
+    pub fn virt_to_phys(&self, virt: usize) -> Option<usize> {
+        if let Some(base) = self.phys_map_base {
+            if let Some(size) = self.phys_map_size {
+                if virt >= base && virt < base + size {
+                    return Some(virt - base);
+                }
+            } else if virt >= base {
+                 return Some(virt - base);
+            }
+        }
+        None
+    }
+}
+
 /// Memory region type for ASLR offset application
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AslrRegionType {
@@ -100,190 +156,136 @@ pub enum AslrRegionType {
     Mmio,
 }
 
-impl AddressSpaceLayout {
-    /// Check if an address is in kernel space
-    #[inline]
-    pub fn is_kernel_address(&self, addr: usize) -> bool {
-        addr >= self.kernel_base
-    }
-
-    /// Check if an address is in user space
-    #[inline]
-    pub fn is_user_address(&self, addr: usize) -> bool {
-        addr < self.user_max && addr >= self.user_base
-    }
-
-    /// Check if an address is in kernel code region
-    #[inline]
-    pub fn is_kernel_code(&self, addr: usize) -> bool {
-        addr >= self.kernel_code_base &&
-        addr < self.kernel_code_base + self.kernel_code_size
-    }
-
-    /// Check if an address is in kernel data region
-    #[inline]
-    pub fn is_kernel_data(&self, addr: usize) -> bool {
-        addr >= self.kernel_data_base &&
-        addr < self.kernel_data_base + self.kernel_data_size
-    }
-
-    /// Check if an address is in kernel heap region
-    #[inline]
-    pub fn is_kernel_heap(&self, addr: usize) -> bool {
-        addr >= self.kernel_heap_base &&
-        addr < self.kernel_heap_base + self.kernel_heap_size
-    }
-
-    /// Convert physical address to kernel virtual address (if direct mapping supported)
-    #[inline]
-    pub fn phys_to_virt(&self, phys: usize) -> Option<usize> {
-        self.phys_map_base.map(|base| base + phys)
-    }
-
-    /// Convert kernel virtual address to physical address (if direct mapping supported)
-    #[inline]
-    pub fn virt_to_phys(&self, virt: usize) -> Option<usize> {
-        if let Some(base) = self.phys_map_base {
-            if let Some(size) = self.phys_map_size {
-                if virt >= base && virt < base + size {
-                    return Some(virt - base);
-                }
-            } else if virt >= base {
-                return Some(virt - base);
+/// Apply ASLR offset to a base address with boundary checks and region awareness
+/// 
+/// This function applies ASLR offset with the following enhancements:
+/// 1. Boundary checking to ensure the offset doesn't cause address overflow
+/// 2. Region-aware offset application (different strategies for different regions)
+/// 3. Validation that the resulting address doesn't conflict with other regions
+/// 
+/// # Arguments
+/// * `base` - Base address to apply offset to
+/// * `offset` - ASLR offset (will be page-aligned automatically)
+/// * `region_type` - Type of memory region (for region-aware offset application)
+/// 
+/// # Returns
+/// * `Ok(usize)` - Adjusted address with offset applied
+/// * `Err(&'static str)` - Error if offset would cause address conflict or overflow
+pub fn apply_aslr_offset_enhanced(
+    base: usize,
+    offset: usize,
+    region_type: AslrRegionType,
+) -> Result<usize, &'static str> {
+    let layout = AddressSpaceLayout::current();
+    // Ensure offset is page-aligned
+    let aligned_offset = (offset / layout.page_size) * layout.page_size;
+    
+    // Region-aware offset clamping
+    let max_offset = match region_type {
+        AslrRegionType::KernelCode | AslrRegionType::KernelData => {
+            // Kernel code/data: use smaller offset range to avoid conflicts
+            layout.aslr_offset_range.min(0x1000_0000) // Max 256MB
+        }
+        AslrRegionType::KernelHeap => {
+            // Kernel heap: can use larger offset
+            layout.aslr_offset_range.min(0x4000_0000) // Max 1GB
+        }
+        AslrRegionType::UserCode | AslrRegionType::UserData | AslrRegionType::UserHeap => {
+            // User regions: use full range but check against user_max
+            layout.aslr_offset_range
+        }
+        AslrRegionType::UserStack => {
+            // User stack: smaller offset to avoid conflicts with heap
+            layout.aslr_offset_range.min(0x2000_0000) // Max 512MB
+        }
+        AslrRegionType::PhysicalMapping | AslrRegionType::Mmio => {
+            // Physical mapping and MMIO: minimal offset to avoid conflicts
+            layout.aslr_offset_range.min(0x1000_0000) // Max 256MB
+        }
+    };
+    
+    let clamped_offset = aligned_offset.min(max_offset);
+    
+    // Check for address overflow
+    let adjusted = base.checked_add(clamped_offset)
+        .ok_or("ASLR offset would cause address overflow")?;
+    
+    // Boundary checks based on region type
+    match region_type {
+        AslrRegionType::KernelCode => {
+            let max_addr = layout.kernel_code_base + layout.kernel_code_size;
+            if adjusted >= max_addr {
+                return Err("ASLR offset would exceed kernel code region");
+            }
+            // Check for overlap with kernel data region
+            if adjusted + layout.kernel_code_size > layout.kernel_data_base {
+                return Err("ASLR-adjusted kernel code would overlap with kernel data");
             }
         }
-        None
-    }
-
-    /// Apply ASLR offset to a base address with boundary checks and region awareness
-    /// 
-    /// This function applies ASLR offset with the following enhancements:
-    /// 1. Boundary checking to ensure the offset doesn't cause address overflow
-    /// 2. Region-aware offset application (different strategies for different regions)
-    /// 3. Validation that the resulting address doesn't conflict with other regions
-    /// 
-    /// # Arguments
-    /// * `base` - Base address to apply offset to
-    /// * `offset` - ASLR offset (will be page-aligned automatically)
-    /// * `region_type` - Type of memory region (for region-aware offset application)
-    /// 
-    /// # Returns
-    /// * `Ok(usize)` - Adjusted address with offset applied
-    /// * `Err(&'static str)` - Error if offset would cause address conflict or overflow
-    pub fn apply_aslr_offset_enhanced(
-        &self,
-        base: usize,
-        offset: usize,
-        region_type: AslrRegionType,
-    ) -> Result<usize, &'static str> {
-        // Ensure offset is page-aligned
-        let aligned_offset = (offset / self.page_size) * self.page_size;
-        
-        // Region-aware offset clamping
-        let max_offset = match region_type {
-            AslrRegionType::KernelCode | AslrRegionType::KernelData => {
-                // Kernel code/data: use smaller offset range to avoid conflicts
-                self.aslr_offset_range.min(0x1000_0000) // Max 256MB
+        AslrRegionType::KernelData => {
+            let max_addr = layout.kernel_data_base + layout.kernel_data_size;
+            if adjusted >= max_addr {
+                return Err("ASLR offset would exceed kernel data region");
             }
-            AslrRegionType::KernelHeap => {
-                // Kernel heap: can use larger offset
-                self.aslr_offset_range.min(0x4000_0000) // Max 1GB
+            // Check for overlap with kernel heap
+            if adjusted + layout.kernel_data_size > layout.kernel_heap_base {
+                return Err("ASLR-adjusted kernel data would overlap with kernel heap");
             }
-            AslrRegionType::UserCode | AslrRegionType::UserData | AslrRegionType::UserHeap => {
-                // User regions: use full range but check against user_max
-                self.aslr_offset_range
+        }
+        AslrRegionType::KernelHeap => {
+            let max_addr = layout.kernel_heap_base + layout.kernel_heap_size;
+            if adjusted >= max_addr {
+                return Err("ASLR offset would exceed kernel heap region");
             }
-            AslrRegionType::UserStack => {
-                // User stack: smaller offset to avoid conflicts with heap
-                self.aslr_offset_range.min(0x2000_0000) // Max 512MB
+        }
+        AslrRegionType::UserCode | AslrRegionType::UserData | AslrRegionType::UserHeap => {
+            // Check that adjusted address is still in user space
+            if adjusted >= layout.user_max {
+                return Err("ASLR offset would push address into kernel space");
             }
-            AslrRegionType::PhysicalMapping | AslrRegionType::Mmio => {
-                // Physical mapping and MMIO: minimal offset to avoid conflicts
-                self.aslr_offset_range.min(0x1000_0000) // Max 256MB
+            if adjusted < layout.user_base {
+                return Err("ASLR offset would push address below user base");
             }
-        };
-        
-        let clamped_offset = aligned_offset.min(max_offset);
-        
-        // Check for address overflow
-        let adjusted = base.checked_add(clamped_offset)
-            .ok_or("ASLR offset would cause address overflow")?;
-        
-        // Boundary checks based on region type
-        match region_type {
-            AslrRegionType::KernelCode => {
-                let max_addr = self.kernel_code_base + self.kernel_code_size;
-                if adjusted >= max_addr {
-                    return Err("ASLR offset would exceed kernel code region");
-                }
-                // Check for overlap with kernel data region
-                if adjusted + self.kernel_code_size > self.kernel_data_base {
-                    return Err("ASLR-adjusted kernel code would overlap with kernel data");
-                }
+        }
+        AslrRegionType::UserStack => {
+            // Stack grows downward, so check top address
+            if adjusted >= layout.user_stack_top {
+                return Err("ASLR offset would exceed user stack top");
             }
-            AslrRegionType::KernelData => {
-                let max_addr = self.kernel_data_base + self.kernel_data_size;
-                if adjusted >= max_addr {
-                    return Err("ASLR offset would exceed kernel data region");
-                }
-                // Check for overlap with kernel heap
-                if adjusted + self.kernel_data_size > self.kernel_heap_base {
-                    return Err("ASLR-adjusted kernel data would overlap with kernel heap");
-                }
+            if adjusted < layout.user_stack_top.saturating_sub(layout.user_stack_size) {
+                return Err("ASLR offset would push stack below valid range");
             }
-            AslrRegionType::KernelHeap => {
-                let max_addr = self.kernel_heap_base + self.kernel_heap_size;
-                if adjusted >= max_addr {
-                    return Err("ASLR offset would exceed kernel heap region");
-                }
-            }
-            AslrRegionType::UserCode | AslrRegionType::UserData | AslrRegionType::UserHeap => {
-                // Check that adjusted address is still in user space
-                if adjusted >= self.user_max {
-                    return Err("ASLR offset would push address into kernel space");
-                }
-                if adjusted < self.user_base {
-                    return Err("ASLR offset would push address below user base");
-                }
-            }
-            AslrRegionType::UserStack => {
-                // Stack grows downward, so check top address
-                if adjusted >= self.user_stack_top {
-                    return Err("ASLR offset would exceed user stack top");
-                }
-                if adjusted < self.user_stack_top.saturating_sub(self.user_stack_size) {
-                    return Err("ASLR offset would push stack below valid range");
-                }
-            }
-            AslrRegionType::PhysicalMapping => {
-                if let Some(phys_base) = self.phys_map_base {
-                    if let Some(phys_size) = self.phys_map_size {
-                        let max_addr = phys_base + phys_size;
-                        if adjusted >= max_addr {
-                            return Err("ASLR offset would exceed physical mapping region");
-                        }
-                        // Check for overlap with kernel regions
-                        if adjusted < self.kernel_base + self.kernel_code_size + self.kernel_data_size + self.kernel_heap_size {
-                            return Err("ASLR-adjusted physical mapping would overlap with kernel regions");
-                        }
+        }
+        AslrRegionType::PhysicalMapping => {
+            if let Some(phys_base) = layout.phys_map_base {
+                if let Some(phys_size) = layout.phys_map_size {
+                    let max_addr = phys_base + phys_size;
+                    if adjusted >= max_addr {
+                        return Err("ASLR offset would exceed physical mapping region");
                     }
-                }
-            }
-            AslrRegionType::Mmio => {
-                if let Some(mmio_base) = self.mmio_base {
-                    if let Some(mmio_size) = self.mmio_size {
-                        let max_addr = mmio_base + mmio_size;
-                        if adjusted >= max_addr {
-                            return Err("ASLR offset would exceed MMIO region");
-                        }
+                    // Check for overlap with kernel regions
+                    if adjusted < layout.kernel_base + layout.kernel_code_size + layout.kernel_data_size + layout.kernel_heap_size {
+                        return Err("ASLR-adjusted physical mapping would overlap with kernel regions");
                     }
                 }
             }
         }
-        
-        Ok(adjusted)
+        AslrRegionType::Mmio => {
+            if let Some(mmio_base) = layout.mmio_base {
+                if let Some(mmio_size) = layout.mmio_size {
+                    let max_addr = mmio_base + mmio_size;
+                    if adjusted >= max_addr {
+                        return Err("ASLR offset would exceed MMIO region");
+                    }
+                }
+            }
+        }
     }
     
+    Ok(adjusted)
+}
+
+impl AddressSpaceLayout {
     /// Apply ASLR offset to a base address (backward-compatible version)
     /// 
     /// This is a simplified version that uses default region type (KernelCode)
@@ -298,7 +300,7 @@ impl AddressSpaceLayout {
     #[inline]
     pub fn apply_aslr_offset(&self, base: usize, offset: usize) -> usize {
         // Use enhanced version with default region type
-        self.apply_aslr_offset_enhanced(base, offset, AslrRegionType::KernelCode)
+        apply_aslr_offset_enhanced(base, offset, AslrRegionType::KernelCode)
             .unwrap_or_else(|_| {
                 // Fallback to simple addition if enhanced version fails
                 let aligned_offset = (offset / self.page_size) * self.page_size;
@@ -345,20 +347,21 @@ impl AddressSpaceLayout {
         
         Ok(())
     }
-    
     /// Get the current architecture's memory layout
-    pub fn current() -> &'static AddressSpaceLayout {
+    pub fn current() -> &'static Self {
         #[cfg(target_arch = "x86_64")]
-        return &X86_64_LAYOUT;
+        {
+            use super::arch::x86_64::LAYOUT;
+            &LAYOUT
+        }
         
         #[cfg(target_arch = "aarch64")]
-        return &AARCH64_LAYOUT;
+        {
+            &AARCH64_LAYOUT
+        }
         
-        #[cfg(target_arch = "riscv64")]
-        return &RISCV64_LAYOUT;
-        
-        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
-        compile_error!("Unsupported architecture");
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+        compile_error!("Unsupported architecture")
     }
 }
 
@@ -527,32 +530,67 @@ const RISCV64_LAYOUT: AddressSpaceLayout = AddressSpaceLayout {
 
 /// Get kernel base address for current architecture
 #[inline]
-pub fn kernel_base() -> usize {
-    AddressSpaceLayout::current().kernel_base
+pub const fn kernel_base() -> usize {
+    #[cfg(target_arch = "x86_64")]
+    { X86_64_LAYOUT.kernel_base }
+    #[cfg(target_arch = "aarch64")]
+    { AARCH64_LAYOUT.kernel_base }
+    #[cfg(target_arch = "riscv64")]
+    { RISCV64_LAYOUT.kernel_base }
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
+    { panic!("Unsupported architecture") }
 }
 
 /// Get user base address for current architecture
 #[inline]
-pub fn user_base() -> usize {
-    AddressSpaceLayout::current().user_base
+pub const fn user_base() -> usize {
+    #[cfg(target_arch = "x86_64")]
+    { X86_64_LAYOUT.user_base }
+    #[cfg(target_arch = "aarch64")]
+    { AARCH64_LAYOUT.user_base }
+    #[cfg(target_arch = "riscv64")]
+    { RISCV64_LAYOUT.user_base }
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
+    { panic!("Unsupported architecture") }
 }
 
 /// Get user stack top address for current architecture
 #[inline]
-pub fn user_stack_top() -> usize {
-    AddressSpaceLayout::current().user_stack_top
+pub const fn user_stack_top() -> usize {
+    #[cfg(target_arch = "x86_64")]
+    { X86_64_LAYOUT.user_stack_top }
+    #[cfg(target_arch = "aarch64")]
+    { AARCH64_LAYOUT.user_stack_top }
+    #[cfg(target_arch = "riscv64")]
+    { RISCV64_LAYOUT.user_stack_top }
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
+    { panic!("Unsupported architecture") }
 }
 
 /// Get maximum user address for current architecture
 #[inline]
-pub fn user_max() -> usize {
-    AddressSpaceLayout::current().user_max
+pub const fn user_max() -> usize {
+    #[cfg(target_arch = "x86_64")]
+    { X86_64_LAYOUT.user_max }
+    #[cfg(target_arch = "aarch64")]
+    { AARCH64_LAYOUT.user_max }
+    #[cfg(target_arch = "riscv64")]
+    { RISCV64_LAYOUT.user_max }
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
+    { panic!("Unsupported architecture") }
 }
 
 /// Get page size for current architecture
 #[inline]
-pub fn page_size() -> usize {
-    AddressSpaceLayout::current().page_size
+pub const fn page_size() -> usize {
+    #[cfg(target_arch = "x86_64")]
+    { X86_64_LAYOUT.page_size }
+    #[cfg(target_arch = "aarch64")]
+    { AARCH64_LAYOUT.page_size }
+    #[cfg(target_arch = "riscv64")]
+    { RISCV64_LAYOUT.page_size }
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
+    { panic!("Unsupported architecture") }
 }
 
 /// Check if address is in kernel space
@@ -579,9 +617,9 @@ pub fn virt_to_phys(virt: usize) -> Option<usize> {
     AddressSpaceLayout::current().virt_to_phys(virt)
 }
 
-/// Apply ASLR offset to a base address
+/// Apply ASLR offset to a base address (architecture-agnostic)
 #[inline]
-pub fn apply_aslr_offset(base: usize, offset: usize) -> usize {
+pub fn apply_aslr_offset_global(base: usize, offset: usize) -> usize {
     AddressSpaceLayout::current().apply_aslr_offset(base, offset)
 }
 

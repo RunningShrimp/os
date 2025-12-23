@@ -3,21 +3,14 @@
 //! This module provides error diagnostic tools and analysis.
 
 use spin::Mutex;
+use alloc::vec::Vec;
+use alloc::vec;
+use alloc::string::String;
+use alloc::string::ToString;
+use alloc::collections::BTreeMap;
 use crate::Result;
 
-#[cfg(feature = "alloc")]
-use alloc::vec::Vec;
-#[cfg(feature = "alloc")]
-use alloc::vec;
-#[cfg(feature = "alloc")]
-use alloc::string::String;
-#[cfg(feature = "alloc")]
-use alloc::string::ToString;
-#[cfg(feature = "alloc")]
-use alloc::collections::BTreeMap;
-
 /// Diagnostic analyzer
-#[cfg(feature = "alloc")]
 #[derive(Default)]
 pub struct DiagnosticAnalyzer {
     /// Analysis rules
@@ -26,7 +19,6 @@ pub struct DiagnosticAnalyzer {
     stats: Mutex<AnalysisStats>,
 }
 
-#[cfg(feature = "alloc")]
 impl DiagnosticAnalyzer {
     /// Create a new diagnostic analyzer
     pub fn new() -> Self {
@@ -122,7 +114,6 @@ impl DiagnosticAnalyzer {
 }
 
 /// Analysis rule
-#[cfg(feature = "alloc")]
 #[derive(Debug, Clone)]
 pub struct AnalysisRule {
     /// Rule name
@@ -136,7 +127,6 @@ pub struct AnalysisRule {
 }
 
 /// Analysis condition
-#[cfg(feature = "alloc")]
 #[derive(Debug, Clone)]
 pub enum AnalysisCondition {
     /// Frequency condition
@@ -163,7 +153,6 @@ pub enum AnalysisCondition {
 }
 
 /// Analysis action
-#[cfg(feature = "alloc")]
 #[derive(Debug, Clone)]
 pub enum AnalysisAction {
     /// Log action
@@ -208,7 +197,6 @@ pub enum DiagnosticLevel {
 }
 
 /// Analysis statistics
-#[cfg(feature = "alloc")]
 #[derive(Debug, Clone, Default)]
 pub struct AnalysisStats {
     /// Total analyzed errors
@@ -223,7 +211,6 @@ pub struct AnalysisStats {
     pub avg_analysis_time: u64,
 }
 
-#[cfg(feature = "alloc")]
 impl AnalysisRule {
     /// Check if the rule matches the error record
     pub fn matches(&self, error_record: &crate::types::ErrorRecord) -> bool {
@@ -266,11 +253,9 @@ impl AnalysisRule {
 }
 
 /// Global diagnostic analyzer
-#[cfg(feature = "alloc")]
 static GLOBAL_ANALYZER: spin::Once<Mutex<DiagnosticAnalyzer>> = spin::Once::new();
 
 /// Initialize the global diagnostic analyzer
-#[cfg(feature = "alloc")]
 pub fn init_analyzer() -> Result<()> {
     GLOBAL_ANALYZER.call_once(|| {
         Mutex::new(DiagnosticAnalyzer::new())
@@ -281,19 +266,16 @@ pub fn init_analyzer() -> Result<()> {
 }
 
 /// Get the global diagnostic analyzer
-#[cfg(feature = "alloc")]
 pub fn get_analyzer() -> &'static Mutex<DiagnosticAnalyzer> {
     GLOBAL_ANALYZER.get().expect("Diagnostic analyzer not initialized")
 }
 
 /// Internal function to get the global diagnostic analyzer
-#[cfg(feature = "alloc")]
 fn get_analyzer_internal() -> &'static Mutex<DiagnosticAnalyzer> {
     get_analyzer()
 }
 
 /// Shutdown the global diagnostic analyzer
-#[cfg(feature = "alloc")]
 pub fn shutdown_analyzer() -> Result<()> {
     // Note: spin::Once doesn't provide a way to reset, so we just return Ok(())
     // In a real implementation, you might want to provide a different approach
@@ -301,19 +283,17 @@ pub fn shutdown_analyzer() -> Result<()> {
 }
 
 /// Analyze an error
-#[cfg(feature = "alloc")]
 pub fn analyze_error(error_record: &crate::types::ErrorRecord) -> Result<()> {
     let analyzer = get_analyzer_internal().lock();
     analyzer.analyze_error(error_record)
 }
 
 /// Get diagnostic statistics
-#[cfg(feature = "alloc")]
 pub fn diagnostics_get_stats() -> AnalysisStats {
     get_analyzer_internal().lock().get_stats()
 }
 
-#[cfg(all(test, feature = "alloc"))]
+#[cfg(test)]
 mod tests {
     use super::*;
 

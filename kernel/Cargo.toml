@@ -46,7 +46,7 @@ serde_json = { workspace = true }
 bincode = { workspace = true }
 
 [features]
-default = ["posix_layer", "net_stack", "syscalls", "services", "error_handling", "alloc"]
+default = ["posix_layer", "net_stack", "syscalls", "services", "error_handling"]
 baremetal = []
 kernel_tests = []
 link_phys_end = []
@@ -65,15 +65,15 @@ net_stack = []
 graphics_subsystem = []
 web_engine = []
 posix_layer = []
-alloc = []
+
 hpage_2mb = []
 hpage_1gb = []
 debug = []
 
 # New modular features
-syscalls = ["nos-syscalls", "nos-syscalls/alloc"]
+syscalls = ["nos-syscalls"]
 services = ["nos-services"]
-error_handling = ["nos-error-handling", "nos-error-handling/alloc"]
+error_handling = ["nos-error-handling"]
 advanced_syscalls = ["nos-syscalls/advanced_syscalls"]
 realtime = []
 log = []

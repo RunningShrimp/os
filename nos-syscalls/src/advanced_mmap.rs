@@ -3,14 +3,11 @@
 //! This module provides advanced memory management system calls,
 //! including memory-mapped files, huge pages, and other advanced features.
 
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
-#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 use nos_api::{Result, Error};
-use crate::core::traits::SyscallHandler;
-#[cfg(feature = "alloc")]
-use crate::core::dispatcher::SyscallDispatcher;
+use crate::SyscallHandler;
+use crate::SyscallDispatcher;
 
 #[cfg(feature = "log")]
 use log;
@@ -32,10 +29,7 @@ impl SyscallHandler for AdvancedMmapHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 6 {
-            #[cfg(feature = "alloc")]
             return Err(Error::InvalidArgument("Insufficient arguments for advanced mmap".to_string()));
-            #[cfg(not(feature = "alloc"))]
-            return Err(Error::InvalidArgument("Insufficient arguments for advanced mmap".into()));
         }
 
         let addr = args[0];
@@ -76,12 +70,8 @@ impl AdvancedMmapHandler {
 }
 
 /// Register advanced memory management system calls
-#[cfg(feature = "alloc")]
 pub fn register_syscalls(dispatcher: &mut SyscallDispatcher) -> Result<()> {
-    #[cfg(feature = "alloc")]
-    {
-        dispatcher.register_handler(300, Box::new(AdvancedMmapHandler::new()));
-    }
+    dispatcher.register_handler(300, Box::new(AdvancedMmapHandler::new()));
     Ok(())
 }
 

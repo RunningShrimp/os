@@ -3,7 +3,6 @@
 //! This module provides an optimized system call path implementation
 //! for reducing overhead and improving performance in NOS operating system.
 
-#[cfg(feature = "alloc")]
 use alloc::{
     collections::BTreeMap,
     string::{String, ToString},
@@ -11,14 +10,14 @@ use alloc::{
     format,
 };
 use nos_api::Result;
-use crate::core::traits::SyscallHandler;
-use crate::core::dispatcher::SyscallDispatcher;;
+use crate::{SyscallHandler, SyscallDispatcher};
 use core::sync::atomic::{AtomicU64, Ordering};
 use spin::Mutex;  // 使用spin::Mutex替代RefCell以支持Sync
 
+
 /// System call statistics for optimization
 #[derive(Debug, Clone)]
-pub struct SyscallStats {
+pub struct OptimizedSyscallStats {
     /// Number of times the syscall was called
     pub call_count: u64,
     /// Total time spent in microseconds
@@ -31,7 +30,7 @@ pub struct SyscallStats {
     pub slow_path_count: u64,
 }
 
-impl SyscallStats {
+impl OptimizedSyscallStats {
     /// Create new syscall stats
     pub fn new() -> Self {
         Self {
@@ -66,19 +65,17 @@ impl SyscallStats {
 }
 
 /// Optimized syscall dispatcher
-#[cfg(feature = "alloc")]
 pub struct OptimizedSyscallDispatcher {
     /// Base dispatcher
     base_dispatcher: SyscallDispatcher,
     /// Syscall statistics
-    stats: BTreeMap<u32, SyscallStats>,
+    stats: BTreeMap<u32, OptimizedSyscallStats>,
     /// Fast path cache for common syscalls
     fast_path_cache: BTreeMap<u32, u32>,
     /// Total syscall count
     total_calls: AtomicU64,
 }
 
-#[cfg(feature = "alloc")]
 impl OptimizedSyscallDispatcher {
     /// Create a new optimized dispatcher
     pub fn new() -> Self {
@@ -102,7 +99,7 @@ impl OptimizedSyscallDispatcher {
         }
         
         // Initialize stats
-        self.stats.insert(id, SyscallStats::new());
+        self.stats.insert(id, OptimizedSyscallStats::new());
         
         Ok(())
     }
@@ -211,7 +208,7 @@ impl OptimizedSyscallDispatcher {
     }
     
     /// Get syscall statistics
-    pub fn get_stats(&self) -> &BTreeMap<u32, SyscallStats> {
+    pub fn get_stats(&self) -> &BTreeMap<u32, OptimizedSyscallStats> {
         &self.stats
     }
     
@@ -222,29 +219,22 @@ impl OptimizedSyscallDispatcher {
     
     /// Get optimization report
     pub fn get_optimization_report(&self) -> String {
-        #[cfg(feature = "alloc")]
-        {
-            let mut report = String::from("=== System Call Optimization Report ===\n");
-            report.push_str(&format!("Total syscalls: {}\n", self.get_total_calls()));
-            report.push_str(&format!("Fast path cache size: {}\n", self.fast_path_cache.len()));
-            
-            for (id, stats) in &self.stats {
-                let syscall_name = self.get_syscall_name(*id);
-                report.push_str(&format!(
-                    "{}: calls={}, avg_time={}μs, fast_path={}%\n",
-                    syscall_name,
-                    stats.call_count,
-                    stats.avg_time_us,
-                    stats.fast_path_percentage()
-                ));
-            }
-            
-            report
+        let mut report = String::from("=== System Call Optimization Report ===\n");
+        report.push_str(&format!("Total syscalls: {}\n", self.get_total_calls()));
+        report.push_str(&format!("Fast path cache size: {}\n", self.fast_path_cache.len()));
+        
+        for (id, stats) in &self.stats {
+            let syscall_name = self.get_syscall_name(*id);
+            report.push_str(&format!(
+                "{}: calls={}, avg_time={}μs, fast_path={}%\n",
+                syscall_name,
+                stats.call_count,
+                stats.avg_time_us,
+                stats.fast_path_percentage()
+            ));
         }
-        #[cfg(not(feature = "alloc"))]
-        {
-            "Optimization report not available without alloc".into()
-        }
+        
+        report
     }
     
     /// Get syscall name by ID
@@ -268,7 +258,7 @@ pub struct OptimizedSyscallHandler {
     /// Base handler
     base_handler: Box<dyn SyscallHandler>,
     /// Execution statistics
-    stats: Mutex<SyscallStats>,
+    stats: Mutex<OptimizedSyscallStats>,
 }
 
 impl OptimizedSyscallHandler {
@@ -276,12 +266,12 @@ impl OptimizedSyscallHandler {
     pub fn new(handler: Box<dyn SyscallHandler>) -> Self {
         Self {
             base_handler: handler,
-            stats: Mutex::new(SyscallStats::new()),
+            stats: Mutex::new(OptimizedSyscallStats::new()),
         }
     }
     
     /// Get handler statistics
-    pub fn get_stats(&self) -> SyscallStats {
+    pub fn get_stats(&self) -> OptimizedSyscallStats {
         self.stats.lock().clone()
     }
 }
@@ -305,19 +295,15 @@ impl SyscallHandler for OptimizedSyscallHandler {
         let execution_time = end_time - start_time;
         
         // Update statistics
-        let fast_path = self.should_use_fast_path(args);
-        self.stats.lock().record_execution(execution_time, fast_path);
+        let mut stats = self.stats.lock();
+        let fast_path = args.len() <= 4 && stats.call_count > 10;
+        stats.record_execution(execution_time, fast_path);
         
         result
     }
 }
 
 impl OptimizedSyscallHandler {
-    /// Check if fast path should be used
-    fn should_use_fast_path(&self, args: &[usize]) -> bool {
-        // Use fast path for simple, common cases
-        args.len() <= 4 && self.stats.lock().call_count > 10
-    }
     
     /// Get current time in microseconds
     fn get_time_us(&self) -> u64 {
@@ -328,7 +314,6 @@ impl OptimizedSyscallHandler {
 }
 
 /// Register optimized system call handlers
-#[cfg(feature = "alloc")]
 pub fn register_handlers(_dispatcher: &mut SyscallDispatcher) -> Result<()> {
     // Create optimized dispatcher
     let mut optimized_dispatcher = OptimizedSyscallDispatcher::new();
@@ -353,37 +338,26 @@ pub fn register_handlers(_dispatcher: &mut SyscallDispatcher) -> Result<()> {
     let zero_copy_recv_handler = OptimizedSyscallHandler::new(Box::new(crate::zero_copy_network_impl::ZeroCopyRecvHandler::new()));
     let _ = optimized_dispatcher.register_handler(crate::types::SYS_ZERO_COPY_RECV, Box::new(zero_copy_recv_handler));
     
-        // Print optimization report
-    #[cfg(feature = "alloc")]
+    // Print optimization report
+    let report = optimized_dispatcher.get_optimization_report();
+    // In a real implementation, this would send the report to a logging system
+    #[cfg(feature = "std")]
     {
-        let report = optimized_dispatcher.get_optimization_report();
-        // In a real implementation, this would send the report to a logging system
-        #[cfg(feature = "std")]
-        {
-            use std::println;
-            println!("{}", report);
-        }
-        // For no_std environments with alloc, we can still use the report for debugging
-        #[cfg(all(feature = "alloc", not(feature = "std"), feature = "log"))]
-        {
-            log::debug!("{}", report);
-        }
-        // Even if we can't log, we still want to acknowledge the report was generated
-        #[cfg(all(feature = "alloc", not(feature = "std"), not(feature = "log")))]
-        {
-            // Use a simple debug output mechanism for no_std environments
-            // In a real kernel, this would use kernel-specific logging
-            let _ = report; // Prevent unused variable warning
-        }
+        use std::println;
+        println!("{}", report);
+    }
+    // For no_std environments with alloc, we can still use the report for debugging
+    #[cfg(all(feature = "alloc", not(feature = "std"), feature = "log"))]
+    {
+        log::debug!("{}", report);
+    }
+    // Even if we can't log, we still want to acknowledge the report was generated
+    #[cfg(all(feature = "alloc", not(feature = "std"), not(feature = "log")))]
+    {
+        // Use a simple debug output mechanism for no_std environments
+        // In a real kernel, this would use kernel-specific logging
+        let _ = report; // Prevent unused variable warning
     }
     
-    Ok(())
-}
-
-/// Register optimized system call handlers (no-alloc version)
-#[cfg(not(feature = "alloc"))]
-pub fn register_handlers(_dispatcher: &mut SyscallDispatcher) -> Result<()> {
-    // In no-alloc environments, optimization is limited
-    // For now, just return success
     Ok(())
 }

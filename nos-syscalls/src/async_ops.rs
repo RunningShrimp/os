@@ -3,20 +3,14 @@
 //! This module provides system calls for asynchronous operations,
 //! including async I/O, async file operations, and other async primitives.
 
-#[cfg(feature = "alloc")]
 use alloc::collections::BTreeMap;
-#[cfg(feature = "alloc")]
 use alloc::sync::Arc;
-#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
-#[cfg(feature = "alloc")]
 use alloc::format;
 use nos_api::{Result, Error};
 use spin::Mutex;
-use crate::core::traits::SyscallHandler;
-use crate::core::dispatcher::SyscallDispatcher;;
+use crate::{SyscallHandler, SyscallDispatcher};
 
 /// Async operation context
 #[derive(Debug, Clone)]
@@ -107,10 +101,7 @@ impl AsyncManager {
             context.error = error;
             Ok(())
         } else {
-            #[cfg(feature = "alloc")]
             return Err(Error::NotFound(format!("Async context {} not found", id)));
-            #[cfg(not(feature = "alloc"))]
-            return Err(Error::NotFound("Async context not found".into()));
         }
     }
     
@@ -132,14 +123,7 @@ impl AsyncManager {
     /// Remove a completed operation
     pub fn remove_operation(&self, id: u64) -> Result<()> {
         let mut operations = self.operations.lock();
-        #[cfg(feature = "alloc")]
-        {
-            operations.remove(&id).ok_or_else(|| Error::NotFound(format!("Async context {} not found", id)))?;
-        }
-        #[cfg(not(feature = "alloc"))]
-        {
-            operations.remove(&id).ok_or_else(|| Error::NotFound("Async context not found".into()))?;
-        }
+        operations.remove(&id).ok_or_else(|| Error::NotFound(format!("Async context {} not found", id)))?;
         Ok(())
     }
 }
@@ -171,10 +155,7 @@ impl SyscallHandler for AsyncOpHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 2 {
-            #[cfg(feature = "alloc")]
             return Err(Error::InvalidArgument("Insufficient arguments for async operation".to_string()));
-            #[cfg(not(feature = "alloc"))]
-            return Err(Error::InvalidArgument("Insufficient arguments for async operation".into()));
         }
 
         let operation_type = match args[0] {
@@ -220,36 +201,21 @@ impl SyscallHandler for AsyncWaitHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 1 {
-            #[cfg(feature = "alloc")]
             return Err(Error::InvalidArgument("Insufficient arguments for async wait".to_string()));
-            #[cfg(not(feature = "alloc"))]
-            return Err(Error::InvalidArgument("Insufficient arguments for async wait".into()));
         }
 
         let context_id = args[0] as u64;
         
         // Get the async context
-        #[cfg(feature = "alloc")]
         let context = self.manager.get_context(context_id)
             .ok_or_else(|| Error::NotFound("Async context not found".to_string()))?;
-        #[cfg(not(feature = "alloc"))]
-        let context = self.manager.get_context(context_id)
-            .ok_or_else(|| Error::NotFound("Async context not found".into()))?;
         
         // Check if the operation is completed
-        #[cfg(feature = "alloc")]
         match context.status {
             AsyncStatus::Completed => Ok(context.result.unwrap_or(0)),
             AsyncStatus::Failed => Err(Error::InvalidArgument("Operation failed".to_string())),
             AsyncStatus::Cancelled => Err(Error::InvalidArgument("Operation cancelled".to_string())),
             _ => Err(Error::InvalidArgument("Operation still in progress".to_string())),
-        }
-        #[cfg(not(feature = "alloc"))]
-        match context.status {
-            AsyncStatus::Completed => Ok(context.result.unwrap_or(0)),
-            AsyncStatus::Failed => Err(Error::InvalidArgument("Operation failed".into())),
-            AsyncStatus::Cancelled => Err(Error::InvalidArgument("Operation cancelled".into())),
-            _ => Err(Error::InvalidArgument("Operation still in progress".into())),
         }
     }
     
@@ -260,14 +226,11 @@ impl SyscallHandler for AsyncWaitHandler {
 
 /// Register async operation system calls
 pub fn register_syscalls(dispatcher: &mut SyscallDispatcher) -> Result<()> {
-    #[cfg(feature = "alloc")]
-    {
-        let async_handler = AsyncOpHandler::new();
-        let manager = async_handler.manager().clone();
-        
-        dispatcher.register_handler(310, Box::new(async_handler));
-        dispatcher.register_handler(311, Box::new(AsyncWaitHandler::new(manager)));
-    }
+    let async_handler = AsyncOpHandler::new();
+    let manager = async_handler.manager().clone();
+    
+    dispatcher.register_handler(310, Box::new(async_handler));
+    dispatcher.register_handler(311, Box::new(AsyncWaitHandler::new(manager)));
     
     Ok(())
 }

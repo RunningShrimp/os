@@ -1,9 +1,12 @@
 //! Core error handling traits
-//!
+//! 
 //! This module defines the core traits for error handling in NOS.
 //! Implementations of these traits are in kernel/src/error.
 
+extern crate alloc;
+
 use crate::types::{ErrorRecord, ErrorSeverity, ErrorCategory};
+use alloc::string::String;
 
 /// Error handler trait
 /// 
@@ -39,13 +42,13 @@ pub struct ErrorContext {
     /// The error record
     pub error: ErrorRecord,
     /// Context description
-    pub context: alloc::string::String,
+    pub context: String,
     /// File name where error occurred
-    pub file: Option<alloc::string::String>,
+    pub file: Option<String>,
     /// Line number where error occurred
     pub line: Option<u32>,
     /// Function name where error occurred
-    pub function: Option<alloc::string::String>,
+    pub function: Option<String>,
 }
 
 impl ErrorContext {

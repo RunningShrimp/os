@@ -1,5 +1,5 @@
 //! Error recovery
-//!
+//! 
 //! This module provides error recovery strategies and management.
 
 use crate::Result;
@@ -7,15 +7,13 @@ use crate::Error;
 use nos_api::collections::BTreeMap;
 use spin::Mutex;
 
-#[cfg(feature = "alloc")]
+extern crate alloc;
+
 use alloc::string::String;
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
-#[cfg(feature = "alloc")]
 use alloc::format;
 
 /// Recovery manager
-#[cfg(feature = "alloc")]
 #[derive(Default)]
 pub struct RecoveryManager {
     /// Recovery strategies
@@ -24,7 +22,6 @@ pub struct RecoveryManager {
     stats: Mutex<RecoveryStats>,
 }
 
-#[cfg(feature = "alloc")]
 impl RecoveryManager {
     /// Create a new recovery manager
     pub fn new() -> Self {
@@ -171,7 +168,6 @@ impl RecoveryManager {
 }
 
 /// Recovery strategy
-#[cfg(feature = "alloc")]
 #[derive(Debug, Clone)]
 pub struct RecoveryStrategy {
     /// Strategy ID
@@ -208,11 +204,9 @@ pub struct RecoveryStats {
 }
 
 /// Global recovery manager
-#[cfg(feature = "alloc")]
 static GLOBAL_MANAGER: spin::Once<Mutex<RecoveryManager>> = spin::Once::new();
 
 /// Initialize the global recovery manager
-#[cfg(feature = "alloc")]
 pub fn init_manager() -> Result<()> {
     GLOBAL_MANAGER.call_once(|| {
         Mutex::new(RecoveryManager::new())
@@ -223,19 +217,16 @@ pub fn init_manager() -> Result<()> {
 }
 
 /// Get the global recovery manager
-#[cfg(feature = "alloc")]
 pub fn get_manager() -> &'static Mutex<RecoveryManager> {
     GLOBAL_MANAGER.get().expect("Recovery manager not initialized")
 }
 
 /// Internal function to get the global recovery manager
-#[cfg(feature = "alloc")]
 fn get_manager_internal() -> &'static Mutex<RecoveryManager> {
     get_manager()
 }
 
 /// Shutdown the global recovery manager
-#[cfg(feature = "alloc")]
 pub fn shutdown_manager() -> Result<()> {
     // Note: spin::Once doesn't provide a way to reset, so we just return Ok(())
     // In a real implementation, you might want to provide a different approach
@@ -243,21 +234,18 @@ pub fn shutdown_manager() -> Result<()> {
 }
 
 /// Execute a recovery action
-#[cfg(feature = "alloc")]
 pub fn execute_recovery_action(action: &crate::types::RecoveryAction) -> Result<()> {
     let manager = get_manager().lock();
     manager.execute_recovery_action(action)
 }
 
 /// Apply a recovery strategy
-#[cfg(feature = "alloc")]
 pub fn apply_recovery_strategy(strategy_id: &crate::types::RecoveryStrategy, error_record: &crate::types::ErrorRecord) -> Result<()> {
     let manager = get_manager_internal().lock();
     manager.apply_recovery_strategy(strategy_id, error_record)
 }
 
 /// Get recovery statistics
-#[cfg(feature = "alloc")]
 pub fn recovery_get_stats() -> RecoveryStats {
     get_manager_internal().lock().get_stats()
 }
@@ -265,6 +253,7 @@ pub fn recovery_get_stats() -> RecoveryStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::string::ToString;
 
     #[test]
     fn test_recovery_manager() {

@@ -1487,9 +1487,6 @@ pub enum ClassificationModel {
 }
 
 /// 主机入侵检测统计
-#[derive(Debug, Clone, Default)]
-
-
 impl HostIds {
     /// 创建新的主机入侵检测系统
     pub fn new() -> Self {

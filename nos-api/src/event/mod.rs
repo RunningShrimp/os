@@ -1,25 +1,10 @@
 //! Event system for NOS operating system
 
 use crate::error::Result;
-#[cfg(feature = "alloc")]
+extern crate alloc;
 use alloc::vec::Vec;
-#[cfg(feature = "alloc")]
 use alloc::string::{String, ToString};
-#[cfg(not(feature = "alloc"))]
-use crate::fmt_utils::ToStringExt;
-
-// Display and String are not used in no-alloc mode
-
-#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
-// Box is already imported through interfaces module
-
-// Import types from interfaces module for no-alloc mode
-#[cfg(not(feature = "alloc"))]
-use crate::interfaces::String;
-
-#[cfg(not(feature = "alloc"))]
-use crate::Vec;
 
 use core::sync::atomic::{AtomicU64, Ordering};
 
@@ -110,15 +95,11 @@ pub struct BasicEvent {
     source: String,
     category: EventCategory,
     priority: EventPriority,
-    #[cfg(feature = "alloc")]
     tags: Vec<&'static str>,
-    #[cfg(not(feature = "alloc"))]
-    tags: &'static [&'static str],
 }
 
 impl BasicEvent {
     /// Create a new basic event
-    #[cfg(feature = "alloc")]
     pub fn new(category: EventCategory, priority: EventPriority, source: &str) -> Self {
         Self {
             id: None, // ID will be assigned when event is dispatched
@@ -130,28 +111,13 @@ impl BasicEvent {
         }
     }
     
-    /// Create a new basic event for no-alloc mode
-    #[cfg(not(feature = "alloc"))]
-    pub fn new(category: EventCategory, priority: EventPriority, source: &'static str) -> Self {
-        Self {
-            id: None, // ID will be assigned when event is dispatched
-            timestamp: get_time_ns(),
-            source: source.to_string(),
-            category,
-            priority,
-            tags: &[],
-        }
-    }
-    
     /// Adds a tag to the event
-    #[cfg(feature = "alloc")]
     pub fn with_tag(mut self, tag: &'static str) -> Self {
         self.tags.push(tag);
         self
     }
     
     /// Sets the event source
-    #[cfg(feature = "alloc")]
     pub fn with_source(mut self, source: &str) -> Self {
         self.source = source.to_string();
         self
@@ -202,12 +168,7 @@ pub trait EventDispatcher {
     fn dispatch(&mut self, event: &BasicEvent) -> Result<()>;
     
     /// Register an event listener
-    #[cfg(feature = "alloc")]
     fn register_listener(&mut self, listener: Box<dyn EventListener>) -> Result<()>;
-    
-    /// Register an event listener for no-alloc mode
-    #[cfg(not(feature = "alloc"))]
-    fn register_listener(&mut self, listener: &'static dyn EventListener) -> Result<()>;
     
     /// Unregister an event listener
     fn unregister_listener(&mut self, listener_id: u64) -> Result<()>;
@@ -229,15 +190,8 @@ pub trait EventListener {
 }
 
 /// Basic event dispatcher implementation
-#[cfg(feature = "alloc")]
 pub struct BasicEventDispatcher {
     listeners: Vec<Box<dyn EventListener>>,
-    next_listener_id: AtomicU64,
-}
-
-#[cfg(not(feature = "alloc"))]
-pub struct BasicEventDispatcher {
-    listeners: &'static [&'static dyn EventListener],
     next_listener_id: AtomicU64,
 }
 
@@ -251,19 +205,9 @@ impl core::fmt::Debug for BasicEventDispatcher {
 
 impl BasicEventDispatcher {
     /// Create a new basic event dispatcher
-    #[cfg(feature = "alloc")]
     pub fn new() -> Self {
         Self {
             listeners: Vec::new(),
-            next_listener_id: AtomicU64::new(1),
-        }
-    }
-    
-    /// Create a new basic event dispatcher for no-alloc mode
-    #[cfg(not(feature = "alloc"))]
-    pub fn new() -> Self {
-        Self {
-            listeners: &[],
             next_listener_id: AtomicU64::new(1),
         }
     }
@@ -275,7 +219,6 @@ impl Default for BasicEventDispatcher {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl EventDispatcher for BasicEventDispatcher {
     fn dispatch(&mut self, event: &BasicEvent) -> Result<()> {
         for listener in &mut self.listeners {
@@ -300,50 +243,15 @@ impl EventDispatcher for BasicEventDispatcher {
     }
 }
 
-#[cfg(not(feature = "alloc"))]
-impl EventDispatcher for BasicEventDispatcher {
-    fn dispatch(&mut self, _event: &BasicEvent) -> Result<()> {
-        for _listener in self.listeners {
-            // In no-alloc mode, we can't convert static references to mutable
-            // This is a limitation of no-alloc mode
-            // For now, we'll skip handling events in no-alloc mode
-        }
-        Ok(())
-    }
-    
-    fn register_listener(&mut self, _listener: &'static dyn EventListener) -> Result<()> {
-        // In no-alloc mode, we can't add listeners dynamically
-        // This method is a no-op
-        Ok(())
-    }
-    
-    fn unregister_listener(&mut self, _listener_id: u64) -> Result<()> {
-        // In no-alloc mode, we can't remove listeners dynamically
-        // This method is a no-op
-        Ok(())
-    }
-    
-    fn listener_count(&self) -> usize {
-        self.listeners.len()
-    }
-}
+
 
 /// Basic event listener implementation
-#[cfg(feature = "alloc")]
 #[derive(Debug)]
 pub struct BasicEventListener {
     id: u64,
     name: String,
 }
 
-#[cfg(not(feature = "alloc"))]
-#[derive(Debug)]
-pub struct BasicEventListener {
-    id: u64,
-    name: &'static str,
-}
-
-#[cfg(feature = "alloc")]
 impl BasicEventListener {
     /// Create a new basic event listener
     pub fn new(name: &str) -> Self {
@@ -354,35 +262,6 @@ impl BasicEventListener {
     }
 }
 
-#[cfg(not(feature = "alloc"))]
-impl BasicEventListener {
-    /// Create a new basic event listener
-    pub fn new(name: &'static str) -> Self {
-        Self {
-            id: 0,
-            name,
-        }
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl EventListener for BasicEventListener {
-    fn handle_event(&mut self, _event: &BasicEvent) -> Result<()> {
-        // In a real implementation, this would log the event
-        // or perform some action based on event type
-        Ok(())
-    }
-    
-    fn id(&self) -> u64 {
-        self.id
-    }
-    
-    fn name(&self) -> &str {
-        &self.name
-    }
-}
-
-#[cfg(not(feature = "alloc"))]
 impl EventListener for BasicEventListener {
     fn handle_event(&mut self, _event: &BasicEvent) -> Result<()> {
         // In a real implementation, this would log the event

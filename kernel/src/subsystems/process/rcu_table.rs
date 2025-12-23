@@ -235,7 +235,7 @@ impl Iterator for ProcTableIterator {
 }
 
 // Import necessary types
-use crate::subsystems::process::manager::{ProcState, NPROC};
+// use crate::subsystems::process::manager::{ProcState, NPROC}; // Already imported earlier
 
 /// Global RCU-protected process table
 static RCU_PROC_TABLE: Mutex<Option<RcuProcTable>> = Mutex::new(None);

@@ -7,15 +7,14 @@
 //! including system call performance statistics, resource usage statistics,
 //! performance metrics collection, and performance report generation.
 
-#[cfg(feature = "alloc")]
 extern crate alloc;
 
-#[cfg(feature = "alloc")]
 use alloc::{
     collections::BTreeMap,
     string::String,
     vec::Vec,
     boxed::Box,
+    format,
 };
 use core::sync::atomic::{AtomicU64, Ordering};
 use spin::Mutex;

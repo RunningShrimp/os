@@ -3,14 +3,10 @@
 
 //! Core optimization module providing common data structures.
 
-#[cfg(feature = "alloc")]
 extern crate alloc;
 
-#[cfg(feature = "alloc")]
 use alloc::collections::BTreeMap;
-#[cfg(feature = "alloc")]
 use alloc::sync::Arc;
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, Ordering};
 use spin::Mutex;

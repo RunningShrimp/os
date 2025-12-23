@@ -29,7 +29,7 @@ pub mod enhanced_network; // POSIX-compatible network API (required for socket s
 // use crate::{log_info, log_error};
 
 // Import packet pool and other essential types
-use packet::{PacketPool, PacketBuffer, PacketType};
+use packet::{PacketPool};
 
 use core::sync::atomic::{AtomicU32, Ordering};
 

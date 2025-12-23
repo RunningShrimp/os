@@ -197,7 +197,7 @@ pub fn init_kernel_core(boot_params: Option<&BootParameters>) {
     // Initialize unified system call dispatcher
     #[cfg(feature = "syscalls")]
     {
-        use crate::subsystems::syscalls::dispatch::unified::{init_unified_dispatcher, UnifiedDispatcherConfig};
+        use crate::syscalls::dispatch::unified::{init_unified_dispatcher, UnifiedDispatcherConfig};
         let config = UnifiedDispatcherConfig::default();
         init_unified_dispatcher(config);
         crate::println!("[boot] unified syscall dispatcher initialized");
@@ -232,7 +232,7 @@ pub fn init_kernel_core(boot_params: Option<&BootParameters>) {
     
     // Initialize unified scheduler with priority queues
     {
-        use crate::subsystems::scheduler::unified::init_unified_scheduler;
+        use crate::sched::unified::init_unified_scheduler;
         let num_cpus = crate::cpu::ncpus();
         init_unified_scheduler(num_cpus);
         crate::println!("[boot] unified scheduler initialized ({} CPUs)", num_cpus);

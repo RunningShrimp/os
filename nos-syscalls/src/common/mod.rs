@@ -2,7 +2,6 @@
 //! 
 //! This module provides common utilities for system calls.
 
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
 
 #[cfg(feature = "log")]
@@ -72,8 +71,7 @@ pub fn copy_to_user<T: core::fmt::Debug>(dst: *mut T, src: &T) -> Result<()> {
 }
 
 /// Copy string from user space
-#[cfg(feature = "alloc")]
-pub fn copy_string_from_user(ptr: *const u8, max_len: usize) -> Result<alloc::string::String> {
+pub fn copy_string_from_user(ptr: *const u8, max_len: usize) -> Result<String> {
     // TODO: Implement actual string copy from user using parameters:
     // ptr: String pointer in user space
     // max_len: Maximum string length to copy
@@ -83,19 +81,5 @@ pub fn copy_string_from_user(ptr: *const u8, max_len: usize) -> Result<alloc::st
     // Ensure parameters are used even when logging is disabled
     let _ = (ptr, max_len);
     
-    Ok("".to_string())
-}
-
-#[cfg(not(feature = "alloc"))]
-pub fn copy_string_from_user(ptr: *const u8, max_len: usize) -> Result<&'static str> {
-    // TODO: Implement actual string copy from user using parameters:
-    // ptr: String pointer in user space
-    // max_len: Maximum string length to copy
-    #[cfg(feature = "log")]
-    log::trace!("copy_string_from_user called with: ptr={:?}, max_len={}", ptr, max_len);
-    
-    // Ensure parameters are used even when logging is disabled
-    let _ = (ptr, max_len);
-    
-    Ok("")
+    Ok(String::new())
 }

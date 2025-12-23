@@ -2,13 +2,9 @@
 //!
 //! This module provides error registration and lookup functionality.
 
-#[cfg(feature = "alloc")]
 use nos_api::collections::BTreeMap;
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
-#[cfg(feature = "alloc")]
 use alloc::string::String;
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
 
 
@@ -17,7 +13,6 @@ use crate::Result;
 use spin::Mutex;
 
 /// Error registry
-#[cfg(feature = "alloc")]
 pub struct ErrorRegistry {
     /// Registered errors
     errors: BTreeMap<u32, ErrorInfo>,
@@ -27,14 +22,12 @@ pub struct ErrorRegistry {
     next_id: u32,
 }
 
-#[cfg(feature = "alloc")]
 impl Default for ErrorRegistry {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[cfg(feature = "alloc")]
 impl ErrorRegistry {
     /// Create a new error registry
     pub fn new() -> Self {
@@ -73,7 +66,6 @@ impl ErrorRegistry {
     }
 
     /// List all registered errors
-    #[cfg(feature = "alloc")]
     pub fn list(&self) -> Vec<&ErrorInfo> {
         self.errors.values().collect()
     }
@@ -92,7 +84,6 @@ impl ErrorRegistry {
 }
 
 /// Error information
-#[cfg(feature = "alloc")]
 #[derive(Debug, Clone)]
 pub struct ErrorInfo {
     /// Error name
@@ -110,11 +101,9 @@ pub struct ErrorInfo {
 }
 
 /// Global error registry
-#[cfg(feature = "alloc")]
 static GLOBAL_REGISTRY: spin::Once<Mutex<ErrorRegistry>> = spin::Once::new();
 
 /// Initialize the global error registry
-#[cfg(feature = "alloc")]
 pub fn init_registry() -> Result<()> {
     GLOBAL_REGISTRY.call_once(|| {
         Mutex::new(ErrorRegistry::new())
@@ -123,7 +112,6 @@ pub fn init_registry() -> Result<()> {
 }
 
 /// Get the global error registry
-#[cfg(feature = "alloc")]
 pub fn get_registry() -> &'static Mutex<ErrorRegistry> {
     GLOBAL_REGISTRY.get().expect("Error registry not initialized")
 }
@@ -131,14 +119,13 @@ pub fn get_registry() -> &'static Mutex<ErrorRegistry> {
 
 
 /// Shutdown the global error registry
-#[cfg(feature = "alloc")]
 pub fn shutdown_registry() -> Result<()> {
     // Note: spin::Once doesn't provide a way to reset, so we just return Ok(())
     // In a real implementation, you might want to provide a different approach
     Ok(())
 }
 
-#[cfg(all(test, feature = "alloc"))]
+#[cfg(test)]
 mod tests {
     use super::*;
 

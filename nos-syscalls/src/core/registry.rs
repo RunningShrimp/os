@@ -3,21 +3,16 @@
 //! This module provides the system call registry functionality.
 
 use nos_api::Result;
-#[cfg(feature = "alloc")]
 use alloc::collections::BTreeMap;
-#[cfg(feature = "alloc")]
 use alloc::string::{String, ToString};
-#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
+use alloc::vec::Vec;
 use spin::{Mutex, Once};
 
 /// System call registry
 pub struct SyscallRegistry {
     /// Registered system calls
-    #[cfg(feature = "alloc")]
     syscalls: BTreeMap<u32, SyscallInfo>,
-    #[cfg(not(feature = "alloc"))]
-    syscalls: core::marker::PhantomData<u32>,
     /// Next available system call ID
     next_id: u32,
 }
@@ -26,16 +21,12 @@ impl SyscallRegistry {
     /// Create a new system call registry
     pub fn new() -> Self {
         Self {
-            #[cfg(feature = "alloc")]
             syscalls: BTreeMap::new(),
-            #[cfg(not(feature = "alloc"))]
-            syscalls: core::marker::PhantomData,
             next_id: 1000, // Start from 1000 to avoid conflicts
         }
     }
 
     /// Register a system call
-    #[cfg(feature = "alloc")]
     pub fn register(&mut self, name: &str, handler: Box<dyn SyscallHandler>) -> Result<u32> {
         let id = self.next_id;
         self.next_id += 1;
@@ -50,44 +41,23 @@ impl SyscallRegistry {
         Ok(id)
     }
 
-    // No-alloc version doesn't have a register method that uses Box
-    // since Box requires alloc feature
-
     /// Get system call info by ID
-    #[cfg(feature = "alloc")]
     pub fn get(&self, id: u32) -> Option<&SyscallInfo> {
         self.syscalls.get(&id)
     }
 
-    /// Get system call handler by ID (no-alloc version)
-    #[cfg(not(feature = "alloc"))]
-    pub fn get(&self, _id: u32) -> Option<&dyn SyscallHandler> {
-        // TODO: Implement for no-alloc
-        None
-    }
-
     /// Get system call info by name
-    #[cfg(feature = "alloc")]
     pub fn get_by_name(&self, name: &str) -> Option<&SyscallInfo> {
         self.syscalls.values().find(|info| info.name == name)
     }
 
-    /// Get system call handler by name (no-alloc version)
-    #[cfg(not(feature = "alloc"))]
-    pub fn get_by_name(&self, _name: &str) -> Option<&dyn SyscallHandler> {
-        // TODO: Implement for no-alloc
-        None
-    }
-
     /// List all registered system calls
-    #[cfg(feature = "alloc")]
-    pub fn list(&self) -> alloc::vec::Vec<&SyscallInfo> {
+    pub fn list(&self) -> Vec<&SyscallInfo> {
         self.syscalls.values().collect()
     }
 }
 
 /// System call information
-#[cfg(feature = "alloc")]
 pub struct SyscallInfo {
     /// System call ID
     pub id: u32,
@@ -121,7 +91,6 @@ pub fn get_registry() -> &'static Mutex<SyscallRegistry> {
 }
 
 /// Register a system call
-#[cfg(feature = "alloc")]
 pub fn register_syscall(name: &str, handler: Box<dyn SyscallHandler>) -> Result<u32> {
     let mut registry = get_registry().lock();
     registry.register(name, handler)

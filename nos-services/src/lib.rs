@@ -34,7 +34,6 @@
 #![no_std]
 #![allow(dead_code)]
 
-#[cfg(feature = "alloc")]
 extern crate alloc;
 
 // Core modules
@@ -48,11 +47,9 @@ pub mod ipc;
 pub mod types;
 
 // Re-export commonly used items
-#[cfg(feature = "alloc")]
 pub use registry::{ServiceRegistry, ServiceInfo, register_service, unregister_service, get_service, get_stats};
 pub use discovery::{ServiceDiscovery, ServiceDescriptor};
 pub use core::{Service, ServiceStatus, ServiceStats};
-#[cfg(feature = "alloc")]
 pub use core::{ServiceManager, ServiceConfig};
 // Note: fs, process, network, ipc modules are not re-exported to avoid unused import warnings
 pub use types::{ServicePriority, ServiceMetrics, ServiceDependency};
@@ -67,8 +64,7 @@ pub use types::service_type::*;
 ///
 /// * `nos_api::Result<()>` - Success or error
 pub fn init_services() -> nos_api::Result<()> {
-    // Initialize service registry if alloc feature is enabled
-    #[cfg(feature = "alloc")]
+    // Initialize service registry
     registry::init_registry()?;
     
     // Initialize service discovery
@@ -89,8 +85,7 @@ pub fn shutdown_services() -> nos_api::Result<()> {
     // Shutdown service discovery
     discovery::shutdown_discovery()?;
     
-    // Shutdown service registry if alloc feature is enabled
-    #[cfg(feature = "alloc")]
+    // Shutdown service registry
     registry::shutdown_registry()?;
     
     Ok(())
@@ -102,11 +97,7 @@ pub fn shutdown_services() -> nos_api::Result<()> {
 ///
 /// * `ServiceStats` - Service statistics
 pub fn get_service_stats() -> ServiceStats {
-    #[cfg(feature = "alloc")]
     return registry::get_stats();
-    
-    #[cfg(not(feature = "alloc"))]
-    return ServiceStats::default();
 }
 
 

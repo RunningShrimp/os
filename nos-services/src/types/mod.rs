@@ -2,11 +2,8 @@
 //!
 //! This module provides common types for services.
 
-#[cfg(feature = "alloc")]
 use alloc::collections::BTreeMap;
-#[cfg(feature = "alloc")]
 use alloc::string::String;
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
 /// Service type constants
@@ -48,20 +45,11 @@ impl Default for ServicePriority {
 #[derive(Debug, Clone)]
 pub struct ServiceDependency {
     /// Service name
-    #[cfg(feature = "alloc")]
     pub name: String,
-    #[cfg(not(feature = "alloc"))]
-    pub name: &'static str,
     /// Minimum version
-    #[cfg(feature = "alloc")]
     pub min_version: String,
-    #[cfg(not(feature = "alloc"))]
-    pub min_version: &'static str,
     /// Maximum version
-    #[cfg(feature = "alloc")]
     pub max_version: Option<String>,
-    #[cfg(not(feature = "alloc"))]
-    pub max_version: Option<&'static str>,
     /// Required flag
     pub required: bool,
 }
@@ -72,22 +60,13 @@ pub struct ServiceEndpoint {
     /// Endpoint type
     pub endpoint_type: EndpointType,
     /// Endpoint address
-    #[cfg(feature = "alloc")]
     pub address: String,
-    #[cfg(not(feature = "alloc"))]
-    pub address: &'static str,
     /// Endpoint port
     pub port: Option<u16>,
     /// Endpoint protocol
-    #[cfg(feature = "alloc")]
     pub protocol: Option<String>,
-    #[cfg(not(feature = "alloc"))]
-    pub protocol: Option<&'static str>,
     /// Endpoint parameters
-    #[cfg(feature = "alloc")]
     pub parameters: BTreeMap<String, String>,
-    #[cfg(not(feature = "alloc"))]
-    pub parameters: core::marker::PhantomData<()>,
 }
 
 /// Endpoint type
@@ -113,22 +92,13 @@ pub struct ServiceEvent {
     /// Service ID
     pub service_id: u32,
     /// Service name
-    #[cfg(feature = "alloc")]
     pub service_name: String,
-    #[cfg(not(feature = "alloc"))]
-    pub service_name: &'static str,
     /// Event timestamp
     pub timestamp: u64,
     /// Event data
-    #[cfg(feature = "alloc")]
     pub data: Vec<u8>,
-    #[cfg(not(feature = "alloc"))]
-    pub data: &'static [u8],
     /// Event metadata
-    #[cfg(feature = "alloc")]
     pub metadata: BTreeMap<String, String>,
-    #[cfg(not(feature = "alloc"))]
-    pub metadata: core::marker::PhantomData<()>,
 }
 
 /// Service event type
@@ -175,10 +145,7 @@ pub struct ServiceMetrics {
     /// Service ID
     pub service_id: u32,
     /// Service name
-    #[cfg(feature = "alloc")]
     pub service_name: String,
-    #[cfg(not(feature = "alloc"))]
-    pub service_name: &'static str,
     /// CPU usage (percentage)
     pub cpu_usage: f64,
     /// Memory usage (bytes)
@@ -199,10 +166,7 @@ impl Default for ServiceMetrics {
     fn default() -> Self {
         Self {
             service_id: 0,
-            #[cfg(feature = "alloc")]
             service_name: String::new(),
-            #[cfg(not(feature = "alloc"))]
-            service_name: "",
             cpu_usage: 0.0,
             memory_usage: 0,
             request_count: 0,
@@ -217,17 +181,8 @@ impl Default for ServiceMetrics {
 impl Default for ServiceDependency {
     fn default() -> Self {
         Self {
-            #[cfg(feature = "alloc")]
             name: String::new(),
-            #[cfg(not(feature = "alloc"))]
-            name: "",
-            #[cfg(feature = "alloc")]
             min_version: String::new(),
-            #[cfg(not(feature = "alloc"))]
-            min_version: "",
-            #[cfg(feature = "alloc")]
-            max_version: None,
-            #[cfg(not(feature = "alloc"))]
             max_version: None,
             required: false,
         }
@@ -238,19 +193,10 @@ impl Default for ServiceEndpoint {
     fn default() -> Self {
         Self {
             endpoint_type: EndpointType::Local,
-            #[cfg(feature = "alloc")]
             address: String::new(),
-            #[cfg(not(feature = "alloc"))]
-            address: "",
             port: None,
-            #[cfg(feature = "alloc")]
             protocol: None,
-            #[cfg(not(feature = "alloc"))]
-            protocol: None,
-            #[cfg(feature = "alloc")]
             parameters: BTreeMap::new(),
-            #[cfg(not(feature = "alloc"))]
-            parameters: core::marker::PhantomData,
         }
     }
 }
@@ -261,19 +207,10 @@ impl Default for ServiceEvent {
             id: 0,
             event_type: ServiceEventType::Started,
             service_id: 0,
-            #[cfg(feature = "alloc")]
             service_name: String::new(),
-            #[cfg(not(feature = "alloc"))]
-            service_name: "",
             timestamp: 0,
-            #[cfg(feature = "alloc")]
             data: Vec::new(),
-            #[cfg(not(feature = "alloc"))]
-            data: &[],
-            #[cfg(feature = "alloc")]
             metadata: BTreeMap::new(),
-            #[cfg(not(feature = "alloc"))]
-            metadata: core::marker::PhantomData,
         }
     }
 }

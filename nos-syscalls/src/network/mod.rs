@@ -2,19 +2,15 @@
 //!
 //! This module provides network related system calls.
 
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
-#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 use nos_api::Result;
-use crate::core::traits::SyscallHandler;
+use crate::SyscallHandler;
 #[cfg(feature = "log")]
 use log;
-#[cfg(feature = "alloc")]
-use crate::core::dispatcher::SyscallDispatcher;
+use crate::SyscallDispatcher;
 
 /// Register network system call handlers
-#[cfg(feature = "alloc")]
 pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     // Register socket system call
     dispatcher.register_handler(
@@ -47,10 +43,7 @@ impl SyscallHandler for SocketHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 3 {
-            #[cfg(feature = "alloc")]
-        return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
-        #[cfg(not(feature = "alloc"))]
-        return Err(nos_api::Error::InvalidArgument("Insufficient arguments".into()));
+            return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
         }
         
         let domain = args[0] as i32;
@@ -85,10 +78,7 @@ impl SyscallHandler for ConnectHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 3 {
-            #[cfg(feature = "alloc")]
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
-            #[cfg(not(feature = "alloc"))]
-            return Err(nos_api::Error::InvalidArgument("Insufficient arguments".into()));
         }
         
         let sockfd = args[0] as i32;
@@ -123,10 +113,7 @@ impl SyscallHandler for AcceptHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 3 {
-            #[cfg(feature = "alloc")]
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
-            #[cfg(not(feature = "alloc"))]
-            return Err(nos_api::Error::InvalidArgument("Insufficient arguments".into()));
         }
         
         let sockfd = args[0] as i32;

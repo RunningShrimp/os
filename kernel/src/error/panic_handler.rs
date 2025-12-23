@@ -12,8 +12,8 @@ use alloc::string::String;
 use alloc::format;
 use alloc::vec::Vec;
 use core::panic::PanicInfo;
-use nos_error_handling::types::{ErrorRecord, ErrorSeverity, ErrorCategory};
-use nos_error_handling::reporting::report_error;
+use crate::error::{UnifiedError, ErrorContext, ErrorSeverity, handle_error};
+use crate::log_error; use crate::log_info;
 
 /// Structured crash information
 #[derive(Debug, Clone)]
@@ -424,59 +424,21 @@ pub fn format_crash_report(crash_info: &CrashInfo) -> String {
 
 /// Report crash to error reporting system
 pub fn report_crash(crash_info: &CrashInfo) {
-    use nos_error_handling::types::{ErrorType, ErrorStatus, ErrorSource, ErrorContext as ErrCtx, RecoveryAction};
+    // Create unified error from crash info
+    let error = UnifiedError::Other(format!("Kernel panic: {}", crash_info.message));
     
-    // Create error record from crash info
-    let mut error_record = ErrorRecord {
-        id: crash_info.timestamp,
-        code: 0xDEADBEEF, // Panic error code
-        error_type: ErrorType::SystemCallError,
-        category: ErrorCategory::System,
-        severity: ErrorSeverity::Fatal,
-        status: ErrorStatus::Active,
-        message: format!("Kernel panic: {}", crash_info.message),
-        description: format!("Kernel panic occurred at {:?}:{:?} on CPU {}",
-            crash_info.file, crash_info.line, crash_info.cpu_id),
-        source: ErrorSource {
-            module: crash_info.file.clone().unwrap_or_else(|| "unknown".to_string()),
-            function: "panic_handler".to_string(),
-            file: crash_info.file.clone().unwrap_or_else(|| "unknown".to_string()),
-            line: crash_info.line.unwrap_or(0),
-            column: crash_info.column.unwrap_or(0),
-            process_id: crash_info.pid.map(|p| p as u32).unwrap_or(0),
-            thread_id: 0,
-            cpu_id: crash_info.cpu_id as u32,
-        },
-        timestamp: crash_info.timestamp,
-        context: ErrCtx::default(),
-        recovery_actions: Vec::new(),
-        occurrence_count: 1,
-        last_occurrence: crash_info.timestamp,
-        resolved: false,
-        resolution_time: None,
-        resolution_method: None,
-        metadata: {
-            let mut meta = alloc::collections::BTreeMap::new();
-            meta.insert("panic_message".to_string(), crash_info.message.clone());
-            if let Some(ref file) = crash_info.file {
-                meta.insert("panic_file".to_string(), file.clone());
-            }
-            if let Some(line) = crash_info.line {
-                meta.insert("panic_line".to_string(), line.to_string());
-            }
-            meta.insert("cpu_id".to_string(), crash_info.cpu_id.to_string());
-            if let Some(pid) = crash_info.pid {
-                meta.insert("pid".to_string(), pid.to_string());
-            }
-            meta
-        },
-    };
-
-    // Try to report to error reporting system
-    if let Ok(_) = report_error(&error_record) {
-        crate::println!("[panic] Crash reported to error reporting system");
-    } else {
-        crate::println!("[panic] Warning: Failed to report crash to error reporting system");
+    // Create error context
+    let location = crash_info.file.clone().unwrap_or_else(|| "unknown".to_string());
+    let context = format!("{}:{} on CPU {}", location, crash_info.line.unwrap_or(0), crash_info.cpu_id);
+    
+    // Handle the error using kernel's internal error handling
+    let action = handle_error(error, &context);
+    
+    // Log the result
+    match action {
+        crate::error::ErrorAction::Log => log_info!("[panic] Crash logged successfully"),
+        crate::error::ErrorAction::Panic => log_error!("[panic] Crash reported as panic"),
+        _ => log_info!("[panic] Crash handled with action: {:?}", action),
     }
 }
 

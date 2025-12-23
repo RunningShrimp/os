@@ -3,15 +3,10 @@
 //! This module provides core service interfaces and common types.
 
 use nos_api::Result;
-#[cfg(feature = "alloc")]
 use alloc::string::String;
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
-#[cfg(feature = "alloc")]
 use alloc::collections::BTreeMap;
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
-#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 
 /// Service trait
@@ -55,7 +50,6 @@ pub enum ServiceStatus {
 }
 
 /// Service configuration
-#[cfg(feature = "alloc")]
 #[derive(Debug, Clone)]
 pub struct ServiceConfig {
     /// Service name
@@ -78,7 +72,6 @@ pub struct ServiceConfig {
     pub max_restart_attempts: u32,
 }
 
-#[cfg(feature = "alloc")]
 impl Default for ServiceConfig {
     fn default() -> Self {
         Self {
@@ -96,7 +89,6 @@ impl Default for ServiceConfig {
 }
 
 /// Service manager trait
-#[cfg(feature = "alloc")]
 pub trait ServiceManager: Send + Sync {
     /// Register a service
     fn register_service(&mut self, name: &str, service: Box<dyn Service>) -> Result<u32>;
@@ -129,10 +121,7 @@ pub struct ServiceInfo {
     /// Service ID
     pub id: u32,
     /// Service name
-    #[cfg(feature = "alloc")]
     pub name: String,
-    #[cfg(not(feature = "alloc"))]
-    pub name: &'static str,
     /// Service type
     pub service_type: u32,
     /// Service status

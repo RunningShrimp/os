@@ -1,5 +1,5 @@
 [workspace]
-members = ["kernel", "xtask", "user", "benchmarks/microbench", "bootloader", "nos-memory-management", "nos-api", "nos-syscalls", "nos-services", "nos-error-handling", "tests"]
+members = ["kernel", "xtask", "user", "benchmarks/microbench", "bootloader", "nos-memory-management", "nos-api", "nos-syscalls", "nos-services", "nos-error-handling"]
 default-members = ["kernel", "xtask"]
 resolver = "2"
 

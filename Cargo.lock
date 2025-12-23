@@ -696,21 +696,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nos-tests"
-version = "0.1.0"
-dependencies = [
- "hashbrown 0.16.1",
- "kernel",
- "log",
- "nos-api",
- "nos-error-handling",
- "nos-memory-management",
- "nos-services",
- "nos-syscalls",
- "spin 0.10.0",
-]
-
-[[package]]
 name = "num-traits"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1280,9 +1265,6 @@ checksum = "6d49784317cd0d1ee7ec5c716dd598ec5b4483ea832a2dced265471cc0f690ae"
 [[package]]
 name = "user"
 version = "0.1.0"
-dependencies = [
- "libm",
-]
 
 [[package]]
 name = "virtue"

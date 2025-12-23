@@ -20,7 +20,8 @@ use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use spin::Mutex;
 
 use crate::types::stubs::{VirtAddr, RNG_INSTANCE};
-use nos_api::{Result, Error};
+use nos_api::Error;
+use core::result::Result;
 
 /// ASLR entropy bits for different memory regions
 #[derive(Debug, Clone, Copy)]

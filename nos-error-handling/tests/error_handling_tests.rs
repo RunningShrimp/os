@@ -1,6 +1,8 @@
 //! Error handling tests
 
-use nos_error_handling::*;
+use nos_error_handling::core;
+use nos_error_handling::types;
+use nos_error_handling::kernel_integration;
 use std::collections::BTreeMap;
 
 #[test]
@@ -135,8 +137,8 @@ fn test_recovery_strategy() {
 #[test]
 fn test_error_handling_engine() {
     // Test error handling engine
-    let config = core::ErrorHandlingConfig::default();
-    let mut engine = core::ErrorHandlingEngine::new(config);
+    let config = kernel_integration::ErrorHandlingConfig::default();
+    let mut engine = kernel_integration::ErrorHandlingEngine::new(config);
     
     assert!(engine.init().is_ok());
     
@@ -149,7 +151,7 @@ fn test_error_handling_engine() {
 #[test]
 fn test_error_handling_config() {
     // Test error handling configuration
-    let config = core::ErrorHandlingConfig::default();
+    let config = kernel_integration::ErrorHandlingConfig::default();
     assert!(config.enable_recovery);
     assert_eq!(config.max_error_records, 10000);
     assert_eq!(config.retention_period_seconds, 86400 * 7);

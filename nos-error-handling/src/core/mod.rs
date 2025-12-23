@@ -2,5 +2,5 @@
 
 pub mod traits;
 
-// Re-export traits
+// Re-export all traits
 pub use traits::*;

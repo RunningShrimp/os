@@ -3,7 +3,6 @@
 //! This module provides a modular framework for organizing and managing
 //! system calls in NOS operating system, improving maintainability.
 
-#[cfg(feature = "alloc")]
 use alloc::{
     collections::BTreeMap,
     sync::Arc,
@@ -13,7 +12,7 @@ use alloc::{
     format,
 };
 use nos_api::Result;
-use crate::core::traits::SyscallHandler;
+use crate::SyscallHandler;
 use core::sync::atomic::{AtomicU64, Ordering};
 
 /// System call category for organization
@@ -141,7 +140,6 @@ impl SyscallMetadata {
 }
 
 /// System call module for organizing related syscalls
-#[cfg(feature = "alloc")]
 pub struct SyscallModule {
     /// Module name
     pub name: String,
@@ -161,7 +159,6 @@ pub struct SyscallModule {
     pub cleanup_fn: Option<Box<dyn Fn() -> Result<()>>>,
 }
 
-#[cfg(feature = "alloc")]
 impl SyscallModule {
     /// Create a new syscall module
     pub fn new(
@@ -261,7 +258,6 @@ pub struct ModuleInfo {
 }
 
 /// Modular system call dispatcher
-#[cfg(feature = "alloc")]
 pub struct ModularDispatcher {
     /// Registered modules
     modules: BTreeMap<String, Arc<SyscallModule>>,
@@ -318,7 +314,6 @@ impl DispatcherStats {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl ModularDispatcher {
     /// Create a new modular dispatcher
     pub fn new() -> Self {
@@ -508,7 +503,6 @@ impl ModularDispatcher {
 }
 
 /// Module builder for easier module creation
-#[cfg(feature = "alloc")]
 pub struct ModuleBuilder {
     name: String,
     version: String,
@@ -516,7 +510,6 @@ pub struct ModuleBuilder {
     category: SyscallCategory,
 }
 
-#[cfg(feature = "alloc")]
 impl ModuleBuilder {
     /// Create a new module builder
     pub fn new(name: String, version: String, category: SyscallCategory) -> Self {
@@ -546,7 +539,6 @@ impl ModuleBuilder {
 }
 
 /// Register all standard modules
-#[cfg(feature = "alloc")]
 pub fn register_standard_modules(dispatcher: &mut ModularDispatcher) -> Result<()> {
     // File system module
     let fs_module = ModuleBuilder::new(
@@ -590,13 +582,5 @@ pub fn register_standard_modules(dispatcher: &mut ModularDispatcher) -> Result<(
     let _ = dispatcher.register_module(Arc::new(net_module));
     let _ = dispatcher.register_module(Arc::new(proc_module));
     
-    Ok(())
-}
-
-/// Register modular framework (no-alloc version)
-#[cfg(not(feature = "alloc"))]
-pub fn register_standard_modules(_dispatcher: &mut SyscallDispatcher) -> Result<()> {
-    // In no-alloc environments, modular framework is limited
-    // For now, just return success
     Ok(())
 }

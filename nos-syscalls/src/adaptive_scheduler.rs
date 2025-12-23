@@ -3,7 +3,6 @@
 //! This module provides an adaptive scheduling algorithm implementation
 //! for optimizing task scheduling in NOS operating system.
 
-#[cfg(feature = "alloc")]
 use alloc::{
     collections::BTreeMap,
     sync::Arc,
@@ -14,9 +13,7 @@ use alloc::{
 };
 use spin::Mutex;
 use nos_api::Result;
-use crate::core::traits::SyscallHandler;
-#[cfg(feature = "alloc")]
-use crate::core::dispatcher::SyscallDispatcher;
+use crate::{SyscallHandler, SyscallDispatcher};
 use core::sync::atomic::{AtomicU64, Ordering};
 
 /// Task priority levels
@@ -126,9 +123,7 @@ impl TaskStats {
 }
 
 /// Task control block for adaptive scheduling
-#[derive(Debug)]
-#[cfg(feature = "alloc")]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct TaskControlBlock {
     /// Task ID
     pub task_id: u64,
@@ -154,7 +149,6 @@ pub struct TaskControlBlock {
     pub cpu_usage_percent: f32,
 }
 
-#[cfg(feature = "alloc")]
 impl TaskControlBlock {
     /// Create a new task control block
     pub fn new(task_id: u64, name: String, priority: TaskPriority) -> Self {
@@ -239,7 +233,6 @@ impl TaskControlBlock {
 }
 
 /// Adaptive scheduler
-#[cfg(feature = "alloc")]
 pub struct AdaptiveScheduler {
     /// Ready queue for each priority level
     ready_queues: [Vec<Arc<TaskControlBlock>>; 5],
@@ -317,7 +310,6 @@ impl Default for AdaptiveParameters {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl AdaptiveScheduler {
     /// Create a new adaptive scheduler
     pub fn new() -> Self {
@@ -338,7 +330,6 @@ impl AdaptiveScheduler {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl Clone for AdaptiveScheduler {
     fn clone(&self) -> Self {
         Self {
@@ -381,13 +372,7 @@ impl AdaptiveScheduler {
             
             Ok(())
         } else {
-            Err(nos_api::Error::NotFound(
-                if cfg!(feature = "alloc") {
-                    format!("Task {} not found", task_id)
-                } else {
-                    "Task not found".to_string()
-                }
-            ))
+            Err(nos_api::Error::NotFound(format!("Task {} not found", task_id)))
         }
     }
     
@@ -517,34 +502,19 @@ impl AdaptiveScheduler {
 
 /// System call handler for task management
 pub struct TaskSchedulerHandler {
-    #[cfg(feature = "alloc")]
     scheduler: Arc<Mutex<AdaptiveScheduler>>,
 }
 
 impl TaskSchedulerHandler {
     /// Create a new task scheduler handler
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            scheduler: Arc::new(Mutex::new(AdaptiveScheduler::new())),
+        }
     }
     
-    #[cfg(feature = "alloc")]
     pub fn new_with_scheduler(scheduler: Arc<Mutex<AdaptiveScheduler>>) -> Self {
         Self { scheduler }
-    }
-}
-
-impl Default for TaskSchedulerHandler {
-    fn default() -> Self {
-        #[cfg(feature = "alloc")]
-        {
-            Self {
-                scheduler: Arc::new(Mutex::new(AdaptiveScheduler::new())),
-            }
-        }
-        #[cfg(not(feature = "alloc"))]
-        {
-            Self {}
-        }
     }
 }
 
@@ -558,22 +528,12 @@ impl SyscallHandler for TaskSchedulerHandler {
     }
     
     fn execute(&self, _args: &[usize]) -> Result<isize> {
-        #[cfg(feature = "alloc")]
-        {
-            // Yield current task
-            self.scheduler.lock().yield_current()?;
-            Ok(0) // Success
-        }
-        #[cfg(not(feature = "alloc"))]
-        {
-            // In no-alloc environment, just return success
-            Ok(0)
-        }
+        self.scheduler.lock().yield_current()?;
+        Ok(0)
     }
 }
 
 /// Register adaptive scheduler system call handlers
-#[cfg(feature = "alloc")]
 pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     // Create adaptive scheduler
     let scheduler = Arc::new(Mutex::new(AdaptiveScheduler::new()));
@@ -597,7 +557,6 @@ pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
 }
 
 /// Get scheduler report
-#[cfg(feature = "alloc")]
 pub fn get_scheduler_report(scheduler: &AdaptiveScheduler) -> String {
     let mut report = String::from("=== Adaptive Scheduler Report ===\n");
     
@@ -616,12 +575,4 @@ pub fn get_scheduler_report(scheduler: &AdaptiveScheduler) -> String {
     }
     
     report
-}
-
-/// Register adaptive scheduler system call handlers (no-alloc version)
-#[cfg(not(feature = "alloc"))]
-pub fn register_handlers(_dispatcher: &mut crate::core::traits::SyscallDispatcher) -> Result<()> {
-    // In no-alloc environments, adaptive scheduling is limited
-    // For now, just return success
-    Ok(())
 }

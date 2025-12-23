@@ -1,127 +1,14 @@
 //! 统一接口定义模块
-//!
+//! 
 //! 本模块提供系统调用和服务的抽象接口，用于解决循环依赖问题。
 //! 通过定义清晰的接口边界，实现模块间的解耦。
 
 use crate::error::Result;
-// Export types that work in both alloc and no-alloc environments
-#[cfg(feature = "alloc")]
+extern crate alloc;
 pub use alloc::boxed::Box;
-#[cfg(feature = "alloc")]
 pub use alloc::vec::Vec;
-#[cfg(feature = "alloc")]
 pub use alloc::string::String;
-#[cfg(feature = "alloc")]
 pub use alloc::sync::Arc;
-
-// Fallback types for no-alloc environment
-#[cfg(not(feature = "alloc"))]
-pub type Vec<T> = &'static [T];
-#[cfg(not(feature = "alloc"))]
-pub type String = &'static str;
-#[cfg(not(feature = "alloc"))]
-pub struct Arc<T: ?Sized> {
-    inner: *const T,
-}
-#[cfg(not(feature = "alloc"))]
-pub struct Box<T: ?Sized> {
-    inner: *mut T,
-}
-
-#[cfg(not(feature = "alloc"))]
-impl<T: ?Sized> Arc<T> {
-    pub fn new(value: &'static T) -> Self {
-        Self { inner: value }
-    }
-    
-    pub fn as_ref(&self) -> &'static T {
-        unsafe { &*self.inner }
-    }
-    
-    /// Get the inner pointer (for internal use)
-    pub fn as_ptr(&self) -> *const T {
-        self.inner
-    }
-}
-
-#[cfg(not(feature = "alloc"))]
-impl<T: ?Sized> core::ops::Deref for Arc<T> {
-    type Target = T;
-    
-    fn deref(&self) -> &Self::Target {
-        unsafe { &*self.inner }
-    }
-}
-
-#[cfg(not(feature = "alloc"))]
-impl<T: ?Sized> Clone for Arc<T> {
-    fn clone(&self) -> Self {
-        Self { inner: self.inner }
-    }
-}
-
-#[cfg(not(feature = "alloc"))]
-unsafe impl<T: ?Sized + Send + Sync> Send for Arc<T> {}
-
-#[cfg(not(feature = "alloc"))]
-unsafe impl<T: ?Sized + Send + Sync> Sync for Arc<T> {}
-
-#[cfg(not(feature = "alloc"))]
-impl<T: ?Sized> From<Box<T>> for Arc<T> {
-    fn from(box_value: Box<T>) -> Self {
-        Self { inner: box_value.inner }
-    }
-}
-
-#[cfg(not(feature = "alloc"))]
-impl<T: ?Sized + 'static> Arc<T> {
-    pub fn downcast<U: 'static>(self) -> Result<Arc<U>> {
-        if core::any::TypeId::of::<T>() == core::any::TypeId::of::<U>() {
-            // This is safe because we've checked the types are the same
-            Ok(Arc::<U> { inner: self.inner as *const U })
-        } else {
-            Err(crate::error::Error::ServiceError("Failed to downcast service instance"))
-        }
-    }
-}
-
-#[cfg(not(feature = "alloc"))]
-impl<T: ?Sized> Box<T> {
-    pub fn new(value: T) -> Self 
-    where
-        T: Sized,
-    {
-        // In no-alloc environment, we leak the value to create a "box"
-        let mut boxed = core::mem::ManuallyDrop::new(value);
-        Self { 
-            inner: &raw mut *boxed as *mut T 
-        }
-    }
-    
-    pub fn as_ref(&self) -> &T {
-        unsafe { &*self.inner }
-    }
-    
-    pub fn as_mut(&mut self) -> &mut T 
-    where
-        T: Sized,
-    {
-        unsafe { &mut *self.inner }
-    }
-    
-    /// Get the inner pointer (for internal use)
-    pub fn as_ptr(&self) -> *mut T {
-        self.inner
-    }
-}
-
-#[cfg(not(feature = "alloc"))]
-impl<T: ?Sized> Drop for Box<T> {
-    fn drop(&mut self) {
-        // In no-alloc environment, we don't actually free the memory
-        // This is a limitation of the no-alloc environment
-    }
-}
 
 /// 系统调用分发器接口
 pub trait InterfaceSyscallDispatcher: Send + Sync {
@@ -215,7 +102,6 @@ pub trait InterfaceService: Send + Sync {
 }
 
 /// 服务信息
-#[cfg(feature = "alloc")]
 #[derive(Debug, Clone)]
 pub struct InterfaceServiceInfo {
     /// 服务ID
@@ -230,25 +116,6 @@ pub struct InterfaceServiceInfo {
     pub description: String,
     /// 服务依赖
     pub dependencies: Vec<String>,
-    /// 注册时间
-    pub registration_time: u64,
-}
-
-#[cfg(not(feature = "alloc"))]
-#[derive(Debug, Clone)]
-pub struct InterfaceServiceInfo {
-    /// 服务ID
-    pub id: &'static str,
-    /// 服务名称
-    pub name: &'static str,
-    /// 服务版本
-    pub version: &'static str,
-    /// 服务状态
-    pub status: InterfaceServiceStatus,
-    /// 服务描述
-    pub description: &'static str,
-    /// 服务依赖
-    pub dependencies: &'static [&'static str],
     /// 注册时间
     pub registration_time: u64,
 }

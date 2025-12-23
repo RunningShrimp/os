@@ -3,23 +3,16 @@
 //! This module provides epoll system calls for efficient event notification,
 //! including edge-triggered and level-triggered modes.
 
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
-#[cfg(feature = "alloc")]
 use alloc::collections::{BTreeMap, VecDeque};
-#[cfg(feature = "alloc")]
 use alloc::sync::Arc;
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
-#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
-#[cfg(feature = "alloc")]
 use alloc::format;
 
 use nos_api::{Result, Error};
 use spin::Mutex;
-use crate::core::traits::SyscallHandler;
-use crate::core::dispatcher::SyscallDispatcher;;
+use crate::{SyscallHandler, SyscallDispatcher};
 
 /// Epoll event
 #[derive(Debug, Clone, Copy)]
@@ -69,44 +62,25 @@ impl EpollInstance {
             monitored_fds.insert(fd, event);
             Ok(())
         } else {
-            #[cfg(feature = "alloc")]
             return Err(Error::NotFound(format!("FD {} not being monitored", fd)));
-            #[cfg(not(feature = "alloc"))]
-            return Err(Error::NotFound("FD not being monitored".into()));
         }
     }
     
     /// Remove a file descriptor from monitoring
     pub fn remove_fd(&self, fd: i32) -> Result<()> {
         let mut monitored_fds = self.monitored_fds.lock();
-        #[cfg(feature = "alloc")]
-        {
-            monitored_fds.remove(&fd).ok_or_else(|| Error::NotFound(format!("FD {} not being monitored", fd)))?;
-        }
-        #[cfg(not(feature = "alloc"))]
-        {
-            monitored_fds.remove(&fd).ok_or_else(|| Error::NotFound("FD not being monitored".into()))?;
-        }
+        monitored_fds.remove(&fd).ok_or_else(|| Error::NotFound(format!("FD {} not being monitored", fd)))?;
         Ok(())
     }
     
     /// Add an event to the queue
-    #[cfg(feature = "alloc")]
     pub fn add_event(&self, event: EpollEvent) -> Result<()> {
         let mut event_queue = self.event_queue.lock();
         event_queue.push_back(event);
         Ok(())
     }
     
-    #[cfg(not(feature = "alloc"))]
-    pub fn add_event(&self, _event: EpollEvent) -> Result<()> {
-        // In a no-alloc environment, we can't add events to the queue
-        // For now, we'll just return success
-        Ok(())
-    }
-    
     /// Wait for events
-    #[cfg(feature = "alloc")]
     pub fn wait(&self, max_events: usize, _timeout_ms: Option<u32>) -> Result<Vec<EpollEvent>> {
         let mut event_queue = self.event_queue.lock();
         let mut events = Vec::with_capacity(max_events);
@@ -124,25 +98,10 @@ impl EpollInstance {
         Ok(events)
     }
     
-    #[cfg(not(feature = "alloc"))]
-    pub fn wait(&self, _max_events: usize, _timeout_ms: Option<u32>) -> Result<Vec<EpollEvent>> {
-        // In a no-alloc environment, we can't return a Vec
-        // For now, we'll just return an empty result
-        Ok(Vec::new())
-    }
-    
     /// Get the list of monitored file descriptors
-    #[cfg(feature = "alloc")]
     pub fn monitored_fds(&self) -> Vec<i32> {
         let monitored_fds = self.monitored_fds.lock();
         monitored_fds.keys().cloned().collect()
-    }
-    
-    #[cfg(not(feature = "alloc"))]
-    pub fn monitored_fds(&self) -> Vec<i32> {
-        // In a no-alloc environment, we can't return a Vec
-        // For now, we'll just return an empty result
-        Vec::new()
     }
 }
 
@@ -186,14 +145,7 @@ impl EpollManager {
     /// Remove an epoll instance
     pub fn remove_instance(&self, id: u32) -> Result<()> {
         let mut instances = self.instances.lock();
-        #[cfg(feature = "alloc")]
-        {
-            instances.remove(&id).ok_or_else(|| Error::NotFound(format!("Epoll instance {} not found", id)))?;
-        }
-        #[cfg(not(feature = "alloc"))]
-        {
-            instances.remove(&id).ok_or_else(|| Error::NotFound("Epoll instance not found".into()))?;
-        }
+        instances.remove(&id).ok_or_else(|| Error::NotFound(format!("Epoll instance {} not found", id)))?;
         Ok(())
     }
 }
@@ -246,10 +198,7 @@ impl SyscallHandler for EpollCtlHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 4 {
-            #[cfg(feature = "alloc")]
             return Err(Error::InvalidArgument("Insufficient arguments for epoll_ctl".to_string()));
-            #[cfg(not(feature = "alloc"))]
-            return Err(Error::InvalidArgument("Insufficient arguments for epoll_ctl".into()));
         }
 
         let instance_id = args[0] as u32;
@@ -257,12 +206,8 @@ impl SyscallHandler for EpollCtlHandler {
         let fd = args[2] as i32;
         let event_data = args[3];
         
-                #[cfg(feature = "alloc")]
         let instance = self.manager.get_instance(instance_id)
             .ok_or_else(|| Error::NotFound("Epoll instance not found".to_string()))?;
-        #[cfg(not(feature = "alloc"))]
-        let instance = self.manager.get_instance(instance_id)
-            .ok_or_else(|| Error::NotFound("Epoll instance not found".into()))?;
         
         // Parse event data (in a real implementation, this would be a pointer to an epoll_event struct)
         let event = EpollEvent {
@@ -275,10 +220,7 @@ impl SyscallHandler for EpollCtlHandler {
             1 => instance.add_fd(fd, event)?, // EPOLL_CTL_ADD
             2 => instance.modify_fd(fd, event)?, // EPOLL_CTL_MOD
             3 => instance.remove_fd(fd)?, // EPOLL_CTL_DEL
-            #[cfg(feature = "alloc")]
             _ => return Err(Error::InvalidArgument("Invalid epoll operation".to_string())),
-            #[cfg(not(feature = "alloc"))]
-            _ => return Err(Error::InvalidArgument("Invalid epoll operation".into())),
         }
         
         Ok(0)
@@ -309,10 +251,7 @@ impl SyscallHandler for EpollWaitHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 3 {
-            #[cfg(feature = "alloc")]
             return Err(Error::InvalidArgument("Insufficient arguments for epoll_wait".to_string()));
-            #[cfg(not(feature = "alloc"))]
-            return Err(Error::InvalidArgument("Insufficient arguments for epoll_wait".into()));
         }
 
         let instance_id = args[0] as u32;
@@ -336,14 +275,11 @@ impl SyscallHandler for EpollWaitHandler {
 
 /// Register epoll system calls
 pub fn register_syscalls(dispatcher: &mut SyscallDispatcher) -> Result<()> {
-    #[cfg(feature = "alloc")]
-    {
-        let manager = Arc::new(EpollManager::new());
-        
-        dispatcher.register_handler(320, Box::new(EpollCreateHandler::new(manager.clone())));
-        dispatcher.register_handler(321, Box::new(EpollCtlHandler::new(manager.clone())));
-        dispatcher.register_handler(322, Box::new(EpollWaitHandler::new(manager)));
-    }
+    let manager = Arc::new(EpollManager::new());
+    
+    dispatcher.register_handler(320, Box::new(EpollCreateHandler::new(manager.clone())));
+    dispatcher.register_handler(321, Box::new(EpollCtlHandler::new(manager.clone())));
+    dispatcher.register_handler(322, Box::new(EpollWaitHandler::new(manager)));
     
     Ok(())
 }

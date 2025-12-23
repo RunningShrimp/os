@@ -10,13 +10,9 @@
 // Re-export API types
 pub use nos_api::*;
 
-#[cfg(feature = "alloc")]
 extern crate alloc;
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
-#[cfg(feature = "alloc")]
 use alloc::string::String;
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
 
 // Core modules
@@ -101,7 +97,7 @@ pub fn get_kernel_info() -> KernelInfo {
 /// # Returns
 /// * `Vec<String>` - Enabled features
 fn get_enabled_features() -> Vec<String> {
-    let features = Vec::new();
+    let mut features = Vec::new();
     
     #[cfg(feature = "std")]
     features.push("std".to_string());

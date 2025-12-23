@@ -4,19 +4,13 @@
 
 use spin::Mutex;
 use crate::Result;
-
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
-#[cfg(feature = "alloc")]
 use alloc::string::String;
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
-#[cfg(feature = "alloc")]
 use alloc::format;
 use nos_api::collections::BTreeMap;
 
 /// Error reporter
-#[cfg(feature = "alloc")]
 #[derive(Default)]
 pub struct ErrorReporter {
     /// Report destinations
@@ -25,7 +19,6 @@ pub struct ErrorReporter {
     stats: Mutex<ReportingStats>,
 }
 
-#[cfg(feature = "alloc")]
 impl ErrorReporter {
     /// Create a new error reporter
     pub fn new() -> Self {
@@ -133,7 +126,6 @@ impl ErrorReporter {
 }
 
 /// Report destination
-#[cfg(feature = "alloc")]
 #[derive(Debug, Clone)]
 pub enum ReportDestination {
     /// Console destination
@@ -167,7 +159,6 @@ pub enum ReportDestination {
     },
 }
 
-#[cfg(feature = "alloc")]
 impl ReportDestination {
     /// Report an error to this destination
     pub fn report_error(&self, error_record: &crate::types::ErrorRecord) -> Result<()> {
@@ -214,7 +205,6 @@ pub enum ReportLevel {
 }
 
 /// Reporting statistics
-#[cfg(feature = "alloc")]
 #[derive(Debug, Clone, Default)]
 pub struct ReportingStats {
     /// Total reported errors
@@ -228,11 +218,9 @@ pub struct ReportingStats {
 }
 
 /// Global error reporter
-#[cfg(feature = "alloc")]
 static GLOBAL_REPORTER: spin::Once<Mutex<ErrorReporter>> = spin::Once::new();
 
 /// Initialize the global error reporter
-#[cfg(feature = "alloc")]
 pub fn init_reporter() -> Result<()> {
     GLOBAL_REPORTER.call_once(|| {
         Mutex::new(ErrorReporter::new())
@@ -243,19 +231,16 @@ pub fn init_reporter() -> Result<()> {
 }
 
 /// Get the global error reporter
-#[cfg(feature = "alloc")]
 pub fn get_reporter() -> &'static Mutex<ErrorReporter> {
     GLOBAL_REPORTER.get().expect("Error reporter not initialized")
 }
 
 /// Internal function to get the global error reporter
-#[cfg(feature = "alloc")]
 fn get_reporter_internal() -> &'static Mutex<ErrorReporter> {
     get_reporter()
 }
 
 /// Shutdown the global error reporter
-#[cfg(feature = "alloc")]
 pub fn shutdown_reporter() -> Result<()> {
     // Note: spin::Once doesn't provide a way to reset, so we just return Ok(())
     // In a real implementation, you might want to provide a different approach
@@ -263,28 +248,23 @@ pub fn shutdown_reporter() -> Result<()> {
 }
 
 /// Report an error
-#[cfg(feature = "alloc")]
 pub fn report_error(error: &crate::types::ErrorRecord) -> Result<()> {
     let reporter = get_reporter_internal().lock();
     reporter.report_error(error)
 }
 
 /// Generate an error report
-#[cfg(feature = "alloc")]
 pub fn generate_report(errors: &[crate::types::ErrorRecord], time_range: Option<(u64, u64)>) -> Result<String> {
     let reporter = get_reporter_internal().lock();
     reporter.generate_report(errors, time_range)
 }
 
 /// Get reporting statistics
-#[cfg(feature = "alloc")]
 pub fn reporting_get_stats() -> ReportingStats {
     get_reporter_internal().lock().get_stats()
 }
 
-
-
-#[cfg(all(test, feature = "alloc"))]
+#[cfg(test)]
 mod tests {
     use super::*;
 

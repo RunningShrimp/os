@@ -10,7 +10,8 @@ use crate::api::error::{KernelError, Result};
 use crate::subsystems::ipc::mqueue;
 use crate::subsystems::ipc::mqueue::{MqAttr, MqNotify, MqOpenFlags, MqNotifyType};
 use crate::subsystems::process::{get_current_process, get_process_by_pid};
-use crate::subsystems::fs::{Path, VfsNode};
+use crate::types::stubs::VfsNode;
+// use crate::subsystems::fs::Path;
 use crate::subsystems::time::{get_current_time, Timespec};
 use core::ptr;
 use core::slice;
@@ -360,23 +361,8 @@ impl CStringReader for MqOpenHandler {
 }
 
 /// Convert kernel errors to syscall errors
-impl From<KernelError> for SyscallError {
-    fn from(error: KernelError) -> Self {
-        match error {
-            KernelError::InvalidArgument => SyscallError::InvalidArgument,
-            KernelError::NotFound => SyscallError::NotFound,
-            KernelError::PermissionDenied => SyscallError::PermissionDenied,
-            KernelError::AlreadyExists => SyscallError::AlreadyExists,
-            KernelError::WouldBlock => SyscallError::WouldBlock,
-            KernelError::NotConnected => SyscallError::NotConnected,
-            KernelError::TimedOut => SyscallError::TimedOut,
-            KernelError::NoMemory => SyscallError::NoMemory,
-            KernelError::NoSpace => SyscallError::NoSpace,
-            KernelError::NotSupported => SyscallError::NotSupported,
-            _ => SyscallError::UnknownError,
-        }
-    }
-}
+// Removed conflicting From<KernelError> for SyscallError implementation
+// Use TryFrom or explicit conversion instead
 
 /// Register all message queue system call handlers
 pub fn register_handlers(dispatcher: &mut dyn crate::api::syscall::SyscallDispatcher) -> Result<(), KernelError> {

@@ -12,7 +12,6 @@ pub mod process;
 pub mod registry;
 pub mod network;
 pub mod user;
-pub mod integrity;
 pub mod malware;
 
 // 临时：保留原有文件作为过渡

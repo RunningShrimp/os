@@ -3,10 +3,8 @@
 
 //! Adaptive optimization module for dynamic performance tuning.
 
-#[cfg(feature = "alloc")]
 extern crate alloc;
 
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 use spin::Mutex;
 

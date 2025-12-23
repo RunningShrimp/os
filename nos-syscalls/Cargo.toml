@@ -22,7 +22,6 @@ libm = { workspace = true }
 [features]
 default = []
 std = []
-alloc = ["nos-api/alloc"]
 log = ["dep:log"]
 debug_subsystems = []
 formal_verification = []
@@ -31,9 +30,9 @@ advanced_syscalls = []
 
 # Feature flags for conditional compilation
 minimal = []
-embedded = ["alloc"]
-server = ["alloc", "log", "advanced_syscalls"]
-desktop = ["alloc", "log", "advanced_syscalls"]
+embedded = []
+server = ["log", "advanced_syscalls"]
+desktop = ["log", "advanced_syscalls"]
 
 [lib]
 name = "nos_syscalls"

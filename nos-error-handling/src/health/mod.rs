@@ -1,30 +1,21 @@
 //! System health monitoring
-//!
+//! 
 //! This module provides system health monitoring functionality.
+//! 
+//! DEPRECATED: Implementation should be in kernel/src/error, not here
 
 use crate::Error;
 use crate::Result;
 use spin::Mutex;
+extern crate alloc;
 
-#[cfg(feature = "alloc")]
 use nos_api::collections::BTreeMap;
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
-#[cfg(feature = "alloc")]
 use alloc::string::String;
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
-#[cfg(feature = "alloc")]
 use alloc::format;
-#[cfg(not(feature = "alloc"))]
-use nos_api::collections::BTreeMap;
-#[cfg(not(feature = "alloc"))]
-use nos_api::interfaces::String;
-#[cfg(not(feature = "alloc"))]
-use nos_api::interfaces::Vec;
 
 /// Health monitor
-#[cfg(feature = "alloc")]
 #[derive(Default)]
 pub struct HealthMonitor {
     /// Health metrics
@@ -37,7 +28,6 @@ pub struct HealthMonitor {
     stats: Mutex<HealthStats>,
 }
 
-#[cfg(feature = "alloc")]
 impl HealthMonitor {
     /// Create a new health monitor
     pub fn new() -> Self {
@@ -277,7 +267,6 @@ impl HealthMonitor {
 }
 
 /// Health metric
-#[cfg(feature = "alloc")]
 #[derive(Debug, Clone)]
 pub struct HealthMetric {
     /// Metric name
@@ -297,7 +286,6 @@ pub struct HealthMetric {
 }
 
 /// Health threshold
-#[cfg(feature = "alloc")]
 #[derive(Debug, Clone)]
 pub struct HealthThreshold {
     /// Threshold name
@@ -325,19 +313,6 @@ pub struct HealthStatus {
     pub last_updated: u64,
 }
 
-#[cfg(feature = "alloc")]
-impl Default for HealthStatus {
-    fn default() -> Self {
-        Self {
-            overall_health: HealthLevel::Healthy,
-            component_health: BTreeMap::new(),
-            alerts: Vec::new(),
-            last_updated: crate::common::get_timestamp(),
-        }
-    }
-}
-
-#[cfg(not(feature = "alloc"))]
 impl Default for HealthStatus {
     fn default() -> Self {
         Self {
@@ -410,11 +385,9 @@ pub struct HealthStats {
 }
 
 /// Global health monitor
-#[cfg(feature = "alloc")]
 static GLOBAL_MONITOR: spin::Once<Mutex<HealthMonitor>> = spin::Once::new();
 
 /// Initialize global health monitor
-#[cfg(feature = "alloc")]
 pub fn init_monitor() -> Result<()> {
     GLOBAL_MONITOR.call_once(|| {
         Mutex::new(HealthMonitor::new())
@@ -425,19 +398,16 @@ pub fn init_monitor() -> Result<()> {
 }
 
 /// Get the global health monitor
-#[cfg(feature = "alloc")]
 pub fn get_monitor() -> &'static Mutex<HealthMonitor> {
     GLOBAL_MONITOR.get().expect("Health monitor not initialized")
 }
 
 /// Internal function to get the global health monitor
-#[cfg(feature = "alloc")]
 fn get_monitor_internal() -> &'static Mutex<HealthMonitor> {
     get_monitor()
 }
 
 /// Shutdown the global health monitor
-#[cfg(feature = "alloc")]
 pub fn shutdown_monitor() -> Result<()> {
     // Note: spin::Once doesn't provide a way to reset, so we just return Ok(())
     // In a real implementation, you might want to provide a different approach
@@ -445,29 +415,25 @@ pub fn shutdown_monitor() -> Result<()> {
 }
 
 /// Update a metric value
-#[cfg(feature = "alloc")]
 pub fn update_metric(name: &str, value: f64) -> Result<()> {
     let mut monitor = get_monitor_internal().lock();
     monitor.update_metric(name, value)
 }
 
 /// Get current health status
-#[cfg(feature = "alloc")]
 pub fn get_current_status() -> HealthStatus {
     get_monitor_internal().lock().get_current_status()
 }
 
 /// Get health statistics
-#[cfg(feature = "alloc")]
 pub fn health_get_stats() -> HealthStats {
     get_monitor_internal().lock().get_stats()
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::string::ToString;
 
     #[test]
     fn test_health_monitor() {

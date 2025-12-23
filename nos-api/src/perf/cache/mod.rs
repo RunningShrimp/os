@@ -6,10 +6,8 @@
 //! This module provides caching functionality for system call results.
 //! It supports multiple eviction policies and cache configurations.
 
-#[cfg(feature = "alloc")]
 extern crate alloc;
 
-#[cfg(feature = "alloc")]
 use alloc::{
     collections::BTreeMap,
     string::String,

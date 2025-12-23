@@ -1000,7 +1000,7 @@ pub fn schedule() {
     // If no RT thread found, fall back to unified scheduler
     if next_tid.is_none() {
         // Use unified scheduler with priority queues (O(log n) instead of O(n))
-        use crate::subsystems::scheduler::unified::unified_schedule;
+        use crate::sched::unified::unified_schedule;
         if let Some(tid) = unified_schedule() {
             next_tid = Some(tid);
         } else {

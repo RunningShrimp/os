@@ -2,39 +2,28 @@
 //!
 //! This module provides inter-process communication related services.
 
-#[cfg(feature = "alloc")]
 use nos_api::Result;
-#[cfg(feature = "alloc")]
 use crate::core::{Service, ServiceStatus};
-#[cfg(feature = "alloc")]
 use alloc::string::String;
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
-#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 
 /// IPC service
-#[cfg(feature = "alloc")]
 pub struct IpcService {
     name: String,
     status: ServiceStatus,
 }
 
-#[cfg(feature = "alloc")]
 impl IpcService {
     /// Create a new IPC service
     pub fn new(name: &str) -> Self {
         Self {
-            #[cfg(feature = "alloc")]
             name: name.to_string(),
-            #[cfg(not(feature = "alloc"))]
-            name: name.into(),
             status: ServiceStatus::Stopped,
         }
     }
 }
 
-#[cfg(feature = "alloc")]
 impl Service for IpcService {
     fn start(&self) -> Result<()> {
         // TODO: Implement actual IPC service start
@@ -60,7 +49,6 @@ impl Service for IpcService {
 }
 
 /// Register IPC services
-#[cfg(feature = "alloc")]
 pub fn register_ipc_services() -> Result<()> {
     use crate::registry;
     

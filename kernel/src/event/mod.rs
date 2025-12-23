@@ -14,11 +14,10 @@ use alloc::{
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use nos_api::{
+    core::EventHandler,
     event::{
-        Event, EventHandler, EventDispatcher, EventBus, EventFilter, EventId,
-        EventType, EventMetadata, EventPriority,
-        SystemEvent, MemoryEvent, ProcessEvent, FileSystemEvent,
-        NetworkEvent, SecurityEvent, HardwareEvent, UserEvent,
+        Event, EventDispatcher, EventMetadata, EventType, EventPriority, EventFilter,
+        SystemEventData, MemoryEventData, ProcessEventData,
     },
     Result,
 };
@@ -186,7 +185,7 @@ impl Default for EventSystem {
 /// Convenience functions for creating common event types
 pub mod events {
     use super::*;
-    use nos_api::event::{SystemEventData, MemoryEventData, ProcessEventData};
+    // use nos_api::event::{SystemEventData, MemoryEventData, ProcessEventData};
 
     /// Create a system boot event
     pub fn system_boot_event(stage: String) -> Box<dyn Event> {
@@ -254,22 +253,22 @@ pub fn publish(event: Box<dyn Event>) -> Result<()> {
 }
 
 /// Subscribe to events using the global event system
-pub fn subscribe(event_type: &str, handler: Arc<dyn EventHandler>) -> Result<()> {
+pub fn subscribe(event_type: &str, handler: Arc<dyn EventHandler<Event = Box<dyn Event>>>) -> Result<()> {
     EventSystem::global().subscribe(event_type, handler)
 }
 
 /// Subscribe to all events using the global event system
-pub fn subscribe_all(handler: Arc<dyn EventHandler>) -> Result<()> {
+pub fn subscribe_all(handler: Arc<dyn EventHandler<Event = Box<dyn Event>>>) -> Result<()> {
     EventSystem::global().subscribe_all(handler)
 }
 
 /// Unsubscribe from events of a specific type
-pub fn unsubscribe(event_type: &str, handler: &Arc<dyn EventHandler>) -> Result<()> {
+pub fn unsubscribe(event_type: &str, handler: &Arc<dyn EventHandler<Event = Box<dyn Event>>>) -> Result<()> {
     EventSystem::global().unsubscribe(event_type, handler)
 }
 
 /// Unsubscribe from all events
-pub fn unsubscribe_all(handler: &Arc<dyn EventHandler>) -> Result<()> {
+pub fn unsubscribe_all(handler: &Arc<dyn EventHandler<Event = Box<dyn Event>>>) -> Result<()> {
     EventSystem::global().unsubscribe_all(handler)
 }
 

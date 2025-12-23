@@ -3,22 +3,21 @@
 //! This module provides performance monitoring and analysis tools
 //! for NOS operating system to improve maintainability and optimization.
 
-#[cfg(feature = "alloc")]
-use alloc::{
-    collections::BTreeMap,
-    sync::Arc,
-    vec::Vec,
-    string::{String, ToString},
-    boxed::Box,
-    format,
+use {
+    alloc::{
+        collections::BTreeMap,
+        sync::Arc,
+        vec::Vec,
+        string::{String, ToString},
+        boxed::Box,
+        format,
+    },
+    spin::Mutex,
 };
-#[cfg(feature = "alloc")]
-use spin::Mutex;
 #[cfg(feature = "log")]
 use log;
 use nos_api::Result;
-use crate::core::traits::SyscallHandler;
-use crate::core::dispatcher::SyscallDispatcher;;
+use crate::{SyscallHandler, SyscallDispatcher};
 use core::sync::atomic::{AtomicU64, Ordering};
 use libm::sqrt;
 
@@ -121,7 +120,6 @@ impl PerformanceMetric {
 }
 
 /// Performance monitor
-#[cfg(feature = "alloc")]
 pub struct PerformanceMonitor {
     /// Registered metrics
     metrics: BTreeMap<String, PerformanceMetric>,
@@ -165,7 +163,6 @@ impl MonitorStats {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl PerformanceMonitor {
     /// Create a new performance monitor
     pub fn new() -> Self {
@@ -348,7 +345,6 @@ impl PerformanceMonitor {
 }
 
 /// Performance analyzer
-#[cfg(feature = "alloc")]
 pub struct PerformanceAnalyzer {
     /// Performance monitor
     monitor: Arc<Mutex<PerformanceMonitor>>,
@@ -408,7 +404,6 @@ pub enum TrendDirection {
     Stable,
 }
 
-#[cfg(feature = "alloc")]
 impl PerformanceAnalyzer {
     /// Create a new performance analyzer
     pub fn new(monitor: Arc<Mutex<PerformanceMonitor>>) -> Self {
@@ -573,34 +568,19 @@ impl PerformanceAnalyzer {
 
 /// System call performance monitor
 pub struct SyscallMonitor {
-    #[cfg(feature = "alloc")]
     monitor: Arc<Mutex<PerformanceMonitor>>,
 }
 
 impl SyscallMonitor {
     /// Create a new syscall monitor
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            monitor: Arc::new(Mutex::new(PerformanceMonitor::new())),
+        }
     }
     
-    #[cfg(feature = "alloc")]
     pub fn new_with_monitor(monitor: Arc<Mutex<PerformanceMonitor>>) -> Self {
         Self { monitor }
-    }
-}
-
-impl Default for SyscallMonitor {
-    fn default() -> Self {
-        #[cfg(feature = "alloc")]
-        {
-            Self {
-                monitor: Arc::new(Mutex::new(PerformanceMonitor::new())),
-            }
-        }
-        #[cfg(not(feature = "alloc"))]
-        {
-            Self {}
-        }
     }
 }
 
@@ -614,28 +594,22 @@ impl SyscallHandler for SyscallMonitor {
     }
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
-        #[cfg(feature = "alloc")]
-        {
-            let monitor = &self.monitor;
-            
-            // Parse arguments
-            if args.len() < 2 {
-                return Err(nos_api::Error::InvalidArgument(
-                    "Insufficient arguments for performance monitor".to_string()
-                ));
-            }
-            
-            let operation = args[0];
-            let metric_name_ptr = args[1];
-            
-            // In a real implementation, this would read the metric name from memory
-            let metric_name = if cfg!(feature = "alloc") {
-                format!("metric_{}", metric_name_ptr)
-            } else {
-                "metric".to_string()
-            };
-            
-            match operation {
+        let monitor = &self.monitor;
+        
+        // Parse arguments
+        if args.len() < 2 {
+            return Err(nos_api::Error::InvalidArgument(
+                "Insufficient arguments for performance monitor".to_string()
+            ));
+        }
+        
+        let operation = args[0];
+        let metric_name_ptr = args[1];
+        
+        // In a real implementation, this would read the metric name from memory
+        let metric_name = format!("metric_{}", metric_name_ptr);
+        
+        match operation {
             0 => {
                 // Get metric value
                 let metric_value = {
@@ -651,41 +625,34 @@ impl SyscallHandler for SyscallMonitor {
                     ))
                 }
             },
-                1 => {
-                    // Increment metric
-                    {
-                        monitor.lock().increment_metric(&metric_name)?;
-                    }
-                    Ok(0)
-                },
-                2 => {
-                    // Generate report
-                    let report = {
-                        monitor.lock().generate_report()
-                    };
-                    #[cfg(feature = "log")]
-                    log::info!("{}", report);
-                    #[cfg(not(feature = "log"))]
-                    let _ = report; // Suppress unused variable warning
-                    Ok(0)
-                },
-                _ => {
-                    Err(nos_api::Error::InvalidArgument(
-                        format!("Invalid operation: {}", operation)
-                    ))
+            1 => {
+                // Increment metric
+                {
+                    monitor.lock().increment_metric(&metric_name)?;
                 }
+                Ok(0)
+            },
+            2 => {
+                // Generate report
+                let report = {
+                    monitor.lock().generate_report()
+                };
+                #[cfg(feature = "log")]
+                log::info!("{}", report);
+                #[cfg(not(feature = "log"))]
+                let _ = report; // Suppress unused variable warning
+                Ok(0)
+            },
+            _ => {
+                Err(nos_api::Error::InvalidArgument(
+                    format!("Invalid operation: {}", operation)
+                ))
             }
-        }
-        #[cfg(not(feature = "alloc"))]
-        {
-            // In no-alloc environment, just return success
-            Ok(0)
         }
     }
 }
 
 /// Register performance monitoring system call handlers
-#[cfg(feature = "alloc")]
 pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     // Create performance monitor
     let monitor = Arc::new(Mutex::new(PerformanceMonitor::new()));
@@ -738,13 +705,5 @@ pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     #[cfg(not(feature = "log"))]
     let _ = report; // Suppress unused variable warning
     
-    Ok(())
-}
-
-/// Register performance monitoring system call handlers (no-alloc version)
-#[cfg(not(feature = "alloc"))]
-pub fn register_handlers(_dispatcher: &mut SyscallDispatcher) -> Result<()> {
-    // In no-alloc environments, performance monitoring is limited
-    // For now, just return success
     Ok(())
 }

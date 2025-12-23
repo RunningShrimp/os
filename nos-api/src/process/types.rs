@@ -1,9 +1,7 @@
 //! Process management types
 
 use crate::core::types::{Pid, Size};
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
-#[cfg(feature = "alloc")]
 use alloc::string::String;
 
 
@@ -223,8 +221,7 @@ pub struct ThreadContext {
     pub thread_specific_data: usize,
 }
 
-/// Process attributes (alloc version)
-#[cfg(feature = "alloc")]
+/// Process attributes
 #[derive(Debug, Clone)]
 pub struct ProcessAttributes {
     /// Process name
@@ -265,50 +262,7 @@ pub struct ProcessAttributes {
     pub oom_adjustment: i32,
 }
 
-/// Process attributes (no-alloc version)
-#[cfg(not(feature = "alloc"))]
-#[derive(Debug, Clone)]
-pub struct ProcessAttributes {
-    /// Process name
-    pub name: &'static str,
-    /// Process arguments (static slice)
-    pub arguments: &'static [&'static str],
-    /// Environment variables (static slice)
-    pub environment: &'static [&'static str],
-    /// Working directory
-    pub working_directory: &'static str,
-    /// Root directory
-    pub root_directory: &'static str,
-    /// Standard input
-    pub stdin: i32,
-    /// Standard output
-    pub stdout: i32,
-    /// Standard error
-    pub stderr: i32,
-    /// User ID
-    pub uid: u32,
-    /// Group ID
-    pub gid: u32,
-    /// Supplementary group IDs (static slice)
-    pub supplementary_gids: &'static [u32],
-    /// Process priority
-    pub priority: u32,
-    /// Scheduling policy
-    pub scheduling_policy: u32,
-    /// CPU affinity
-    pub cpu_affinity: u32,
-    /// Memory limit
-    pub memory_limit: Size,
-    /// Stack size
-    pub stack_size: Size,
-    /// Nice value
-    pub nice_value: i32,
-    /// OOM adjustment
-    pub oom_adjustment: i32,
-}
-
-/// Thread attributes (alloc version)
-#[cfg(feature = "alloc")]
+/// Thread attributes
 #[derive(Debug, Clone)]
 pub struct ThreadAttributes {
     /// Thread name
@@ -335,36 +289,9 @@ pub struct ThreadAttributes {
     pub thread_specific_data: usize,
 }
 
-/// Thread attributes (no-alloc version)
-#[cfg(not(feature = "alloc"))]
-#[derive(Debug, Clone)]
-pub struct ThreadAttributes {
-    /// Thread name
-    pub name: &'static str,
-    /// Thread priority
-    pub priority: u32,
-    /// Scheduling policy
-    pub scheduling_policy: u32,
-    /// CPU affinity
-    pub cpu_affinity: u32,
-    /// Stack size
-    pub stack_size: Size,
-    /// Stack address
-    pub stack_address: usize,
-    /// Guard size
-    pub guard_size: Size,
-    /// Detached state
-    pub detached: bool,
-    /// Joinable state
-    pub joinable: bool,
-    /// Real-time priority
-    pub real_time_priority: u32,
-    /// Thread-specific data
-    pub thread_specific_data: usize,
-}
 
-/// Process statistics (alloc version)
-#[cfg(feature = "alloc")]
+
+/// Process statistics
 #[derive(Debug, Clone)]
 pub struct ProcessStats {
     /// Process ID
@@ -429,74 +356,7 @@ pub struct ProcessStats {
     pub write_operations: u64,
 }
 
-/// Process statistics (no-alloc version)
-#[cfg(not(feature = "alloc"))]
-#[derive(Debug, Clone)]
-pub struct ProcessStats {
-    /// Process ID
-    pub pid: Pid,
-    /// Parent process ID
-    pub ppid: Pid,
-    /// Process name
-    pub name: &'static str,
-    /// Process state
-    pub state: &'static str,
-    /// User ID
-    pub uid: u32,
-    /// Group ID
-    pub gid: u32,
-    /// Process priority
-    pub priority: u32,
-    /// Nice value
-    pub nice_value: i32,
-    /// Virtual memory size
-    pub virtual_size: Size,
-    /// Resident set size
-    pub resident_size: Size,
-    /// Shared memory size
-    pub shared_size: Size,
-    /// Text segment size
-    pub text_size: Size,
-    /// Data segment size
-    pub data_size: Size,
-    /// Stack segment size
-    pub stack_size: Size,
-    /// Start time
-    pub start_time: u64,
-    /// User time
-    pub user_time: u64,
-    /// System time
-    pub system_time: u64,
-    /// CPU usage percentage
-    pub cpu_percent: f32,
-    /// Memory usage percentage
-    pub memory_percent: f32,
-    /// Number of threads
-    pub thread_count: usize,
-    /// Number of page faults
-    pub page_faults: u64,
-    /// Number of major page faults
-    pub major_page_faults: u64,
-    /// Number of minor page faults
-    pub minor_page_faults: u64,
-    /// Number of context switches
-    pub context_switches: u64,
-    /// Number of voluntary context switches
-    pub voluntary_context_switches: u64,
-    /// Number of involuntary context switches
-    pub involuntary_context_switches: u64,
-    /// Number of bytes read
-    pub bytes_read: u64,
-    /// Number of bytes written
-    pub bytes_written: u64,
-    /// Number of read operations
-    pub read_operations: u64,
-    /// Number of write operations
-    pub write_operations: u64,
-}
-
-/// Thread statistics (alloc version)
-#[cfg(feature = "alloc")]
+/// Thread statistics
 #[derive(Debug, Clone)]
 pub struct ThreadStats {
     /// Thread ID
@@ -507,44 +367,6 @@ pub struct ThreadStats {
     pub name: String,
     /// Thread state
     pub state: String,
-    /// Thread priority
-    pub priority: u32,
-    /// Nice value
-    pub nice_value: i32,
-    /// CPU affinity
-    pub cpu_affinity: u32,
-    /// Stack size
-    pub stack_size: Size,
-    /// Stack usage
-    pub stack_usage: Size,
-    /// Start time
-    pub start_time: u64,
-    /// User time
-    pub user_time: u64,
-    /// System time
-    pub system_time: u64,
-    /// CPU usage percentage
-    pub cpu_percent: f32,
-    /// Number of context switches
-    pub context_switches: u64,
-    /// Number of voluntary context switches
-    pub voluntary_context_switches: u64,
-    /// Number of involuntary context switches
-    pub involuntary_context_switches: u64,
-}
-
-/// Thread statistics (no-alloc version)
-#[cfg(not(feature = "alloc"))]
-#[derive(Debug, Clone)]
-pub struct ThreadStats {
-    /// Thread ID
-    pub tid: Pid,
-    /// Process ID
-    pub pid: Pid,
-    /// Thread name
-    pub name: &'static str,
-    /// Thread state
-    pub state: &'static str,
     /// Thread priority
     pub priority: u32,
     /// Nice value

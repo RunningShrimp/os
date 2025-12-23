@@ -2,18 +2,9 @@
 //!
 //! This module provides common types for error handling.
 
-#[cfg(feature = "alloc")]
 use alloc::collections::BTreeMap;
-#[cfg(feature = "alloc")]
 use alloc::string::String;
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
-#[cfg(not(feature = "alloc"))]
-use nos_api::collections::BTreeMap;
-#[cfg(not(feature = "alloc"))]
-use nos_api::interfaces::String;
-#[cfg(not(feature = "alloc"))]
-use nos_api::interfaces::Vec;
 
 /// Error severity
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -199,7 +190,6 @@ pub struct ErrorRecord {
     pub metadata: BTreeMap<String, String>,
 }
 
-#[cfg(feature = "alloc")]
 impl Default for ErrorRecord {
     fn default() -> Self {
         Self {
@@ -215,32 +205,6 @@ impl Default for ErrorRecord {
             timestamp: 0,
             context: ErrorContext::default(),
             recovery_actions: Vec::new(),
-            occurrence_count: 1,
-            last_occurrence: 0,
-            resolved: false,
-            resolution_time: None,
-            resolution_method: None,
-            metadata: BTreeMap::new(),
-        }
-    }
-}
-
-#[cfg(not(feature = "alloc"))]
-impl Default for ErrorRecord {
-    fn default() -> Self {
-        Self {
-            id: 0,
-            code: 0,
-            error_type: ErrorType::default(),
-            category: ErrorCategory::default(),
-            severity: ErrorSeverity::default(),
-            status: ErrorStatus::default(),
-            message: "",
-            description: "",
-            source: ErrorSource::default(),
-            timestamp: 0,
-            context: ErrorContext::default(),
-            recovery_actions: &[],
             occurrence_count: 1,
             last_occurrence: 0,
             resolved: false,
@@ -272,29 +236,12 @@ pub struct ErrorSource {
     pub cpu_id: u32,
 }
 
-#[cfg(feature = "alloc")]
 impl Default for ErrorSource {
     fn default() -> Self {
         Self {
             module: String::new(),
             function: String::new(),
             file: String::new(),
-            line: 0,
-            column: 0,
-            process_id: 0,
-            thread_id: 0,
-            cpu_id: 0,
-        }
-    }
-}
-
-#[cfg(not(feature = "alloc"))]
-impl Default for ErrorSource {
-    fn default() -> Self {
-        Self {
-            module: "",
-            function: "",
-            file: "",
             line: 0,
             column: 0,
             process_id: 0,
@@ -323,7 +270,6 @@ pub struct ErrorContext {
     pub postconditions: Vec<String>,
 }
 
-#[cfg(feature = "alloc")]
 impl Default for ErrorContext {
     fn default() -> Self {
         Self {
@@ -334,21 +280,6 @@ impl Default for ErrorContext {
             operation_sequence: Vec::new(),
             preconditions: Vec::new(),
             postconditions: Vec::new(),
-        }
-    }
-}
-
-#[cfg(not(feature = "alloc"))]
-impl Default for ErrorContext {
-    fn default() -> Self {
-        Self {
-            environment_variables: BTreeMap::new(),
-            system_config: BTreeMap::new(),
-            user_input: None,
-            related_data: &[],
-            operation_sequence: &[],
-            preconditions: &[],
-            postconditions: &[],
         }
     }
 }

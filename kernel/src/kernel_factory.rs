@@ -2,8 +2,10 @@
 //!
 //! 本模块提供工厂模式创建和管理内核内部模块，减少lib.rs的直接依赖。
 
-use nos_api::{Result, ServiceLocator, Container};
-use nos_api::interfaces::{SyscallDispatcher, ServiceManager, EventPublisher};
+use nos_api::{Result, di::{ServiceLocator, Container}};
+use nos_syscalls::SyscallDispatcher;
+use crate::syscall_interface::ServiceManager;
+// use nos_api::interfaces::EventPublisher;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 

@@ -950,6 +950,7 @@ pub struct InAddr {
 
 /// Address families
 pub const AF_UNSPEC: i32 = 0;       // Unspecified
+pub const AF_UNIX: i32 = 1;         // Unix domain sockets
 pub const AF_INET: i32 = 2;         // IPv4
 pub const AF_INET6: i32 = 10;       // IPv6
 
@@ -1747,6 +1748,9 @@ pub struct stat {
 // ============================================================================
 // POSIX Semaphore and Message Queue Types
 // ============================================================================
+
+/// POSIX semaphore type
+// pub type SemT = SemT;
 
 /// POSIX message queue descriptor type
 pub type MqdT = i32;

@@ -14,7 +14,7 @@ extern crate alloc;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use core::sync::Mutex;
+use spin::mutex::Mutex;
 use crate::subsystems::mm::{PAGE_SIZE, vm::{PageTable, VmPerm, VmArea, VmSpace}};
 use crate::subsystems::sync::Mutex as NosMutex;
 

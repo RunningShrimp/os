@@ -32,19 +32,25 @@
 #![no_std]
 #![allow(dead_code)]
 
-#[cfg(feature = "alloc")]
 extern crate alloc;
 
-// Core trait definitions
+/// NOS System Calls - Interface Definition Layer
+///
+/// This crate provides the system call interface definitions (traits and types)
+/// for the NOS operating system. The actual implementations are in the kernel.
+///
+/// # Architecture
+///
+/// This crate serves as an interface definition layer:
+/// - Defines traits for system call handlers, dispatchers, and related components
+/// - Provides type definitions and constants for system calls
+/// - Does NOT contain actual implementations (those are in kernel/subsystems/syscalls)
+
+// Re-export core functionality
 pub mod core {
     pub mod traits;
     pub mod registry; // Registry trait definitions only
-
-    // Note: dispatcher module contains implementation details that should be
-    // in kernel, not here. It is deprecated.
-    #[cfg(feature = "alloc")]
-    #[deprecated(note = "Dispatcher implementation should be in kernel/subsystems/syscalls")]
-    pub mod dispatcher;
+    pub mod dispatcher; // Dispatcher implementation
 }
 
 // System call type definitions and constants
@@ -63,55 +69,38 @@ pub mod time;
 // Advanced system call type definitions
 pub mod advanced_mmap;
 
-// Re-export commonly used traits and types
+// Re-export core functionality
 pub use core::traits::{
-    SyscallHandler, SyscallValidator, SyscallLogger,
-    SyscallInterceptor, SyscallFilter, SyscallContext, SyscallStatsTrait
+    SyscallHandler, SyscallValidator, SyscallLogger, 
+    SyscallInterceptor, SyscallFilter, SyscallContext
 };
-pub use core::registry::{SyscallRegistry, SyscallInfo};
+pub use core::registry::SyscallRegistry;
+
+pub use core::registry::SyscallInfo;
+pub use core::dispatcher::SyscallDispatcher;
+pub use core::dispatcher::{init_dispatcher, get_dispatcher};
+pub use optimized_syscall_path::{
+    OptimizedSyscallDispatcher, OptimizedSyscallHandler, register_handlers
+};
 pub use types::*;
 
-// Re-export dispatcher for compatibility
-#[cfg(feature = "alloc")]
-pub use core::dispatcher::SyscallDispatcher;
+// Re-export SyscallResult from nos_api
+pub use nos_api::syscall::SyscallResult;
+
+
 
 // Note: The following modules contain implementation details that should be
 // moved to kernel/subsystems/syscalls. They are kept here temporarily for
 // backward compatibility but will be deprecated.
-#[cfg(feature = "alloc")]
-#[deprecated(note = "Implementation should be in kernel, not in nos-syscalls")]
+// Declare alloc-dependent modules
 pub mod async_ops;
-
-#[cfg(feature = "alloc")]
-#[deprecated(note = "Implementation should be in kernel, not in nos-syscalls")]
 pub mod epoll;
-
-#[cfg(feature = "alloc")]
-#[deprecated(note = "Implementation should be in kernel, not in nos-syscalls")]
 pub mod zero_copy_network;
-
-#[cfg(feature = "alloc")]
-#[deprecated(note = "Implementation should be in kernel, not in nos-syscalls")]
 pub mod optimized_syscall_path;
-
-#[cfg(feature = "alloc")]
-#[deprecated(note = "Implementation should be in kernel, not in nos-syscalls")]
 pub mod adaptive_scheduler;
-
-#[cfg(feature = "alloc")]
-#[deprecated(note = "Implementation should be in kernel, not in nos-syscalls")]
 pub mod modular_framework;
-
-#[cfg(feature = "alloc")]
-#[deprecated(note = "Implementation should be in kernel, not in nos-syscalls")]
 pub mod testing_framework;
-
-#[cfg(feature = "alloc")]
-#[deprecated(note = "Implementation should be in kernel, not in nos-syscalls")]
 pub mod performance_monitor;
-
-#[cfg(feature = "alloc")]
-#[deprecated(note = "Implementation should be in kernel, not in nos-syscalls")]
 pub mod zero_copy_network_impl;
 
 /// System call number constants
@@ -475,11 +464,10 @@ pub mod syscall_numbers {
 }
 
 // Re-export syscall numbers for convenience
-pub use syscall_numbers::*;
+
 
 /// System call statistics
 #[derive(Debug, Clone)]
-#[cfg(feature = "alloc")]
 pub struct SyscallStats {
     /// Total number of system calls
     pub total_calls: u64,
@@ -491,7 +479,6 @@ pub struct SyscallStats {
     pub error_count: u64,
 }
 
-#[cfg(feature = "alloc")]
 impl Default for SyscallStats {
     fn default() -> Self {
         Self {
@@ -504,7 +491,6 @@ impl Default for SyscallStats {
 }
 
 #[cfg(test)]
-#[cfg(feature = "alloc")]
 mod tests {
     use super::*;
 

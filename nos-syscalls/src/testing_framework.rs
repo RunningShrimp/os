@@ -3,7 +3,6 @@
 //! This module provides an automated testing framework for NOS operating system
 //! to improve maintainability and reliability.
 
-#[cfg(feature = "alloc")]
 use alloc::{
     collections::BTreeMap,
     sync::Arc,
@@ -13,9 +12,6 @@ use alloc::{
     format,
 };
 
-// Import vec macro globally to make it available in all contexts
-#[cfg(feature = "alloc")]
-use alloc::vec;
 use nos_api::Result;
 use core::sync::atomic::{AtomicU64, Ordering};
 
@@ -96,7 +92,6 @@ impl TestResult {
 }
 
 /// Test suite
-#[cfg(feature = "alloc")]
 pub struct TestSuite {
     /// Suite name
     pub name: String,
@@ -110,7 +105,6 @@ pub struct TestSuite {
     pub teardown_fn: Option<Box<dyn Fn() -> Result<()> + Send + Sync>>,
 }
 
-#[cfg(feature = "alloc")]
 impl TestSuite {
     /// Create a new test suite
     pub fn new(name: String, description: String) -> Self {
@@ -163,11 +157,7 @@ impl TestSuite {
                         TIME_COUNTER.fetch_add(1, Ordering::SeqCst)
                     } - start_time,
                     results,
-                    error_message: Some(if cfg!(feature = "alloc") {
-                        format!("Setup failed: {}", e)
-                    } else {
-                        "Setup failed".to_string()
-                    }),
+                    error_message: Some(format!("Setup failed: {}", e)),
                 };
             }
         }
@@ -260,7 +250,6 @@ pub trait TestCase: Send + Sync {
 }
 
 /// Simple test case implementation
-#[cfg(feature = "alloc")]
 pub struct SimpleTestCase {
     /// Test name
     pub name: String,
@@ -270,7 +259,6 @@ pub struct SimpleTestCase {
     pub test_fn: Box<dyn Fn() -> TestResult + Send + Sync>,
 }
 
-#[cfg(feature = "alloc")]
 impl SimpleTestCase {
     /// Create a new simple test case
     pub fn new(
@@ -286,7 +274,6 @@ impl SimpleTestCase {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl TestCase for SimpleTestCase {
     fn name(&self) -> &str {
         &self.name
@@ -313,7 +300,6 @@ impl TestCase for SimpleTestCase {
 }
 
 /// Test runner
-#[cfg(feature = "alloc")]
 pub struct TestRunner {
     /// Registered test suites
     suites: BTreeMap<String, Arc<TestSuite>>,
@@ -374,7 +360,6 @@ impl TestRunnerStats {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl TestRunner {
     /// Create a new test runner
     pub fn new() -> Self {
@@ -460,7 +445,6 @@ impl TestRunner {
 }
 
 /// System call test case
-#[cfg(feature = "alloc")]
 pub struct SyscallTestCase {
     /// Test name
     pub name: String,
@@ -476,7 +460,6 @@ pub struct SyscallTestCase {
     pub expected_error: Option<nos_api::Error>,
 }
 
-#[cfg(feature = "alloc")]
 impl SyscallTestCase {
     /// Create a new syscall test case
     pub fn new(
@@ -508,7 +491,6 @@ impl SyscallTestCase {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl TestCase for SyscallTestCase {
     fn name(&self) -> &str {
         &self.name
@@ -535,11 +517,7 @@ impl TestCase for SyscallTestCase {
                 crate::types::SYS_OPEN => Ok(3), // Return file descriptor
                 crate::types::SYS_CLOSE => Ok(0), // Success
                 _ => Err(nos_api::Error::NotFound(
-                    if cfg!(feature = "alloc") {
-                        format!("Syscall {} not implemented", self.syscall_id)
-                    } else {
-                        "Syscall not implemented".to_string()
-                    }
+                    format!("Syscall {} not implemented", self.syscall_id)
                 )),
             }
         };
@@ -558,20 +536,12 @@ impl TestCase for SyscallTestCase {
                     TestResult::new(self.name.clone())
                         .with_status(TestStatus::Passed)
                         .with_exec_time(exec_time)
-                        .with_output(if cfg!(feature = "alloc") {
-                            format!("Syscall returned expected value: {}", actual)
-                        } else {
-                            "Syscall returned expected value".to_string()
-                        })
+                        .with_output(format!("Syscall returned expected value: {}", actual))
                 } else {
                     TestResult::new(self.name.clone())
                         .with_status(TestStatus::Failed)
                         .with_exec_time(exec_time)
-                        .with_error(if cfg!(feature = "alloc") {
-                            format!("Expected {}, got {}", expected, actual)
-                        } else {
-                            "Unexpected return value".to_string()
-                        })
+                        .with_error(format!("Expected {}, got {}", expected, actual))
                 }
             },
             (Err(actual_error), None, Some(expected_error)) => {
@@ -589,20 +559,12 @@ impl TestCase for SyscallTestCase {
                     TestResult::new(self.name.clone())
                         .with_status(TestStatus::Passed)
                         .with_exec_time(exec_time)
-                        .with_output(if cfg!(feature = "alloc") {
-                            format!("Syscall returned expected error: {:?}", actual_error)
-                        } else {
-                            "Syscall returned expected error".to_string()
-                        })
+                        .with_output(format!("Syscall returned expected error: {:?}", actual_error))
                 } else {
                     TestResult::new(self.name.clone())
                         .with_status(TestStatus::Failed)
                         .with_exec_time(exec_time)
-                        .with_error(if cfg!(feature = "alloc") {
-                            format!("Expected error {:?}, got {:?}", expected_error, actual_error)
-                        } else {
-                            "Unexpected error".to_string()
-                        })
+                        .with_error(format!("Expected error {:?}, got {:?}", expected_error, actual_error))
                 }
             },
             (Ok(_), None, None) => {
@@ -615,11 +577,7 @@ impl TestCase for SyscallTestCase {
                 TestResult::new(self.name.clone())
                         .with_status(TestStatus::Failed)
                         .with_exec_time(exec_time)
-                        .with_error(if cfg!(feature = "alloc") {
-                            format!("Unexpected error: {:?}", actual_error)
-                        } else {
-                            "Unexpected error".to_string()
-                        })
+                        .with_error(format!("Unexpected error: {:?}", actual_error))
             },
             _ => {
                 TestResult::new(self.name.clone())
@@ -639,7 +597,6 @@ fn get_time_us() -> u64 {
 }
 
 /// Create standard test suites
-#[cfg(feature = "alloc")]
 pub fn create_standard_test_suites() -> Vec<Arc<TestSuite>> {
     let mut suites = Vec::new();
     
@@ -727,7 +684,6 @@ pub fn create_standard_test_suites() -> Vec<Arc<TestSuite>> {
 }
 
 /// Run all tests
-#[cfg(feature = "alloc")]
 pub fn run_all_tests() -> Result<()> {
     let mut runner = TestRunner::new();
     
@@ -755,20 +711,6 @@ pub fn run_all_tests() -> Result<()> {
     if all_passed {
         Ok(())
     } else {
-        Err(nos_api::Error::ServiceError(
-            if cfg!(feature = "alloc") {
-                "Some tests failed".to_string()
-            } else {
-                "Some tests failed".to_string()
-            }
-        ))
+        Err(nos_api::Error::ServiceError("Some tests failed".to_string()))
     }
-}
-
-/// Run all tests (no-alloc version)
-#[cfg(not(feature = "alloc"))]
-pub fn run_all_tests() -> Result<()> {
-    // In no-alloc environments, testing is limited
-    // For now, just return success
-    Ok(())
 }

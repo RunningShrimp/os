@@ -1,7 +1,9 @@
 //! Kernel error handling integration
-//!
+//! 
 //! This module provides integration between kernel error handling and the nos-error-handling crate.
 //! It includes kernel-specific error types and handling logic.
+//! 
+//! DEPRECATED: Implementation should be in kernel/src/error, not here
 
 extern crate alloc;
 

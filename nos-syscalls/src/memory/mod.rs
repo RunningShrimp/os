@@ -2,21 +2,17 @@
 //!
 //! This module provides memory management system calls.
 
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
-#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 
 use nos_api::Result;
-use crate::core::traits::SyscallHandler;
+use crate::SyscallHandler;
 #[cfg(feature = "log")]
 use log;
 
-#[cfg(feature = "alloc")]
-use crate::core::dispatcher::SyscallDispatcher;
+use crate::SyscallDispatcher;
 
 /// Register memory system call handlers
-#[cfg(feature = "alloc")]
 pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     // Register mmap system call
     dispatcher.register_handler(
@@ -49,11 +45,7 @@ impl SyscallHandler for MmapHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 6 {
-            #[cfg(feature = "alloc")]
-            #[cfg(feature = "alloc")]
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
-            #[cfg(not(feature = "alloc"))]
-            return Err(nos_api::Error::InvalidArgument("Insufficient arguments".into()));
         }
         
         let addr = args[0] as *mut u8;
@@ -94,11 +86,7 @@ impl SyscallHandler for MunmapHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 2 {
-            #[cfg(feature = "alloc")]
-            #[cfg(feature = "alloc")]
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
-            #[cfg(not(feature = "alloc"))]
-            return Err(nos_api::Error::InvalidArgument("Insufficient arguments".into()));
         }
         
         let addr = args[0] as *mut u8;
@@ -131,11 +119,7 @@ impl SyscallHandler for MprotectHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 3 {
-            #[cfg(feature = "alloc")]
-            #[cfg(feature = "alloc")]
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
-            #[cfg(not(feature = "alloc"))]
-            return Err(nos_api::Error::InvalidArgument("Insufficient arguments".into()));
         }
         
         let addr = args[0] as *mut u8;

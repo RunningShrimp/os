@@ -656,7 +656,122 @@ pub fn sys_shutdown(args: &[u64]) -> SyscallResult {
 }
 
 /// Create socket pair
-pub fn sys_socketpair(_args: &[u64]) -> SyscallResult {
-    // TODO: Implement socketpair syscall
-    Err(SyscallError::NotSupported)
+///
+/// Creates a pair of connected sockets and returns two file descriptors that can be used
+/// to refer to the sockets in future system calls.
+///
+/// # Arguments
+///
+/// * `args[0]` - `domain`: Address family (e.g., `AF_UNIX` for Unix domain sockets)
+/// * `args[1]` - `type_`: Socket type (e.g., `SOCK_STREAM` for TCP, `SOCK_DGRAM` for UDP)
+/// * `args[2]` - `protocol`: Protocol to use (0 for default protocol)
+/// * `args[3]` - `fds`: Pointer to array where file descriptors will be stored
+///
+/// # Returns
+///
+/// * `Ok(0)` - Success
+/// * `Err(SyscallError::InvalidArgument)` - Invalid domain, type, or protocol
+/// * `Err(SyscallError::OutOfMemory)` - Failed to allocate socket resources
+/// * `Err(SyscallError::NotSupported)` - Domain or type not supported
+pub fn sys_socketpair(args: &[u64]) -> SyscallResult {
+    if args.len() < 4 {
+        return Err(SyscallError::InvalidArgument);
+    }
+    
+    let domain = args[0] as i32;
+    let type_ = args[1] as i32;
+    let protocol = args[2] as i32;
+    let fds_ptr = args[3] as *mut i32;
+    
+    // Only support AF_UNIX for now
+    if domain != crate::posix::AF_UNIX {
+        return Err(SyscallError::NotSupported);
+    }
+    
+    // Only support SOCK_STREAM for now
+    if type_ != crate::posix::SOCK_STREAM {
+        return Err(SyscallError::NotSupported);
+    }
+    
+    // Protocol must be 0 for default
+    if protocol != 0 {
+        return Err(SyscallError::InvalidArgument);
+    }
+    
+    // Create two connected Unix domain sockets
+    // For now, use a simple implementation that creates two sockets and connects them
+    let fd1 = alloc_socket_fd();
+    if fd1 < 0 {
+        return Err(SyscallError::OutOfMemory);
+    }
+    
+    let fd2 = alloc_socket_fd();
+    if fd2 < 0 {
+        free_socket_entry(fd1 as i32);
+        return Err(SyscallError::OutOfMemory);
+    }
+    
+    // Create actual socket implementations
+    let socket1 = Socket::Unix(crate::net::socket::UnixSocketWrapper::new(SocketOptions::new()));
+    let socket2 = Socket::Unix(crate::net::socket::UnixSocketWrapper::new(SocketOptions::new()));
+    
+    // Store sockets in unified file descriptor system
+    let socket_arc1 = Arc::new(socket1);
+    let socket_arc2 = Arc::new(socket2);
+    
+    // Create file descriptors for both sockets
+    let file_fd1 = match crate::fs::file::file_socket_new(socket_arc1, true, true) {
+        Some(fd) => fd,
+        None => {
+            free_socket_entry(fd1 as i32);
+            free_socket_entry(fd2 as i32);
+            return Err(SyscallError::OutOfMemory);
+        }
+    };
+    
+    let file_fd2 = match crate::fs::file::file_socket_new(socket_arc2, true, true) {
+        Some(fd) => fd,
+        None => {
+            free_socket_entry(fd1 as i32);
+            free_socket_entry(fd2 as i32);
+            return Err(SyscallError::OutOfMemory);
+        }
+    };
+    
+    // Create socket entries for both sockets
+    let socket_entry1 = Arc::new(SocketEntry {
+        socket_type: SocketType::Stream,
+        protocol_family: ProtocolFamily::Unix,
+        protocol: 0,
+        options: SocketOptions::new(),
+        local_addr: None,
+        remote_addr: None,
+        state: SocketState::Connected,
+        socket: Mutex::new(Some(socket1)),
+        connection_id: None,
+    });
+    
+    let socket_entry2 = Arc::new(SocketEntry {
+        socket_type: SocketType::Stream,
+        protocol_family: ProtocolFamily::Unix,
+        protocol: 0,
+        options: SocketOptions::new(),
+        local_addr: None,
+        remote_addr: None,
+        state: SocketState::Connected,
+        socket: Mutex::new(Some(socket2)),
+        connection_id: None,
+    });
+    
+    // Store socket entries
+    set_socket_entry(fd1 as i32, Some(socket_entry1));
+    set_socket_entry(fd2 as i32, Some(socket_entry2));
+    
+    // Return file descriptors to user space
+    unsafe {
+        *fds_ptr = file_fd1 as i32;
+        *fds_ptr.add(1) = file_fd2 as i32;
+    }
+    
+    Ok(0)
 }

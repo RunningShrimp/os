@@ -8,7 +8,8 @@
 extern crate alloc;
 use alloc::vec::Vec;
 use alloc::string::String;
-use alloc::collections::{BTreeMap, HashMap, VecDeque};
+use alloc::collections::{BTreeMap, VecDeque};
+use crate::collections::HashMap;
 // use alloc::sync::Arc;
 // use core::sync::atomic::{AtomicU64, AtomicU32, AtomicBool, AtomicU8, Ordering};
 // use crate::subsystems::sync::{Sleeplock, Mutex};

@@ -5,8 +5,6 @@ pub mod process;
 pub mod microkernel;
 
 // Flattened modules from deep nesting
-pub mod process_service;
-pub mod glib_memory;
 
 // Migrated infrastructure modules
 pub mod mm;

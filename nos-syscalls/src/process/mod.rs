@@ -2,20 +2,15 @@
 //!
 //! This module provides process management related system calls.
 
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
-#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 use nos_api::Result;
-use crate::core::traits::SyscallHandler;
-use nos_api::syscall::types::{SyscallNumber, SyscallArgs, SyscallResult};
+use crate::SyscallHandler;
 #[cfg(feature = "log")]
 use log;
-#[cfg(feature = "alloc")]
-use crate::core::dispatcher::SyscallDispatcher;
+use crate::SyscallDispatcher;
 
 /// Register process system call handlers
-#[cfg(feature = "alloc")]
 pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     // Register fork system call
     dispatcher.register_handler(
@@ -48,17 +43,17 @@ pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
 struct ForkHandler;
 
 impl SyscallHandler for ForkHandler {
+    fn id(&self) -> u32 {
+        crate::types::SYS_FORK
+    }
+    
     fn execute(&self, _args: &[usize]) -> Result<isize> {
         // TODO: Implement actual fork logic
         Ok(0) // Return child PID in parent, 0 in child
     }
-
+    
     fn name(&self) -> &str {
         "fork"
-    }
-
-    fn id(&self) -> u32 {
-        crate::types::SYS_FORK
     }
 }
 
@@ -66,22 +61,32 @@ impl SyscallHandler for ForkHandler {
 struct ExecHandler;
 
 impl SyscallHandler for ExecHandler {
+    fn id(&self) -> u32 {
+        crate::types::SYS_EXEC
+    }
+    
     fn execute(&self, args: &[usize]) -> Result<isize> {
+        if args.len() < 2 {
+            return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
+        }
+        
+        let pathname = args[0] as *const u8;
+        let argv = args[1] as *const *const u8;
+        
         // TODO: Implement actual exec logic using parameters:
         // pathname: Path to executable file
         // argv: Array of argument strings
         #[cfg(feature = "log")]
-        log::trace!("exec called with: arg0={:?}, arg1={:?}", args.get(0), args.get(1));
-
+        log::trace!("exec called with: pathname={:?}, argv={:?}", pathname, argv);
+        
+        // Ensure parameters are used even when logging is disabled
+        let _ = (pathname, argv);
+        
         Ok(0)
     }
-
+    
     fn name(&self) -> &str {
         "exec"
-    }
-
-    fn id(&self) -> u32 {
-        crate::types::SYS_EXEC
     }
 }
 
@@ -89,28 +94,32 @@ impl SyscallHandler for ExecHandler {
 struct WaitHandler;
 
 impl SyscallHandler for WaitHandler {
+    fn id(&self) -> u32 {
+        crate::types::SYS_WAIT
+    }
+    
     fn execute(&self, args: &[usize]) -> Result<isize> {
-        let pid = args.get(0).copied().unwrap_or(0) as i32;
-        let status = args.get(1).copied().unwrap_or(0) as *mut i32;
-
+        if args.len() < 2 {
+            return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
+        }
+        
+        let pid = args[0] as i32;
+        let status = args[1] as *mut i32;
+        
         // TODO: Implement actual wait logic using parameters:
         // pid: Process ID to wait for, or -1 for any child process
         // status: Pointer to store exit status information
         #[cfg(feature = "log")]
         log::trace!("wait called with: pid={}, status={:?}", pid, status);
-
+        
         // Ensure status is used even when logging is disabled
         let _ = status;
-
-        Ok(pid as isize)
+        
+        Ok(pid as isize) // Return child PID
     }
-
+    
     fn name(&self) -> &str {
         "wait"
-    }
-
-    fn id(&self) -> u32 {
-        crate::types::SYS_WAIT
     }
 }
 
@@ -118,25 +127,29 @@ impl SyscallHandler for WaitHandler {
 struct ExitHandler;
 
 impl SyscallHandler for ExitHandler {
+    fn id(&self) -> u32 {
+        crate::types::SYS_EXIT
+    }
+    
     fn execute(&self, args: &[usize]) -> Result<isize> {
-        let status = args.get(0).copied().unwrap_or(0) as i32;
-
+        if args.len() < 1 {
+            return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
+        }
+        
+        let status = args[0] as i32;
+        
         // TODO: Implement actual exit logic using parameters:
         // status: Exit status value to return to parent process
         #[cfg(feature = "log")]
         log::trace!("exit called with: status={}", status);
-
+        
         // Ensure status is used even when logging is disabled
         let _ = status;
-
+        
         Ok(0)
     }
-
+    
     fn name(&self) -> &str {
         "exit"
-    }
-
-    fn id(&self) -> u32 {
-        crate::types::SYS_EXIT
     }
 }

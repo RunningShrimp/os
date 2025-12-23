@@ -4,13 +4,11 @@
 
 use crate::Result;
 
-#[cfg(feature = "alloc")]
 use nos_api::collections::BTreeMap;
 
 use spin::Mutex;
 
 /// Error classifier
-#[cfg(feature = "alloc")]
 pub struct ErrorClassifier {
     /// Classification rules
     rules: BTreeMap<u32, ClassificationRule>,
@@ -18,14 +16,12 @@ pub struct ErrorClassifier {
     stats: Mutex<ClassificationStats>,
 }
 
-#[cfg(feature = "alloc")]
 impl Default for ErrorClassifier {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[cfg(feature = "alloc")]
 impl ErrorClassifier {
     /// Create a new error classifier
     pub fn new() -> Self {
@@ -138,7 +134,6 @@ pub struct ClassificationRule {
 }
 
 /// Classification statistics
-#[cfg(feature = "alloc")]
 #[derive(Debug, Clone, Default)]
 pub struct ClassificationStats {
     /// Total classified errors
@@ -152,11 +147,9 @@ pub struct ClassificationStats {
 }
 
 /// Global error classifier
-#[cfg(feature = "alloc")]
 static GLOBAL_CLASSIFIER: spin::Once<Mutex<ErrorClassifier>> = spin::Once::new();
 
 /// Initialize the global error classifier
-#[cfg(feature = "alloc")]
 pub fn init_classifier() -> Result<()> {
     GLOBAL_CLASSIFIER.call_once(|| {
         Mutex::new(ErrorClassifier::new())
@@ -167,7 +160,6 @@ pub fn init_classifier() -> Result<()> {
 }
 
 /// Get the global error classifier
-#[cfg(feature = "alloc")]
 pub fn get_classifier() -> &'static Mutex<ErrorClassifier> {
     GLOBAL_CLASSIFIER.get().expect("Error classifier not initialized")
 }
@@ -175,14 +167,13 @@ pub fn get_classifier() -> &'static Mutex<ErrorClassifier> {
 
 
 /// Shutdown the global error classifier
-#[cfg(feature = "alloc")]
 pub fn shutdown_classifier() -> Result<()> {
     // Note: spin::Once doesn't provide a way to reset, so we just return Ok(())
     // In a real implementation, you might want to provide a different approach
     Ok(())
 }
 
-#[cfg(all(test, feature = "alloc"))]
+#[cfg(test)]
 mod tests {
     use super::*;
 

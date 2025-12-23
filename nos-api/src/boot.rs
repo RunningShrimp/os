@@ -270,7 +270,7 @@ pub unsafe fn validate_boot_parameters(params: *const BootParameters) -> bool {
         return false;
     }
     
-    let params = &*params;
+    let params = unsafe { &*params };
     params.is_valid()
 }
 

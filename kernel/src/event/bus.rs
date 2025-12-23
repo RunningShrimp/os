@@ -13,9 +13,9 @@ use alloc::{
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use nos_api::{
+    core::EventHandler,
     event::{
-        Event, EventHandler, EventDispatcher, EventBus, EventFilter, EventId,
-        EventType, EventMetadata,
+        Event, EventDispatcher,
     },
     Result,
 };

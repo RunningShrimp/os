@@ -10,9 +10,9 @@ use alloc::{
 };
 use core::sync::atomic::{AtomicUsize, Ordering};
 use nos_api::{
+    core::EventHandler,
     event::{
-        Event, EventHandler, EventDispatcher, EventFilter, EventId, EventType,
-        EventMetadata, EventPriority,
+        Event, EventDispatcher,
     },
     Result,
 };
@@ -23,7 +23,7 @@ pub trait EventDispatcherExt {
 /// Default implementation of an EventDispatcher
 pub struct DefaultEventDispatcher {
     /// Map of event type to handlers
-    handlers: BTreeMap<&'static str, Vec<Arc<dyn EventHandler>>>,
+    handlers: BTreeMap<&'static str, Vec<Arc<dyn EventHandler<Event = Box<dyn Event>>>>>,
     /// Map of event type to filters
     filters: BTreeMap<&'static str, Vec<Arc<dyn EventFilter>>>,
 
@@ -60,7 +60,7 @@ impl DefaultEventDispatcher {
 
     /// Generate a unique event ID
     fn generate_event_id(&self) -> EventId {
-        EventId(self.event_counter.fetch_add(1, Ordering::SeqCst))
+        self.event_counter.fetch_add(1, Ordering::SeqCst)
     }
 
     /// Check if an event passes all registered filters
@@ -187,9 +187,9 @@ impl EventDispatcher for DefaultEventDispatcher {
 }
 
 impl EventHandler for DefaultEventDispatcher {
-    type Event = dyn Event;
+    type Event = Box<dyn Event>;
     
-    fn handle(&self, event: &dyn Event) -> Result<()> {
+    fn handle(&mut self, event: &Box<dyn Event>) -> Result<()> {
         Ok(())
     }
 

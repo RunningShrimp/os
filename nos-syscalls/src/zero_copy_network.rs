@@ -2,22 +2,17 @@
 //!
 //! This module provides system call handlers for zero-copy network I/O operations.
 
-#[cfg(feature = "alloc")]
-use alloc::string::ToString;
-#[cfg(feature = "alloc")]
-use alloc::boxed::Box;
-#[cfg(feature = "alloc")]
-use alloc::sync::Arc;
+use {
+    alloc::boxed::Box,
+    alloc::sync::Arc,
+    alloc::string::ToString,
+};
 use nos_api::Result;
-use crate::core::traits::SyscallHandler;
-#[cfg(feature = "alloc")]
-use crate::core::dispatcher::SyscallDispatcher;
+use crate::{SyscallHandler, SyscallDispatcher};
 
 /// Zero-copy network manager placeholder
-#[cfg(feature = "alloc")]
 struct ZeroCopyNetworkManager;
 
-#[cfg(feature = "alloc")]
 impl ZeroCopyNetworkManager {
     fn new(_config: ()) -> Result<Self> {
         Ok(Self {})
@@ -30,7 +25,6 @@ pub struct ZeroCopyConfig;
 
 /// Zero-copy send system call handler
 pub struct ZeroCopySendHandler {
-    #[cfg(feature = "alloc")]
     manager: Arc<ZeroCopyNetworkManager>,
 }
 
@@ -40,7 +34,6 @@ impl ZeroCopySendHandler {
         Self::default()
     }
     
-    #[cfg(feature = "alloc")]
     pub fn new_with_manager(manager: Arc<ZeroCopyNetworkManager>) -> Self {
         Self { manager }
     }
@@ -48,15 +41,8 @@ impl ZeroCopySendHandler {
 
 impl Default for ZeroCopySendHandler {
     fn default() -> Self {
-        #[cfg(feature = "alloc")]
-        {
-            Self {
-                manager: Arc::new(ZeroCopyNetworkManager::new(()).unwrap()),
-            }
-        }
-        #[cfg(not(feature = "alloc"))]
-        {
-            Self {}
+        Self {
+            manager: Arc::new(ZeroCopyNetworkManager::new(()).unwrap()),
         }
     }
 }
@@ -72,10 +58,7 @@ impl SyscallHandler for ZeroCopySendHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 3 {
-            #[cfg(feature = "alloc")]
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments for zero-copy send".to_string()));
-            #[cfg(not(feature = "alloc"))]
-            return Err(nos_api::Error::InvalidArgument("Insufficient arguments for zero-copy send".into()));
         }
         
         let _fd = args[0] as i32;
@@ -90,7 +73,6 @@ impl SyscallHandler for ZeroCopySendHandler {
 
 /// Zero-copy receive system call handler
 pub struct ZeroCopyRecvHandler {
-    #[cfg(feature = "alloc")]
     manager: Arc<ZeroCopyNetworkManager>,
 }
 
@@ -100,7 +82,6 @@ impl ZeroCopyRecvHandler {
         Self::default()
     }
     
-    #[cfg(feature = "alloc")]
     pub fn new_with_manager(manager: Arc<ZeroCopyNetworkManager>) -> Self {
         Self { manager }
     }
@@ -108,15 +89,8 @@ impl ZeroCopyRecvHandler {
 
 impl Default for ZeroCopyRecvHandler {
     fn default() -> Self {
-        #[cfg(feature = "alloc")]
-        {
-            Self {
-                manager: Arc::new(ZeroCopyNetworkManager::new(()).unwrap()),
-            }
-        }
-        #[cfg(not(feature = "alloc"))]
-        {
-            Self {}
+        Self {
+            manager: Arc::new(ZeroCopyNetworkManager::new(()).unwrap()),
         }
     }
 }
@@ -132,10 +106,7 @@ impl SyscallHandler for ZeroCopyRecvHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 2 {
-            #[cfg(feature = "alloc")]
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments for zero-copy receive".to_string()));
-            #[cfg(not(feature = "alloc"))]
-            return Err(nos_api::Error::InvalidArgument("Insufficient arguments for zero-copy receive".into()));
         }
         
         let _fd = args[0] as i32;
@@ -148,7 +119,6 @@ impl SyscallHandler for ZeroCopyRecvHandler {
 }
 
 /// Register zero-copy network I/O system call handlers
-#[cfg(feature = "alloc")]
 pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     // Register zero-copy send system call
     dispatcher.register_handler(
@@ -162,13 +132,5 @@ pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
         Box::new(ZeroCopyRecvHandler::new())
     );
     
-    Ok(())
-}
-
-/// Register zero-copy network I/O system call handlers (no-alloc version)
-#[cfg(not(feature = "alloc"))]
-pub fn register_handlers(_dispatcher: &mut crate::core::traits::SyscallDispatcher) -> Result<()> {
-    // In no-alloc environments, handlers would need to be registered differently
-    // For now, just return success
     Ok(())
 }

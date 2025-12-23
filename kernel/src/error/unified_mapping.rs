@@ -9,42 +9,9 @@
 //! This ensures consistent error reporting across all layers of the kernel.
 
 use crate::error::unified::UnifiedError;
+use crate::syscalls::api::syscall_result::SyscallError as ApiSyscallError;
+use crate::syscalls::interface::SyscallError as InterfaceSyscallError;
 use nos_error_handling::kernel_integration::ErrorType as NosErrorType;
-
-// API syscall error type (stub)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ApiSyscallError {
-    EPERM, ENOENT, ESRCH, EINTR, EIO, ENXIO, E2BIG, ENOEXEC,
-    EBADF, ECHILD, EAGAIN, ENOMEM, EACCES, EFAULT, ENOTBLK, EBUSY,
-    EEXIST, EXDEV, ENODEV, ENOTDIR, EISDIR, EINVAL, ENFILE, EMFILE,
-    ENOTTY, ETXTBSY, EFBIG, ENOSPC, ESPIPE, EROFS, EMLINK, EPIPE,
-}
-
-// Interface syscall error type (stub)
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum InterfaceSyscallError {
-    InvalidSyscall(u64),
-    InvalidArguments,
-    PermissionDenied,
-    NotFound,
-    AlreadyExists,
-    InvalidFd,
-    IoError,
-    OutOfMemory,
-    NotSupported,
-    WouldBlock,
-    Interrupted,
-    InvalidAddress,
-    AccessDenied,
-    ResourceBusy,
-    ResourceUnavailable,
-    TimedOut,
-    QuotaExceeded,
-    FileSystemError,
-    NetworkError,
-    ProtocolError,
-    Unknown,
-}
 
 /// POSIX errno values
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

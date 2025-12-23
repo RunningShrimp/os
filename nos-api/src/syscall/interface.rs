@@ -2,7 +2,6 @@
 
 use crate::error::Result;
 use crate::syscall::types::{SyscallNumber, SyscallArgs, SyscallResult};
-#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 
 /// Trait for handling system calls
@@ -20,11 +19,7 @@ pub trait SyscallHandler {
 /// Trait for system call dispatchers
 pub trait SyscallDispatcher {
     /// Registers a system call handler
-    #[cfg(feature = "alloc")]
     fn register_handler(&mut self, number: SyscallNumber, handler: Box<dyn SyscallHandler>);
-    
-    #[cfg(not(feature = "alloc"))]
-    fn register_handler(&mut self, number: SyscallNumber, handler: crate::interfaces::Box<dyn SyscallHandler>);
     
     /// Unregisters a system call handler
     fn unregister_handler(&mut self, number: SyscallNumber);

@@ -2,19 +2,13 @@
 //!
 //! This module provides file system related services.
 
-#[cfg(feature = "alloc")]
 use nos_api::Result;
-#[cfg(feature = "alloc")]
 use crate::core::{Service, ServiceStatus};
-#[cfg(feature = "alloc")]
 use alloc::string::String;
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
-#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 
 /// File system service
-#[cfg(feature = "alloc")]
 pub struct FileSystemService {
     name: String,
     mount_point: String,
@@ -22,23 +16,13 @@ pub struct FileSystemService {
     status: ServiceStatus,
 }
 
-#[cfg(feature = "alloc")]
 impl FileSystemService {
     /// Create a new file system service
     pub fn new(name: &str, mount_point: &str, fs_type: &str) -> Self {
         Self {
-            #[cfg(feature = "alloc")]
             name: name.to_string(),
-            #[cfg(not(feature = "alloc"))]
-            name: name.into(),
-            #[cfg(feature = "alloc")]
             mount_point: mount_point.to_string(),
-            #[cfg(not(feature = "alloc"))]
-            mount_point: mount_point.into(),
-            #[cfg(feature = "alloc")]
             fs_type: fs_type.to_string(),
-            #[cfg(not(feature = "alloc"))]
-            fs_type: fs_type.into(),
             status: ServiceStatus::Stopped,
         }
     }
@@ -54,7 +38,6 @@ impl FileSystemService {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl Service for FileSystemService {
     fn start(&self) -> Result<()> {
         // TODO: Implement actual file system mounting
@@ -80,7 +63,6 @@ impl Service for FileSystemService {
 }
 
 /// Register file system services
-#[cfg(feature = "alloc")]
 pub fn register_fs_services() -> Result<()> {
     use crate::registry;
     

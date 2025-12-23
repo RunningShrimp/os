@@ -26,7 +26,6 @@
 
 #![no_std]
 
-#[cfg(feature = "alloc")]
 extern crate alloc;
 
 // Import and re-export Result and Error from nos_api
@@ -36,6 +35,22 @@ pub use nos_api::error::{Error, Result};
 pub mod core {
     // Core traits for error handling
     pub mod traits;
+    
+    // Engine functions - these are implemented in kernel/src/error
+    pub fn init_engine() -> nos_api::Result<()> {
+        // Implementation in kernel/src/error
+        Ok(())
+    }
+    
+    pub fn shutdown_engine() -> nos_api::Result<()> {
+        // Implementation in kernel/src/error
+        Ok(())
+    }
+    
+    pub fn get_stats() -> crate::types::ErrorHandlingStats {
+        // Implementation in kernel/src/error
+        crate::types::ErrorHandlingStats::default()
+    }
 }
 
 // Type definitions
@@ -105,7 +120,6 @@ pub use health::{HealthMonitor as ImplHealthMonitor, HealthMetric, HealthThresho
 /// # Returns
 ///
 /// * `nos_api::Result<()>` - Success or error
-#[cfg(feature = "alloc")]
 pub fn init_error_handling() -> nos_api::Result<()> {
     // Note: Actual implementation should be in kernel/src/error
     // This is just an interface definition layer
@@ -120,7 +134,6 @@ pub fn init_error_handling() -> nos_api::Result<()> {
 /// # Returns
 ///
 /// * `nos_api::Result<()>` - Success or error
-#[cfg(feature = "alloc")]
 pub fn shutdown_error_handling() -> nos_api::Result<()> {
     // Note: Actual implementation should be in kernel/src/error
     // This is just an interface definition layer
@@ -132,7 +145,6 @@ pub fn shutdown_error_handling() -> nos_api::Result<()> {
 /// # Returns
 ///
 /// * `ErrorHandlingStats` - Error handling statistics
-#[cfg(feature = "alloc")]
 pub fn get_error_stats() -> types::ErrorHandlingStats {
     // Note: Actual implementation should be in kernel/src/error
     // This is just an interface definition layer
@@ -153,7 +165,6 @@ pub fn get_error_stats() -> types::ErrorHandlingStats {
 mod tests {
     use super::*;
 
-    #[cfg(feature = "alloc")]
     #[test]
     fn test_error_stats() {
         let stats = ErrorHandlingStats::default();

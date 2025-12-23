@@ -3,34 +3,22 @@
 use crate::error::Result;
 use crate::core::traits::Service;
 use crate::service::interface::{ServiceRegistry, ServiceStatus, ServiceMetadata};
-#[cfg(feature = "alloc")]
 use hashbrown::HashMap;
-// HashMap is not used in no-alloc mode
-#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
-#[cfg(not(feature = "alloc"))]
-use crate::interfaces::Box;
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
-#[cfg(not(feature = "alloc"))]
-use crate::interfaces::Vec;
-#[cfg(feature = "alloc")]
 use alloc::string::String;
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
 
 
 
 
 /// Default service registry implementation
-#[cfg(feature = "alloc")]
 pub struct DefaultServiceRegistry {
     /// Map of registered services
     services: HashMap<String, ServiceEntry>,
 }
 
 /// Service entry in the registry
-#[cfg(feature = "alloc")]
 struct ServiceEntry {
     /// Service instance
     service: Box<dyn Service>,
@@ -40,26 +28,6 @@ struct ServiceEntry {
     status: ServiceStatus,
 }
 
-#[cfg(not(feature = "alloc"))]
-pub struct DefaultServiceRegistry {
-    /// Map of registered services (using static slices)
-    services: &'static [ServiceEntry],
-}
-
-/// Service entry in the registry
-#[cfg(not(feature = "alloc"))]
-pub struct ServiceEntry {
-    /// Service instance
-    pub service: Box<dyn Service>,
-    /// Service metadata
-    pub metadata: ServiceMetadata,
-    /// Service status
-    pub status: ServiceStatus,
-    /// Service name (static)
-    pub name: &'static str,
-}
-
-#[cfg(feature = "alloc")]
 impl DefaultServiceRegistry {
     /// Creates a new service registry
     pub fn new() -> Self {
@@ -69,7 +37,6 @@ impl DefaultServiceRegistry {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl ServiceRegistry for DefaultServiceRegistry {
     fn register(&mut self, service: Box<dyn Service>) -> Result<()> {
         let name = service.name().to_string();
@@ -136,71 +103,17 @@ impl ServiceRegistry for DefaultServiceRegistry {
     }
 }
 
-#[cfg(not(feature = "alloc"))]
-impl DefaultServiceRegistry {
-    /// Creates a new service registry (no-alloc mode - static only)
-    pub fn new(_services: &'static [ServiceEntry]) -> Self {
-        Self {
-            services: _services,
-        }
-    }
-}
-
-#[cfg(not(feature = "alloc"))]
-impl ServiceRegistry for DefaultServiceRegistry {
-    fn register(&mut self, _service: Box<dyn Service>) -> Result<()> {
-        // In no-alloc mode, services must be registered at creation time
-        Err(crate::error::service_error("Cannot register services in no-alloc mode"))
-    }
-    
-    fn unregister(&mut self, _name: &str) -> Result<()> {
-        // In no-alloc mode, services cannot be unregistered
-        Err(crate::error::service_error("Cannot unregister services in no-alloc mode"))
-    }
-    
-    fn find(&self, name: &str) -> Option<&dyn Service> {
-        // Look up the service by name
-        for entry in self.services {
-            if entry.name == name {
-                return Some(entry.service.as_ref());
-            }
-        }
-        None
-    }
-    
-    fn find_mut(&mut self, _name: &str) -> Option<&mut dyn Service> {
-        // In no-alloc mode, services are immutable
-        None
-    }
-    
-    fn list(&self) -> Vec<&str> {
-        // In no-alloc mode, return empty slice since we can't collect into static slice
-        &[]
-    }
-    
-    fn count(&self) -> usize {
-        self.services.len()
-    }
-    
-    fn contains(&self, name: &str) -> bool {
-        self.services.iter().any(|entry| entry.name == name)
-    }
-}
-
 /// Service registry builder
-#[cfg(feature = "alloc")]
 pub struct ServiceRegistryBuilder {
     registry: DefaultServiceRegistry,
 }
 
-#[cfg(feature = "alloc")]
 impl Default for ServiceRegistryBuilder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[cfg(feature = "alloc")]
 impl ServiceRegistryBuilder {
     /// Creates a new service registry builder
     pub fn new() -> Self {
@@ -221,37 +134,15 @@ impl ServiceRegistryBuilder {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl Default for DefaultServiceRegistry {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[cfg(not(feature = "alloc"))]
-impl Default for DefaultServiceRegistry {
-    fn default() -> Self {
-        Self::new(&[])
-    }
-}
-
-#[cfg(not(feature = "alloc"))]
-pub struct ServiceRegistryBuilder {
-    // In no-alloc mode, we don't actually store services
-    // since they need to be statically defined
-}
-
-#[cfg(not(feature = "alloc"))]
-impl ServiceRegistryBuilder {
-    /// Creates a new service registry builder (no-alloc mode)
-    pub fn new() -> Self {
-        Self {}
-    }
-    
-    /// Builds the service registry (no-alloc mode)
+impl DefaultServiceRegistry {
+    /// Builds the service registry
     pub fn build(self) -> DefaultServiceRegistry {
-        // In no-alloc mode, return an empty registry
-        // Services should be added at compile time or via the new() method
-        DefaultServiceRegistry::new(&[])
+        DefaultServiceRegistry::new()
     }
 }

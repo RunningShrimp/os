@@ -6,10 +6,8 @@ pub mod api;
 pub mod traits;
 pub mod compress;
 pub mod hugepage;
-pub mod optimized_allocator;
 pub mod percpu_allocator;
 pub mod prefetch;
-pub mod optimized_memory_manager;
 pub mod numa;
 pub mod stats;
 pub mod memory_isolation;
@@ -18,7 +16,7 @@ pub mod optimized_page_allocator;
 #[cfg(feature = "kernel_tests")]
 pub mod tests;
 
-pub use optimized_allocator::OptimizedHybridAllocator;
+// pub use optimized_allocator::OptimizedHybridAllocator;
 
 /// Align up to the given alignment
 pub const fn align_up(addr: usize, align: usize) -> usize {
@@ -88,7 +86,7 @@ pub fn init_advanced_memory_management() -> nos_api::Result<()> {
     percpu_allocator::init_percpu_allocators()?;
     
     // Initialize optimized memory manager
-    optimized_memory_manager::init_optimized_memory_manager()?;
+    // optimized_memory_manager::init_optimized_memory_manager()?;
     
     // Initialize memory statistics
     stats::init_memory_stats()?;
@@ -108,7 +106,7 @@ pub fn shutdown_advanced_memory_management() -> nos_api::Result<()> {
     stats::shutdown_memory_stats()?;
     
     // Shutdown optimized memory manager
-    optimized_memory_manager::shutdown_optimized_memory_manager()?;
+    // optimized_memory_manager::shutdown_optimized_memory_manager()?;
     
     // Shutdown per-CPU allocators
     percpu_allocator::shutdown_percpu_allocators()?;

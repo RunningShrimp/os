@@ -14,7 +14,8 @@ use core::any::{Any, TypeId};
 use nos_api::{
     di::{Container, ServiceFactory, ServiceMetadata, ServiceScope, ServiceResolver},
     error::Result,
-    event::{Event, EventHandler, EventMetadata, EventPriority, EventType},
+    event::{Event, EventPriority, EventDispatcher, EventMetadata, EventType, SystemEventData, MemoryEventData, ProcessEventData},
+    core::EventHandler,
 };
 
 
@@ -184,7 +185,7 @@ impl ServiceEvent {
 }
 
 // Event types for service lifecycle
-use nos_api::event::{SystemEvent, SystemEventData};
+// use nos_api::event::{SystemEvent, SystemEventData};
 
 /// Service registered event
 pub struct ServiceRegisteredEvent {

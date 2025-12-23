@@ -1,48 +1,9 @@
 [package]
 name = "user"
 version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-libm = "0.2"
+edition = "2021"
 
 [lib]
-crate-type = ["rlib"]
+path = "src/lib.rs"
 
-[features]
-user-bin = []
-
-[[bin]]
-name = "init"
-path = "src/bin/init.rs"
-required-features = ["user-bin"]
-
-[[bin]]
-name = "sh"
-path = "src/bin/sh.rs"
-required-features = ["user-bin"]
-
-[[bin]]
-name = "cat"
-path = "src/bin/cat.rs"
-required-features = ["user-bin"]
-
-[[bin]]
-name = "ls"
-path = "src/bin/ls.rs"
-required-features = ["user-bin"]
-
-[[bin]]
-name = "echo"
-path = "src/bin/echo.rs"
-required-features = ["user-bin"]
-
-[[bin]]
-name = "execrel"
-path = "src/bin/execrel.rs"
-required-features = ["user-bin"]
-
-[[bin]]
-name = "sigmask"
-path = "src/bin/sigmask.rs"
-required-features = ["user-bin"]
+[dependencies]

@@ -33,7 +33,7 @@ pub use ext4::{EXT4_MAGIC, Ext4State, Ext4Errors, Ext4SuperBlock};
 pub use recovery::{DEFAULT_CHECKPOINT_INTERVAL, MAX_SNAPSHOTS, SNAPSHOT_MAGIC};
 
 // Export VfsManager for use in vfs module
-pub use VfsManager;
+// pub use VfsManager;
 
 /// VFS manager structure
 /// 

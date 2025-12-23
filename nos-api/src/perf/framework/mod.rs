@@ -9,17 +9,13 @@
 //! - Optimization effect evaluation
 //! - Optimization strategy management
 
-#[cfg(feature = "alloc")]
 extern crate alloc;
 
-#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
-#[cfg(feature = "alloc")]
 use alloc::string::String;
-#[cfg(feature = "alloc")]
 use alloc::collections::BTreeMap;
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
+use alloc::format;
 use core::sync::atomic::{AtomicU64, Ordering};
 use spin::Mutex;
 

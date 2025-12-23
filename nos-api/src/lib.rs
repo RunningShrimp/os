@@ -42,14 +42,22 @@
 //! }
 //! ```
 
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 #![allow(dead_code)]
+#![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 
 #[cfg(feature = "std")]
 extern crate std;
 
-#[cfg(feature = "alloc")]
 extern crate alloc;
+
+pub use alloc::vec::Vec;
+pub use alloc::string::String;
+pub use alloc::boxed::Box;
+pub use alloc::collections::BTreeMap;
+pub use alloc::collections::BTreeSet;
+pub use hashbrown::HashMap;
+
 
 // Core modules
 pub mod core;

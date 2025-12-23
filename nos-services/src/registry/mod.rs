@@ -3,25 +3,16 @@
 //! This module provides service registration and lookup functionality.
 
 use crate::core::Service;
-#[cfg(feature = "alloc")]
 use alloc::collections::BTreeMap;
-#[cfg(feature = "alloc")]
 use alloc::string::String;
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
-#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
-#[cfg(feature = "alloc")]
 use alloc::format;
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
-#[cfg(feature = "alloc")]
 use spin::Mutex;
-#[cfg(feature = "alloc")]
 use nos_api::Result;
 
 /// Service registry
-#[cfg(feature = "alloc")]
 pub struct ServiceRegistry {
     /// Registered services
     services: BTreeMap<u32, ServiceInfo>,
@@ -31,7 +22,6 @@ pub struct ServiceRegistry {
     next_id: u32,
 }
 
-#[cfg(feature = "alloc")]
 impl ServiceRegistry {
     /// Create a new service registry
     pub fn new() -> Self {
@@ -46,10 +36,7 @@ impl ServiceRegistry {
     pub fn register(&mut self, name: &str, service: Box<dyn Service>) -> Result<u32> {
         // Check if service already exists
         if self.services_by_name.contains_key(name) {
-            #[cfg(feature = "alloc")]
             return Err(nos_api::Error::InvalidState(format!("Service {} already exists", name)));
-            #[cfg(not(feature = "alloc"))]
-            return Err(nos_api::Error::InvalidState("Service already exists".into()));
         }
         
         let id = self.next_id;
@@ -64,10 +51,7 @@ impl ServiceRegistry {
         };
         
         self.services.insert(id, info);
-        #[cfg(feature = "alloc")]
         self.services_by_name.insert(name.to_string(), id);
-        #[cfg(not(feature = "alloc"))]
-        self.services_by_name.insert(name.into(), id);
         
         Ok(id)
     }
@@ -75,12 +59,7 @@ impl ServiceRegistry {
     /// Unregister a service
     pub fn unregister(&mut self, id: u32) -> Result<()> {
         let info = self.services.remove(&id)
-            .ok_or_else(|| {
-                #[cfg(feature = "alloc")]
-                return nos_api::Error::NotFound(format!("Service {} not found", id));
-                #[cfg(not(feature = "alloc"))]
-                nos_api::Error::NotFound("Service not found".into())
-            })?;
+            .ok_or_else(|| nos_api::Error::NotFound(format!("Service {} not found", id)))?;
         
         self.services_by_name.remove(&info.name);
         
@@ -99,7 +78,6 @@ impl ServiceRegistry {
     }
 
     /// List all registered services
-    #[cfg(feature = "alloc")]
     pub fn list(&self) -> Vec<&ServiceInfo> {
         self.services.values().collect()
     }
@@ -107,18 +85,10 @@ impl ServiceRegistry {
     /// Start a service
     pub fn start(&mut self, id: u32) -> Result<()> {
         let info = self.services.get_mut(&id)
-            .ok_or_else(|| {
-                #[cfg(feature = "alloc")]
-                return nos_api::Error::NotFound(format!("Service {} not found", id));
-                #[cfg(not(feature = "alloc"))]
-                nos_api::Error::NotFound("Service not found".into())
-            })?;
+            .ok_or_else(|| nos_api::Error::NotFound(format!("Service {} not found", id)))?;
         
         if info.status != ServiceStatus::Registered {
-            #[cfg(feature = "alloc")]
             return Err(nos_api::Error::InvalidState(format!("Service {} is not registered", id)));
-            #[cfg(not(feature = "alloc"))]
-            return Err(nos_api::Error::InvalidState("Service is not registered".into()));
         }
         
         // Start the service
@@ -131,18 +101,10 @@ impl ServiceRegistry {
     /// Stop a service
     pub fn stop(&mut self, id: u32) -> Result<()> {
         let info = self.services.get_mut(&id)
-            .ok_or_else(|| {
-                #[cfg(feature = "alloc")]
-                return nos_api::Error::NotFound(format!("Service {} not found", id));
-                #[cfg(not(feature = "alloc"))]
-                nos_api::Error::NotFound("Service not found".into())
-            })?;
+            .ok_or_else(|| nos_api::Error::NotFound(format!("Service {} not found", id)))?;
         
         if info.status != ServiceStatus::Running {
-            #[cfg(feature = "alloc")]
             return Err(nos_api::Error::InvalidState(format!("Service {} is not running", id)));
-            #[cfg(not(feature = "alloc"))]
-            return Err(nos_api::Error::InvalidState("Service is not running".into()));
         }
         
         // Stop the service
@@ -154,7 +116,6 @@ impl ServiceRegistry {
 }
 
 /// Service information
-#[cfg(feature = "alloc")]
 pub struct ServiceInfo {
     /// Service ID
     pub id: u32,
@@ -182,12 +143,10 @@ pub enum ServiceStatus {
 }
 
 /// Global service registry
-#[cfg(feature = "alloc")]
 static GLOBAL_REGISTRY: spin::Mutex<core::mem::MaybeUninit<Mutex<ServiceRegistry>>> = spin::Mutex::new(core::mem::MaybeUninit::uninit());
 static REGISTRY_INIT: spin::Once = spin::Once::new();
 
 /// Initialize the global service registry
-#[cfg(feature = "alloc")]
 pub fn init_registry() -> Result<()> {
     REGISTRY_INIT.call_once(|| {
         let mut registry = GLOBAL_REGISTRY.lock();
@@ -201,7 +160,6 @@ pub fn init_registry() -> Result<()> {
 }
 
 /// Get the global service registry
-#[cfg(feature = "alloc")]
 pub fn get_registry() -> &'static Mutex<ServiceRegistry> {
     // SAFETY: We've already initialized the registry in init_registry
     unsafe {
@@ -210,7 +168,6 @@ pub fn get_registry() -> &'static Mutex<ServiceRegistry> {
 }
 
 /// Shutdown the global service registry
-#[cfg(feature = "alloc")]
 pub fn shutdown_registry() -> Result<()> {
     // In this implementation, we don't actually shut down the registry
     // since it's statically allocated and can't be deallocated
@@ -218,14 +175,12 @@ pub fn shutdown_registry() -> Result<()> {
 }
 
 /// Register a service
-#[cfg(feature = "alloc")]
 pub fn register_service(name: &str, service: Box<dyn Service>) -> Result<u32> {
     let mut registry = get_registry().lock();
     registry.register(name, service)
 }
 
 /// Get a service by name
-#[cfg(feature = "alloc")]
 pub fn get_service_by_name(name: &str) -> Option<&'static dyn Service> {
     // In a real implementation, this would return a reference to a global service
     // For now, we'll return None to indicate the service needs to be implemented
@@ -233,27 +188,21 @@ pub fn get_service_by_name(name: &str) -> Option<&'static dyn Service> {
 }
 
 /// Get a service by name (alias for get_service_by_name)
-#[cfg(feature = "alloc")]
 pub fn get_service(name: &str) -> Option<&'static dyn Service> {
     get_service_by_name(name)
 }
 
 /// Unregister a service by name
-#[cfg(feature = "alloc")]
 pub fn unregister_service(name: &str) -> Result<()> {
     let mut registry = get_registry().lock();
     if let Some(id) = registry.services_by_name.get(name).copied() {
         registry.unregister(id)
     } else {
-        #[cfg(feature = "alloc")]
-        return Err(nos_api::Error::NotFound(format!("Service {} not found", name)));
-        #[cfg(not(feature = "alloc"))]
-        Err(nos_api::Error::NotFound("Service not found".into()))
+        Err(nos_api::Error::NotFound(format!("Service {} not found", name)))
     }
 }
 
 /// Get service statistics
-#[cfg(feature = "alloc")]
 pub fn get_stats() -> crate::ServiceStats {
     let registry = get_registry().lock();
     let services = registry.list();
@@ -306,18 +255,14 @@ mod tests {
         let service = TestService {
             name: "test_service",
         };
-        #[cfg(feature = "alloc")]
         let id = registry.register("test_service", Box::new(service)).unwrap();
         
         // Get service
-        #[cfg(feature = "alloc")]
-        {
-            let info = registry.get(id).unwrap();
-            assert_eq!(info.name, "test_service");
-            
-            // Get by name
-            let info = registry.get_by_name("test_service").unwrap();
-            assert_eq!(info.id, id);
-        }
+        let info = registry.get(id).unwrap();
+        assert_eq!(info.name, "test_service");
+        
+        // Get by name
+        let info = registry.get_by_name("test_service").unwrap();
+        assert_eq!(info.id, id);
     }
 }

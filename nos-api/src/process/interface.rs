@@ -2,7 +2,6 @@
 
 use crate::error::Result;
 use crate::core::types::{Pid, Uid, Gid, ProcessState, ThreadState, SchedulingPolicy};
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
 /// Trait for process manager
@@ -20,12 +19,7 @@ pub trait ProcessManager {
     fn find_process_mut(&mut self, pid: Pid) -> Option<&mut dyn Process>;
     
     /// Lists all processes
-    #[cfg(feature = "alloc")]
     fn list_processes(&self) -> Vec<&dyn Process>;
-    
-    /// Lists all processes (no-alloc version)
-    #[cfg(not(feature = "alloc"))]
-    fn list_processes(&self) -> &'static [&'static dyn Process];
     
     /// Returns the current process
     fn current_process(&self) -> Option<&dyn Process>;
@@ -37,12 +31,7 @@ pub trait ProcessManager {
     fn parent_pid(&self, pid: Pid) -> Option<Pid>;
     
     /// Returns the children of a process
-    #[cfg(feature = "alloc")]
     fn child_processes(&self, pid: Pid) -> Vec<Pid>;
-    
-    /// Returns the children of a process (no-alloc version)
-    #[cfg(not(feature = "alloc"))]
-    fn child_processes(&self, pid: Pid) -> &'static [Pid];
     
     /// Returns the number of processes
     fn process_count(&self) -> usize;
@@ -129,20 +118,10 @@ pub trait Process {
     fn thread_count(&self) -> usize;
     
     /// Returns the threads of the process
-    #[cfg(feature = "alloc")]
     fn threads(&self) -> Vec<&dyn Thread>;
     
-    /// Returns the threads of the process (no-alloc version)
-    #[cfg(not(feature = "alloc"))]
-    fn threads(&self) -> &'static [&'static dyn Thread];
-    
     /// Returns the mutable threads of the process
-    #[cfg(feature = "alloc")]
     fn threads_mut(&mut self) -> Vec<&mut dyn Thread>;
-    
-    /// Returns the mutable threads of the process (no-alloc version)
-    #[cfg(not(feature = "alloc"))]
-    fn threads_mut(&mut self) -> &'static mut [&'static mut dyn Thread];
     
     /// Creates a new thread
     fn create_thread(&mut self, name: &str) -> Result<Pid>;

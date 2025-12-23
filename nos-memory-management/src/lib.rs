@@ -23,7 +23,7 @@ pub use physical::{PhysAddr, PAGE_SIZE, PAGE_SHIFT, page_round_up, page_round_do
 pub use virtual_mem::{VirtAddr};
 pub use page_table::*;
 pub use allocator::{buddy, slab, mempool};
-pub use layout::{AddressSpaceLayout, AslrRegionType, kernel_base, user_base, user_stack_top, user_max, page_size, is_kernel_address, is_user_address, phys_to_virt, virt_to_phys, apply_aslr_offset};
+pub use layout::{AddressSpaceLayout, AslrRegionType, kernel_base, user_base, user_stack_top, user_max, page_size, is_kernel_address, is_user_address, phys_to_virt, virt_to_phys, apply_aslr_offset_global as apply_aslr_offset, apply_aslr_offset_enhanced};
 
 // Re-export allocator types for convenience
 pub use allocator::buddy::OptimizedBuddyAllocator;

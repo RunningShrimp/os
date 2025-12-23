@@ -2,39 +2,28 @@
 //!
 //! This module provides process related services.
 
-#[cfg(feature = "alloc")]
 use nos_api::Result;
-#[cfg(feature = "alloc")]
 use crate::core::{Service, ServiceStatus};
-#[cfg(feature = "alloc")]
 use alloc::string::String;
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
-#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 
 /// Process service
-#[cfg(feature = "alloc")]
 pub struct ProcessService {
     name: String,
     status: ServiceStatus,
 }
 
-#[cfg(feature = "alloc")]
 impl ProcessService {
     /// Create a new process service
     pub fn new(name: &str) -> Self {
         Self {
-            #[cfg(feature = "alloc")]
             name: name.to_string(),
-            #[cfg(not(feature = "alloc"))]
-            name: name.into(),
             status: ServiceStatus::Stopped,
         }
     }
 }
 
-#[cfg(feature = "alloc")]
 impl Service for ProcessService {
     fn start(&self) -> Result<()> {
         // TODO: Implement actual process service start
@@ -60,7 +49,6 @@ impl Service for ProcessService {
 }
 
 /// Register process services
-#[cfg(feature = "alloc")]
 pub fn register_process_services() -> Result<()> {
     use crate::registry;
     

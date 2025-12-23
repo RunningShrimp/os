@@ -2,21 +2,16 @@
 //!
 //! This module provides time-related system calls.
 
-#[cfg(feature = "alloc")]
 use alloc::string::ToString;
-#[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 
 use nos_api::Result;
-use crate::core::traits::SyscallHandler;
+use crate::SyscallHandler;
 #[cfg(feature = "log")]
 use log;
-
-#[cfg(feature = "alloc")]
-use crate::core::dispatcher::SyscallDispatcher;
+use crate::SyscallDispatcher;
 
 /// Register time system call handlers
-#[cfg(feature = "alloc")]
 pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     // Register clock_gettime system call
     dispatcher.register_handler(
@@ -49,11 +44,7 @@ impl SyscallHandler for ClockGettimeHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 2 {
-            #[cfg(feature = "alloc")]
-            #[cfg(feature = "alloc")]
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
-            #[cfg(not(feature = "alloc"))]
-            return Err(nos_api::Error::InvalidArgument("Insufficient arguments".into()));
         }
         
         let clock_id = args[0] as i32;
@@ -86,11 +77,7 @@ impl SyscallHandler for GettimeofdayHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 2 {
-            #[cfg(feature = "alloc")]
-            #[cfg(feature = "alloc")]
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
-            #[cfg(not(feature = "alloc"))]
-            return Err(nos_api::Error::InvalidArgument("Insufficient arguments".into()));
         }
         
         let tv = args[0] as *mut Timeval;
@@ -123,11 +110,7 @@ impl SyscallHandler for NanosleepHandler {
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 2 {
-            #[cfg(feature = "alloc")]
-            #[cfg(feature = "alloc")]
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
-            #[cfg(not(feature = "alloc"))]
-            return Err(nos_api::Error::InvalidArgument("Insufficient arguments".into()));
         }
         
         let req = args[0] as *const Timespec;

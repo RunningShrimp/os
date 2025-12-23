@@ -2,7 +2,6 @@
 //! 
 //! This module provides a concrete implementation of the dependency injection container.
 
-#[cfg(feature = "alloc")]
 use alloc::{
     collections::{BTreeMap, VecDeque},
     sync::{Arc, Weak},
@@ -11,7 +10,6 @@ use alloc::{
     boxed::Box,
     format,
 };
-#[cfg(not(feature = "alloc"))]
 
 use core::any::{Any, TypeId};
 use core::cell::RefCell;

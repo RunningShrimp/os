@@ -76,7 +76,7 @@ pub mod error;
 mod kernel_factory;
 
 // Include necessary internal modules for library
-pub mod arch;
+// pub mod arch;
 pub mod subsystems;
 pub mod platform;
 
@@ -101,7 +101,6 @@ pub use subsystems::fs;
 pub use subsystems::vfs;
 pub use subsystems::ipc;
 pub use subsystems::process;
-pub use subsystems::mm;
 pub use subsystems::sync;
 pub use subsystems::time;
 
@@ -184,7 +183,6 @@ mod di;
 mod ids;
 mod libc;
 // Legacy modules - now accessed through subsystems
-mod mm;
 mod sched;
 mod monitoring;
 mod perf;
@@ -192,8 +190,6 @@ pub mod posix;
 mod security;
 #[cfg(feature = "security_audit")]
 mod security_audit;
-mod sync;
-mod time;
 mod procfs;
 
 #[cfg(not(feature = "cloud_native"))]
