@@ -16,6 +16,10 @@ pub mod dispatcher;
 // Re-export trait definitions
 pub use traits::{
     SyscallHandler, SyscallValidator, SyscallLogger,
-    SyscallInterceptor, SyscallFilter, SyscallContext, SyscallStats
+    SyscallInterceptor, SyscallFilter, SyscallContext, SyscallStatsTrait
 };
 pub use registry::{SyscallRegistry, SyscallInfo};
+
+// Re-export dispatcher for compatibility
+#[cfg(feature = "alloc")]
+pub use dispatcher::SyscallDispatcher;

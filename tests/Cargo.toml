@@ -11,6 +11,7 @@ categories = ["os", "development-tools::testing"]
 
 [dependencies]
 # Core dependencies
+kernel = { path = "../kernel", default-features = false }
 nos-api = { workspace = true, default-features = false }
 nos-memory-management = { workspace = true, default-features = false, optional = true }
 nos-syscalls = { workspace = true, default-features = false, optional = true }

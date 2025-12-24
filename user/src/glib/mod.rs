@@ -43,6 +43,7 @@ pub use async_io::*;
 pub use string::*;
 pub use utils::*;
 pub use macros::*;
+pub use types::*;
 
 // GLib错误处理
 pub mod error;

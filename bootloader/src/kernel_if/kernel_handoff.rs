@@ -5,6 +5,22 @@
 
 use core::mem;
 
+// Import VGA writer for error output
+use crate::drivers::vga::{VGAWriter, Color};
+
+/// Halt the system with an error message
+fn halt_with_error(msg: &str) -> ! {
+    let mut vga = VGAWriter::new();
+    vga.set_fg_color(Color::Red);
+    vga.set_bg_color(Color::Black);
+    vga.write_str("\n=== BOOTLOADER ERROR ===\n");
+    vga.write_str(msg);
+    vga.write_str("\n");
+    loop {
+        core::hint::spin_loop();
+    }
+}
+
 /// Boot protocol type indicator
 #[derive(Debug, Clone, Copy)]
 pub enum BootProtocol {
@@ -235,7 +251,8 @@ impl KernelHandoff {
         if let Err(e) = self.boot_info.validate() {
             // In bootloader context, we can't panic normally, so halt
             // This should not happen if prepare() was called, but check anyway
-            crate::panic!("Kernel handoff validation failed: {}", e);
+            // Simple error message for now
+            halt_with_error("Kernel handoff validation failed");
         }
 
         let kernel_entry = self.boot_info.kernel_entry;
@@ -245,12 +262,12 @@ impl KernelHandoff {
         // Kernel entry should be page-aligned (4KB) for most architectures
         const PAGE_SIZE: u64 = 4096;
         if kernel_entry % PAGE_SIZE != 0 {
-            crate::panic!("Kernel entry point {:#x} not page-aligned (must be aligned to 4KB boundary)", kernel_entry);
+            halt_with_error("Kernel entry point not page-aligned");
         }
 
         // Validate pointer alignment (should be 8-byte aligned for 64-bit)
         if (boot_info_ptr as usize) % 8 != 0 {
-            crate::panic!("Boot info pointer {:#p} not properly aligned (must be 8-byte aligned)", boot_info_ptr);
+            halt_with_error("Boot info pointer not properly aligned");
         }
 
         // Validate kernel entry is in reasonable range
@@ -260,14 +277,14 @@ impl KernelHandoff {
         #[cfg(target_arch = "x86_64")]
         {
             if kernel_entry < 0x100000 || (kernel_entry > 0x7FFFFFFFFFFF && kernel_entry < 0xFFFF800000000000) {
-                crate::panic!("Invalid kernel entry point address {:#x} (must be in valid kernel address space)", kernel_entry);
+                halt_with_error("Invalid kernel entry point address");
             }
         }
 
         #[cfg(target_arch = "aarch64")]
         {
             if kernel_entry < 0x100000 || (kernel_entry > 0xFFFFFFFFFFFF && kernel_entry < 0xFFFF000000000000) {
-                crate::panic!("Invalid kernel entry point address {:#x} (must be in valid kernel address space)", kernel_entry);
+                halt_with_error("Invalid kernel entry point address");
             }
         }
 

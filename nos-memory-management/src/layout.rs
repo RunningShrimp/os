@@ -77,46 +77,69 @@ pub struct AddressSpaceLayout {
     pub aslr_offset_range: usize,
 }
 
+/// Memory region type for ASLR offset application
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AslrRegionType {
+    /// Kernel code region
+    KernelCode,
+    /// Kernel data region
+    KernelData,
+    /// Kernel heap region
+    KernelHeap,
+    /// User code region
+    UserCode,
+    /// User data region
+    UserData,
+    /// User heap region
+    UserHeap,
+    /// User stack region
+    UserStack,
+    /// Physical mapping region
+    PhysicalMapping,
+    /// MMIO region
+    Mmio,
+}
+
 impl AddressSpaceLayout {
     /// Check if an address is in kernel space
     #[inline]
     pub fn is_kernel_address(&self, addr: usize) -> bool {
         addr >= self.kernel_base
     }
-    
+
     /// Check if an address is in user space
     #[inline]
     pub fn is_user_address(&self, addr: usize) -> bool {
         addr < self.user_max && addr >= self.user_base
     }
-    
+
     /// Check if an address is in kernel code region
     #[inline]
     pub fn is_kernel_code(&self, addr: usize) -> bool {
-        addr >= self.kernel_code_base && 
+        addr >= self.kernel_code_base &&
         addr < self.kernel_code_base + self.kernel_code_size
     }
-    
+
     /// Check if an address is in kernel data region
     #[inline]
     pub fn is_kernel_data(&self, addr: usize) -> bool {
-        addr >= self.kernel_data_base && 
+        addr >= self.kernel_data_base &&
         addr < self.kernel_data_base + self.kernel_data_size
     }
-    
+
     /// Check if an address is in kernel heap region
     #[inline]
     pub fn is_kernel_heap(&self, addr: usize) -> bool {
-        addr >= self.kernel_heap_base && 
+        addr >= self.kernel_heap_base &&
         addr < self.kernel_heap_base + self.kernel_heap_size
     }
-    
+
     /// Convert physical address to kernel virtual address (if direct mapping supported)
     #[inline]
     pub fn phys_to_virt(&self, phys: usize) -> Option<usize> {
         self.phys_map_base.map(|base| base + phys)
     }
-    
+
     /// Convert kernel virtual address to physical address (if direct mapping supported)
     #[inline]
     pub fn virt_to_phys(&self, virt: usize) -> Option<usize> {
@@ -130,29 +153,6 @@ impl AddressSpaceLayout {
             }
         }
         None
-    }
-    
-    /// Memory region type for ASLR offset application
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub enum AslrRegionType {
-        /// Kernel code region
-        KernelCode,
-        /// Kernel data region
-        KernelData,
-        /// Kernel heap region
-        KernelHeap,
-        /// User code region
-        UserCode,
-        /// User data region
-        UserData,
-        /// User heap region
-        UserHeap,
-        /// User stack region
-        UserStack,
-        /// Physical mapping region
-        PhysicalMapping,
-        /// MMIO region
-        Mmio,
     }
 
     /// Apply ASLR offset to a base address with boundary checks and region awareness
@@ -527,31 +527,31 @@ const RISCV64_LAYOUT: AddressSpaceLayout = AddressSpaceLayout {
 
 /// Get kernel base address for current architecture
 #[inline]
-pub const fn kernel_base() -> usize {
+pub fn kernel_base() -> usize {
     AddressSpaceLayout::current().kernel_base
 }
 
 /// Get user base address for current architecture
 #[inline]
-pub const fn user_base() -> usize {
+pub fn user_base() -> usize {
     AddressSpaceLayout::current().user_base
 }
 
 /// Get user stack top address for current architecture
 #[inline]
-pub const fn user_stack_top() -> usize {
+pub fn user_stack_top() -> usize {
     AddressSpaceLayout::current().user_stack_top
 }
 
 /// Get maximum user address for current architecture
 #[inline]
-pub const fn user_max() -> usize {
+pub fn user_max() -> usize {
     AddressSpaceLayout::current().user_max
 }
 
 /// Get page size for current architecture
 #[inline]
-pub const fn page_size() -> usize {
+pub fn page_size() -> usize {
     AddressSpaceLayout::current().page_size
 }
 

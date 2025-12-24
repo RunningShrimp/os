@@ -81,19 +81,19 @@ pub trait SyscallContext: Send + Sync {
 }
 
 /// System call statistics trait
-pub trait SyscallStats: Send + Sync {
+pub trait SyscallStatsTrait: Send + Sync {
     /// Record a system call execution
     fn record(&self, id: u32, execution_time: u64, success: bool);
-    
+
     /// Get the total number of system calls
     fn get_total_calls(&self) -> u64;
-    
+
     /// Get the number of system calls by type
     fn get_calls_by_type(&self, id: u32) -> u64;
-    
+
     /// Get the average execution time
     fn get_avg_execution_time(&self) -> u64;
-    
+
     /// Get the error rate
     fn get_error_rate(&self) -> f64;
 }

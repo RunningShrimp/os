@@ -9,7 +9,9 @@ use alloc::boxed::Box;
 #[cfg(feature = "alloc")]
 use alloc::sync::Arc;
 use nos_api::Result;
-use crate::core::{SyscallHandler, SyscallDispatcher};
+use crate::core::traits::SyscallHandler;
+#[cfg(feature = "alloc")]
+use crate::core::dispatcher::SyscallDispatcher;
 
 /// Zero-copy network manager placeholder
 #[cfg(feature = "alloc")]
@@ -165,7 +167,7 @@ pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
 
 /// Register zero-copy network I/O system call handlers (no-alloc version)
 #[cfg(not(feature = "alloc"))]
-pub fn register_handlers(_dispatcher: &mut SyscallDispatcher) -> Result<()> {
+pub fn register_handlers(_dispatcher: &mut crate::core::traits::SyscallDispatcher) -> Result<()> {
     // In no-alloc environments, handlers would need to be registered differently
     // For now, just return success
     Ok(())

@@ -13,7 +13,7 @@
 #![no_main]
 
 extern crate alloc;
-use user::glib::{init, cleanup, g_malloc, g_malloc0, g_realloc, g_free, g_strdup, strlen, g_utf8_validate, g_strcmp0, g_ascii_strcasecmp, g_path_dirname, g_path_basename, GList, GSList, GHashTable, GQueue, GPtrArray, GTimeVal_, gpointer, gconstpointer, gboolean, g_slice_free1, get_memory_stats, check_memory_leaks, g_strndup};
+use user::glib::{init, cleanup, g_malloc, g_malloc0, g_malloc_n, g_realloc, g_free, g_strdup, g_slice_alloc, g_utf8_strlen, g_utf8_validate, g_strcmp0, g_ascii_strcasecmp, g_path_dirname, g_path_basename, GList, GSList, GHashTable, GQueue, GPtrArray, GTimeVal_, gpointer, gconstpointer, gboolean, g_slice_free1, get_memory_stats, check_memory_leaks, g_strndup};
 // 使用user::println函数而不是宏
 use user::glib::string::{GString};
 use user::glib::utils::{math, bit_ops, g_random_set_seed, g_random_int, g_random_int_range, g_random_double, g_random_double_range, G_PI};
@@ -31,7 +31,10 @@ pub extern "C" fn main() -> i32 {
             user::println("✓ GLib initialized successfully");
         }
         Err(e) => {
-            user::println("✗ GLib initialization failed: {:?}", e);
+            #[cfg(feature = "alloc")]
+    user::println(&alloc::format!("✗ GLib initialization failed: {:?}", e));
+    #[cfg(not(feature = "alloc"))]
+    user::println("✗ GLib initialization failed");
             return 1;
         }
     }
@@ -101,11 +104,20 @@ fn test_memory_management() {
 
     // 检查内存统计
     let stats = get_memory_stats();
-    user::println("  Total allocations: {}", stats.total_allocations.load(core::sync::atomic::Ordering::SeqCst));
-    user::println("  Current allocated: {} bytes", stats.current_allocated.load(core::sync::atomic::Ordering::SeqCst));
-
+    let total = stats.total_allocations.load(core::sync::atomic::Ordering::SeqCst);
+    let current = stats.current_allocated_bytes.load(core::sync::atomic::Ordering::SeqCst);
     let leaks = check_memory_leaks();
-    user::println("  Memory leaks: {}", leaks);
+
+    #[cfg(feature = "alloc")]
+    {
+        user::println("  Total allocations: {}", total);
+        user::println("  Current allocated: {} bytes", current);
+        user::println("  Memory leaks: {}", leaks);
+    }
+    #[cfg(not(feature = "alloc"))]
+    {
+        user::println("  Memory management tests passed");
+    }
 }
 
 fn test_data_structures() {

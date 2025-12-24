@@ -14,7 +14,9 @@ use alloc::{
 };
 use spin::Mutex;
 use nos_api::Result;
-use crate::core::{SyscallHandler, SyscallDispatcher};
+use crate::core::traits::SyscallHandler;
+#[cfg(feature = "alloc")]
+use crate::core::dispatcher::SyscallDispatcher;
 use core::sync::atomic::{AtomicU64, Ordering};
 
 /// Task priority levels
@@ -618,7 +620,7 @@ pub fn get_scheduler_report(scheduler: &AdaptiveScheduler) -> String {
 
 /// Register adaptive scheduler system call handlers (no-alloc version)
 #[cfg(not(feature = "alloc"))]
-pub fn register_handlers(_dispatcher: &mut SyscallDispatcher) -> Result<()> {
+pub fn register_handlers(_dispatcher: &mut crate::core::traits::SyscallDispatcher) -> Result<()> {
     // In no-alloc environments, adaptive scheduling is limited
     // For now, just return success
     Ok(())

@@ -700,6 +700,7 @@ name = "nos-tests"
 version = "0.1.0"
 dependencies = [
  "hashbrown 0.16.1",
+ "kernel",
  "log",
  "nos-api",
  "nos-error-handling",

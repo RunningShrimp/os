@@ -3,7 +3,7 @@
 //! This module provides inter-process communication system calls.
 
 #[cfg(feature = "alloc")]
-use crate::core::SyscallDispatcher;
+use crate::core::dispatcher::SyscallDispatcher;
 
 /// Register IPC system call handlers
 #[cfg(feature = "alloc")]

@@ -11,7 +11,8 @@ use alloc::{
     format,
 };
 use nos_api::Result;
-use crate::core::{SyscallHandler, SyscallDispatcher};
+use crate::core::traits::SyscallHandler;
+use crate::core::dispatcher::SyscallDispatcher;;
 use core::sync::atomic::{AtomicU64, Ordering};
 use spin::Mutex;  // 使用spin::Mutex替代RefCell以支持Sync
 

@@ -19,7 +19,10 @@ pub extern "C" fn main() -> i32 {
             user::println("✓ GLib initialization successful");
         }
         Err(e) => {
-            user::println("✗ GLib initialization failed: {:?}", e);
+            #[cfg(feature = "alloc")]
+            user::println(&alloc::format!("✗ GLib initialization failed: {:?}", e));
+            #[cfg(not(feature = "alloc"))]
+            user::println("✗ GLib initialization failed");
             return 1;
         }
     }

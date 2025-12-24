@@ -15,7 +15,8 @@ use alloc::string::ToString;
 use alloc::format;
 use nos_api::{Result, Error};
 use spin::Mutex;
-use crate::core::{SyscallHandler, SyscallDispatcher};
+use crate::core::traits::SyscallHandler;
+use crate::core::dispatcher::SyscallDispatcher;;
 
 /// Async operation context
 #[derive(Debug, Clone)]

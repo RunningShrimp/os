@@ -13,7 +13,9 @@
 
 extern crate alloc;
 
-use crate::glib::{g_free, g_malloc, g_malloc0, g_strdup, error::GError, guint, guint8, guint16, guint32, gpointer, gchar};
+use crate::glib::{g_free, g_malloc, g_malloc0, g_strdup, error::GError, guint, guint8, gpointer, gchar, gdouble};
+use crate::glib::{GList};
+use crate::glib::{glong, gulong, gint32, gint64, gboolean, guint64};
 use core::ffi::c_int;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -69,10 +71,10 @@ pub struct GTimeSpec_ {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct GDate {
-    pub year: guint16,
+    pub year: u16,
     pub month: guint8,
     pub day: guint8,
-    pub julian_days: guint32,
+    pub julian_days: u32,
     pub dmy: guint8,
 }
 
@@ -119,7 +121,7 @@ pub fn g_random_set_seed(seed: u32) {
 }
 
 /// 生成随机整数 [0, 2^31-1]
-pub fn g_random_int() -> guint32 {
+pub fn g_random_int() -> u32 {
     unsafe {
         // 简化的线性同余生成器
         RANDOM_STATE = RANDOM_STATE.wrapping_mul(1103515245).wrapping_add(12345);
@@ -359,7 +361,7 @@ pub mod date {
     }
 
     /// 设置日期
-    pub fn g_date_set_dmy(date: *mut GDate, day: guint8, month: GDateMonth, year: guint16) {
+    pub fn g_date_set_dmy(date: *mut GDate, day: guint8, month: GDateMonth, year: u16) {
         if date.is_null() || day == 0 || day > 31 || month == GDateMonth::BadMonth || year == 0 {
             return;
         }
@@ -392,7 +394,7 @@ pub mod date {
     }
 
     /// 获取日期的年
-    pub fn g_date_get_year(date: *const GDate) -> guint16 {
+    pub fn g_date_get_year(date: *const GDate) -> u16 {
         if date.is_null() {
             return 0;
         }
@@ -480,7 +482,7 @@ pub mod date {
     }
 
     /// 计算Julian日
-    fn calculate_julian_days(day: guint8, month: guint8, year: guint16) -> guint32 {
+    fn calculate_julian_days(day: guint8, month: guint8, year: u16) -> u32 {
         // 简化的Julian日计算
         let y = year as i32;
         let m = month as i32;
@@ -488,10 +490,10 @@ pub mod date {
 
         if m <= 2 {
             ((y - 1) * 365 + (y - 1) / 4 - (y - 1) / 100 + (y - 1) / 400
-                + 306 * (m + 12) / 10 + d - 428) as guint32
+                + 306 * (m + 12) / 10 + d - 428) as u32
         } else {
             (y * 365 + y / 4 - y / 100 + y / 400
-                + 306 * m / 10 + d - 428) as guint32
+                + 306 * m / 10 + d - 428) as u32
         }
     }
 
@@ -811,7 +813,7 @@ pub mod bit_ops {
     }
 
     /// 交换字节序
-    pub fn g_htonl(val: guint32) -> guint32 {
+    pub fn g_htonl(val: u32) -> u32 {
         if cfg!(target_endian = "little") {
             val.swap_bytes()
         } else {
@@ -820,12 +822,12 @@ pub mod bit_ops {
     }
 
     /// 交换字节序（从网络字节序）
-    pub fn g_ntohl(val: guint32) -> guint32 {
+    pub fn g_ntohl(val: u32) -> u32 {
         g_htonl(val)
     }
 
     /// 交换16位字节序
-    pub fn g_htons(val: guint16) -> guint16 {
+    pub fn g_htons(val: u16) -> u16 {
         if cfg!(target_endian = "little") {
             val.swap_bytes()
         } else {
@@ -834,7 +836,7 @@ pub mod bit_ops {
     }
 
     /// 交换16位字节序（从网络字节序）
-    pub fn g_ntohs(val: guint16) -> guint16 {
+    pub fn g_ntohs(val: u16) -> u16 {
         g_htons(val)
     }
 }

@@ -8,12 +8,12 @@ use alloc::string::ToString;
 use alloc::boxed::Box;
 
 use nos_api::Result;
-use crate::core::SyscallHandler;
+use crate::core::traits::SyscallHandler;
 #[cfg(feature = "log")]
 use log;
 
 #[cfg(feature = "alloc")]
-use crate::core::SyscallDispatcher;
+use crate::core::dispatcher::SyscallDispatcher;
 
 /// Register memory system call handlers
 #[cfg(feature = "alloc")]

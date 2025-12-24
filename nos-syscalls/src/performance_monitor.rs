@@ -17,7 +17,8 @@ use spin::Mutex;
 #[cfg(feature = "log")]
 use log;
 use nos_api::Result;
-use crate::core::{SyscallHandler, SyscallDispatcher};
+use crate::core::traits::SyscallHandler;
+use crate::core::dispatcher::SyscallDispatcher;;
 use core::sync::atomic::{AtomicU64, Ordering};
 use libm::sqrt;
 

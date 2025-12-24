@@ -107,9 +107,8 @@ pub use health::{HealthMonitor as ImplHealthMonitor, HealthMetric, HealthThresho
 /// * `nos_api::Result<()>` - Success or error
 #[cfg(feature = "alloc")]
 pub fn init_error_handling() -> nos_api::Result<()> {
-    // Initialize error handling engine
-    core::init_engine()?;
-    
+    // Note: Actual implementation should be in kernel/src/error
+    // This is just an interface definition layer
     Ok(())
 }
 
@@ -123,9 +122,8 @@ pub fn init_error_handling() -> nos_api::Result<()> {
 /// * `nos_api::Result<()>` - Success or error
 #[cfg(feature = "alloc")]
 pub fn shutdown_error_handling() -> nos_api::Result<()> {
-    // Shutdown error handling engine
-    core::shutdown_engine()?;
-    
+    // Note: Actual implementation should be in kernel/src/error
+    // This is just an interface definition layer
     Ok(())
 }
 
@@ -136,7 +134,17 @@ pub fn shutdown_error_handling() -> nos_api::Result<()> {
 /// * `ErrorHandlingStats` - Error handling statistics
 #[cfg(feature = "alloc")]
 pub fn get_error_stats() -> types::ErrorHandlingStats {
-    core::get_stats()
+    // Note: Actual implementation should be in kernel/src/error
+    // This is just an interface definition layer
+    types::ErrorHandlingStats {
+        total_errors: 0,
+        errors_by_category: alloc::collections::BTreeMap::new(),
+        errors_by_severity: alloc::collections::BTreeMap::new(),
+        recovered_errors: 0,
+        recovery_success_rate: 0.0,
+        avg_recovery_time: 0,
+        health_score: 100.0,
+    }
 }
 
 

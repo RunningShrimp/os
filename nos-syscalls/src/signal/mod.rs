@@ -6,7 +6,7 @@
 use nos_api::Result;
 
 #[cfg(feature = "alloc")]
-use crate::core::SyscallDispatcher;
+use crate::core::dispatcher::SyscallDispatcher;
 
 /// Register signal system call handlers
 #[cfg(feature = "alloc")]

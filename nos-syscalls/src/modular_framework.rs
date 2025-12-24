@@ -13,7 +13,7 @@ use alloc::{
     format,
 };
 use nos_api::Result;
-use crate::core::SyscallHandler;
+use crate::core::traits::SyscallHandler;
 use core::sync::atomic::{AtomicU64, Ordering};
 
 /// System call category for organization

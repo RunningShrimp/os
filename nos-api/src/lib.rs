@@ -74,7 +74,7 @@ pub mod perf;
 // Re-export commonly used types
 pub use crate::core::types::*;
 pub use crate::error::{Error, Result};
-pub use crate::syscall::interface::SyscallHandler;
+pub use crate::syscall::interface::{SyscallHandler, SyscallDispatcher};
 pub use crate::core::traits::Service;
 pub use crate::service::interface::ServiceRegistry;
 pub use crate::memory::interface::{MemoryManager, PageAllocator};

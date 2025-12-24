@@ -35,22 +35,16 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-//! NOS System Calls - Interface Definition Layer
-//!
-//! This crate provides the system call interface definitions (traits and types)
-//! for the NOS operating system. The actual implementations are in the kernel.
-//!
-//! # Architecture
-//!
-//! This crate serves as an interface definition layer:
-//! - Defines traits for system call handlers, dispatchers, and related components
-//! - Provides type definitions and constants for system calls
-//! - Does NOT contain actual implementations (those are in kernel/subsystems/syscalls)
-
 // Core trait definitions
 pub mod core {
     pub mod traits;
     pub mod registry; // Registry trait definitions only
+
+    // Note: dispatcher module contains implementation details that should be
+    // in kernel, not here. It is deprecated.
+    #[cfg(feature = "alloc")]
+    #[deprecated(note = "Dispatcher implementation should be in kernel/subsystems/syscalls")]
+    pub mod dispatcher;
 }
 
 // System call type definitions and constants
@@ -71,11 +65,15 @@ pub mod advanced_mmap;
 
 // Re-export commonly used traits and types
 pub use core::traits::{
-    SyscallHandler, SyscallValidator, SyscallLogger, 
-    SyscallInterceptor, SyscallFilter, SyscallContext, SyscallStats
+    SyscallHandler, SyscallValidator, SyscallLogger,
+    SyscallInterceptor, SyscallFilter, SyscallContext, SyscallStatsTrait
 };
 pub use core::registry::{SyscallRegistry, SyscallInfo};
 pub use types::*;
+
+// Re-export dispatcher for compatibility
+#[cfg(feature = "alloc")]
+pub use core::dispatcher::SyscallDispatcher;
 
 // Note: The following modules contain implementation details that should be
 // moved to kernel/subsystems/syscalls. They are kept here temporarily for

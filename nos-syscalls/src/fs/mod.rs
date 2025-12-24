@@ -7,11 +7,11 @@ use alloc::string::ToString;
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 use nos_api::Result;
-use crate::core::SyscallHandler;
+use crate::core::traits::SyscallHandler;
 #[cfg(feature = "log")]
 use log;
 #[cfg(feature = "alloc")]
-use crate::core::SyscallDispatcher;
+use crate::core::dispatcher::SyscallDispatcher;
 
 /// Register file system system call handlers
 #[cfg(feature = "alloc")]

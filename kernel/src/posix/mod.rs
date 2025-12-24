@@ -1748,9 +1748,6 @@ pub struct stat {
 // POSIX Semaphore and Message Queue Types
 // ============================================================================
 
-/// POSIX semaphore type
-pub type SemT = SemT;
-
 /// POSIX message queue descriptor type
 pub type MqdT = i32;
 
