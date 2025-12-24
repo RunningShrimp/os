@@ -3,7 +3,7 @@
 use crate::error::Result;
 
 /// Core trait for all services in the system
-pub trait Service {
+pub trait Service: Send + Sync {
     /// Returns the unique name of the service
     fn name(&self) -> &str;
     

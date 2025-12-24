@@ -12,6 +12,18 @@ pub mod numa;
 pub mod stats;
 pub mod memory_isolation;
 pub mod optimized_page_allocator;
+pub mod types;
+pub mod unified_stats;
+
+// Re-export unified stats to avoid duplication
+pub use unified_stats::{
+    MemoryManagementStats,
+    AllocationStats,
+    AtomicAllocationStats,
+    NumStats,
+    LightweightAllocationStats,
+    ExtendedAllocationStats,
+};
 
 #[cfg(feature = "kernel_tests")]
 pub mod tests;
@@ -124,116 +136,6 @@ pub fn shutdown_advanced_memory_management() -> nos_api::Result<()> {
 /// * `MemoryManagementStats` - Memory management statistics
 pub fn get_memory_stats() -> MemoryManagementStats {
     stats::get_memory_stats()
-}
-
-/// Memory management statistics
-#[derive(Debug, Clone)]
-pub struct MemoryManagementStats {
-    /// Total physical memory
-    pub total_physical_memory: u64,
-    /// Available physical memory
-    pub available_physical_memory: u64,
-    /// Total virtual memory
-    pub total_virtual_memory: u64,
-    /// Available virtual memory
-    pub available_virtual_memory: u64,
-    /// Memory usage by type
-    pub memory_usage_by_type: alloc::collections::BTreeMap<MemoryType, u64>,
-    /// Allocation statistics
-    pub allocation_stats: AllocationStats,
-    /// NUMA statistics
-    pub numa_stats: NumStats,
-}
-
-/// Memory type
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum MemoryType {
-    /// Normal memory
-    Normal = 0,
-    /// DMA memory
-    DMA = 1,
-    /// High memory
-    HighMem = 2,
-    /// Reserved memory
-    Reserved = 3,
-    /// Kernel memory
-    Kernel = 4,
-    /// User memory
-    User = 5,
-}
-
-/// Allocation statistics
-#[derive(Debug, Clone)]
-pub struct AllocationStats {
-    /// Total allocations
-    pub total_allocations: u64,
-    /// Total deallocations
-    pub total_deallocations: u64,
-    /// Current allocations
-    pub current_allocations: u64,
-    /// Peak allocations
-    pub peak_allocations: u64,
-    /// Total allocated bytes
-    pub total_allocated_bytes: u64,
-    /// Total deallocated bytes
-    pub total_deallocated_bytes: u64,
-    /// Currently allocated bytes
-    pub current_allocated_bytes: u64,
-    /// Peak allocated bytes
-    pub peak_allocated_bytes: u64,
-    /// Allocation failures
-    pub allocation_failures: u64,
-}
-
-/// NUMA statistics
-#[derive(Debug, Clone)]
-pub struct NumStats {
-    /// Number of NUMA nodes
-    pub num_nodes: u32,
-    /// Memory per node
-    pub memory_per_node: alloc::vec::Vec<u64>,
-    /// Allocation statistics per node
-    pub allocation_stats_per_node: alloc::vec::Vec<AllocationStats>,
-}
-
-impl Default for MemoryManagementStats {
-    fn default() -> Self {
-        Self {
-            total_physical_memory: 0,
-            available_physical_memory: 0,
-            total_virtual_memory: 0,
-            available_virtual_memory: 0,
-            memory_usage_by_type: alloc::collections::BTreeMap::new(),
-            allocation_stats: AllocationStats::default(),
-            numa_stats: NumStats::default(),
-        }
-    }
-}
-
-impl Default for AllocationStats {
-    fn default() -> Self {
-        Self {
-            total_allocations: 0,
-            total_deallocations: 0,
-            current_allocations: 0,
-            peak_allocations: 0,
-            total_allocated_bytes: 0,
-            total_deallocated_bytes: 0,
-            current_allocated_bytes: 0,
-            peak_allocated_bytes: 0,
-            allocation_failures: 0,
-        }
-    }
-}
-
-impl Default for NumStats {
-    fn default() -> Self {
-        Self {
-            num_nodes: 0,
-            memory_per_node: alloc::vec::Vec::new(),
-            allocation_stats_per_node: alloc::vec::Vec::new(),
-        }
-    }
 }
 
 #[cfg(test)]

@@ -66,6 +66,9 @@ macro_rules! log_error { ($($arg:tt)*) => { let _ = ($($arg)*); }; }
 // API layer - public interfaces for kernel subsystems
 pub mod api;
 
+// VFS interface layer - breaks circular dependency between VFS and FS
+pub mod vfs_interface;
+
 // Core kernel functionality (from nos-kernel-core)
 pub mod core;
 

@@ -6,11 +6,45 @@
 //! - Command execution framework
 //! - Security measurements and attestation
 
+use crate::utils::mmio::Mmio32;
+
 /// TPM base address (typically 0xFED40000)
 pub const TPM_BASE: u64 = 0xFED40000;
 
 /// TPM command/response buffer size
 pub const TPM_BUFFER_SIZE: usize = 4096;
+
+/// TPM 2.0 Register offsets
+pub mod tpm_reg {
+    pub const ACCESS: u32 = 0x0000;
+    pub const INT_ENABLE: u32 = 0x0008;
+    pub const INT_VECTOR: u32 = 0x000C;
+    pub const INT_STATUS: u32 = 0x0010;
+    pub const INTF_CAPABILITY: u32 = 0x0014;
+    pub const STATUS: u32 = 0x0018;
+    pub const DATA_FIFO: u32 = 0x0024;
+    pub const INTERFACE_ID: u32 = 0x0030;
+    pub const DID_VID: u32 = 0x0F00;
+    pub const RID: u32 = 0x0F04;
+}
+
+/// TPM_ACCESS register bits
+pub mod access_reg {
+    pub const ACTIVE_LOCALITY: u32 = 0x20;
+    pub const REQUEST_USE: u32 = 0x02;
+    pub const ESTABLISH: u32 = 0x01;
+}
+
+/// TPM_STS register bits
+pub mod sts_reg {
+    pub const VALID: u32 = 0x80;
+    pub const COMMAND_READY: u32 = 0x40;
+    pub const TPM_GO: u32 = 0x20;
+    pub const DATA_AVAIL: u32 = 0x10;
+    pub const EXPECT: u32 = 0x08;
+    pub const SELF_TEST_DONE: u32 = 0x04;
+    pub const RESPONSE_RETRY: u32 = 0x02;
+}
 
 /// TPM 2.0 command codes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -248,13 +282,47 @@ impl TpmDriver {
             return false;
         }
 
-        if let Some(mut pcr) = self.pcr_values[idx] {
-            pcr.set_hash(data);
-            self.pcr_values[idx] = Some(pcr);
-            self.command_count += 1;
-            true
-        } else {
-            false
+        let mut command_buffer = [0u8; TPM_BUFFER_SIZE];
+        let mut response_buffer = [0u8; TPM_BUFFER_SIZE];
+
+        command_buffer[0] = 0x80;
+        command_buffer[1] = 0x01;
+        command_buffer[2] = 0x00;
+        command_buffer[3] = 0x00;
+        command_buffer[4] = 0x00;
+        command_buffer[5] = 0x22;
+
+        let cmd_len = 10 + data.len();
+        command_buffer[6] = (cmd_len >> 8) as u8;
+        command_buffer[7] = (cmd_len & 0xFF) as u8;
+
+        command_buffer[8] = 0x00;
+        command_buffer[9] = 0x01;
+
+        command_buffer[10] = 0x00;
+        command_buffer[11] = 0x0B;
+
+        command_buffer[12] = idx as u8;
+
+        command_buffer[13] = (data.len() >> 8) as u8;
+        command_buffer[14] = (data.len() & 0xFF) as u8;
+
+        for (i, &byte) in data.iter().enumerate() {
+            command_buffer[15 + i] = byte;
+        }
+
+        match self.execute_command(&command_buffer[..15 + data.len()], &mut response_buffer) {
+            Ok(_) => {
+                if let Some(mut pcr) = self.pcr_values[idx] {
+                    pcr.set_hash(data);
+                    self.pcr_values[idx] = Some(pcr);
+                    self.command_count += 1;
+                    true
+                } else {
+                    false
+                }
+            }
+            Err(_) => false,
         }
     }
 
@@ -299,16 +367,156 @@ impl TpmDriver {
         }
     }
 
-    /// Read TPM register (simulated)
-    fn read_register(&self, _offset: u32) -> u32 {
-        // Real implementation reads from TPM MMIO region
-        1
+    /// Read TPM register via MMIO
+    fn read_register(&self, offset: u32) -> u32 {
+        let addr = (self.base_address + offset as u64) as usize;
+        unsafe {
+            let reg = Mmio32::new(addr);
+            reg.read()
+        }
     }
 
-    /// Write TPM register (simulated)
-    #[allow(dead_code)]
-    fn write_register(&self, _offset: u32, _value: u32) {
-        // Real implementation writes to TPM MMIO region
+    /// Write TPM register via MMIO
+    fn write_register(&self, offset: u32, value: u32) {
+        let addr = (self.base_address + offset as u64) as usize;
+        unsafe {
+            let mut reg = Mmio32::new(addr);
+            reg.write(value);
+        }
+    }
+
+    /// Wait for TPM command ready bit
+    fn wait_for_ready(&self, timeout_us: u32) -> bool {
+        for _ in 0..timeout_us {
+            let sts = self.read_register(tpm_reg::STATUS);
+            if (sts & sts_reg::COMMAND_READY) != 0 {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Wait for TPM data available bit
+    fn wait_for_data_avail(&self, timeout_us: u32) -> bool {
+        for _ in 0..timeout_us {
+            let sts = self.read_register(tpm_reg::STATUS);
+            if (sts & sts_reg::DATA_AVAIL) != 0 {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Request TPM locality
+    fn request_locality(&self) -> bool {
+        let access_addr = (self.base_address + tpm_reg::ACCESS as u64) as usize;
+        unsafe {
+            let mut reg = Mmio32::new(access_addr);
+            let current = reg.read();
+            if (current & access_reg::ACTIVE_LOCALITY) == 0 {
+                reg.write(current | access_reg::REQUEST_USE);
+                for _ in 0..1000 {
+                    if (reg.read() & access_reg::ACTIVE_LOCALITY) != 0 {
+                        return true;
+                    }
+                }
+            } else {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Release TPM locality
+    fn release_locality(&self) {
+        let access_addr = (self.base_address + tpm_reg::ACCESS as u64) as usize;
+        unsafe {
+            let mut reg = Mmio32::new(access_addr);
+            reg.write(access_reg::ACTIVE_LOCALITY);
+        }
+    }
+
+    /// Write TPM command to FIFO
+    fn write_command(&self, command: &[u8]) -> bool {
+        for &byte in command {
+            let sts = self.read_register(tpm_reg::STATUS);
+            if (sts & sts_reg::EXPECT) == 0 {
+                return false;
+            }
+
+            let data_addr = (self.base_address + tpm_reg::DATA_FIFO as u64) as usize;
+            unsafe {
+                let mut reg = Mmio32::new(data_addr);
+                reg.write(byte as u32);
+            }
+        }
+        true
+    }
+
+    /// Read TPM response from FIFO
+    fn read_response(&self, buffer: &mut [u8]) -> usize {
+        let mut count = 0;
+        let max_len = buffer.len().min(TPM_BUFFER_SIZE);
+
+        while count < max_len {
+            let sts = self.read_register(tpm_reg::STATUS);
+            if (sts & sts_reg::DATA_AVAIL) == 0 {
+                break;
+            }
+
+            let data_addr = (self.base_address + tpm_reg::DATA_FIFO as u64) as usize;
+            unsafe {
+                let reg = Mmio32::new(data_addr);
+                buffer[count] = reg.read() as u8;
+            }
+
+            count += 1;
+        }
+
+        count
+    }
+
+    /// Execute TPM command with response
+    fn execute_command(&mut self, command: &[u8], response: &mut [u8]) -> Result<usize, u32> {
+        if !self.request_locality() {
+            return Err(0xFFFF0001);
+        }
+
+        if !self.wait_for_ready(1000) {
+            self.release_locality();
+            return Err(0xFFFF0002);
+        }
+
+        let sts_addr = (self.base_address + tpm_reg::STATUS as u64) as usize;
+        unsafe {
+            let mut reg = Mmio32::new(sts_addr);
+            reg.write(sts_reg::COMMAND_READY);
+        }
+
+        if !self.wait_for_ready(1000) {
+            self.release_locality();
+            return Err(0xFFFF0003);
+        }
+
+        if !self.write_command(command) {
+            self.release_locality();
+            return Err(0xFFFF0004);
+        }
+
+        let go_addr = (self.base_address + tpm_reg::STATUS as u64) as usize;
+        unsafe {
+            let mut reg = Mmio32::new(go_addr);
+            reg.write(sts_reg::TPM_GO);
+        }
+
+        if !self.wait_for_data_avail(10000) {
+            self.release_locality();
+            return Err(0xFFFF0005);
+        }
+
+        let count = self.read_response(response);
+        self.release_locality();
+        Ok(count)
     }
 }
 

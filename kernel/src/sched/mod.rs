@@ -433,4 +433,66 @@ impl O1Scheduler {
         // 实际实现需要考虑任务亲和性等
         info!("Migrating {} tasks for load balancing", num_tasks);
     }
+
+    /// 工作窃取：从其他CPU窃取任务
+    pub fn work_steal() -> Option<usize> {
+        let cpu_id = cpuid() as usize % MAX_CPUS;
+        let local_scheduler = &PER_CPU_SCHEDULERS[cpu_id];
+
+        // 如果本地CPU有足够工作，不窃取（反抖动）
+        let (local_count, _, _) = local_scheduler.stats();
+        if local_count > 2 {
+            return None;
+        }
+
+        // 获取随机起始点（公平窃取）
+        let random_start = Self::get_steal_random_offset() as usize % MAX_CPUS;
+
+        // 工作窃取：负载感知选择
+        for i in 0..MAX_CPUS.saturating_sub(1) {
+            let steal_cpu_id = (random_start + i) % MAX_CPUS;
+
+            // 跳过本地CPU
+            if steal_cpu_id == cpu_id {
+                continue;
+            }
+
+            let steal_scheduler = &PER_CPU_SCHEDULERS[steal_cpu_id];
+            let (steal_count, _, _) = steal_scheduler.stats();
+
+            // 只从负载更高的CPU窃取
+            if steal_count <= local_count + 1 {
+                continue;
+            }
+
+            // 尝试从该CPU窃取最高优先级任务
+            if let Some(task_id) = steal_scheduler.peek() {
+                // 成功窃取，从原CPU移除
+                steal_scheduler.remove(task_id);
+                return Some(task_id);
+            }
+        }
+
+        None
+    }
+
+    /// 带工作窃取的调度
+    pub fn schedule_next_with_steal() -> Option<usize> {
+        // 先尝试本地调度
+        if let Some(task_id) = Self::schedule_next() {
+            return Some(task_id);
+        }
+
+        // 本地无任务，尝试工作窃取
+        Self::work_steal()
+    }
+
+    /// 获取窃取随机偏移（简单哈希）
+    fn get_steal_random_offset() -> u32 {
+        use crate::subsystems::time::get_ticks;
+        let timestamp = get_ticks();
+        let cpu_id = cpuid() as u64;
+        let combined = timestamp.wrapping_mul(31).wrapping_add(cpu_id);
+        (combined as u32)
+    }
 }

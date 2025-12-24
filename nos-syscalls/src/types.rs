@@ -23,16 +23,24 @@ pub const SYS_NANOSLEEP: u32 = 16;
 
 // Advanced system calls
 pub const SYS_ADVANCED_MMAP: u32 = 1000;
-pub const SYS_ASYNC_OP: u32 = 1001;
-pub const SYS_ASYNC_WAIT: u32 = 1002;
-pub const SYS_EPOLL_CREATE: u32 = 1003;
-pub const SYS_EPOLL_CTL: u32 = 1004;
-pub const SYS_EPOLL_WAIT: u32 = 1005;
-pub const SYS_SCHED_YIELD: u32 = 1006;
+pub const SYS_ADVANCED_MPROTECT: u32 = 1001;
+pub const SYS_ADVANCED_MUNMAP: u32 = 1002;
+pub const SYS_MEMORY_STATS: u32 = 1003;
+pub const SYS_ASYNC_OP: u32 = 1004;
+pub const SYS_ASYNC_WAIT: u32 = 1005;
+pub const SYS_ASYNC_CANCEL: u32 = 1010;
+pub const SYS_ASYNC_STATS: u32 = 1011;
+pub const SYS_EPOLL_CREATE: u32 = 1006;
+pub const SYS_EPOLL_CTL: u32 = 1007;
+pub const SYS_EPOLL_WAIT: u32 = 1008;
+pub const SYS_EPOLL_CLOSE: u32 = 1012;
+pub const SYS_SCHED_YIELD: u32 = 1009;
 
 // Zero-copy network I/O system calls
 pub const SYS_ZERO_COPY_SEND: u32 = 2000;
 pub const SYS_ZERO_COPY_RECV: u32 = 2001;
+pub const SYS_ZERO_COPY_CREATE_BUFFER: u32 = 2002;
+pub const SYS_ZERO_COPY_DESTROY_BUFFER: u32 = 2003;
 
 // Performance monitoring system calls
 pub const SYS_PERF_MONITOR: u32 = 3000;

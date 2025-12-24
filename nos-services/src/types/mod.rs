@@ -24,10 +24,12 @@ pub mod service_type {
 
 /// Service priority
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Default)]
 pub enum ServicePriority {
     /// Low priority
     Low = 0,
     /// Normal priority
+    #[default]
     Normal = 1,
     /// High priority
     High = 2,
@@ -35,14 +37,10 @@ pub enum ServicePriority {
     Critical = 3,
 }
 
-impl Default for ServicePriority {
-    fn default() -> Self {
-        Self::Normal
-    }
-}
 
 /// Service dependency
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct ServiceDependency {
     /// Service name
     pub name: String,
@@ -122,6 +120,7 @@ pub enum ServiceEventType {
 
 /// Service health status
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum ServiceHealthStatus {
     /// Service is healthy
     Healthy,
@@ -130,14 +129,10 @@ pub enum ServiceHealthStatus {
     /// Service is unhealthy
     Unhealthy,
     /// Service status unknown
+    #[default]
     Unknown,
 }
 
-impl Default for ServiceHealthStatus {
-    fn default() -> Self {
-        Self::Unknown
-    }
-}
 
 /// Service metrics
 #[derive(Debug, Clone)]
@@ -178,16 +173,6 @@ impl Default for ServiceMetrics {
     }
 }
 
-impl Default for ServiceDependency {
-    fn default() -> Self {
-        Self {
-            name: String::new(),
-            min_version: String::new(),
-            max_version: None,
-            required: false,
-        }
-    }
-}
 
 impl Default for ServiceEndpoint {
     fn default() -> Self {

@@ -342,6 +342,65 @@ pub fn unpin_user_pages(frames: &[usize]) -> Result<(), VmError> {
 }
 
 // ============================================================================
+// KPTI (Kernel Page Table Isolation) for Meltdown mitigation
+// ============================================================================
+
+/// KPTI configuration
+pub mod kpti {
+    /// KPTI enabled flag
+    static KPTI_ENABLED: AtomicU32 = AtomicU32::new(0);
+
+    /// Check if KPTI is enabled
+    pub fn is_enabled() -> bool {
+        KPTI_ENABLED.load(Ordering::Relaxed) != 0
+    }
+
+    /// Enable KPTI
+    pub fn enable() {
+        KPTI_ENABLED.store(1, Ordering::Release);
+    }
+
+    /// Disable KPTI
+    pub fn disable() {
+        KPTI_ENABLED.store(0, Ordering::Release);
+    }
+}
+
+/// User page table entry (KPTI-only)
+#[repr(C, align(4096))]
+pub struct UserPageTable {
+    pub entries: [usize; PTE_COUNT],
+}
+
+impl UserPageTable {
+    pub const fn new() -> Self {
+        Self {
+            entries: [0; PTE_COUNT],
+        }
+    }
+}
+
+/// KPTI per-process state
+pub struct KptiState {
+    /// Full kernel+user page table
+    pub full_pagetable: *mut PageTable,
+    /// User-only page table (minimal kernel mappings)
+    pub user_pagetable: *mut UserPageTable,
+    /// Current active page table
+    pub active_is_user: bool,
+}
+
+impl KptiState {
+    pub const fn new() -> Self {
+        Self {
+            full_pagetable: core::ptr::null_mut(),
+            user_pagetable: core::ptr::null_mut(),
+            active_is_user: false,
+        }
+    }
+}
+
+// ============================================================================
 // Architecture-specific page table definitions
 // ============================================================================
 
@@ -1670,12 +1729,158 @@ pub unsafe fn map_pages(
 pub unsafe fn activate(pagetable: *mut PageTable) {
     #[cfg(target_arch = "riscv64")]
     unsafe { riscv64::activate_pt(pagetable); }
-    
+
     #[cfg(target_arch = "aarch64")]
     unsafe { aarch64::activate_pt(pagetable); }
-    
+
     #[cfg(target_arch = "x86_64")]
     x86_64::activate_pt(pagetable);
+}
+
+/// Activate user page table (KPTI)
+pub unsafe fn activate_user_pt(user_pagetable: *mut UserPageTable) {
+    if !kpti::is_enabled() {
+        return;
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    {
+        let pt = user_pagetable as *mut PageTable;
+        x86_64::activate_pt(pt);
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        let pt = user_pagetable as *mut PageTable;
+        aarch64::activate_pt(pt);
+    }
+
+    #[cfg(target_arch = "riscv64")]
+    {
+        let pt = user_pagetable as *mut PageTable;
+        riscv64::activate_pt(pt);
+    }
+}
+
+/// Activate full page table (KPTI)
+pub unsafe fn activate_full_pt(full_pagetable: *mut PageTable) {
+    if !kpti::is_enabled() {
+        activate(full_pagetable);
+        return;
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    x86_64::activate_pt(full_pagetable);
+
+    #[cfg(target_arch = "aarch64")]
+    aarch64::activate_pt(full_pagetable);
+
+    #[cfg(target_arch = "riscv64")]
+    riscv64::activate_pt(full_pagetable);
+}
+
+/// Create KPTI user page table from full page table
+pub unsafe fn create_kpti_user_pt(full_pagetable: *mut PageTable) -> Option<*mut UserPageTable> {
+    let user_pt = kalloc() as *mut UserPageTable;
+    if user_pt.is_null() {
+        return None;
+    }
+    ptr::write_bytes(user_pt as *mut u8, 0, PAGE_SIZE);
+
+    #[cfg(target_arch = "x86_64")]
+    {
+        for i in 0..PTE_COUNT {
+            let full_pte = (*full_pagetable).entries[i];
+
+            if full_pte & flags::PTE_V == 0 {
+                continue;
+            }
+
+            let is_user_entry = full_pte & flags::PTE_U != 0;
+            let is_kernel_text = (full_pte & flags::PTE_X) != 0 && (full_pte & flags::PTE_U) == 0;
+
+            if is_user_entry || is_kernel_text {
+                (*user_pt).entries[i] = full_pte;
+            }
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        for i in 0..PTE_COUNT {
+            let full_pte = (*full_pagetable).entries[i];
+
+            if full_pte & flags::PTE_V == 0 {
+                continue;
+            }
+
+            let is_user_entry = full_pte & flags::PTE_U != 0;
+            let is_kernel_text = (full_pte & flags::PTE_X) != 0 && (full_pte & flags::PTE_U) == 0;
+
+            if is_user_entry || is_kernel_text {
+                (*user_pt).entries[i] = full_pte;
+            }
+        }
+    }
+
+    #[cfg(target_arch = "riscv64")]
+    {
+        for i in 0..PTE_COUNT {
+            let full_pte = (*full_pagetable).entries[i];
+
+            if full_pte & flags::PTE_V == 0 {
+                continue;
+            }
+
+            let is_user_entry = full_pte & flags::PTE_U != 0;
+            let is_kernel_text = (full_pte & flags::PTE_X) != 0 && (full_pte & flags::PTE_U) == 0;
+
+            if is_user_entry || is_kernel_text {
+                (*user_pt).entries[i] = full_pte;
+            }
+        }
+    }
+
+    Some(user_pt)
+}
+
+/// Initialize KPTI state for a process
+pub unsafe fn init_kpti_state(full_pagetable: *mut PageTable) -> Option<KptiState> {
+    if !kpti::is_enabled() {
+        return None;
+    }
+
+    let user_pagetable = create_kpti_user_pt(full_pagetable)?;
+    Some(KptiState {
+        full_pagetable,
+        user_pagetable,
+        active_is_user: false,
+    })
+}
+
+/// Switch to user page table on syscall entry (KPTI)
+pub unsafe fn switch_to_user_pt(kpti_state: &KptiState) {
+    if !kpti::is_enabled() || kpti_state.user_pagetable.is_null() {
+        return;
+    }
+
+    activate_user_pt(kpti_state.user_pagetable);
+}
+
+/// Switch to full page table on syscall exit (KPTI)
+pub unsafe fn switch_to_full_pt(kpti_state: &KptiState) {
+    if !kpti::is_enabled() || kpti_state.full_pagetable.is_null() {
+        return;
+    }
+
+    activate_full_pt(kpti_state.full_pagetable);
+}
+
+/// Destroy KPTI state and free resources
+pub unsafe fn destroy_kpti_state(kpti_state: KptiState) {
+    if !kpti_state.user_pagetable.is_null() {
+        kfree(kpti_state.user_pagetable as *mut u8);
+    }
 }
 
 #[cfg(target_arch = "x86_64")]

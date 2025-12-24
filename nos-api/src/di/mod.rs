@@ -244,7 +244,7 @@ macro_rules! inject {
 macro_rules! injectable {
     ($struct_name:ident { $($field:ident: $type:ty),* }) => {
         impl $struct_name {
-            pub fn new(container: &crate::di::Container) -> Result<Self> {
+            pub fn new(container: &$crate::di::Container) -> Result<Self> {
                 Ok(Self {
                     $($field: Some(container.resolve()?),)*
                 })
@@ -472,9 +472,9 @@ impl Container {
                 let mut stack = self.resolution_stack.lock();
                 stack.pop();
             }
-            return Err(crate::error::Error::ServiceError(
+            Err(crate::error::Error::ServiceError(
                 format!("Service not registered for type: {:?}", type_id)
-            ));
+            ))
         }
     }
     
@@ -547,9 +547,9 @@ impl ServiceResolver for Arc<Container> {
             let arc_instance: Arc<dyn Any + Send + Sync> = instance.into();
             Ok(arc_instance)
         } else {
-            return Err(crate::error::Error::ServiceError(
+            Err(crate::error::Error::ServiceError(
                 format!("Service not registered for type: {:?}", type_id)
-            ));
+            ))
         }
     }
     

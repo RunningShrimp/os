@@ -466,6 +466,24 @@ pub enum TcpError {
     ConnectionTimeout,
     /// Connection refused
     ConnectionRefused,
+    /// Invalid option
+    InvalidOption,
+    /// Not initialized
+    NotInitialized,
+    /// Connection not found
+    ConnectionNotFound,
+    /// Invalid connection state
+    InvalidConnection,
+    /// Not connected
+    NotConnected,
+    /// Buffer full
+    BufferFull,
+    /// Port in use
+    PortInUse,
+    /// No ports available
+    NoPortsAvailable,
+    /// Invalid packet
+    InvalidPacket,
 }
 
 /// Well-known TCP ports
@@ -502,4 +520,305 @@ pub mod defaults {
     pub const INITIAL_CWND: u32 = 10;
     /// Default slow start threshold
     pub const INITIAL_SSTHRESH: u32 = u32::MAX;
+}
+
+/// Maximum number of outstanding segments
+pub const MAX_OUTSTANDING_SEGMENTS: usize = 64;
+
+/// Maximum receive window size
+pub const MAX_RECEIVE_WINDOW: u32 = 65535;
+
+/// Maximum send window size
+pub const MAX_SEND_WINDOW: u32 = 65535;
+
+/// Maximum segment lifetime (in seconds)
+pub const MAX_SEGMENT_LIFETIME: u64 = 120;
+
+/// Minimum retransmission timeout (in milliseconds)
+pub const MIN_RTO_MS: u64 = 200;
+
+/// Maximum retransmission timeout (in milliseconds)
+pub const MAX_RTO_MS: u64 = 60000;
+
+/// Initial retransmission timeout (in milliseconds)
+pub const INITIAL_RTO_MS: u64 = 1000;
+
+/// TCP option kinds
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TcpOptionKind {
+    End = 0,
+    Nop = 1,
+    Mss = 2,
+    WindowScale = 3,
+    SackPermitted = 4,
+    Sack = 5,
+    Timestamps = 8,
+}
+
+/// TCP option
+#[derive(Debug, Clone)]
+pub struct TcpOption {
+    pub kind: TcpOptionKind,
+    pub length: u8,
+    pub data: Vec<u8>,
+}
+
+impl TcpOption {
+    pub fn new(kind: TcpOptionKind, data: Vec<u8>) -> Self {
+        let length = 2 + data.len() as u8;
+        Self { kind, length, data }
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(self.length as usize);
+        bytes.push(self.kind as u8);
+        bytes.push(self.length);
+        bytes.extend_from_slice(&self.data);
+        bytes
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, TcpError> {
+        if bytes.len() < 2 {
+            return Err(TcpError::InvalidOption);
+        }
+
+        let kind = bytes[0];
+        let length = bytes[1];
+
+        if length < 2 || bytes.len() < length as usize {
+            return Err(TcpError::InvalidOption);
+        }
+
+        let data = bytes[2..length as usize].to_vec();
+
+        Ok(Self {
+            kind: match kind {
+                0 => TcpOptionKind::End,
+                1 => TcpOptionKind::Nop,
+                2 => TcpOptionKind::Mss,
+                3 => TcpOptionKind::WindowScale,
+                4 => TcpOptionKind::SackPermitted,
+                5 => TcpOptionKind::Sack,
+                8 => TcpOptionKind::Timestamps,
+                _ => return Err(TcpError::InvalidOption),
+            },
+            length,
+            data,
+        })
+    }
+}
+
+/// MSS option
+#[derive(Debug, Clone)]
+pub struct MssOption {
+    pub mss: u16,
+}
+
+impl MssOption {
+    pub fn new(mss: u16) -> Self {
+        Self { mss }
+    }
+
+    pub fn to_option(&self) -> TcpOption {
+        TcpOption::new(TcpOptionKind::Mss, self.mss.to_be_bytes().to_vec())
+    }
+
+    pub fn from_option(option: &TcpOption) -> Result<Self, TcpError> {
+        if option.kind != TcpOptionKind::Mss || option.data.len() != 2 {
+            return Err(TcpError::InvalidOption);
+        }
+
+        let mss = u16::from_be_bytes([option.data[0], option.data[1]]);
+        Ok(Self { mss })
+    }
+}
+
+/// Window scale option
+#[derive(Debug, Clone)]
+pub struct WindowScaleOption {
+    pub shift: u8,
+}
+
+impl WindowScaleOption {
+    pub fn new(shift: u8) -> Self {
+        Self { shift }
+    }
+
+    pub fn to_option(&self) -> TcpOption {
+        TcpOption::new(TcpOptionKind::WindowScale, vec![self.shift])
+    }
+
+    pub fn from_option(option: &TcpOption) -> Result<Self, TcpError> {
+        if option.kind != TcpOptionKind::WindowScale || option.data.is_empty() {
+            return Err(TcpError::InvalidOption);
+        }
+
+        Ok(Self { shift: option.data[0] })
+    }
+}
+
+/// Timestamp option
+#[derive(Debug, Clone)]
+pub struct TimestampOption {
+    pub timestamp: u32,
+    pub echo: u32,
+}
+
+impl TimestampOption {
+    pub fn new(timestamp: u32, echo: u32) -> Self {
+        Self { timestamp, echo }
+    }
+
+    pub fn to_option(&self) -> TcpOption {
+        let mut data = Vec::with_capacity(8);
+        data.extend_from_slice(&self.timestamp.to_be_bytes());
+        data.extend_from_slice(&self.echo.to_be_bytes());
+        TcpOption::new(TcpOptionKind::Timestamps, data)
+    }
+
+    pub fn from_option(option: &TcpOption) -> Result<Self, TcpError> {
+        if option.kind != TcpOptionKind::Timestamps || option.data.len() != 8 {
+            return Err(TcpError::InvalidOption);
+        }
+
+        let timestamp = u32::from_be_bytes([option.data[0], option.data[1], option.data[2], option.data[3]]);
+        let echo = u32::from_be_bytes([option.data[4], option.data[5], option.data[6], option.data[7]]);
+
+        Ok(Self { timestamp, echo })
+    }
+}
+
+/// SACK option
+#[derive(Debug, Clone)]
+pub struct SackOption {
+    pub blocks: Vec<SackBlock>,
+}
+
+/// SACK block
+#[derive(Debug, Clone)]
+pub struct SackBlock {
+    pub left: u32,
+    pub right: u32,
+}
+
+impl SackBlock {
+    pub fn new(left: u32, right: u32) -> Self {
+        Self { left, right }
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(8);
+        bytes.extend_from_slice(&self.left.to_be_bytes());
+        bytes.extend_from_slice(&self.right.to_be_bytes());
+        bytes
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, TcpError> {
+        if bytes.len() < 8 {
+            return Err(TcpError::InvalidOption);
+        }
+
+        let left = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+        let right = u32::from_be_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
+
+        Ok(Self { left, right })
+    }
+}
+
+impl SackOption {
+    pub fn new(blocks: Vec<SackBlock>) -> Self {
+        Self { blocks }
+    }
+
+    pub fn to_option(&self) -> TcpOption {
+        let mut data = Vec::with_capacity(2 + self.blocks.len() * 8);
+        data.push(self.blocks.len() as u8);
+        data.push(0);
+
+        for block in &self.blocks {
+            data.extend_from_slice(&block.to_bytes());
+        }
+
+        TcpOption::new(TcpOptionKind::Sack, data)
+    }
+
+    pub fn from_option(option: &TcpOption) -> Result<Self, TcpError> {
+        if option.kind != TcpOptionKind::Sack || option.data.len() < 2 {
+            return Err(TcpError::InvalidOption);
+        }
+
+        let block_count = option.data[0] as usize;
+        if option.data.len() < 2 + block_count * 8 {
+            return Err(TcpError::InvalidOption);
+        }
+
+        let mut blocks = Vec::with_capacity(block_count);
+        for i in 0..block_count {
+            let offset = 2 + i * 8;
+            let block = SackBlock::from_bytes(&option.data[offset..offset + 8])?;
+            blocks.push(block);
+        }
+
+        Ok(Self { blocks })
+    }
+}
+
+/// Enhanced TCP statistics
+#[derive(Debug, Default, Clone)]
+pub struct EnhancedTcpStats {
+    pub connections_attempted: u64,
+    pub connections_established: u64,
+    pub connections_failed: u64,
+    pub connections_reset: u64,
+    pub connections_timed_out: u64,
+    pub bytes_transmitted: u64,
+    pub bytes_received: u64,
+    pub packets_transmitted: u64,
+    pub packets_received: u64,
+    pub retransmissions: u64,
+    pub duplicate_acks: u64,
+    pub out_of_order_packets: u64,
+    pub fast_retransmits: u64,
+    pub partial_acks: u64,
+    pub window_updates: u64,
+    pub avg_rtt_us: u64,
+    pub min_rtt_us: u64,
+    pub max_rtt_us: u64,
+    pub current_cwnd: u32,
+    pub current_swnd: u32,
+    pub current_rwnd: u32,
+    pub last_activity_timestamp: u64,
+}
+
+/// TCP configuration
+#[derive(Debug, Clone)]
+pub struct TcpConfig {
+    pub default_mss: u16,
+    pub default_window: u16,
+    pub enable_window_scaling: bool,
+    pub enable_timestamps: bool,
+    pub enable_sack: bool,
+    pub enable_selective_ack: bool,
+    pub enable_fast_retransmit: bool,
+    pub enable_fast_recovery: bool,
+    pub initial_cwnd: u32,
+    pub max_retransmit_attempts: u32,
+}
+
+impl Default for TcpConfig {
+    fn default() -> Self {
+        Self {
+            default_mss: 1460,
+            default_window: 65535,
+            enable_window_scaling: true,
+            enable_timestamps: true,
+            enable_sack: true,
+            enable_selective_ack: true,
+            enable_fast_retransmit: true,
+            enable_fast_recovery: true,
+            initial_cwnd: 10 * 1460,
+            max_retransmit_attempts: 5,
+        }
+    }
 }

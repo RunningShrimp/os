@@ -76,6 +76,8 @@ pub mod collections;
 pub mod fmt_utils;
 pub mod boot;
 
+pub use crate::fmt_utils::format;
+
 // Performance monitoring and optimization (from nos-perf)
 pub mod perf;
 

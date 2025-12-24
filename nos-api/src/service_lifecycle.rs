@@ -252,14 +252,13 @@ impl LifecycleAwareServiceManager {
             {
                 let mut service_info = self.inner.service_info.lock();
                 let service_id_owned = service_id.to_string();
-                if let Some(info) = service_info.get_mut(&service_id_owned) {
-                    if info.status == ServiceStatus::Starting {
-                        info.status = ServiceStatus::Stopped;
-                    }
+                if let Some(info) = service_info.get_mut(&service_id_owned)
+                    && info.status == ServiceStatus::Starting {
+                    info.status = ServiceStatus::Stopped;
                 }
             } // 释放锁
             
-            return Err(crate::error::not_found(&format!("Service '{}' not found", service_id)));
+            Err(crate::error::not_found(&format!("Service '{}' not found", service_id)))
         }
     }
     
@@ -333,14 +332,13 @@ impl LifecycleAwareServiceManager {
             {
                 let mut service_info = self.inner.service_info.lock();
                 let service_id_owned = service_id.to_string();
-                if let Some(info) = service_info.get_mut(&service_id_owned) {
-                    if info.status == ServiceStatus::Stopping {
-                        info.status = ServiceStatus::Running;
-                    }
+                if let Some(info) = service_info.get_mut(&service_id_owned)
+                    && info.status == ServiceStatus::Stopping {
+                    info.status = ServiceStatus::Running;
                 }
             } // 释放锁
             
-            return Err(crate::error::not_found(&format!("Service '{}' not found", service_id)));
+            Err(crate::error::not_found(&format!("Service '{}' not found", service_id)))
         }
     }
 }
@@ -360,8 +358,8 @@ impl ServiceManager for LifecycleAwareServiceManager {
         
         // 通知监听器
         self.notify_listeners(&ServiceLifecycleEvent::ServiceRegistered {
-            service_id: service_id,
-            service_name: service_name,
+            service_id,
+            service_name,
         });
         
         Ok(())

@@ -179,14 +179,143 @@ pub fn ifence() {
     unsafe {
         asm!("fence.i");
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     unsafe {
         asm!("isb");
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     {
         // x86 has strong memory model, no explicit ifence needed
+    }
+}
+
+// ============================================================================
+// Spectre V2 Mitigation: Retpoline Compiler Barriers
+// ============================================================================
+
+/// Retpoline: LFENCE-based speculation barrier for x86_64
+#[inline]
+#[cfg(target_arch = "x86_64")]
+pub unsafe fn retpoline_barrier() {
+    asm!(
+        "lfence",
+        options(nostack, preserves_flags)
+    );
+}
+
+/// Retpoline thunk for indirect calls (x86_64)
+///
+/// This replaces indirect calls with a call/ret sequence that controls
+/// the return address used by the CPU's return predictor.
+#[inline]
+#[cfg(target_arch = "x86_64")]
+pub unsafe fn retpoline_thunk(target: *const u8) -> ! {
+    let target_value = target;
+    asm!(
+        "call 2f",
+        "1:",
+        "pause",
+        "lfence",
+        "jmp 1b",
+        "2:",
+        "mov rax, {0}",
+        "jmp rax",
+        in(reg) target_value,
+        options(nostack, noreturn)
+    )
+}
+
+/// Retpoline thunk for indirect jumps (x86_64)
+#[inline]
+#[cfg(target_arch = "x86_64")]
+pub unsafe fn retpoline_jump_thunk(target: *const u8) -> ! {
+    let target_value = target;
+    asm!(
+        "call 2f",
+        "1:",
+        "pause",
+        "lfence",
+        "jmp 1b",
+        "2:",
+        "mov rax, {0}",
+        "jmp rax",
+        in(reg) target_value,
+        options(nostack, noreturn)
+    )
+}
+
+/// Speculation barrier using LFENCE (x86_64)
+#[inline]
+#[cfg(target_arch = "x86_64")]
+pub unsafe fn speculation_barrier() {
+    asm!(
+        "lfence",
+        options(nostack, preserves_flags)
+    );
+}
+
+/// Speculation barrier using DSB/ISB (AArch64)
+#[inline]
+#[cfg(target_arch = "aarch64")]
+pub unsafe fn speculation_barrier() {
+    asm!(
+        "dsb sy",
+        "isb",
+        options(nostack)
+    );
+}
+
+/// Speculation barrier using FENCE (RISC-V)
+#[inline]
+#[cfg(target_arch = "riscv64")]
+pub unsafe fn speculation_barrier() {
+    asm!(
+        "fence",
+        options(nostack)
+    );
+}
+
+/// Flush Return Stack Buffer (RSB) on context switch
+#[inline]
+#[cfg(target_arch = "x86_64")]
+pub unsafe fn flush_rsb() {
+    const RSB_DEPTH: usize = 16;
+    for _ in 0..RSB_DEPTH {
+        asm!(
+            "call 1f",
+            "1:",
+            "pause",
+            "lfence",
+            "ret",
+            options(nostack)
+        );
+    }
+}
+
+/// Indirect branch predictor barrier (IBPB) simulation
+#[inline]
+#[cfg(target_arch = "x86_64")]
+pub unsafe fn indirect_branch_predictor_barrier() {
+    speculation_barrier();
+}
+
+/// Control flow integrity barrier for Spectre v2
+#[inline]
+pub fn cfi_barrier() {
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        speculation_barrier();
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        speculation_barrier();
+    }
+
+    #[cfg(target_arch = "riscv64")]
+    unsafe {
+        speculation_barrier();
     }
 }

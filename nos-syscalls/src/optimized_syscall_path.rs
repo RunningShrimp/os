@@ -11,12 +11,14 @@ use alloc::{
 };
 use nos_api::Result;
 use crate::{SyscallHandler, SyscallDispatcher};
+use crate::logging::output_report;
 use core::sync::atomic::{AtomicU64, Ordering};
-use spin::Mutex;  // 使用spin::Mutex替代RefCell以支持Sync
+use spin::Mutex;
 
 
 /// System call statistics for optimization
 #[derive(Debug, Clone)]
+#[allow(clippy::should_implement_trait)]
 pub struct OptimizedSyscallStats {
     /// Number of times the syscall was called
     pub call_count: u64,
@@ -65,6 +67,7 @@ impl OptimizedSyscallStats {
 }
 
 /// Optimized syscall dispatcher
+#[allow(clippy::should_implement_trait)]
 pub struct OptimizedSyscallDispatcher {
     /// Base dispatcher
     base_dispatcher: SyscallDispatcher,
@@ -340,24 +343,7 @@ pub fn register_handlers(_dispatcher: &mut SyscallDispatcher) -> Result<()> {
     
     // Print optimization report
     let report = optimized_dispatcher.get_optimization_report();
-    // In a real implementation, this would send the report to a logging system
-    #[cfg(feature = "std")]
-    {
-        use std::println;
-        println!("{}", report);
-    }
-    // For no_std environments with alloc, we can still use the report for debugging
-    #[cfg(all(feature = "alloc", not(feature = "std"), feature = "log"))]
-    {
-        log::debug!("{}", report);
-    }
-    // Even if we can't log, we still want to acknowledge the report was generated
-    #[cfg(all(feature = "alloc", not(feature = "std"), not(feature = "log")))]
-    {
-        // Use a simple debug output mechanism for no_std environments
-        // In a real kernel, this would use kernel-specific logging
-        let _ = report; // Prevent unused variable warning
-    }
+    output_report(&report);
     
     Ok(())
 }

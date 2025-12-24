@@ -14,6 +14,7 @@ use alloc::{
 use spin::Mutex;
 use nos_api::Result;
 use crate::{SyscallHandler, SyscallDispatcher};
+use crate::logging::output_report;
 use core::sync::atomic::{AtomicU64, Ordering};
 
 /// Task priority levels
@@ -233,6 +234,7 @@ impl TaskControlBlock {
 }
 
 /// Adaptive scheduler
+#[allow(clippy::should_implement_trait)]
 pub struct AdaptiveScheduler {
     /// Ready queue for each priority level
     ready_queues: [Vec<Arc<TaskControlBlock>>; 5],
@@ -250,6 +252,7 @@ pub struct AdaptiveScheduler {
 
 /// Scheduler statistics
 #[derive(Debug, Clone)]
+#[allow(clippy::should_implement_trait)]
 pub struct SchedulerStats {
     /// Total tasks scheduled
     pub total_scheduled: u64,
@@ -362,14 +365,12 @@ impl AdaptiveScheduler {
             // Remove from ready queue
             let priority = task.priority as usize;
             self.ready_queues[priority].retain(|t| t.task_id != task_id);
-            
+
             // If it was the current task, clear it
-            if let Some(current) = &self.current_task {
-                if current.task_id == task_id {
-                    self.current_task = None;
-                }
+            if let Some(current) = &self.current_task && current.task_id == task_id {
+                self.current_task = None;
             }
-            
+
             Ok(())
         } else {
             Err(nos_api::Error::NotFound(format!("Task {} not found", task_id)))
@@ -385,7 +386,7 @@ impl AdaptiveScheduler {
                 queue.remove(0);
                 
                 // Record context switch if changing tasks
-                if let Some(_) = self.current_task {
+                if self.current_task.is_some() {
                     self.stats.record_context_switch();
                 }
                 
@@ -501,6 +502,7 @@ impl AdaptiveScheduler {
 }
 
 /// System call handler for task management
+#[allow(clippy::should_implement_trait)]
 pub struct TaskSchedulerHandler {
     scheduler: Arc<Mutex<AdaptiveScheduler>>,
 }
@@ -544,14 +546,7 @@ pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     
     // Print scheduler report
     let report = get_scheduler_report(&scheduler.lock());
-    // In a real implementation, this would send the report to a logging system
-    #[cfg(feature = "log")]
-    log::info!("{}", report);
-    #[cfg(all(feature = "std", not(feature = "log")))]
-    println!("{}", report);
-    // Ensure the report is used even if logging features are disabled
-    #[cfg(not(any(feature = "log", feature = "std")))]
-    core::hint::black_box(report); // Use black_box to ensure the variable is used
+    output_report(&report);
     
     Ok(())
 }

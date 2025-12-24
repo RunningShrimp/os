@@ -14,10 +14,9 @@ use {
     },
     spin::Mutex,
 };
-#[cfg(feature = "log")]
-use log;
 use nos_api::Result;
 use crate::{SyscallHandler, SyscallDispatcher};
+use crate::logging::output_report;
 use core::sync::atomic::{AtomicU64, Ordering};
 use libm::sqrt;
 
@@ -120,6 +119,7 @@ impl PerformanceMetric {
 }
 
 /// Performance monitor
+#[allow(clippy::should_implement_trait)]
 pub struct PerformanceMonitor {
     /// Registered metrics
     metrics: BTreeMap<String, PerformanceMetric>,
@@ -133,6 +133,7 @@ pub struct PerformanceMonitor {
 
 /// Monitor statistics
 #[derive(Debug, Clone)]
+#[allow(clippy::should_implement_trait)]
 pub struct MonitorStats {
     /// Total metrics registered
     pub total_metrics: usize,
@@ -215,13 +216,7 @@ impl PerformanceMonitor {
             self.stats.record_update();
             Ok(())
         } else {
-            Err(nos_api::Error::NotFound(
-                if cfg!(feature = "alloc") {
-                    format!("Metric '{}' not found", name)
-                } else {
-                    "Metric not found".to_string()
-                }
-            ))
+            Err(nos_api::Error::NotFound(format!("Metric '{}' not found", name)))
         }
     }
     
@@ -238,13 +233,7 @@ impl PerformanceMonitor {
             self.stats.record_update();
             Ok(())
         } else {
-            Err(nos_api::Error::NotFound(
-                if cfg!(feature = "alloc") {
-                    format!("Metric '{}' not found", name)
-                } else {
-                    "Metric not found".to_string()
-                }
-            ))
+            Err(nos_api::Error::NotFound(format!("Metric '{}' not found", name)))
         }
     }
     
@@ -262,11 +251,7 @@ impl PerformanceMonitor {
             Ok(())
         } else {
             Err(nos_api::Error::NotFound(
-                if cfg!(feature = "alloc") {
-                    format!("Metric '{}' not found", name)
-                } else {
-                    "Metric not found".to_string()
-                }
+                format!("Metric '{}' not found", name)
             ))
         }
     }
@@ -319,17 +304,15 @@ impl PerformanceMonitor {
             ));
             
             // Add history statistics if available
-            if let Some(history) = self.history.get(&metric.name) {
-                if !history.is_empty() {
-                    let min = history.iter().fold(f64::INFINITY, |a, &b| a.min(b));
-                    let max = history.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
-                    let avg = history.iter().sum::<f64>() / history.len() as f64;
-                    
-                    report.push_str(&format!(
-                        "    History: min={:.2}, max={:.2}, avg={:.2}\n",
-                        min, max, avg
-                    ));
-                }
+            if let Some(history) = self.history.get(&metric.name) && !history.is_empty() {
+                let min = history.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+                let max = history.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+                let avg = history.iter().sum::<f64>() / history.len() as f64;
+
+                report.push_str(&format!(
+                    "    History: min={:.2}, max={:.2}, avg={:.2}\n",
+                    min, max, avg
+                ));
             }
         }
         
@@ -418,8 +401,7 @@ impl PerformanceAnalyzer {
         // Collect metric names first to avoid borrowing conflicts
         let metric_names: Vec<String> = {
             let monitor = self.monitor.lock();
-            monitor.metrics.keys()
-                .map(|s: &String| s.clone())
+            monitor.metrics.keys().cloned()
                 .collect()
         };
         
@@ -482,11 +464,7 @@ impl PerformanceAnalyzer {
             Ok(())
         } else {
             Err(nos_api::Error::NotFound(
-                if cfg!(feature = "alloc") {
-                    format!("Metric '{}' not found", metric_name)
-                } else {
-                    "Metric not found".to_string()
-                }
+                format!("Metric '{}' not found", metric_name)
             ))
         }
     }
@@ -567,6 +545,7 @@ impl PerformanceAnalyzer {
 }
 
 /// System call performance monitor
+#[allow(clippy::should_implement_trait)]
 pub struct SyscallMonitor {
     monitor: Arc<Mutex<PerformanceMonitor>>,
 }
@@ -637,10 +616,7 @@ impl SyscallHandler for SyscallMonitor {
                 let report = {
                     monitor.lock().generate_report()
                 };
-                #[cfg(feature = "log")]
-                log::info!("{}", report);
-                #[cfg(not(feature = "log"))]
-                let _ = report; // Suppress unused variable warning
+                output_report(&report);
                 Ok(0)
             },
             _ => {
@@ -700,10 +676,7 @@ pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     
     // Print analysis report
     let report = analyzer.generate_report();
-    #[cfg(feature = "log")]
-    log::info!("{}", report);
-    #[cfg(not(feature = "log"))]
-    let _ = report; // Suppress unused variable warning
+    output_report(&report);
     
     Ok(())
 }

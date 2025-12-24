@@ -6,8 +6,6 @@ use alloc::string::ToString;
 use alloc::boxed::Box;
 use nos_api::Result;
 use crate::SyscallHandler;
-#[cfg(feature = "log")]
-use log;
 use crate::SyscallDispatcher;
 
 /// Register process system call handlers
@@ -76,11 +74,7 @@ impl SyscallHandler for ExecHandler {
         // TODO: Implement actual exec logic using parameters:
         // pathname: Path to executable file
         // argv: Array of argument strings
-        #[cfg(feature = "log")]
-        log::trace!("exec called with: pathname={:?}, argv={:?}", pathname, argv);
-        
-        // Ensure parameters are used even when logging is disabled
-        let _ = (pathname, argv);
+        sys_trace_with_args!("exec called with: pathname={:?}, argv={:?}", pathname, argv);
         
         Ok(0)
     }
@@ -109,11 +103,7 @@ impl SyscallHandler for WaitHandler {
         // TODO: Implement actual wait logic using parameters:
         // pid: Process ID to wait for, or -1 for any child process
         // status: Pointer to store exit status information
-        #[cfg(feature = "log")]
-        log::trace!("wait called with: pid={}, status={:?}", pid, status);
-        
-        // Ensure status is used even when logging is disabled
-        let _ = status;
+        sys_trace_with_args!("wait called with: pid={}, status={:?}", pid, status);
         
         Ok(pid as isize) // Return child PID
     }
@@ -132,20 +122,16 @@ impl SyscallHandler for ExitHandler {
     }
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
-        if args.len() < 1 {
+        if args.is_empty() {
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
         }
         
         let status = args[0] as i32;
-        
+
         // TODO: Implement actual exit logic using parameters:
         // status: Exit status value to return to parent process
-        #[cfg(feature = "log")]
-        log::trace!("exit called with: status={}", status);
-        
-        // Ensure status is used even when logging is disabled
-        let _ = status;
-        
+        sys_trace_with_args!("exit called with: status={}", status);
+
         Ok(0)
     }
     

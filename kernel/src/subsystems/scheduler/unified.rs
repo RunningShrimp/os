@@ -421,20 +421,100 @@ impl UnifiedScheduler {
             return Some(next_tid);
         }
 
-        // Work stealing: try to steal from other CPUs
-        for offset in 1..MAX_CPUS {
-            let steal_cpu_id = (cpu_id + offset) % MAX_CPUS;
+        // Optimized work stealing with load-aware selection
+        self.try_steal_work(cpu_id, scheduler)
+    }
+
+    /// Try to steal work from other CPUs with optimized algorithm
+    fn try_steal_work(&self, local_cpu_id: usize, local_scheduler: &PerCpuScheduler) -> Option<Tid> {
+        let local_load = local_scheduler.len();
+
+        // Don't steal if local CPU has enough work (anti-thrashing)
+        if local_load > 2 {
+            return None;
+        }
+
+        // Get random starting point for fair stealing (avoid stealing bias)
+        let num_cpus = self.per_cpu_schedulers.len();
+        let random_start = self.get_random_offset() as usize % num_cpus;
+
+        // Adaptive steal probability based on load imbalance
+        // Steal more aggressively when load is very imbalanced
+        let steal_probability = if local_load == 0 { 80 }
+                              else if local_load == 1 { 60 }
+                              else { 30 };
+
+        // Work stealing with load awareness and probability control
+        let mut steal_attempts = 0;
+        let max_attempts = num_cpus.saturating_sub(1);
+
+        for i in 0..max_attempts {
+            steal_attempts += 1;
+
+            // Early exit based on steal probability
+            let random_threshold = self.get_random_offset() as u32 % 100;
+            if steal_attempts > 2 && random_threshold > steal_probability {
+                break;
+            }
+
+            let steal_cpu_id = (random_start + i) % num_cpus;
+
+            // Skip local CPU
+            if steal_cpu_id == local_cpu_id {
+                continue;
+            }
+
             let steal_scheduler = &self.per_cpu_schedulers[steal_cpu_id];
-            
+            let steal_load = steal_scheduler.len();
+
+            // Only steal from CPUs with significantly higher load (load balancing)
+            // Threshold increases as steal attempts increase
+            let threshold = local_load + steal_attempts;
+            if steal_load <= threshold {
+                continue;
+            }
+
+            // Try to steal from this CPU
             if let Some(stolen_tid) = steal_scheduler.dequeue() {
-                scheduler.set_current(stolen_tid);
+                // Steal successful, update stolen thread's CPU affinity
+                if let Some(mut metadata) = self.thread_metadata.lock().get_mut(&stolen_tid).copied() {
+                    metadata.last_cpu = Some(local_cpu_id);
+                }
+                local_scheduler.set_current(stolen_tid);
                 return Some(stolen_tid);
             }
         }
 
-        // No threads available, return idle thread
-        scheduler.set_current(scheduler.idle_thread);
-        Some(scheduler.idle_thread)
+        // No work to steal, return idle thread
+        local_scheduler.set_current(local_scheduler.idle_thread);
+        Some(local_scheduler.idle_thread)
+    }
+
+    /// Get random offset for work stealing (using RDRAND when available)
+    fn get_random_offset(&self) -> u32 {
+        // Try to use RDRAND for better randomness
+        #[cfg(target_arch = "x86_64")]
+        {
+            unsafe {
+                let mut value: u32 = 0;
+                let success: bool;
+                core::arch::asm!(
+                    "rdrand {0:e}",
+                    out(reg) value,
+                    setne(success),
+                    options(nostack, pure)
+                );
+                if success {
+                    return value;
+                }
+            }
+        }
+
+        // Fallback: Use a simple hash of timestamp + CPU ID as random source
+        let timestamp = crate::subsystems::time::get_ticks();
+        let cpu_id = cpu::cpuid();
+        let combined = timestamp.wrapping_mul(31).wrapping_add(cpu_id as u64);
+        (combined as u32)
     }
 
     /// Set thread state

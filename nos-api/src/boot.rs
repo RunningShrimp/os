@@ -17,6 +17,18 @@ pub enum BootProtocolType {
     Multiboot3 = 5,
 }
 
+/// Get the current architecture ID
+pub const fn get_current_arch_id() -> u32 {
+    #[cfg(target_arch = "x86_64")]
+    { 0 }
+    #[cfg(target_arch = "aarch64")]
+    { 1 }
+    #[cfg(target_arch = "riscv64")]
+    { 2 }
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
+    { u32::MAX }
+}
+
 /// Memory types passed from bootloader
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
@@ -225,17 +237,7 @@ impl BootParameters {
     
     /// Validate architecture matches current build
     pub fn validate_architecture(&self) -> bool {
-        #[cfg(target_arch = "x86_64")]
-        return self.architecture == 0;
-        
-        #[cfg(target_arch = "aarch64")]
-        return self.architecture == 1;
-        
-        #[cfg(target_arch = "riscv64")]
-        return self.architecture == 2;
-        
-        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
-        return false;
+        self.architecture == get_current_arch_id()
     }
     
     /// Check if ASLR is enabled (aslr_offset != 0)

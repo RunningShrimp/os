@@ -11,6 +11,8 @@ use alloc::vec::Vec;
 use spin::{Mutex, Once};
 
 /// Service discovery
+#[allow(clippy::should_implement_trait)]
+#[allow(clippy::field_reassign_with_default)]
 pub struct ServiceDiscovery {
     /// Discovered services
     services: BTreeMap<String, ServiceDescriptor>,
@@ -53,6 +55,7 @@ impl ServiceDiscovery {
 
 /// Service descriptor
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct ServiceDescriptor {
     /// Service name
     pub name: String,
@@ -68,18 +71,6 @@ pub struct ServiceDescriptor {
     pub metadata: BTreeMap<String, String>,
 }
 
-impl Default for ServiceDescriptor {
-    fn default() -> Self {
-        Self {
-            name: String::new(),
-            service_type: 0,
-            version: String::new(),
-            description: String::new(),
-            endpoint: String::new(),
-            metadata: BTreeMap::new(),
-        }
-    }
-}
 
 /// Global service discovery
 static GLOBAL_DISCOVERY: Once<Mutex<ServiceDiscovery>> = Once::new();

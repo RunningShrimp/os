@@ -11,6 +11,7 @@ use core::ptr::{null_mut};
 use core::sync::atomic::{AtomicUsize, AtomicPtr, AtomicBool, Ordering};
 use alloc::vec::Vec;
 use crate::subsystems::sync::Mutex;
+use crate::subsystems::mm::unified_stats::ExtendedAllocationStats;
 use super::phys::{PAGE_SIZE, page_round_up, page_round_down};
 
 /// Page order (log2 of number of pages)
@@ -235,22 +236,7 @@ pub struct BuddyAllocator {
     /// Free pages count
     free_pages: AtomicUsize,
     /// Allocation statistics
-    alloc_stats: AllocationStats,
-}
-
-/// Allocation statistics
-#[derive(Debug, Default)]
-pub struct AllocationStats {
-    /// Total allocations
-    pub total_allocations: AtomicUsize,
-    /// Total deallocations
-    pub total_deallocations: AtomicUsize,
-    /// Failed allocations
-    pub failed_allocations: AtomicUsize,
-    /// Fast path hits (from cache)
-    pub fast_path_hits: AtomicUsize,
-    /// Slow path allocations (from buddy)
-    pub slow_path_allocations: AtomicUsize,
+    pub alloc_stats: AllocationStats,
     /// Defragmentation runs
     pub defragmentation_runs: AtomicUsize,
 }
@@ -271,6 +257,7 @@ impl BuddyAllocator {
             total_pages: 0,
             free_pages: AtomicUsize::new(0),
             alloc_stats: AllocationStats::default(),
+            defragmentation_runs: AtomicUsize::new(0),
         }
     }
     

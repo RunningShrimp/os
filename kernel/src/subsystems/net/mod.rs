@@ -16,7 +16,6 @@ pub mod icmp;
 pub mod icmp_enhanced; // Enhanced ICMP features (optional: extended ICMP types, traceroute, ping)
 pub mod udp;
 pub mod tcp;
-pub mod tcp_enhanced; // Enhanced TCP features (optional: advanced options, SACK, window scaling)
 pub mod route;
 pub mod buffer_management;
 pub mod fragment;
@@ -352,14 +351,12 @@ pub use self::icmp_enhanced::{
 };
 pub use self::udp::{UdpHeader, UdpPacket, UdpSocket};
 pub use self::tcp::{
-    TcpHeader, TcpPacket, TcpState, TcpSocket
+    TcpHeader, TcpPacket, TcpState, TcpSocket, TcpOption, TcpOptionKind,
+    MssOption, WindowScaleOption, TimestampOption, SackOption, SackBlock,
+    EnhancedTcpStats, TcpConfig, TcpError
 };
 pub use self::tcp::state::TcpStateMachine;
 pub use self::tcp::manager::{TcpConnection, TcpConnectionManager};
-pub use self::tcp_enhanced::{
-    EnhancedTcp, TcpConfig, EnhancedTcpStats, TcpOption, TcpOptionKind,
-    MssOption, WindowScaleOption, TimestampOption, SackOption, SackBlock
-};
 pub use self::route::{RouteEntry, RoutingTable, RouteManager, RouteLookupResult, RoutingTableStats};
 pub use self::fragment::{FragmentReassembler, Fragmenter, ReassemblyEntry};
 pub use self::processor::{NetworkProcessor, PacketResult};

@@ -10,11 +10,32 @@
 
 extern crate alloc;
 use alloc::vec::Vec;
+use alloc::string::String;
 use alloc::collections::BTreeMap;
 use crate::drivers::BlockDevice;
 use crate::subsystems::sync::Mutex;
 use crate::subsystems::fs::fs_impl::BufCache;
 use core::hash::Hasher;
+
+/// Placeholder journaling file system trait
+pub trait JournalingFileSystem {
+    fn begin_transaction(&self) -> u32;
+    fn commit_transaction(&self, id: u32);
+}
+
+/// Placeholder journal entry
+#[derive(Debug, Clone)]
+pub struct JournalEntry {
+    pub block: u32,
+    pub data: Vec<u8>,
+}
+
+/// Placeholder journal transaction
+#[derive(Debug, Clone)]
+pub struct JournalTransaction {
+    pub id: u32,
+    pub entries: Vec<JournalEntry>,
+}
 
 // ============================================================================
 // Ext4 Constants and Structures
@@ -414,45 +435,579 @@ pub enum Ext4FileType {
     Symlink = 7,
 }
 
+/// Ext4 feature flags - compatible
+pub const EXT4_FEATURE_COMPAT_DIR_PREALLOC: u32 = 0x0001;
+pub const EXT4_FEATURE_COMPAT_IMAGIC_INODES: u32 = 0x0002;
+pub const EXT4_FEATURE_COMPAT_HAS_JOURNAL: u32 = 0x0004;
+pub const EXT4_FEATURE_COMPAT_EXT_ATTR: u32 = 0x0008;
+pub const EXT4_FEATURE_COMPAT_RESIZE_INODE: u32 = 0x0010;
+pub const EXT4_FEATURE_COMPAT_DIR_INDEX: u32 = 0x0020;
+pub const EXT4_FEATURE_COMPAT_LAZY_BG: u32 = 0x0040;
+pub const EXT4_FEATURE_COMPAT_EXCLUDE_INODE: u32 = 0x0080;
+pub const EXT4_FEATURE_COMPAT_EXCLUDE_BITMAP: u32 = 0x0100;
+pub const EXT4_FEATURE_COMPAT_SPARSE_SUPER2: u32 = 0x0200;
+
+/// Ext4 feature flags - incompatible
+pub const EXT4_FEATURE_INCOMPAT_COMPRESSION: u32 = 0x0001;
+pub const EXT4_FEATURE_INCOMPAT_FILETYPE: u32 = 0x0002;
+pub const EXT4_FEATURE_INCOMPAT_RECOVER: u32 = 0x0004;
+pub const EXT4_FEATURE_INCOMPAT_JOURNAL_DEV: u32 = 0x0008;
+pub const EXT4_FEATURE_INCOMPAT_META_BG: u32 = 0x0010;
+pub const EXT4_FEATURE_INCOMPAT_EXTENTS: u32 = 0x0040;
+pub const EXT4_FEATURE_INCOMPAT_64BIT: u32 = 0x0080;
+pub const EXT4_FEATURE_INCOMPAT_MMP: u32 = 0x0100;
+pub const EXT4_FEATURE_INCOMPAT_FLEX_BG: u32 = 0x0200;
+pub const EXT4_FEATURE_INCOMPAT_EA_INODE: u32 = 0x0400;
+pub const EXT4_FEATURE_INCOMPAT_DIRDATA: u32 = 0x1000;
+pub const EXT4_FEATURE_INCOMPAT_CSUM_SEED: u32 = 0x2000;
+pub const EXT4_FEATURE_INCOMPAT_LARGEDIR: u32 = 0x4000;
+pub const EXT4_FEATURE_INCOMPAT_INLINE_DATA: u32 = 0x8000;
+pub const EXT4_FEATURE_INCOMPAT_ENCRYPT: u32 = 0x10000;
+
+/// Ext4 feature flags - read-only compatible
+pub const EXT4_FEATURE_RO_COMPAT_SPARSE_SUPER: u32 = 0x0001;
+pub const EXT4_FEATURE_RO_COMPAT_LARGE_FILE: u32 = 0x0002;
+pub const EXT4_FEATURE_RO_COMPAT_BTREE_DIR: u32 = 0x0004;
+pub const EXT4_FEATURE_RO_COMPAT_HUGE_FILE: u32 = 0x0008;
+pub const EXT4_FEATURE_RO_COMPAT_GDT_CSUM: u32 = 0x0010;
+pub const EXT4_FEATURE_RO_COMPAT_DIR_NLINK: u32 = 0x0020;
+pub const EXT4_FEATURE_RO_COMPAT_EXTRA_ISIZE: u32 = 0x0040;
+pub const EXT4_FEATURE_RO_COMPAT_HAS_SNAPSHOT: u32 = 0x0100;
+pub const EXT4_FEATURE_RO_COMPAT_QUOTA: u32 = 0x0200;
+pub const EXT4_FEATURE_RO_COMPAT_BIGALLOC: u32 = 0x0400;
+pub const EXT4_FEATURE_RO_COMPAT_METADATA_CSUM: u32 = 0x0800;
+pub const EXT4_FEATURE_RO_COMPAT_REPLICA: u32 = 0x1000;
+pub const EXT4_FEATURE_RO_COMPAT_READONLY: u32 = 0x2000;
+pub const EXT4_FEATURE_RO_COMPAT_PROJECT: u32 = 0x4000;
+
+/// Ext4 encryption modes
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum Ext4EncryptionMode {
+    Invalid = 0,
+    AES256XTS = 1,
+    AES256GCM = 2,
+    AES256CBC = 3,
+    AES256CTS = 4,
+}
+
+/// Ext4 encryption context
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Ext4EncryptionContext {
+    pub mode: u8,
+    pub flags: u8,
+    pub master_key_descriptor: [u8; 8],
+    pub nonce: [u8; 16],
+}
+
+/// Ext4 extended attribute entry
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Ext4XattrEntry {
+    pub e_name_len: u8,
+    pub e_name_index: u8,
+    pub e_value_offs: u16,
+    pub e_value_block: u32,
+    pub e_value_size: u32,
+    pub e_hash: u32,
+    pub e_name: [u8; 0],
+}
+
+/// Ext4 extended attribute header
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Ext4XattrHeader {
+    pub h_magic: u32,
+    pub h_refcount: u32,
+    pub h_blocks: u32,
+    pub h_hash: u32,
+    pub h_checksum: u32,
+    pub h_reserved: [u32; 3],
+}
+
+/// Ext4 quota information
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Ext4QuotaInfo {
+    pub dqb_bhardlimit: u64,
+    pub dqb_bsoftlimit: u64,
+    pub dqb_curspace: u64,
+    pub dqb_ihardlimit: u64,
+    pub dqb_isoftlimit: u64,
+    pub dqb_curinodes: u64,
+    pub dqb_btime: u64,
+    pub dqb_itime: u64,
+    pub dqb_valid: u32,
+    pub dqb_pad: u32,
+}
+
+/// Ext4 project quota
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Ext4ProjectQuota {
+    pub prj_quota_id: u32,
+    pub quota: Ext4QuotaInfo,
+}
+
+/// Ext4 directory hash versions
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum Ext4DirHashVersion {
+    Legacy = 0,
+    HalfMD4 = 1,
+    Tea = 2,
+    LegacyUnsigned = 3,
+    HalfMD4Unsigned = 4,
+    TeaUnsigned = 5,
+}
+
+/// Ext4 directory index entry
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Ext4DirIndexEntry {
+    pub hash: u32,
+    pub block: u32,
+}
+
+/// Ext4 directory index root
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Ext4DirIndexRoot {
+    pub limit: u8,
+    pub count: u8,
+    pub current_index: u8,
+    pub hash_version: u8,
+    pub padding: [u8; 4],
+    pub hash_seed: [u32; 4],
+    pub tree_depth: u8,
+    pub indirect_levels: u8,
+    pub unused_flags: u16,
+}
+
+/// Ext4 directory index tail
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Ext4DirIndexTail {
+    pub dt_checksum: u32,
+    pub dt_reserved: [u32; 3],
+}
+
+/// Ext4 directory index node
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Ext4DirIndexNode {
+    pub fake_inode: u32,
+    pub limit: u16,
+    pub count: u16,
+    pub current_index: u8,
+    pub hash_version: u8,
+    pub padding: [u8; 6],
+    pub entries: [Ext4DirIndexEntry; 0],
+}
+
+/// Ext4 extent status tree entry
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Ext4ExtentStatus {
+    pub es_lblk: u32,
+    pub es_len: u32,
+    pub es_pblk_hi: u16,
+    pub es_status: u16,
+    pub es_pblk_lo: u32,
+}
+
+/// Ext4 extent status flags
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u16)]
+pub enum Ext4ExtentStatusFlags {
+    Written = 0x0001,
+    Unwritten = 0x0002,
+    Delayed = 0x0004,
+    Hole = 0x0008,
+}
+
+/// Ext4 extent status tree
+#[derive(Debug, Clone)]
+pub struct Ext4ExtentStatusTree {
+    pub root: Ext4ExtentStatus,
+    pub depth: u32,
+    pub count: u32,
+    pub max_entries: u32,
+    pub entries: Vec<Ext4ExtentStatus>,
+}
+
+/// Ext4 multi-mount protection (MMP) structure
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Ext4MmpStruct {
+    pub mmp_magic: u32,
+    pub mmp_seq: u32,
+    pub mmp_time: u64,
+    pub mmp_nodename: [u8; 64],
+    pub mmp_bdevname: [u8; 32],
+    pub mmp_check: u32,
+    pub mmp_interval: u16,
+    pub mmp_pad: u16,
+    pub mmp_generation: u32,
+    pub mmp_reserved: [u32; 22],
+}
+
+/// Ext4 flexible block group descriptor
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Ext4FlexBgDesc {
+    pub block_bitmap: u32,
+    pub inode_bitmap: u32,
+    pub inode_table: u32,
+    pub free_blocks: u16,
+    pub free_inodes: u16,
+    pub used_dirs: u16,
+    pub flags: u16,
+    pub exclude_bitmap: u64,
+    pub block_bitmap_csum: u16,
+    pub inode_bitmap_csum: u16,
+    pub reserved: [u32; 3],
+}
+
+/// Ext4 checksum seed
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Ext4ChecksumSeed {
+    pub checksum_seed: u32,
+}
+
+/// Ext4 file system statistics
+#[derive(Debug, Clone)]
+pub struct Ext4Stats {
+    pub total_blocks: u64,
+    pub free_blocks: u64,
+    pub total_inodes: u32,
+    pub free_inodes: u32,
+    pub directories: u32,
+    pub files: u32,
+    pub symlinks: u32,
+    pub devices: u32,
+    pub fifos: u32,
+    pub sockets: u32,
+    pub fragments: u64,
+    pub free_fragments: u64,
+    pub allocated_blocks: u64,
+    pub allocated_inodes: u32,
+    pub deleted_inodes: u32,
+    pub orphan_inodes: u32,
+    pub quota_inodes: u32,
+    pub journal_inodes: u32,
+    pub reserved_inodes: u32,
+    pub used_blocks: u64,
+    pub used_inodes: u32,
+    pub reserved_blocks: u64,
+    pub reserved_inodes_count: u32,
+    pub system_blocks: u64,
+    pub system_inodes: u32,
+    pub user_blocks: u64,
+    pub user_inodes: u32,
+    pub group_descriptors: u32,
+    pub block_groups: u32,
+    pub flex_groups: u32,
+    pub metadata_blocks: u64,
+    pub metadata_inodes: u32,
+    pub data_blocks: u64,
+    pub data_inodes: u32,
+    pub journal_blocks: u64,
+    pub journal_inodes_count: u32,
+    pub quota_blocks: u64,
+    pub quota_inodes_count: u32,
+    pub reserved_quota_blocks: u64,
+    pub reserved_quota_inodes: u32,
+    pub used_quota_blocks: u64,
+    pub used_quota_inodes: u32,
+    pub free_quota_blocks: u64,
+    pub free_quota_inodes: u32,
+    pub reserved_journal_blocks: u64,
+    pub reserved_journal_inodes: u32,
+    pub used_journal_blocks: u64,
+    pub used_journal_inodes: u32,
+    pub free_journal_blocks: u64,
+    pub free_journal_inodes: u32,
+    pub reserved_metadata_blocks: u64,
+    pub reserved_metadata_inodes: u32,
+    pub used_metadata_blocks: u64,
+    pub used_metadata_inodes: u32,
+    pub free_metadata_blocks: u64,
+    pub free_metadata_inodes: u32,
+    pub reserved_data_blocks: u64,
+    pub reserved_data_inodes: u32,
+    pub used_data_blocks: u64,
+    pub used_data_inodes: u32,
+    pub free_data_blocks: u64,
+    pub free_data_inodes: u32,
+    pub reserved_system_blocks: u64,
+    pub reserved_system_inodes: u32,
+    pub used_system_blocks: u64,
+    pub used_system_inodes: u32,
+    pub free_system_blocks: u64,
+    pub free_system_inodes: u32,
+    pub reserved_user_blocks: u64,
+    pub reserved_user_inodes: u32,
+    pub used_user_blocks: u64,
+    pub used_user_inodes: u32,
+    pub free_user_blocks: u64,
+    pub free_user_inodes: u32,
+}
+
+/// Ext4 file system mount options
+#[derive(Debug, Clone)]
+pub struct Ext4MountOptions {
+    pub read_only: bool,
+    pub noatime: bool,
+    pub nodiratime: bool,
+    pub relatime: bool,
+    pub strictatime: bool,
+    pub data_journaling: bool,
+    pub data_ordered: bool,
+    pub data_writeback: bool,
+    pub user_xattr: bool,
+    pub acl: bool,
+    pub usrquota: bool,
+    pub grpquota: bool,
+    pub prjquota: bool,
+    pub barrier: bool,
+    pub nobarrier: bool,
+    pub block_size: u32,
+    pub inode_size: u32,
+    pub journal_size: u32,
+    pub checksum: bool,
+    pub encrypt: bool,
+    pub casefold: bool,
+    pub project: bool,
+    pub largedir: bool,
+    pub inline_data: bool,
+    pub metadata_csum: bool,
+    pub _64bit: bool,
+    pub flex_bg: bool,
+    pub sparse_super: bool,
+    pub huge_file: bool,
+    pub bigalloc: bool,
+    pub quota: bool,
+    pub mmp: bool,
+    pub dir_index: bool,
+    pub ext_attr: bool,
+    pub journal: bool,
+    pub recover: bool,
+    pub compression: bool,
+    pub filetype: bool,
+    pub meta_bg: bool,
+    pub extents: bool,
+    pub write_policy: Ext4WritePolicy,
+}
+
+/// Runtime write policy for balancing latency vs durability.
+#[derive(Debug, Clone, Copy)]
+pub enum Ext4WritePolicy {
+    Balanced,
+    LatencyOptimized,
+    Durability,
+}
+
+impl Default for Ext4MountOptions {
+    fn default() -> Self {
+        Self {
+            read_only: false,
+            noatime: false,
+            nodiratime: false,
+            relatime: false,
+            strictatime: false,
+            data_journaling: false,
+            data_ordered: true,
+            data_writeback: false,
+            user_xattr: true,
+            acl: true,
+            usrquota: false,
+            grpquota: false,
+            prjquota: false,
+            barrier: true,
+            nobarrier: false,
+            block_size: 4096,
+            inode_size: 256,
+            journal_size: 0,
+            checksum: true,
+            encrypt: false,
+            casefold: false,
+            project: false,
+            largedir: false,
+            inline_data: false,
+            metadata_csum: true,
+            _64bit: true,
+            flex_bg: true,
+            sparse_super: true,
+            huge_file: true,
+            bigalloc: false,
+            quota: false,
+            mmp: false,
+            dir_index: true,
+            ext_attr: true,
+            journal: true,
+            recover: true,
+            compression: false,
+            filetype: true,
+            meta_bg: true,
+            extents: true,
+            write_policy: Ext4WritePolicy::Balanced,
+        }
+    }
+}
+
+impl Default for Ext4Stats {
+    fn default() -> Self {
+        Self {
+            total_blocks: 0,
+            free_blocks: 0,
+            total_inodes: 0,
+            free_inodes: 0,
+            directories: 0,
+            files: 0,
+            symlinks: 0,
+            devices: 0,
+            fifos: 0,
+            sockets: 0,
+            fragments: 0,
+            free_fragments: 0,
+            allocated_blocks: 0,
+            allocated_inodes: 0,
+            deleted_inodes: 0,
+            orphan_inodes: 0,
+            quota_inodes: 0,
+            journal_inodes: 0,
+            reserved_inodes: 0,
+            used_blocks: 0,
+            used_inodes: 0,
+            reserved_blocks: 0,
+            reserved_inodes_count: 0,
+            system_blocks: 0,
+            system_inodes: 0,
+            user_blocks: 0,
+            user_inodes: 0,
+            group_descriptors: 0,
+            block_groups: 0,
+            flex_groups: 0,
+            metadata_blocks: 0,
+            metadata_inodes: 0,
+            data_blocks: 0,
+            data_inodes: 0,
+            journal_blocks: 0,
+            journal_inodes_count: 0,
+            quota_blocks: 0,
+            quota_inodes_count: 0,
+            reserved_quota_blocks: 0,
+            reserved_quota_inodes: 0,
+            used_quota_blocks: 0,
+            used_quota_inodes: 0,
+            free_quota_blocks: 0,
+            free_quota_inodes: 0,
+            reserved_journal_blocks: 0,
+            reserved_journal_inodes: 0,
+            used_journal_blocks: 0,
+            used_journal_inodes: 0,
+            free_journal_blocks: 0,
+            free_journal_inodes: 0,
+            reserved_metadata_blocks: 0,
+            reserved_metadata_inodes: 0,
+            used_metadata_blocks: 0,
+            used_metadata_inodes: 0,
+            free_metadata_blocks: 0,
+            free_metadata_inodes: 0,
+            reserved_data_blocks: 0,
+            reserved_data_inodes: 0,
+            used_data_blocks: 0,
+            used_data_inodes: 0,
+            free_data_blocks: 0,
+            free_data_inodes: 0,
+            reserved_system_blocks: 0,
+            reserved_system_inodes: 0,
+            used_system_blocks: 0,
+            used_system_inodes: 0,
+            free_system_blocks: 0,
+            free_system_inodes: 0,
+            reserved_user_blocks: 0,
+            reserved_user_inodes: 0,
+            used_user_blocks: 0,
+            used_user_inodes: 0,
+            free_user_blocks: 0,
+            free_user_inodes: 0,
+        }
+    }
+}
+
 // ============================================================================
 // Ext4 File System Implementation
 // ============================================================================
 
 /// Ext4 file system implementation
 pub struct Ext4FileSystem {
-    /// Block device
     dev: Box<dyn BlockDevice>,
-    /// Superblock
     sb: Ext4SuperBlock,
-    /// Block size
     block_size: u32,
-    /// Block group count
     group_count: u32,
-    /// Block group descriptors
     group_descs: Vec<Ext4GroupDesc>,
-    /// Buffer cache
     buf_cache: BufCache,
-    /// Inode cache
     inode_cache: Mutex<BTreeMap<u32, Ext4Inode>>,
-    /// Block bitmap cache
     block_bitmap_cache: Mutex<BTreeMap<u32, Vec<bool>>>,
-    /// Inode bitmap cache
     inode_bitmap_cache: Mutex<BTreeMap<u32, Vec<bool>>>,
+    mount_options: Ext4MountOptions,
+    journal: Option<Box<dyn JournalingFileSystem>>,
+    xattr_cache: Mutex<BTreeMap<u32, BTreeMap<String, Vec<u8>>>>,
+    acl_cache: Mutex<BTreeMap<u32, Vec<u8>>>,
+    quota_info: Mutex<BTreeMap<u32, Ext4QuotaInfo>>,
+    project_quota: Mutex<BTreeMap<u32, Ext4ProjectQuota>>,
+    encryption_contexts: Mutex<BTreeMap<u32, Ext4EncryptionContext>>,
+    extent_status_trees: Mutex<BTreeMap<u32, Ext4ExtentStatusTree>>,
+    mmp: Option<Ext4MmpStruct>,
+    stats: Mutex<Ext4Stats>,
+    checksum_seed: Mutex<Ext4ChecksumSeed>,
+    flex_bg_descs: Mutex<BTreeMap<u32, Ext4FlexBgDesc>>,
+    dir_index_roots: Mutex<BTreeMap<u32, Ext4DirIndexRoot>>,
+    dir_index_tails: Mutex<BTreeMap<u32, Ext4DirIndexTail>>,
+    dir_index_nodes: Mutex<BTreeMap<u32, Ext4DirIndexNode>>,
+    xattr_headers: Mutex<BTreeMap<u32, Ext4XattrHeader>>,
+    xattr_entries: Mutex<BTreeMap<u32, Vec<Ext4XattrEntry>>>,
+    journal_entries: Mutex<BTreeMap<u32, Vec<JournalEntry>>>,
+    journal_transactions: Mutex<BTreeMap<u32, JournalTransaction>>,
+    journal_checkpoint: Mutex<u32>,
 }
 
 impl Ext4FileSystem {
-    /// Create a new Ext4 file system instance
     pub fn new(dev: Box<dyn BlockDevice>) -> Self {
         Self {
             dev,
             sb: Ext4SuperBlock::default(),
-            block_size: 1024, // Default block size
+            block_size: 1024,
             group_count: 0,
             group_descs: Vec::new(),
             buf_cache: BufCache::new(),
             inode_cache: Mutex::new(BTreeMap::new()),
             block_bitmap_cache: Mutex::new(BTreeMap::new()),
             inode_bitmap_cache: Mutex::new(BTreeMap::new()),
+            mount_options: Ext4MountOptions::default(),
+            journal: None,
+            xattr_cache: Mutex::new(BTreeMap::new()),
+            acl_cache: Mutex::new(BTreeMap::new()),
+            quota_info: Mutex::new(BTreeMap::new()),
+            project_quota: Mutex::new(BTreeMap::new()),
+            encryption_contexts: Mutex::new(BTreeMap::new()),
+            extent_status_trees: Mutex::new(BTreeMap::new()),
+            mmp: None,
+            stats: Mutex::new(Ext4Stats::default()),
+            checksum_seed: Mutex::new(Ext4ChecksumSeed { checksum_seed: 0 }),
+            flex_bg_descs: Mutex::new(BTreeMap::new()),
+            dir_index_roots: Mutex::new(BTreeMap::new()),
+            dir_index_tails: Mutex::new(BTreeMap::new()),
+            dir_index_nodes: Mutex::new(BTreeMap::new()),
+            xattr_headers: Mutex::new(BTreeMap::new()),
+            xattr_entries: Mutex::new(BTreeMap::new()),
+            journal_entries: Mutex::new(BTreeMap::new()),
+            journal_transactions: Mutex::new(BTreeMap::new()),
+            journal_checkpoint: Mutex::new(0),
         }
     }
 

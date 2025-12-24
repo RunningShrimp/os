@@ -51,8 +51,8 @@ impl Service for IpcService {
 /// Register IPC services
 pub fn register_ipc_services() -> Result<()> {
     use crate::registry;
-    
-    let mut registry = registry::get_registry().lock();
+
+    let mut registry = registry::get_registry()?.lock();
     
     // Register message queue service
     let mq_service = IpcService::new("message_queue");

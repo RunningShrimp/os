@@ -150,6 +150,7 @@ pub struct SyscallModule {
     /// Module category
     pub category: SyscallCategory,
     /// System calls in this module
+    #[allow(clippy::arc_with_non_send_sync)]
     pub syscalls: BTreeMap<u32, Arc<dyn SyscallHandler>>,
     /// Module dependencies
     pub dependencies: Vec<String>,
@@ -258,6 +259,7 @@ pub struct ModuleInfo {
 }
 
 /// Modular system call dispatcher
+#[allow(clippy::should_implement_trait)]
 pub struct ModularDispatcher {
     /// Registered modules
     modules: BTreeMap<String, Arc<SyscallModule>>,
@@ -271,6 +273,7 @@ pub struct ModularDispatcher {
 
 /// Dispatcher statistics
 #[derive(Debug, Clone)]
+#[allow(clippy::should_implement_trait)]
 pub struct DispatcherStats {
     /// Total modules registered
     pub total_modules: usize,
@@ -409,16 +412,14 @@ impl ModularDispatcher {
     pub fn dispatch(&mut self, id: u32, args: &[usize]) -> Result<isize> {
         // Record syscall execution
         self.stats.record_syscall(id);
-        
+
         // Find the module that handles this syscall
-        if let Some(module_name) = self.syscall_to_module.get(&id) {
-            if let Some(module) = self.modules.get(module_name) {
-                if let Some(handler) = module.syscalls.get(&id) {
-                    return handler.execute(args);
-                }
-            }
+        if let Some(module_name) = self.syscall_to_module.get(&id)
+            && let Some(module) = self.modules.get(module_name)
+            && let Some(handler) = module.syscalls.get(&id) {
+            return handler.execute(args);
         }
-        
+
         Err(nos_api::Error::NotFound(
             "Syscall not found".to_string()
         ))
@@ -486,18 +487,16 @@ impl ModularDispatcher {
         let most_used = self.stats.get_most_used_syscalls(10);
         report.push_str("Most used syscalls:\n");
         for (id, count) in most_used {
-            if let Some(module_name) = self.syscall_to_module.get(&id) {
-                if let Some(module) = self.modules.get(module_name) {
-                    if let Some(handler) = module.syscalls.get(&id) {
-                        report.push_str(&format!(
-                            "  {}: {} ({} calls)\n",
-                            handler.name(), id, count
-                        ));
-                    }
-                }
+            if let Some(module_name) = self.syscall_to_module.get(&id)
+                && let Some(module) = self.modules.get(module_name)
+                && let Some(handler) = module.syscalls.get(&id) {
+                report.push_str(&format!(
+                    "  {}: {} ({} calls)\n",
+                    handler.name(), id, count
+                ));
             }
         }
-        
+
         report
     }
 }
@@ -539,6 +538,7 @@ impl ModuleBuilder {
 }
 
 /// Register all standard modules
+#[allow(clippy::arc_with_non_send_sync)]
 pub fn register_standard_modules(dispatcher: &mut ModularDispatcher) -> Result<()> {
     // File system module
     let fs_module = ModuleBuilder::new(
@@ -548,7 +548,7 @@ pub fn register_standard_modules(dispatcher: &mut ModularDispatcher) -> Result<(
     )
     .description("File system operations".to_string())
     .build();
-    
+
     // Memory module
     let mem_module = ModuleBuilder::new(
         "memory".to_string(),
@@ -557,7 +557,7 @@ pub fn register_standard_modules(dispatcher: &mut ModularDispatcher) -> Result<(
     )
     .description("Memory management operations".to_string())
     .build();
-    
+
     // Network module
     let net_module = ModuleBuilder::new(
         "network".to_string(),
@@ -566,7 +566,7 @@ pub fn register_standard_modules(dispatcher: &mut ModularDispatcher) -> Result<(
     )
     .description("Network operations".to_string())
     .build();
-    
+
     // Process module
     let proc_module = ModuleBuilder::new(
         "process".to_string(),
@@ -575,12 +575,12 @@ pub fn register_standard_modules(dispatcher: &mut ModularDispatcher) -> Result<(
     )
     .description("Process management operations".to_string())
     .build();
-    
+
     // Register modules
     let _ = dispatcher.register_module(Arc::new(fs_module));
     let _ = dispatcher.register_module(Arc::new(mem_module));
     let _ = dispatcher.register_module(Arc::new(net_module));
     let _ = dispatcher.register_module(Arc::new(proc_module));
-    
+
     Ok(())
 }

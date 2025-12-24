@@ -1,7 +1,7 @@
 //! NUMA-aware memory allocation support
 //!
 //! This module provides comprehensive NUMA (Non-Uniform Memory Access) support for
-//! memory allocation. NUMA allows the kernel to allocate memory from the
+//! memory allocation. NUMA allows to kernel to allocate memory from the
 //! closest memory node to the CPU, improving performance by reducing
 //! memory access latency.
 
@@ -9,6 +9,7 @@ use core::ptr::null_mut;
 use core::sync::atomic::{AtomicUsize, AtomicPtr, Ordering};
 use alloc::vec::Vec;
 use crate::subsystems::sync::Mutex;
+use crate::subsystems::mm::unified_stats::AtomicAllocationStats;
 use nos_api::{Result, Error};
 
 /// NUMA node identifier
@@ -45,41 +46,11 @@ pub struct NumaNode {
     memory_zones: Vec<MemoryZone>,
     free_memory: AtomicUsize,
     total_memory: usize,
-    distance: [u8; MAX_NUMA_NODES], // Distance to other nodes
+    distance: [u8; MAX_tomicANUMA_NODES], // Distance to other nodes
     allocation_stats: AllocationStats,
     preferred_zone: Option<MemoryZoneType>,
 }
-
-/// NUMA allocation statistics
-#[derive(Debug, Clone)]
-pub struct AllocationStats {
-    pub total_allocations: AtomicUsize,
-    pub total_deallocations: AtomicUsize,
-    pub current_allocations: AtomicUsize,
-    pub peak_allocations: AtomicUsize,
-    pub total_allocated_bytes: AtomicUsize,
-    pub total_deallocated_bytes: AtomicUsize,
-    pub current_allocated_bytes: AtomicUsize,
-    pub peak_allocated_bytes: AtomicUsize,
-    pub allocation_failures: AtomicUsize,
-}
-
-impl Default for AllocationStats {
-    fn default() -> Self {
-        Self {
-            total_allocations: AtomicUsize::new(0),
-            total_deallocations: AtomicUsize::new(0),
-            current_allocations: AtomicUsize::new(0),
-            peak_allocations: AtomicUsize::new(0),
-            total_allocated_bytes: AtomicUsize::new(0),
-            total_deallocated_bytes: AtomicUsize::new(0),
-            current_allocated_bytes: AtomicUsize::new(0),
-            peak_allocated_bytes: AtomicUsize::new(0),
-            allocation_failures: AtomicUsize::new(0),
-        }
-    }
-}
-
+o rt_allocat policd
 /// NUMA allocation policy
 #[derive(Debug, Clone, Copy)]
 pub enum NumaPolicy {
@@ -99,7 +70,7 @@ impl NumaNode {
             memory_zones: Vec::new(),
             free_memory: AtomicUsize::new(0),
             total_memory: 0,
-            distance: [10; MAX_NUMA_NODES], // Default distance
+            distance: [10; MAXNODES], // Default distance
             allocation_stats: AllocationStats::default(),
             preferred_zone: None,
         }

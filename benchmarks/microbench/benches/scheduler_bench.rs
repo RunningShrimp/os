@@ -7,7 +7,9 @@ fn sim_runqueue(n: usize) {
     let mut nodes = vec![Node { pid: 0, next: 0 }; n + 1];
     let mut head = 0usize;
     let mut tail = 0usize;
-    for i in 1..=n { nodes[i] = Node { pid: i, next: 0 }; }
+    nodes[1..=n].iter_mut().enumerate().for_each(|(i, node)| {
+        *node = Node { pid: i + 1, next: 0 };
+    });
     for i in 1..=n {
         if head == 0 { head = i; tail = i; } else { nodes[tail].next = i; tail = i; }
     }
@@ -17,7 +19,7 @@ fn sim_runqueue(n: usize) {
         picked += nodes[cur].pid;
         head = nodes[cur].next;
     }
-    std::hint::black_box(picked);
+    core::hint::black_box(picked);
 }
 
 fn bench_scheduler(c: &mut Criterion) {

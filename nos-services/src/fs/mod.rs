@@ -65,8 +65,8 @@ impl Service for FileSystemService {
 /// Register file system services
 pub fn register_fs_services() -> Result<()> {
     use crate::registry;
-    
-    let mut registry = registry::get_registry().lock();
+
+    let mut registry = registry::get_registry()?.lock();
     
     // Register root file system
     let root_fs = FileSystemService::new("root_fs", "/", "ext4");

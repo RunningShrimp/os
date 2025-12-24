@@ -1,6 +1,6 @@
 //! System call registry
 //!
-//! This module provides the system call registry functionality.
+//! This module provides system call registry functionality.
 
 use nos_api::Result;
 use alloc::collections::BTreeMap;
@@ -10,6 +10,7 @@ use alloc::vec::Vec;
 use spin::{Mutex, Once};
 
 /// System call registry
+#[allow(clippy::should_implement_trait)]
 pub struct SyscallRegistry {
     /// Registered system calls
     syscalls: BTreeMap<u32, SyscallInfo>,

@@ -7,9 +7,6 @@ use alloc::boxed::Box;
 
 use nos_api::Result;
 use crate::SyscallHandler;
-#[cfg(feature = "log")]
-use log;
-
 use crate::SyscallDispatcher;
 
 /// Register memory system call handlers
@@ -49,12 +46,12 @@ impl SyscallHandler for MmapHandler {
         }
         
         let addr = args[0] as *mut u8;
-        let length = args[1] as usize;
+        let length = args[1];
         let prot = args[2] as u32;
         let flags = args[3] as u32;
         let fd = args[4] as i32;
         let offset = args[5] as isize;
-        
+
         // TODO: Implement actual mmap logic using parameters:
         // addr: Requested address for mapping
         // length: Length of mapping in bytes
@@ -62,12 +59,8 @@ impl SyscallHandler for MmapHandler {
         // flags: Mapping flags (MAP_SHARED, MAP_PRIVATE, etc.)
         // fd: File descriptor to map (or -1 for anonymous mapping)
         // offset: Offset in file to start mapping from
-        #[cfg(feature = "log")]
-        log::trace!("mmap called with: addr={:?}, length={}, prot={}, flags={}, fd={}, offset={}", addr, length, prot, flags, fd, offset);
-        
-        // Basic validation to ensure parameters are used even when logging is disabled
-        let _ = (addr, length, prot, flags, fd, offset);
-        
+        sys_trace_with_args!("mmap called with: addr={:?}, length={}, prot={}, flags={}, fd={}, offset={}", addr, length, prot, flags, fd, offset);
+
         Ok(addr as isize) // Return the mapped address
     }
     
@@ -90,16 +83,12 @@ impl SyscallHandler for MunmapHandler {
         }
         
         let addr = args[0] as *mut u8;
-        let length = args[1] as usize;
+        let length = args[1];
         
         // TODO: Implement actual munmap logic using parameters:
         // addr: Address of mapping to unmap
         // length: Length of mapping to unmap
-        #[cfg(feature = "log")]
-        log::trace!("munmap called with: addr={:?}, length={}", addr, length);
-        
-        // Basic validation to ensure parameters are used even when logging is disabled
-        let _ = (addr, length);
+        sys_trace_with_args!("munmap called with: addr={:?}, length={}", addr, length);
         
         Ok(0)
     }
@@ -123,18 +112,14 @@ impl SyscallHandler for MprotectHandler {
         }
         
         let addr = args[0] as *mut u8;
-        let len = args[1] as usize;
+        let len = args[1];
         let prot = args[2] as u32;
         
         // TODO: Implement actual mprotect logic using parameters:
         // addr: Address of memory to protect
         // len: Length of memory to protect
         // prot: New protection flags
-        #[cfg(feature = "log")]
-        log::trace!("mprotect called with: addr={:?}, len={}, prot={}", addr, len, prot);
-        
-        // Basic validation to ensure parameters are used even when logging is disabled
-        let _ = (addr, len, prot);
+        sys_trace_with_args!("mprotect called with: addr={:?}, len={}, prot={}", addr, len, prot);
         
         Ok(0)
     }

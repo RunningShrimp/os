@@ -136,6 +136,7 @@ pub struct ServiceInfo {
 
 /// Service statistics
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct ServiceStats {
     /// Total number of services
     pub total_services: u64,
@@ -151,18 +152,6 @@ pub struct ServiceStats {
     pub total_restarts: u64,
 }
 
-impl Default for ServiceStats {
-    fn default() -> Self {
-        Self {
-            total_services: 0,
-            running_services: 0,
-            stopped_services: 0,
-            error_services: 0,
-            avg_uptime: 0,
-            total_restarts: 0,
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {

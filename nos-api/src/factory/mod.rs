@@ -78,16 +78,22 @@ pub struct FactoryRegistry {
 // and the trait objects are Send + Sync, so the entire struct is Sync.
 unsafe impl Sync for FactoryRegistry {}
 
+impl Default for FactoryRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FactoryRegistry {
     /// Creates a new factory registry
     pub fn new() -> Self {
         Self {
             service_factories: alloc::collections::BTreeMap::new(),
-            
+
             memory_manager_factories: alloc::collections::BTreeMap::new(),
-            
+
             process_manager_factories: alloc::collections::BTreeMap::new(),
-            
+
             syscall_dispatcher_factories: alloc::collections::BTreeMap::new(),
         }
     }

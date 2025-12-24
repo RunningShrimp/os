@@ -40,16 +40,18 @@ pub const ALIGNMENT: usize = 8;
 
 /// Memory block type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub enum BlockType {
     Free,
-    Small,      // Small objects (<= 2KB)
-    Medium,     // Medium objects (<= 32KB)
-    Large,      // Large objects (<= 1MB)
-    Huge,       // Huge objects (> 1MB)
+    Small,
+    Medium,
+    Large,
+    Huge,
 }
 
 /// Memory block state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub enum BlockState {
     Free,
     Allocated,
@@ -105,7 +107,7 @@ impl BlockHeader {
     /// Get block header from data pointer
     pub fn from_data_ptr(ptr: *mut u8) -> *mut BlockHeader {
         unsafe {
-            (ptr as *mut BlockHeader).sub(core::mem::size_of::<BlockHeader>())
+            (ptr as *mut BlockHeader).sub(1)
         }
     }
     
@@ -206,9 +208,9 @@ impl MemoryPool {
     pub fn allocate(&self, size: usize) -> *mut u8 {
         // Align size
         let aligned_size = (size + ALIGNMENT - 1) & !(ALIGNMENT - 1);
-        
+
         // Check min and max size
-        if aligned_size < MIN_ALLOC_SIZE || aligned_size > MAX_ALLOC_SIZE {
+        if !(MIN_ALLOC_SIZE..=MAX_ALLOC_SIZE).contains(&aligned_size) {
             return core::ptr::null_mut();
         }
         
@@ -231,7 +233,7 @@ impl MemoryPool {
                     };
                     
                     // Update original block
-                    let block = unsafe { &mut *(block_header.as_ptr() as *mut BlockHeader) };
+                    let block = unsafe { &mut *block_header.as_ptr() };
                     block.size = aligned_size;
                     block.mark_allocated(0); // Use default PID
                     
@@ -250,7 +252,7 @@ impl MemoryPool {
                     return block.data_ptr();
                 } else {
                     // Allocate entire block
-                    let block = unsafe { &mut *(block_header.as_ptr() as *mut BlockHeader) };
+                    let block = unsafe { &mut *block_header.as_ptr() };
                     block.mark_allocated(0); // Use default PID
                     
                     // Remove from free list
@@ -491,6 +493,7 @@ impl MemoryPoolStats {
 
 /// Pool information
 #[derive(Debug, Clone)]
+#[allow(missing_docs)]
 pub struct PoolInfo {
     pub total_blocks: usize,
     pub free_blocks: usize,
@@ -561,6 +564,12 @@ impl Clone for AllocatorStats {
             peak_allocated_bytes: AtomicU64::new(self.peak_allocated_bytes.load(Ordering::SeqCst)),
             failed_allocations: AtomicU64::new(self.failed_allocations.load(Ordering::SeqCst)),
         }
+    }
+}
+
+impl Default for TieredMemoryAllocator {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -670,18 +679,12 @@ impl TieredMemoryAllocator {
         drop(stats);
         
         // Deallocate from appropriate pool
-        if size <= SMALL_OBJECT_THRESHOLD {
-            if let Some(pool) = &self.small_pool {
-                unsafe { pool.deallocate(ptr, 0) };
-            }
-        } else if size <= MEDIUM_OBJECT_THRESHOLD {
-            if let Some(pool) = &self.medium_pool {
-                unsafe { pool.deallocate(ptr, 0) };
-            }
-        } else if size <= LARGE_OBJECT_THRESHOLD {
-            if let Some(pool) = &self.large_pool {
-                unsafe { pool.deallocate(ptr, 0) };
-            }
+        if size <= SMALL_OBJECT_THRESHOLD && let Some(pool) = &self.small_pool {
+            unsafe { pool.deallocate(ptr, 0) };
+        } else if size <= MEDIUM_OBJECT_THRESHOLD && let Some(pool) = &self.medium_pool {
+            unsafe { pool.deallocate(ptr, 0) };
+        } else if size <= LARGE_OBJECT_THRESHOLD && let Some(pool) = &self.large_pool {
+            unsafe { pool.deallocate(ptr, 0) };
         }
     }
     

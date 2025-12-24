@@ -58,8 +58,8 @@ impl Service for NetworkService {
 /// Register network services
 pub fn register_network_services() -> Result<()> {
     use crate::registry;
-    
-    let mut registry = registry::get_registry().lock();
+
+    let mut registry = registry::get_registry()?.lock();
     
     // Register loopback network service
     let loopback_service = NetworkService::new("loopback", "lo");

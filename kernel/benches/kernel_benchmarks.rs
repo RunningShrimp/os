@@ -9,7 +9,8 @@
 
 extern crate alloc;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
+use core::hint::black_box;
 
 /// Benchmark memory allocation performance
 fn bench_memory_allocation(c: &mut Criterion) {

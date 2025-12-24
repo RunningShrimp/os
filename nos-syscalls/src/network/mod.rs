@@ -6,8 +6,6 @@ use alloc::string::ToString;
 use alloc::boxed::Box;
 use nos_api::Result;
 use crate::SyscallHandler;
-#[cfg(feature = "log")]
-use log;
 use crate::SyscallDispatcher;
 
 /// Register network system call handlers
@@ -54,11 +52,7 @@ impl SyscallHandler for SocketHandler {
         // domain: Address family (AF_INET, AF_INET6, etc.)
         // type_: Socket type (SOCK_STREAM, SOCK_DGRAM, etc.)
         // protocol: Protocol type (0 for default protocol)
-        #[cfg(feature = "log")]
-        log::trace!("socket called with: domain={}, type={}, protocol={}", domain, type_, protocol);
-        
-        // Ensure parameters are used even when logging is disabled
-        let _ = (domain, type_, protocol);
+        sys_trace_with_args!("socket called with: domain={}, type={}, protocol={}", domain, type_, protocol);
         
         Ok(3) // Return a dummy socket descriptor
     }
@@ -84,17 +78,13 @@ impl SyscallHandler for ConnectHandler {
         let sockfd = args[0] as i32;
         let addr = args[1] as *const u8;
         let addrlen = args[2] as u32;
-        
+
         // TODO: Implement actual connect logic using parameters:
         // sockfd: Socket file descriptor
         // addr: Pointer to socket address structure
         // addrlen: Size of socket address structure
-        #[cfg(feature = "log")]
-        log::trace!("connect called with: sockfd={}, addr={:?}, addrlen={}", sockfd, addr, addrlen);
-        
-        // Ensure parameters are used even when logging is disabled
-        let _ = (sockfd, addr, addrlen);
-        
+        sys_trace_with_args!("connect called with: sockfd={}, addr={:?}, addrlen={}", sockfd, addr, addrlen);
+
         Ok(0)
     }
     
@@ -124,11 +114,7 @@ impl SyscallHandler for AcceptHandler {
         // sockfd: Socket file descriptor for listening
         // addr: Pointer to store client address
         // addrlen: Pointer to store client address length
-        #[cfg(feature = "log")]
-        log::trace!("accept called with: sockfd={}, addr={:?}, addrlen={:?}", sockfd, addr, addrlen);
-        
-        // Ensure parameters are used even when logging is disabled
-        let _ = (sockfd, addr, addrlen);
+        sys_trace_with_args!("accept called with: sockfd={}, addr={:?}, addrlen={:?}", sockfd, addr, addrlen);
         
         Ok(4) // Return a dummy socket descriptor
     }

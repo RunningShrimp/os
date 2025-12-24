@@ -154,12 +154,86 @@ impl VirtAddr {
     }
 }
 
-// RNG stub
+// RNG implementation with hardware RDRAND support
 pub struct RNG;
 
 impl RNG {
     pub fn get_random(&self) -> usize {
-        // Simple pseudo-random generator based on a static seed
+        #[cfg(target_arch = "x86_64")]
+        {
+            if let Some(rdrand) = self.get_rdrand() {
+                return rdrand;
+            }
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        {
+            if let Some(rnreg) = self.get_rnreg() {
+                return rnreg;
+            }
+        }
+
+        self.get_fallback_random()
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn get_rdrand(&self) -> Option<usize> {
+        unsafe {
+            let mut value: u32 = 0;
+            let success: bool;
+            core::arch::asm!(
+                "rdrand {0:e}",
+                out(reg) value,
+                setne(success),
+                options(nostack, pure)
+            );
+            if success {
+                Some(value as usize)
+            } else {
+                None
+            }
+        }
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn get_rdrand64(&self) -> Option<usize> {
+        unsafe {
+            let mut value: u64 = 0;
+            let success: bool;
+            core::arch::asm!(
+                "rdrand {0:e}",
+                out(reg) value,
+                setne(success),
+                options(nostack, pure)
+            );
+            if success {
+                Some(value as usize)
+            } else {
+                None
+            }
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    fn get_rnreg(&self) -> Option<usize> {
+        unsafe {
+            let mut value: u64 = 0;
+            let success: bool;
+            core::arch::asm!(
+                "mrs {0}, RNDR",
+                out(reg) value,
+                setne(success),
+                options(nostack, pure)
+            );
+            if success {
+                Some(value as usize)
+            } else {
+                None
+            }
+        }
+    }
+
+    fn get_fallback_random(&self) -> usize {
         use core::sync::atomic::{AtomicUsize, Ordering};
         static SEED: AtomicUsize = AtomicUsize::new(12345);
         let seed = SEED.fetch_add(1103515245, Ordering::SeqCst);

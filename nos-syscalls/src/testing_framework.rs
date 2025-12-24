@@ -6,6 +6,7 @@
 use alloc::{
     collections::BTreeMap,
     sync::Arc,
+    vec,
     vec::Vec,
     string::{String, ToString},
     boxed::Box,
@@ -13,6 +14,7 @@ use alloc::{
 };
 
 use nos_api::Result;
+use crate::logging::output_report;
 use core::sync::atomic::{AtomicU64, Ordering};
 
 /// Test result status
@@ -142,24 +144,22 @@ impl TestSuite {
         };
         
         // Run setup
-        if let Some(ref setup_fn) = self.setup_fn {
-            if let Err(e) = setup_fn() {
-                return TestSuiteResult {
-                    name: self.name.clone(),
-                    total_tests: self.tests.len(),
-                    passed: 0,
-                    failed: 0,
-                    skipped: 0,
-                    errors: 1,
-                    exec_time_us: {
-                        // In a real implementation, this would use a high-precision timer
-                        static TIME_COUNTER: AtomicU64 = AtomicU64::new(0);
-                        TIME_COUNTER.fetch_add(1, Ordering::SeqCst)
-                    } - start_time,
-                    results,
-                    error_message: Some(format!("Setup failed: {}", e)),
-                };
-            }
+        if let Some(ref setup_fn) = self.setup_fn && let Err(e) = setup_fn() {
+            return TestSuiteResult {
+                name: self.name.clone(),
+                total_tests: self.tests.len(),
+                passed: 0,
+                failed: 0,
+                skipped: 0,
+                errors: 1,
+                exec_time_us: {
+                    // In a real implementation, this would use a high-precision timer
+                    static TIME_COUNTER: AtomicU64 = AtomicU64::new(0);
+                    TIME_COUNTER.fetch_add(1, Ordering::SeqCst)
+                } - start_time,
+                results,
+                error_message: Some(format!("Setup failed: {}", e)),
+            };
         }
         
         // Run all tests
@@ -300,6 +300,7 @@ impl TestCase for SimpleTestCase {
 }
 
 /// Test runner
+#[allow(clippy::should_implement_trait)]
 pub struct TestRunner {
     /// Registered test suites
     suites: BTreeMap<String, Arc<TestSuite>>,
@@ -309,6 +310,7 @@ pub struct TestRunner {
 
 /// Test runner statistics
 #[derive(Debug, Clone)]
+#[allow(clippy::should_implement_trait)]
 pub struct TestRunnerStats {
     /// Total suites run
     pub total_suites: usize,
@@ -546,14 +548,13 @@ impl TestCase for SyscallTestCase {
             },
             (Err(actual_error), None, Some(expected_error)) => {
                 // Check if two errors are equal
-                let errors_equal = match (&actual_error, expected_error) {
-                    (nos_api::Error::NotFound(_), nos_api::Error::NotFound(_)) => true,
-                    (nos_api::Error::InvalidArgument(_), nos_api::Error::InvalidArgument(_)) => true,
-                    (nos_api::Error::PermissionDenied(_), nos_api::Error::PermissionDenied(_)) => true,
-                    (nos_api::Error::IoError(_), nos_api::Error::IoError(_)) => true,
-                    (nos_api::Error::ServiceError(_), nos_api::Error::ServiceError(_)) => true,
-                    _ => false,
-                };
+                let errors_equal = matches!((&actual_error, expected_error),
+                    (nos_api::Error::NotFound(_), nos_api::Error::NotFound(_)) |
+                    (nos_api::Error::InvalidArgument(_), nos_api::Error::InvalidArgument(_)) |
+                    (nos_api::Error::PermissionDenied(_), nos_api::Error::PermissionDenied(_)) |
+                    (nos_api::Error::IoError(_), nos_api::Error::IoError(_)) |
+                    (nos_api::Error::ServiceError(_), nos_api::Error::ServiceError(_))
+                );
                 
                 if errors_equal {
                     TestResult::new(self.name.clone())
@@ -697,14 +698,7 @@ pub fn run_all_tests() -> Result<()> {
     
     // Generate and print report
     let report = runner.generate_report(&results);
-    // In a real implementation, this would send the report to a logging system
-    #[cfg(feature = "log")]
-    log::info!("{}", report);
-    #[cfg(all(feature = "std", not(feature = "log")))]
-    println!("{}", report);
-    // Ensure the report is used even if logging features are disabled
-    #[cfg(not(any(feature = "log", feature = "std")))]
-    core::hint::black_box(report); // Use black_box to ensure the variable is used
+    output_report(&report);
     
     // Check if all tests passed
     let all_passed = results.iter().all(|r| r.all_passed());

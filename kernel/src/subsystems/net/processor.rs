@@ -5,6 +5,7 @@
 
 extern crate alloc;
 use alloc::vec::Vec;
+use alloc::collections::BTreeMap;
 use super::packet::{Packet, PacketType};
 use super::device::NetworkDevice;
 use super::interface::Interface;
@@ -15,6 +16,13 @@ use super::udp::{UdpPacket, UdpSocket};
 use super::tcp::{TcpPacket, TcpSocket, TcpState};
 use super::route::RoutingTable;
 use super::fragment::FragmentReassembler;
+
+/// Socket key for HashMap lookup
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SocketKey {
+    pub local_ip: Ipv4Addr,
+    pub local_port: u16,
+}
 
 /// Packet processing result
 #[derive(Debug, Clone)]
@@ -39,10 +47,10 @@ pub struct NetworkProcessor {
     reassembler: FragmentReassembler,
     /// Routing table
     routing_table: RoutingTable,
-    /// UDP socket manager
-    udp_sockets: Vec<UdpSocket>,
-    /// TCP socket manager
-    tcp_sockets: Vec<TcpSocket>,
+    /// UDP socket manager (using BTreeMap for O(log n) lookup)
+    udp_sockets: BTreeMap<SocketKey, UdpSocket>,
+    /// TCP socket manager (using BTreeMap for O(log n) lookup)
+    tcp_sockets: BTreeMap<SocketKey, TcpSocket>,
 }
 
 impl NetworkProcessor {
@@ -53,8 +61,8 @@ impl NetworkProcessor {
             icmp_processor: IcmpProcessor::new(),
             reassembler: FragmentReassembler::new(),
             routing_table: RoutingTable::new(),
-            udp_sockets: Vec::new(),
-            tcp_sockets: Vec::new(),
+            udp_sockets: BTreeMap::new(),
+            tcp_sockets: BTreeMap::new(),
         }
     }
 
@@ -273,14 +281,16 @@ impl NetworkProcessor {
         let tcp_packet = TcpPacket::from_bytes(data)
             .map_err(|_| ProcessorError::InvalidPacket)?;
 
-        // Find matching TCP socket
-        let matching_socket_idx = self.tcp_sockets.iter_mut().position(|socket| {
-            socket.local_ip == dst_addr && socket.local_port == tcp_packet.src_port()
-        });
+        // Find matching TCP socket using BTreeMap for O(log n) lookup
+        let socket_key = SocketKey {
+            local_ip: dst_addr,
+            local_port: tcp_packet.src_port(),
+        };
 
-        if let Some(idx) = matching_socket_idx {
+        if let Some(socket) = self.tcp_sockets.get(&socket_key) {
             // Process the packet with the matching socket
-            let socket = &mut self.tcp_sockets[idx];
+            // Note: Cannot mutate directly in BTreeMap, need to get and reinsert
+            let mut socket = socket.clone();
 
             // Update socket state based on TCP flags and sequence numbers
             if tcp_packet.has_flag(super::tcp::tcp_flags::SYN) {
@@ -288,6 +298,7 @@ impl NetworkProcessor {
                     // Transition to SYN_RECEIVED
                     socket.state = TcpState::SynReceived;
                     // TODO: Send SYN-ACK
+                    self.tcp_sockets.insert(socket_key, socket);
                     return Ok(PacketResult::Drop);
                 }
             }
@@ -298,6 +309,7 @@ impl NetworkProcessor {
                 crate::log_info!("TCP received {} bytes from {}", tcp_packet.payload.len(), src_addr);
             }
 
+            self.tcp_sockets.insert(socket_key, socket);
             return Ok(PacketResult::Drop);
         }
 
@@ -315,19 +327,28 @@ impl NetworkProcessor {
         let udp_packet = UdpPacket::from_bytes(data)
             .map_err(|_| ProcessorError::InvalidPacket)?;
 
-        // Find matching UDP socket index first
-        let matching_socket_idx = self.udp_sockets.iter_mut().position(|socket| {
-            socket.is_bound() &&
-            socket.local_port == udp_packet.dst_port() &&
-            (socket.local_ip == Ipv4Addr::UNSPECIFIED || socket.local_ip == dst_addr)
-        });
+        // Find matching UDP socket using BTreeMap for O(log n) lookup
+        let socket_key = SocketKey {
+            local_ip: dst_addr,
+            local_port: udp_packet.dst_port(),
+        };
 
-        if let Some(idx) = matching_socket_idx {
-            // Extract socket from vector to avoid borrow conflicts
-            let mut socket = self.udp_sockets.swap_remove(idx);
+        // First try exact match
+        if let Some(mut socket) = self.udp_sockets.get(&socket_key).cloned() {
             let result = self.deliver_udp_packet(&mut socket, &udp_packet, src_addr);
-            // Put the socket back
-            self.udp_sockets.push(socket);
+            // Update socket in map (in case state changed)
+            self.udp_sockets.insert(socket_key, socket);
+            return result;
+        }
+
+        // Try wildcard IP match (UNSPECIFIED)
+        let wildcard_key = SocketKey {
+            local_ip: Ipv4Addr::UNSPECIFIED,
+            local_port: udp_packet.dst_port(),
+        };
+        if let Some(mut socket) = self.udp_sockets.get(&wildcard_key).cloned() {
+            let result = self.deliver_udp_packet(&mut socket, &udp_packet, src_addr);
+            self.udp_sockets.insert(wildcard_key, socket);
             return result;
         }
 

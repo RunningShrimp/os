@@ -267,7 +267,7 @@ mod tests {
         
         unsafe {
             // Create a memory pool with 64-byte blocks
-            let pool = MemoryPool::new(buffer.as_mut_ptr(), buffer.len(), 64, 8).unwrap();
+            let mut pool = MemoryPool::new(buffer.as_mut_ptr(), buffer.len(), 64, 8).unwrap();
             
             // Allocate some blocks
             let ptr1 = pool.alloc();

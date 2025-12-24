@@ -6,8 +6,6 @@ use crate::subsystems::sync::Mutex;
 pub mod api;
 pub mod ext2;
 pub mod ext4;
-pub mod ext4_enhanced; // Type definitions and constants for enhanced ext4
-pub mod ext4_enhanced_impl; // Main implementation (renamed from ext4_enhanced_impl2)
 pub mod ext4_persistence;
 pub mod fs_cache;
 pub mod fs_impl;

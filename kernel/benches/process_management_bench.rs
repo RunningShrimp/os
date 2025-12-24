@@ -11,7 +11,8 @@
 
 extern crate alloc;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
+use core::hint::black_box;
 use alloc::vec::Vec;
 use hashbrown::HashMap;
 

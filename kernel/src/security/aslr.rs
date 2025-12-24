@@ -19,7 +19,7 @@ use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use spin::Mutex;
 
-use crate::types::stubs::{VirtAddr, RNG_INSTANCE};
+use crate::types::stubs::{VirtAddr, RNG_INSTANCE, get_timestamp};
 use nos_api::Error;
 use core::result::Result;
 
@@ -337,15 +337,45 @@ impl AslrSubsystem {
 
     /// Generate a random number using kernel RNG
     fn random_number(&self) -> usize {
-        // Use architecture-specific RNG
         crate::types::stubs::RNG_INSTANCE.get_random()
     }
 
-    /// Generate a random seed for process ASLR
+    /// Get RDRAND entropy if available
+    fn get_rdrand_entropy(&self) -> Option<u64> {
+        #[cfg(target_arch = "x86_64")]
+        {
+            unsafe {
+                let mut value: u64 = 0;
+                let success: bool;
+                core::arch::asm!(
+                    "rdrand {0:e}",
+                    out(reg) value,
+                    setne(success),
+                    options(nostack, pure)
+                );
+                if success {
+                    return Some(value);
+                }
+            }
+        }
+        None
+    }
+
+    /// Generate a random seed for process ASLR using RDRAND
     fn generate_seed(&self) -> u64 {
-        let mut seed = self.rng_state.load(Ordering::Relaxed);
-        seed = seed.wrapping_add(self.random_number() as u64);
-        self.rng_state.store(seed, Ordering::Relaxed);
+        let mut seed: u64 = 0;
+
+        seed ^= self.get_rdrand_entropy().unwrap_or(0);
+        seed ^= self.random_number() as u64;
+
+        let time = get_timestamp();
+        seed ^= time;
+
+        seed = seed.wrapping_mul(0x517cc1b727220a95);
+        seed ^= seed.rotate_right(17);
+        seed ^= seed.rotate_left(43);
+        seed ^= seed.rotate_right(21);
+
         seed
     }
 

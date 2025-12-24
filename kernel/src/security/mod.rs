@@ -7,12 +7,16 @@ pub mod enhanced_permissions;
 pub mod memory_security;
 pub mod stack_canaries;
 pub mod aslr;
+pub mod audit;
+pub mod memory_audit;
 
 // 只导出在其他地方直接使用的安全函数
 pub use enhanced_permissions::init_permission_manager;
 pub use memory_security::{init_security, create_process_security_context, remove_process_security_context};
 pub use stack_canaries::CanaryConfig;
 pub use aslr::{initialize_aslr, randomize_memory_region, MemoryRegionType, is_aslr_enabled};
+pub use audit::{SecurityAuditor, AuditConfig, SecurityAuditResult, SecurityFinding, SecurityScore, ComplianceLevel, Severity, SecurityCategory};
+pub use memory_audit::{MemoryAuditor, MemoryAuditConfig, MemoryAuditResult, MemorySafetyFinding, MemoryStatistics, MemoryUsage, MEMORY_AUDITOR, run_memory_audit, record_allocation, record_deallocation, get_memory_usage};
 
 // Global ASLR subsystem instance
 use spin::Mutex;

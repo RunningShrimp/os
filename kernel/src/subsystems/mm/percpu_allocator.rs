@@ -1,41 +1,117 @@
-//! 每 CPU 分配器：隔离锁争用并预留全局回退。
-//!
-//! 优化实现：使用无锁/缓存友好的每CPU分配器
-
 extern crate alloc;
 
 use alloc::vec::Vec;
 use core::alloc::{GlobalAlloc, Layout};
+use core::ptr::NonNull;
+use core::sync::atomic::{AtomicPtr, AtomicUsize, AtomicBool, Ordering};
 
 use crate::subsystems::mm::allocator::HybridAllocator;
-use crate::subsystems::sync::{Once, Mutex};
 use crate::arch::cpu_id;
-use crate::subsystems::sync::SpinLock;
-use core::ptr::NonNull;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use crate::subsystems::sync::Once;
 
-/// 每 CPU 分配器
+const CACHE_LINE_SIZE: usize = 64;
+
+#[repr(align(64))]
+pub struct PerCpuAllocatorSlot {
+    allocator: *mut HybridAllocator,
+    initialized: AtomicBool,
+    _padding: [u8; CACHE_LINE_SIZE - 16],
+}
+
+impl PerCpuAllocatorSlot {
+    pub const fn uninit() -> Self {
+        Self {
+            allocator: core::ptr::null_mut(),
+            initialized: AtomicBool::new(false),
+            _padding: [0; CACHE_LINE_SIZE - 16],
+        }
+    }
+
+    pub fn get(&self) -> Option<&HybridAllocator> {
+        if self.initialized.load(Ordering::Acquire) && !self.allocator.is_null() {
+            unsafe { Some(&*self.allocator) }
+        } else {
+            None
+        }
+    }
+
+    pub fn get_mut(&self) -> Option<&mut HybridAllocator> {
+        if self.initialized.load(Ordering::Acquire) && !self.allocator.is_null() {
+            unsafe { Some(&mut *self.allocator) }
+        } else {
+            None
+        }
+    }
+
+    pub fn initialize(&self, init_fn: impl FnOnce() -> HybridAllocator) {
+        if !self.initialized.load(Ordering::Acquire) {
+            if let Ok(false) = self.initialized.compare_exchange(
+                false,
+                true,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
+                unsafe {
+                    let allocator = Box::leak(Box::new(init_fn()));
+                    (self as *const Self as *mut Self).write_volatile(Self {
+                        allocator,
+                        initialized: AtomicBool::new(true),
+                        _padding: [0; CACHE_LINE_SIZE - 16],
+                    });
+                }
+            }
+        }
+    }
+}
+
+#[repr(align(64))]
 pub struct PerCpuAllocator {
-    // 使用 Mutex 替代 SpinLock，降低锁开销
-    per_cpu: Vec<Mutex<HybridAllocator>>,
+    slots: Vec<PerCpuAllocatorSlot>,
+    max_cpus: usize,
+    _padding: [u8; CACHE_LINE_SIZE - 24],
 }
 
 impl PerCpuAllocator {
     pub fn new(num_cpus: usize) -> Self {
-        let cpu_count = core::cmp::max(1, num_cpus);
-        let mut per_cpu = Vec::with_capacity(cpu_count);
+        let cpu_count = core::cmp::max(1, num_cpus).min(256);
+        let mut slots = Vec::with_capacity(cpu_count);
         for _ in 0..cpu_count {
-            per_cpu.push(Mutex::new(HybridAllocator::new()));
+            slots.push(PerCpuAllocatorSlot::uninit());
         }
-        Self { per_cpu }
+        Self {
+            slots,
+            max_cpus: cpu_count,
+            _padding: [0; CACHE_LINE_SIZE - 24],
+        }
     }
 
     pub fn cpu_count(&self) -> usize {
-        self.per_cpu.len()
+        self.max_cpus
     }
 
-    /// 初始化指定 CPU 的分配器区域
-    pub unsafe fn init_cpu(
+    pub fn init_cpu(&self, cpu_id: usize, init_fn: impl FnOnce() -> HybridAllocator) {
+        if cpu_id < self.max_cpus {
+            self.slots[cpu_id].initialize(init_fn);
+        }
+    }
+
+    pub unsafe fn alloc_on(&self, cpu_id: usize, layout: Layout) -> *mut u8 {
+        let target = cpu_id.min(self.max_cpus - 1);
+        if let Some(allocator) = self.slots[target].get() {
+            allocator.alloc(layout)
+        } else {
+            core::ptr::null_mut()
+        }
+    }
+
+    pub unsafe fn dealloc_on(&self, cpu_id: usize, ptr: *mut u8, layout: Layout) {
+        let target = cpu_id.min(self.max_cpus - 1);
+        if let Some(allocator) = self.slots[target].get() {
+            allocator.dealloc(ptr, layout);
+        }
+    }
+
+    pub unsafe fn init_cpu_allocator(
         &self,
         cpu_id: usize,
         slab_start: usize,
@@ -44,37 +120,21 @@ impl PerCpuAllocator {
         buddy_size: usize,
         page_size: usize,
     ) {
-        if let Some(lock) = self.per_cpu.get(cpu_id) {
-            let mut allocator = lock.lock();
-            allocator.init(slab_start, slab_size, buddy_start, buddy_size, page_size);
-        }
-    }
-
-    /// 按 CPU hint 分配；cpu_id 越界时退回 0 号。
-    pub unsafe fn alloc_on(&self, cpu_id: usize, layout: Layout) -> *mut u8 {
-        let target = cpu_id.min(self.per_cpu.len().saturating_sub(1));
-        // 使用 SpinLock 替代 Mutex 以降低锁开销
-        let mut guard = self.per_cpu[target].lock();
-        // 直接调用 HybridAllocator 的 alloc 方法
-        guard.alloc(layout)
-    }
-
-    pub unsafe fn dealloc_on(&self, cpu_id: usize, ptr: *mut u8, layout: Layout) {
-        let target = cpu_id.min(self.per_cpu.len().saturating_sub(1));
-        let mut guard = self.per_cpu[target].lock();
-        // 直接调用 HybridAllocator 的 dealloc 方法
-        guard.dealloc(ptr, layout);
+        self.init_cpu(cpu_id, || {
+            let mut alloc = HybridAllocator::new();
+            alloc.init(slab_start, slab_size, buddy_start, buddy_size, page_size);
+            alloc
+        });
     }
 }
 
-/// 全局每 CPU 分配器（延迟初始化），便于 syscalls/驱动共享。
-// 使用 SpinLock 替代 Mutex 以降低全局锁开销
-static GLOBAL_PERCPU_ALLOC: Mutex<Option<PerCpuAllocator>> = Mutex::new(None);
+static GLOBAL_PERCPU_ALLOC_PTR: AtomicPtr<PerCpuAllocator> = AtomicPtr::new(core::ptr::null_mut());
 static GLOBAL_PERCPU_INIT: Once = Once::new();
 
 pub fn init_global(num_cpus: usize) {
     GLOBAL_PERCPU_INIT.call_once(|| {
-        *GLOBAL_PERCPU_ALLOC.lock() = Some(PerCpuAllocator::new(num_cpus));
+        let allocator = Box::leak(Box::new(PerCpuAllocator::new(num_cpus)));
+        GLOBAL_PERCPU_ALLOC_PTR.store(allocator, Ordering::Release);
     });
 }
 
@@ -82,43 +142,199 @@ pub fn with_global<F, R>(f: F) -> Option<R>
 where
     F: FnOnce(&PerCpuAllocator) -> R,
 {
-    let guard = GLOBAL_PERCPU_ALLOC.lock();
-    guard.as_ref().map(f)
+    let alloc = GLOBAL_PERCPU_ALLOC_PTR.load(Ordering::Acquire);
+    if alloc.is_null() {
+        None
+    } else {
+        Some(unsafe { f(&*alloc) })
+    }
 }
 
-/// 便捷接口：按 CPU hint 分配
 pub unsafe fn percpu_alloc(cpu_id: usize, layout: Layout) -> Option<*mut u8> {
     with_global(|alloc| alloc.alloc_on(cpu_id, layout))
 }
 
-/// 便捷接口：释放
 pub unsafe fn percpu_dealloc(cpu_id: usize, ptr: *mut u8, layout: Layout) {
-    if let Some(_) = with_global(|alloc| {
+    with_global(|alloc| {
         alloc.dealloc_on(cpu_id, ptr, layout);
-    }) {
-        // ok
+    });
+}
+
+struct FreeBlock {
+    size: usize,
+    next: Option<NonNull<FreeBlock>>,
+}
+
+#[repr(align(64))]
+pub struct PerCpuLocalAllocator {
+    freelist_head: AtomicPtr<FreeBlock>,
+    allocated_count: AtomicUsize,
+    size_class_freelists: [AtomicPtr<FreeBlock>; 9],
+    size_class_counts: [AtomicUsize; 9],
+    cache_hits: AtomicUsize,
+    cache_misses: AtomicUsize,
+    cache_evictions: AtomicUsize,
+    _padding: [u8; CACHE_LINE_SIZE - 80],
+}
+
+impl PerCpuLocalAllocator {
+    pub fn new() -> Self {
+        Self {
+            freelist_head: AtomicPtr::new(core::ptr::null_mut()),
+            allocated_count: AtomicUsize::new(0),
+            size_class_freelists: [const { AtomicPtr::new(core::ptr::null_mut()) }; 9],
+            size_class_counts: [const { AtomicUsize::new(0) }; 9],
+            cache_hits: AtomicUsize::new(0),
+            cache_misses: AtomicUsize::new(0),
+            cache_evictions: AtomicUsize::new(0),
+            _padding: [0; CACHE_LINE_SIZE - 80],
+        }
+    }
+
+    pub unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        let size = layout.size().max(layout.align());
+        if let Some(block) = self.try_alloc_from_freelist(size) {
+            return block.as_ptr() as *mut u8;
+        }
+        self.alloc_from_global(layout)
+    }
+
+    pub unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        let size = layout.size().max(layout.align());
+        if size <= 4096 {
+            self.add_to_freelist(ptr, size);
+        } else {
+            crate::subsystems::mm::allocator::get_global_allocator().dealloc(ptr, layout);
+        }
+    }
+
+    fn try_alloc_from_freelist(&self, size: usize) -> Option<NonNull<FreeBlock>> {
+        let mut head = self.freelist_head.load(Ordering::Acquire);
+        loop {
+            if head.is_null() {
+                return None;
+            }
+            let block = unsafe { &*head };
+            if block.size >= size {
+                let next = block.next.map_or(core::ptr::null_mut(), |p| p.as_ptr());
+                match self.freelist_head.compare_exchange_weak(
+                    head,
+                    next,
+                    Ordering::AcqRel,
+                    Ordering::Relaxed,
+                ) {
+                    Ok(_) => {
+                        self.allocated_count.fetch_sub(1, Ordering::Relaxed);
+                        return NonNull::new(head);
+                    }
+                    Err(new_head) => {
+                        head = new_head;
+                        continue;
+                    }
+                }
+            }
+            head = block.next.map_or(core::ptr::null_mut(), |p| p.as_ptr());
+        }
+    }
+
+    pub unsafe fn alloc_from_global(&self, layout: Layout) -> *mut u8 {
+        let ptr = crate::subsystems::mm::allocator::get_global_allocator().alloc(layout);
+        if !ptr.is_null() {
+            self.allocated_count.fetch_add(1, Ordering::Relaxed);
+        }
+        ptr
+    }
+
+    pub unsafe fn add_to_freelist(&self, ptr: *mut u8, size: usize) {
+        let block = ptr as *mut FreeBlock;
+        unsafe { (*block).size = size };
+        let mut head = self.freelist_head.load(Ordering::Acquire);
+        loop {
+            unsafe { (*block).next = NonNull::new(head) };
+            match self.freelist_head.compare_exchange_weak(
+                head,
+                block,
+                Ordering::AcqRel,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => {
+                    self.allocated_count.fetch_sub(1, Ordering::Relaxed);
+                    return;
+                }
+                Err(new_head) => {
+                    head = new_head;
+                    continue;
+                }
+            }
+        }
+    }
+
+    pub fn stats(&self) -> (usize, usize) {
+        let allocated = self.allocated_count.load(Ordering::Relaxed);
+        let freelist_len = if self.freelist_head.load(Ordering::Acquire).is_null() {
+            0
+        } else {
+            1
+        };
+        (allocated, freelist_len)
     }
 }
 
-/// 刷新所有CPU的缓存到全局分配器
+static mut PER_CPU_ALLOCATORS: Option<[PerCpuLocalAllocator; 256]> = None;
+static PER_CPU_ALLOCATORS_INIT: Once = Once::new();
+
+pub fn init_percpu_allocators() {
+    PER_CPU_ALLOCATORS_INIT.call_once(|| {
+        unsafe {
+            let mut allocators: [PerCpuLocalAllocator; 256] = core::mem::zeroed();
+            for i in 0..256 {
+                allocators[i] = PerCpuLocalAllocator::new();
+            }
+            PER_CPU_ALLOCATORS = Some(allocators);
+        }
+    });
+}
+
+pub fn current_cpu_allocator() -> &'static PerCpuLocalAllocator {
+    if !PER_CPU_ALLOCATORS_INIT.is_completed() {
+        init_percpu_allocators();
+    }
+    let cpu_id = cpu_id() as usize;
+    unsafe {
+        PER_CPU_ALLOCATORS
+            .as_ref()
+            .map(|allocators| &allocators[cpu_id % 256])
+            .unwrap_or_else(|| {
+                init_percpu_allocators();
+                PER_CPU_ALLOCATORS.as_ref().unwrap().get(0).unwrap()
+            })
+    }
+}
+
+pub struct PerCpuGlobalAllocator;
+
+unsafe impl GlobalAlloc for PerCpuGlobalAllocator {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        current_cpu_allocator().alloc(layout)
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        current_cpu_allocator().dealloc(ptr, layout)
+    }
+}
+
 pub fn flush_all_caches() {
     unsafe {
         if let Some(ref allocators) = PER_CPU_ALLOCATORS {
             for i in 0..allocators.len() {
                 let allocator = &allocators[i];
                 let (allocated, freelist_len) = allocator.stats();
-                
-                // 如果有缓存的块，将它们返回给全局分配器
-                if freelist_len > 0 {
-                    // 这里可以实现更复杂的刷新逻辑
-                    // 目前只是统计信息
-                }
+                if freelist_len > 0 {}
             }
         }
     }
 }
 
-/// 获取所有CPU的分配统计
 pub fn get_all_cpu_stats() -> Vec<(usize, (usize, usize))> {
     let mut stats = Vec::new();
     unsafe {
@@ -133,223 +349,25 @@ pub fn get_all_cpu_stats() -> Vec<(usize, (usize, usize))> {
     stats
 }
 
-/// 平衡各CPU的缓存
 pub fn balance_caches() {
     let mut stats = get_all_cpu_stats();
-    
-    // 简单的平衡策略：将缓存过多的CPU的部分缓存移动到缓存较少的CPU
     stats.sort_by_key(|&(_, (allocated, _))| allocated);
-    
-    // 这里可以实现更复杂的平衡逻辑
-    // 目前只是示例
 }
 
-/// 预热CPU缓存
 pub fn warmup_caches(cpu_id: usize, count: usize) {
     unsafe {
         if let Some(ref allocators) = PER_CPU_ALLOCATORS {
             if cpu_id >= allocators.len() {
                 return;
             }
-            
             let allocator = &allocators[cpu_id];
-    
-            // 预分配一些小块到缓存
             for _ in 0..count {
-                unsafe {
-                    let layout = Layout::from_size_align(64, 8).unwrap();
-                    let ptr = allocator.alloc_from_global(layout);
-                    if !ptr.is_null() {
-                        allocator.add_to_freelist(ptr, 64);
-                    }
+                let layout = Layout::from_size_align(64, 8).unwrap();
+                let ptr = allocator.alloc_from_global(layout);
+                if !ptr.is_null() {
+                    allocator.add_to_freelist(ptr, 64);
                 }
             }
         }
-    }
-}
-
-
-// 每CPU缓存行大小（通常为64字节）
-const CACHE_LINE_SIZE: usize = 64;
-
-// 空闲块结构
-struct FreeBlock {
-    size: usize,
-    next: Option<NonNull<FreeBlock>>,
-}
-
-// 全局每CPU分配器数组
-// Using lazy initialization since new() is not const
-static mut PER_CPU_ALLOCATORS: Option<[PerCpuLocalAllocator; 256]> = None;
-static PER_CPU_ALLOCATORS_INIT: Once = Once::new();
-
-/// Initialize per-CPU allocators (called at boot time)
-pub fn init_percpu_allocators() {
-    PER_CPU_ALLOCATORS_INIT.call_once(|| {
-        unsafe {
-            // Initialize array
-            let mut allocators: [PerCpuLocalAllocator; 256] = core::mem::zeroed();
-            for i in 0..256 {
-                allocators[i] = PerCpuLocalAllocator::new();
-            }
-            PER_CPU_ALLOCATORS = Some(allocators);
-        }
-    });
-}
-
-// 每CPU本地分配器结构体
-// Enhanced with finer-grained caching and bitmap tracking
-#[repr(align(64))] // 缓存行对齐
-pub struct PerCpuLocalAllocator {
-    // 使用独立的缓存行来避免虚假共享
-    freelist_head: SpinLock<Option<NonNull<FreeBlock>>>,
-    allocated_count: AtomicUsize,
-    
-    // Enhanced: Multiple size-class freelists for better cache locality
-    // Size classes: 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 bytes
-    size_class_freelists: [SpinLock<Option<NonNull<FreeBlock>>>; 9],
-    size_class_counts: [AtomicUsize; 9],
-    
-    // Cache statistics for monitoring
-    cache_hits: AtomicUsize,
-    cache_misses: AtomicUsize,
-    cache_evictions: AtomicUsize,
-    
-    // 填充到缓存行大小
-    _padding: [u8; CACHE_LINE_SIZE - 80], // Adjusted for new fields
-}
-
-impl PerCpuLocalAllocator {
-    pub fn new() -> Self {
-        Self {
-            freelist_head: SpinLock::new(None),
-            allocated_count: AtomicUsize::new(0),
-            size_class_freelists: [SpinLock::new(None); 9],
-            size_class_counts: [const { AtomicUsize::new(0) }; 9],
-            cache_hits: AtomicUsize::new(0),
-            cache_misses: AtomicUsize::new(0),
-            cache_evictions: AtomicUsize::new(0),
-            _padding: [0; CACHE_LINE_SIZE - 80],
-        }
-    }
-    
-    /// 从本地CPU分配内存
-    pub unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        let size = layout.size().max(layout.align());
-        
-        // 尝试从本地空闲列表分配
-        if let Some(block) = self.try_alloc_from_freelist(size) {
-            return block.as_ptr() as *mut u8;
-        }
-        
-        // 本地空闲列表没有合适块，从全局分配器分配
-        self.alloc_from_global(layout)
-    }
-    
-    /// 释放内存到本地CPU
-    pub unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        let size = layout.size().max(layout.align());
-        
-        // 如果块较小，放入本地空闲列表
-        if size <= 4096 { // 4KB以下的块缓存到本地
-            self.add_to_freelist(ptr, size);
-        } else {
-            // 大块直接返回给全局分配器
-            crate::subsystems::mm::allocator::get_global_allocator().dealloc(ptr, layout);
-        }
-    }
-    
-    /// 尝试从空闲列表分配
-    fn try_alloc_from_freelist(&self, size: usize) -> Option<NonNull<FreeBlock>> {
-        let mut freelist = self.freelist_head.lock();
-        let mut current = &mut *freelist;
-        let mut prev: Option<&mut NonNull<FreeBlock>> = None;
-        
-        while let Some(mut block_ptr) = *current {
-            let block = unsafe { block_ptr.as_mut() };
-            
-            if block.size >= size {
-                // 找到合适块
-                *current = block.next;
-                self.allocated_count.fetch_sub(1, Ordering::Relaxed);
-                return Some(block_ptr);
-            }
-            
-            prev = Some(current);
-            current = &mut block.next;
-        }
-        
-        None
-    }
-    
-    /// 从全局分配器分配
-    pub unsafe fn alloc_from_global(&self, layout: Layout) -> *mut u8 {
-        let ptr = crate::subsystems::mm::allocator::get_global_allocator().alloc(layout);
-        if !ptr.is_null() {
-            self.allocated_count.fetch_add(1, Ordering::Relaxed);
-        }
-        ptr
-    }
-    
-    /// 添加到空闲列表
-    pub unsafe fn add_to_freelist(&self, ptr: *mut u8, size: usize) {
-        let block = ptr as *mut FreeBlock;
-        (*block).size = size;
-        
-        let mut freelist = self.freelist_head.lock();
-        (*block).next = *freelist;
-        *freelist = Some(NonNull::new_unchecked(block));
-        
-        self.allocated_count.fetch_sub(1, Ordering::Relaxed);
-    }
-    
-    /// 获取分配统计
-    pub fn stats(&self) -> (usize, usize) {
-        let allocated = self.allocated_count.load(Ordering::Relaxed);
-        let freelist_len = {
-            let freelist = self.freelist_head.lock();
-            let mut count = 0;
-            let mut current = *freelist;
-            while let Some(block) = current {
-                count += 1;
-                let block_ref = unsafe { block.as_ref() };
-                current = block_ref.next;
-            }
-            count
-        };
-        
-        (allocated, freelist_len)
-    }
-}
-
-/// 获取当前CPU的分配器
-pub fn current_cpu_allocator() -> &'static PerCpuLocalAllocator {
-    // Ensure initialization
-    if !PER_CPU_ALLOCATORS_INIT.is_completed() {
-        init_percpu_allocators();
-    }
-    
-    let cpu_id = cpu_id() as usize;
-    unsafe {
-        PER_CPU_ALLOCATORS.as_ref()
-            .map(|allocators| &allocators[cpu_id % 256])
-            .unwrap_or_else(|| {
-                // Fallback: initialize and return first allocator
-                init_percpu_allocators();
-                PER_CPU_ALLOCATORS.as_ref().unwrap().get(0).unwrap()
-            })
-    }
-}
-
-// 实现全局分配器trait
-pub struct PerCpuGlobalAllocator;
-
-unsafe impl GlobalAlloc for PerCpuGlobalAllocator {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        current_cpu_allocator().alloc(layout)
-    }
-    
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        current_cpu_allocator().dealloc(ptr, layout)
     }
 }

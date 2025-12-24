@@ -686,6 +686,205 @@ impl<T: Send + Sync> Drop for RwLockEnhancedWriteGuard<'_, T> {
 // Thread-Safe Collections
 // ============================================================================
 
+/// Lock-free per-CPU SPSC (Single Producer Single Consumer) queue
+///
+/// This queue is designed for per-CPU use where:
+/// - Only one CPU (producer) pushes to the queue
+/// - Only one CPU (consumer) pops from the queue
+/// - No locks needed due to SPSC guarantee
+#[repr(align(64))]
+pub struct PerCpuLockFreeQueue<T> {
+    /// Buffer for queue elements
+    buffer: UnsafeCell<[Option<T>; PERCPU_QUEUE_CAPACITY]>,
+    /// Head index (consumer position)
+    head: AtomicUsize,
+    /// Tail index (producer position)
+    tail: AtomicUsize,
+    /// Padding to prevent false sharing
+    _padding: [u8; CACHE_LINE_PADDING],
+}
+
+/// Default capacity for per-CPU queue
+const PERCPU_QUEUE_CAPACITY: usize = 256;
+
+/// Cache line size (typical: 64 bytes)
+const CACHE_LINE_SIZE: usize = 64;
+
+/// Padding to align to cache line
+const CACHE_LINE_PADDING: usize = CACHE_LINE_SIZE -
+    (core::mem::size_of::<[Option<T>; PERCPU_QUEUE_CAPACITY]>() +
+     core::mem::size_of::<AtomicUsize>() * 2) % CACHE_LINE_SIZE;
+
+// Safety: PerCpuLockFreeQueue provides thread-safe SPSC queue
+unsafe impl<T: Send> Send for PerCpuLockFreeQueue<T> {}
+
+impl<T> PerCpuLockFreeQueue<T> {
+    /// Create a new per-CPU lock-free queue
+    pub const fn new() -> Self {
+        Self {
+            buffer: UnsafeCell::new([None; PERCPU_QUEUE_CAPACITY]),
+            head: AtomicUsize::new(0),
+            tail: AtomicUsize::new(0),
+            _padding: [0; CACHE_LINE_PADDING],
+        }
+    }
+
+    /// Push an item to the queue (producer only)
+    ///
+    /// # Safety
+    /// - Only one thread/CPU should call this method
+    /// - Caller must ensure queue is not full
+    pub unsafe fn push(&self, item: T) -> Result<(), T> {
+        let tail = self.tail.load(Ordering::Relaxed);
+        let next_tail = (tail + 1) % PERCPU_QUEUE_CAPACITY;
+
+        let head = self.head.load(Ordering::Acquire);
+
+        if next_tail == head {
+            return Err(item);
+        }
+
+        let buffer = &mut *self.buffer.get();
+        buffer[tail] = Some(item);
+
+        self.tail.store(next_tail, Ordering::Release);
+        Ok(())
+    }
+
+    /// Pop an item from the queue (consumer only)
+    ///
+    /// # Safety
+    /// - Only one thread/CPU should call this method
+    pub unsafe fn pop(&self) -> Option<T> {
+        let head = self.head.load(Ordering::Relaxed);
+        let tail = self.tail.load(Ordering::Acquire);
+
+        if head == tail {
+            return None;
+        }
+
+        let buffer = &mut *self.buffer.get();
+        let item = buffer[head].take();
+
+        let next_head = (head + 1) % PERCPU_QUEUE_CAPACITY;
+        self.head.store(next_head, Ordering::Release);
+
+        item
+    }
+
+    /// Check if queue is empty
+    pub fn is_empty(&self) -> bool {
+        let head = self.head.load(Ordering::Acquire);
+        let tail = self.tail.load(Ordering::Acquire);
+        head == tail
+    }
+
+    /// Check if queue is full
+    pub fn is_full(&self) -> bool {
+        let tail = self.tail.load(Ordering::Relaxed);
+        let next_tail = (tail + 1) % PERCPU_QUEUE_CAPACITY;
+        let head = self.head.load(Ordering::Acquire);
+        next_tail == head
+    }
+
+    /// Get current queue size
+    pub fn len(&self) -> usize {
+        let head = self.head.load(Ordering::Acquire);
+        let tail = self.tail.load(Ordering::Acquire);
+        if tail >= head {
+            tail - head
+        } else {
+            PERCPU_QUEUE_CAPACITY - head + tail
+        }
+    }
+
+    /// Get queue capacity
+    pub fn capacity(&self) -> usize {
+        PERCPU_QUEUE_CAPACITY
+    }
+}
+
+/// Lock-free per-CPU work queue with work stealing support
+///
+/// Extends PerCpuLockFreeQueue with multi-producer support
+/// for work stealing scenarios.
+#[repr(align(64))]
+pub struct PerCpuWorkQueue<T> {
+    /// Local producer queue (SPSC for local CPU)
+    local_queue: PerCpuLockFreeQueue<T>,
+    /// Stealable queue for work stealing (lock-free MPMC)
+    steal_queue: ConcurrentQueue<T>,
+    /// Steal attempts counter
+    steal_attempts: AtomicU64,
+    /// Successful steals counter
+    steal_successes: AtomicU64,
+    /// Padding to prevent false sharing
+    _padding: [u8; CACHE_LINE_PADDING],
+}
+
+impl<T: Send> PerCpuWorkQueue<T> {
+    /// Create a new per-CPU work queue
+    pub fn new() -> Self {
+        Self {
+            local_queue: PerCpuLockFreeQueue::new(),
+            steal_queue: ConcurrentQueue::new(),
+            steal_attempts: AtomicU64::new(0),
+            steal_successes: AtomicU64::new(0),
+            _padding: [0; CACHE_LINE_PADDING],
+        }
+    }
+
+    /// Push work item locally (SPSC, lock-free)
+    pub fn push_local(&self, item: T) -> Result<(), T> {
+        unsafe { self.local_queue.push(item) }
+    }
+
+    /// Pop work item locally (lock-free)
+    pub fn pop_local(&self) -> Option<T> {
+        unsafe { self.local_queue.pop() }
+    }
+
+    /// Push work item for potential stealing (MPMC, lock-free)
+    pub fn push_stealable(&self, item: T) {
+        self.steal_queue.push(item);
+    }
+
+    /// Try to steal work from another CPU's queue
+    pub fn try_steal(&self) -> Option<T> {
+        self.steal_attempts.fetch_add(1, Ordering::Relaxed);
+        if let Some(item) = self.steal_queue.pop() {
+            self.steal_successes.fetch_add(1, Ordering::Relaxed);
+            Some(item)
+        } else {
+            None
+        }
+    }
+
+    /// Get steal statistics: (attempts, successes)
+    pub fn steal_stats(&self) -> (u64, u64) {
+        let attempts = self.steal_attempts.load(Ordering::Relaxed);
+        let successes = self.steal_successes.load(Ordering::Relaxed);
+        (attempts, successes)
+    }
+
+    /// Reset steal statistics
+    pub fn reset_steal_stats(&self) {
+        self.steal_attempts.store(0, Ordering::Relaxed);
+        self.steal_successes.store(0, Ordering::Relaxed);
+    }
+
+    /// Get total work count (local + stealable)
+    pub fn total_work(&self) -> usize {
+        // Note: ConcurrentQueue does not have a len() method due to lock-free nature
+        // Return local count + indicate if stealable queue has items
+        self.local_queue.len() + if self.steal_queue.is_empty() { 0 } else { 1 }
+    }
+}
+
+// ============================================================================
+// Thread-Safe Collections
+// ============================================================================
+
 /// Thread-safe queue using lock-free algorithms
 pub struct ConcurrentQueue<T> {
     /// Head pointer

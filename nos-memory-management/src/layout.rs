@@ -257,26 +257,24 @@ pub fn apply_aslr_offset_enhanced(
             }
         }
         AslrRegionType::PhysicalMapping => {
-            if let Some(phys_base) = layout.phys_map_base {
-                if let Some(phys_size) = layout.phys_map_size {
-                    let max_addr = phys_base + phys_size;
-                    if adjusted >= max_addr {
-                        return Err("ASLR offset would exceed physical mapping region");
-                    }
-                    // Check for overlap with kernel regions
-                    if adjusted < layout.kernel_base + layout.kernel_code_size + layout.kernel_data_size + layout.kernel_heap_size {
-                        return Err("ASLR-adjusted physical mapping would overlap with kernel regions");
-                    }
+            if let Some(phys_base) = layout.phys_map_base
+                && let Some(phys_size) = layout.phys_map_size {
+                let max_addr = phys_base + phys_size;
+                if adjusted >= max_addr {
+                    return Err("ASLR offset would exceed physical mapping region");
+                }
+                // Check for overlap with kernel regions
+                if adjusted < layout.kernel_base + layout.kernel_code_size + layout.kernel_data_size + layout.kernel_heap_size {
+                    return Err("ASLR-adjusted physical mapping would overlap with kernel regions");
                 }
             }
         }
         AslrRegionType::Mmio => {
-            if let Some(mmio_base) = layout.mmio_base {
-                if let Some(mmio_size) = layout.mmio_size {
-                    let max_addr = mmio_base + mmio_size;
-                    if adjusted >= max_addr {
-                        return Err("ASLR offset would exceed MMIO region");
-                    }
+            if let Some(mmio_base) = layout.mmio_base
+                && let Some(mmio_size) = layout.mmio_size {
+                let max_addr = mmio_base + mmio_size;
+                if adjusted >= max_addr {
+                    return Err("ASLR offset would exceed MMIO region");
                 }
             }
         }
@@ -528,70 +526,28 @@ const RISCV64_LAYOUT: AddressSpaceLayout = AddressSpaceLayout {
 // Public API - Architecture-agnostic constants
 // ============================================================================
 
-/// Get kernel base address for current architecture
-#[inline]
-pub const fn kernel_base() -> usize {
-    #[cfg(target_arch = "x86_64")]
-    { X86_64_LAYOUT.kernel_base }
-    #[cfg(target_arch = "aarch64")]
-    { AARCH64_LAYOUT.kernel_base }
-    #[cfg(target_arch = "riscv64")]
-    { RISCV64_LAYOUT.kernel_base }
-    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
-    { panic!("Unsupported architecture") }
+macro_rules! arch_const_fn {
+    ($name:ident, $field:ident) => {
+        #[inline]
+        #[allow(missing_docs)]
+        pub const fn $name() -> usize {
+            #[cfg(target_arch = "x86_64")]
+            { X86_64_LAYOUT.$field }
+            #[cfg(target_arch = "aarch64")]
+            { AARCH64_LAYOUT.$field }
+            #[cfg(target_arch = "riscv64")]
+            { RISCV64_LAYOUT.$field }
+            #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
+            { panic!("Unsupported architecture") }
+        }
+    };
 }
 
-/// Get user base address for current architecture
-#[inline]
-pub const fn user_base() -> usize {
-    #[cfg(target_arch = "x86_64")]
-    { X86_64_LAYOUT.user_base }
-    #[cfg(target_arch = "aarch64")]
-    { AARCH64_LAYOUT.user_base }
-    #[cfg(target_arch = "riscv64")]
-    { RISCV64_LAYOUT.user_base }
-    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
-    { panic!("Unsupported architecture") }
-}
-
-/// Get user stack top address for current architecture
-#[inline]
-pub const fn user_stack_top() -> usize {
-    #[cfg(target_arch = "x86_64")]
-    { X86_64_LAYOUT.user_stack_top }
-    #[cfg(target_arch = "aarch64")]
-    { AARCH64_LAYOUT.user_stack_top }
-    #[cfg(target_arch = "riscv64")]
-    { RISCV64_LAYOUT.user_stack_top }
-    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
-    { panic!("Unsupported architecture") }
-}
-
-/// Get maximum user address for current architecture
-#[inline]
-pub const fn user_max() -> usize {
-    #[cfg(target_arch = "x86_64")]
-    { X86_64_LAYOUT.user_max }
-    #[cfg(target_arch = "aarch64")]
-    { AARCH64_LAYOUT.user_max }
-    #[cfg(target_arch = "riscv64")]
-    { RISCV64_LAYOUT.user_max }
-    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
-    { panic!("Unsupported architecture") }
-}
-
-/// Get page size for current architecture
-#[inline]
-pub const fn page_size() -> usize {
-    #[cfg(target_arch = "x86_64")]
-    { X86_64_LAYOUT.page_size }
-    #[cfg(target_arch = "aarch64")]
-    { AARCH64_LAYOUT.page_size }
-    #[cfg(target_arch = "riscv64")]
-    { RISCV64_LAYOUT.page_size }
-    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
-    { panic!("Unsupported architecture") }
-}
+arch_const_fn!(kernel_base, kernel_base);
+arch_const_fn!(user_base, user_base);
+arch_const_fn!(user_stack_top, user_stack_top);
+arch_const_fn!(user_max, user_max);
+arch_const_fn!(page_size, page_size);
 
 /// Check if address is in kernel space
 #[inline]

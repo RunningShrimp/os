@@ -399,7 +399,6 @@ pub fn shm_info(shm_id: u32) -> Option<(usize, usize, u32)> {
 }
 
 pub mod signal;
-pub mod signal_enhanced;
 pub mod pipe;
 pub mod enhanced_ipc;
 pub mod mqueue;

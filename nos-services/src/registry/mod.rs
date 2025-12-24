@@ -7,12 +7,15 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 use alloc::format;
 use alloc::vec::Vec;
 use spin::Mutex;
 use nos_api::Result;
 
 /// Service registry
+#[allow(clippy::should_implement_trait)]
+#[allow(clippy::field_reassign_with_default)]
 pub struct ServiceRegistry {
     /// Registered services
     services: BTreeMap<u32, ServiceInfo>,
@@ -38,21 +41,21 @@ impl ServiceRegistry {
         if self.services_by_name.contains_key(name) {
             return Err(nos_api::Error::InvalidState(format!("Service {} already exists", name)));
         }
-        
+
         let id = self.next_id;
         self.next_id += 1;
-        
+
         let info = ServiceInfo {
             id,
             name: name.to_string(),
-            service,
+            service: Arc::from(service),
             status: ServiceStatus::Registered,
             registration_time: crate::discovery::get_timestamp(),
         };
-        
+
         self.services.insert(id, info);
         self.services_by_name.insert(name.to_string(), id);
-        
+
         Ok(id)
     }
 
@@ -122,7 +125,7 @@ pub struct ServiceInfo {
     /// Service name
     pub name: String,
     /// Service implementation
-    pub service: Box<dyn Service>,
+    pub service: Arc<dyn Service>,
     /// Service status
     pub status: ServiceStatus,
     /// Registration time
@@ -143,28 +146,19 @@ pub enum ServiceStatus {
 }
 
 /// Global service registry
-static GLOBAL_REGISTRY: spin::Mutex<core::mem::MaybeUninit<Mutex<ServiceRegistry>>> = spin::Mutex::new(core::mem::MaybeUninit::uninit());
-static REGISTRY_INIT: spin::Once = spin::Once::new();
+static GLOBAL_REGISTRY: spin::Once<Mutex<ServiceRegistry>> = spin::Once::new();
 
 /// Initialize the global service registry
 pub fn init_registry() -> Result<()> {
-    REGISTRY_INIT.call_once(|| {
-        let mut registry = GLOBAL_REGISTRY.lock();
-        // SAFETY: We're writing to an uninitialized MaybeUninit, which is safe
-        // and we're in a call_once so no concurrent access
-        unsafe {
-            registry.write(Mutex::new(ServiceRegistry::new()));
-        }
-    });
+    GLOBAL_REGISTRY.call_once(|| Mutex::new(ServiceRegistry::new()));
     Ok(())
 }
 
-/// Get the global service registry
-pub fn get_registry() -> &'static Mutex<ServiceRegistry> {
-    // SAFETY: We've already initialized the registry in init_registry
-    unsafe {
-        GLOBAL_REGISTRY.lock().assume_init_ref()
-    }
+/// Get global service registry
+pub fn get_registry() -> Result<&'static Mutex<ServiceRegistry>> {
+    GLOBAL_REGISTRY.get().ok_or_else(|| {
+        nos_api::Error::InvalidState("Registry not initialized. Call init_registry() first.".to_string())
+    })
 }
 
 /// Shutdown the global service registry
@@ -176,25 +170,30 @@ pub fn shutdown_registry() -> Result<()> {
 
 /// Register a service
 pub fn register_service(name: &str, service: Box<dyn Service>) -> Result<u32> {
-    let mut registry = get_registry().lock();
+    let registry = get_registry()?;
+    let mut registry = registry.lock();
     registry.register(name, service)
 }
 
 /// Get a service by name
-pub fn get_service_by_name(name: &str) -> Option<&'static dyn Service> {
-    // In a real implementation, this would return a reference to a global service
-    // For now, we'll return None to indicate the service needs to be implemented
-    None
+pub fn get_service_by_name(name: &str) -> Result<Arc<dyn Service>> {
+    let registry = get_registry()?;
+    let registry = registry.lock();
+    let service_info = registry.get_by_name(name)
+        .ok_or_else(|| nos_api::Error::NotFound(format!("Service {} not found", name)))?;
+
+    Ok(Arc::clone(&service_info.service))
 }
 
 /// Get a service by name (alias for get_service_by_name)
-pub fn get_service(name: &str) -> Option<&'static dyn Service> {
+pub fn get_service(name: &str) -> Result<Arc<dyn Service>> {
     get_service_by_name(name)
 }
 
 /// Unregister a service by name
 pub fn unregister_service(name: &str) -> Result<()> {
-    let mut registry = get_registry().lock();
+    let registry = get_registry()?;
+    let mut registry = registry.lock();
     if let Some(id) = registry.services_by_name.get(name).copied() {
         registry.unregister(id)
     } else {
@@ -203,22 +202,27 @@ pub fn unregister_service(name: &str) -> Result<()> {
 }
 
 /// Get service statistics
+#[allow(clippy::field_reassign_with_default)]
 pub fn get_stats() -> crate::ServiceStats {
-    let registry = get_registry().lock();
-    let services = registry.list();
-    
-    let mut stats = crate::ServiceStats::default();
-    stats.total_services = services.len() as u64;
-    
-    for info in services {
-        if info.status == ServiceStatus::Running {
-            stats.running_services += 1;
-        } else if info.status == ServiceStatus::Error {
-            stats.error_services += 1;
+    if let Ok(registry) = get_registry() {
+        let registry = registry.lock();
+        let services = registry.list();
+
+        let mut stats = crate::ServiceStats::default();
+        stats.total_services = services.len() as u64;
+
+        for info in services {
+            if info.status == ServiceStatus::Running {
+                stats.running_services += 1;
+            } else if info.status == ServiceStatus::Error {
+                stats.error_services += 1;
+            }
         }
+
+        stats
+    } else {
+        crate::ServiceStats::default()
     }
-    
-    stats
 }
 
 #[cfg(test)]

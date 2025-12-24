@@ -6,8 +6,6 @@ use alloc::string::ToString;
 use alloc::boxed::Box;
 use nos_api::Result;
 use crate::SyscallHandler;
-#[cfg(feature = "log")]
-use log;
 use crate::SyscallDispatcher;
 
 /// Register file system system call handlers
@@ -40,6 +38,7 @@ pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
 }
 
 /// Read system call handler
+#[allow(clippy::should_implement_trait)]
 pub struct ReadHandler;
 
 impl ReadHandler {
@@ -61,17 +60,13 @@ impl SyscallHandler for ReadHandler {
         
         let fd = args[0] as i32;
         let buf = args[1] as *mut u8;
-        let count = args[2] as usize;
+        let count = args[2];
         
         // TODO: Implement actual read logic using parameters:
         // fd: File descriptor to read from
         // buf: Buffer to read data into
         // count: Maximum number of bytes to read
-        #[cfg(feature = "log")]
-        log::trace!("read called with: fd={}, buf={:?}, count={}", fd, buf, count);
-        
-        // Ensure parameters are used even when logging is disabled
-        let _ = (fd, buf, count);
+        sys_trace_with_args!("read called with: fd={}, buf={:?}, count={}", fd, buf, count);
         
         Ok(0)
     }
@@ -82,6 +77,7 @@ impl SyscallHandler for ReadHandler {
 }
 
 /// Write system call handler
+#[allow(clippy::should_implement_trait)]
 pub struct WriteHandler;
 
 impl WriteHandler {
@@ -103,17 +99,13 @@ impl SyscallHandler for WriteHandler {
         
         let fd = args[0] as i32;
         let buf = args[1] as *const u8;
-        let count = args[2] as usize;
+        let count = args[2];
         
         // TODO: Implement actual write logic using parameters:
         // fd: File descriptor to write to
         // buf: Buffer containing data to write
         // count: Number of bytes to write
-        #[cfg(feature = "log")]
-        log::trace!("write called with: fd={}, buf={:?}, count={}", fd, buf, count);
-        
-        // Ensure fd and buf are used even when logging is disabled
-        let _ = (fd, buf);
+        sys_trace_with_args!("write called with: fd={}, buf={:?}, count={}", fd, buf, count);
         
         Ok(count as isize)
     }
@@ -124,6 +116,7 @@ impl SyscallHandler for WriteHandler {
 }
 
 /// Open system call handler
+#[allow(clippy::should_implement_trait)]
 pub struct OpenHandler;
 
 impl OpenHandler {
@@ -151,11 +144,7 @@ impl SyscallHandler for OpenHandler {
         // pathname: Path to the file to open
         // flags: Open flags (O_RDONLY, O_WRONLY, O_CREAT, etc.)
         // mode: File permissions (only used when O_CREAT is set)
-        #[cfg(feature = "log")]
-        log::trace!("open called with: pathname={:?}, flags={}, mode={}", pathname, flags, mode);
-        
-        // Ensure parameters are used even when logging is disabled
-        let _ = (pathname, flags, mode);
+        sys_trace_with_args!("open called with: pathname={:?}, flags={}, mode={}", pathname, flags, mode);
         
         Ok(3) // Return a dummy file descriptor
     }
@@ -166,6 +155,7 @@ impl SyscallHandler for OpenHandler {
 }
 
 /// Close system call handler
+#[allow(clippy::should_implement_trait)]
 pub struct CloseHandler;
 
 impl CloseHandler {
@@ -181,20 +171,16 @@ impl SyscallHandler for CloseHandler {
     }
     
     fn execute(&self, args: &[usize]) -> Result<isize> {
-        if args.len() < 1 {
+        if args.is_empty() {
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
         }
         
         let fd = args[0] as i32;
-        
+
         // TODO: Implement actual close logic using parameter:
         // fd: File descriptor to close
-        #[cfg(feature = "log")]
-        log::trace!("close called with: fd={}", fd);
-        
-        // Ensure fd is used even when logging is disabled
-        let _ = fd;
-        
+        sys_trace_with_args!("close called with: fd={}", fd);
+
         Ok(0)
     }
     

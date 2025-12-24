@@ -12,7 +12,8 @@
 
 extern crate alloc;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
+use core::hint::black_box;
 
 // Note: These benchmarks require the kernel to be compiled as a library
 // and may need adjustments for no_std environment

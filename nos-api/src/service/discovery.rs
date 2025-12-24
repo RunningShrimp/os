@@ -1,30 +1,27 @@
-//! Service discovery implementation
-
 use crate::core::traits::Service;
 use crate::service::interface::ServiceMetadata;
 use alloc::{
     string::{String, ToString},
-    boxed::Box,
     vec::Vec,
+    sync::Arc,
 };
 
 use hashbrown::HashMap;
 
-
 /// Service discovery trait
 pub trait ServiceDiscovery {
     /// Discovers services by type
-    fn discover_by_type(&self, service_type: &str) -> Vec<&dyn Service>;
-    
+    fn discover_by_type(&self, service_type: &str) -> Vec<Arc<dyn Service>>;
+
     /// Discovers services by interface
-    fn discover_by_interface(&self, interface: &str) -> Vec<&dyn Service>;
-    
+    fn discover_by_interface(&self, interface: &str) -> Vec<Arc<dyn Service>>;
+
     /// Discovers services by capability
-    fn discover_by_capability(&self, capability: &str) -> Vec<&dyn Service>;
-    
+    fn discover_by_capability(&self, capability: &str) -> Vec<Arc<dyn Service>>;
+
     /// Lists all services
-    fn list_all(&self) -> Vec<&dyn Service>;
-    
+    fn list_all(&self) -> Vec<Arc<dyn Service>>;
+
     /// Checks if a service is discoverable
     fn is_discoverable(&self, name: &str) -> bool;
 }
@@ -38,14 +35,10 @@ pub struct DefaultServiceDiscovery {
 /// Service entry for discovery
 struct ServiceEntry {
     /// Service instance
-    service: Box<dyn Service>,
+    service: Arc<dyn Service>,
     /// Service metadata
     metadata: ServiceMetadata,
 }
-
-
-
-
 
 impl DefaultServiceDiscovery {
     /// Creates a new service discovery
@@ -54,117 +47,97 @@ impl DefaultServiceDiscovery {
             services: HashMap::new()
         }
     }
-    
+
     /// Adds a service to discovery (alloc mode)
-    pub fn add_service(&mut self, service: Box<dyn Service>) {
+    pub fn add_service(&mut self, service: Arc<dyn Service>) {
         let name = service.name().to_string();
         let version = service.version().to_string();
         let metadata = ServiceMetadata::new(&name, &version);
-        
+
         let entry = ServiceEntry {
             service,
             metadata,
         };
-        
+
         self.services.insert(name, entry);
     }
-    
+
     /// Removes a service from discovery (alloc mode)
     pub fn remove_service(&mut self, name: &str) {
         self.services.remove(name);
     }
-    
+
     /// Clears all services from discovery (alloc mode)
     pub fn clear(&mut self) {
         self.services.clear();
     }
-    
+
     /// Gets a service by name (alloc mode)
-    pub fn get_service(&self, name: &str) -> Option<&dyn Service> {
-        self.services.get(name).map(|entry| entry.service.as_ref())
+    pub fn get_service(&self, name: &str) -> Option<Arc<dyn Service>> {
+        self.services.get(name).map(|entry| entry.service.clone())
     }
-    
-    /// Gets a service by name (mutable, alloc mode)
-    pub fn get_service_mut(&mut self, name: &str) -> Option<&mut (dyn Service + '_)> {
-        let entry = self.services.get_mut(name)?;
-        Some(entry.service.as_mut())
-    }
-    
+
     /// Checks if a service exists (alloc mode)
     pub fn contains_service(&self, name: &str) -> bool {
         self.services.contains_key(name)
     }
-    
-    /// Gets the number of services (alloc mode)
+
+    /// Gets number of services (alloc mode)
     pub fn len(&self) -> usize {
         self.services.len()
     }
-    
-    /// Checks if the discovery is empty (alloc mode)
+
+    /// Checks if discovery is empty (alloc mode)
     pub fn is_empty(&self) -> bool {
         self.services.is_empty()
     }
-    
+
     /// Iterates over services (alloc mode)
-    pub fn iter(&self) -> impl Iterator<Item = &dyn Service> {
-        self.services.values().map(|entry| entry.service.as_ref())
-    }
-    
-    /// Iterates over services (mutable, alloc mode)
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut dyn Service> + '_ {
-        self.services.values_mut().map(|entry| {
-            let service = entry.service.as_mut();
-            service
-        })
+    pub fn iter(&self) -> impl Iterator<Item = Arc<dyn Service>> + '_ {
+        self.services.values().map(|entry| entry.service.clone())
     }
 }
 
 impl ServiceDiscovery for DefaultServiceDiscovery {
-    fn discover_by_type(&self, service_type: &str) -> Vec<&dyn Service> {
-        // Find services by type (using service name as type)
+    fn discover_by_type(&self, service_type: &str) -> Vec<Arc<dyn Service>> {
         self.services
             .iter()
             .filter(|(name, _): &(&String, _)| name.starts_with(service_type))
-            .map(|(_, entry)| entry.service.as_ref())
+            .map(|(_, entry)| entry.service.clone())
             .collect()
     }
-    
-    fn discover_by_interface(&self, interface: &str) -> Vec<&dyn Service> {
-        // Find services by interface
+
+    fn discover_by_interface(&self, interface: &str) -> Vec<Arc<dyn Service>> {
         self.services
             .iter()
             .filter(|(_, entry)| {
                 entry.metadata.interfaces.iter().any(|i| i == interface)
             })
-            .map(|(_, entry)| entry.service.as_ref())
+            .map(|(_, entry)| entry.service.clone())
             .collect()
     }
-    
-    fn discover_by_capability(&self, capability: &str) -> Vec<&dyn Service> {
-        // Find services by capability
+
+    fn discover_by_capability(&self, capability: &str) -> Vec<Arc<dyn Service>> {
         self.services
             .iter()
             .filter(|(_, entry)| {
                 entry.metadata.capabilities.iter().any(|c| c == capability)
             })
-            .map(|(_, entry)| entry.service.as_ref())
+            .map(|(_, entry)| entry.service.clone())
             .collect()
     }
-    
-    fn list_all(&self) -> Vec<&dyn Service> {
-        // Return all discoverable services
+
+    fn list_all(&self) -> Vec<Arc<dyn Service>> {
         self.services
             .values()
-            .map(|entry| entry.service.as_ref())
+            .map(|entry| entry.service.clone())
             .collect()
     }
-    
+
     fn is_discoverable(&self, name: &str) -> bool {
         self.services.contains_key(name)
     }
 }
-
-
 
 /// Service discovery builder
 pub struct ServiceDiscoveryBuilder {
@@ -178,14 +151,14 @@ impl ServiceDiscoveryBuilder {
             discovery: DefaultServiceDiscovery::new(),
         }
     }
-    
+
     /// Adds a service to discovery
-    pub fn with_service(mut self, service: Box<dyn Service>) -> Self {
+    pub fn with_service(mut self, service: Arc<dyn Service>) -> Self {
         self.discovery.add_service(service);
         self
     }
-    
-    /// Builds the service discovery
+
+    /// Builds service discovery
     pub fn build(self) -> DefaultServiceDiscovery {
         self.discovery
     }

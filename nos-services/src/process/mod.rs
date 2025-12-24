@@ -51,8 +51,8 @@ impl Service for ProcessService {
 /// Register process services
 pub fn register_process_services() -> Result<()> {
     use crate::registry;
-    
-    let mut registry = registry::get_registry().lock();
+
+    let mut registry = registry::get_registry()?.lock();
     
     // Register init process service
     let init_service = ProcessService::new("init");

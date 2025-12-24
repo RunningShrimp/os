@@ -48,6 +48,7 @@ pub mod types;
 
 // Re-export commonly used items
 pub use registry::{ServiceRegistry, ServiceInfo, register_service, unregister_service, get_service, get_stats};
+pub use alloc::sync::Arc;
 pub use discovery::{ServiceDiscovery, ServiceDescriptor};
 pub use core::{Service, ServiceStatus, ServiceStats};
 pub use core::{ServiceManager, ServiceConfig};
@@ -97,7 +98,7 @@ pub fn shutdown_services() -> nos_api::Result<()> {
 ///
 /// * `ServiceStats` - Service statistics
 pub fn get_service_stats() -> ServiceStats {
-    return registry::get_stats();
+    registry::get_stats()
 }
 
 

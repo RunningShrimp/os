@@ -3,6 +3,7 @@ pub mod net;
 pub mod ipc;
 pub mod process;
 pub mod microkernel;
+pub mod perf;
 
 // Flattened modules from deep nesting
 

@@ -390,7 +390,7 @@ impl Ext4Persistence {
 
     /// Apply mount write policy to writeback knobs (interval, thresholds, etc.).
     fn apply_write_policy(&self) {
-        use crate::subsystems::fs::ext4_enhanced::Ext4WritePolicy;
+        use crate::subsystems::fs::ext4::Ext4WritePolicy;
         let policy = self.mount_options.write_policy;
         let mut wb = self.writeback_control.lock();
         match policy {

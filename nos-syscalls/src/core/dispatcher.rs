@@ -13,6 +13,7 @@ use {
 };
 
 /// System call dispatcher
+#[allow(clippy::should_implement_trait)]
 pub struct SyscallDispatcher {
     /// Registered system call handlers
     handlers: BTreeMap<u32, Box<dyn SyscallHandler>>,
@@ -35,6 +36,7 @@ impl SyscallDispatcher {
     }
 
     /// Get a system call handler
+    #[allow(clippy::borrowed_box)]
     pub fn get_handler(&self, id: u32) -> Option<&Box<dyn SyscallHandler>> {
         self.handlers.get(&id)
     }
@@ -173,6 +175,10 @@ mod tests {
         
         fn name(&self) -> &str {
             self.name
+        }
+        
+        fn id(&self) -> u32 {
+            100
         }
     }
 

@@ -39,6 +39,25 @@ embedded = []
 server = ["log"]
 desktop = ["log"]
 
+# Additional feature combinations
+full = ["log", "debug_subsystems"]
+debug = ["log", "debug_subsystems"]
+release = []
+
+# Feature documentation:
+# std          - Enable standard library support for testing and development
+# log          - Enable logging using the log crate
+# debug_subsystems - Enable debug subsystems for development
+# formal_verification - Enable formal verification annotations
+# security_audit - Enable security audit annotations
+# minimal      - Minimal build without optional features
+# embedded     - Optimized for embedded systems
+# server       - Server configuration with logging
+# desktop      - Desktop configuration with logging
+# full         - Full configuration with logging and debug features
+# debug        - Debug configuration with logging and debug subsystems
+# release      - Release configuration without optional features
+
 [lib]
 name = "nos_api"
 path = "src/lib.rs"

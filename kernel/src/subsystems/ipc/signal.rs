@@ -9,7 +9,8 @@
 extern crate alloc;
 
 use alloc::collections::VecDeque;
-use core::sync::atomic::{AtomicU64, Ordering};
+use alloc::vec::Vec;
+use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use crate::subsystems::sync::Mutex;
 
@@ -256,6 +257,130 @@ pub mod si_code {
 }
 
 // ============================================================================
+// Signal Delivery Flags (Enhanced)
+// ============================================================================
+
+pub mod delivery_flags {
+    pub const IN_CRITICAL_SECTION: u64 = 1 << 0;
+    pub const SIGNAL_UNSAFE: u64 = 1 << 1;
+    pub const DEFER_REALTIME: u64 = 1 << 2;
+    pub const PRESERVE_ORDER: u64 = 1 << 3;
+    pub const TRACK_LATENCY: u64 = 1 << 4;
+}
+
+/// Maximum signal queue size
+pub const MAX_SIGNAL_QUEUE_SIZE: usize = 64;
+
+/// Signal safety levels
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SignalSafetyLevel {
+    /// Signal-unsafe - cannot handle signals
+    Unsafe,
+    /// Signal-safe - can handle basic signals
+    Safe,
+    /// Signal-critical - must handle signals immediately
+    Critical,
+}
+
+/// Signal delivery entry with metadata
+#[derive(Debug, Clone)]
+pub struct SignalDelivery {
+    /// Signal number
+    pub signal: Signal,
+    /// Signal information
+    pub info: SigInfo,
+    /// Delivery priority (higher = higher priority)
+    pub priority: u8,
+    /// Delivery timestamp
+    pub timestamp: u64,
+    /// Source process ID
+    pub source_pid: i32,
+    /// Whether this is a real-time signal
+    pub is_realtime: bool,
+}
+
+/// Signal delivery statistics
+#[derive(Debug, Default, Clone)]
+pub struct SignalDeliveryStats {
+    /// Total signals sent
+    pub total_sent: u64,
+    /// Total signals delivered
+    pub total_delivered: u64,
+    /// Total signals ignored
+    pub total_ignored: u64,
+    /// Total signals blocked
+    pub total_blocked: u64,
+    /// Total signals lost (queue overflow)
+    pub total_lost: u64,
+    /// Average delivery latency in microseconds
+    pub avg_delivery_latency_us: f64,
+    /// Maximum delivery latency in microseconds
+    pub max_delivery_latency_us: u64,
+}
+
+/// Signal handler execution context
+#[derive(Debug, Clone)]
+pub struct SignalHandlerContext {
+    /// Signal being handled
+    pub signal: Signal,
+    /// Handler function address
+    pub handler_address: usize,
+    /// Signal mask during handler execution
+    pub handler_mask: SigSet,
+    /// Whether using SA_SIGINFO
+    pub use_siginfo: bool,
+    /// Whether handler should restart syscalls
+    pub restart_syscalls: bool,
+    /// Handler entry timestamp
+    pub entry_timestamp: u64,
+}
+
+/// Deferred signal for later delivery
+#[derive(Debug, Clone)]
+pub struct DeferredSignal {
+    /// Signal number
+    pub signal: Signal,
+    /// Signal information
+    pub info: SigInfo,
+    /// Reason for deferral
+    pub reason: DeferralReason,
+    /// Deferral timestamp
+    pub timestamp: u64,
+}
+
+/// Reason for signal deferral
+#[derive(Debug, Clone, PartialEq)]
+pub enum DeferralReason {
+    /// Signal was blocked
+    Blocked,
+    /// Process was in critical section
+    CriticalSection,
+    /// Signal queue was full
+    QueueFull,
+    /// Handler was already executing for this signal
+    HandlerActive,
+    /// System was in signal-unsafe state
+    SignalUnsafe,
+}
+
+/// Signal errors
+#[derive(Debug, Clone, PartialEq)]
+pub enum SignalError {
+    /// Invalid signal number
+    InvalidSignal,
+    /// Process not found
+    ProcessNotFound,
+    /// Invalid address
+    InvalidAddress,
+    /// Signal queue full
+    QueueFull,
+    /// Signal blocked
+    SignalBlocked,
+    /// System error
+    SystemError,
+}
+
+// ============================================================================
 // Default Signal Actions
 // ============================================================================
 
@@ -322,6 +447,21 @@ pub struct SignalState {
     saved_mask: AtomicU64,
     /// In signal handler
     in_handler: AtomicU64,
+
+    /// Enhanced: Signal delivery queue with ordering guarantees
+    delivery_queue: Mutex<VecDeque<SignalDelivery>>,
+    /// Enhanced: Signal safety state
+    signal_safety: AtomicUsize,
+    /// Enhanced: Signal delivery statistics
+    delivery_stats: Mutex<SignalDeliveryStats>,
+    /// Enhanced: Signal handler execution context
+    handler_context: Mutex<Option<SignalHandlerContext>>,
+    /// Enhanced: Signal mask stack for nested signal handling
+    mask_stack: Mutex<Vec<SigSet>>,
+    /// Enhanced: Pending signals that couldn't be delivered immediately
+    pending_deferred: Mutex<VecDeque<DeferredSignal>>,
+    /// Enhanced: Signal delivery flags
+    delivery_flags: AtomicU64,
 }
 
 impl SignalState {
@@ -334,9 +474,17 @@ impl SignalState {
             queued: Mutex::new(VecDeque::new()),
             saved_mask: AtomicU64::new(0),
             in_handler: AtomicU64::new(0),
+
+            delivery_queue: Mutex::new(VecDeque::new()),
+            signal_safety: AtomicUsize::new(SignalSafetyLevel::Safe as usize),
+            delivery_stats: Mutex::new(SignalDeliveryStats::default()),
+            handler_context: Mutex::new(None),
+            mask_stack: Mutex::new(Vec::new()),
+            pending_deferred: Mutex::new(VecDeque::new()),
+            delivery_flags: AtomicU64::new(0),
         }
     }
-    
+
     /// Fork signal state (copy to child)
     pub fn fork(&self) -> Self {
         Self {
@@ -346,6 +494,14 @@ impl SignalState {
             queued: Mutex::new(VecDeque::new()),
             saved_mask: AtomicU64::new(0),
             in_handler: AtomicU64::new(0),
+
+            delivery_queue: Mutex::new(VecDeque::new()),
+            signal_safety: AtomicUsize::new(SignalSafetyLevel::Safe as usize),
+            delivery_stats: Mutex::new(SignalDeliveryStats::default()),
+            handler_context: Mutex::new(None),
+            mask_stack: Mutex::new(Vec::new()),
+            pending_deferred: Mutex::new(VecDeque::new()),
+            delivery_flags: AtomicU64::new(self.delivery_flags.load(Ordering::Relaxed)),
         }
     }
     
@@ -358,10 +514,25 @@ impl SignalState {
                 *action = SigAction::default();
             }
         }
-        
+
         // Clear pending signals (except blocked ones? unclear)
         self.pending.store(0, Ordering::Release);
         self.queued.lock().clear();
+
+        // Enhanced: Clear delivery queue
+        self.delivery_queue.lock().clear();
+
+        // Enhanced: Clear pending deferred signals
+        self.pending_deferred.lock().clear();
+
+        // Enhanced: Reset signal safety
+        self.signal_safety.store(SignalSafetyLevel::Safe as usize, Ordering::Relaxed);
+
+        // Enhanced: Clear handler context
+        *self.handler_context.lock() = None;
+
+        // Enhanced: Clear mask stack
+        self.mask_stack.lock().clear();
     }
     
     /// Send a signal to the process
@@ -793,4 +964,485 @@ pub fn sys_sigsuspend(state: &SignalState, mask: &SigSet) -> Result<(), ()> {
 /// sigpending syscall support
 pub fn sys_sigpending(state: &SignalState) -> SigSet {
     SigSet::from_bits(state.pending.load(Ordering::Acquire))
+}
+
+// ============================================================================
+// Enhanced Signal Functions
+// ============================================================================
+
+impl SignalState {
+    /// Send a signal with enhanced semantics
+    pub fn send_signal_enhanced(&self, sig: Signal, info: SigInfo, source_pid: i32) -> Result<(), SignalError> {
+        if sig == 0 || sig >= NSIG as u32 {
+            return Err(SignalError::InvalidSignal);
+        }
+
+        {
+            let mut stats = self.delivery_stats.lock();
+            stats.total_sent += 1;
+        }
+
+        let pid = crate::process::myproc().unwrap_or(0);
+        if crate::syscalls::glib::deliver_signal_to_signalfd(pid, sig, info) {
+            return Ok(());
+        }
+
+        let safety_level = self.get_signal_safety_level();
+        let in_critical_section = self.is_in_critical_section();
+        let priority = self.calculate_signal_priority(sig, &info);
+        let is_realtime = sig >= SIGRTMIN && sig <= SIGRTMAX;
+
+        let delivery = SignalDelivery {
+            signal: sig,
+            info,
+            priority,
+            timestamp: crate::subsystems::time::timestamp_nanos(),
+            source_pid,
+            is_realtime,
+        };
+
+        let should_defer = self.should_defer_signal(&delivery, safety_level, in_critical_section);
+
+        if should_defer {
+            self.defer_signal(delivery, self.get_deferral_reason(safety_level, in_critical_section));
+            return Ok(());
+        }
+
+        self.queue_signal_for_delivery(delivery);
+        self.wakeup_process_if_needed();
+
+        Ok(())
+    }
+
+    fn calculate_signal_priority(&self, sig: Signal, _info: &SigInfo) -> u8 {
+        if sig >= SIGRTMIN && sig <= SIGRTMAX {
+            return (sig - SIGRTMIN) as u8;
+        }
+
+        match sig {
+            SIGKILL | SIGSTOP => 255,
+            SIGSEGV | SIGBUS | SIGFPE | SIGILL => 200,
+            SIGINT | SIGQUIT => 150,
+            SIGTERM | SIGHUP => 100,
+            SIGCHLD => 50,
+            SIGALRM | SIGVTALRM | SIGPROF => 25,
+            _ => 0,
+        }
+    }
+
+    fn should_defer_signal(&self, delivery: &SignalDelivery, safety_level: SignalSafetyLevel, in_critical_section: bool) -> bool {
+        if safety_level == SignalSafetyLevel::Unsafe {
+            return true;
+        }
+
+        if in_critical_section && !self.is_critical_section_interruptible(delivery.signal) {
+            return true;
+        }
+
+        if let Some(ref ctx) = *self.handler_context.lock() {
+            if ctx.signal == delivery.signal {
+                return true;
+            }
+        }
+
+        let current_mask = self.get_mask();
+        if current_mask.contains(delivery.signal) {
+            return true;
+        }
+
+        {
+            let queue = self.delivery_queue.lock();
+            if queue.len() >= MAX_SIGNAL_QUEUE_SIZE {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn is_critical_section_interruptible(&self, sig: Signal) -> bool {
+        match sig {
+            SIGKILL | SIGSTOP => true,
+            SIGSEGV | SIGBUS | SIGFPE | SIGILL => true,
+            _ => false,
+        }
+    }
+
+    fn get_deferral_reason(&self, safety_level: SignalSafetyLevel, in_critical_section: bool) -> DeferralReason {
+        if safety_level == SignalSafetyLevel::Unsafe {
+            return DeferralReason::SignalUnsafe;
+        }
+
+        if in_critical_section {
+            return DeferralReason::CriticalSection;
+        }
+
+        let current_mask = self.get_mask();
+        if !current_mask.is_empty() {
+            return DeferralReason::Blocked;
+        }
+
+        {
+            let queue = self.delivery_queue.lock();
+            if queue.len() >= MAX_SIGNAL_QUEUE_SIZE {
+                return DeferralReason::QueueFull;
+            }
+        }
+
+        if let Some(_) = *self.handler_context.lock() {
+            return DeferralReason::HandlerActive;
+        }
+
+        DeferralReason::SignalUnsafe
+    }
+
+    fn defer_signal(&self, delivery: SignalDelivery, reason: DeferralReason) {
+        let deferred = DeferredSignal {
+            signal: delivery.signal,
+            info: delivery.info,
+            reason,
+            timestamp: delivery.timestamp,
+        };
+
+        self.pending_deferred.lock().push_back(deferred);
+
+        {
+            let mut stats = self.delivery_stats.lock();
+            stats.total_blocked += 1;
+        }
+    }
+
+    fn queue_signal_for_delivery(&self, delivery: SignalDelivery) {
+        let mut queue = self.delivery_queue.lock();
+
+        let mut insert_pos = queue.len();
+        for (i, existing) in queue.iter().enumerate() {
+            if delivery.priority > existing.priority {
+                insert_pos = i;
+                break;
+            }
+        }
+
+        queue.insert(insert_pos, delivery);
+    }
+
+    fn wakeup_process_if_needed(&self) {
+        let pid = crate::process::myproc().unwrap_or(0);
+
+        let mut proc_table = crate::process::manager::PROC_TABLE.lock();
+        if let Some(proc) = proc_table.find_mut(pid) {
+            if proc.state == crate::process::ProcState::Sleeping {
+                proc.state = crate::process::ProcState::Runnable;
+            }
+        }
+    }
+
+    pub fn process_pending_signals(&self) -> Vec<SignalDelivery> {
+        let mut ready_signals = Vec::new();
+
+        {
+            let mut deferred = self.pending_deferred.lock();
+            let mut i = 0;
+            while i < deferred.len() {
+                let def_signal = &deferred[i];
+
+                if self.can_deliver_deferred_signal(def_signal) {
+                    let delivery = SignalDelivery {
+                        signal: def_signal.signal,
+                        info: def_signal.info,
+                        priority: self.calculate_signal_priority(def_signal.signal, &def_signal.info),
+                        timestamp: crate::subsystems::time::timestamp_nanos(),
+                        source_pid: def_signal.info.pid,
+                        is_realtime: def_signal.signal >= SIGRTMIN && def_signal.signal <= SIGRTMAX,
+                    };
+
+                    ready_signals.push(delivery);
+                    deferred.remove(i);
+                } else {
+                    i += 1;
+                }
+            }
+        }
+
+        {
+            let mut queue = self.delivery_queue.lock();
+            while let Some(delivery) = queue.pop_front() {
+                if self.can_deliver_signal(&delivery) {
+                    ready_signals.push(delivery);
+                } else {
+                    queue.push_front(delivery);
+                    break;
+                }
+            }
+        }
+
+        ready_signals
+    }
+
+    fn can_deliver_deferred_signal(&self, def_signal: &DeferredSignal) -> bool {
+        match def_signal.reason {
+            DeferralReason::Blocked => {
+                let current_mask = self.get_mask();
+                !current_mask.contains(def_signal.signal)
+            }
+            DeferralReason::CriticalSection => {
+                !self.is_in_critical_section()
+            }
+            DeferralReason::QueueFull => {
+                let queue = self.delivery_queue.lock();
+                queue.len() < MAX_SIGNAL_QUEUE_SIZE
+            }
+            DeferralReason::HandlerActive => {
+                self.handler_context.lock().is_none()
+            }
+            DeferralReason::SignalUnsafe => {
+                self.get_signal_safety_level() != SignalSafetyLevel::Unsafe
+            }
+        }
+    }
+
+    fn can_deliver_signal(&self, delivery: &SignalDelivery) -> bool {
+        let safety_level = self.get_signal_safety_level();
+        if safety_level == SignalSafetyLevel::Unsafe {
+            return false;
+        }
+
+        if self.is_in_critical_section() && !self.is_critical_section_interruptible(delivery.signal) {
+            return false;
+        }
+
+        let current_mask = self.get_mask();
+        if current_mask.contains(delivery.signal) {
+            return false;
+        }
+
+        if let Some(ref ctx) = *self.handler_context.lock() {
+            if ctx.signal == delivery.signal {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    pub fn deliver_signal(&self, delivery: &SignalDelivery) -> Result<(), SignalError> {
+        let action = self.get_action(delivery.signal);
+
+        if action.handler == SIG_IGN {
+            {
+                let mut stats = self.delivery_stats.lock();
+                stats.total_ignored += 1;
+            }
+            return Ok(());
+        }
+
+        if action.handler == SIG_DFL {
+            match default_action(delivery.signal) {
+                DefaultAction::Term | DefaultAction::Core => {
+                    self.terminate_process(delivery.signal, delivery.info);
+                    return Ok(());
+                }
+                DefaultAction::Stop => {
+                    self.stop_process(delivery.signal);
+                    return Ok(());
+                }
+                DefaultAction::Cont => {
+                    self.continue_process();
+                    return Ok(());
+                }
+                DefaultAction::Ign => {
+                    {
+                        let mut stats = self.delivery_stats.lock();
+                        stats.total_ignored += 1;
+                    }
+                    return Ok(());
+                }
+            }
+        }
+
+        self.setup_signal_handler(delivery, &action)?;
+
+        {
+            let mut stats = self.delivery_stats.lock();
+            stats.total_delivered += 1;
+
+            let now = crate::subsystems::time::timestamp_nanos();
+            let latency_us = (now - delivery.timestamp) / 1000;
+            stats.avg_delivery_latency_us =
+                (stats.avg_delivery_latency_us * (stats.total_delivered - 1) as f64 + latency_us as f64)
+                / stats.total_delivered as f64;
+            stats.max_delivery_latency_us = stats.max_delivery_latency_us.max(latency_us);
+        }
+
+        Ok(())
+    }
+
+    fn setup_signal_handler(&self, delivery: &SignalDelivery, action: &SigAction) -> Result<(), SignalError> {
+        let current_mask = self.get_mask();
+
+        {
+            let mut mask_stack = self.mask_stack.lock();
+            mask_stack.push(current_mask);
+        }
+
+        let mut handler_mask = action.mask;
+        if (action.flags.0 & SigActionFlags::SA_NODEFER) == 0 {
+            handler_mask.add(delivery.signal);
+        }
+
+        self.set_mask(handler_mask);
+
+        let handler_context = SignalHandlerContext {
+            signal: delivery.signal,
+            handler_address: action.handler,
+            handler_mask,
+            use_siginfo: (action.flags.0 & SigActionFlags::SA_SIGINFO) != 0,
+            restart_syscalls: (action.flags.0 & SigActionFlags::SA_RESTART) != 0,
+            entry_timestamp: crate::subsystems::time::timestamp_nanos(),
+        };
+
+        *self.handler_context.lock() = Some(handler_context);
+
+        self.setup_signal_frame(delivery, action)?;
+
+        Ok(())
+    }
+
+    fn setup_signal_frame(&self, delivery: &SignalDelivery, action: &SigAction) -> Result<(), SignalError> {
+        let pid = crate::process::myproc().ok_or(SignalError::ProcessNotFound)?;
+        let proc_table = crate::process::manager::PROC_TABLE.lock();
+        let proc = proc_table.find_ref(pid).ok_or(SignalError::ProcessNotFound)?;
+        let pagetable = proc.pagetable;
+        drop(proc_table);
+
+        if pagetable.is_null() {
+            return Err(SignalError::InvalidAddress);
+        }
+
+        let use_alt_stack = (action.flags.0 & SigActionFlags::SA_ONSTACK) != 0;
+
+        let _sp = if use_alt_stack {
+            self.get_alternate_stack_address()
+        } else {
+            self.get_current_stack_pointer()
+        };
+
+        let _frame = SignalFrame {
+            info: delivery.info,
+            context: self.get_current_context(),
+            handler: action.handler,
+            use_siginfo: (action.flags.0 & SigActionFlags::SA_SIGINFO) != 0,
+            return_address: self.get_signal_return_address(),
+        };
+
+        crate::println!("Setting up signal frame for signal {}", delivery.signal);
+
+        Ok(())
+    }
+
+    fn get_alternate_stack_address(&self) -> usize {
+        0x7ffff0000000usize
+    }
+
+    fn get_current_stack_pointer(&self) -> usize {
+        0x7fffffffe000usize
+    }
+
+    fn get_current_context(&self) -> SignalContext {
+        SignalContext {
+            saved_regs: SavedRegs::default(),
+            info: SigInfo::default(),
+            saved_mask: 0,
+        }
+    }
+
+    fn get_signal_return_address(&self) -> usize {
+        0x7fffff000000usize
+    }
+
+    fn terminate_process(&self, sig: Signal, info: SigInfo) {
+        let pid = crate::process::myproc().unwrap_or(0);
+
+        if default_action(sig) == DefaultAction::Core {
+            self.create_core_dump(sig, info);
+        }
+
+        crate::process::manager::exit_process(pid, sig as i32);
+    }
+
+    fn stop_process(&self, sig: Signal) {
+        let pid = crate::process::myproc().unwrap_or(0);
+        crate::process::manager::stop_process(pid, sig);
+    }
+
+    fn continue_process(&self) {
+        let pid = crate::process::myproc().unwrap_or(0);
+        crate::process::manager::continue_process(pid);
+    }
+
+    fn create_core_dump(&self, sig: Signal, info: SigInfo) {
+        crate::println!("Creating core dump for signal {} from pid {}", sig, info.pid);
+    }
+
+    pub fn return_from_handler(&self) -> Result<(), SignalError> {
+        {
+            let mut mask_stack = self.mask_stack.lock();
+            if let Some(old_mask) = mask_stack.pop() {
+                self.set_mask(old_mask);
+            }
+        }
+
+        *self.handler_context.lock() = None;
+
+        Ok(())
+    }
+
+    pub fn get_signal_safety_level(&self) -> SignalSafetyLevel {
+        match self.signal_safety.load(Ordering::Relaxed) {
+            0 => SignalSafetyLevel::Unsafe,
+            1 => SignalSafetyLevel::Safe,
+            2 => SignalSafetyLevel::Critical,
+            _ => SignalSafetyLevel::Safe,
+        }
+    }
+
+    pub fn set_signal_safety_level(&self, level: SignalSafetyLevel) {
+        self.signal_safety.store(level as usize, Ordering::Relaxed);
+    }
+
+    pub fn is_in_critical_section(&self) -> bool {
+        (self.delivery_flags.load(Ordering::Relaxed) & delivery_flags::IN_CRITICAL_SECTION) != 0
+    }
+
+    pub fn enter_critical_section(&self) {
+        self.delivery_flags.fetch_or(delivery_flags::IN_CRITICAL_SECTION, Ordering::Relaxed);
+    }
+
+    pub fn exit_critical_section(&self) {
+        self.delivery_flags.fetch_and(!delivery_flags::IN_CRITICAL_SECTION, Ordering::Relaxed);
+    }
+
+    pub fn get_delivery_stats(&self) -> SignalDeliveryStats {
+        self.delivery_stats.lock().clone()
+    }
+
+    pub fn reset_delivery_stats(&self) {
+        *self.delivery_stats.lock() = SignalDeliveryStats::default();
+    }
+}
+
+/// Signal frame for user handler
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct SignalFrame {
+    /// Signal information
+    pub info: SigInfo,
+    /// Saved context
+    pub context: SignalContext,
+    /// Handler address
+    pub handler: usize,
+    /// Using SA_SIGINFO
+    pub use_siginfo: bool,
+    /// Return address
+    pub return_address: usize,
 }

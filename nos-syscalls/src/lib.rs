@@ -36,8 +36,8 @@ extern crate alloc;
 
 /// NOS System Calls - Interface Definition Layer
 ///
-/// This crate provides the system call interface definitions (traits and types)
-/// for the NOS operating system. The actual implementations are in the kernel.
+/// This crate provides of system call interface definitions (traits and types)
+/// for NOS operating system. The actual implementations are in kernel.
 ///
 /// # Architecture
 ///
@@ -45,6 +45,8 @@ extern crate alloc;
 /// - Defines traits for system call handlers, dispatchers, and related components
 /// - Provides type definitions and constants for system calls
 /// - Does NOT contain actual implementations (those are in kernel/subsystems/syscalls)
+#[macro_use]
+pub mod logging;
 
 // Re-export core functionality
 pub mod core {
@@ -67,11 +69,18 @@ pub mod memory;
 pub mod time;
 
 // Advanced system call type definitions
+#[cfg(feature = "advanced_syscalls")]
 pub mod advanced_mmap;
+#[cfg(feature = "advanced_syscalls")]
+pub mod async_ops;
+#[cfg(feature = "advanced_syscalls")]
+pub mod epoll;
+#[cfg(feature = "advanced_syscalls")]
+pub mod zero_copy_network;
 
 // Re-export core functionality
 pub use core::traits::{
-    SyscallHandler, SyscallValidator, SyscallLogger, 
+    SyscallHandler, SyscallValidator, SyscallLogger,
     SyscallInterceptor, SyscallFilter, SyscallContext
 };
 pub use core::registry::SyscallRegistry;
@@ -86,8 +95,6 @@ pub use types::*;
 
 // Re-export SyscallResult from nos_api
 pub use nos_api::syscall::SyscallResult;
-
-
 
 // Note: The following modules contain implementation details that should be
 // moved to kernel/subsystems/syscalls. They are kept here temporarily for
@@ -468,6 +475,7 @@ pub mod syscall_numbers {
 
 /// System call statistics
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct SyscallStats {
     /// Total number of system calls
     pub total_calls: u64,
@@ -479,16 +487,6 @@ pub struct SyscallStats {
     pub error_count: u64,
 }
 
-impl Default for SyscallStats {
-    fn default() -> Self {
-        Self {
-            total_calls: 0,
-            calls_by_type: alloc::collections::BTreeMap::new(),
-            avg_execution_time: 0,
-            error_count: 0,
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {

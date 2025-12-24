@@ -124,18 +124,34 @@ pub struct FileDescriptor {
 }
 
 /// 内存分配统计
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct AllocationStats {
     /// 总分配次数
-    pub total_allocations: AtomicI32,
+    pub total_allocations: u64,
     /// 总分配大小
-    pub total_allocated_bytes: AtomicI32,
+    pub total_allocated_bytes: u64,
     /// 当前分配块数
-    pub current_blocks: AtomicI32,
+    pub current_blocks: u64,
     /// 最大内存使用量
-    pub peak_memory_usage: AtomicI32,
+    pub peak_memory_usage: u64,
     /// 内存泄漏检测
     pub leak_detection_enabled: bool,
+}
+
+impl AllocationStats {
+    pub fn record_allocation(&mut self, size: u64) {
+        self.total_allocations += 1;
+        self.current_blocks += 1;
+        self.total_allocated_bytes += size;
+        if self.total_allocated_bytes > self.peak_memory_usage {
+            self.peak_memory_usage = self.total_allocated_bytes;
+        }
+    }
+    
+    pub fn record_deallocation(&mut self, size: u64) {
+        self.current_blocks = self.current_blocks.saturating_sub(1);
+        self.total_allocated_bytes = self.total_allocated_bytes.saturating_sub(size);
+    }
 }
 
 /// 信号处理器类型

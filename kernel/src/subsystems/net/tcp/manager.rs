@@ -7,11 +7,114 @@ extern crate alloc;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use alloc::vec;
-use core::sync::atomic::{AtomicU16, AtomicU32, Ordering};
+use core::sync::atomic::{AtomicU16, AtomicU32, AtomicU64, Ordering};
 
 use super::TcpState;
 use super::state::{TcpStateMachine, TcpAction};
 use crate::net::ipv4::Ipv4Addr;
+
+/// Port bitmap allocator for efficient port management
+///
+/// Uses a bitmap to track allocated ports:
+/// - Each bit represents one port (0-65535)
+/// - O(1) allocation and deallocation
+/// - Minimal memory footprint (8KB for all ports)
+#[repr(align(64))]
+pub struct PortBitmap {
+    /// Bitmap storage: 65536 bits / 64 bits per word = 1024 u64 words
+    bitmap: [AtomicU64; 1024],
+    /// Next port to try for allocation (round-robin)
+    next_port: AtomicU16,
+}
+
+impl PortBitmap {
+    /// Create a new port bitmap
+    pub fn new() -> Self {
+        let bitmap: [AtomicU64; 1024] = core::array::from_fn(|_| AtomicU64::new(0));
+        Self {
+            bitmap,
+            next_port: AtomicU16::new(1024),
+        }
+    }
+
+    /// Allocate a port (O(1) average case)
+    pub fn allocate(&self) -> Option<u16> {
+        let start_port = self.next_port.load(Ordering::Relaxed);
+
+        // Try to find a free port starting from next_port
+        for i in 0..(65535 - 1024 + 1) {
+            let port = start_port.wrapping_add(i);
+            let adjusted_port = if port < 1024 { port.wrapping_add(1024) } else { port };
+
+            if self.try_set_bit(adjusted_port) {
+                self.next_port.store(adjusted_port.wrapping_add(1), Ordering::Relaxed);
+                return Some(adjusted_port);
+            }
+        }
+
+        None
+    }
+
+    /// Allocate a specific port
+    pub fn allocate_specific(&self, port: u16) -> bool {
+        if port < 1024 {
+            return false; // Don't allocate well-known ports
+        }
+        self.try_set_bit(port)
+    }
+
+    /// Deallocate a port (O(1))
+    pub fn deallocate(&self, port: u16) {
+        self.clear_bit(port);
+    }
+
+    /// Check if a port is allocated
+    pub fn is_allocated(&self, port: u16) -> bool {
+        self.get_bit(port)
+    }
+
+    /// Set a bit atomically
+    fn try_set_bit(&self, port: u16) -> bool {
+        let word_idx = (port as usize) / 64;
+        let bit_idx = (port as usize) % 64;
+        let mask = 1u64 << bit_idx;
+
+        let old_value = self.bitmap[word_idx].fetch_or(mask, Ordering::AcqRel);
+        (old_value & mask) == 0
+    }
+
+    /// Clear a bit atomically
+    fn clear_bit(&self, port: u16) {
+        let word_idx = (port as usize) / 64;
+        let bit_idx = (port as usize) % 64;
+        let mask = 1u64 << bit_idx;
+
+        self.bitmap[word_idx].fetch_and(!mask, Ordering::Release);
+    }
+
+    /// Get a bit value
+    fn get_bit(&self, port: u16) -> bool {
+        let word_idx = (port as usize) / 64;
+        let bit_idx = (port as usize) % 64;
+        let mask = 1u64 << bit_idx;
+
+        (self.bitmap[word_idx].load(Ordering::Acquire) & mask) != 0
+    }
+
+    /// Get number of allocated ports
+    pub fn count_allocated(&self) -> u32 {
+        let mut count = 0u32;
+        for word in &self.bitmap {
+            count += word.load(Ordering::Relaxed).count_ones() as u32;
+        }
+        count
+    }
+
+    /// Get free port count
+    pub fn count_free(&self) -> u32 {
+        (65536 - 1024) - self.count_allocated()
+    }
+}
 
 /// TCP connection identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -249,10 +352,8 @@ pub struct TcpConnectionManager {
     connections: BTreeMap<ConnectionId, TcpConnection>,
     /// Listening sockets
     listening_sockets: BTreeMap<ConnectionId, TcpConnection>,
-    /// Next port to allocate
-    next_port: AtomicU16,
-    /// Port allocation bitmap (simplified)
-    allocated_ports: BTreeMap<u16, bool>,
+    /// Port bitmap allocator (O(1) allocation/deallocation)
+    port_bitmap: PortBitmap,
     /// Connection ID counter
     next_connection_id: AtomicU32,
 }
@@ -263,37 +364,20 @@ impl TcpConnectionManager {
         Self {
             connections: BTreeMap::new(),
             listening_sockets: BTreeMap::new(),
-            next_port: AtomicU16::new(1024), // Start from port 1024
-            allocated_ports: BTreeMap::new(),
+            port_bitmap: PortBitmap::new(),
             next_connection_id: AtomicU32::new(1),
         }
     }
 
     /// Allocate a new port
     pub fn allocate_port(&mut self) -> Result<u16, TcpError> {
-        let start_port = self.next_port.load(Ordering::Relaxed);
-
-        for i in 0..=65535 {
-            let port = start_port.wrapping_add(i);
-
-            // Skip well-known ports and system ports
-            if port < 1024 {
-                continue;
-            }
-
-            if !self.allocated_ports.contains_key(&port) {
-                self.allocated_ports.insert(port, true);
-                self.next_port.store(port.wrapping_add(1), Ordering::Relaxed);
-                return Ok(port);
-            }
-        }
-
-        Err(TcpError::NoPortsAvailable)
+        self.port_bitmap.allocate()
+            .ok_or(TcpError::NoPortsAvailable)
     }
 
     /// Deallocate a port
     pub fn deallocate_port(&mut self, port: u16) {
-        self.allocated_ports.remove(&port);
+        self.port_bitmap.deallocate(port);
     }
 
     /// Create a listening socket
@@ -306,10 +390,12 @@ impl TcpConnectionManager {
         let port = if local_port == 0 {
             self.allocate_port()?
         } else {
-            if self.allocated_ports.contains_key(&local_port) {
+            if self.port_bitmap.is_allocated(local_port) {
                 return Err(TcpError::PortInUse);
             }
-            self.allocated_ports.insert(local_port, true);
+            if !self.port_bitmap.allocate_specific(local_port) {
+                return Err(TcpError::PortInUse);
+            }
             local_port
         };
 
@@ -504,7 +590,7 @@ impl TcpConnectionManager {
         TcpManagerStats {
             active_connections: self.connections.len(),
             listening_sockets: self.listening_sockets.len(),
-            allocated_ports: self.allocated_ports.len(),
+            allocated_ports: self.port_bitmap.count_allocated() as usize,
         }
     }
 }

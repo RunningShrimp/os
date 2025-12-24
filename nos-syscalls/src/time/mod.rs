@@ -7,8 +7,6 @@ use alloc::boxed::Box;
 
 use nos_api::Result;
 use crate::SyscallHandler;
-#[cfg(feature = "log")]
-use log;
 use crate::SyscallDispatcher;
 
 /// Register time system call handlers
@@ -53,11 +51,7 @@ impl SyscallHandler for ClockGettimeHandler {
         // TODO: Implement actual clock_gettime logic using parameters:
         // clock_id: Clock type (CLOCK_REALTIME, CLOCK_MONOTONIC, etc.)
         // timespec: Pointer to timespec structure to fill with current time
-        #[cfg(feature = "log")]
-        log::trace!("clock_gettime called with: clock_id={}, timespec={:?}", clock_id, timespec);
-        
-        // Basic validation to ensure parameters are used even when logging is disabled
-        let _ = (clock_id, timespec);
+        sys_trace_with_args!("clock_gettime called with: clock_id={}, timespec={:?}", clock_id, timespec);
         
         Ok(0)
     }
@@ -86,11 +80,7 @@ impl SyscallHandler for GettimeofdayHandler {
         // TODO: Implement actual gettimeofday logic using parameters:
         // tv: Pointer to timeval structure to fill with current time
         // tz: Pointer to timezone structure (unused in modern systems)
-        #[cfg(feature = "log")]
-        log::trace!("gettimeofday called with: tv={:?}, tz={:?}", tv, tz);
-        
-        // Basic validation to ensure parameters are used even when logging is disabled
-        let _ = (tv, tz);
+        sys_trace_with_args!("gettimeofday called with: tv={:?}, tz={:?}", tv, tz);
         
         Ok(0)
     }
@@ -115,16 +105,12 @@ impl SyscallHandler for NanosleepHandler {
         
         let req = args[0] as *const Timespec;
         let rem = args[1] as *mut Timespec;
-        
+
         // TODO: Implement actual nanosleep logic using parameters:
         // req: Requested sleep time
         // rem: Remaining sleep time if interrupted
-        #[cfg(feature = "log")]
-        log::trace!("nanosleep called with: req={:?}, rem={:?}", req, rem);
-        
-        // Basic validation to ensure parameters are used even when logging is disabled
-        let _ = (req, rem);
-        
+        sys_trace_with_args!("nanosleep called with: req={:?}, rem={:?}", req, rem);
+
         Ok(0)
     }
     
