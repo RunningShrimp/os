@@ -343,7 +343,7 @@ impl O1Scheduler {
             // 确保内存屏障
             core::sync::atomic::fence(Ordering::SeqCst);
         }
-        info!("O(1) scheduler initialized");
+        crate::log_debug!("O(1) scheduler initialized");
     }
     
     /// 调度下一个任务
