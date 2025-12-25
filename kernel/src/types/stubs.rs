@@ -222,7 +222,6 @@ impl RNG {
             core::arch::asm!(
                 "mrs {0}, RNDR",
                 out(reg) value,
-                setne(success),
                 options(nostack, pure)
             );
             if success {
