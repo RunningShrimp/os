@@ -1,0 +1,37 @@
+error: expected expression, found `let` statement
+error: expected expression, found `let` statement
+error: expected expression, found `let` statement
+error: the `pure` option must be combined with either `nomem` or `readonly`
+error: cannot find macro `info` in this scope
+error: trailing semicolon in macro used in expression position
+error: trailing semicolon in macro used in expression position
+error: trailing semicolon in macro used in expression position
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: unsafe attribute used without unsafe
+error: could not compile `kernel` (lib) due to 158 previous errors; 114 warnings emitted
