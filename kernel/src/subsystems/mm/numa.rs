@@ -46,11 +46,10 @@ pub struct NumaNode {
     memory_zones: Vec<MemoryZone>,
     free_memory: AtomicUsize,
     total_memory: usize,
-    distance: [u8; MAX_tomicANUMA_NODES], // Distance to other nodes
+    distance: [u8; MAX_NUMA_NODES], // Distance to other nodes
     allocation_stats: AllocationStats,
     preferred_zone: Option<MemoryZoneType>,
 }
-o rt_allocat policd
 /// NUMA allocation policy
 #[derive(Debug, Clone, Copy)]
 pub enum NumaPolicy {
