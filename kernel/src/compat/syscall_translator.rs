@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // System Call Translation Engine
 //
 // Translates foreign system calls to NOS native system calls with JIT compilation

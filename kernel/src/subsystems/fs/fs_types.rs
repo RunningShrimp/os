@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! File System Type Definitions
 //!
 //! Unified type definitions for file system operations

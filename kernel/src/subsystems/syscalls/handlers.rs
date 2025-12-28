@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 信号系统调用处理函数
 //! 
 //! 本模块包含信号相关系统调用的具体实现逻辑，包括：

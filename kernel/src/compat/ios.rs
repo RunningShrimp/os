@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! iOS Framework Compatibility Layer
 //!
 //! Provides compatibility for iOS applications on NOS:

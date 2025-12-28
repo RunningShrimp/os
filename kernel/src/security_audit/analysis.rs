@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Analysis Module for Security Audit
 
 extern crate alloc;

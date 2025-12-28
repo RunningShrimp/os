@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Futex (Fast Userspace Mutex) Implementation
 //!
 //! This module provides futex system call implementation for thread synchronization.

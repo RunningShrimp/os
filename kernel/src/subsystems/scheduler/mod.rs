@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Scheduler Subsystem
 //! 
 //! This module provides comprehensive scheduling capabilities for the NOS kernel,

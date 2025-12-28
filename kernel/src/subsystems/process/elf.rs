@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // ELF64 Loader
 // Parse and load ELF executables into user address space
 

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 性能监控模块
 //!
 //! 本模块提供性能监控功能，合并自nos-perf。

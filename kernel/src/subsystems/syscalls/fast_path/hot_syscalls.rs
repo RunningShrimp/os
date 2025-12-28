@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Hot system call fast-path implementations
 //!
 //! This module provides optimized fast-path implementations for frequently

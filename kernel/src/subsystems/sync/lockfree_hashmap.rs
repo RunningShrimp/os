@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Lock-free Hashmap
 //!
 //! A concurrent, lock-free hashmap implementation using open addressing and atomic operations.

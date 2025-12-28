@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Kernel Dependency Injection System
 //! 
 //! This module provides kernel-specific dependency injection implementation

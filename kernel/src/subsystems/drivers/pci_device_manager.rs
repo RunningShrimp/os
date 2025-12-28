@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! PCI Device Manager Implementation
 //!
 //! This module implements a comprehensive PCI device manager for NOS,

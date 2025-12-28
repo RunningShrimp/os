@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // File system implementation for xv6-rust
 // Implements xv6-compatible simple file system
 

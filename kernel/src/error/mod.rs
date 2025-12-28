@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Error Handling Module
 //!
 //! This module provides unified error handling for the NOS kernel,

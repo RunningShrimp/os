@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! C标准库统一错误处理机制
 //!
 //! 提供统一的errno错误码管理和错误处理功能，确保所有C库实现使用一致的错误处理机制。

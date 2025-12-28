@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! NUMA Policy Module
 //! 
 //! This module provides policy management for NUMA systems, including

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Ext4 File System Implementation
 //!
 //! This module implements the Ext4 file system core functionality for the NOS operating system.

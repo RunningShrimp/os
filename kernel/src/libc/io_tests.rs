@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! C标准库I/O功能测试
 //!
 //! 测试增强的I/O管理器和格式化器的各种功能：

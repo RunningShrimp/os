@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 扩展的文件描述符缓存系统
 //!
 //! 提供高效的文件描述符缓存机制，支持：

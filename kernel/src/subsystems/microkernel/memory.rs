@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Microkernel memory management
 //!
 //! Provides basic memory management services for the microkernel layer.

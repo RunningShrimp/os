@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Surface protocol for zero-copy graphics
 //!
 //! Implements a shared memory-based surface protocol that allows applications

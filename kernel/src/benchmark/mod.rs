@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Performance benchmarking and monitoring
 //!
 //! Provides performance benchmarks and monitoring capabilities for production validation.

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Memory and Performance Analyzer Module
 //
 // 内存和性能分析器模块

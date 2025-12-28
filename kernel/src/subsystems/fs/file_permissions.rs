@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! File Permissions Implementation
 //!
 //! This module implements a comprehensive file permissions system for NOS,

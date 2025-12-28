@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Service Mesh
 //!
 //! This module implements service mesh for cloud-native:

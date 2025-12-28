@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Anomaly Detector for Machine Learning
 //! 
 //! This module provides anomaly detection capabilities for various kernel components,

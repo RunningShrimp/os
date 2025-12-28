@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! SignalFd System Calls
 //!
 //! This module implements the signalfd system calls:

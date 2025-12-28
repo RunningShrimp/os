@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 增强的C标准库I/O管理器
 
 extern crate alloc;

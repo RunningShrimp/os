@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 信号处理程序模块
 //! 
 //! 本模块提供信号处理的具体实现，包括：

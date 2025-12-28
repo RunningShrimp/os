@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 网络系统调用辅助函数
 //!
 //! 本模块包含网络系统调用的辅助函数，为服务层提供基础支持。

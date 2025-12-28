@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 pub const LOG_ERROR: usize = 1;

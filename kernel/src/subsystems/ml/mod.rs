@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Machine Learning Optimization
 //!
 //! This module implements ML-based optimization for NOS:

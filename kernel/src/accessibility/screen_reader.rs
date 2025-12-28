@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Screen Reader Support
 //!
 //! This module implements screen reader accessibility:

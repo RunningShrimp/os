@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Web system APIs
 //!
 //! Provides Web APIs for file access, notifications, and other system features.

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 通用优化模块
 //!
 //! 提供系统调用优化的通用组件，包括：

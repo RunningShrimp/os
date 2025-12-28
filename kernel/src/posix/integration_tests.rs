@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! POSIX Advanced Features Integration Tests
 //!
 //! This module contains integration tests for advanced POSIX features,

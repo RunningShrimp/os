@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! TimerFd System Calls
 //!
 //! This module implements the timerfd system calls:

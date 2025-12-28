@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! GLib事件循环集成系统调用
 //!
 //! 为GLib的主事件循环提供高性能的epoll支持，包括：

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Lock-Free Network Statistics
 //!
 //! This module provides high-performance, lock-free statistics for network operations.

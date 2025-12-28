@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Sleeplock - Lock that allows sleeping
 //
 // This module provides a lock that can be held during

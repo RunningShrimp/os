@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Time-related syscalls
 
 use super::common::{SyscallError, SyscallResult};

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! IPC系统调用模块
 //!
 //! 本模块提供IPC相关的系统调用处理。

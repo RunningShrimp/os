@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Futex implementation tests
 //! 
 //! This module contains comprehensive tests for the futex implementation,

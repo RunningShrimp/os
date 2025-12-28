@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Interrupt control functions for SMP safety
 //
 // This module provides interrupt control functions for SMP-safe

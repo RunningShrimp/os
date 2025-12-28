@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Once - One-time initialization primitive
 //
 // This module provides a synchronization primitive for

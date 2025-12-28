@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Security Audit and Logging System
 //!
 //! This module implements comprehensive security event logging and auditing:

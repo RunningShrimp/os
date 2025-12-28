@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Optimized TCP Protocol Stack
 //!
 //! This module provides high-performance TCP implementation including:

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Internationalization (i18n)
 //!
 //! This module implements internationalization for NOS:

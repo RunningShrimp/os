@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Production monitoring system
 //!
 //! Provides system monitoring and metrics collection for production environments.

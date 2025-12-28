@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 示例字符设备驱动程序
 //! 
 //! 本模块实现了一个简单的字符设备驱动程序，演示如何使用驱动程序架构

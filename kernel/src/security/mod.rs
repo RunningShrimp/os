@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 安全模块
 //! 
 //! 提供增强的安全功能，包括细粒度权限控制、

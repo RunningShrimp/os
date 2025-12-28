@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Dispatch function for filesystem syscalls
 //!
 //! Routes syscall numbers to appropriate handler functions

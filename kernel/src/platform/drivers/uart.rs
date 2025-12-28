@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // UART driver for xv6-rust
 // Provides serial console I/O for all supported architectures
 

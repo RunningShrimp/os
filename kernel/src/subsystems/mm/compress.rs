@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Advanced Memory Compression Module for NOS
 //! 
 //! Implements multiple compression algorithms to reduce memory footprint:

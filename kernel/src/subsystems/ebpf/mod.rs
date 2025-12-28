@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Extended Berkeley Packet Filter (eBPF) Support
 //!
 //! This module implements full eBPF support for NOS:

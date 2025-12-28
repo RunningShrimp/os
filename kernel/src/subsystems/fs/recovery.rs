@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Enhanced Logging and Recovery Mechanisms
 //!
 //! This module provides comprehensive logging and recovery mechanisms for the NOS

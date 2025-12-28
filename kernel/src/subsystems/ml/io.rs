@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! ML-Based I/O Optimization
 //!
 //! This module implements ML-enhanced I/O:

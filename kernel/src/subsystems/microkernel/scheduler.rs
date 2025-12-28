@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Microkernel core scheduler
 //!
 //! Provides basic thread scheduling capabilities for the microkernel layer.

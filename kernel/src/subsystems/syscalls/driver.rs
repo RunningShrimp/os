@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Driver module for syscalls
 //!
 //! This module provides driver-related functionality for system calls

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Kernel Debugger
 //!
 //! This module implements kernel debugging tools:

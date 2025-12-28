@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Optimization modules have been temporarily disabled pending refactoring
 // pub use crate::subsystems::syscalls::file_io_optimized;
 // pub use crate::subsystems::syscalls::process_optimized;

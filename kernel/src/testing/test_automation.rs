@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Test Automation Module
 //! 
 //! This module provides comprehensive test automation capabilities for the NOS kernel,

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Advanced Thread System Calls
 //!
 //! This module implements system calls for advanced POSIX thread features:

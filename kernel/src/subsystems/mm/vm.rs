@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Virtual Memory Management for xv6-rust
 //!
 //! This module provides virtual memory support including:

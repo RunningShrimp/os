@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Distributed Logging
 //!
 //! This module implements distributed logging for cloud-native:

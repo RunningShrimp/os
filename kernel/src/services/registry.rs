@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Service Registry Module
 //! 
 //! This module provides the service registry for registering and managing services

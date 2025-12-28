@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Filesystem System Call Service Implementation
 //!
 //! This module provides the filesystem service that manages all filesystem-related

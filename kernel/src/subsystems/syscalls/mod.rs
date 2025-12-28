@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 系统调用模块
 //! 
 //! 本模块提供系统调用接口和分发机制，按功能域拆分为：

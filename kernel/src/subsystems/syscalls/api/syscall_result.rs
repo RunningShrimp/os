@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! System call result type definitions.
 //!
 //! This module defines the standard result type used by all system calls.

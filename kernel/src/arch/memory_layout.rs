@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Architecture-specific memory layout definitions
 //!
 //! This module provides architecture-agnostic abstractions for memory layout

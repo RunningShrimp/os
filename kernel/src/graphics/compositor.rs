@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Graphics compositor service
 //!
 //! Implements a zero-copy compositor that combines multiple surfaces into a single framebuffer.

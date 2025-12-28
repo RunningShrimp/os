@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Optimized Page Allocator
 //!
 //! This module implements an optimized page allocator with the following features:

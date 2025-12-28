@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! POSIX Advanced Features Unit Tests
 //!
 //! This module contains unit tests for advanced POSIX features including:

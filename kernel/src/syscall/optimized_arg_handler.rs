@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Optimized System Call Argument Handling
 //!
 //! This module provides optimized system call argument handling with:

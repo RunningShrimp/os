@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Internet Control Message Protocol (ICMP) implementation
 //!
 //! This module provides ICMP protocol support for network diagnostics and error reporting.

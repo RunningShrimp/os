@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! POSIX Open Flags (fcntl.h)
 
 /// Open for reading only

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Cgroup (Control Group) Resource Limits
 //!
 //! This module implements cgroup v2 for container resource management:

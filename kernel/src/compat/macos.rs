@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! macOS Framework Compatibility Layer
 //!
 //! Provides compatibility for macOS applications on NOS:

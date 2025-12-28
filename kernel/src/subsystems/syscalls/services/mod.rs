@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 服务管理模块
 //! 
 //! 本模块提供了完整的服务管理架构，包括：

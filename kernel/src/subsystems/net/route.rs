@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! IPv4 routing table implementation
 //!
 //! This module provides routing table functionality for determining the best

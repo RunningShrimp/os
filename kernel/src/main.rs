@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 #![no_std]
 #![no_main]
 #![feature(c_variadic)]

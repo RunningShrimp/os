@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Benchmarks for memory allocation performance
 //! 
 //! This module contains benchmarks for comparing the performance of the

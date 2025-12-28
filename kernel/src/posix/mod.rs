@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! POSIX Types and Constants
 //!
 //! Standard types and constants for POSIX compliance

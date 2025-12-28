@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Hybrid Allocator
 //!
 //! This module provides a hybrid memory allocator combining different allocation strategies.

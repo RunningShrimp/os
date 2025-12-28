@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! VFS 接口层
 //!
 //! 此模块提供 VFS 核心接口，用于打破 VFS 和 FS 之间的循环依赖。

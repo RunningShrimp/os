@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Input Method Editor (IME) framework
 //!
 //! Provides input method support for text input, especially for CJK languages.

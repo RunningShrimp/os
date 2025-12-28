@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Performance Baseline Establishment
 //!
 //! This module establishes performance baselines for NOS kernel

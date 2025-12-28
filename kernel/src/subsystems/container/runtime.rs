@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Container Runtime
 //!
 //! This module implements container runtime for NOS:

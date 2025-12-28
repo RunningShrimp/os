@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Formal Verification System
 //!
 //! This module implements formal verification for kernel correctness:

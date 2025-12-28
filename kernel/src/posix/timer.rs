@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! POSIX Timer Implementation
 //!
 //! Implements POSIX timers for per-process and per-thread timing

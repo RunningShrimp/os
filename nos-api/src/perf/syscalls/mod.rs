@@ -1,5 +1,4 @@
 //! Minimal syscalls stubs for nos-perf
-#![allow(dead_code)]
 
 pub mod common {
     #[derive(Clone, Debug, PartialEq, Eq)]

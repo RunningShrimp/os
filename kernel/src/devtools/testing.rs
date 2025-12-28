@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Testing Framework
 //!
 //! This module implements comprehensive testing tools:

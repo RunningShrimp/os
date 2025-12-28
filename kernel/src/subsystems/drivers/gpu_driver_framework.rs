@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! GPU Driver Framework Implementation
 //!
 //! This module implements a comprehensive GPU driver framework for NOS,

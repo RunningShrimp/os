@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Testing Module
 //! 
 //! This module provides comprehensive testing capabilities for NOS kernel,

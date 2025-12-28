@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Process Management API Interface
 //!
 //! This module defines trait interfaces for process management.

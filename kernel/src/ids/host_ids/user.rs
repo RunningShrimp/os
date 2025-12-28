@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! User Activity Monitor
 //!
 //! 用户活动监控器模块

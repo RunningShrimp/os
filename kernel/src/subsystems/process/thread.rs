@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Thread management for xv6-rust kernel
 //
 // Implements threading support that extends the existing process infrastructure.

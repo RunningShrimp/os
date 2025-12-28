@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 /// Anomaly Detection Module for IDS
 
 extern crate alloc;

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 /// Intrusion Detection System (IDS) Module
 
 extern crate alloc;

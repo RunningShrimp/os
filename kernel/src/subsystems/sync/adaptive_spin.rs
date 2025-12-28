@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Adaptive Spinlock with Dynamic Backoff
 //!
 //! This module provides an adaptive spinlock that dynamically adjusts

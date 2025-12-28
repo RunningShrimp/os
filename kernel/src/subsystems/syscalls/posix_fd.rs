@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! POSIX File Descriptor System Calls Registration
 //!
 //! This module registers timerfd, eventfd, and signalfd system calls

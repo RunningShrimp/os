@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Translation and Localization
 //!
 //! This module implements translation and localization for internationalization:

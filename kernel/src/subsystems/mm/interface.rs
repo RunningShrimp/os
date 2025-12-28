@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Memory Management Interface
 //!
 //! This module defines the public interface for memory management

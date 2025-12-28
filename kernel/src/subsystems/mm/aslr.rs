@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Address Space Layout Randomization (ASLR)
 //!
 //! This module implements ASLR to prevent buffer overflow exploits:

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Event Bus Implementation
 //! 
 //! This module provides a concrete implementation of the EventBus trait

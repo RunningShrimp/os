@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Supervisor Mode Access Prevention (SMAP) and Supervisor Mode Execution Prevention (SMEP)
 //
 // This module implements SMAP and SMEP security features that prevent the kernel

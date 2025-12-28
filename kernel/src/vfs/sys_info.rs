@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! System information files in /proc
 //!
 //! Provides system-wide information files like /proc/meminfo, /proc/stat, etc.

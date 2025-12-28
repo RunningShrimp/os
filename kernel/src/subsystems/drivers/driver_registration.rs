@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Device Driver Registration Mechanism
 //!
 //! This module provides a comprehensive device driver registration mechanism for NOS,

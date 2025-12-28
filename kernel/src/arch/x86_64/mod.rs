@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! x86_64 architecture-specific functions
 
 /// Read Time-Stamp Counter

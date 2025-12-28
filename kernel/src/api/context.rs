@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Kernel Context Module
 //!
 //! This module provides the KernelContext structure that manages core kernel components.

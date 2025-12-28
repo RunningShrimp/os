@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Security Audit Module
 //!
 //! This module provides security audit functionality for tracking

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Network device driver framework
 //!
 //! This module provides a comprehensive network device driver framework that supports

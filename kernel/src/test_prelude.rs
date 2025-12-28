@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Test prelude - provides common imports for test modules
 //!
 //! This module re-exports all test macros and helper functions

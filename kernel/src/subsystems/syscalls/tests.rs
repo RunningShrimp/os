@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! System call dispatch tests
 //!
 //! Tests for system call dispatch routing, argument passing, error handling, etc.

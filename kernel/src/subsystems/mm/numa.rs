@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! NUMA-aware memory allocation support
 //!
 //! This module provides comprehensive NUMA (Non-Uniform Memory Access) support for

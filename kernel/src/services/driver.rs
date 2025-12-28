@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Driver Service Module
 //! 
 //! This module provides driver-related types and functions for the services subsystem.

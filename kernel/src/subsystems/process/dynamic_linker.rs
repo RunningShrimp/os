@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Dynamic linker for ELF shared libraries
 //!
 //! This module implements dynamic linking support for loading and linking

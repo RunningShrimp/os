@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 服务特征定义模块
 //! 
 //! 本模块定义了服务管理系统的核心特征接口，包括：

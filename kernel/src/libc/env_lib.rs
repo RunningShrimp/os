@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! C标准库环境变量支持
 //!
 //! 提供完整的stdlib.h环境变量函数支持，包括：

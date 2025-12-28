@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Memory module public types
 // These types follow the MM_MODULE_API_BOUNDARIES_DESIGN.md
 

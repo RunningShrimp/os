@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Microkernel core for NOS hybrid architecture
 //!
 //! This module implements the microkernel layer that provides the most basic

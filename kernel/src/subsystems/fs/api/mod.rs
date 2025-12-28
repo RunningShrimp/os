@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Public API for the fs module.
 //!
 //! This module contains all the public interfaces and types for the fs

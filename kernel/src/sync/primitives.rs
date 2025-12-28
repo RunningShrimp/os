@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Advanced synchronization primitives for multithreading
 //
 // This module provides thread-safe synchronization primitives including

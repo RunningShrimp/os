@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! POSIX Real-time Extensions
 //!
 //! This module implements POSIX real-time scheduling and CPU affinity features:

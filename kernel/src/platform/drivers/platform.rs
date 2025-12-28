@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 /// Platform probing for memory and MMIO via DTB/firmware (stub)
 use crate::mm;
 use crate::subsystems::sync::Mutex;

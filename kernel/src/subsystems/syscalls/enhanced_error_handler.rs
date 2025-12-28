@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Enhanced System Call Error Handling Module
 //! 
 //! This module provides a unified error handling system for system calls.

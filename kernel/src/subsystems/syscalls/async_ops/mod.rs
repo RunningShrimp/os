@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! GLib异步I/O系统调用
 //!
 //! 为GLib的GIO异步I/O提供内核级支持，包括：

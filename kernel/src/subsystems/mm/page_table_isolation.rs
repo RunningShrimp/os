@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Page Table Isolation and Memory Protection
 //!
 //! This module implements page-level memory isolation for security:

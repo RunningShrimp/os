@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! POSIX System Calls Tests
 //! 
 //! This module contains unit tests for the POSIX system calls implemented

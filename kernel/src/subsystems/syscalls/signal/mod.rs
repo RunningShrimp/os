@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 信号模块
 //! 
 //! 本模块提供信号相关的系统调用服务，包括：

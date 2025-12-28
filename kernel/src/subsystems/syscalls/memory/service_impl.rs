@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Memory service implementation
 //!
 //! This module provides memory service implementation for system calls.

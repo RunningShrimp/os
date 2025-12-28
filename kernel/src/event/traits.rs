@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Event System Traits
 //!
 //! This module defines the core traits for the event system.

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! POSIX Security System Calls
 //!
 //! This module implements system calls for POSIX security and permission features:

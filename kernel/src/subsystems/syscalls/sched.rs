@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Scheduling syscalls bridge.
 //!
 //! - 0xE000-0xE008 仍委托给现有实时调度实现。

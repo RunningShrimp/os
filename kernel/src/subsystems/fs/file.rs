@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // File abstraction for xv6-rust
 // Provides unified file interface for regular files, devices, and pipes
 

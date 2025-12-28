@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Memory Isolation and Protection Mechanisms
 //!
 //! This module provides advanced memory isolation and protection features

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Real-time synchronization primitives
 //!
 //! Implements real-time locks with priority inheritance to prevent priority inversion.

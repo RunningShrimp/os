@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Enhanced Ext4 File System Implementation - Additional Functionality
 //!
 //! This module implements additional functionality of enhanced Ext4 file system.

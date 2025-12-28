@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! NOS Kernel Core
 //!
 //! This crate provides core kernel functionality and abstractions.

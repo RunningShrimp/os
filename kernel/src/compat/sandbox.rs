@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Security Sandbox for Cross-Platform Applications
 //
 // Provides isolated execution environment for foreign applications:

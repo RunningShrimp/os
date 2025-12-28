@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Lazy<T, F> - Lazily initialized value
 //
 // This module provides a value which is initialized on

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Prometheus Integration
 //!
 //! This module implements Prometheus metrics and alerting:

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Unified System Call Dispatcher
 //!
 //! This module provides a unified, high-performance system call dispatcher that

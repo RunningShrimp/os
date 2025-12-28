@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 性能监控模块
 //!
 //! 提供性能统计和监控功能

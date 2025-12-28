@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Observability and Monitoring
 //!
 //! This module implements observability for cloud-native:

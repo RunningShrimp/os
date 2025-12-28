@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Sandbox Mechanism Implementation
 //!
 //! This module implements complete sandboxing system for process isolation:

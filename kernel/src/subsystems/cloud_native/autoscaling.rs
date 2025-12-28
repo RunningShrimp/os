@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Autoscaling
 //!
 //! This module implements autoscaling for cloud-native:

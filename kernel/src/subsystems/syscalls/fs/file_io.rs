@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! File I/O related system calls
 //!
 //! Implements read, write, open, close, fstat, lseek, dup, dup2, fcntl, poll, select

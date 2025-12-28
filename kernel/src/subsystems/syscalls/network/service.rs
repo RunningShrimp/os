@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Network System Call Service Implementation
 //!
 //! This module provides the network service that manages all network-related

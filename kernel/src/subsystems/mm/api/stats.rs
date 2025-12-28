@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! mm模块内存统计公共接口
 //! 
 //! 提供内存使用统计和监控功能

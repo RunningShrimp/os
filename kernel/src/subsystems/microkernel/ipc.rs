@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Microkernel Inter-Process Communication
 //!
 //! Provides IPC primitives for communication between microkernel services.

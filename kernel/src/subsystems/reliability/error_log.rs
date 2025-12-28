@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 错误日志和诊断工具模块
 //! 
 //! 本模块提供错误日志和诊断功能，包括：

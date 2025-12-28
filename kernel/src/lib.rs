@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! NOS Kernel Library
 //!
 //! This crate provides the public API for the NOS (New Operating System) kernel.
@@ -39,7 +36,6 @@
 //! - `error_handling`: Enables error handling (via nos-error-handling crate)
 
 #![no_std]
-#![allow(dead_code)]
 #![allow(missing_docs)]
 
 #[macro_use]

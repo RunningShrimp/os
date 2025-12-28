@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! C标准库全面测试套件
 //!
 //! 提供完整的C标准库功能测试，包括：

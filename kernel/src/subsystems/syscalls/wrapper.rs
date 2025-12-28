@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! System Call Handler Wrapper Module
 //!
 //! This module provides wrapper functions to unify system call handler return types.

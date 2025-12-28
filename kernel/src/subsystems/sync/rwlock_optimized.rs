@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Optimized Reader-Writer Lock with Advanced Features
 //!
 //! This module provides an enhanced RWLock with:

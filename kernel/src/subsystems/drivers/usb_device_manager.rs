@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! USB Device Manager Implementation
 //!
 //! This module implements a comprehensive USB device manager for NOS,

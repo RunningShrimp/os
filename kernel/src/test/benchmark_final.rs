@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! NOS 内核性能基准测试 - 最终完整版本
 //! 
 //! 提供全面的性能基准测试和性能分析工具

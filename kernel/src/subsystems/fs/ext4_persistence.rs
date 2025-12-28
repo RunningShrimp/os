@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Ext4 File System Persistence Implementation
 //! 
 //! This module implements the persistence layer for the Ext4 file system,

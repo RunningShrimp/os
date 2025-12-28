@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Documentation Generation
 //!
 //! This module implements documentation generation for NOS:

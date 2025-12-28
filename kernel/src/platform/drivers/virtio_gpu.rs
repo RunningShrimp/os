@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! VirtIO GPU Driver
 //!
 //! Provides GPU acceleration support via VirtIO-GPU for virtualized environments.

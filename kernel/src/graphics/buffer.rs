@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Graphics buffer management (GBM-like)
 //!
 //! Provides kernel-level graphics buffer management similar to Generic Buffer Management (GBM).

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! File System Cache Implementation
 //!
 //! This module provides a comprehensive file system cache implementation with multiple

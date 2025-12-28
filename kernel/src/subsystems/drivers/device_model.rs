@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Enhanced Device Model Abstraction
 //!
 //! This module provides a comprehensive device model abstraction for NOS,

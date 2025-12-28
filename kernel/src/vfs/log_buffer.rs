@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 简单内存日志缓冲（环形），仅用于记录 VFS 操作占位。
 
 use alloc::string::String;

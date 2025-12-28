@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Priority-Based Mutex with Starvation Prevention
 
 use spin::Mutex;

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Network interface management
 //!
 //! This module provides network interface abstraction, managing network devices

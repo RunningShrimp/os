@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Unified Ext4 File System Implementation
 //!
 //! This module provides a complete, unified Ext4 file system implementation

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Memory Allocator Tests
 //!
 //! Tests for memory allocation functionality

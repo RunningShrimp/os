@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Security Module for Memory Isolation Integration
 //!
 //! This module integrates memory isolation and protection mechanisms

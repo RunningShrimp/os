@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Backup and Recovery
 //!
 //! This module implements backup and recovery:

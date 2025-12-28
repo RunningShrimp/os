@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Control Groups (cgroups) Support Module
 //
 // 控制组支持模块

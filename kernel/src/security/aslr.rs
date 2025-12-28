@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Advanced Address Space Layout Randomization (ASLR) implementation
 //
 // This module provides comprehensive ASLR capabilities to randomize memory address spaces,

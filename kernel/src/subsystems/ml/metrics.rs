@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! ML Metrics Collection
 //!
 //! This module implements metrics collection for ML optimization:

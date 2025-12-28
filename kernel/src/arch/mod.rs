@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Architecture abstraction layer
 //!
 //! This module provides architecture-specific implementations and abstractions

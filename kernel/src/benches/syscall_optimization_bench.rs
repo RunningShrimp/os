@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 系统调用优化性能基准测试
 //!
 //! 测试和验证系统调用快速路径优化的效果，包括：

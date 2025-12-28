@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! FD 语义校验占位：close-on-exec/dup*/fcntl 标志
 
 #[derive(Debug, Default, Clone, Copy)]

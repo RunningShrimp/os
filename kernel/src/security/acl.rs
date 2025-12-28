@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Access Control List (ACL) implementation
 //
 // This module provides fine-grained access control for system resources including

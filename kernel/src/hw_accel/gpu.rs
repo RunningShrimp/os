@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! GPU Hardware Acceleration Module
 //! 
 //! This module provides GPU-specific hardware acceleration features including

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 信号系统调用服务实现
 //! 
 //! 本模块提供信号系统调用服务的实现，包括：

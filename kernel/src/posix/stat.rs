@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! POSIX Stat and Time Structures
 
 use super::types::{Mode, Dev, Ino, Nlink, Off, Blksize, Blkcnt, Time};

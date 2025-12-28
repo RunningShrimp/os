@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 /// Host Intrusion Detection System (HIDS)
 
 extern crate alloc;

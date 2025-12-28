@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 系统调用分发器模块
 //! 
 //! 本模块实现了系统调用的路由和分发功能，包括：

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! ML-Based Memory Management
 //!
 //! This module implements ML-enhanced memory management:

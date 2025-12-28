@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // VirtIO Optimization Module
 //
 // VirtIO优化模块

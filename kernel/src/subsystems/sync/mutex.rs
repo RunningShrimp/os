@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Mutex implementation with RAII guard
 //
 // This module provides a mutual exclusion primitive protecting

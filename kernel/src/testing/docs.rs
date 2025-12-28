@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Performance Optimization Documentation and Examples
 //!
 //! This module provides comprehensive documentation and usage examples

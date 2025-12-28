@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! System Integration and Deployment
 //!
 //! This module implements integration and deployment features for NOS:

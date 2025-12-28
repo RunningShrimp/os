@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! System call context definition.
 //!
 //! This module defines the context structure that is passed to all system

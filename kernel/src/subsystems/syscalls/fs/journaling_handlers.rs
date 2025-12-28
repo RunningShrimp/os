@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Journaling File System System Call Handlers
 //!
 //! This module contains system call handlers for journaling file system operations.

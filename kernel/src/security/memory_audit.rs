@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Memory Safety Audit Module
 //!
 //! Provides memory safety auditing capabilities for the NOS kernel.

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Memory statistics
 //!
 //! This module provides memory statistics collection and reporting functionality.

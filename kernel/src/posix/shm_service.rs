@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Shared Memory Service
 //!
 //! This module provides the Shared Memory Service for dependency injection.

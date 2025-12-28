@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Network stack tests
 //!
 //! Comprehensive test suite for network functionality including

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Linux Namespaces Support Module
 //
 // Linux命名空间支持模块

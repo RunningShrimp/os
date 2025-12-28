@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! POSIX Thread (pthread) support
 //!
 //! Implements complete POSIX thread functionality for xv6-rust including

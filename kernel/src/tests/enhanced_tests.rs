@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Enhanced Test Framework for NOS Kernel
 //!
 //! This module provides an enhanced testing framework with:

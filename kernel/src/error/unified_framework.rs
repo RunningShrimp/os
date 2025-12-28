@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Unified Error Handling Framework
 //! 
 //! This module provides a comprehensive error handling framework that

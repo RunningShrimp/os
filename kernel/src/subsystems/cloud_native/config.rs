@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Configuration Management
 //!
 //! This module implements configuration management for cloud-native:

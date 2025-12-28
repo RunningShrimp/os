@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! EventFd System Calls
 //!
 //! This module implements the eventfd system calls:

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 extern crate alloc;
 use alloc::{sync::Arc, collections::BTreeMap, string::String};
 use spin::Once;

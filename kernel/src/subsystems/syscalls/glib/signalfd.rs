@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! GLib signalfd re-exports
 //!
 //! This module bridges the core `signalfd` implementation into the

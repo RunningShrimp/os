@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Re-export nos-mm as base memory management
 pub use crate::mm;
 

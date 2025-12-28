@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Address Resolution Protocol (ARP) implementation
 //!
 //! This module provides ARP functionality for mapping IPv4 addresses to MAC addresses.

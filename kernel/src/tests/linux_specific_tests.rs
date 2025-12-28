@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Linux Specific Functionality Tests
 //!
 //! This module contains comprehensive tests for Linux-specific system calls

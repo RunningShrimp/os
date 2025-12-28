@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Machine Learning Optimization Module
 //! 
 //! This module provides machine learning capabilities for optimizing various aspects

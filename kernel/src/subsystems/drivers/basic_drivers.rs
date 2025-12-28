@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Basic Device Drivers
 //!
 //! This module provides basic device drivers for NOS, including

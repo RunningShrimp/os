@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! IPC Type Definitions
 //!
 //! Common types for IPC operations

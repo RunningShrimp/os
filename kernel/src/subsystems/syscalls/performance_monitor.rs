@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 性能监控和统计系统
 //!
 //! 本模块提供系统性能监控和统计功能，包括：

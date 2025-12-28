@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Integration Test Suite for Performance Optimizations
 //!
 //! This module provides comprehensive integration tests to verify

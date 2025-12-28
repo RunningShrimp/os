@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Comprehensive Testing Framework
 //! 
 //! This module provides a complete testing framework for the NOS kernel,

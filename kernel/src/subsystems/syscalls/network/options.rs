@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Socket options syscalls
 
 use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};

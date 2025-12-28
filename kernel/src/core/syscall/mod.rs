@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Core System Call Implementation
 //!
 //! This module contains the core implementation of system call handling.

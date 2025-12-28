@@ -43,7 +43,6 @@
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![allow(dead_code)]
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
 
 #[cfg(feature = "std")]

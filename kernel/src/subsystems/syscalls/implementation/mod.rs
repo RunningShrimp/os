@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! System Call Implementation Layer
 //!
 //! This module contains concrete implementations of system call handlers.

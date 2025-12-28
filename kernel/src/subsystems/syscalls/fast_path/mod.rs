@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Fast-path system call optimization module
 //!
 //! This module provides fast-path system call handling with:

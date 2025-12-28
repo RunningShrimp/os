@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Fuzz Testing Main Entry Point
 //!
 //! This module provides a fuzz testing framework for the NOS kernel.

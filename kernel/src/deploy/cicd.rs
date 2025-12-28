@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! CI/CD Pipeline
 //!
 //! This module implements CI/CD deployment:

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! NUMA Scheduling Module
 //! 
 //! This module provides NUMA-aware scheduling functionality, including

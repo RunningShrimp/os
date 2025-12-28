@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! POSIX Error Numbers (errno)
 //! 
 //! Standard POSIX error codes for system calls

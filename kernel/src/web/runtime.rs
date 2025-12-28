@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Web runtime support (PWA and WASM)
 //!
 //! Provides Progressive Web App (PWA) and WebAssembly (WASM) runtime support.

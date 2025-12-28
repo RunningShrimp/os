@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Device Discovery and Enumeration
 //!
 //! This module provides comprehensive device discovery and enumeration capabilities for NOS,

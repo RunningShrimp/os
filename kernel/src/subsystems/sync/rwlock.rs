@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Reader-writer lock implementation
 //
 // This module provides a read-write lock that allows

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! VFS Mount Interface
 //!
 //! This module provides the mount interface for filesystems.

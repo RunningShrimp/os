@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! C标准库随机数生成器
 //!
 //! 提供完整的stdlib.h随机数函数支持，包括：

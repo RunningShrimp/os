@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Auto Scaling Module
 //! 
 //! This module provides auto-scaling capabilities for NOS kernel,

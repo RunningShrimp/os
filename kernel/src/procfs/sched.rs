@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! /proc/sched 统计导出（占位）
 
 use crate::sched::{with_global, StatsSnapshot};

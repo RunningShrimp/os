@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! System Call Interface Module
 //!
 //! This module provides abstract interfaces for system call handling,

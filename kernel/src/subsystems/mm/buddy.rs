@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Buddy System Memory Allocator
 //! 
 //! This module implements the buddy system allocator for physical memory management.

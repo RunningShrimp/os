@@ -3,7 +3,6 @@
 //! This module defines the unified boot parameter structures used for
 //! communication between the bootloader and the kernel.
 
-#![allow(dead_code)]
 
 /// Boot protocol types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

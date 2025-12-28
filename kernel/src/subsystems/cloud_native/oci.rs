@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // OCI (Open Container Initiative) Runtime Support
 //
 // OCI运行时支持模块

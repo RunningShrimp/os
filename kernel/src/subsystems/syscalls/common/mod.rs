@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 系统调用通用模块
 //!
 //! 本模块提供系统调用的通用功能和常量定义。

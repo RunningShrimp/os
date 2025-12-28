@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! File System System Call Handlers
 //!
 //! This module contains the actual system call handler functions for filesystem operations.

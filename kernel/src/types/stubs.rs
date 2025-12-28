@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Type stubs for missing modules
 //!
 //! This module provides placeholder type definitions for modules that

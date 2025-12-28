@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! VSync (Vertical Synchronization) support
 //!
 //! Implements VSync timing for smooth frame presentation and power efficiency.

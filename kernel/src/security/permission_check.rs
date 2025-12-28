@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Unified Permission Checking Framework
 //!
 //! This module provides a unified interface for permission checking across

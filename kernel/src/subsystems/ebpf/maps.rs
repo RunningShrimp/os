@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! eBPF Maps
 //!
 //! This module implements eBPF maps for kernel-space data sharing:

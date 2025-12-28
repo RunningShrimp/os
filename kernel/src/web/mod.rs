@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Web engine integration for NOS
 //!
 //! Provides integration for Rust web engines (Servo/Blitz) with NOS graphics and network stack.

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 /// Threat Intelligence Module for IDS
 
 extern crate alloc;

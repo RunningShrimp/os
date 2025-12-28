@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 系统调用安全验证模块
 //! 
 //! 本模块提供系统调用的安全验证功能，包括：

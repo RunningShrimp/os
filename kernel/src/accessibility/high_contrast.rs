@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! High Contrast Mode
 //!
 //! This module implements high contrast accessibility:

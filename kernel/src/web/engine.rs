@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Web engine backend adapters
 //!
 //! Provides backend adapters for Servo and Blitz web engines to work with NOS.

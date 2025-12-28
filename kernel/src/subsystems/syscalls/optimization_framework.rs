@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 统一性能优化框架
 //!
 //! **NOTE**: This module is being integrated into the unified dispatcher.

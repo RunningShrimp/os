@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Memory Protection Unit (MPU) Implementation
 //!
 //! This module implements MPU (Memory Protection Unit) for hardware-accelerated

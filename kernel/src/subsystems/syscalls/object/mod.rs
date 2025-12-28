@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // GLib对象系统支持系统调用
 
 extern crate alloc;

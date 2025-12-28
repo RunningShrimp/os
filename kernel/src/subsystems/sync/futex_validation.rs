@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Futex implementation validation and performance verification
 //! 
 //! This module provides comprehensive validation and performance testing

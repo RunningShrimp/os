@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! mm模块公共API边界
 //! 
 //! 这些是mm模块对外暴露的唯一公共接口

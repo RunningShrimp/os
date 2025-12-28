@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Access Control and Permission System
 //!
 //! This module implements comprehensive access control and permission management:

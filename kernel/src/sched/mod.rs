@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! O(1) Scheduler skeleton with per-CPU runqueues and syscall bridge.
 //!
 //! 设计目标：
@@ -8,7 +5,6 @@
 //! - 轻量骨架，便于后续接入调度策略与抢占逻辑。
 //! - 提供全局访问封装，供系统调用层快速落地。
 
-#![allow(dead_code)]
 
 extern crate alloc;
 

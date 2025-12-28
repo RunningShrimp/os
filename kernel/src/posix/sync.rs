@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! POSIX-compatible synchronization primitives
 //!
 //! This module provides POSIX-compliant versions of mutexes,

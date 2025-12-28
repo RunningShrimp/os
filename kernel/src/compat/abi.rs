@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Foreign ABI Support Layer
 //!
 //! Provides support for multiple calling conventions and ABI specifications:

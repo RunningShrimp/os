@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // seccomp (Secure Computing) Implementation
 //
 // This module implements seccomp filtering to restrict the system calls

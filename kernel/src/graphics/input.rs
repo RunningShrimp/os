@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Input event handling for GUI frameworks
 //!
 //! Provides keyboard, mouse, and touch input event handling for GUI applications.

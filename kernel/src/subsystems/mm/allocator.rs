@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Kernel heap allocator - Hybrid approach using Buddy and Slab allocators
 //!
 //! Reduces fragmentation and improves allocation efficiency

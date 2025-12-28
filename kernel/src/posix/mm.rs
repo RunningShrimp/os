@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! POSIX Memory Management Constants (mmap, mprotect, etc.)
 
 /// Memory protection flags for mprotect and mmap

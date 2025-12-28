@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Adaptive Prefetching Module
 //!
 //! This module implements adaptive prefetching strategies for memory access optimization.

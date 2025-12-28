@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Kernel core initialization
 //!
 //! This module provides the core kernel initialization logic that is shared

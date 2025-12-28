@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Service driver module for syscalls
 //!
 //! This module provides driver management functionality for system calls

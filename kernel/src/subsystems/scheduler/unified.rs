@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Unified Scheduler Implementation
 //!
 //! This module provides a unified, high-performance scheduler that replaces

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Real-time Scheduling System Calls
 //!
 //! This module implements system calls for POSIX real-time scheduling features:

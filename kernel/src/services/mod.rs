@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Services Module
 //! 
 //! This module provides the service registration and management system for the NOS kernel.

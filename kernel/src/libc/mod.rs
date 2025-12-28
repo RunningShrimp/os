@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! C标准库统一支持模块
 //!
 //! 提供完整的newlib C标准库集成，支持标准C程序在NOS上运行。

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Enhanced ICMP Protocol Implementation
 //!
 //! This module provides a comprehensive ICMP protocol implementation with advanced features

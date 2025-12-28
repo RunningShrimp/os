@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Thread System Calls Module
 //!
 //! Provides thread-related system calls

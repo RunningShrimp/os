@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! RCU-based Process Table Implementation
 //!
 //! This module provides an RCU-protected process table that allows lock-free

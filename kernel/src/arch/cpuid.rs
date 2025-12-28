@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! CPUID (CPU Identification) support
 //!
 //! This module provides functions to read CPU identification information

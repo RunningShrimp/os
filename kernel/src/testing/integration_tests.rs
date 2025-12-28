@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Integration Testing Module
 //! 
 //! This module provides comprehensive integration testing capabilities for the NOS kernel,

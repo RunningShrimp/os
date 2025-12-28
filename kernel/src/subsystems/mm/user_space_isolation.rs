@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! User Space Isolation and Sandbox Mechanism
 //!
 //! This module implements sandboxing and user space isolation:

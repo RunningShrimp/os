@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Performance Optimization Test Suite
 //!
 //! This module provides comprehensive unit tests for all performance optimizations

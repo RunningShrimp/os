@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 性能优化测试框架
 //!
 //! 这个模块实现了一个全面的性能测试框架，包含以下功能：

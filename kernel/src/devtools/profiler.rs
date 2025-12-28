@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Performance Profiler
 //!
 //! This module implements performance profiling tools:

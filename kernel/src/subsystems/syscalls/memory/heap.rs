@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Heap allocator module
 //!
 //! This module provides heap allocation functionality.

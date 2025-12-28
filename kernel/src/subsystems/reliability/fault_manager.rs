@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 故障检测和恢复模块
 //! 
 //! 本模块提供系统的故障检测和恢复功能，包括：

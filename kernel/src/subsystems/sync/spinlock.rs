@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Raw spinlock for low-level synchronization
 //
 // This module provides SMP-safe spinlock implementations

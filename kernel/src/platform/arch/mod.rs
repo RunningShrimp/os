@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Architecture abstraction layer
 // Provides a unified interface for architecture-specific operations
 

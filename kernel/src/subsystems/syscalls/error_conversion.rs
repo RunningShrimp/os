@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! System Call Error Conversion Module
 //!
 //! This module provides unified error conversion mechanisms for system calls.

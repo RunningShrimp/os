@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Microkernel service registry
 //!
 //! Provides service registration and discovery mechanisms for the

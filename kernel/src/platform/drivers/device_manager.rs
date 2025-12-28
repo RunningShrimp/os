@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // 动态设备管理器
 //
 // 提供动态设备发现、热插拔支持和设备生命周期管理。

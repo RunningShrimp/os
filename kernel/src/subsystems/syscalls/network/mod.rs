@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 网络系统调用模块
 //!
 //! 本模块提供网络相关的系统调用处理。

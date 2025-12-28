@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Module Interface Specification
 //!
 //! This document defines the interface specification for all kernel modules.

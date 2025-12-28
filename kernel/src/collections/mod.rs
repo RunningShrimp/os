@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 // Collections module for kernel
 // Provides HashMap and VecDeque implementations
 

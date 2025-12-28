@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Enhanced IPC System Call Handlers
 //!
 //! This module contains system call handlers for enhanced IPC operations.

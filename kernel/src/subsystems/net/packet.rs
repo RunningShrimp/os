@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Network packet buffer management
 //!
 //! This module provides efficient packet buffer management with zero-copy

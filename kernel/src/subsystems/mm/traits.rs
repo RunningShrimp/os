@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Unified memory allocator traits
 //!
 //! Provides a common interface for all memory allocators in the system,

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! System Call Result Cache Module
 //!
 //! This module provides caching functionality for system call results. It supports:

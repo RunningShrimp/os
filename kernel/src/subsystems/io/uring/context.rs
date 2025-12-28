@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! io_uring Context Management
 //!
 //! This module implements io_uring context management:

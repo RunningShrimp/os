@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Microkernel timer management
 //!
 //! Provides high-resolution timer support for the microkernel layer.

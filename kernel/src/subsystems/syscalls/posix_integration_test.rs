@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! POSIX System Calls Integration Test
 //! 
 //! This module provides an integration test for all POSIX system calls

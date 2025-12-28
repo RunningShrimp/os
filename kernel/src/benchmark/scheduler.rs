@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Scheduler performance benchmarks
 //!
 //! Measures scheduler latency and context switch performance.

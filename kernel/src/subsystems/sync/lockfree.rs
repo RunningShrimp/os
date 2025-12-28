@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Lock-free Data Structures and Primitives
 //!
 //! This module provides high-performance lock-free alternatives to

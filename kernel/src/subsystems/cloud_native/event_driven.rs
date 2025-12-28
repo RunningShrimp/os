@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Event-Driven Architecture
 //!
 //! This module implements event-driven architecture for cloud-native:

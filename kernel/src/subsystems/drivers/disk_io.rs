@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Disk I/O Drivers Implementation
 //!
 //! This module provides comprehensive disk I/O drivers for various storage devices,

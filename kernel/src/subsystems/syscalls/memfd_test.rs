@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! memfd_create system call test cases
 
 use super::common::{SyscallError, SyscallResult};

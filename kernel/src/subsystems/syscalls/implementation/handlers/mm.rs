@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 内存管理系统调用处理函数
 //!
 //! 本模块包含内存管理相关系统调用的具体实现逻辑，包括：

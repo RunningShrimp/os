@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Network device abstraction layer
 //!
 //! This module provides a unified interface for different types of network devices,

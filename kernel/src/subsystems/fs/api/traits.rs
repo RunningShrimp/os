@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Interface contracts for the fs module.
 //!
 //! This module defines the traits that all file system implementations must

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 性能核心模块
 //! 
 //! 提供统一的系统调用性能统计功能

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 服务注册表模块
 //! 
 //! 本模块实现了服务的注册、发现和管理功能，包括：

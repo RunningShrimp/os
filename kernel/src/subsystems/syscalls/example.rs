@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! System Call Layered Architecture Example
 //!
 //! This module demonstrates how to use the new layered system call architecture.

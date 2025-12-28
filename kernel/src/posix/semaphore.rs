@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! POSIX Semaphore (semaphore.h) Implementation
 //!
 //! Implements POSIX named and unnamed semaphores for synchronization

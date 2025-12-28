@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Mount point information for VFS
 extern crate alloc;
 use alloc::{string::String, sync::Arc};

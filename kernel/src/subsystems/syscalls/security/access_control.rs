@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! 访问控制和权限管理模块
 //! 
 //! 本模块提供系统的访问控制和权限管理功能，包括：

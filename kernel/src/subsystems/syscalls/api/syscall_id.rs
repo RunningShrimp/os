@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! System call ID definitions for the NOS kernel.
 //!
 //! This file defines all public system call IDs that applications can use.

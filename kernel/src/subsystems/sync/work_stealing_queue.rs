@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Lock-free Work-Stealing Deque (Chase-Lev deque)
 //!
 //! A concurrent work-stealing deque used in work-stealing schedulers.
