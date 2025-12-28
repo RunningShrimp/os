@@ -1,5 +1,15 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // Re-export nos-mm as base memory management
-pub use nos_mm;
+pub use crate::mm;
+
+// Core memory management modules
+pub mod phys;
+pub mod vm;
+pub mod buddy;
+pub mod allocator;
+pub mod slab;
 
 // Advanced memory management extensions
 pub mod api;
@@ -14,6 +24,10 @@ pub mod memory_isolation;
 pub mod optimized_page_allocator;
 pub mod types;
 pub mod unified_stats;
+
+// Re-export commonly used items from phys and vm modules
+pub use phys::{kalloc, kfree, PAGE_SIZE};
+pub use vm::{PageTable, map_pages, VmArea, VmPerm, activate, free_pagetable, flags, copyout, PTE_COUNT, flush_tlb_page};
 
 // Re-export unified stats to avoid duplication
 pub use unified_stats::{
@@ -168,3 +182,14 @@ mod tests {
         assert!(stats.memory_usage_by_type.is_empty());
     }
 }
+/// Page size constant
+pub const PAGE_SIZE: usize = 4096;
+
+// Page table entry type
+pub type PageTableEntry = u64;
+
+// Physical address type
+pub type PhysAddr = usize;
+
+// Virtual address type
+pub type VirtAddr = usize;

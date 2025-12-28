@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Advanced POSIX Signal Handling
 //!
 //! This module implements advanced POSIX signal handling features including:

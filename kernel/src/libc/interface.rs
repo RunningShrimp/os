@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! C标准库统一接口定义
 //!
 //! 定义了所有C标准库实现的统一接口，确保不同实现版本之间的一致性。

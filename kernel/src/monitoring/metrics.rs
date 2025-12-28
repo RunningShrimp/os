@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! System metrics collection
 //!
 //! Collects and tracks system metrics for production monitoring.

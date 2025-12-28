@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Enhanced Logging and Recovery Mechanisms
 //!
 //! This module provides comprehensive logging and recovery mechanisms for the NOS
@@ -18,7 +21,7 @@ use crate::subsystems::sync::Mutex;
 // BlockDevice在当前文件中未使用，暂时注释掉
 // use crate::platform::drivers::BlockDevice;crate::subsystems::fs::fs_cache::FsCache;
 // use crate::platform::drivers::BlockDevice;
-use nos_nos_error_handling::unified::KernelError;
+use crate::error::UnifiedError;
 
 // ============================================================================
 // Logging and Recovery Constants

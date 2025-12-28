@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // Synchronization primitives for xv6-rust kernel
 // Provides SpinLock, Mutex, Sleeplock, Once, and related types
 //

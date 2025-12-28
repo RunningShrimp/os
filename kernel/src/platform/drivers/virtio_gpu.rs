@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! VirtIO GPU Driver
 //!
 //! Provides GPU acceleration support via VirtIO-GPU for virtualized environments.
@@ -7,7 +10,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering};
 use crate::subsystems::sync::Mutex;
-use crate::reliability::errno::{EINVAL, ENOMEM, EIO};
+use crate::reliability::{EINVAL, ENOMEM, EIO};
 // Note: Graphics types are used conceptually, actual implementation would integrate with graphics subsystem
 
 /// VirtIO GPU device ID

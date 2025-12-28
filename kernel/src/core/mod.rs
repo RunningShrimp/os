@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 内核核心模块
 //!
 //! 本模块提供内核核心功能，合并自nos-kernel-core。

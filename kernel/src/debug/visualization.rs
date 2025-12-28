@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // 性能监控可视化模块
 //
 // 提供实时性能指标的可视化显示和交互式分析功能。

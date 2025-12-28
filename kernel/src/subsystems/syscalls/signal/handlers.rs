@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 信号处理程序模块
 //! 
 //! 本模块提供信号处理的具体实现，包括：
@@ -6,9 +9,9 @@
 //! - 信号掩码操作
 //! - 信号集操作
 
-use nos_nos_error_handling::unified::KernelError;
-use crate::syscalls::types::SyscallError;
-use crate::process::ProcessId;
+use crate::error::UnifiedError;
+use crate::error::SyscallError;
+use crate::subsystems::process::ProcessId;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering};

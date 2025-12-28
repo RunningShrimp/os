@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! POSIX Security and Permissions Management
 //!
 //! This module implements POSIX security and permission features including:

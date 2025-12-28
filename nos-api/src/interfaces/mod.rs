@@ -37,6 +37,9 @@ pub trait InterfaceSyscallHandler: Send + Sync {
     fn syscall_number(&self) -> usize;
 }
 
+// Re-export from syscall::interface for backward compatibility
+pub use crate::syscall::interface::{SyscallDispatcher, SyscallHandler};
+
 /// 系统调用统计信息
 #[derive(Debug, Clone)]
 pub struct SyscallStats {
@@ -205,8 +208,8 @@ pub trait InterfaceEventPublisher: Send + Sync {
 /// 事件订阅器接口
 pub trait InterfaceEventSubscriber: Send + Sync {
     /// 订阅事件
-    fn subscribe(&mut self, event_type: &str, handler: Arc<dyn crate::core::EventHandler<Event = crate::event::BasicEvent>>) -> Result<()>;
-    
+    fn subscribe(&mut self, event_type: &str, handler: Arc<dyn crate::event::EventHandler>) -> Result<()>;
+
     /// 取消订阅
     fn unsubscribe(&mut self, event_type: &str, handler_id: &str) -> Result<()>;
 }

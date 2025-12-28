@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! O(1) Scheduler skeleton with per-CPU runqueues and syscall bridge.
 //!
 //! 设计目标：
@@ -115,7 +118,7 @@ pub struct StatsSnapshot {
 pub mod syscall {
     use super::O1Scheduler;
     use crate::process::thread::Tid;
-    use crate::syscalls::common::SyscallError;
+    use crate::error::SyscallError;
     use nos_api::syscall::SyscallResult;
     use crate::subsystems::time::get_time_ns;
     use crate::arch::cpuid;
@@ -495,4 +498,11 @@ impl O1Scheduler {
         let combined = timestamp.wrapping_mul(31).wrapping_add(cpu_id);
         (combined as u32)
     }
+}pub mod unified;
+/// Run function with global scheduler
+pub fn with_global<F, R>(f: F) -> R 
+where
+    F: FnOnce() -> R,
+{
+    f()
 }

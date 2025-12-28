@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Enhanced Panic Handler
 //!
 //! This module provides an enhanced panic handler that:

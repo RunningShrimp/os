@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Static Analyzer Types
 //! 
 //! This module defines all the core types used by the static analyzer.

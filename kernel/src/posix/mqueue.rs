@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! POSIX Message Queue Implementation
 //!
 //! This module implements POSIX message queues (mqueue) with complete semantics:

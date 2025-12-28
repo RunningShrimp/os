@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Input event handling for GUI frameworks
 //!
 //! Provides keyboard, mouse, and touch input event handling for GUI applications.
@@ -8,7 +11,7 @@ use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicU32, AtomicBool, Ordering};
 use crate::subsystems::sync::Mutex;
-use crate::reliability::errno::{EINVAL, ENOMEM};
+use crate::reliability::{EINVAL, ENOMEM};
 use crate::graphics::surface::SurfaceId;
 
 /// Input device type

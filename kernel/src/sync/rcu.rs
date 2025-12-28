@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! RCU (Read-Copy-Update) Implementation
 //!
 //! This module provides a complete RCU implementation with grace period

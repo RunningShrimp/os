@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Alerting system
 //!
 //! Provides alerting capabilities for production monitoring.

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Host Intrusion Detection System (HIDS)
 //!
 //! 主机入侵检测系统模块

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! File system error definitions for the public API.
 //!
 //! This module contains all public file system error types.

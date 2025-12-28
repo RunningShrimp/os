@@ -1,9 +1,12 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Enhanced IPC System Call Handlers
 //!
 //! This module contains system call handlers for enhanced IPC operations.
 
 use super::types::*;
-use nos_nos_error_handling::unified::KernelError;
+use crate::error::UnifiedError;
 use alloc::string::ToString;
 use crate::subsystems::ipc::enhanced_ipc::{
     create_message_queue, send_message, receive_message,

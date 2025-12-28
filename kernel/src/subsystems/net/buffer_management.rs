@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Network buffer management for NOS network stack
 //!
 //! This module provides efficient network buffer management including:

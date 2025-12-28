@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! GLib extensions and related syscalls
 
 use super::common::{SyscallError, SyscallResult};

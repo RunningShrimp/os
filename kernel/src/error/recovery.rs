@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Error Recovery Strategies
 //!
 //! This module provides configurable, dynamic error recovery strategies

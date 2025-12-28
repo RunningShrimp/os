@@ -1,4 +1,7 @@
 #![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+#![allow(dead_code)]
 
 #[cfg(target_arch = "aarch64")]
 pub struct GicV2 {

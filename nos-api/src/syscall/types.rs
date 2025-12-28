@@ -114,7 +114,7 @@ impl SyscallResult {
     /// Returns error if failed
     pub fn error_value(&self) -> Option<KernelError> {
         match self {
-            SyscallResult::Error(error) => Some(*error),
+            SyscallResult::Error(error) => Some(error.clone()),
             _ => None,
         }
     }

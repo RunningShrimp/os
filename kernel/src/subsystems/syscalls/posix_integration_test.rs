@@ -1,10 +1,13 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! POSIX System Calls Integration Test
 //! 
 //! This module provides an integration test for all POSIX system calls
 //! implemented in the NOS kernel. It runs a comprehensive test suite
 //! to verify the correctness and compatibility of the POSIX system calls.
 
-// use crate::syscalls::posix_tests; // Temporarily disabled due to compilation errors
+// use crate::subsystems::syscalls::posix_tests; // Temporarily disabled due to compilation errors
 
 /// Run POSIX system calls integration test
 pub fn run_posix_integration_test() -> Result<(), &'static str> {

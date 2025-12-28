@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 内存管理系统调用处理函数
 //!
 //! 本模块包含内存管理相关系统调用的具体实现逻辑，包括：
@@ -6,8 +9,8 @@
 //! - 内存分配和释放
 //! - 虚拟内存管理
 
-use nos_nos_error_handling::unified::{KernelError, KernelResult};
-// use crate::syscalls::mm::types::*;
+use nos_error_handling::unified::{KernelError, KernelResult};
+// use crate::subsystems::syscalls::mm::types::*;
 use crate::process::{PROC_TABLE, myproc};
 use crate::subsystems::mm::vm::{flags, PAGE_SIZE, map_page, flush_tlb_page};
 use crate::subsystems::mm::{kalloc, kfree};
@@ -437,7 +440,7 @@ pub fn handle_mprotect(args: &[u64]) -> KernelResult<u64> {
 /// * `Ok(u64)` - 0表示成功
 /// * `Err(KernelError)` - 系统调用执行失败
 pub fn handle_msync(args: &[u64]) -> KernelResult<u64> {
-    use crate::syscalls::common::extract_args;
+    use crate::subsystems::syscalls::common::extract_args;
 
     let args = extract_args(args, 3)?;
     let addr = args[0] as usize;

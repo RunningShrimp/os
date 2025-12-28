@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! C标准库字符串处理增强库
 //!
 //! 提供完整的string.h字符串函数支持，包括：
@@ -16,7 +19,7 @@ pub type SizeT = usize;
 pub type size_t = SizeT;
 use crate::libc::error::set_errno;
 use crate::libc::error::errno::EINVAL;
-use crate::reliability::errno::ERANGE;
+use crate::reliability::ERANGE;
 
 /// 字符分类常量
 pub mod char_class {

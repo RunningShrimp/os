@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! EventFd System Calls
 //!
 //! This module implements the eventfd system calls:
@@ -6,8 +9,9 @@
 //!
 //! These system calls are POSIX-compatible and integrate with epoll.
 
-use super::common::{SyscallError, SyscallResult, extract_args};
-use super::interface::SyscallHandler;
+use crate::error::SyscallError;
+use nos_api::syscall::SyscallResult;
+use nos_api::SyscallHandler;
 use alloc::sync::Arc;
 use crate::subsystems::sync::Mutex;
 use alloc::vec::Vec;

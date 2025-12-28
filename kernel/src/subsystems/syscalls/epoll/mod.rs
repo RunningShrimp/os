@@ -1,6 +1,7 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! GLib事件循环集成系统调用
-
-extern crate alloc;
 //!
 //! 为GLib的主事件循环提供高性能的epoll支持，包括：
 //! - GLib专用epoll实例创建
@@ -8,7 +9,9 @@ extern crate alloc;
 //! - 批量事件等待和处理
 //! - 超时和定时器支持
 
-use crate::syscalls::SyscallResult;
+extern crate alloc;
+
+use crate::subsystems::syscalls::SyscallResult;
 use crate::subsystems::sync::Mutex;
 use crate::fs::epoll::{EpollManager, EpollEvent, EPOLLIN, EPOLLOUT, EPOLLERR, EPOLLHUP};
 use alloc::collections::BTreeMap;

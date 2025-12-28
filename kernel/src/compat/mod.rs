@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Platform-specific compatibility modules
 //!
 //! This module contains platform-specific compatibility implementations:

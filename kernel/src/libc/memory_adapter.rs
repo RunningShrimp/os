@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! libc memory allocator adapter
 //!
 //! Provides an adapter layer that wraps the unified allocator

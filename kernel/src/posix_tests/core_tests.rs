@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 核心POSIX系统调用测试
 //!
 //! 测试核心POSIX系统调用的实现，包括：

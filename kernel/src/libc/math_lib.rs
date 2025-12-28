@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! C标准库数学函数实现
 //!
 //! 提供完整的math.h数学函数支持，包括：

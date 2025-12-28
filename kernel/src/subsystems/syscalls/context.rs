@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! System Call Context Implementation
 //!
 //! This module provides a concrete implementation of SyscallContext trait.

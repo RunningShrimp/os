@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! EXT4 file system implementation
 //!
 //! Implements EXT4 file system support for VFS layer

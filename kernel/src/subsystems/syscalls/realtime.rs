@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Real-time Scheduling System Calls
 //!
 //! This module implements system calls for POSIX real-time scheduling features:
@@ -12,7 +15,7 @@
 //! - sched_getaffinity() - Get CPU affinity
 
 use crate::posix::realtime::*;
-use crate::syscalls::common::{SyscallError, SyscallResult};
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
 use crate::process::myproc;
 
 /// System call dispatch for real-time scheduling operations

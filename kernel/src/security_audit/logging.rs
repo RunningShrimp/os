@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // Logging Module for Security Audit
 //
 // 日志模块，负责安全审计事件的持久化存储和管理

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! VFS 基础日志/写序列化策略骨架
 //! 当前仅提供接口占位，未真正持久化。
 

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Time and timer management for xv6-rust
 //! Provides timer drivers and time-related functions
 

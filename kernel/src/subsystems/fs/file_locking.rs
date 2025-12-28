@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! File Locking Implementation
 //!
 //! This module implements comprehensive file locking mechanisms for NOS,

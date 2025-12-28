@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Microkernel memory management
 //!
 //! Provides basic memory management services for the microkernel layer.
@@ -9,7 +12,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use crate::subsystems::sync::Mutex;
-use crate::reliability::errno::{ENOMEM, EINVAL, EFAULT};
+use crate::reliability::{ENOMEM, EINVAL, EFAULT};
 // use crate::subsystems::mm::vm::{Page, VirtAddr, PhysAddr}; // TODO: Implement vm module
 
 pub type VirtAddr = usize;

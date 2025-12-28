@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Core Process Management
 //!
 //! This module provides the core process management functionality:
@@ -1029,7 +1032,7 @@ pub fn exit(status: i32) {
             // Close all open files efficiently
             for fd_slot in proc.ofile.iter_mut() {
                 if let Some(fd_idx) = *fd_slot {
-                    crate::fs::file_close(fd_idx);
+                    crate::vfs::file_close(fd_idx);
                     *fd_slot = None;
                 }
             }

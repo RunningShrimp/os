@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! CPU Hardware Acceleration Module
 //! 
 //! This module provides CPU-specific hardware acceleration features including

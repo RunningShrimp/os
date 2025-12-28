@@ -48,13 +48,17 @@ pub mod types;
 
 // Re-export commonly used items
 pub use registry::{ServiceRegistry, ServiceInfo, register_service, unregister_service, get_service, get_stats};
-pub use alloc::sync::Arc;
 pub use discovery::{ServiceDiscovery, ServiceDescriptor};
 pub use core::{Service, ServiceStatus, ServiceStats};
 pub use core::{ServiceManager, ServiceConfig};
 // Note: fs, process, network, ipc modules are not re-exported to avoid unused import warnings
 pub use types::{ServicePriority, ServiceMetrics, ServiceDependency};
 pub use types::service_type::*;
+
+// Re-export traits module as alias to core
+pub mod traits {
+    pub use crate::core::Service;
+}
 
 /// Initialize the services subsystem
 ///
@@ -98,7 +102,7 @@ pub fn shutdown_services() -> nos_api::Result<()> {
 ///
 /// * `ServiceStats` - Service statistics
 pub fn get_service_stats() -> ServiceStats {
-    registry::get_stats()
+    return registry::get_stats();
 }
 
 

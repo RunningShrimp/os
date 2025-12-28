@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! POSIX Thread (pthread) support
 //!
 //! Implements complete POSIX thread functionality for xv6-rust including
@@ -13,7 +16,7 @@ use crate::subsystems::sync::Mutex;
 use crate::subsystems::sync::primitives::{MutexEnhanced, CondVar};
 use crate::process::getpid;
 use crate::subsystems::mm::PAGE_SIZE;
-use crate::reliability::errno::{EINVAL, EAGAIN, ESRCH, EDEADLK, EBUSY};
+use crate::reliability::{EINVAL, EAGAIN, ESRCH, EDEADLK, EBUSY};
 
 // ============================================================================
 // Constants and Types

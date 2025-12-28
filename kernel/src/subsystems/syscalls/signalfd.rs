@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! SignalFd System Calls
 //!
 //! This module implements the signalfd system calls:
@@ -6,8 +9,9 @@
 //!
 //! These system calls are POSIX-compatible and integrate with epoll.
 
-use super::common::{SyscallError, SyscallResult, extract_args};
-use super::interface::SyscallHandler;
+use crate::error::SyscallError;
+use nos_api::syscall::SyscallResult;
+use nos_api::SyscallHandler;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use alloc::collections::VecDeque;

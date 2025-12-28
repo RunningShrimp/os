@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Event Bus Implementation
 //! 
 //! This module provides a concrete implementation of the EventBus trait
@@ -13,9 +16,8 @@ use alloc::{
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use nos_api::{
-    core::EventHandler,
     event::{
-        Event, EventDispatcher,
+        Event, EventDispatcher, EventHandler,
     },
     Result,
 };

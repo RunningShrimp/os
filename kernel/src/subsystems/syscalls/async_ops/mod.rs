@@ -1,6 +1,7 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! GLib异步I/O系统调用
-
-extern crate alloc;
 //!
 //! 为GLib的GIO异步I/O提供内核级支持，包括：
 //! - 异步文件读写操作
@@ -9,7 +10,9 @@ extern crate alloc;
 //! - 回调和完成通知
 //! - 超时和取消机制
 
-use crate::syscalls::SyscallResult;
+extern crate alloc;
+
+use crate::subsystems::syscalls::SyscallResult;
 use crate::subsystems::sync::Mutex;
 use alloc::collections::BTreeMap;
 use core::ffi::{c_int, c_void};

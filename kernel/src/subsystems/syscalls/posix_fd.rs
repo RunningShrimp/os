@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! POSIX File Descriptor System Calls Registration
 //!
 //! This module registers timerfd, eventfd, and signalfd system calls
@@ -5,7 +8,7 @@
 
 use super::dispatch::unified::{get_unified_dispatcher};
 use super::dispatch::unified::FastPathHandler;
-use super::common::SyscallError;
+use crate::error::SyscallError;
 use super::timerfd::{sys_timerfd_create, sys_timerfd_settime, sys_timerfd_gettime};
 use super::eventfd::{sys_eventfd, sys_eventfd2};
 use super::signalfd::{sys_signalfd, sys_signalfd4};

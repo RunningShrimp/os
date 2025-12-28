@@ -3,6 +3,8 @@
 //! This module provides core service interfaces and common types.
 
 use nos_api::Result;
+extern crate alloc;
+
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::collections::BTreeMap;

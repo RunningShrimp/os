@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 可扩展的驱动程序架构模块
 //! 
 //! 本模块提供可扩展的驱动程序架构，包括：
@@ -7,7 +10,7 @@
 //! - 驱动程序生命周期管理
 //! - 设备资源管理
 
-use nos_nos_error_handling::unified::KernelError;
+use crate::error::UnifiedError;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;

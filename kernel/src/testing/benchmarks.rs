@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Benchmark Testing Module
 //! 
 //! This module provides comprehensive benchmarking capabilities for the NOS kernel,

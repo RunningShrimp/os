@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // Event Processing Module for Security Audit
 //
 // 事件处理模块，负责处理和管理安全审计事件

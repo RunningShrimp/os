@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Stack Canaries Implementation
 //! 
 //! Provides stack buffer overflow protection through canary values

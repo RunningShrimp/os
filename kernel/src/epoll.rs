@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 extern crate alloc;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;

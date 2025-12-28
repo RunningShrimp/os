@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Error Handling Module
 //!
 //! This module provides unified error handling for the NOS kernel,
@@ -38,7 +41,6 @@ pub use unified::{
     UnifiedError, UnifiedResult, ErrorContext, ErrorSeverity,
     MemoryError, FileSystemError, NetworkError, ProcessError,
     SyscallError, DriverError, SecurityError,
-    create_error, return_error,
 };
 
 // Re-export framework types

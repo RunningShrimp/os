@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Microkernel core scheduler
 //!
 //! Provides basic thread scheduling capabilities for the microkernel layer.
@@ -8,7 +11,7 @@ use alloc::collections::VecDeque;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use crate::subsystems::sync::Mutex;
-use crate::reliability::errno::{EINVAL, ESRCH};
+use crate::reliability::{EINVAL, ESRCH};
 use crate::process::thread::{ThreadState, Tid};
 
 /// Scheduling policies

@@ -71,12 +71,6 @@ pub mod time;
 // Advanced system call type definitions
 #[cfg(feature = "advanced_syscalls")]
 pub mod advanced_mmap;
-#[cfg(feature = "advanced_syscalls")]
-pub mod async_ops;
-#[cfg(feature = "advanced_syscalls")]
-pub mod epoll;
-#[cfg(feature = "advanced_syscalls")]
-pub mod zero_copy_network;
 
 // Re-export core functionality
 pub use core::traits::{
@@ -500,4 +494,10 @@ mod tests {
         assert_eq!(stats.avg_execution_time, 0);
         assert!(stats.calls_by_type.is_empty());
     }
+}
+
+/// Shutdown system call subsystem
+pub fn shutdown_syscalls() -> nos_api::Result<()> {
+    // TODO: Implement syscall subsystem cleanup
+    Ok(())
 }

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Cloud Native Monitoring System
 //! 
 //! This module provides comprehensive monitoring capabilities for cloud-native applications,

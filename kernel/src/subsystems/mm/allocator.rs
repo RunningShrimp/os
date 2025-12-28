@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Kernel heap allocator - Hybrid approach using Buddy and Slab allocators
 //!
 //! Reduces fragmentation and improves allocation efficiency
@@ -7,8 +10,8 @@ extern crate alloc;
 use core::alloc::{GlobalAlloc, Layout};
 use core::ptr::null_mut;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use nos_perf::monitoring::{get_perf_stats};
-use nos_perf::core::{UnifiedSyscallStats, SyscallStatsSnapshot};
+use crate::perf::monitoring::{get_perf_stats};
+use crate::perf::core::{UnifiedSyscallStats, SyscallStatsSnapshot};
 use alloc::vec::Vec;
 use crate::subsystems::sync::Mutex;
 

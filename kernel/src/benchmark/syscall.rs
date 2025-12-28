@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! System call performance benchmarks
 //!
 //! Measures system call latency and throughput for production validation.

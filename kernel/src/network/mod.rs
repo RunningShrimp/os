@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Network subsystem
 //!
 //! This module provides network functionality including zero-copy I/O optimizations.

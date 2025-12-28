@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // Boot information handling
 //
 // This module handles boot information provided by bootloaders,

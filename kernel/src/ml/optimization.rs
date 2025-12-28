@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Optimization Engine for Machine Learning
 //! 
 //! This module provides optimization capabilities for various kernel components,

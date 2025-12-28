@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // Container Management Module
 //
 // 容器管理模块
@@ -6,7 +9,7 @@
 extern crate alloc;
 
 use alloc::format;
-use crate::reliability::errno::{EINVAL, ENOENT, ENOMEM, EIO, EPERM};
+use crate::reliability::{EINVAL, ENOENT, ENOMEM, EIO, EPERM};
 use crate::subsystems::cloud_native::oci::{OciContainerSpec, OciProcess, OciRoot, OciUser};
 use alloc::collections::BTreeMap;
 use alloc::string::String;

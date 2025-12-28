@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! System health monitoring
 //!
 //! Monitors system health and detects issues.

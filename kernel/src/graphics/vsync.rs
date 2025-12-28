@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! VSync (Vertical Synchronization) support
 //!
 //! Implements VSync timing for smooth frame presentation and power efficiency.
@@ -5,7 +8,7 @@
 extern crate alloc;
 
 use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use crate::reliability::errno::{EINVAL, EIO};
+use crate::reliability::{EINVAL, EIO};
 
 /// VSync manager - handles vertical synchronization
 pub struct VsyncManager {

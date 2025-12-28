@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Futex implementation tests
 //! 
 //! This module contains comprehensive tests for the futex implementation,
@@ -7,14 +10,14 @@
 extern crate alloc;
 
 use core::sync::atomic::{AtomicI32, Ordering};
-use crate::syscalls::thread::{
+use crate::subsystems::syscalls::thread::{
     FutexWaiter, PiFutexData, FUTEX_WAIT_QUEUE, 
     futex_wait_timeout, futex_wake_optimized, futex_requeue,
     futex_lock_pi, futex_unlock_pi, futex_trylock_pi,
     add_futex_waiter, remove_futex_waiter, wake_futex_waiters,
     requeue_futex_waiters
 };
-use crate::syscalls::common::SyscallError;
+use crate::subsystems::syscalls::common::SyscallError;
 use crate::subsystems::mm::vm::PageTable;
 
 /// Test configuration

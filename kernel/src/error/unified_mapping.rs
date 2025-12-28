@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Unified Error Code Mapping
 //!
 //! This module provides unified error code mapping between:
@@ -9,8 +12,8 @@
 //! This ensures consistent error reporting across all layers of the kernel.
 
 use crate::error::unified::UnifiedError;
-use crate::syscalls::api::syscall_result::SyscallError as ApiSyscallError;
-use crate::syscalls::interface::SyscallError as InterfaceSyscallError;
+use crate::subsystems::syscalls::api::syscall_result::SyscallError as ApiSyscallError;
+use crate::subsystems::syscalls::interface::SyscallError as InterfaceSyscallError;
 use nos_error_handling::kernel_integration::ErrorType as NosErrorType;
 
 /// POSIX errno values

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! System Call Optimization Tests
 //!
 //! This module provides comprehensive tests for system call optimization
@@ -7,8 +10,8 @@
 //! 3. Boundary condition handling
 //! 4. Stress testing
 
-use crate::syscalls::{dispatch, SYS_GETPID, SYS_READ, SYS_WRITE, SYS_CLOSE, SYS_BATCH};
-use crate::syscalls::common::{SyscallResult};
+use crate::subsystems::syscalls::{dispatch, SYS_GETPID, SYS_READ, SYS_WRITE, SYS_CLOSE, SYS_BATCH};
+use crate::subsystems::syscalls::common::{SyscallResult};
 use crate::tests::TestResult;
 use core::time::Duration;
 use alloc::vec::Vec;

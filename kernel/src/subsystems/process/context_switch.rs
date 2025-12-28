@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Context Switch Implementation
 //!
 //! This module provides efficient context switching between threads/processes.

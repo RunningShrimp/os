@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! IPC系统调用模块
 //!
 //! 本模块提供IPC相关的系统调用处理。
@@ -314,4 +317,4 @@ impl IpcSyscallHandler {
 /// 创建IPC系统调用处理器
 pub fn create_ipc_handler() -> Arc<dyn SyscallHandler> {
     Arc::new(IpcSyscallHandler::new())
-}
+}mod types;

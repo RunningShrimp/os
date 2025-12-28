@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Graphics subsystem for NOS
 //!
 //! Provides zero-copy graphics compositor with shared memory surfaces.

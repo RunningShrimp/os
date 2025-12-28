@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 信号系统调用服务实现
 //! 
 //! 本模块实现信号相关的系统调用服务，包括：
@@ -6,9 +9,9 @@
 //! - 与服务注册器的集成
 //! - 信号处理程序管理
 
-use nos_nos_error_handling::unified::{Error, KernelError};
-use crate::syscalls::signal::handlers;
-use crate::syscalls::services::{Service, ServiceStatus, SyscallService};
+use nos_error_handling::unified::{Error, KernelError};
+use crate::subsystems::syscalls::signal::handlers;
+use crate::subsystems::syscalls::services::{Service, ServiceStatus, SyscallService};
 use alloc::string::String;
 use alloc::vec::Vec;
 

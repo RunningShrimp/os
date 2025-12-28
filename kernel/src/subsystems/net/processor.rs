@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Network packet processor
 //!
 //! This module coordinates the processing of network packets across different

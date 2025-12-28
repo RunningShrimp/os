@@ -5,6 +5,7 @@
 
 use alloc::string::ToString;
 use alloc::boxed::Box;
+use alloc::format;
 use nos_api::{Result, Error};
 use crate::SyscallHandler;
 use crate::SyscallDispatcher;

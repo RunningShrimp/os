@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Real-Time Scheduling Implementation
 //! 
 //! This module provides comprehensive real-time scheduling with priority-based

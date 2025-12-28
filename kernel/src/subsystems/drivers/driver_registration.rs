@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Device Driver Registration Mechanism
 //!
 //! This module provides a comprehensive device driver registration mechanism for NOS,
@@ -22,7 +25,7 @@ use crate::subsystems::drivers::device_model::{
 use crate::subsystems::drivers::device_discovery::{
     BusDiscovery, BusType, DeviceIdentification, get_device_discovery_manager
 };
-use nos_nos_error_handling::unified::KernelError;
+use crate::error::UnifiedError;
 
 // ============================================================================
 // Driver Registration Constants

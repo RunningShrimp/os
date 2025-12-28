@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Advanced POSIX Thread Features
 //!
 //! This module implements advanced POSIX thread features including:

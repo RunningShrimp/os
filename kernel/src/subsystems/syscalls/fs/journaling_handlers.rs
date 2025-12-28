@@ -1,9 +1,12 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Journaling File System System Call Handlers
 //!
 //! This module contains system call handlers for journaling file system operations.
 
 use super::types::*;
-use nos_nos_error_handling::unified::KernelError;
+use crate::error::UnifiedError;
 use alloc::string::ToString;
 use crate::subsystems::fs::{get_jfs_wrapper, JournalStats};
 

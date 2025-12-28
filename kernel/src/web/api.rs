@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Web system APIs
 //!
 //! Provides Web APIs for file access, notifications, and other system features.
@@ -6,7 +9,7 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use alloc::string::String;
-use crate::reliability::errno::{EINVAL, EPERM, ENOENT};
+use crate::reliability::{EINVAL, EPERM, ENOENT};
 
 /// Web file API - provides secure file access for web applications
 pub struct WebFileApi {

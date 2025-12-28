@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! C标准库验证和测试工具
 //!
 //! 提供C库功能的快速验证和性能测试

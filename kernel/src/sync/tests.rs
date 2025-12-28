@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Synchronization Primitives Tests
 //!
 //! Tests for synchronization primitives (SpinLock, Mutex, etc.)

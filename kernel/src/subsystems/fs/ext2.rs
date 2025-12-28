@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Ext2 file system implementation for NOS
 //!
 //! This module provides a complete implementation of the ext2 file system,

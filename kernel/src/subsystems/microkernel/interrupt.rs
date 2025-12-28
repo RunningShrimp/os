@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Microkernel interrupt handling
 //!
 //! Provides basic interrupt management for the microkernel layer.
@@ -8,7 +11,7 @@ extern crate alloc;
 use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use crate::subsystems::sync::Mutex;
-use crate::reliability::errno::{EINVAL, ENOENT, EBUSY};
+use crate::reliability::{EINVAL, ENOENT, EBUSY};
 
 /// Interrupt vector numbers (x86_64 example)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

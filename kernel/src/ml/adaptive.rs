@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Adaptive Tuner for Machine Learning
 //! 
 //! This module provides adaptive tuning capabilities for various kernel components,

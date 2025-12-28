@@ -1,6 +1,7 @@
 //! Core types used throughout NOS operating system
 
 use core::fmt;
+use alloc::string::String;
 
 /// Process identifier type
 pub type Pid = u32;
@@ -45,7 +46,7 @@ pub type Milliseconds = u64;
 pub type Seconds = u64;
 
 /// Represents a kernel error code
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KernelError {
     /// Operation not permitted
     PermissionDenied,
@@ -57,6 +58,8 @@ pub enum KernelError {
     NoDevice,
     /// Invalid argument
     InvalidArgument,
+    /// Invalid address
+    InvalidAddress,
     /// Not enough memory
     OutOfMemory,
     /// Resource busy
@@ -83,8 +86,12 @@ pub enum KernelError {
     OutOfSpace,
     /// Quota exceeded
     QuotaExceeded,
+    /// Key not found
+    NotFoundKey,
     /// Unknown error
     Unknown(i32),
+    /// Other error with message
+    Other(String),
 }
 
 impl fmt::Display for KernelError {
@@ -95,6 +102,7 @@ impl fmt::Display for KernelError {
             KernelError::IoError => write!(f, "Input/output error"),
             KernelError::NoDevice => write!(f, "No such device or address"),
             KernelError::InvalidArgument => write!(f, "Invalid argument"),
+            KernelError::InvalidAddress => write!(f, "Invalid address"),
             KernelError::OutOfMemory => write!(f, "Not enough memory"),
             KernelError::Busy => write!(f, "Resource busy"),
             KernelError::WouldBlock => write!(f, "Operation would block"),
@@ -108,7 +116,9 @@ impl fmt::Display for KernelError {
             KernelError::TimedOut => write!(f, "Operation timed out"),
             KernelError::OutOfSpace => write!(f, "Out of space"),
             KernelError::QuotaExceeded => write!(f, "Quota exceeded"),
+            KernelError::NotFoundKey => write!(f, "Key not found"),
             KernelError::Unknown(code) => write!(f, "Unknown error: {}", code),
+            KernelError::Other(msg) => write!(f, "Other error: {}", msg),
         }
     }
 }

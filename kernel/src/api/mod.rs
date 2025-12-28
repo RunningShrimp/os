@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! API Layer Module
 //!
 //! This module contains the public API definitions for the kernel.

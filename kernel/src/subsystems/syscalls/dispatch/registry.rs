@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 服务注册表模块
 //! 
 //! 本模块实现了服务的注册、发现和管理功能，包括：
@@ -8,8 +11,8 @@
 //! 
 //! 服务注册表是整个服务管理系统的核心，负责维护所有已注册服务的信息。
 
-use nos_nos_error_handling::unified::KernelError;
-use crate::syscalls::services::traits::*;
+use crate::error::UnifiedError;
+use crate::subsystems::syscalls::services::traits::*;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;

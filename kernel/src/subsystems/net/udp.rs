@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! User Datagram Protocol (UDP) implementation
 //!
 //! This module provides UDP protocol support for connectionless datagram communication.

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! IPv4 protocol implementation
 //!
 //! This module provides IPv4 packet handling, address management, and routing functionality.

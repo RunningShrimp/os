@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // Device drivers for xv6-rust
 // Provides block device abstraction and implementations
 

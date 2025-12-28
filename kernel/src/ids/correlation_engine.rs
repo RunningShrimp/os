@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 /// Correlation Engine Module for IDS
 
 extern crate alloc;

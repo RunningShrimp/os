@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Test Runner Module
 //! 
 //! This module provides a comprehensive test runner that integrates all testing components

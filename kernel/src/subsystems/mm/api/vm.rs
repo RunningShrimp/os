@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! mm模块虚拟内存管理公共接口
 //! 
 //! 提供虚拟内存映射和管理功能

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Services Module
 //! 
 //! This module provides the service registration and management system for the NOS kernel.
@@ -39,4 +42,4 @@ pub fn get_discovery() -> &'static discovery::ServiceDiscovery {
 /// Get the service manager
 pub fn get_manager() -> &'static manager::ServiceManager {
     manager::get_manager()
-}
+}pub mod driver;

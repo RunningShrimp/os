@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 extern crate alloc;
 
 use alloc::vec::Vec;
@@ -6,7 +9,7 @@ use core::ptr::NonNull;
 use core::sync::atomic::{AtomicPtr, AtomicUsize, AtomicBool, Ordering};
 
 use crate::subsystems::mm::allocator::HybridAllocator;
-use crate::arch::cpu_id;
+use crate::arch::cpuid;
 use crate::subsystems::sync::Once;
 
 const CACHE_LINE_SIZE: usize = 64;

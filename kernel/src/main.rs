@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 #![no_std]
 #![no_main]
 #![feature(c_variadic)]
@@ -22,10 +25,11 @@ mod platform;
 mod subsystems;
 mod services_unified; // Unified services module
 mod security; // Security module
+mod vfs; // VFS module
 
 // Re-exports for compatibility with existing code in main.rs
 use platform::{arch, boot, drivers, trap};
-use subsystems::{fs, ipc, process, vfs};
+use subsystems::{fs, ipc, process};
 use services_unified as services; // Use unified services module
 use security::enhanced_permissions as permissions; // Use enhanced permissions
 
@@ -38,6 +42,8 @@ use subsystems::net;
 
 mod cpu; // cpu was missed in previous edit
 
+// Synchronization primitives
+pub mod sync;
 
 mod compat;
 mod security;
@@ -48,7 +54,7 @@ mod security_audit;
 use nos_error_handling as error_handling;
 #[cfg(feature = "debug_subsystems")]
 mod debug;
-mod reliability;
+pub mod reliability;
 mod libc;
 mod types;
 mod collections;
@@ -60,7 +66,9 @@ mod benchmark;
 #[cfg(feature = "observability")]
 mod monitoring;
 
-// Legacy infrastructure modules have been migrated to subsystems/
+// Legacy infrastructure modules
+
+// Memory, sync, and time modules have been migrated to subsystems/
 // Access them via crate::subsystems::mm, crate::subsystems::sync, crate::subsystems::time
 
 #[cfg(feature = "kernel_tests")]

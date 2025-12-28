@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Prediction Engine for Machine Learning
 //! 
 //! This module provides prediction capabilities for various kernel components,

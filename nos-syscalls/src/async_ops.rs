@@ -309,6 +309,7 @@ impl SyscallHandler for AsyncOpHandler {
             9 => AsyncOperationType::Poll,
             #[cfg(feature = "advanced_syscalls")]
             custom => AsyncOperationType::Custom(custom as u32),
+            #[cfg(not(feature = "advanced_syscalls"))]
             _ => AsyncOperationType::Read,
         };
         

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Microkernel service registry
 //!
 //! Provides service registration and discovery mechanisms for the
@@ -10,7 +13,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, AtomicUsize, AtomicBool, Ordering};
 use crate::subsystems::sync::Mutex;
-use crate::reliability::errno::{EINVAL, ENOMEM, EEXIST, ENOENT, EPERM, EBUSY, ETIMEDOUT};
+use crate::reliability::{EINVAL, ENOMEM, EEXIST, ENOENT, EPERM, EBUSY, ETIMEDOUT};
 
 /// Service identifier
 pub type ServiceId = u64;

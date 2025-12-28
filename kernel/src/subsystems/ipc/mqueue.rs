@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! POSIX Message Queue Implementation
 //! 
 //! This module provides POSIX-compliant message queues (mqueue) with
@@ -774,3 +777,8 @@ pub fn mq_list_queues() -> Result<Vec<String>, MqError> {
     let manager = get_mq_manager().ok_or(MqError::SystemError)?;
     Ok(manager.list_queues())
 }
+/// Message queue open flags
+pub type MqOpenFlags = i32;
+
+/// Message queue notification type
+pub type MqNotifyType = i32;

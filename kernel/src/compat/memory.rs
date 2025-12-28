@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Memory Layout Manager for Cross-Platform Processes
 
 extern crate alloc;

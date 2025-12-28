@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Service Manager Module
 //! 
 //! This module provides service management functionality for starting, stopping,

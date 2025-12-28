@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! File System System Call Handlers
 //!
 //! This module contains the actual system call handler functions for filesystem operations.
@@ -5,8 +8,8 @@
 //! for the new modular service architecture.
 
 use super::types::*;
-// use crate::syscalls::common::{SyscallError};
-use nos_nos_error_handling::unified::KernelError;
+// use crate::subsystems::syscalls::common::{SyscallError};
+use crate::error::UnifiedError;
 use alloc::string::ToString;
 
 /// Handle chdir system call - change current working directory

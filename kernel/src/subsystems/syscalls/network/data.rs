@@ -1,7 +1,10 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Data transfer syscalls
 
 use super::*;
-use crate::syscalls::common::{SyscallError, SyscallResult};
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
 
 /// Send data on a socket
 ///

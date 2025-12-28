@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! TCP connection manager
 //!
 //! This module provides management for multiple TCP connections, including

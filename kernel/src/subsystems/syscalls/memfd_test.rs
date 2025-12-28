@@ -1,7 +1,10 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! memfd_create system call test cases
 
 use super::common::{SyscallError, SyscallResult};
-use crate::syscalls::glib::{memfd_flags, fcntl_seals, get_memfd_instance};
+use crate::subsystems::syscalls::glib::{memfd_flags, fcntl_seals, get_memfd_instance};
 use crate::fs::file;
 use crate::process;
 

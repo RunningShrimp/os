@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! C标准库统一实现
 //!
 //! 提供完整的C标准库实现，包括：

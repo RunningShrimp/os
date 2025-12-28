@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! IPv4 packet fragmentation and reassembly
 //!
 //! This module handles IP packet fragmentation for transmission and reassembly

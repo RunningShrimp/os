@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Security Testing Module
 //! 
 //! This module provides comprehensive security testing capabilities for the NOS kernel,

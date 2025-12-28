@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Orchestration Engine Module
 //! 
 //! This module provides orchestration capabilities for NOS kernel,

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 信号系统调用处理函数
 //! 
 //! 本模块包含信号相关系统调用的具体实现逻辑，包括：
@@ -6,8 +9,8 @@
 //! - 信号处理程序管理
 //! - 信号集操作
 
-use nos_nos_error_handling::unified::KernelError;
-use crate::syscalls::signal::types::*;
+use crate::error::UnifiedError;
+use crate::subsystems::syscalls::signal::types::*;
 use alloc::vec::Vec;
 
 /// kill系统调用处理函数
@@ -83,9 +86,9 @@ pub fn handle_sigaction(args: &[u64]) -> Result<u64, KernelError> {
     match sys_sigaction(args) {
         Ok(_) => Ok(0),
         Err(e) => Err(match e {
-            crate::subsystems::syscalls::common::SyscallError::InvalidArgument => KernelError::InvalidArgument,
-            crate::subsystems::syscalls::common::SyscallError::BadAddress => KernelError::BadAddress,
-            crate::subsystems::syscalls::common::SyscallError::NotFound => KernelError::NotFound,
+            crate::subsystems::syscalls::SyscallError::InvalidArgument => KernelError::InvalidArgument,
+            crate::subsystems::syscalls::SyscallError::BadAddress => KernelError::BadAddress,
+            crate::subsystems::syscalls::SyscallError::NotFound => KernelError::NotFound,
             _ => KernelError::InvalidArgument,
         }),
     }

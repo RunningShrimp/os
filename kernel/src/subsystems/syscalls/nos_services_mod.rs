@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! nos_services stub module
 //! This provides stub implementations for the nos_services crate
 

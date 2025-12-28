@@ -25,8 +25,10 @@ pub enum Error {
     Busy(String),
     /// Out of memory
     OutOfMemory,
-    /// I/O error
+    /// I/O error (string variant)
     IoError(String),
+    /// I/O error (for compatibility with FsError)
+    Io(String),
     /// Network error
     NetworkError(String),
     /// Protocol error
@@ -45,6 +47,20 @@ pub enum Error {
     SystemError(String),
     /// Circular dependency error
     CircularDependency(String),
+    /// Event error
+    EventError(String),
+    /// Bad address
+    BadAddress,
+    /// Not supported
+    NotSupported(String),
+    /// Too many open files
+    TooManyFiles,
+    /// Read-only
+    ReadOnly(String),
+    /// COM error (Windows specific)
+    ComError(String),
+    /// DI error
+    DIError(String),
     /// Custom error with code and message
     Custom(i32, String),
 }
@@ -61,6 +77,7 @@ impl fmt::Display for Error {
             Error::Busy(msg) => write!(f, "Resource busy: {}", msg),
             Error::OutOfMemory => write!(f, "Out of memory"),
             Error::IoError(msg) => write!(f, "I/O error: {}", msg),
+            Error::Io(msg) => write!(f, "I/O error: {}", msg),
             Error::NetworkError(msg) => write!(f, "Network error: {}", msg),
             Error::ProtocolError(msg) => write!(f, "Protocol error: {}", msg),
             Error::Timeout => write!(f, "Operation timed out"),
@@ -70,6 +87,13 @@ impl fmt::Display for Error {
             Error::ServiceError(msg) => write!(f, "Service error: {}", msg),
             Error::SystemError(msg) => write!(f, "System error: {}", msg),
             Error::CircularDependency(msg) => write!(f, "Circular dependency: {}", msg),
+            Error::EventError(msg) => write!(f, "Event error: {}", msg),
+            Error::BadAddress => write!(f, "Bad address"),
+            Error::NotSupported(msg) => write!(f, "Not supported: {}", msg),
+            Error::TooManyFiles => write!(f, "Too many open files"),
+            Error::ReadOnly(msg) => write!(f, "Read-only: {}", msg),
+            Error::ComError(msg) => write!(f, "COM error: {}", msg),
+            Error::DIError(msg) => write!(f, "DI error: {}", msg),
             Error::Custom(code, msg) => write!(f, "Error {}: {}", code, msg),
         }
     }
@@ -80,6 +104,28 @@ impl From<crate::core::types::KernelError> for Error {
         Error::Kernel(err)
     }
 }
+
+// Additional From implementations for kernel error types
+impl From<&str> for Error {
+    fn from(msg: &str) -> Self {
+        Error::SystemError(msg.to_string())
+    }
+}
+
+impl From<String> for Error {
+    fn from(msg: String) -> Self {
+        Error::SystemError(msg)
+    }
+}
+
+impl From<&alloc::string::String> for Error {
+    fn from(msg: &alloc::string::String) -> Self {
+        Error::SystemError(msg.clone())
+    }
+}
+
+// Note: alloc::io::Error doesn't exist in no_std environments
+// IO errors should be handled as strings directly
 
 /// Result type for operations that can fail
 pub type Result<T> = core::result::Result<T, Error>;

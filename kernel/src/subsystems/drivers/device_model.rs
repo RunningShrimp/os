@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Enhanced Device Model Abstraction
 //!
 //! This module provides a comprehensive device model abstraction for NOS,
@@ -15,7 +18,7 @@ use crate::subsystems::drivers::driver_manager::{
     Driver, DeviceId, DriverId, DeviceType, DeviceStatus, DriverStatus,
     DeviceInfo, DriverInfo, DeviceResources, IoOperation, IoResult, InterruptInfo
 };
-use nos_nos_error_handling::unified::KernelError;
+use crate::error::UnifiedError;
 
 // ============================================================================
 // Device Model Constants

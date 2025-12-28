@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Zero-copy I/O syscalls
 //!
 //! Implements zero-copy I/O operations for efficient data transfer

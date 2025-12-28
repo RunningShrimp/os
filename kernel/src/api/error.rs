@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Kernel Error API Interface
 //!
 //! This module defines unified error types for the kernel.

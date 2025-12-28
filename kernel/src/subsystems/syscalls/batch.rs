@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 系统调用批处理机制
 //!
 //! 提供高效的系统调用批处理功能，包括：

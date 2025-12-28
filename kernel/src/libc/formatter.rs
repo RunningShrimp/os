@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 增强的C标准库格式化器
 //!
 //! 实现完整的printf格式化功能，包括：

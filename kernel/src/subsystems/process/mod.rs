@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 pub mod manager;
 pub mod thread;
 pub mod thread_cancellation;
@@ -98,3 +101,5 @@ pub fn shutdown() -> nos_api::Result<()> {
     crate::println!("[process] Process management subsystem shutdown");
     Ok(())
 }
+pub mod types;
+pub use types::{Process, ProcessId, Thread, get_current_process, get_process_by_pid};

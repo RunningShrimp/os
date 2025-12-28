@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Memory performance benchmarks
 //!
 //! Measures memory allocation and access performance.

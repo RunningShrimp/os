@@ -64,21 +64,27 @@ pub mod kernel_integration;
 // Note: The following modules contain implementation details that should be
 // moved to kernel/src/error. They are kept here temporarily for backward
 // compatibility but will be deprecated.
+#[allow(deprecated)]
 #[deprecated(note = "Implementation should be in kernel/src/error, not here")]
 pub mod registry;
 
+#[allow(deprecated)]
 #[deprecated(note = "Implementation should be in kernel/src/error, not here")]
 pub mod classifier;
 
+#[allow(deprecated)]
 #[deprecated(note = "Implementation should be in kernel/src/error, not here")]
 pub mod recovery;
 
+#[allow(deprecated)]
 #[deprecated(note = "Implementation should be in kernel/src/error, not here")]
 pub mod diagnostics;
 
+#[allow(deprecated)]
 #[deprecated(note = "Implementation should be in kernel/src/error, not here")]
 pub mod reporting;
 
+#[allow(deprecated)]
 #[deprecated(note = "Implementation should be in kernel/src/error, not here")]
 pub mod health;
 
@@ -94,21 +100,28 @@ pub use types::*;
 pub use common::{get_timestamp, validate_error_record, format_error_message};
 
 // Deprecated: Implementation exports (should use kernel/src/error instead)
+// Suppress deprecation warnings during migration period
+#[allow(deprecated)]
 #[deprecated(note = "Use kernel/src/error implementations instead")]
 pub use registry::{ErrorRegistry, init_registry, get_registry, shutdown_registry};
 
+#[allow(deprecated)]
 #[deprecated(note = "Use kernel/src/error implementations instead")]
 pub use classifier::{ErrorClassifier as ImplErrorClassifier, get_classifier};
 
+#[allow(deprecated)]
 #[deprecated(note = "Use kernel/src/error implementations instead")]
 pub use recovery::{RecoveryManager, apply_recovery_strategy, get_manager, recovery_get_stats};
 
+#[allow(deprecated)]
 #[deprecated(note = "Use kernel/src/error implementations instead")]
 pub use diagnostics::{DiagnosticAnalyzer, analyze_error, get_analyzer, diagnostics_get_stats};
 
+#[allow(deprecated)]
 #[deprecated(note = "Use kernel/src/error implementations instead")]
 pub use reporting::{ErrorReporter, ReportDestination, ReportLevel, ReportingStats, report_error, generate_report, get_reporter, reporting_get_stats};
 
+#[allow(deprecated)]
 #[deprecated(note = "Use kernel/src/error implementations instead")]
 pub use health::{HealthMonitor as ImplHealthMonitor, HealthMetric, HealthThreshold, HealthLevel, HealthSeverity, HealthStats, get_current_status, get_monitor, health_get_stats};
 

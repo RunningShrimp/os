@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Kernel Dependency Injection System
 //! 
 //! This module provides kernel-specific dependency injection implementation
@@ -14,8 +17,7 @@ use core::any::{Any, TypeId};
 use nos_api::{
     di::{Container, ServiceFactory, ServiceMetadata, ServiceScope, ServiceResolver},
     error::Result,
-    event::{Event, EventPriority, EventDispatcher, EventMetadata, EventType, SystemEventData, MemoryEventData, ProcessEventData},
-    core::EventHandler,
+    event::{Event, EventPriority, EventDispatcher, EventMetadata, EventType, SystemEventData, MemoryEventData, ProcessEventData, EventHandler},
 };
 
 

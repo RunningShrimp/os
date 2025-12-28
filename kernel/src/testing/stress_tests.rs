@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Stress Testing Module
 //! 
 //! This module provides comprehensive stress testing capabilities for the NOS kernel,

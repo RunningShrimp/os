@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! mm模块页面管理公共接口
 //! 
 //! 提供页面级别的内存管理功能

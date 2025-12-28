@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // Pipe implementation for inter-process communication
 //
 // Pipes provide a unidirectional data channel that can be used

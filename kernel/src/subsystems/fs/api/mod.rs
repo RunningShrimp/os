@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Public API for the fs module.
 //!
 //! This module contains all the public interfaces and types for the fs
@@ -131,7 +134,7 @@ pub mod file_ops {
     /// * 更新进程文件描述符表
     pub fn close(handle: FileHandle) -> Result<(), FsError> {
         let fd = handle.0 as usize;
-        crate::fs::file_close(fd);
+        crate::vfs::file_close(fd);
         Ok(())
     }
 }

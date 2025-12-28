@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Basic Device Drivers
 //!
 //! This module provides basic device drivers for NOS, including
@@ -13,7 +16,7 @@ use crate::subsystems::drivers::driver_manager::{
     Driver, DeviceId, DriverId, DeviceType, DeviceStatus, DriverStatus,
     DeviceInfo, DriverInfo, DeviceResources, IoOperation, IoResult, InterruptInfo
 };
-use nos_nos_error_handling::unified::KernelError;
+use crate::error::UnifiedError;
 
 // ============================================================================
 // Console Driver

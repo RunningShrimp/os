@@ -2,6 +2,8 @@
 //!
 //! This module provides service registration and lookup functionality.
 
+extern crate alloc;
+
 use crate::core::Service;
 use alloc::collections::BTreeMap;
 use alloc::string::String;

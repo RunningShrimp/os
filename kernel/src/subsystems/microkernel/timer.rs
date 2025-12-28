@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Microkernel timer management
 //!
 //! Provides high-resolution timer support for the microkernel layer.
@@ -8,7 +11,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, AtomicUsize, AtomicBool, Ordering};
 use crate::subsystems::sync::Mutex;
-use crate::reliability::errno::{EINVAL, ETIMEDOUT, EALREADY, ENOENT};
+use crate::reliability::{EINVAL, ETIMEDOUT, EALREADY, ENOENT};
 
 /// Timer types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

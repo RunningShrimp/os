@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // OCI (Open Container Initiative) Runtime Support
 //
 // OCI运行时支持模块
@@ -6,7 +9,7 @@
 extern crate alloc;
 
 use alloc::format;
-use crate::reliability::errno::{EINVAL, ENOENT, ENOMEM, EIO, EACCES};
+use crate::reliability::{EINVAL, ENOENT, ENOMEM, EIO, EACCES};
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::string::ToString;

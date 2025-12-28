@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Device Discovery and Enumeration
 //!
 //! This module provides comprehensive device discovery and enumeration capabilities for NOS,
@@ -17,7 +20,7 @@ use crate::subsystems::drivers::device_model::{
     DeviceModel, EnhancedDeviceInfo, DeviceClass, DevicePowerState, DeviceCapabilities,
     EnhancedDeviceModel, get_enhanced_device_model
 };
-use nos_nos_error_handling::unified::KernelError;
+use crate::error::UnifiedError;
 
 // ============================================================================
 // Device Discovery Constants

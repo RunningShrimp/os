@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Memory Allocator Tests
 //!
 //! Tests for memory allocation functionality
@@ -71,9 +74,9 @@ pub mod memory_tests {
     use alloc::vec::Vec;
     use crate::{test_assert_eq, test_assert, test_assert_ne};
     use crate::tests::TestResult;
-    use crate::syscalls::memory::{sys_mmap, sys_munmap};
+    use crate::subsystems::syscalls::memory::{sys_mmap, sys_munmap};
     use crate::posix::{PROT_READ, PROT_WRITE, PROT_EXEC, MAP_SHARED, MAP_PRIVATE, MAP_ANONYMOUS};
-    use crate::reliability::errno::{EOK as E_OK, EINVAL as E_INVAL, ENOENT as E_NOENT, EINVAL as E_BADARG};
+    use crate::reliability::{EOK as E_OK, EINVAL as E_INVAL, ENOENT as E_NOENT, EINVAL as E_BADARG};
 
     /// Test anonymous memory mapping
     pub fn test_mmap_anonymous() -> TestResult {

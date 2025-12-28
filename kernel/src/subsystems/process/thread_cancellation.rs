@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Enhanced Thread Cancellation Mechanism
 //! 
 //! This module provides POSIX-compliant thread cancellation with proper

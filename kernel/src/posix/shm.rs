@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! POSIX Shared Memory (sys/shm.h) Implementation
 //!
 //! Implements POSIX shared memory segments for inter-process communication.
@@ -7,7 +10,7 @@ extern crate alloc;
 use alloc::sync::Arc;
 use alloc::collections::BTreeMap;
 use crate::subsystems::sync::Mutex;
-use crate::reliability::errno::{EOK, EINVAL, ENOENT};
+use crate::reliability::{EOK, EINVAL, ENOENT};
 use crate::posix::{ShmidDs, IpcPerm, Mode, Pid, Size};
 use crate::subsystems::mm::vm;
 

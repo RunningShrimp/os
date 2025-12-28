@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Memory Management API Interface
 //!
 //! This module defines trait interfaces for memory management.

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Directory entry cache for VFS
 extern crate alloc;
 use alloc::{string::String, sync::Arc, collections::BTreeMap};

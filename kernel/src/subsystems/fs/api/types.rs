@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Public type definitions for the fs module API.
 //!
 //! This module contains all public types that are used by the fs module API.

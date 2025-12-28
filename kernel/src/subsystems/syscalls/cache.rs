@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! System Call Result Cache Module
 //!
 //! This module provides caching functionality for system call results. It supports:
@@ -13,7 +16,7 @@ use alloc::{
     vec::Vec,
     string::{String, ToString},
 };
-use crate::syscalls::common::{SyscallError, SyscallResult};
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
 
 /// Cache entry for system call results
 pub struct SyscallCacheEntry {

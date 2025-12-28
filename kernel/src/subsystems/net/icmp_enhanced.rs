@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Enhanced ICMP Protocol Implementation
 //!
 //! This module provides a comprehensive ICMP protocol implementation with advanced features
@@ -6,7 +9,7 @@
 extern crate alloc;
 use alloc::vec::Vec;
 use crate::subsystems::sync::Mutex;
-use nos_nos_error_handling::unified::KernelError;
+use crate::error::UnifiedError;
 
 // Re-export existing ICMP functionality
 pub use super::icmp::*;

@@ -17,9 +17,9 @@ path = "src/main.rs"
 # Core dependencies
 arrayvec = { version = "0.7", default-features = false }
 bitflags = { version = "2.10", default-features = false }
-spin = { version = "0.9", default-features = false, features = ["spin_mutex", "once", "rwlock"] }
+spin = { version = "0.10.0", default-features = false, features = ["mutex", "once", "rwlock"] }
 log = { version = "0.4", default-features = false }
-hashbrown = { version = "0.14", default-features = false, features = ["inline-more"] }
+hashbrown = { version = "0.16.1", default-features = false, features = ["inline-more"] }
 itoa = { version = "1.0", default-features = false }
 
 # NOS API for unified boot parameters

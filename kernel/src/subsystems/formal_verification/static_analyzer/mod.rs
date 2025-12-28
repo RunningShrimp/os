@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Static Analyzer Module
 //! 
 //! This module provides comprehensive static analysis capabilities

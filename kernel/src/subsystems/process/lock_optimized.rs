@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Optimized Process Table Locking Strategy
 //!
 //! This module provides optimized locking mechanisms for the process table:

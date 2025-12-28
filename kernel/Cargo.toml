@@ -70,6 +70,11 @@ hpage_2mb = []
 hpage_1gb = []
 debug = []
 
+# Additional infrastructure features
+alloc = []
+strict_boot = []
+journaling_fs = []
+
 # New modular features
 syscalls = ["nos-syscalls"]
 services = ["nos-services"]

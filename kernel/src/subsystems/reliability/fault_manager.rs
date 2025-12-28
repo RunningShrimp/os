@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 故障检测和恢复模块
 //! 
 //! 本模块提供系统的故障检测和恢复功能，包括：
@@ -7,7 +10,7 @@
 //! - 故障报告
 //! - 故障历史记录
 
-use nos_nos_error_handling::unified::KernelError;
+use crate::error::UnifiedError;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;

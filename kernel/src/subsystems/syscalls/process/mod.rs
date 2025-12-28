@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 进程管理系统调用模块
 //!
 //! 本模块提供进程管理相关的系统调用处理。

@@ -71,21 +71,12 @@ pub trait StatusProvider {
 pub trait ResourceManager {
     /// Resource type
     type Resource;
-    
+
     /// Acquires a resource
     fn acquire(&mut self) -> Result<Self::Resource>;
-    
+
     /// Releases a resource
     fn release(&mut self, resource: Self::Resource) -> Result<()>;
-}
-
-/// Trait for event handling
-pub trait EventHandler {
-    /// Event type
-    type Event;
-    
-    /// Handles an event
-    fn handle(&mut self, event: Self::Event) -> Result<()>;
 }
 
 /// Trait for logging

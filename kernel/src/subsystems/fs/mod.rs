@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 extern crate alloc;
 use alloc::{sync::Arc, collections::BTreeMap, string::String};
 use spin::Once;
@@ -262,3 +265,5 @@ pub fn shutdown() -> nos_api::Result<()> {
     crate::println!("[fs] File system subsystem shutdown");
     Ok(())
 }
+pub mod fs_types;
+pub use fs_types::*;

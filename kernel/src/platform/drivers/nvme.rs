@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! NVMe（非易失性内存Express）驱动程序
 //!
 //! 提供高性能的NVMe SSD支持，包括命名空间管理、

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! NOS Kernel Library
 //!
 //! This crate provides the public API for the NOS (New Operating System) kernel.
@@ -418,4 +421,6 @@ mod tests {
         let features = get_enabled_features();
         assert!(!features.is_empty());
     }
-}
+}pub mod reliability;
+mod tests;
+mod mm;

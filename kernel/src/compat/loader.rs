@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // Universal Binary Loader
 //
 // Supports loading binaries from multiple platforms:

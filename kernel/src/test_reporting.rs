@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Test Reporting and Analysis System
 //!
 //! This module provides comprehensive test reporting and analysis:

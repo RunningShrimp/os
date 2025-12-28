@@ -1,9 +1,11 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
-use crate::subsystems::mm::types::MemoryType;
-
+// Re-export MemoryType for external use
 pub use crate::subsystems::mm::types::MemoryType;
 
 /// Memory management statistics

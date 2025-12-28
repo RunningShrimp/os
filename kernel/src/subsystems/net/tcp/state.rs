@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! TCP state machine implementation
 //!
 //! This module provides a complete TCP state machine implementation with

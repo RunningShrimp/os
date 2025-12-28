@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! POSIX 会话/进程组/TTY 语义骨架
 //!
 //! 仅提供占位实现与数据结构，后续需与进程表、TTY 层正式对接。

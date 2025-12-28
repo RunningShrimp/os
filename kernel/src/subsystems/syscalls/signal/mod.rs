@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 信号模块
 //! 
 //! 本模块提供信号相关的系统调用服务，包括：
@@ -16,7 +19,7 @@ pub mod types;
 pub use service::SignalService;
 pub use types::*;
 
-use crate::syscalls::services::SyscallService;
+use crate::subsystems::syscalls::services::SyscallService;
 
 /// 获取信号系统调用服务实例
 /// 

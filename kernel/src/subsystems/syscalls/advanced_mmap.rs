@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Advanced POSIX Memory Mapping Implementation
 //!
 //! This module implements advanced POSIX memory mapping features including:

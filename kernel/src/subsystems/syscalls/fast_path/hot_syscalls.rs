@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Hot system call fast-path implementations
 //!
 //! This module provides optimized fast-path implementations for frequently
@@ -5,7 +8,8 @@
 //! These implementations bypass normal validation and dispatch mechanisms
 //! for maximum performance.
 
-use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
+use crate::error::SyscallError;
+use nos_api::syscall::SyscallResult;
 use crate::process;
 use crate::process::manager::PROC_TABLE;
 use core::sync::atomic::{AtomicU64, Ordering};

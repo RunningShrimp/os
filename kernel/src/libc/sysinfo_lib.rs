@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! C标准库系统信息查询支持
 //!
 //! 提供完整的sys/utsname.h和sys/sysinfo.h系统信息函数支持，包括：

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Type stubs for missing modules
 //!
 //! This module provides placeholder type definitions for modules that
@@ -109,6 +112,14 @@ use crate::posix::{Pid, Uid, Gid};
 pub type PidT = crate::posix::Pid;
 pub type UidT = crate::posix::Uid;
 pub type GidT = crate::posix::Gid;
+
+// POSIX type aliases for compatibility with API layer
+// These are the standard POSIX type names used in system calls
+pub type pid_t = i32;  // Process ID
+pub type uid_t = u32;  // User ID
+pub type gid_t = u32;  // Group ID
+pub type mode_t = u32; // File mode/permissions
+
 pub type AfUnix = i32;
 
 pub const AF_UNIX_CONST: AfUnix = 1;
@@ -222,7 +233,7 @@ impl RNG {
             core::arch::asm!(
                 "mrs {0}, RNDR",
                 out(reg) value,
-                options(nostack, pure)
+                options(nostack, readonly)
             );
             if success {
                 Some(value as usize)

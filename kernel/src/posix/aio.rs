@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! POSIX AIO Types (aio.h)
 
 use super::types::{off_t, size_t, aio_reqprio_t};

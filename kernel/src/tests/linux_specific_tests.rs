@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Linux Specific Functionality Tests
 //!
 //! This module contains comprehensive tests for Linux-specific system calls
@@ -10,8 +13,8 @@
 //! - Integration between different syscalls
 //! - Compatibility with Linux behavior
 
-use crate::syscalls::common::{SyscallError, SyscallResult};
-use crate::syscalls::glib;
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
+use crate::subsystems::syscalls::glib;
 use crate::syscalls;
 use alloc::vec::Vec;
 use alloc::string::String;
@@ -69,7 +72,7 @@ impl LinuxTestContext {
 /// Inotify test module
 pub mod inotify_tests {
     use super::*;
-    use crate::syscalls::glib::inotify_mask;
+    use crate::subsystems::syscalls::glib::inotify_mask;
 
     /// Test basic inotify_init functionality
     pub fn test_inotify_init_basic() -> TestResult {
@@ -262,7 +265,7 @@ pub mod inotify_tests {
 /// EventFd test module
 pub mod eventfd_tests {
     use super::*;
-    use crate::syscalls::glib::eventfd_flags;
+    use crate::subsystems::syscalls::glib::eventfd_flags;
 
     /// Test basic eventfd functionality
     pub fn test_eventfd_basic() -> TestResult {
@@ -396,7 +399,7 @@ pub mod eventfd_tests {
 /// SignalFd test module
 pub mod signalfd_tests {
     use super::*;
-    use crate::syscalls::glib::signalfd_flags;
+    use crate::subsystems::syscalls::glib::signalfd_flags;
 
     /// Test basic signalfd functionality
     pub fn test_signalfd_basic() -> TestResult {
@@ -490,7 +493,7 @@ pub mod signalfd_tests {
 /// TimerFd test module
 pub mod timerfd_tests {
     use super::*;
-    use crate::syscalls::glib::timerfd_flags;
+    use crate::subsystems::syscalls::glib::timerfd_flags;
     use crate::posix::Itimerspec;
 
     /// Test basic timerfd functionality

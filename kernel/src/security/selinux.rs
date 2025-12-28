@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // SELinux (Security-Enhanced Linux) Implementation
 //
 // This module provides SELinux-style mandatory access control (MAC)

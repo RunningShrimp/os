@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Network performance benchmarks
 //!
 //! Measures network stack performance for production validation.

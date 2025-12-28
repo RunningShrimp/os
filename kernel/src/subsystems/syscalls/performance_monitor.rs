@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 性能监控和统计系统
 //!
 //! 本模块提供系统性能监控和统计功能，包括：
@@ -7,10 +10,10 @@
 //! - 性能报告生成
 
 // TODO: Re-enable these imports when optimization modules are refactored
-// use crate::syscalls::file_io_optimized::{get_io_stats, IoStats};
-// use crate::syscalls::process_optimized::{get_proc_stats, ProcStats};
-// use crate::syscalls::memory_optimized::{get_mem_stats, MemStats};
-// use crate::syscalls::signal_optimized::{get_signal_stats, SignalStats};
+// use crate::subsystems::syscalls::file_io_optimized::{get_io_stats, IoStats};
+// use crate::subsystems::syscalls::process_optimized::{get_proc_stats, ProcStats};
+// use crate::subsystems::syscalls::memory_optimized::{get_mem_stats, MemStats};
+// use crate::subsystems::syscalls::signal_optimized::{get_signal_stats, SignalStats};
 use crate::subsystems::sync::Mutex;
 use alloc::string::String;
 use core::sync::atomic::{AtomicU64, Ordering};

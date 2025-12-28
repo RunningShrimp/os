@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Time and timer management for xv6-rust
 //! Provides timer drivers and time-related functions
 
@@ -408,3 +411,5 @@ impl SystemTimeError {
         Duration::from_secs(0) // Simplified implementation
     }
 }
+pub mod types;
+pub use types::{Timespec, get_current_time};

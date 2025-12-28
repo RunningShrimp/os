@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 use alloc::vec::Vec;
 use alloc::collections::{VecDeque, HashMap};
 use alloc::sync::Arc;

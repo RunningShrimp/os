@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! mm模块内存分配公共接口
 //!
 //! 提供基本的内存分配和释放功能（作为 mm 的唯一对外入口，内部走每CPU快速路径 + 全局回退）。

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Signal handling syscalls (simplified version)
 
 use super::common::{SyscallError, SyscallResult};

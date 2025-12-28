@@ -1,7 +1,30 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // Architecture abstraction layer
 // Provides a unified interface for architecture-specific operations
 
 use core::arch::asm;
+
+/// x86_64 specific functions
+pub mod x86_64 {
+    /// Read Time-Stamp Counter
+    #[inline]
+    pub unsafe fn rdtsc() -> u64 {
+        let low: u32;
+        let high: u32;
+        asm!(
+            "rdtsc",
+            out("eax") low,
+            out("edx") high,
+            options(nostack, nomem)
+        );
+        ((high as u64) << 32) | (low as u64)
+    }
+}
+
+// Re-export memory_layout from top-level arch module
+pub use crate::arch::memory_layout;
 
 /// Early hardware initialization (called before any other init)
 pub fn early_init() {

@@ -1,10 +1,13 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Pipe-related system calls
 //!
 //! Implements pipe creation
 
 use crate::process;
 use crate::file::FILE_TABLE;
-use crate::reliability::errno::{errno_neg, ENOMEM, ENOSPC, EINVAL};
+use crate::reliability::{errno_neg, ENOMEM, ENOSPC, EINVAL};
 
 /// Create a pipe
 pub fn sys_pipe(pipefd: *mut i32) -> isize {

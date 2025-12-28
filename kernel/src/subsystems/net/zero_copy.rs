@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 网络零拷贝与环形缓冲骨架
 //! 未接入驱动，仅提供数据结构与接口占位。
 

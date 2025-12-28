@@ -1,14 +1,17 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! System Call Layered Architecture Example
 //!
 //! This module demonstrates how to use the new layered system call architecture.
 //! It shows how to create a dispatcher, register handlers, and dispatch system calls.
 
 use alloc::sync::Arc;
-use crate::syscalls::interface::{SyscallDispatcher, SyscallContext};
-use crate::syscalls::dispatch::{SyscallDispatcherImpl, DispatcherConfig};
-use crate::syscalls::implementation::register_all_handlers;
-use crate::syscalls::context::SyscallContextImpl;
-use crate::syscalls::interface::syscall_numbers::*;
+use crate::subsystems::syscalls::interface::{SyscallDispatcher, SyscallContext};
+use crate::subsystems::syscalls::dispatch::{SyscallDispatcherImpl, DispatcherConfig};
+use crate::subsystems::syscalls::implementation::register_all_handlers;
+use crate::subsystems::syscalls::context::SyscallContextImpl;
+use crate::subsystems::syscalls::interface::syscall_numbers::*;
 
 /// Example of using the layered system call architecture
 pub fn example_usage() -> Result<(), crate::syscalls::interface::SyscallError> {

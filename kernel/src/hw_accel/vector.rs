@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Vector Processing Hardware Acceleration Module
 //! 
 //! This module provides SIMD and vector processing acceleration features including

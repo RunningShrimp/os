@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 统一性能优化框架
 //!
 //! **NOTE**: This module is being integrated into the unified dispatcher.
@@ -9,16 +12,16 @@
 //! - 优化效果评估
 //! - 优化策略管理
 
-// use crate::syscalls::common::{SyscallError, SyscallResult};
+// use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
 use alloc::boxed::Box;
 use alloc::string::String;
-use crate::syscalls::optimization_core::{
+use crate::subsystems::syscalls::optimization_core::{
     UnifiedSyscallStats, OptimizationConfig
 };
 // DEPRECATED: This module references old unified_dispatcher
 // TODO: Update to use new unified dispatcher from dispatch::unified
 // use crate::subsystems::syscalls::dispatch::unified::{UnifiedSyscallDispatcher};
-use crate::syscalls::optimization_core::UnifiedSyscallStats;
+use crate::subsystems::syscalls::optimization_core::UnifiedSyscallStats;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;

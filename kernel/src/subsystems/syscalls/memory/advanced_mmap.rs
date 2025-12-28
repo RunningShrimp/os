@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Advanced Memory Mapping Implementation
 //!
 //! This module provides advanced memory mapping functionality including:
@@ -6,7 +9,7 @@
 //! - Page residency information (mincore)
 //! - Remapped file pages (remap_file_pages)
 
-use crate::syscalls::common::{SyscallError, SyscallResult};
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
 
 /// Advanced memory mapping implementation placeholder
 pub struct AdvancedMmap;

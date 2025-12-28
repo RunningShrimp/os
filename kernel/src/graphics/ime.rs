@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Input Method Editor (IME) framework
 //!
 //! Provides input method support for text input, especially for CJK languages.
@@ -8,7 +11,7 @@ use alloc::vec::Vec;
 use alloc::string::{String, ToString};
 use alloc::collections::BTreeMap;
 use crate::subsystems::sync::Mutex;
-use crate::reliability::errno::{EINVAL, ENOMEM};
+use crate::reliability::{EINVAL, ENOMEM};
 
 /// IME state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

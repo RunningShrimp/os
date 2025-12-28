@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 驱动程序模块
 //! 
 //! 本模块提供可扩展的驱动程序架构，包括：

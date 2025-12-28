@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 系统调用核心模块
 //!
 //! 本模块提供系统调用的核心分发逻辑。
@@ -5,7 +8,7 @@
 use nos_api::{Result, interfaces::SyscallDispatcher, interfaces::SyscallHandler, interfaces::SyscallStats};
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
-use core::sync::Mutex;
+use spin::Mutex;
 
 /// 系统调用核心分发器
 pub struct SyscallCoreDispatcher {

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Memory Hardware Acceleration Module
 //! 
 //! This module provides memory-specific hardware acceleration features including

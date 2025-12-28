@@ -1,10 +1,13 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 网络系统调用辅助函数
 //!
 //! 本模块包含网络系统调用的辅助函数，为服务层提供基础支持。
 //! 所有核心逻辑已移至 NetworkService 内，不再有独立的全局处理函数。
 
-use nos_nos_error_handling::unified::KernelError;
-use crate::syscalls::net::types::*;
+use crate::error::UnifiedError;
+use crate::subsystems::syscalls::net::types::*;
 
 /// 从用户空间复制地址结构
 /// TODO: 实现真正的用户空间拷贝机制，目前为占位符

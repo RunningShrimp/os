@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Surface protocol for zero-copy graphics
 //!
 //! Implements a shared memory-based surface protocol that allows applications
@@ -9,7 +12,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use crate::subsystems::sync::Mutex;
-use crate::reliability::errno::{EINVAL, ENOMEM, ENOENT};
+use crate::reliability::{EINVAL, ENOMEM, ENOENT};
 
 /// Surface ID type
 pub type SurfaceId = u32;

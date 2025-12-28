@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Architecture abstraction layer
 //!
 //! This module provides architecture-specific implementations and abstractions
@@ -7,4 +10,5 @@
 pub mod memory_layout;
 pub mod kpti;
 pub mod retpoline;
+pub mod x86_64;
 

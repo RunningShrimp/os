@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Enhanced File System Journaling Implementation
 //!
 //! This module provides a comprehensive journaling system for NOS file system,

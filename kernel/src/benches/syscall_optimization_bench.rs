@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 系统调用优化性能基准测试
 //!
 //! 测试和验证系统调用快速路径优化的效果，包括：
@@ -15,7 +18,7 @@ use core::time::Duration;
 use crate::benchmark::syscall_benchmarks::{benchmark_syscall, print_benchmark_result, SyscallBenchmarkResult};
 use crate::process::fd_cache::{ExtendedFdCache, FdCacheStats};
 use crate::subsystems::mm::copy_optimized::{OptimizedCopier, CopyStats};
-use crate::syscalls::batch::{batch_syscalls, get_batch_stats, reset_batch_stats, BatchStatsSnapshot};
+use crate::subsystems::syscalls::batch::{batch_syscalls, get_batch_stats, reset_batch_stats, BatchStatsSnapshot};
 use crate::process::lock_optimized::{get_lock_stats, reset_lock_stats, LockStatsSnapshot};
 
 /// 性能测试结果

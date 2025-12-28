@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // Linux Namespaces Support Module
 //
 // Linux命名空间支持模块
@@ -6,7 +9,7 @@
 extern crate alloc;
 
 use alloc::format;
-use crate::reliability::errno::{EINVAL, ENOENT, ENOMEM, EIO, EPERM, EACCES};
+use crate::reliability::{EINVAL, ENOENT, ENOMEM, EIO, EPERM, EACCES};
 use crate::subsystems::cloud_native::oci::OciLinuxNamespaceType;
 use alloc::collections::BTreeMap;
 use alloc::string::String;

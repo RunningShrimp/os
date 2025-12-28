@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Trap handling for xv6-rust
 //!
 //! This module handles traps (interrupts and exceptions) from both

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Service Types Module
 //! 
 //! This module defines the types and structures used for service registration

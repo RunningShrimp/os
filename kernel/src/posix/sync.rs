@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! POSIX-compatible synchronization primitives
 //!
 //! This module provides POSIX-compliant versions of mutexes,
@@ -9,7 +12,7 @@ use crate::subsystems::sync::primitives::{MutexEnhanced, CondVar, RwLockEnhanced
 use core::ptr::null_mut;
 use core::cell::UnsafeCell;
 use alloc::boxed::Box;
-use crate::reliability::errno::{EOK, EINVAL, EPERM, EBUSY, EDEADLK, ETIMEDOUT};
+use crate::reliability::{EOK, EINVAL, EPERM, EBUSY, EDEADLK, ETIMEDOUT};
 
 // ============================================================================
 // POSIX Mutex Types

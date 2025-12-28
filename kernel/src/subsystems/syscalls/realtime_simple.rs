@@ -1,6 +1,9 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Real-time scheduling syscalls (simplified version)
 
-use crate::syscalls::common::SyscallError;
+use crate::subsystems::syscalls::common::SyscallError;
 
 pub type SyscallResult = Result<u64, SyscallError>;
 

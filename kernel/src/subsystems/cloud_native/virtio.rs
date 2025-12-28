@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // VirtIO Optimization Module
 //
 // VirtIO优化模块
@@ -6,7 +9,7 @@
 extern crate alloc;
 
 use alloc::format;
-use crate::reliability::errno::{EINVAL, ENOENT, ENOMEM, EIO, EACCES, EAGAIN};
+use crate::reliability::{EINVAL, ENOENT, ENOMEM, EIO, EACCES, EAGAIN};
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use spin::Mutex;

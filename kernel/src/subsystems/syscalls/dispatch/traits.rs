@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 服务特征定义模块
 //! 
 //! 本模块定义了服务管理系统的核心特征接口，包括：
@@ -7,11 +10,11 @@
 //! 
 //! 这些特征为依赖注入和服务发现机制提供了统一的接口规范。
 
-use nos_nos_error_handling::unified::KernelError;
+use crate::error::UnifiedError;
 use alloc::sync::Arc;
 use alloc::string::String;
 use alloc::vec::Vec;
-use crate::syscalls::mm::service::MemoryService;
+use crate::subsystems::syscalls::mm::service::MemoryService;
 
 // 定义Result类型别名，使用KernelError作为错误类型
 pub type Result<T> = core::result::Result<T, KernelError>;

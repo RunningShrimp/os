@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! POSIX Advanced Features Integration Tests
 //!
 //! This module contains integration tests for advanced POSIX features,
@@ -9,7 +12,7 @@ use crate::posix::advanced_signal::*;
 use crate::posix::realtime::*;
 use crate::posix::advanced_thread::*;
 use crate::posix::security::*;
-use crate::syscalls::common::SyscallError;
+use crate::subsystems::syscalls::common::SyscallError;
 use alloc::string::String;
 use alloc::vec::Vec;
 use alloc::string::ToString;

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 服务管理模块
 //! 
 //! 本模块提供了完整的服务管理架构，包括：
@@ -205,7 +208,7 @@ impl ServiceSystem {
     /// # 返回值
     /// 
     /// * `Result<(), KernelError>` - 启动结果
-    pub fn start_all_services(&self) -> Result<(), nos_nos_error_handling::unified::KernelError> {
+    pub fn start_all_services(&self) -> Result<(), nos_error_handling::unified::KernelError> {
         let startup_order = self.registry.calculate_startup_order()?;
         
         for service_name in startup_order {
@@ -224,7 +227,7 @@ impl ServiceSystem {
     /// # 返回值
     /// 
     /// * `Result<(), KernelError>` - 停止结果
-    pub fn stop_all_services(&self) -> Result<(), nos_nos_error_handling::unified::KernelError> {
+    pub fn stop_all_services(&self) -> Result<(), nos_error_handling::unified::KernelError> {
         let startup_order = self.registry.calculate_startup_order()?;
         
         // 按相反顺序停止服务

@@ -1,13 +1,16 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Network System Call Service Implementation
 //!
 //! This module provides the network service that manages all network-related
 //! system calls through the new modular service architecture.
 
-use nos_nos_error_handling::unified::KernelError;
+use crate::error::UnifiedError;
 use super::socket;
 use super::interface;
 use super::options;
-use crate::syscalls::services::{BaseService, ServiceStatus, SyscallService};
+use crate::subsystems::syscalls::services::{BaseService, ServiceStatus, SyscallService};
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;

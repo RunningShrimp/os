@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! I/O performance benchmarks
 //!
 //! Measures file I/O and zero-copy performance.

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // GLib对象系统支持系统调用
 
 extern crate alloc;
@@ -9,7 +12,7 @@ extern crate alloc;
 // - 继承和接口管理
 // - 引用计数管理
 
-use crate::syscalls::SyscallResult;
+use crate::subsystems::syscalls::SyscallResult;
 use crate::subsystems::sync::Mutex;
 use alloc::collections::BTreeMap;
 use core::ffi::{c_int, c_void};

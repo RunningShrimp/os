@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Web engine backend adapters
 //!
 //! Provides backend adapters for Servo and Blitz web engines to work with NOS.
@@ -8,7 +11,7 @@ use alloc::vec::Vec;
 use alloc::string::{String, ToString};
 use crate::graphics::surface::{SurfaceId, SurfaceFormat, get_surface_manager};
 use crate::graphics::compositor::{get_compositor, composite_frame};
-use crate::reliability::errno::{EINVAL, ENOMEM};
+use crate::reliability::{EINVAL, ENOMEM};
 
 /// Web engine type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

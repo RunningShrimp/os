@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Kernel core initialization
 //!
 //! This module provides the core kernel initialization logic that is shared
@@ -197,7 +200,7 @@ pub fn init_kernel_core(boot_params: Option<&BootParameters>) {
     // Initialize unified system call dispatcher
     #[cfg(feature = "syscalls")]
     {
-        use crate::syscalls::dispatch::unified::{init_unified_dispatcher, UnifiedDispatcherConfig};
+        use crate::subsystems::syscalls::dispatch::unified::{init_unified_dispatcher, UnifiedDispatcherConfig};
         let config = UnifiedDispatcherConfig::default();
         init_unified_dispatcher(config);
         crate::println!("[boot] unified syscall dispatcher initialized");

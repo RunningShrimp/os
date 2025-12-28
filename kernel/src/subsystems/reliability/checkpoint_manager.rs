@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 系统状态检查点模块
 //! 
 //! 本模块提供系统状态检查点功能，包括：
@@ -7,7 +10,7 @@
 //! - 增量检查点
 //! - 检查点压缩
 
-use nos_nos_error_handling::unified::KernelError;
+use crate::error::UnifiedError;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 通用优化模块
 //!
 //! 提供系统调用优化的通用组件，包括：
@@ -11,7 +14,7 @@ use alloc::sync::Arc;
 // removed unused imports
 use spin::Mutex;
 
-use crate::syscalls::optimization_core::{
+use crate::subsystems::syscalls::optimization_core::{
     UnifiedSyscallStats, SyscallStatsSnapshot, OptimizationConfig
 };
 

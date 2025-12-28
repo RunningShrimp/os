@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Enhanced System Call Error Handling Module
 //! 
 //! This module provides a unified error handling system for system calls.
@@ -6,9 +9,9 @@
 
 use alloc::{boxed::Box, collections::BTreeMap, string::{String, ToString}, vec::Vec};
 
-use crate::syscalls::common::SyscallError;
-use crate::reliability::errno::{self, Errno};
-use crate::syscalls::validation::ValidationError;
+use crate::subsystems::syscalls::common::SyscallError;
+use crate::reliability::{self, Errno};
+use crate::subsystems::syscalls::validation::ValidationError;
 
 /// Error context containing information about the error occurrence
 #[derive(Clone)]
@@ -192,7 +195,7 @@ impl StandardErrorHandler {
     
     /// Populate validation error mappings
     fn populate_validation_mappings(mappings: &mut BTreeMap<crate::syscalls::validation::ValidationErrorCode, Errno>) {
-        use crate::syscalls::validation::ValidationErrorCode::*;
+        use crate::subsystems::syscalls::validation::ValidationErrorCode::*;
         use errno::*;
         
         mappings.insert(InsufficientArguments, EINVAL);
@@ -452,7 +455,7 @@ pub fn enhanced_syscall_error_to_errno(error: &SyscallError, context: &ErrorCont
         }
         None => {
             // Fall back to default mapping if no handler exists
-            use crate::syscalls::common::syscall_error_to_errno;
+            use crate::subsystems::syscalls::common::syscall_error_to_errno;
             syscall_error_to_errno(*error)
         }
     }
@@ -468,7 +471,7 @@ pub fn validation_error_to_errno(error: &ValidationError, context: &ErrorContext
         }
         None => {
             // Fall back to default mapping if no handler exists
-            use crate::syscalls::validation::ValidationErrorCode as VEC;
+            use crate::subsystems::syscalls::validation::ValidationErrorCode as VEC;
             match error.code {
                 VEC::InsufficientArguments | 
                 VEC::InvalidArgumentType | 
@@ -521,7 +524,7 @@ mod tests {
         let context = ErrorContext::new(0x2002, 1234, 5678, 0x100000);
         
         // Test validation error mapping
-        use crate::syscalls::validation::ValidationErrorCode as VEC;
+        use crate::subsystems::syscalls::validation::ValidationErrorCode as VEC;
         use errno::*;
         
         let error = ValidationError::new(VEC::BadPointer, "Null pointer");

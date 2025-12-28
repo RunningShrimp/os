@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! GUI framework integration
 //!
 //! Provides backend adapters for Rust GUI frameworks (Slint/Iced) to work with NOS graphics system.
@@ -9,7 +12,7 @@ use alloc::string::String;
 use crate::graphics::surface::{SurfaceId, SurfaceFormat, get_surface_manager};
 use crate::graphics::input::{InputEvent, InputEventHandler, get_input_manager};
 use crate::graphics::compositor::{get_compositor, composite_frame};
-use crate::reliability::errno::{EINVAL, ENOMEM};
+use crate::reliability::{EINVAL, ENOMEM};
 
 /// GUI framework backend trait
 pub trait GuiBackend: Send + Sync {

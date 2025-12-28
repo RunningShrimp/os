@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Microkernel Inter-Process Communication
 //!
 //! Provides IPC primitives for communication between microkernel services.
@@ -14,7 +17,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, AtomicUsize, AtomicBool, Ordering};
 use crate::subsystems::sync::Mutex;
-use crate::reliability::errno::{EINVAL, ENOMEM, EAGAIN, EFAULT, EMSGSIZE, ENOENT};
+use crate::reliability::{EINVAL, ENOMEM, EAGAIN, EFAULT, EMSGSIZE, ENOENT};
 
 /// IPC message structure
 #[derive(Debug, Clone)]

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Temporary file system (tmpfs) implementation
 //! 
 //! Similar to ramfs but with size limits and better performance

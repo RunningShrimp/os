@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Service Discovery Module
 //! 
 //! This module provides service discovery capabilities for NOS kernel,

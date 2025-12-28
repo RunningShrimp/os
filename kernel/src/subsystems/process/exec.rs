@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // exec system call - load and execute ELF binaries
 //
 // This module implements the exec() system call which loads an ELF binary

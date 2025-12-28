@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 优化核心模块
 //!
 //! **NOTE**: This module provides optimization infrastructure that is being integrated

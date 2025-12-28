@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! POSIX Basic Types
 //!
 //! Standard primitive types for POSIX compliance
@@ -13,6 +16,9 @@ pub type Gid = u32;
 
 /// File mode type
 pub type Mode = u32;
+
+/// POSIX mode_t type alias (for compatibility with system call APIs)
+pub type mode_t = Mode;
 
 /// Device ID type
 pub type Dev = u64;

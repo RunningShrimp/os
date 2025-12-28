@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! VFS 接口层
 //!
 //! 此模块提供 VFS 核心接口，用于打破 VFS 和 FS 之间的循环依赖。
@@ -9,7 +12,69 @@ use alloc::sync::Arc;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use crate::vfs::{FileAttr, FileMode, FileType, DirEntry, FilesystemStats, VfsError};
+// ============================================================================
+// VFS Core Types
+// ============================================================================
+
+/// File mode/permission bits
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FileMode(pub u32);
+
+impl FileMode {
+    pub const fn empty() -> Self { FileMode(0) }
+    pub const fn from_bits(bits: u32) -> Self { FileMode(bits) }
+    pub const fn bits(&self) -> u32 { self.0 }
+}
+
+/// File type enumeration
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileType {
+    RegularFile,
+    Directory,
+    CharacterDevice,
+    BlockDevice,
+    NamedPipe,
+    SymbolicLink,
+    Socket,
+    Unknown,
+}
+
+/// VFS Error type
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VfsError {
+    NoEntry,
+    NotADirectory,
+    IsADirectory,
+    PermissionDenied,
+    IoError,
+    NotSupported,
+    InvalidInput,
+    NotFound,
+}
+
+/// File attributes
+#[derive(Debug, Clone)]
+pub struct FileAttr {
+    pub file_type: FileType,
+    pub mode: FileMode,
+    pub size: u64,
+    pub blocks: u64,
+    pub atime: u64,
+    pub mtime: u64,
+    pub ctime: u64,
+    pub uid: u32,
+    pub gid: u32,
+}
+
+/// Directory entry
+#[derive(Debug, Clone)]
+pub struct DirEntry {
+    pub ino: u64,
+    pub name: String,
+    pub file_type: FileType,
+}
+
+use crate::subsystems::syscalls::fs::service::FilesystemStats;
 
 /// 文件系统类型 trait - 所有文件系统实现都需要实现
 pub trait FileSystemType: Send + Sync {

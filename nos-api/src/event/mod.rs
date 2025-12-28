@@ -5,6 +5,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 use alloc::string::{String, ToString};
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 
 use core::sync::atomic::{AtomicU64, Ordering};
 
@@ -17,7 +18,7 @@ pub fn get_time_ns() -> u64 {
     EVENT_TIME_COUNTER.fetch_add(1, Ordering::Relaxed)
 }
 
-/// Event categories
+/// Event categories (coarse-grained)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EventCategory {
     System,
@@ -30,6 +31,36 @@ pub enum EventCategory {
     Hardware,
 }
 
+/// Event type categories (fine-grained)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EventType {
+    System,
+    User,
+    Security,
+    Network,
+    Storage,
+    Process,
+    Service,
+    Hardware,
+    Memory,
+}
+
+impl EventType {
+    pub fn name(&self) -> &'static str {
+        match self {
+            EventType::System => "System",
+            EventType::User => "User",
+            EventType::Security => "Security",
+            EventType::Network => "Network",
+            EventType::Storage => "Storage",
+            EventType::Process => "Process",
+            EventType::Service => "Service",
+            EventType::Hardware => "Hardware",
+            EventType::Memory => "Memory",
+        }
+    }
+}
+
 /// Event priority levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum EventPriority {
@@ -37,6 +68,59 @@ pub enum EventPriority {
     Normal = 1,
     High = 2,
     Critical = 3,
+}
+
+/// Event metadata
+#[derive(Debug, Clone)]
+pub struct EventMetadata {
+    pub id: Option<u64>,
+    pub timestamp: u64,
+    pub source: String,
+    pub category: EventType,
+    pub priority: EventPriority,
+    pub tags: Vec<String>,
+}
+
+impl EventMetadata {
+    pub fn new(source: &str, category: EventType, priority: EventPriority) -> Self {
+        Self {
+            id: None,
+            timestamp: get_time_ns(),
+            source: String::from(source),
+            category,
+            priority,
+            tags: Vec::new(),
+        }
+    }
+
+    pub fn with_tag(mut self, tag: String) -> Self {
+        self.tags.push(tag);
+        self
+    }
+}
+
+/// Event data types
+#[derive(Debug, Clone)]
+pub enum SystemEventData {
+    Shutdown { reason: String },
+    Boot { stage: String },
+}
+
+#[derive(Debug, Clone)]
+pub enum MemoryEventData {
+    Allocation { size: usize, success: bool },
+    Deallocation { addr: usize, size: usize },
+}
+
+#[derive(Debug, Clone)]
+pub enum ProcessEventData {
+    Created { pid: u32, ppid: u32, name: String },
+    Exited { pid: u32, exit_code: i32 },
+}
+
+/// Event filter trait
+pub trait EventFilter: Send + Sync {
+    fn matches(&self, event: &dyn Event) -> bool;
 }
 
 /// Event trait for type-erased event handling
@@ -75,7 +159,13 @@ pub trait Event: core::any::Any {
     fn data(&self) -> Option<&[u8]> {
         None
     }
-    
+
+    /// Get event metadata
+    fn metadata(&self) -> &EventMetadata;
+
+    /// Get event type
+    fn event_type(&self) -> EventType;
+
     /// Serialize event to bytes
     fn serialize(&self) -> Result<Vec<u8>> {
         Err(crate::error::Error::NotImplemented("Event serialization not implemented".to_string()))
@@ -96,27 +186,49 @@ pub struct BasicEvent {
     category: EventCategory,
     priority: EventPriority,
     tags: Vec<&'static str>,
+    metadata: EventMetadata,
 }
 
 impl BasicEvent {
     /// Create a new basic event
     pub fn new(category: EventCategory, priority: EventPriority, source: &str) -> Self {
+        let event_type = match category {
+            EventCategory::System => EventType::System,
+            EventCategory::User => EventType::User,
+            EventCategory::Security => EventType::Security,
+            EventCategory::Network => EventType::Network,
+            EventCategory::Storage => EventType::Storage,
+            EventCategory::Process => EventType::Process,
+            EventCategory::Service => EventType::Service,
+            EventCategory::Hardware => EventType::Hardware,
+        };
+
+        let metadata = EventMetadata {
+            id: None,
+            timestamp: get_time_ns(),
+            source: source.to_string(),
+            category: event_type,
+            priority,
+            tags: Vec::new(),
+        };
+
         Self {
-            id: None, // ID will be assigned when event is dispatched
+            id: None,
             timestamp: get_time_ns(),
             source: source.to_string(),
             category,
             priority,
             tags: Vec::new(),
+            metadata,
         }
     }
-    
+
     /// Adds a tag to the event
     pub fn with_tag(mut self, tag: &'static str) -> Self {
         self.tags.push(tag);
         self
     }
-    
+
     /// Sets the event source
     pub fn with_source(mut self, source: &str) -> Self {
         self.source = source.to_string();
@@ -128,35 +240,43 @@ impl Event for BasicEvent {
     fn id(&self) -> Option<u64> {
         self.id
     }
-    
+
     fn source(&self) -> &str {
         &self.source
     }
-    
+
     fn category(&self) -> EventCategory {
         self.category
     }
-    
+
     fn priority(&self) -> EventPriority {
         self.priority
     }
-    
+
     fn timestamp(&self) -> u64 {
         self.timestamp
     }
-    
+
     fn tags(&self) -> &[&str] {
         &self.tags
     }
-    
+
     fn data(&self) -> Option<&[u8]> {
         None
     }
-    
+
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
+    fn event_type(&self) -> EventType {
+        self.metadata.category
+    }
+
     fn serialize(&self) -> Result<Vec<u8>> {
         Err(crate::error::Error::NotImplemented("Event serialization not implemented".to_string()))
     }
-    
+
     fn deserialize(_data: &[u8]) -> Result<Self> where Self: Sized {
         Err(crate::error::Error::NotImplemented("Deserialization not implemented".to_string()))
     }
@@ -276,6 +396,31 @@ impl EventListener for BasicEventListener {
     fn name(&self) -> &str {
         &self.name
     }
+}
+
+/// Event handler trait for event system (using &self and &dyn Event)
+/// This is the preferred trait for event handling in the kernel's event system
+pub trait EventHandler: Send + Sync {
+    /// Handle an event
+    fn handle(&self, event: &dyn Event) -> Result<()>;
+}
+
+/// Event bus for publishing and subscribing to events
+pub trait EventBus {
+    /// Publish an event to the bus
+    fn publish(&mut self, event: Box<dyn Event>) -> Result<()>;
+
+    /// Subscribe to events of a specific topic
+    fn subscribe(&mut self, topic: &str, handler: Arc<dyn EventHandler>) -> Result<()>;
+
+    /// Subscribe to all events
+    fn subscribe_all(&mut self, handler: Arc<dyn EventHandler>) -> Result<()>;
+
+    /// Unsubscribe from events of a specific topic
+    fn unsubscribe(&mut self, topic: &str, handler: &Arc<dyn EventHandler>) -> Result<()>;
+
+    /// Unsubscribe from all events
+    fn unsubscribe_all(&mut self, handler: &Arc<dyn EventHandler>) -> Result<()>;
 }
 
 #[cfg(test)]

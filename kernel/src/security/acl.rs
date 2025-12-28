@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // Access Control List (ACL) implementation
 //
 // This module provides fine-grained access control for system resources including
@@ -16,7 +19,7 @@ use spin::Mutex;
 
 
 use crate::vfs::{FileMode};
-use crate::reliability::errno::{EACCES, EPERM};
+use crate::reliability::{EACCES, EPERM};
 
 /// ACL entry types
 #[derive(Debug, Clone, Copy, PartialEq)]

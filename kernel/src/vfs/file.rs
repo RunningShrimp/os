@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! VFS file handle
 extern crate alloc;
 use alloc::sync::Arc;

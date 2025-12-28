@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Enhanced Inter-Process Communication (IPC) Mechanism
 //!
 //! This module provides a comprehensive IPC system with support for:

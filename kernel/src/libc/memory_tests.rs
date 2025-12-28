@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! C标准库内存管理测试
 //!
 //! 测试增强内存管理器的各种功能：

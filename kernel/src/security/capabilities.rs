@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // POSIX Capabilities Implementation
 //
 // This module implements POSIX capabilities to provide fine-grained privilege

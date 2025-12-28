@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Microkernel core for NOS hybrid architecture
 //!
 //! This module implements the microkernel layer that provides the most basic
@@ -10,7 +13,7 @@ pub mod interrupt;
 pub mod timer;
 pub mod service_registry;
 
-use crate::reliability::errno::{ENOMEM, EINVAL};
+use crate::reliability::{ENOMEM, EINVAL};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 /// Microkernel initialization state

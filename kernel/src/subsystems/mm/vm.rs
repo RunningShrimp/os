@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Virtual Memory Management for xv6-rust
 //!
 //! This module provides virtual memory support including:
@@ -914,86 +917,7 @@ mod aarch64 {
         core::arch::asm!("msr tcr_el1, {}", in(reg) tcr);
         core::arch::asm!("isb");
     }
-    
-    /// Map a huge page (2MB or 1GB) for AArch64
-    pub unsafe fn map_huge_page(
-        pagetable: *mut PageTable,
-        va: usize,
-        pa: usize,
-        size: usize,
-        perm: usize,
-    ) -> Result<(), ()> {
-        use crate::subsystems::mm::hugepage::{HPAGE_2MB, HPAGE_1GB};
-        
-        if size == HPAGE_2MB {
-            // 2MB huge page: use level 2 descriptor
-            let mut pt = pagetable;
-            
-            // Walk to level 1
-            let idx1 = va_index(va, 1);
-            let pte1 = &mut (*pt).entries[idx1];
-            
-            if *pte1 & DESC_VALID == 0 {
-                // Allocate level 1 page table if needed
-                let new_pt = kalloc();
-                if new_pt.is_null() {
-                    return Err(());
-                }
-                ptr::write_bytes(new_pt, 0, PAGE_SIZE);
-                *pte1 = (new_pt as usize) | DESC_TABLE | DESC_VALID;
-                pt = new_pt as *mut PageTable;
-            } else {
-                pt = ((*pte1) & !0xFFF) as *mut PageTable;
-            }
-            
-            // Set level 2 descriptor for 2MB page
-            let idx2 = va_index(va, 2);
-            let pte2 = &mut (*pt).entries[idx2];
-            
-            if *pte2 & DESC_VALID != 0 {
-                return Err(()); // Already mapped
-            }
-            
-            let mut flags = DESC_VALID | DESC_AF;
-            if perm & PTE_W == 0 {
-                flags |= DESC_AP_RO;
-            }
-            if perm & PTE_U != 0 {
-                flags |= DESC_AP_USER;
-            }
-            if perm & PTE_X == 0 {
-                flags |= DESC_UXN | DESC_PXN;
-            }
-            
-            *pte2 = (pa & !0x1FFFFF) | flags; // 2MB alignment
-            Ok(())
-        } else if size == HPAGE_1GB {
-            // 1GB huge page: use level 1 descriptor directly
-            let idx1 = va_index(va, 1);
-            let pte1 = &mut (*pagetable).entries[idx1];
-            
-            if *pte1 & DESC_VALID != 0 {
-                return Err(()); // Already mapped
-            }
-            
-            let mut flags = DESC_VALID | DESC_AF;
-            if perm & PTE_W == 0 {
-                flags |= DESC_AP_RO;
-            }
-            if perm & PTE_U != 0 {
-                flags |= DESC_AP_USER;
-            }
-            if perm & PTE_X == 0 {
-                flags |= DESC_UXN | DESC_PXN;
-            }
-            
-            *pte1 = (pa & !0x3FFFFFFF) | flags; // 1GB alignment
-            Ok(())
-        } else {
-            Err(()) // Unsupported huge page size
-        }
-    }
-    
+
     pub unsafe fn activate_pt(pagetable: *mut PageTable) {
         let ttbr0 = pagetable as u64;
         core::arch::asm!("msr ttbr0_el1, {}", in(reg) ttbr0);

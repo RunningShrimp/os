@@ -1,7 +1,10 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Socket creation and management syscalls
 
 use super::*;
-use crate::syscalls::common::{SyscallError, SyscallResult};
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
 use crate::net::socket::SocketAddr;
 
 /// Create a new socket

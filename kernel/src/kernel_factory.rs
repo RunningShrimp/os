@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 内核工厂模块
 //!
 //! 本模块提供工厂模式创建和管理内核内部模块，减少lib.rs的直接依赖。

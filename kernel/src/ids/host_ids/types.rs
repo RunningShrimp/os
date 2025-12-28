@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Host IDs Shared Types
 //!
 //! 主机入侵检测系统共享类型定义

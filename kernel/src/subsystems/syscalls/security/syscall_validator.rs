@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 系统调用安全验证模块
 //! 
 //! 本模块提供系统调用的安全验证功能，包括：
@@ -7,7 +10,7 @@
 //! - 安全策略执行
 //! - 审计日志记录
 
-use nos_nos_error_handling::unified::KernelError;
+use crate::error::UnifiedError;
 use crate::api::syscall::{SyscallCategory, get_syscall_category};
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};

@@ -1,11 +1,14 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Dispatch function for filesystem syscalls
 //!
 //! Routes syscall numbers to appropriate handler functions
 
 use super::handlers;
-use crate::syscalls::common::SyscallError;
-use crate::syscalls::common::SyscallResult;
-use nos_nos_error_handling::unified::KernelError;
+use crate::error::SyscallError;
+use nos_api::syscall::SyscallResult;
+use crate::error::UnifiedError;
 
 /// Dispatch filesystem syscalls to appropriate handlers
 pub fn dispatch(syscall_number: u32, args: &[u64]) -> Result<u64, KernelError> {

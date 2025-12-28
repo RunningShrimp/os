@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! C标准库环境变量支持
 //!
 //! 提供完整的stdlib.h环境变量函数支持，包括：
@@ -15,7 +18,7 @@ use core::str::FromStr;
 use heapless::{String, Vec};
 use crate::libc::error::set_errno;
 use crate::libc::error::errno::{EINVAL, ENOMEM};
-use crate::reliability::errno::{EPERM, EAGAIN};
+use crate::reliability::{EPERM, EAGAIN};
 use crate::subsystems::sync::Mutex;
 
 /// 环境变量条目

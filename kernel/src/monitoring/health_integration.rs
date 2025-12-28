@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Health Monitoring Integration Module
 //!
 //! This module integrates health monitoring with graceful degradation.

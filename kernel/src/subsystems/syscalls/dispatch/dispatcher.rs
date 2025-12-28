@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 系统调用分发器模块
 //! 
 //! 本模块实现了系统调用的路由和分发功能，包括：
@@ -8,10 +11,10 @@
 //! 
 //! 分发器是系统调用处理的核心组件，负责将系统调用请求路由到相应的服务。
 
-use nos_nos_error_handling::unified::KernelError;
-use crate::syscalls::services::traits::*;
-use crate::syscalls::services::registry::{ServiceRegistry, Version};
-use crate::syscalls::security::{SyscallSecurityValidator, SecurityContext, SecurityLevel, SecurityValidationResult, ResourceAccess, AccessControlManager, Permission, ResourceType};
+use crate::error::UnifiedError;
+use crate::subsystems::syscalls::services::traits::*;
+use crate::subsystems::syscalls::services::registry::{ServiceRegistry, Version};
+use crate::subsystems::syscalls::security::{SyscallSecurityValidator, SecurityContext, SecurityLevel, SecurityValidationResult, ResourceAccess, AccessControlManager, Permission, ResourceType};
 use crate::reliability::{FaultManager, FaultType, FaultSeverity, CheckpointManager, CheckpointType, ErrorLogManager, LogLevel};
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};

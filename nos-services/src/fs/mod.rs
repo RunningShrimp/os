@@ -2,6 +2,8 @@
 //!
 //! This module provides file system related services.
 
+extern crate alloc;
+
 use nos_api::Result;
 use crate::core::{Service, ServiceStatus};
 use alloc::string::String;

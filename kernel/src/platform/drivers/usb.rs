@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // USB（通用串行总线）驱动程序
 //
 // 提供全面的USB支持，包括主机控制器、设备枚举、

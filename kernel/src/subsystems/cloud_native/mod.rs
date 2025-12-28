@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // Cloud Native Features Module
 //
 // 云原生特性模块
@@ -13,7 +16,7 @@ pub mod namespaces;
 
 use crate::subsystems::microkernel::service_registry::{ServiceInfo, InterfaceVersion, ServiceCategory, get_service_registry};
 use crate::subsystems;
-use crate::reliability::errno::{EINVAL, ENOENT, ENOMEM, EIO};
+use crate::reliability::{EINVAL, ENOENT, ENOMEM, EIO};
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::format;

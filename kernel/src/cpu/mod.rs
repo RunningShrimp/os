@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // SMP (Symmetric Multi-Processing) Support
 // Per-CPU data structures and multi-core management
 

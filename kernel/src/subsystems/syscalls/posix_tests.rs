@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! POSIX System Calls Tests
 //! 
 //! This module contains unit tests for the POSIX system calls implemented
@@ -1368,7 +1371,7 @@ pub fn run_phase1_integration_tests() -> Result<(), Vec<&'static str>> {
     // Run new integration tests
     #[cfg(feature = "kernel_tests")]
     {
-        use crate::syscalls::integration_tests;
+        use crate::subsystems::syscalls::integration_tests;
         return integration_tests::run_all_integration_tests();
     }
 

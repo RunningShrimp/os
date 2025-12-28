@@ -1,9 +1,12 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Tests for advanced POSIX memory mapping features
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::syscalls::common::SyscallError;
+    use crate::subsystems::syscalls::common::SyscallError;
     use crate::posix;
     use crate::subsystems::mm::vm::PAGE_SIZE;
 

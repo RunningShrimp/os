@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! C标准库配置管理
 //!
 //! 提供灵活的配置系统，支持不同的C库实现类型和参数调整。

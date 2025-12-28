@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Journaling File System Wrapper
 //!
 //! This module provides a wrapper around the existing file system implementation

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Pipe Tests
 //!
 //! Tests for pipe IPC functionality

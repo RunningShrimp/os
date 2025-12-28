@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Message Queue System Calls
 //!
 //! This module implements system calls for POSIX message queues

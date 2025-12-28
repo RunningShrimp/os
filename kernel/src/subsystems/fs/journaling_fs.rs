@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Journaling File System Implementation
 //!
 //! This module implements a journaling file system (JFS) for NOS,

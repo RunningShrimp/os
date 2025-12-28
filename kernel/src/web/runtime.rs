@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Web runtime support (PWA and WASM)
 //!
 //! Provides Progressive Web App (PWA) and WebAssembly (WASM) runtime support.
@@ -8,7 +11,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::collections::BTreeMap;
 use crate::subsystems::sync::Mutex;
-use crate::reliability::errno::{EINVAL, ENOMEM};
+use crate::reliability::{EINVAL, ENOMEM};
 
 /// PWA manifest
 #[derive(Debug, Clone)]

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! File System Tests
 //!
 //! Tests for file system functionality
@@ -53,12 +56,12 @@ pub mod file_tests {
     /// Test file allocation and deallocation
     pub fn test_file_alloc_dealloc() -> TestResult {
         // Allocate a file
-        let fd1 = crate::fs::file_alloc();
+        let fd1 = crate::vfs::file_alloc();
         test_assert!(fd1.is_some(), "File allocation should succeed");
         let fd1_idx = fd1.unwrap();
 
         // Verify file exists
-        let table = crate::fs::FILE_TABLE.lock();
+        let table = crate::vfs::FILE_TABLE.lock();
         let file = table.get(fd1_idx);
         test_assert!(file.is_some(), "Allocated file should exist");
         test_assert!(file.unwrap().is_valid(), "Allocated file should be valid");
@@ -66,16 +69,16 @@ pub mod file_tests {
         drop(table);
 
         // Allocate another file
-        let fd2 = crate::fs::file_alloc();
+        let fd2 = crate::vfs::file_alloc();
         test_assert!(fd2.is_some(), "Second file allocation should succeed");
         let fd2_idx = fd2.unwrap();
         test_assert_ne!(fd1_idx, fd2_idx, "File indices should be different");
 
         // Close first file
-        crate::fs::file_close(fd1_idx);
+        crate::vfs::file_close(fd1_idx);
 
         // Verify first file is freed
-        let table = crate::fs::FILE_TABLE.lock();
+        let table = crate::vfs::FILE_TABLE.lock();
         let file1 = table.get(fd1_idx);
         test_assert!(file1.is_none() || !file1.unwrap().is_valid(),
             "Closed file should be invalid");
@@ -86,26 +89,26 @@ pub mod file_tests {
             "Second file should still be valid");
 
         // Close second file
-        crate::fs::file_close(fd2_idx);
+        crate::vfs::file_close(fd2_idx);
 
         Ok(())
     }
 
     /// Test file reference counting
     pub fn test_file_ref_counting() -> TestResult {
-        let fd = crate::fs::file_alloc().unwrap();
+        let fd = crate::vfs::file_alloc().unwrap();
 
         // Duplicate the file (increment ref count)
         let dup_fd = crate::fs::file_dup(fd).unwrap();
         test_assert_eq!(dup_fd, fd, "Dup should return same file index");
 
         // Check ref count
-        let table = crate::fs::FILE_TABLE.lock();
+        let table = crate::vfs::FILE_TABLE.lock();
         let file = table.get(fd).unwrap();
         test_assert_eq!(file.ref_count, 2, "File should have ref count 2");
 
         // Close one reference
-        crate::fs::file_close(fd);
+        crate::vfs::file_close(fd);
 
         // File should still exist
         let file_after = table.get(fd).unwrap();
@@ -113,7 +116,7 @@ pub mod file_tests {
         test_assert_eq!(file_after.ref_count, 1, "File should have ref count 1");
 
         // Close last reference
-        crate::fs::file_close(dup_fd);
+        crate::vfs::file_close(dup_fd);
 
         // File should be freed
         let file_final = table.get(fd);
@@ -125,9 +128,9 @@ pub mod file_tests {
 
     /// Test file type validation
     pub fn test_file_type_validation() -> TestResult {
-        let fd = crate::fs::file_alloc().unwrap();
+        let fd = crate::vfs::file_alloc().unwrap();
 
-        let table = crate::fs::FILE_TABLE.lock();
+        let table = crate::vfs::FILE_TABLE.lock();
         let file = table.get_mut(fd).unwrap();
 
         // Initially should be None type
@@ -151,16 +154,16 @@ pub mod file_tests {
         test_assert!(file.is_valid(), "File with Socket type should be valid");
 
         // Clean up
-        crate::fs::file_close(fd);
+        crate::vfs::file_close(fd);
 
         Ok(())
     }
 
     /// Test file permissions
     pub fn test_file_permissions() -> TestResult {
-        let fd = crate::fs::file_alloc().unwrap();
+        let fd = crate::vfs::file_alloc().unwrap();
 
-        let mut table = crate::fs::FILE_TABLE.lock();
+        let mut table = crate::vfs::FILE_TABLE.lock();
         let file = table.get_mut(fd).unwrap();
 
         // Initially not readable or writable
@@ -182,16 +185,16 @@ pub mod file_tests {
         test_assert!(!file.writable, "File should not be writable");
 
         // Clean up
-        crate::fs::file_close(fd);
+        crate::vfs::file_close(fd);
 
         Ok(())
     }
 
     /// Test file status flags
     pub fn test_file_status_flags() -> TestResult {
-        let fd = crate::fs::file_alloc().unwrap();
+        let fd = crate::vfs::file_alloc().unwrap();
 
-        let mut table = crate::fs::FILE_TABLE.lock();
+        let mut table = crate::vfs::FILE_TABLE.lock();
         let file = table.get_mut(fd).unwrap();
 
         // Initially flags should be 0
@@ -209,16 +212,16 @@ pub mod file_tests {
         test_assert_eq!(file.status_flags, 0);
 
         // Clean up
-        crate::fs::file_close(fd);
+        crate::vfs::file_close(fd);
 
         Ok(())
     }
 
     /// Test file offset management
     pub fn test_file_offset_management() -> TestResult {
-        let fd = crate::fs::file_alloc().unwrap();
+        let fd = crate::vfs::file_alloc().unwrap();
 
-        let mut table = crate::fs::FILE_TABLE.lock();
+        let mut table = crate::vfs::FILE_TABLE.lock();
         let file = table.get_mut(fd).unwrap();
 
         // Set file type to allow offset operations
@@ -235,7 +238,7 @@ pub mod file_tests {
         test_assert_eq!(file.offset, 4096);
 
         // Clean up
-        crate::fs::file_close(fd);
+        crate::vfs::file_close(fd);
 
         Ok(())
     }
@@ -246,7 +249,7 @@ pub mod file_tests {
 
         // Allocate all available file slots
         for _ in 0..crate::fs::NFILE {
-            match crate::fs::file_alloc() {
+            match crate::vfs::file_alloc() {
                 Some(fd) => allocated_fds.push(fd),
                 None => break, // No more slots available
             }
@@ -256,24 +259,24 @@ pub mod file_tests {
         test_assert!(allocated_count > 0, "Should be able to allocate at least some files");
 
         // Next allocation should fail
-        let overflow_fd = crate::fs::file_alloc();
+        let overflow_fd = crate::vfs::file_alloc();
         test_assert!(overflow_fd.is_none(), "File allocation should fail when table is full");
 
         // Free one file
         if let Some(fd_to_free) = allocated_fds.pop() {
-            crate::fs::file_close(fd_to_free);
+            crate::vfs::file_close(fd_to_free);
         }
 
         // Now allocation should succeed
-        let new_fd = crate::fs::file_alloc();
+        let new_fd = crate::vfs::file_alloc();
         test_assert!(new_fd.is_some(), "File allocation should succeed after freeing");
 
         // Clean up remaining files
         for fd in allocated_fds {
-            crate::fs::file_close(fd);
+            crate::vfs::file_close(fd);
         }
         if let Some(fd) = new_fd {
-            crate::fs::file_close(fd);
+            crate::vfs::file_close(fd);
         }
 
         Ok(())
@@ -281,10 +284,10 @@ pub mod file_tests {
 
     /// Test file iterator
     pub fn test_file_iterator() -> TestResult {
-        let fd1 = crate::fs::file_alloc().unwrap();
-        let fd2 = crate::fs::file_alloc().unwrap();
+        let fd1 = crate::vfs::file_alloc().unwrap();
+        let fd2 = crate::vfs::file_alloc().unwrap();
 
-        let mut table = crate::fs::FILE_TABLE.lock();
+        let mut table = crate::vfs::FILE_TABLE.lock();
 
         // Count valid files
         let mut valid_count = 0;
@@ -321,17 +324,17 @@ pub mod file_tests {
         test_assert_eq!(readable_count, 2, "Should find 2 readable files");
 
         // Clean up
-        crate::fs::file_close(fd1);
-        crate::fs::file_close(fd2);
+        crate::vfs::file_close(fd1);
+        crate::vfs::file_close(fd2);
 
         Ok(())
     }
 
     /// Test file read/write operations (basic)
     pub fn test_file_read_write_basic() -> TestResult {
-        let fd = crate::fs::file_alloc().unwrap();
+        let fd = crate::vfs::file_alloc().unwrap();
 
-        let table = crate::fs::FILE_TABLE.lock();
+        let table = crate::vfs::FILE_TABLE.lock();
         let file = table.get_mut(fd).unwrap();
 
         // Set up file for testing
@@ -357,16 +360,16 @@ pub mod file_tests {
         // Note: Actual read/write would depend on underlying implementation
 
         // Clean up
-        crate::fs::file_close(fd);
+        crate::vfs::file_close(fd);
 
         Ok(())
     }
 
     /// Test file seek operations
     pub fn test_file_seek_operations() -> TestResult {
-        let fd = crate::fs::file_alloc().unwrap();
+        let fd = crate::vfs::file_alloc().unwrap();
 
-        let table = crate::fs::FILE_TABLE.lock();
+        let table = crate::vfs::FILE_TABLE.lock();
         let file = table.get_mut(fd).unwrap();
 
         // Test seek on different file types
@@ -383,14 +386,14 @@ pub mod file_tests {
         test_assert_eq!(result, -1, "Seek on pipe file should fail");
 
         // Clean up
-        crate::fs::file_close(fd);
+        crate::vfs::file_close(fd);
 
         Ok(())
     }
 
     /// Test file stat operations
     pub fn test_file_stat_operations() -> TestResult {
-        let fd = crate::fs::file_alloc().unwrap();
+        let fd = crate::vfs::file_alloc().unwrap();
 
         // Test stat on invalid file
         let result = crate::fs::file_stat(9999);
@@ -401,14 +404,14 @@ pub mod file_tests {
         test_assert!(result.is_ok(), "Stat on valid file should succeed");
 
         // Clean up
-        crate::fs::file_close(fd);
+        crate::vfs::file_close(fd);
 
         Ok(())
     }
 
     /// Test file truncation
     pub fn test_file_truncate() -> TestResult {
-        let fd = crate::fs::file_alloc().unwrap();
+        let fd = crate::vfs::file_alloc().unwrap();
 
         // Test truncate on invalid file
         let result = crate::fs::file_truncate(9999, 1024);
@@ -419,14 +422,14 @@ pub mod file_tests {
         // Result depends on whether VFS is available
 
         // Clean up
-        crate::fs::file_close(fd);
+        crate::vfs::file_close(fd);
 
         Ok(())
     }
 
     /// Test file permission changes
     pub fn test_file_permission_changes() -> TestResult {
-        let fd = crate::fs::file_alloc().unwrap();
+        let fd = crate::vfs::file_alloc().unwrap();
 
         // Test chmod on invalid file
         let result = crate::fs::file_chmod(9999, 0o644);
@@ -441,14 +444,14 @@ pub mod file_tests {
         test_assert!(result.is_err(), "Chown on invalid file should fail");
 
         // Clean up
-        crate::fs::file_close(fd);
+        crate::vfs::file_close(fd);
 
         Ok(())
     }
 
     /// Test file event subscription
     pub fn test_file_event_subscription() -> TestResult {
-        let fd = crate::fs::file_alloc().unwrap();
+        let fd = crate::vfs::file_alloc().unwrap();
 
         // Test subscribe/unsubscribe (these are no-ops for most file types)
         crate::fs::file_subscribe(fd, crate::posix::POLLIN, 0x1000);
@@ -459,7 +462,7 @@ pub mod file_tests {
         test_assert!(events >= 0, "Poll should return valid event mask");
 
         // Clean up
-        crate::fs::file_close(fd);
+        crate::vfs::file_close(fd);
 
         Ok(())
     }
@@ -474,7 +477,7 @@ pub mod file_tests {
 
         if let Some(fd) = socket_file {
             // Verify socket file properties
-            let table = crate::fs::FILE_TABLE.lock();
+            let table = crate::vfs::FILE_TABLE.lock();
             if let Some(file) = table.get(fd) {
                 test_assert_eq!(file.ftype, crate::fs::FileType::Socket);
                 test_assert!(file.readable);
@@ -487,7 +490,7 @@ pub mod file_tests {
             test_assert!(socket.is_some());
 
             // Clean up
-            crate::fs::file_close(fd);
+            crate::vfs::file_close(fd);
         } else {
             // Socket creation not available, skip test
             skip_test("Socket file creation not available");
@@ -502,7 +505,7 @@ pub mod file_tests {
 
         // Allocate many files
         for _ in 0..50 {
-            if let Some(fd) = crate::fs::file_alloc() {
+            if let Some(fd) = crate::vfs::file_alloc() {
                 allocated_files.push(fd);
             } else {
                 break;
@@ -514,7 +517,7 @@ pub mod file_tests {
 
         // Perform operations on all files
         for &fd in &allocated_files {
-            let table = crate::fs::FILE_TABLE.lock();
+            let table = crate::vfs::FILE_TABLE.lock();
             if let Some(file) = table.get_mut(fd) {
                 file.readable = true;
                 file.writable = true;
@@ -524,11 +527,11 @@ pub mod file_tests {
 
         // Free all files
         for fd in allocated_files {
-            crate::fs::file_close(fd);
+            crate::vfs::file_close(fd);
         }
 
         // Verify all files are freed
-        let table = crate::fs::FILE_TABLE.lock();
+        let table = crate::vfs::FILE_TABLE.lock();
         let mut valid_count = 0;
         for i in 0..crate::fs::NFILE {
             if let Some(file) = table.get(i) {

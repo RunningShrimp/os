@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! POSIX Message Queue System Call Handlers
 //!
 //! This module implements the system call handlers for POSIX message queues.

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Unified Error Handling Module
 //!
 //! 统一错误处理模块

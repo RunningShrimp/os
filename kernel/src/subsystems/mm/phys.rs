@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Physical memory management for xv6-rust
 //! Provides page frame allocation using a free list (like xv6) and bitmap allocator
 

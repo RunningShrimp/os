@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 服务模块
 //! 
 //! 本模块提供服务管理功能，使用nos-services crate作为统一实现。

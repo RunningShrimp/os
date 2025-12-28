@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Advanced Thread System Calls
 //!
 //! This module implements system calls for advanced POSIX thread features:
@@ -21,7 +24,7 @@
 use crate::posix::advanced_thread::*;
 use crate::posix::{ClockId, Pid};
 use crate::posix::realtime::SchedParam;
-use crate::syscalls::common::{SyscallError, SyscallResult};
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
 use crate::process::myproc;
 
 /// System call dispatch for advanced thread operations

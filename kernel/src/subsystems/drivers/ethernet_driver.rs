@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Ethernet network device driver implementation
 //!
 //! This module provides a concrete implementation of an Ethernet network device driver

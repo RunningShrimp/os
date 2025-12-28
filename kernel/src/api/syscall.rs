@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! System Call API Interface
 //!
 //! This module defines the trait interfaces for system call dispatching

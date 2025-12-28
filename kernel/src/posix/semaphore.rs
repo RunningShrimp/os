@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! POSIX Semaphore (semaphore.h) Implementation
 //!
 //! Implements POSIX named and unnamed semaphores for synchronization
@@ -9,7 +12,7 @@ use alloc::sync::Arc;
 use alloc::collections::BTreeMap;
 use alloc::boxed::Box;
 use crate::subsystems::sync::Mutex;
-use crate::reliability::errno::{EOK, EINVAL, ENOENT, EAGAIN};
+use crate::reliability::{EOK, EINVAL, ENOENT, EAGAIN};
 use crate::posix::SemT;
 
 /// Semaphore descriptor

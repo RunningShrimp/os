@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 信号系统调用服务实现
 //! 
 //! 本模块提供信号系统调用服务的实现，包括：
@@ -6,10 +9,10 @@
 //! - 信号掩码操作
 //! - 信号集操作
 
-use nos_nos_error_handling::unified::KernelError;
-use crate::syscalls::services::{BaseService, ServiceStatus, SyscallService};
-use crate::syscalls::signal_service::handlers::*;
-use crate::process::ProcessId;
+use crate::error::UnifiedError;
+use crate::subsystems::syscalls::services::{BaseService, ServiceStatus, SyscallService};
+use crate::subsystems::syscalls::signal_service::handlers::*;
+use crate::subsystems::process::ProcessId;
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;

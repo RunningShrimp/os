@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 信号系统调用类型定义
 //! 
 //! 本模块定义了信号系统调用相关的数据类型，包括：

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! POSIX兼容性测试套件
 //!
 //! 提供全面的POSIX标准合规性测试，包括：

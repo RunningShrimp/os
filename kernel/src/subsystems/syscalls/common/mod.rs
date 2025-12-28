@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 系统调用通用模块
 //!
 //! 本模块提供系统调用的通用功能和常量定义。
@@ -18,8 +21,8 @@ pub mod error_codes {
     pub const ENOMEM: isize = -5;
     /// 资源忙
     pub const EBUSY: isize = -6;
-    /// 资源不存在
-    pub const ENOENT: isize = -7;
+    /// 资源暂时不可用
+    pub const EAGAIN: isize = -7;
     /// 操作不支持
     pub const ENOTSUP: isize = -8;
 }
@@ -166,7 +169,7 @@ fn validate_ipc_args(args: &[usize]) -> bool {
 }
 
 /// 系统调用结果处理
-pub fn handle_syscall_result(result: Result<isize>) -> isize {
+pub fn handle_syscall_result(result: core::result::Result<isize, nos_api::Error>) -> isize {
     match result {
         Ok(value) => value,
         Err(e) => {

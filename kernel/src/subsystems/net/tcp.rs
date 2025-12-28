@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Transmission Control Protocol (TCP) implementation
 //!
 //! This module provides TCP protocol support for reliable stream-oriented communication.

@@ -1,6 +1,9 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Socket options syscalls
 
-use crate::syscalls::common::{SyscallError, SyscallResult};
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
 
 /// Set socket options
 pub fn sys_setsockopt(args: &[u64]) -> SyscallResult {

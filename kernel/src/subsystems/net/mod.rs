@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Network stack implementation
 //!
 //! This module implements a complete TCP/IP network stack for NOS,

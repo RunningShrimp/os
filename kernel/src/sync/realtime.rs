@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Real-time synchronization primitives
 //!
 //! Implements real-time locks with priority inheritance to prevent priority inversion.
@@ -6,7 +9,7 @@
 extern crate alloc;
 
 use core::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use crate::reliability::errno::{EINVAL, EDEADLK};
+use crate::reliability::{EINVAL, EDEADLK};
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 

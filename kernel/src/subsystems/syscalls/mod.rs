@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 系统调用模块
 //! 
 //! 本模块提供系统调用接口和分发机制，按功能域拆分为：
@@ -40,9 +43,13 @@ pub use ipc::*;
 pub use signal::*;
 pub use async_ops::*;
 pub use epoll::*;
-pub use memory::*;
+// Note: memory module not glob-imported due to dispatch function ambiguity
 pub use object::*;
 pub use common::*;
 pub use types::*;
 pub use security::*;
 pub use fast_path::*;
+pub mod api;
+pub mod interface;
+pub mod thread;
+pub mod services;

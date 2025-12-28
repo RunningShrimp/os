@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Linux Binary Compatibility Layer
 //!
 //! Provides compatibility for Linux applications on NOS:

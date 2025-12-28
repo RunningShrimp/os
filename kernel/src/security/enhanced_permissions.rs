@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 增强权限控制系统
 //! 
 //! 本模块提供细粒度的权限管理机制，支持基于角色的访问控制(RBAC)、

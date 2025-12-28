@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! NOS 内核集成测试
 //! 
 //! 测试各个子系统之间的集成和交互

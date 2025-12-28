@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 系统调用安全模块
 //! 
 //! 本模块提供系统调用的安全功能，包括：

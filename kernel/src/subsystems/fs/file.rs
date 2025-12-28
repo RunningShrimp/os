@@ -1,11 +1,14 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 // File abstraction for xv6-rust
 // Provides unified file interface for regular files, devices, and pipes
 
 extern crate alloc;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use nos_perf::monitoring::{get_perf_stats};
-use nos_perf::core::{UnifiedSyscallStats, SyscallStatsSnapshot};
+use crate::perf::monitoring::{get_perf_stats};
+use crate::perf::core::{UnifiedSyscallStats, SyscallStatsSnapshot};
 use crate::subsystems::sync::{Mutex, Sleeplock};
 use crate::process;
 use crate::posix;

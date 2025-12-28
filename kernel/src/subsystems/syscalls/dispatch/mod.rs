@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! System Call Dispatch Layer
 //!
 //! This module implements the dispatch layer for system calls.

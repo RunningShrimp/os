@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! POSIX Asynchronous I/O (AIO) Implementation
 //!
 //! This module implements POSIX AIO functionality as defined in POSIX.1-2008.

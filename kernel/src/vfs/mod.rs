@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Virtual File System (VFS) module
 //!
 //! Provides unified interface for filesystem operations and mount management.

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! 可靠性模块
 //! 
 //! 本模块提供系统的可靠性功能，包括：

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Socket abstraction layer
 //!
 //! This module provides socket types and interfaces that bridge between the

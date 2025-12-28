@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 //! Health Monitoring
 //! 
 //! This module provides health monitoring functionality for the kernel.
