@@ -1,7 +1,7 @@
 //! Socket creation and management syscalls
 
 use super::*;
-use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult);
 use crate::net::socket::SocketAddr;
 
 /// Create a new socket
@@ -40,7 +40,7 @@ use crate::net::socket::SocketAddr;
 /// - The socket type is not supported
 /// - The protocol doesn't match the socket type
 /// - System resources are exhausted
-pub fn sys_socket(args: &[u64]) -> SyscallResult {
+pub fn sys_socket(args: &[u64]) -> SyscallResult<i64> {
     if args.len() < 3 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -155,7 +155,7 @@ pub fn sys_socket(args: &[u64]) -> SyscallResult {
 /// - The file descriptor is invalid or not a socket
 /// - The address family doesn't match the socket's domain
 /// - The address is already in use (unless `SO_REUSEADDR` is set)
-pub fn sys_bind(args: &[u64]) -> SyscallResult {
+pub fn sys_bind(args: &[u64]) -> SyscallResult<i64> {
     if args.len() < 3 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -298,7 +298,7 @@ pub fn sys_bind(args: &[u64]) -> SyscallResult {
 /// - The socket is not a stream socket (TCP)
 /// - The socket is not bound to an address
 /// - The backlog is invalid (must be between 0 and 128)
-pub fn sys_listen(args: &[u64]) -> SyscallResult {
+pub fn sys_listen(args: &[u64]) -> SyscallResult<i64> {
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -387,7 +387,7 @@ pub fn sys_listen(args: &[u64]) -> SyscallResult {
 /// - The file descriptor is invalid
 /// - The socket is not in listening state
 /// - No connections are available (in non-blocking mode)
-pub fn sys_accept(args: &[u64]) -> SyscallResult {
+pub fn sys_accept(args: &[u64]) -> SyscallResult<i64> {
     if args.len() < 3 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -521,7 +521,7 @@ pub fn sys_accept(args: &[u64]) -> SyscallResult {
 /// - The address family doesn't match the socket's domain
 /// - The socket is already connected
 /// - Connection cannot be established (connection refused, timeout, etc.)
-pub fn sys_connect(args: &[u64]) -> SyscallResult {
+pub fn sys_connect(args: &[u64]) -> SyscallResult<i64> {
     if args.len() < 3 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -627,7 +627,7 @@ pub fn sys_connect(args: &[u64]) -> SyscallResult {
 }
 
 /// Shutdown a socket
-pub fn sys_shutdown(args: &[u64]) -> SyscallResult {
+pub fn sys_shutdown(args: &[u64]) -> SyscallResult<i64> {
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -673,7 +673,7 @@ pub fn sys_shutdown(args: &[u64]) -> SyscallResult {
 /// * `Err(SyscallError::InvalidArgument)` - Invalid domain, type, or protocol
 /// * `Err(SyscallError::OutOfMemory)` - Failed to allocate socket resources
 /// * `Err(SyscallError::NotSupported)` - Domain or type not supported
-pub fn sys_socketpair(args: &[u64]) -> SyscallResult {
+pub fn sys_socketpair(args: &[u64]) -> SyscallResult<i64> {
     if args.len() < 4 {
         return Err(SyscallError::InvalidArgument);
     }

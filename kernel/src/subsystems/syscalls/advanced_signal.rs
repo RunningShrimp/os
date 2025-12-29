@@ -9,11 +9,11 @@
 
 use crate::posix::advanced_signal::*;
 use crate::posix::{SigSet, SigVal, Timespec, StackT, SigInfoT};
-use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult);
 use crate::process::myproc;
 
 /// System call dispatch for advanced signal operations
-pub fn dispatch(syscall_num: u32, args: &[u64]) -> SyscallResult {
+pub fn dispatch(syscall_num: u32, args: &[u64]) -> SyscallResult<i64>{
     match syscall_num {
         0x5000 => sys_sigqueue(args),
         0x5001 => sys_sigtimedwait(args),
@@ -32,7 +32,7 @@ pub fn dispatch(syscall_num: u32, args: &[u64]) -> SyscallResult {
 /// 2: value_ptr - Pointer to sigval union
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_sigqueue(args: &[u64]) -> SyscallResult {
+fn sys_sigqueue(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 3 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -105,7 +105,7 @@ fn sys_sigqueue(args: &[u64]) -> SyscallResult {
 /// 2: timeout_ptr - Pointer to timeout specification
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_sigtimedwait(args: &[u64]) -> SyscallResult {
+fn sys_sigtimedwait(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 3 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -205,7 +205,7 @@ fn sys_sigtimedwait(args: &[u64]) -> SyscallResult {
 /// 1: info_ptr - Pointer to store signal info
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_sigwaitinfo(args: &[u64]) -> SyscallResult {
+fn sys_sigwaitinfo(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -282,7 +282,7 @@ fn sys_sigwaitinfo(args: &[u64]) -> SyscallResult {
 /// 1: old_stack_ptr - Pointer to store old stack specification
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_sigaltstack(args: &[u64]) -> SyscallResult {
+fn sys_sigaltstack(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -376,7 +376,7 @@ fn sys_sigaltstack(args: &[u64]) -> SyscallResult {
 /// 2: old_mask_ptr - Pointer to store old signal mask
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_pthread_sigmask(args: &[u64]) -> SyscallResult {
+fn sys_pthread_sigmask(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 3 {
         return Err(SyscallError::InvalidArgument);
     }

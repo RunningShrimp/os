@@ -38,7 +38,7 @@ use crate::subsystems::sync::Mutex;
 
 use super::interface::{
     SyscallDispatcher, SyscallHandler, SyscallContext,
-    SyscallResult, SyscallCategory, get_syscall_category,
+    SyscallResult<i64> SyscallCategory, get_syscall_category,
 };
 use crate::api::SyscallError as InterfaceSyscallError;
 use crate::subsystems::syscalls::api::SyscallError as ApiSyscallError;
@@ -332,8 +332,8 @@ impl SyscallDispatcherImpl {
     /// * `args` - System call arguments
     ///
     /// # Returns
-    /// * `Option<SyscallResult>` - Result if fast path handled
-    fn handle_fast_path(&self, syscall_number: u32, args: &[u64]) -> Option<SyscallResult> {
+    /// * `Option<SyscallResult<i64>` - Result if fast path handled
+    fn handle_fast_path(&self, syscall_number: u32, args: &[u64]) -> Option<SyscallResult<i64> {
         if !self.config.enable_fast_path {
             return None;
         }

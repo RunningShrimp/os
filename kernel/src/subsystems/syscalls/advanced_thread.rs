@@ -21,11 +21,11 @@
 use crate::posix::advanced_thread::*;
 use crate::posix::{ClockId, Pid};
 use crate::posix::realtime::SchedParam;
-use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult);
 use crate::process::myproc;
 
 /// System call dispatch for advanced thread operations
-pub fn dispatch(syscall_num: u32, args: &[u64]) -> SyscallResult {
+pub fn dispatch(syscall_num: u32, args: &[u64]) -> SyscallResult<i64>{
     match syscall_num {
         0x8000 => sys_pthread_attr_setschedpolicy(args),
         0x8001 => sys_pthread_attr_getschedpolicy(args),
@@ -54,7 +54,7 @@ pub fn dispatch(syscall_num: u32, args: &[u64]) -> SyscallResult {
 /// 1: policy - Scheduling policy
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_pthread_attr_setschedpolicy(args: &[u64]) -> SyscallResult {
+fn sys_pthread_attr_setschedpolicy(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -131,7 +131,7 @@ fn sys_pthread_attr_setschedpolicy(args: &[u64]) -> SyscallResult {
 /// 1: policy_ptr - Pointer to store scheduling policy
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_pthread_attr_getschedpolicy(args: &[u64]) -> SyscallResult {
+fn sys_pthread_attr_getschedpolicy(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -197,7 +197,7 @@ fn sys_pthread_attr_getschedpolicy(args: &[u64]) -> SyscallResult {
 /// 1: param_ptr - Pointer to scheduling parameters
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_pthread_attr_setschedparam(args: &[u64]) -> SyscallResult {
+fn sys_pthread_attr_setschedparam(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -290,7 +290,7 @@ fn sys_pthread_attr_setschedparam(args: &[u64]) -> SyscallResult {
 /// 1: param_ptr - Pointer to store scheduling parameters
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_pthread_attr_getschedparam(args: &[u64]) -> SyscallResult {
+fn sys_pthread_attr_getschedparam(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -358,7 +358,7 @@ fn sys_pthread_attr_getschedparam(args: &[u64]) -> SyscallResult {
 /// 1: inherit - Scheduling inheritance
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_pthread_attr_setinheritsched(args: &[u64]) -> SyscallResult {
+fn sys_pthread_attr_setinheritsched(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -435,7 +435,7 @@ fn sys_pthread_attr_setinheritsched(args: &[u64]) -> SyscallResult {
 /// 1: inherit_ptr - Pointer to store scheduling inheritance
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_pthread_attr_getinheritsched(args: &[u64]) -> SyscallResult {
+fn sys_pthread_attr_getinheritsched(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -501,7 +501,7 @@ fn sys_pthread_attr_getinheritsched(args: &[u64]) -> SyscallResult {
 /// 1: param_ptr - Pointer to scheduling parameters
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_pthread_setschedparam(args: &[u64]) -> SyscallResult {
+fn sys_pthread_setschedparam(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -564,7 +564,7 @@ fn sys_pthread_setschedparam(args: &[u64]) -> SyscallResult {
 /// 1: param_ptr - Pointer to store scheduling parameters
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_pthread_getschedparam(args: &[u64]) -> SyscallResult {
+fn sys_pthread_getschedparam(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -619,7 +619,7 @@ fn sys_pthread_getschedparam(args: &[u64]) -> SyscallResult {
 /// 2: clock_id_ptr - Pointer to store clock ID
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_pthread_getcpuclockid(args: &[u64]) -> SyscallResult {
+fn sys_pthread_getcpuclockid(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 3 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -673,7 +673,7 @@ fn sys_pthread_getcpuclockid(args: &[u64]) -> SyscallResult {
 /// 1: count - Number of threads required
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_pthread_barrier_init(args: &[u64]) -> SyscallResult {
+fn sys_pthread_barrier_init(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -740,7 +740,7 @@ fn sys_pthread_barrier_init(args: &[u64]) -> SyscallResult {
 /// 0: barrier_ptr - Pointer to barrier
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_pthread_barrier_wait(args: &[u64]) -> SyscallResult {
+fn sys_pthread_barrier_wait(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 1 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -773,7 +773,7 @@ fn sys_pthread_barrier_wait(args: &[u64]) -> SyscallResult {
 /// 0: barrier_ptr - Pointer to barrier
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_pthread_barrier_destroy(args: &[u64]) -> SyscallResult {
+fn sys_pthread_barrier_destroy(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 1 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -801,7 +801,7 @@ fn sys_pthread_barrier_destroy(args: &[u64]) -> SyscallResult {
 /// 0: spin_ptr - Pointer to spinlock
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_pthread_spin_init(args: &[u64]) -> SyscallResult {
+fn sys_pthread_spin_init(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 1 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -863,7 +863,7 @@ fn sys_pthread_spin_init(args: &[u64]) -> SyscallResult {
 /// 0: spin_ptr - Pointer to spinlock
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_pthread_spin_lock(args: &[u64]) -> SyscallResult {
+fn sys_pthread_spin_lock(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 1 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -894,7 +894,7 @@ fn sys_pthread_spin_lock(args: &[u64]) -> SyscallResult {
 /// 0: spin_ptr - Pointer to spinlock
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_pthread_spin_unlock(args: &[u64]) -> SyscallResult {
+fn sys_pthread_spin_unlock(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 1 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -925,7 +925,7 @@ fn sys_pthread_spin_unlock(args: &[u64]) -> SyscallResult {
 /// 0: spin_ptr - Pointer to spinlock
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_pthread_spin_destroy(args: &[u64]) -> SyscallResult {
+fn sys_pthread_spin_destroy(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 1 {
         return Err(SyscallError::InvalidArgument);
     }

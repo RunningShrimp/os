@@ -46,87 +46,87 @@ impl SyscallHandler for FsSyscallHandler {
 
 impl FsSyscallHandler {
     /// 打开文件
-    fn sys_open(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
+    fn sys_open(&mut self, _args: &SyscallArgs) -> Result<SyscallResult<i64> {
         // 占位符实现
-        Ok(SyscallResult::success(0))
+        Ok(SyscallResult<i64>:success(0))
     }
 
     /// 关闭文件
-    fn sys_close(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
+    fn sys_close(&mut self, _args: &SyscallArgs) -> Result<SyscallResult<i64> {
         // 占位符实现
-        Ok(SyscallResult::success(0))
+        Ok(SyscallResult<i64>:success(0))
     }
 
     /// 读取文件
-    fn sys_read(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
+    fn sys_read(&mut self, _args: &SyscallArgs) -> Result<SyscallResult<i64> {
         // 占位符实现
-        Ok(SyscallResult::success(0))
+        Ok(SyscallResult<i64>:success(0))
     }
 
     /// 写入文件
-    fn sys_write(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
+    fn sys_write(&mut self, _args: &SyscallArgs) -> Result<SyscallResult<i64> {
         // 占位符实现
-        Ok(SyscallResult::success(0))
+        Ok(SyscallResult<i64>:success(0))
     }
 
     /// 文件定位
-    fn sys_lseek(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
+    fn sys_lseek(&mut self, _args: &SyscallArgs) -> Result<SyscallResult<i64> {
         // 占位符实现
-        Ok(SyscallResult::success(0))
+        Ok(SyscallResult<i64>:success(0))
     }
 
     /// 获取文件状态
-    fn sys_stat(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
+    fn sys_stat(&mut self, _args: &SyscallArgs) -> Result<SyscallResult<i64> {
         // 占位符实现
-        Ok(SyscallResult::success(0))
+        Ok(SyscallResult<i64>:success(0))
     }
 
     /// 开始日志事务
-    fn sys_journal_begin(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
+    fn sys_journal_begin(&mut self, _args: &SyscallArgs) -> Result<SyscallResult<i64> {
         // 占位符实现
-        Ok(SyscallResult::success(0))
+        Ok(SyscallResult<i64>:success(0))
     }
 
     /// 提交日志事务
-    fn sys_journal_commit(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
+    fn sys_journal_commit(&mut self, _args: &SyscallArgs) -> Result<SyscallResult<i64> {
         // 占位符实现
-        Ok(SyscallResult::success(0))
+        Ok(SyscallResult<i64>:success(0))
     }
 
     /// 中止日志事务
-    fn sys_journal_abort(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
+    fn sys_journal_abort(&mut self, _args: &SyscallArgs) -> Result<SyscallResult<i64> {
         // 占位符实现
-        Ok(SyscallResult::success(0))
+        Ok(SyscallResult<i64>:success(0))
     }
 
     /// 启用/禁用日志记录
-    fn sys_journal_enable(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
+    fn sys_journal_enable(&mut self, _args: &SyscallArgs) -> Result<SyscallResult<i64> {
         // 占位符实现
-        Ok(SyscallResult::success(0))
+        Ok(SyscallResult<i64>:success(0))
     }
 
     /// 获取日志状态
-    fn sys_journal_status(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
+    fn sys_journal_status(&mut self, _args: &SyscallArgs) -> Result<SyscallResult<i64> {
         // 占位符实现
-        Ok(SyscallResult::success(0))
+        Ok(SyscallResult<i64>:success(0))
     }
 
     /// 获取日志统计信息
-    fn sys_journal_stats(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
+    fn sys_journal_stats(&mut self, _args: &SyscallArgs) -> Result<SyscallResult<i64> {
         // 占位符实现
-        Ok(SyscallResult::success(0))
+        Ok(SyscallResult<i64>:success(0))
     }
 
     /// 日志检查点
-    fn sys_journal_checkpoint(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
+    fn sys_journal_checkpoint(&mut self, _args: &SyscallArgs) -> Result<SyscallResult<i64> {
         // 占位符实现
-        Ok(SyscallResult::success(0))
+        Ok(SyscallResult<i64>:success(0))
     }
 
     /// 获取恢复状态
-    fn sys_journal_recovery_status(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
+    fn sys_journal_recovery_status(&mut self, _args: &SyscallArgs) -> Result<SyscallResult<i64> {
         // 占位符实现
-        Ok(SyscallResult::success(0))
+        Ok(SyscallResult<i64>:success(0))
     }
 }
 

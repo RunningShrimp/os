@@ -1,12 +1,12 @@
 //! memfd_create system call test cases
 
-use super::common::{SyscallError, SyscallResult};
+use super::common::{SyscallError, SyscallResult);
 use crate::subsystems::syscalls::glib::{memfd_flags, fcntl_seals, get_memfd_instance};
 use crate::fs::file;
 use crate::process;
 
 /// Test memfd_create basic functionality
-pub fn test_memfd_create_basic() -> SyscallResult {
+pub fn test_memfd_create_basic() -> SyscallResult<i64>{
     crate::println!("Testing memfd_create basic functionality...");
     
     // Test 1: Create memfd with name and no flags
@@ -90,7 +90,7 @@ pub fn test_memfd_create_basic() -> SyscallResult {
 }
 
 /// Test memfd_create with MFD_CLOEXEC flag
-pub fn test_memfd_cloexec() -> SyscallResult {
+pub fn test_memfd_cloexec() -> SyscallResult<i64>{
     crate::println!("Testing memfd_create with MFD_CLOEXEC flag...");
     
     let name = "test_cloexec";
@@ -125,7 +125,7 @@ pub fn test_memfd_cloexec() -> SyscallResult {
 }
 
 /// Test memfd_create with MFD_ALLOW_SEALING flag
-pub fn test_memfd_sealing() -> SyscallResult {
+pub fn test_memfd_sealing() -> SyscallResult<i64>{
     crate::println!("Testing memfd_create with MFD_ALLOW_SEALING flag...");
     
     let name = "test_sealing";
@@ -195,7 +195,7 @@ pub fn test_memfd_sealing() -> SyscallResult {
 }
 
 /// Test memfd_create with invalid flags
-pub fn test_memfd_invalid_flags() -> SyscallResult {
+pub fn test_memfd_invalid_flags() -> SyscallResult<i64>{
     crate::println!("Testing memfd_create with invalid flags...");
     
     let name = "test_invalid";
@@ -222,7 +222,7 @@ pub fn test_memfd_invalid_flags() -> SyscallResult {
 }
 
 /// Test memfd_create with empty name
-pub fn test_memfd_empty_name() -> SyscallResult {
+pub fn test_memfd_empty_name() -> SyscallResult<i64>{
     crate::println!("Testing memfd_create with empty name...");
     
     let empty_name = "";
@@ -240,7 +240,7 @@ pub fn test_memfd_empty_name() -> SyscallResult {
 }
 
 /// Run all memfd_create tests
-pub fn run_all_memfd_tests() -> SyscallResult {
+pub fn run_all_memfd_tests() -> SyscallResult<i64>{
     crate::println!("=== Starting memfd_create test suite ===");
     
     // Run all test cases

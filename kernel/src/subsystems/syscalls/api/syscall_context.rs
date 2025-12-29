@@ -3,7 +3,7 @@
 //! This module defines the context structure that is passed to all system
 //! call handlers.
 
-use super::{SyscallId, SyscallResult};
+use super::{SyscallId, SyscallResult);
 
 /// System call context.
 ///

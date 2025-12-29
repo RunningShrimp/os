@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 use crate::subsystems::sync::Mutex;
 use crate::subsystems::mm::types::*;
 use crate::subsystems::mm::vm::{VmSpace, VmError};
-use crate::syscalls::SyscallResult;
+use crate::subsystems::syscalls::common::SyscallResult;
 
 /// 更改内存保护属性
 ///
@@ -20,7 +20,7 @@ use crate::syscalls::SyscallResult;
 ///
 /// # 返回
 /// 成功时返回0，失败时返回错误
-pub fn sys_mprotect(addr: usize, length: usize, flags: MapFlags) -> SyscallResult {
+pub fn sys_mprotect(addr: usize, length: usize, flags: MapFlags) -> SyscallResult<i64> {
     // 获取当前地址空间
     let vm_space = crate::subsystems::mm::vm::vm_manager().lock()
         .current_space()
@@ -53,7 +53,7 @@ pub fn sys_mprotect(addr: usize, length: usize, flags: MapFlags) -> SyscallResul
 ///
 /// # 返回
 /// 成功时返回0，失败时返回错误
-pub fn sys_mlock(addr: usize, length: usize) -> SyscallResult {
+pub fn sys_mlock(addr: usize, length: usize) -> SyscallResult<i64> {
     // 获取当前地址空间
     let vm_space = crate::subsystems::mm::vm::vm_manager().lock()
         .current_space()
@@ -86,7 +86,7 @@ pub fn sys_mlock(addr: usize, length: usize) -> SyscallResult {
 ///
 /// # 返回
 /// 成功时返回0，失败时返回错误
-pub fn sys_munlock(addr: usize, length: usize) -> SyscallResult {
+pub fn sys_munlock(addr: usize, length: usize) -> SyscallResult<i64> {
     // 获取当前地址空间
     let vm_space = crate::subsystems::mm::vm::vm_manager().lock()
         .current_space()
@@ -117,7 +117,7 @@ pub fn sys_munlock(addr: usize, length: usize) -> SyscallResult {
 ///
 /// # 返回
 /// 成功时返回0，失败时返回错误
-pub fn sys_mlockall(flags: MlockAllFlags) -> SyscallResult {
+pub fn sys_mlockall(flags: MlockAllFlags) -> SyscallResult<i64> {
     // 获取当前地址空间
     let vm_space = crate::subsystems::mm::vm::vm_manager().lock()
         .current_space()
@@ -133,7 +133,7 @@ pub fn sys_mlockall(flags: MlockAllFlags) -> SyscallResult {
 ///
 /// # 返回
 /// 成功时返回0，失败时返回错误
-pub fn sys_munlockall() -> SyscallResult {
+pub fn sys_munlockall() -> SyscallResult<i64> {
     // 获取当前地址空间
     let vm_space = crate::subsystems::mm::vm::vm_manager().lock()
         .current_space()

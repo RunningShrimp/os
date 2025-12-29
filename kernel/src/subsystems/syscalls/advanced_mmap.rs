@@ -11,7 +11,7 @@
 
 extern crate alloc;
 
-use super::common::{SyscallError, SyscallResult, extract_args};
+use super::common::{SyscallError, SyscallResult extract_args}
 use crate::process::{PROC_TABLE, myproc};
 use crate::subsystems::mm::vm::{map_pages, flags, PAGE_SIZE, flush_tlb_page, flush_tlb_all};
 use crate::subsystems::mm::{kalloc, kfree};
@@ -167,7 +167,7 @@ const MAX_LOCKED_MEMORY: usize = 64 * 1024 * 1024; // 64MB
 // ============================================================================
 
 /// Enhanced mmap with advanced flags support
-pub fn sys_mmap_advanced(args: &[u64]) -> SyscallResult {
+pub fn sys_mmap_advanced(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 6)?;
     let addr_hint = args[0] as usize;
     let length = args[1] as usize;
@@ -415,7 +415,7 @@ fn find_free_address_range(proc: &crate::process::Proc, size: usize, page_size: 
 // ============================================================================
 
 /// Lock pages in memory (mlock)
-pub fn sys_mlock(args: &[u64]) -> SyscallResult {
+pub fn sys_mlock(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 2)?;
     let addr = args[0] as usize;
     let len = args[1] as usize;
@@ -480,7 +480,7 @@ pub fn sys_mlock(args: &[u64]) -> SyscallResult {
 }
 
 /// Unlock pages in memory (munlock)
-pub fn sys_munlock(args: &[u64]) -> SyscallResult {
+pub fn sys_munlock(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 2)?;
     let addr = args[0] as usize;
     let len = args[1] as usize;
@@ -541,7 +541,7 @@ pub fn sys_munlock(args: &[u64]) -> SyscallResult {
 }
 
 /// Lock all current and future mappings (mlockall)
-pub fn sys_mlockall(args: &[u64]) -> SyscallResult {
+pub fn sys_mlockall(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 1)?;
     let flags = args[0] as i32;
 
@@ -592,7 +592,7 @@ pub fn sys_mlockall(args: &[u64]) -> SyscallResult {
 }
 
 /// Unlock all mappings (munlockall)
-pub fn sys_munlockall(_args: &[u64]) -> SyscallResult {
+pub fn sys_munlockall(_args: &[u64]) -> SyscallResult<i64>{
     let pid = myproc().ok_or(SyscallError::InvalidArgument)?;
     let mut table = PROC_TABLE.lock();
     let proc = table.find(pid).ok_or(SyscallError::InvalidArgument)?;
@@ -701,7 +701,7 @@ fn unlock_memory_page(va: usize, pa: *mut u8, size: usize) {
 // ============================================================================
 
 /// Provide advice about memory usage (madvise)
-pub fn sys_madvise(args: &[u64]) -> SyscallResult {
+pub fn sys_madvise(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 3)?;
     let addr = args[0] as usize;
     let length = args[1] as usize;
@@ -819,7 +819,7 @@ fn disable_huge_pages(region: &mut MemoryRegion, start: usize, end: usize) {
 // ============================================================================
 
 /// Check if pages are resident in memory (mincore)
-pub fn sys_mincore(args: &[u64]) -> SyscallResult {
+pub fn sys_mincore(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 3)?;
     let addr = args[0] as usize;
     let length = args[1] as usize;
@@ -883,7 +883,7 @@ pub fn sys_mincore(args: &[u64]) -> SyscallResult {
 // ============================================================================
 
 /// Remap pages in a file mapping (remap_file_pages)
-pub fn sys_remap_file_pages(args: &[u64]) -> SyscallResult {
+pub fn sys_remap_file_pages(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 4)?;
     let addr = args[0] as usize;
     let size = args[1] as usize;

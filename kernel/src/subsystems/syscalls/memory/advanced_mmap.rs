@@ -6,7 +6,7 @@
 //! - Page residency information (mincore)
 //! - Remapped file pages (remap_file_pages)
 
-use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult);
 
 /// Advanced memory mapping implementation placeholder
 pub struct AdvancedMmap;
@@ -28,7 +28,7 @@ impl Default for AdvancedMmap {
 /// 
 /// Arguments: [addr, length, advice]
 /// Returns: 0 on success, error on failure
-pub fn sys_madvise(args: &[u64]) -> SyscallResult {
+pub fn sys_madvise(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 3 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -46,7 +46,7 @@ pub fn sys_madvise(args: &[u64]) -> SyscallResult {
 /// 
 /// Arguments: [addr, length]
 /// Returns: 0 on success, error on failure
-pub fn sys_mlock(args: &[u64]) -> SyscallResult {
+pub fn sys_mlock(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -63,7 +63,7 @@ pub fn sys_mlock(args: &[u64]) -> SyscallResult {
 /// 
 /// Arguments: [addr, length]
 /// Returns: 0 on success, error on failure
-pub fn sys_munlock(args: &[u64]) -> SyscallResult {
+pub fn sys_munlock(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -80,7 +80,7 @@ pub fn sys_munlock(args: &[u64]) -> SyscallResult {
 /// 
 /// Arguments: [flags]
 /// Returns: 0 on success, error on failure
-pub fn sys_mlockall(args: &[u64]) -> SyscallResult {
+pub fn sys_mlockall(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 1 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -96,7 +96,7 @@ pub fn sys_mlockall(args: &[u64]) -> SyscallResult {
 /// 
 /// Arguments: []
 /// Returns: 0 on success, error on failure
-pub fn sys_munlockall(_args: &[u64]) -> SyscallResult {
+pub fn sys_munlockall(_args: &[u64]) -> SyscallResult<i64>{
     // TODO: Implement actual munlockall functionality
     crate::println!("[munlockall] Placeholder implementation");
     Ok(0)
@@ -106,7 +106,7 @@ pub fn sys_munlockall(_args: &[u64]) -> SyscallResult {
 /// 
 /// Arguments: [addr, length, vec]
 /// Returns: 0 on success, error on failure
-pub fn sys_mincore(args: &[u64]) -> SyscallResult {
+pub fn sys_mincore(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 3 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -124,7 +124,7 @@ pub fn sys_mincore(args: &[u64]) -> SyscallResult {
 /// 
 /// Arguments: [addr, size, prot, pgoff, flags]
 /// Returns: 0 on success, error on failure
-pub fn sys_remap_file_pages(args: &[u64]) -> SyscallResult {
+pub fn sys_remap_file_pages(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 5 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -144,7 +144,7 @@ pub fn sys_remap_file_pages(args: &[u64]) -> SyscallResult {
 /// 
 /// Arguments: [addr, length, prot, flags, fd, offset]
 /// Returns: mapped address on success, error on failure
-pub fn sys_mmap_advanced(args: &[u64]) -> SyscallResult {
+pub fn sys_mmap_advanced(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 6 {
         return Err(SyscallError::InvalidArgument);
     }

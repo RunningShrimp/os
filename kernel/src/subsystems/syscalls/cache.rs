@@ -13,12 +13,12 @@ use alloc::{
     vec::Vec,
     string::{String, ToString},
 };
-use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult);
 
 /// Cache entry for system call results
 pub struct SyscallCacheEntry {
     /// System call result
-    result: SyscallResult,
+    result: SyscallResult<i64>
     /// Timestamp when the entry was added to the cache
     timestamp: u64,
     /// Reference count (number of active users of this entry)
@@ -139,7 +139,7 @@ impl SyscallCache {
     }
 
     /// Get a cached result for a syscall
-    pub fn get(&mut self, key: &SyscallCacheKey) -> Option<SyscallResult> {
+    pub fn get(&mut self, key: &SyscallCacheKey) -> Option<SyscallResult<i64> {
         // Check if the syscall is pure (if pure_only is enabled)
         if self.config.pure_only && !self.is_pure_syscall(key.syscall_num) {
             return None;
@@ -181,7 +181,7 @@ impl SyscallCache {
     }
 
     /// Add a result to the cache
-    pub fn put(&mut self, key: SyscallCacheKey, result: SyscallResult) {
+    pub fn put(&mut self, key: SyscallCacheKey, result: SyscallResult<i64> {
         // Check if the syscall is pure (if pure_only is enabled)
         if self.config.pure_only && !self.is_pure_syscall(key.syscall_num) {
             return;

@@ -14,7 +14,7 @@ use core::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::subsystems::{sync::Mutex, syscalls::SyscallResult};
+use crate::subsystems::{sync::Mutex, syscalls::interface::SyscallResult as InterfaceSyscallResult;
 
 /// 对象类型信息
 #[derive(Debug, Clone)]

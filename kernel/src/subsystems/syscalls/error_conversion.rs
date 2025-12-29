@@ -109,7 +109,7 @@ where
 
 /// Result type conversion helper with context
 ///
-/// Converts any Result<T, E> where E: IntoSyscallError to SyscallResult,
+/// Converts any Result<T, E> where E: IntoSyscallError to SyscallResult<i64>
 /// adding context information for debugging.
 pub fn convert_result_with_context<T, E>(
     result: Result<T, E>,
@@ -143,7 +143,7 @@ impl<T> UnifiedSyscallResult<T> {
     where
         F: FnOnce(T) -> U,
     {
-        UnifiedSyscallResult {
+        UnifiedSyscallResult<i64>{
             inner: self.inner.map(f),
         }
     }
@@ -153,7 +153,7 @@ impl<T> UnifiedSyscallResult<T> {
     where
         F: FnOnce(SyscallError) -> SyscallError,
     {
-        UnifiedSyscallResult {
+        UnifiedSyscallResult<i64>{
             inner: self.inner.map_err(f),
         }
     }
@@ -331,7 +331,7 @@ mod tests {
     #[test]
     fn test_unified_result() {
         let result: Result<u32, SyscallError> = Ok(123);
-        let unified = UnifiedSyscallResult::new(result);
+        let unified = UnifiedSyscallResult<i64>:new(result);
         assert!(unified.is_ok());
         assert!(!unified.is_err());
         assert_eq!(unified.to_errno(), 0);
@@ -340,7 +340,7 @@ mod tests {
     #[test]
     fn test_unified_result_error() {
         let result: Result<u32, SyscallError> = Err(SyscallError::InvalidFd);
-        let unified = UnifiedSyscallResult::new(result);
+        let unified = UnifiedSyscallResult<i64>:new(result);
         assert!(!unified.is_ok());
         assert!(unified.is_err());
         assert_eq!(unified.to_errno(), 9); // EBADF

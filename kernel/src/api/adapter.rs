@@ -19,22 +19,22 @@ pub use nos_api::error::{Error as ApiError, Result as ApiResult};
 pub use nos_api::core::traits::Service;
 
 // Service information - adapter for InterfaceServiceInfo
-pub type ServiceInfo = nos_api::interfaces::InterfaceServiceInfo;
+pub use nos_api::interfaces::InterfaceServiceInfo as ServiceInfo;
 
 // Service manager - adapter for InterfaceServiceManager
-pub type ServiceManager = nos_api::interfaces::InterfaceServiceManager;
+pub use nos_api::interfaces::InterfaceServiceManager as ServiceManager;
 
 // Service status - adapter for InterfaceServiceStatus
-pub type ServiceStatus = nos_api::interfaces::InterfaceServiceStatus;
+pub use nos_api::interfaces::InterfaceServiceStatus as ServiceStatus;
 
 // Service request - adapter for InterfaceServiceRequest
-pub type ServiceRequest = nos_api::interfaces::InterfaceServiceRequest;
+pub use nos_api::interfaces::InterfaceServiceRequest as ServiceRequest;
 
 // Service response - adapter for InterfaceServiceResponse
-pub type ServiceResponse = nos_api::interfaces::InterfaceServiceResponse;
+pub use nos_api::interfaces::InterfaceServiceResponse as ServiceResponse;
 
 // Service stats - adapter for InterfaceServiceStats
-pub type ServiceStats = nos_api::interfaces::InterfaceServiceStats;
+pub use nos_api::interfaces::InterfaceServiceStats as ServiceStats;
 
 // ============================================================================
 // Syscall Type Adapters
@@ -47,17 +47,17 @@ pub use nos_api::interfaces::{
 };
 
 // Syscall stats
-pub type SyscallStats = nos_api::interfaces::SyscallStats;
+pub use nos_api::interfaces::SyscallStats as SyscallStats;
 
 // ============================================================================
 // Event Type Adapters
 // ============================================================================
 
 // Event publisher - adapter for InterfaceEventPublisher
-pub type EventPublisher = nos_api::interfaces::InterfaceEventPublisher;
+pub use nos_api::interfaces::InterfaceEventPublisher as EventPublisher;
 
 // Event subscriber - adapter for InterfaceEventSubscriber
-pub type EventSubscriber = nos_api::interfaces::InterfaceEventSubscriber;
+pub use nos_api::interfaces::InterfaceEventSubscriber as EventSubscriber;
 
 // Basic event from nos_api event module
 pub use nos_api::event::BasicEvent;
@@ -67,13 +67,13 @@ pub use nos_api::event::BasicEvent;
 // ============================================================================
 
 // Context manager - adapter for InterfaceContextManager
-pub type ContextManager = nos_api::interfaces::InterfaceContextManager;
+pub use nos_api::interfaces::InterfaceContextManager as ContextManager;
 
 // Context - adapter for InterfaceContext
-pub type Context = nos_api::interfaces::InterfaceContext;
+pub use nos_api::interfaces::InterfaceContext as Context;
 
 // Context type - adapter for InterfaceContextType
-pub type ContextType = nos_api::interfaces::InterfaceContextType;
+pub use nos_api::interfaces::InterfaceContextType as ContextType;
 
 // ============================================================================
 // Additional Type Aliases for Common Patterns

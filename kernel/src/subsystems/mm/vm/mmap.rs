@@ -11,7 +11,7 @@ use crate::subsystems::sync::Mutex;
 use crate::subsystems::mm::types::*;
 use crate::subsystems::mm::PageTable;
 use crate::subsystems::mm::vm::{VmSpace, VmRegion, VmRegionType, VmError};
-use crate::syscalls::SyscallResult;
+use crate::subsystems::syscalls::common::SyscallResult;
 
 /// 创建内存映射
 ///
@@ -30,7 +30,7 @@ pub fn sys_mmap(
     flags: MapFlags,
     fd: isize,
     offset: usize,
-) -> SyscallResult {
+) -> SyscallResult<i64> {
     // 获取当前地址空间
     let vm_space = crate::subsystems::mm::vm::vm_manager().lock()
         .current_space()
@@ -85,7 +85,7 @@ pub fn sys_mmap(
 ///
 /// # 返回
 /// 成功时返回0，失败时返回错误
-pub fn sys_munmap(addr: usize, length: usize) -> SyscallResult {
+pub fn sys_munmap(addr: usize, length: usize) -> SyscallResult<i64> {
     // 获取当前地址空间
     let vm_space = crate::subsystems::mm::vm::vm_manager().lock()
         .current_space()
@@ -132,7 +132,7 @@ pub fn sys_mremap(
     old_size: usize,
     new_size: usize,
     flags: Option<MapFlags>,
-) -> SyscallResult {
+) -> SyscallResult<i64> {
     // 获取当前地址空间
     let vm_space = crate::subsystems::mm::vm::vm_manager().lock()
         .current_space()
@@ -209,7 +209,7 @@ pub fn sys_mremap(
 ///
 /// # 返回
 /// 成功时返回0，失败时返回错误
-pub fn sys_msync(addr: usize, length: usize, flags: MsyncFlags) -> SyscallResult {
+pub fn sys_msync(addr: usize, length: usize, flags: MsyncFlags) -> SyscallResult<i64> {
     // 获取当前地址空间
     let vm_space = crate::subsystems::mm::vm::vm_manager().lock()
         .current_space()

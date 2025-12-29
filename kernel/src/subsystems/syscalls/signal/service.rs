@@ -489,29 +489,3 @@ mod tests {
     }
 }
 
-/// Public wrapper function to kill a process
-///
-/// This provides a convenient interface for sending signals to processes
-/// without requiring direct access to the SignalService instance.
-pub fn kill_process(pid: u64, sig: i32) -> Result<(), crate::error::UnifiedError> {
-    use crate::subsystems::process::ProcessId;
-
-    // Get the global signal service
-    let service = get_global_signal_service();
-    let process_id = ProcessId::new(pid as u32);
-    let signal_number = sig as i32;
-
-    service.kill_process(process_id, signal_number)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_kill_process_wrapper() {
-        let pid = 123;
-        let sig = 9;
-        assert!(kill_process(pid, sig).is_ok());
-    }
-}

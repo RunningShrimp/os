@@ -1,7 +1,7 @@
 //! Data transfer syscalls
 
 use super::*;
-use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult);
 
 /// Send data on a socket
 ///
@@ -45,7 +45,7 @@ use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
 /// - The file descriptor is invalid
 /// - The socket is not connected
 /// - The buffer pointer is invalid
-pub fn sys_send(args: &[u64]) -> SyscallResult {
+pub fn sys_send(args: &[u64]) -> SyscallResult<i64> {
     if args.len() < 4 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -166,7 +166,7 @@ pub fn sys_send(args: &[u64]) -> SyscallResult {
 /// - The file descriptor is invalid
 /// - The socket is not connected or bound
 /// - The buffer pointer is invalid
-pub fn sys_recv(args: &[u64]) -> SyscallResult {
+pub fn sys_recv(args: &[u64]) -> SyscallResult<i64> {
     if args.len() < 4 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -237,25 +237,25 @@ pub fn sys_recv(args: &[u64]) -> SyscallResult {
 }
 
 /// Send data to a specific address
-pub fn sys_sendto(args: &[u64]) -> SyscallResult {
+pub fn sys_sendto(args: &[u64]) -> SyscallResult<i64> {
     // For now, delegate to sys_send
     sys_send(args)
 }
 
 /// Receive data from a specific address
-pub fn sys_recvfrom(args: &[u64]) -> SyscallResult {
+pub fn sys_recvfrom(args: &[u64]) -> SyscallResult<i64> {
     // For now, delegate to sys_recv
     sys_recv(args)
 }
 
 /// Send message
-pub fn sys_sendmsg(_args: &[u64]) -> SyscallResult {
+pub fn sys_sendmsg(_args: &[u64]) -> SyscallResult<i64> {
     // TODO: Implement sendmsg syscall
     Err(SyscallError::NotSupported)
 }
 
 /// Receive message
-pub fn sys_recvmsg(_args: &[u64]) -> SyscallResult {
+pub fn sys_recvmsg(_args: &[u64]) -> SyscallResult<i64> {
     // TODO: Implement recvmsg syscall
     Err(SyscallError::NotSupported)
 }

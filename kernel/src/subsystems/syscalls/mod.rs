@@ -85,12 +85,12 @@ use crate::prelude::*;
 // ### 注册新系统调用
 //
 // ```no_run
-// use kernel::subsystems::syscalls::{SyscallHandler, SyscallId, SyscallResult};
+// use kernel::subsystems::syscalls::{SyscallHandler, SyscallId, SyscallResult);
 //
 // struct MySyscall;
 //
 // impl SyscallHandler for MySyscall {
-//     fn handle(&self, args: &[usize]) -> SyscallResult {
+//     fn handle(&self, args: &[usize]) -> SyscallResult<i64>{
 //         // 处理系统调用
 //         Ok(0)
 //     }

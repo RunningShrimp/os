@@ -1,11 +1,11 @@
 //! Time-related syscalls
 
-use super::common::{SyscallError, SyscallResult};
+use super::common::{SyscallError, SyscallResult);
 // use crate::libc::time_lib::{Timespec, Timezone};
 use crate::subsystems::mm::vm::copyin;
 
 /// Dispatch time-related syscalls
-pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
+pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult<i64>{
     match syscall_id {
         // Time operations
         0x6000 => sys_time(args),           // time
@@ -44,7 +44,7 @@ mod tests {
 
 // Placeholder implementations - to be replaced with actual syscall logic
 
-fn sys_time(_args: &[u64]) -> SyscallResult {
+fn sys_time(_args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyout;
     use crate::libc::interface::time_t;
@@ -91,7 +91,7 @@ fn sys_time(_args: &[u64]) -> SyscallResult {
 /// Get time of day
 /// Arguments: [tv_ptr, tz_ptr]
 /// Returns: 0 on success, error on failure
-fn sys_gettimeofday(args: &[u64]) -> SyscallResult {
+fn sys_gettimeofday(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyout;
     use crate::posix::Timeval;
@@ -134,7 +134,7 @@ fn sys_gettimeofday(args: &[u64]) -> SyscallResult {
     Ok(0)
 }
 
-fn sys_settimeofday(args: &[u64]) -> SyscallResult {
+fn sys_settimeofday(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyin;
     use crate::posix::Timeval;
@@ -181,7 +181,7 @@ fn sys_settimeofday(args: &[u64]) -> SyscallResult {
 /// Clock gettime - get time for specified clock
 /// Arguments: [clockid, tp_ptr]
 /// Returns: 0 on success, error on failure
-fn sys_clock_gettime(args: &[u64]) -> SyscallResult {
+fn sys_clock_gettime(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyout;
     use crate::posix::Timespec;
@@ -243,7 +243,7 @@ fn sys_clock_gettime(args: &[u64]) -> SyscallResult {
     Ok(0)
 }
 
-fn sys_clock_settime(args: &[u64]) -> SyscallResult {
+fn sys_clock_settime(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyin;
     use crate::posix::Timespec;
@@ -296,7 +296,7 @@ fn sys_clock_settime(args: &[u64]) -> SyscallResult {
 /// Clock getres - get clock resolution
 /// Arguments: [clockid, res_ptr]
 /// Returns: 0 on success, error on failure
-fn sys_clock_getres(args: &[u64]) -> SyscallResult {
+fn sys_clock_getres(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyout;
     use crate::posix::Timespec;
@@ -351,7 +351,7 @@ fn sys_clock_getres(args: &[u64]) -> SyscallResult {
 /// Returns: 0 on success, error on failure
 /// 
 /// Real-time aware: Uses high-precision timer for accurate sleep duration
-fn sys_nanosleep(args: &[u64]) -> SyscallResult {
+fn sys_nanosleep(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyout;
     use crate::posix::Timespec;
@@ -434,7 +434,7 @@ fn sys_nanosleep(args: &[u64]) -> SyscallResult {
     Ok(0)
 }
 
-fn sys_clock_nanosleep(args: &[u64]) -> SyscallResult {
+fn sys_clock_nanosleep(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::{copyin, copyout};
     use crate::posix::Timespec;
@@ -528,7 +528,7 @@ fn sys_clock_nanosleep(args: &[u64]) -> SyscallResult {
     Ok(0)
 }
 
-fn sys_alarm(args: &[u64]) -> SyscallResult {
+fn sys_alarm(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use core::sync::atomic::{AtomicU64, Ordering};
     
@@ -576,7 +576,7 @@ const ITIMER_REAL: i32 = 0;
 const ITIMER_VIRTUAL: i32 = 1;
 const ITIMER_PROF: i32 = 2;
 
-fn sys_setitimer(args: &[u64]) -> SyscallResult {
+fn sys_setitimer(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::{copyin, copyout};
     
@@ -637,7 +637,7 @@ fn sys_setitimer(args: &[u64]) -> SyscallResult {
     Ok(0)
 }
 
-fn sys_getitimer(args: &[u64]) -> SyscallResult {
+fn sys_getitimer(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyout;
     
@@ -679,7 +679,7 @@ fn sys_getitimer(args: &[u64]) -> SyscallResult {
 /// Create a per-process timer
 /// Arguments: [clockid, sevp_ptr, timerid_ptr]
 /// Returns: 0 on success, error on failure
-fn sys_timer_create(args: &[u64]) -> SyscallResult {
+fn sys_timer_create(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::{copyin, copyout};
     use crate::posix::{SigEvent, SIGEV_SIGNAL};
@@ -760,7 +760,7 @@ fn sys_timer_create(args: &[u64]) -> SyscallResult {
 /// Set timer time
 /// Arguments: [timerid, flags, new_value_ptr, old_value_ptr]
 /// Returns: 0 on success, error on failure
-fn sys_timer_settime(args: &[u64]) -> SyscallResult {
+fn sys_timer_settime(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::{copyin, copyout};
     use crate::posix::{Itimerspec, TIMER_ABSTIME};
@@ -832,7 +832,7 @@ fn sys_timer_settime(args: &[u64]) -> SyscallResult {
     Ok(0)
 }
 
-fn sys_timer_gettime(args: &[u64]) -> SyscallResult {
+fn sys_timer_gettime(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyout;
     use crate::posix::Itimerspec;
@@ -872,7 +872,7 @@ fn sys_timer_gettime(args: &[u64]) -> SyscallResult {
     Ok(0)
 }
 
-fn sys_timer_getoverrun(args: &[u64]) -> SyscallResult {
+fn sys_timer_getoverrun(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     
     let args = extract_args(args, 1)?;
@@ -883,7 +883,7 @@ fn sys_timer_getoverrun(args: &[u64]) -> SyscallResult {
     Ok(0)
 }
 
-fn sys_timer_delete(args: &[u64]) -> SyscallResult {
+fn sys_timer_delete(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     
     let args = extract_args(args, 1)?;

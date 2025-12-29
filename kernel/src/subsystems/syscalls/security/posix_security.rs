@@ -10,7 +10,7 @@
 
 use crate::posix::security::*;
 use crate::posix::{Uid, Gid, Pid, Mode};
-use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult);
 use crate::process::myproc;
 use crate::security::{check_permission, get_current_security_context, Object, PermissionBits, SecurityContext};
 
@@ -18,7 +18,7 @@ use crate::security::{check_permission, get_current_security_context, Object, Pe
 pub const MAX_NAME_LEN: usize = 256;
 
 /// System call dispatch for security operations
-pub fn dispatch(syscall_num: u32, args: &[u64]) -> SyscallResult {
+pub fn dispatch(syscall_num: u32, args: &[u64]) -> SyscallResult<i64>{
     match syscall_num {
         0xF000 => sys_capget(args),
         0xF001 => sys_capset(args),
@@ -44,7 +44,7 @@ pub fn dispatch(syscall_num: u32, args: &[u64]) -> SyscallResult {
 /// 2: data_ptr - Pointer to cap_user_data_t
 ///
 /// Returns: 0 on success, negative errno on failure
-fn sys_capget(args: &[u64]) -> SyscallResult {
+fn sys_capget(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 3 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -130,7 +130,7 @@ fn sys_capget(args: &[u64]) -> SyscallResult {
 /// 2: data_ptr - Pointer to cap_user_data_t
 ///
 /// Returns: 0 on success, negative errno on failure
-fn sys_capset(args: &[u64]) -> SyscallResult {
+fn sys_capset(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 3 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -215,7 +215,7 @@ fn sys_capset(args: &[u64]) -> SyscallResult {
 /// 1: pwd_ptr - Pointer to store password entry
 ///
 /// Returns: 0 on success, negative errno on failure
-fn sys_getpwnam(args: &[u64]) -> SyscallResult {
+fn sys_getpwnam(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -355,7 +355,7 @@ fn sys_getpwnam(args: &[u64]) -> SyscallResult {
 /// 1: pwd_ptr - Pointer to store password entry
 ///
 /// Returns: 0 on success, negative errno on failure
-fn sys_getpwuid(args: &[u64]) -> SyscallResult {
+fn sys_getpwuid(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -476,7 +476,7 @@ fn sys_getpwuid(args: &[u64]) -> SyscallResult {
 /// 1: grp_ptr - Pointer to store group entry
 ///
 /// Returns: 0 on success, negative errno on failure
-fn sys_getgrnam(args: &[u64]) -> SyscallResult {
+fn sys_getgrnam(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -595,7 +595,7 @@ fn sys_getgrnam(args: &[u64]) -> SyscallResult {
 /// 1: grp_ptr - Pointer to store group entry
 ///
 /// Returns: 0 on success, negative errno on failure
-fn sys_getgrgid(args: &[u64]) -> SyscallResult {
+fn sys_getgrgid(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -694,7 +694,7 @@ fn sys_getgrgid(args: &[u64]) -> SyscallResult {
 /// 0: uid - User ID to set
 ///
 /// Returns: 0 on success, negative errno on failure
-fn sys_setuid(args: &[u64]) -> SyscallResult {
+fn sys_setuid(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 1 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -715,7 +715,7 @@ fn sys_setuid(args: &[u64]) -> SyscallResult {
 /// 0: gid - Group ID to set
 ///
 /// Returns: 0 on success, negative errno on failure
-fn sys_setgid(args: &[u64]) -> SyscallResult {
+fn sys_setgid(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 1 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -736,7 +736,7 @@ fn sys_setgid(args: &[u64]) -> SyscallResult {
 /// 0: euid - Effective user ID to set
 ///
 /// Returns: 0 on success, negative errno on failure
-fn sys_seteuid(args: &[u64]) -> SyscallResult {
+fn sys_seteuid(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 1 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -757,7 +757,7 @@ fn sys_seteuid(args: &[u64]) -> SyscallResult {
 /// 0: egid - Effective group ID to set
 ///
 /// Returns: 0 on success, negative errno on failure
-fn sys_setegid(args: &[u64]) -> SyscallResult {
+fn sys_setegid(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 1 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -779,7 +779,7 @@ fn sys_setegid(args: &[u64]) -> SyscallResult {
 /// 1: euid - Effective user ID to set
 ///
 /// Returns: 0 on success, negative errno on failure
-fn sys_setreuid(args: &[u64]) -> SyscallResult {
+fn sys_setreuid(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -802,7 +802,7 @@ fn sys_setreuid(args: &[u64]) -> SyscallResult {
 /// 1: egid - Effective group ID to set
 ///
 /// Returns: 0 on success, negative errno on failure
-fn sys_setregid(args: &[u64]) -> SyscallResult {
+fn sys_setregid(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }

@@ -7,8 +7,9 @@ use alloc::{collections::BTreeMap, sync::Arc, boxed::Box};
 use nos_api::{
     Result,
     interfaces::{SyscallDispatcher, SyscallHandler, SyscallStats},
-    syscall::{types::SyscallArgs, SyscallResult},
+    syscall::types::SyscallArgs,
 };
+use crate::subsystems::syscalls::interface::SyscallResult;
 use spin::Mutex;
 
 /// 系统调用核心分发器
@@ -51,7 +52,7 @@ impl SyscallCoreDispatcher {
     }
 
     /// 分发系统调用
-    pub fn dispatch(&self, syscall_num: usize, args: &[usize]) -> Result<SyscallResult> {
+    pub fn dispatch(&self, syscall_num: usize, args: &[usize]) -> Result<SyscallResult<i64> {
         let start_time = nos_api::event::get_time_ns();
 
         // 更新统计信息
@@ -106,7 +107,7 @@ impl SyscallCoreDispatcher {
             }
 
             // 返回成功结果
-            Ok(SyscallResult::success(result_value as isize))
+            Ok(SyscallResult<i64>:success(result_value as isize))
         } else {
             // 处理器不存在
             let mut stats = self.stats.lock();
@@ -141,7 +142,7 @@ impl SyscallCoreDispatcher {
 }
 
 impl SyscallDispatcher for SyscallCoreDispatcher {
-    fn dispatch(&mut self, syscall_num: usize, args: &SyscallArgs) -> Result<SyscallResult> {
+    fn dispatch(&mut self, syscall_num: usize, args: &SyscallArgs) -> Result<SyscallResult<i64> {
         // Convert SyscallArgs back to slice for internal dispatch
         let args_slice = [
             args.arg0,

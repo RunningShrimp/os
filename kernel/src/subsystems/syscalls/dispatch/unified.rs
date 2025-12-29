@@ -18,7 +18,7 @@ use crate::subsystems::sync::rcu;
 use crate::cpu;
 
 use nos_api::syscall::interface::{SyscallDispatcher, SyscallHandler};
-use nos_api::syscall::types::{SyscallNumber, SyscallArgs, SyscallResult};
+use nos_api::syscall::types::{SyscallNumber, SyscallArgs, SyscallResult);
 use nos_api::error::Result;
 
 /// Maximum number of CPUs supported
@@ -432,7 +432,7 @@ impl SyscallDispatcher for UnifiedSyscallDispatcher {
         println!("Unregistered handler for syscall {}", number);
     }
 
-    fn dispatch(&mut self, number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult> {
+    fn dispatch(&mut self, number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult<i64> {
         let start_time = if self.config.enable_monitoring {
             Self::rdtsc()
         } else {
@@ -463,7 +463,7 @@ impl SyscallDispatcher for UnifiedSyscallDispatcher {
                     self.stats.record_dispatch(result.is_ok(), true, time_ns);
 
                     // Convert the result to match the trait
-                    return Ok(SyscallResult::success(result.unwrap_or(0) as isize));
+                    return Ok(SyscallResult<i64>:success(result.unwrap_or(0) as isize));
                 }
             }
         }
@@ -495,7 +495,7 @@ impl SyscallDispatcher for UnifiedSyscallDispatcher {
             let time_ns = end_time.saturating_sub(start_time);
             self.stats.record_dispatch(false, false, time_ns);
 
-            return Ok(SyscallResult::success(0));
+            return Ok(SyscallResult<i64>:success(0));
         }
 
         Err(nos_api::syscall::types::SyscallError::InvalidSyscall(number))
@@ -611,8 +611,8 @@ mod tests {
     }
 
     impl SyscallHandler for TestHandler {
-        fn handle(&mut self, number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult> {
-            Ok(SyscallResult::success(self.result as isize))
+        fn handle(&mut self, number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult<i64> {
+            Ok(SyscallResult<i64>:success(self.result as isize))
         }
 
         fn name(&self) -> &str {

@@ -2,14 +2,14 @@
 //!
 //! This module provides wrapper functions to unify system call handler return types.
 //! It automatically converts various error types (KernelError, UnifiedError, etc.)
-//! to the standard SyscallResult type.
+//! to the standard SyscallResult<i64>type.
 //! # Design Principles
 //! - Zero-cost abstraction: minimal overhead
 //! - Type safety: compile-time error checking
 //! - Flexibility: works with different handler signatures
 //! - Performance: inline where possible
 
-use crate::subsystems::syscalls::interface::SyscallResult;
+use crate::subsystems::syscalls::interface::SyscallResult
 use alloc::string::ToString;
 use crate::subsystems::syscalls::error_conversion::{
     IntoSyscallError, convert_result, convert_result_with_context,
@@ -19,12 +19,12 @@ use alloc::vec::Vec;
 /// Wrap a legacy handler that returns Result<u64, KernelError>
 ///
 /// This function wraps handlers from the old API and converts their
-/// return type to the new unified SyscallResult.
+/// return type to the new unified SyscallResult<i64>
 /// # Arguments
 /// * `f` - The legacy handler function
 /// * `args` - System call arguments
 /// # Returns
-/// * `SyscallResult` - Unified system call result
+/// * `SyscallResult<i64> - Unified system call result
 #[inline(always)]
 pub fn wrap_legacy_handler<F>(f: F, args: &[u64]) -> SyscallResult
 where
@@ -66,7 +66,7 @@ where
 /// without changing their implementation.
 pub trait UnifiedHandler {
     /// Execute the handler with arguments
-    fn execute(&self, args: &[u64]) -> SyscallResult;
+    fn execute(&self, args: &[u64]) -> SyscallResult<i64>
     /// Get the handler name for debugging
     fn name(&self) -> &'static str;
 }
@@ -99,7 +99,7 @@ impl<F> UnifiedHandler for LegacyHandlerAdapter<F>
 where
     F: Fn(&[u64]) -> Result<u64, crate::api::KernelError>,
 {
-    fn execute(&self, args: &[u64]) -> SyscallResult {
+    fn execute(&self, args: &[u64]) -> SyscallResult<i64>{
         wrap_legacy_handler(&self.func, args)
     }
 
@@ -144,7 +144,7 @@ where
     T: Into<u64>,
     E: IntoSyscallError,
 {
-    fn execute(&self, args: &[u64]) -> SyscallResult {
+    fn execute(&self, args: &[u64]) -> SyscallResult<i64>{
         wrap_handler(&self.func, args)
     }
 
@@ -153,11 +153,11 @@ where
     }
 }
 
-/// Convert a batch of handler results to SyscallResults
+/// Convert a batch of handler results to SyscallResult<i64>
 /// This function is useful for batch system call operations.
 pub fn wrap_batch_results<T, E>(
     results: Vec<Result<T, E>>,
-) -> Vec<SyscallResult>
+) -> Vec<SyscallResult<i64>
 where
     T: Into<u64>,
     E: IntoSyscallError,

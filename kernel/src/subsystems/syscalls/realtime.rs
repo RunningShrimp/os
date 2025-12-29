@@ -12,11 +12,11 @@
 //! - sched_getaffinity() - Get CPU affinity
 
 use crate::posix::realtime::*;
-use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult);
 use crate::process::myproc;
 
 /// System call dispatch for real-time scheduling operations
-pub fn dispatch(syscall_num: u32, args: &[u64]) -> SyscallResult {
+pub fn dispatch(syscall_num: u32, args: &[u64]) -> SyscallResult<i64>{
     match syscall_num {
         0xE000 => sys_sched_setscheduler(args),
         0xE001 => sys_sched_getscheduler(args),
@@ -39,7 +39,7 @@ pub fn dispatch(syscall_num: u32, args: &[u64]) -> SyscallResult {
 /// 2: param_ptr - Pointer to sched_param structure
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_sched_setscheduler(args: &[u64]) -> SyscallResult {
+fn sys_sched_setscheduler(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 3 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -107,7 +107,7 @@ fn sys_sched_setscheduler(args: &[u64]) -> SyscallResult {
 /// 0: pid - Process ID
 /// 
 /// Returns: scheduling policy on success, negative errno on failure
-fn sys_sched_getscheduler(args: &[u64]) -> SyscallResult {
+fn sys_sched_getscheduler(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 1 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -141,7 +141,7 @@ fn sys_sched_getscheduler(args: &[u64]) -> SyscallResult {
 /// 1: param_ptr - Pointer to sched_param structure
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_sched_setparam(args: &[u64]) -> SyscallResult {
+fn sys_sched_setparam(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -209,7 +209,7 @@ fn sys_sched_setparam(args: &[u64]) -> SyscallResult {
 /// 1: param_ptr - Pointer to store sched_param structure
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_sched_getparam(args: &[u64]) -> SyscallResult {
+fn sys_sched_getparam(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -269,7 +269,7 @@ fn sys_sched_getparam(args: &[u64]) -> SyscallResult {
 /// 0: policy - Scheduling policy
 /// 
 /// Returns: maximum priority on success, negative errno on failure
-fn sys_sched_get_priority_max(args: &[u64]) -> SyscallResult {
+fn sys_sched_get_priority_max(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 1 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -289,7 +289,7 @@ fn sys_sched_get_priority_max(args: &[u64]) -> SyscallResult {
 /// 0: policy - Scheduling policy
 /// 
 /// Returns: minimum priority on success, negative errno on failure
-fn sys_sched_get_priority_min(args: &[u64]) -> SyscallResult {
+fn sys_sched_get_priority_min(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 1 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -310,7 +310,7 @@ fn sys_sched_get_priority_min(args: &[u64]) -> SyscallResult {
 /// 1: ts_ptr - Pointer to store timespec structure
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_sched_rr_get_interval(args: &[u64]) -> SyscallResult {
+fn sys_sched_rr_get_interval(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -378,7 +378,7 @@ fn sys_sched_rr_get_interval(args: &[u64]) -> SyscallResult {
 /// 2: mask_ptr - Pointer to CPU set
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_sched_setaffinity(args: &[u64]) -> SyscallResult {
+fn sys_sched_setaffinity(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 3 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -447,7 +447,7 @@ fn sys_sched_setaffinity(args: &[u64]) -> SyscallResult {
 /// 2: mask_ptr - Pointer to store CPU set
 /// 
 /// Returns: 0 on success, negative errno on failure
-fn sys_sched_getaffinity(args: &[u64]) -> SyscallResult {
+fn sys_sched_getaffinity(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 3 {
         return Err(SyscallError::InvalidArgument);
     }

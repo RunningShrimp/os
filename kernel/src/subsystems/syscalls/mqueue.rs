@@ -7,7 +7,7 @@ use crate::posix::mqueue::*;
 use crate::process::myproc;
 
 /// Dispatch message queue syscalls
-pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
+pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult<i64>{
     match syscall_id {
         // Message queue operations
         0x4000 => sys_mq_open(args),        // mq_open
@@ -35,7 +35,7 @@ pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
 /// # Returns
 /// * Message queue descriptor on success
 /// * Error code on failure
-fn sys_mq_open(args: &[u64]) -> SyscallResult {
+fn sys_mq_open(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 4)?;
     let name_ptr = args[0] as *const i8;
     let oflag = args[1] as i32;
@@ -116,7 +116,7 @@ fn sys_mq_open(args: &[u64]) -> SyscallResult {
 /// # Returns
 /// * 0 on success
 /// * Error code on failure
-fn sys_mq_close(args: &[u64]) -> SyscallResult {
+fn sys_mq_close(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 1)?;
     let mqd = args[0] as i32;
     
@@ -138,7 +138,7 @@ fn sys_mq_close(args: &[u64]) -> SyscallResult {
 /// # Returns
 /// * 0 on success
 /// * Error code on failure
-fn sys_mq_unlink(args: &[u64]) -> SyscallResult {
+fn sys_mq_unlink(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 1)?;
     let name_ptr = args[0] as *const i8;
     
@@ -179,7 +179,7 @@ fn sys_mq_unlink(args: &[u64]) -> SyscallResult {
 /// # Returns
 /// * 0 on success
 /// * Error code on failure
-fn sys_mq_send(args: &[u64]) -> SyscallResult {
+fn sys_mq_send(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 4)?;
     let mqd = args[0] as i32;
     let msg_ptr = args[1] as *const core::ffi::c_void;
@@ -224,7 +224,7 @@ fn sys_mq_send(args: &[u64]) -> SyscallResult {
 /// # Returns
 /// * 0 on success
 /// * Error code on failure
-fn sys_mq_timedsend(args: &[u64]) -> SyscallResult {
+fn sys_mq_timedsend(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 5)?;
     let mqd = args[0] as i32;
     let msg_ptr = args[1] as *const core::ffi::c_void;
@@ -286,7 +286,7 @@ fn sys_mq_timedsend(args: &[u64]) -> SyscallResult {
 /// # Returns
 /// * Message length on success
 /// * Error code on failure
-fn sys_mq_receive(args: &[u64]) -> SyscallResult {
+fn sys_mq_receive(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 4)?;
     let mqd = args[0] as i32;
     let msg_ptr = args[1] as *mut core::ffi::c_void;
@@ -331,7 +331,7 @@ fn sys_mq_receive(args: &[u64]) -> SyscallResult {
 /// # Returns
 /// * Message length on success
 /// * Error code on failure
-fn sys_mq_timedreceive(args: &[u64]) -> SyscallResult {
+fn sys_mq_timedreceive(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 5)?;
     let mqd = args[0] as i32;
     let msg_ptr = args[1] as *mut core::ffi::c_void;
@@ -391,7 +391,7 @@ fn sys_mq_timedreceive(args: &[u64]) -> SyscallResult {
 /// # Returns
 /// * 0 on success
 /// * Error code on failure
-fn sys_mq_getattr(args: &[u64]) -> SyscallResult {
+fn sys_mq_getattr(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 2)?;
     let mqd = args[0] as i32;
     let attr_ptr = args[1] as *mut MqAttr;
@@ -431,7 +431,7 @@ fn sys_mq_getattr(args: &[u64]) -> SyscallResult {
 /// # Returns
 /// * 0 on success
 /// * Error code on failure
-fn sys_mq_setattr(args: &[u64]) -> SyscallResult {
+fn sys_mq_setattr(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 2)?;
     let mqd = args[0] as i32;
     let attr_ptr = args[1] as *const MqAttr;
@@ -471,7 +471,7 @@ fn sys_mq_setattr(args: &[u64]) -> SyscallResult {
 /// # Returns
 /// * 0 on success
 /// * Error code on failure
-fn sys_mq_notify(args: &[u64]) -> SyscallResult {
+fn sys_mq_notify(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 2)?;
     let mqd = args[0] as i32;
     let notify_ptr = args[1] as *const MqNotify;

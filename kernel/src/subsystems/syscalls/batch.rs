@@ -76,7 +76,7 @@ impl BatchSyscall {
 
 /// 批处理系统调用结果
 #[derive(Debug, Clone)]
-pub struct BatchSyscallResult {
+pub struct BatchSyscallResult<i64>{
     /// 系统调用编号
     pub syscall_num: u32,
     /// 执行结果
@@ -89,7 +89,7 @@ pub struct BatchSyscallResult {
     pub execution_time_ns: u64,
 }
 
-impl BatchSyscallResult {
+impl BatchSyscallResult<i64>{
     /// 创建成功的系统调用结果
     #[inline]
     pub const fn success(syscall_num: u32, result: isize) -> Self {
@@ -196,7 +196,7 @@ pub struct BatchResponse {
     /// 批处理ID
     pub batch_id: u64,
     /// 系统调用结果列表
-    pub results: Vec<BatchSyscallResult>,
+    pub results: Vec<BatchSyscallResult<i64>,
     /// 成功的调用数量
     pub success_count: usize,
     /// 失败的调用数量
@@ -210,7 +210,7 @@ pub struct BatchResponse {
 impl BatchResponse {
     /// 创建新的批处理响应
     #[inline]
-    pub fn new(batch_id: u64, results: Vec<BatchSyscallResult>) -> Self {
+    pub fn new(batch_id: u64, results: Vec<BatchSyscallResult<i64>) -> Self {
         let success_count = results.iter().filter(|r| r.is_success()).count();
         let failure_count = results.len() - success_count;
         let total_time = results.iter().map(|r| r.execution_time_ns).sum();
@@ -510,14 +510,14 @@ impl BatchProcessor {
     }
 
     /// 执行原子批处理（全部成功或全部失败）
-    fn execute_atomic_batch(&self, request: &BatchRequest) -> Vec<BatchSyscallResult> {
+    fn execute_atomic_batch(&self, request: &BatchRequest) -> Vec<BatchSyscallResult<i64> {
         let mut results = Vec::with_capacity(request.syscalls.len());
 
         // 预检查所有系统调用的有效性
         for syscall in &request.syscalls {
             if !self.is_syscall_valid(syscall) {
                 // 原子批处理中，一个无效调用导致整个批处理失败
-                return vec![BatchSyscallResult::failure(
+                return vec![BatchSyscallResult<i64>:failure(
                     syscall.syscall_num,
                     -1,
                     crate::reliability::errno::EINVAL
@@ -538,7 +538,7 @@ impl BatchProcessor {
             if !is_success {
                 // 填充剩余的调用为失败
                 for remaining_syscall in request.syscalls.iter().skip(results.len()) {
-                    results.push(BatchSyscallResult::failure(
+                    results.push(BatchSyscallResult<i64>:failure(
                         remaining_syscall.syscall_num,
                         -1,
                         crate::reliability::errno::ECANCELED
@@ -552,12 +552,12 @@ impl BatchProcessor {
     }
 
     /// 执行普通批处理（允许部分失败）
-    fn execute_normal_batch(&self, request: &BatchRequest) -> Vec<BatchSyscallResult> {
+    fn execute_normal_batch(&self, request: &BatchRequest) -> Vec<BatchSyscallResult<i64> {
         let mut results = Vec::with_capacity(request.syscalls.len());
 
         for syscall in &request.syscalls {
             if !self.is_syscall_valid(syscall) {
-                results.push(BatchSyscallResult::failure(
+                results.push(BatchSyscallResult<i64>:failure(
                     syscall.syscall_num,
                     -1,
                     crate::reliability::errno::EINVAL
@@ -596,7 +596,7 @@ impl BatchProcessor {
     }
 
     /// 执行单个系统调用
-    fn execute_single_syscall(&self, syscall: &BatchSyscall) -> BatchSyscallResult {
+    fn execute_single_syscall(&self, syscall: &BatchSyscall) -> BatchSyscallResult<i64>{
         let start_time = crate::subsystems::time::hrtime_nanos();
         
         // 调用实际的系统调用分发器
@@ -609,11 +609,11 @@ impl BatchProcessor {
         // Handle the result from dispatch which returns isize directly
         // In system call conventions, negative values indicate errors
         if result >= 0 {
-            BatchSyscallResult::success(syscall.syscall_num, result)
+            BatchSyscallResult<i64>:success(syscall.syscall_num, result)
         } else {
             // Convert negative result to error code (absolute value)
             let errno = (-result) as i32;
-            BatchSyscallResult::failure(syscall.syscall_num, result, errno)
+            BatchSyscallResult<i64>:failure(syscall.syscall_num, result, errno)
         }
         .with_execution_time(execution_time)
     }

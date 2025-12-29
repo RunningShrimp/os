@@ -24,7 +24,7 @@ pub mod syscall_numbers {
 
 /// Fast-path implementation for getpid
 /// Returns the process ID of the calling process
-pub fn fast_getpid(_args: &[u64]) -> SyscallResult {
+pub fn fast_getpid(_args: &[u64]) -> SyscallResult<i64>{
     // Direct access to current process PID without locking overhead
     if let Some(pid) = process::myproc() {
         Ok(pid as u64)
@@ -35,19 +35,19 @@ pub fn fast_getpid(_args: &[u64]) -> SyscallResult {
 
 /// Fast-path implementation for getuid
 /// Returns the real user ID of the calling process
-pub fn fast_getuid(_args: &[u64]) -> SyscallResult {
+pub fn fast_getuid(_args: &[u64]) -> SyscallResult<i64>{
     Ok(process::getuid() as u64)
 }
 
 /// Fast-path implementation for getgid
 /// Returns the real group ID of the calling process
-pub fn fast_getgid(_args: &[u64]) -> SyscallResult {
+pub fn fast_getgid(_args: &[u64]) -> SyscallResult<i64>{
     Ok(process::getgid() as u64)
 }
 
 /// Fast-path implementation for getppid
 /// Returns the process ID of the parent of the calling process
-pub fn fast_getppid(_args: &[u64]) -> SyscallResult {
+pub fn fast_getppid(_args: &[u64]) -> SyscallResult<i64>{
     if let Some(pid) = process::myproc() {
         let proc_table = PROC_TABLE.lock();
         if let Some(proc) = proc_table.find_ref(pid) {
@@ -61,7 +61,7 @@ pub fn fast_getppid(_args: &[u64]) -> SyscallResult {
 
 /// Fast-path implementation for gettid
 /// Returns the thread ID of the calling thread
-pub fn fast_gettid(_args: &[u64]) -> SyscallResult {
+pub fn fast_gettid(_args: &[u64]) -> SyscallResult<i64>{
     // In a single-threaded process, TID equals PID
     // For multi-threaded processes, this would return thread ID
     if let Some(pid) = process::myproc() {
@@ -73,7 +73,7 @@ pub fn fast_gettid(_args: &[u64]) -> SyscallResult {
 
 /// Fast-path implementation for geteuid
 /// Returns the effective user ID of the calling process
-pub fn fast_geteuid(_args: &[u64]) -> SyscallResult {
+pub fn fast_geteuid(_args: &[u64]) -> SyscallResult<i64>{
     // For now, effective UID equals real UID
     // In a full implementation, this would check for setuid bits
     Ok(process::getuid() as u64)
@@ -81,14 +81,14 @@ pub fn fast_geteuid(_args: &[u64]) -> SyscallResult {
 
 /// Fast-path implementation for getegid
 /// Returns the effective group ID of the calling process
-pub fn fast_getegid(_args: &[u64]) -> SyscallResult {
+pub fn fast_getegid(_args: &[u64]) -> SyscallResult<i64>{
     // For now, effective GID equals real GID
     // In a full implementation, this would check for setgid bits
     Ok(process::getgid() as u64)
 }
 
 /// Fast-path handler type
-pub type FastPathHandler = fn(&[u64]) -> SyscallResult;
+pub type FastPathHandler = fn(&[u64]) -> SyscallResult<i64>
 
 /// Fast-path syscall registry
 pub struct FastPathRegistry {
@@ -121,7 +121,7 @@ impl FastPathRegistry {
     }
 
     /// Dispatch a syscall through fast-path
-    pub fn dispatch(&self, syscall_num: u32, args: &[u64]) -> Option<SyscallResult> {
+    pub fn dispatch(&self, syscall_num: u32, args: &[u64]) -> Option<SyscallResult<i64> {
         let index = (syscall_num % 256) as usize;
 
         if let Some(handler) = self.handlers[index] {
@@ -191,7 +191,7 @@ pub fn can_use_fast_path(syscall_num: u32) -> bool {
 }
 
 /// Dispatch a syscall through fast-path
-pub fn dispatch_fast_path(syscall_num: u32, args: &[u64]) -> Option<SyscallResult> {
+pub fn dispatch_fast_path(syscall_num: u32, args: &[u64]) -> Option<SyscallResult<i64> {
     unsafe {
         if let Some(ref registry) = FAST_PATH_REGISTRY {
             registry.dispatch(syscall_num, args)

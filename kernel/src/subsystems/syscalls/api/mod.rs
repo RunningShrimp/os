@@ -17,13 +17,13 @@ pub enum SyscallError {
 }
 
 /// System call result type - re-exported from nos_api
-/// Note: We use nos_api's SyscallResult (an enum) rather than a type alias
+/// Note: We use nos_api's SyscallResult(an enum) rather than a type alias
 pub use nos_api::syscall::types::SyscallResult;
 
 /// Error module
 pub mod error {
     pub use super::SyscallError as Error;
-    pub use nos_api::syscall::types::SyscallResult as Result;
+    pub use nos_api::syscall::types::SyscallResultas Result;
 }
 
 pub use syscall_result::*;

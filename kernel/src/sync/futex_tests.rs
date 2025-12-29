@@ -9,7 +9,7 @@ extern crate alloc;
 use core::sync::atomic::{AtomicI32, Ordering};
 
 use crate::subsystems::{
-    mm::vm::PageTable,
+    mm::page_table_isolation::PageTable,
     syscalls::{
         common::SyscallError,
         thread::{

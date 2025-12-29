@@ -18,7 +18,7 @@ use crate::{
     subsystems::{
         fs::epoll::{EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLOUT, EpollEvent, EpollEventInfo, EpollManager},
         sync::Mutex,
-        syscalls::SyscallResult,
+        syscalls::interface::SyscallResult as InterfaceSyscallResult
     },
 };
 

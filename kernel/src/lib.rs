@@ -177,13 +177,20 @@ pub use alloc::{
     boxed::Box,
     string::String,
     vec::Vec,
-    collections::{HashMap, BTreeMap},
-    sync::{Arc, Mutex, AtomicUsize, AtomicU64, AtomicU32, AtomicI32, AtomicBool, AtomicPtr},
+    collections::BTreeMap,
+    sync::Arc,
 };
+pub use hashbrown::HashMap;
 
-// Re-export core types
-pub use core::cmp::Ordering;
-pub use core::cmp::{PartialOrd, PartialEq};
+// Re-export atomic types from core (using ::core to avoid shadowing)
+pub use ::core::sync::atomic::{AtomicUsize, AtomicU64, AtomicU32, AtomicI32, AtomicBool, AtomicPtr};
+
+// Re-export synchronization primitives from subsystems
+pub use crate::subsystems::sync::Mutex;
+
+// Re-export core types (using ::core to avoid shadowing by local core module)
+pub use ::core::cmp::Ordering;
+pub use ::core::cmp::{PartialOrd, PartialEq};
 
 // Re-export common types from error module
 pub use crate::{
@@ -195,8 +202,7 @@ pub use crate::{
     vfs::{
         FileMode, VfsError, VfsResult,
     },
-    subsystems::syscalls::common,
-};
+  };
 
 // Re-export additional commonly used types
 pub use crate::{
@@ -290,14 +296,14 @@ pub use nos_error_handling as error_handling;
 // pub use nos_syscalls as syscalls;
 /// Performance monitoring
 pub use perf::*;
-pub use platform::{arch, boot, drivers, trap};
+pub use platform::{arch as platform_arch, boot, drivers, trap};
 /// POSIX types and constants
 pub use posix::*;
 // Re-export moved modules to maintain compatibility
 pub use subsystems::fs;
 #[cfg(feature = "networking")]
 pub use subsystems::net;
-pub use subsystems::{ipc, process, sync, time, vfs};
+pub use subsystems::{ipc, process, sync as subsystems_sync, time, vfs};
 
 /// Boot parameters passed from bootloader to kernel
 pub use crate::boot::BootParameters;

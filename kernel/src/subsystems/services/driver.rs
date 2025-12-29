@@ -2,8 +2,8 @@
 //!
 //! This module provides driver management functionality for system calls
 
-use crate::subsystems::syscalls::interface::SyscallHandler;
-use alloc::sync::Arc;
+use nos_api::syscall::interface::{SyscallHandler, SyscallNumber, SyscallArgs, SyscallResult};
+use nos_api::{Result, error::Error};
 
 /// Service driver handler
 pub struct ServiceDriver;
@@ -15,16 +15,18 @@ impl ServiceDriver {
 }
 
 impl SyscallHandler for ServiceDriver {
-    fn handle(&self, _args: &[u64]) -> Result<u64, crate::subsystems::syscalls::interface::SyscallError> {
+    fn handle(&mut self, number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult> {
         // Placeholder implementation
-        Err(crate::subsystems::syscalls::interface::SyscallError::InvalidSyscall(0))
+        let syscall_error = nos_api::perf::syscalls::common::SyscallError::NotSupported;
+        Err(Error::SystemError(format!("Syscall {} not implemented", number)).into())
     }
 
-    fn get_syscall_number(&self) -> u32 {
-        0 // Will be set during registration
+    fn name(&self) -> &str {
+        "service_driver"
     }
 
-    fn get_name(&self) -> &'static str {
-        "driver"
+    fn supports(&self, number: SyscallNumber) -> bool {
+        // Placeholder implementation
+        false
     }
 }

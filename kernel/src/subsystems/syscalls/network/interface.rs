@@ -5,7 +5,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use crate::subsystems::sync::Mutex;
 
-use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult);
 
 // ============================================================================
 // Network Interface State
@@ -70,7 +70,7 @@ pub fn init_interfaces() {
 }
 
 /// Configure network interface
-pub fn sys_ifconfig(args: &[u64]) -> SyscallResult {
+pub fn sys_ifconfig(args: &[u64]) -> SyscallResult<i64> {
     // use super::super::common::extract_args;
     
     // This would parse ifreq structure from user space
@@ -80,7 +80,7 @@ pub fn sys_ifconfig(args: &[u64]) -> SyscallResult {
 }
 
 /// Get network interface information
-pub fn sys_ifinfo(args: &[u64]) -> SyscallResult {
+pub fn sys_ifinfo(args: &[u64]) -> SyscallResult<i64> {
     use crate::subsystems::syscalls::common::extract_args;
     use crate::subsystems::mm::vm::copyout;
     
@@ -121,7 +121,7 @@ pub fn sys_ifinfo(args: &[u64]) -> SyscallResult {
 }
 
 /// List network interfaces
-pub fn sys_iflist(args: &[u64]) -> SyscallResult {
+pub fn sys_iflist(args: &[u64]) -> SyscallResult<i64> {
     use crate::subsystems::syscalls::common::extract_args;
     use crate::subsystems::mm::vm::copyout;
     

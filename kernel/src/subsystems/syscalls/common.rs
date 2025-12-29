@@ -1,6 +1,6 @@
 //! Common types and utilities for system calls
 
-pub use crate::api::SyscallError;
+pub use crate::{api::SyscallError, error::Result};
 
 /// Result type for system calls
 pub type SyscallResult<T> = Result<T, SyscallError>;

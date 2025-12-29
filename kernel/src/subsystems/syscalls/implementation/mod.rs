@@ -24,7 +24,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use super::interface::{
-    SyscallHandler, SyscallError, SyscallResult,
+    SyscallHandler, SyscallError, SyscallResult<i64>
     SyscallCategory, get_syscall_category,
 };
 
@@ -44,7 +44,7 @@ pub mod process {
     }
     
     impl SyscallHandler for GetPidHandler {
-        fn handle(&self, _args: &[u64]) -> SyscallResult {
+        fn handle(&self, _args: &[u64]) -> SyscallResult<i64>{
             // Return current process ID
             // In a real implementation, this would get the PID from process manager
             Ok(1234) // Example PID
@@ -70,7 +70,7 @@ pub mod process {
     }
     
     impl SyscallHandler for ForkHandler {
-        fn handle(&self, _args: &[u64]) -> SyscallResult {
+        fn handle(&self, _args: &[u64]) -> SyscallResult<i64>{
             // Fork the current process
             // In a real implementation, this would create a new process
             Ok(1235) // Example child PID, 0 for parent
@@ -109,7 +109,7 @@ pub mod memory {
     }
     
     impl SyscallHandler for MmapHandler {
-        fn handle(&self, args: &[u64]) -> SyscallResult {
+        fn handle(&self, args: &[u64]) -> SyscallResult<i64>{
             if args.len() < 6 {
                 return Err(SyscallError::InvalidArguments);
             }
@@ -146,7 +146,7 @@ pub mod memory {
     }
     
     impl SyscallHandler for MunmapHandler {
-        fn handle(&self, args: &[u64]) -> SyscallResult {
+        fn handle(&self, args: &[u64]) -> SyscallResult<i64>{
             if args.len() < 2 {
                 return Err(SyscallError::InvalidArguments);
             }
@@ -192,7 +192,7 @@ pub mod fs {
     }
     
     impl SyscallHandler for OpenHandler {
-        fn handle(&self, args: &[u64]) -> SyscallResult {
+        fn handle(&self, args: &[u64]) -> SyscallResult<i64>{
             if args.len() < 3 {
                 return Err(SyscallError::InvalidArguments);
             }
@@ -226,7 +226,7 @@ pub mod fs {
     }
     
     impl SyscallHandler for ReadHandler {
-        fn handle(&self, args: &[u64]) -> SyscallResult {
+        fn handle(&self, args: &[u64]) -> SyscallResult<i64>{
             if args.len() < 3 {
                 return Err(SyscallError::InvalidArguments);
             }
@@ -260,7 +260,7 @@ pub mod fs {
     }
     
     impl SyscallHandler for WriteHandler {
-        fn handle(&self, args: &[u64]) -> SyscallResult {
+        fn handle(&self, args: &[u64]) -> SyscallResult<i64>{
             if args.len() < 3 {
                 return Err(SyscallError::InvalidArguments);
             }
@@ -294,7 +294,7 @@ pub mod fs {
     }
     
     impl SyscallHandler for CloseHandler {
-        fn handle(&self, args: &[u64]) -> SyscallResult {
+        fn handle(&self, args: &[u64]) -> SyscallResult<i64>{
             if args.len() < 1 {
                 return Err(SyscallError::InvalidArguments);
             }
@@ -341,7 +341,7 @@ pub mod network {
     }
     
     impl SyscallHandler for SocketHandler {
-        fn handle(&self, args: &[u64]) -> SyscallResult {
+        fn handle(&self, args: &[u64]) -> SyscallResult<i64>{
             if args.len() < 3 {
                 return Err(SyscallError::InvalidArguments);
             }
@@ -375,7 +375,7 @@ pub mod network {
     }
     
     impl SyscallHandler for BindHandler {
-        fn handle(&self, args: &[u64]) -> SyscallResult {
+        fn handle(&self, args: &[u64]) -> SyscallResult<i64>{
             if args.len() < 3 {
                 return Err(SyscallError::InvalidArguments);
             }

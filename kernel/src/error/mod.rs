@@ -342,14 +342,4 @@ pub fn create_error_with_type(error_type: ErrorType, message: &str) -> UnifiedEr
     }
 }
 
-/// Error type enumeration for error creation
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ErrorType {
-    Memory,
-    FileSystem,
-    Network,
-    Process,
-    Security,
-    Syscall,
-}
 

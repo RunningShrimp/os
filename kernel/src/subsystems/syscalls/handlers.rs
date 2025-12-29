@@ -78,7 +78,7 @@ pub fn handle_raise(args: &[u64]) -> Result<u64, KernelError> {
 pub fn handle_sigaction(args: &[u64]) -> Result<u64, KernelError> {
     // Delegate to signal_advanced implementation
     use crate::subsystems::syscalls::signal_advanced::sys_sigaction;
-    use crate::subsystems::syscalls::common::SyscallResult;
+    use crate::subsystems::syscalls::common::SyscallResult
     
     match sys_sigaction(args) {
         Ok(_) => Ok(0),

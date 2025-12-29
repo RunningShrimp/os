@@ -199,7 +199,7 @@ pub trait SyscallInterceptor: Send + Sync {
     }
 
     /// 在系统调用执行后拦截
-    fn after_syscall(&self, context: &SyscallContext, result: &mut SyscallResult) {
+    fn after_syscall(&self, context: &SyscallContext, result: &mut SyscallResult<i64> {
         // 默认实现：不做任何操作
     }
 
@@ -215,7 +215,7 @@ pub trait SyscallInterceptor: Send + Sync {
 /// 系统调用日志记录器
 pub trait SyscallLogger: Send + Sync {
     /// 记录系统调用
-    fn log_syscall(&self, context: &SyscallContext, result: &SyscallResult);
+    fn log_syscall(&self, context: &SyscallContext, result: &SyscallResult<i64>);
 
     /// 获取日志记录器名称
     fn name(&self) -> &str;

@@ -19,13 +19,13 @@
 
 extern crate alloc;
 
-use super::common::{SyscallError, SyscallResult, extract_args};
+use super::common::{SyscallError, SyscallResult extract_args}
 // Error codes are handled through SyscallError enum
 use crate::fs::file::{FILE_TABLE, FileType};
 use crate::process::{myproc, NOFILE};
 
 /// Dispatch zero-copy I/O syscalls
-pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
+pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult<i64>{
     match syscall_id {
         // Zero-copy I/O operations
         0x9000 => sys_sendfile(args),       // sendfile
@@ -44,7 +44,7 @@ pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
 /// Sendfile: Transfer data from one file descriptor to another
 /// Arguments: [out_fd, in_fd, offset_ptr, count]
 /// Returns: Number of bytes transferred
-fn sys_sendfile(args: &[u64]) -> SyscallResult {
+fn sys_sendfile(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 4)?;
     
     let out_fd = args[0] as i32;
@@ -249,7 +249,7 @@ fn sys_sendfile(args: &[u64]) -> SyscallResult {
 /// Splice: Move data between file descriptors without copying
 /// Arguments: [fd_in, off_in_ptr, fd_out, off_out_ptr, len, flags]
 /// Returns: Number of bytes spliced
-fn sys_splice(args: &[u64]) -> SyscallResult {
+fn sys_splice(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 6)?;
     
     let fd_in = args[0] as i32;
@@ -476,7 +476,7 @@ fn sys_splice(args: &[u64]) -> SyscallResult {
 /// Tee: Copy data from one pipe to another without copying to user space
 /// Arguments: [fd_in, fd_out, len, flags]
 /// Returns: Number of bytes copied
-fn sys_tee(args: &[u64]) -> SyscallResult {
+fn sys_tee(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 4)?;
     
     let fd_in = args[0] as i32;
@@ -593,7 +593,7 @@ fn sys_tee(args: &[u64]) -> SyscallResult {
 /// Vmsplice: Splice user pages into a pipe
 /// Arguments: [fd, iov_ptr, nr_segs, flags]
 /// Returns: Number of bytes spliced
-fn sys_vmsplice(args: &[u64]) -> SyscallResult {
+fn sys_vmsplice(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 4)?;
     
     let fd = args[0] as i32;
@@ -716,7 +716,7 @@ fn sys_vmsplice(args: &[u64]) -> SyscallResult {
 /// 
 /// This is similar to sendfile but works with regular files and supports
 /// both input and output offsets. For large transfers, uses optimized chunking.
-fn sys_copy_file_range(args: &[u64]) -> SyscallResult {
+fn sys_copy_file_range(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 6)?;
     
     let fd_in = args[0] as i32;
@@ -864,14 +864,14 @@ fn sys_copy_file_range(args: &[u64]) -> SyscallResult {
 
 /// Sendfile64: 64-bit version of sendfile
 /// Arguments: [out_fd, in_fd, offset_ptr, count]
-fn sys_sendfile64(args: &[u64]) -> SyscallResult {
+fn sys_sendfile64(args: &[u64]) -> SyscallResult<i64>{
     // Same as sendfile but with 64-bit offset
     sys_sendfile(args)
 }
 
 /// io_uring_setup: Setup io_uring instance
 /// Arguments: [entries, params_ptr]
-fn sys_io_uring_setup(args: &[u64]) -> SyscallResult {
+fn sys_io_uring_setup(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 2)?;
     
     let entries = args[0] as u32;
@@ -894,7 +894,7 @@ fn sys_io_uring_setup(args: &[u64]) -> SyscallResult {
 
 /// io_uring_enter: Submit and/or wait for io_uring events
 /// Arguments: [fd, to_submit, min_complete, flags, sig_ptr]
-fn sys_io_uring_enter(args: &[u64]) -> SyscallResult {
+fn sys_io_uring_enter(args: &[u64]) -> SyscallResult<i64>{
     let _args = extract_args(args, 5)?;
     
     // TODO: Implement io_uring_enter
@@ -904,7 +904,7 @@ fn sys_io_uring_enter(args: &[u64]) -> SyscallResult {
 
 /// io_uring_register: Register buffers or files for io_uring
 /// Arguments: [fd, opcode, arg_ptr, nr_args]
-fn sys_io_uring_register(args: &[u64]) -> SyscallResult {
+fn sys_io_uring_register(args: &[u64]) -> SyscallResult<i64>{
     let _args = extract_args(args, 4)?;
     
     // TODO: Implement io_uring_register

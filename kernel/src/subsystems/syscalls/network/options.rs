@@ -1,9 +1,9 @@
 //! Socket options syscalls
 
-use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult);
 
 /// Set socket options
-pub fn sys_setsockopt(args: &[u64]) -> SyscallResult {
+pub fn sys_setsockopt(args: &[u64]) -> SyscallResult<i64> {
     if args.len() < 5 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -30,7 +30,7 @@ pub fn sys_setsockopt(args: &[u64]) -> SyscallResult {
 }
 
 /// Get socket options
-pub fn sys_getsockopt(args: &[u64]) -> SyscallResult {
+pub fn sys_getsockopt(args: &[u64]) -> SyscallResult<i64> {
     if args.len() < 5 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -57,13 +57,13 @@ pub fn sys_getsockopt(args: &[u64]) -> SyscallResult {
 }
 
 /// Get socket name
-pub fn sys_getsockname(_args: &[u64]) -> SyscallResult {
+pub fn sys_getsockname(_args: &[u64]) -> SyscallResult<i64> {
     // TODO: Implement getsockname syscall
     Err(SyscallError::NotSupported)
 }
 
 /// Get peer name
-pub fn sys_getpeername(_args: &[u64]) -> SyscallResult {
+pub fn sys_getpeername(_args: &[u64]) -> SyscallResult<i64> {
     // TODO: Implement getpeername syscall
     Err(SyscallError::NotSupported)
 }

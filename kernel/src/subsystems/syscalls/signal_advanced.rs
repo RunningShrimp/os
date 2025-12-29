@@ -1,9 +1,9 @@
 //! Signal handling syscalls
 
-use super::common::{SyscallError, SyscallResult};
+use super::common::{SyscallError, SyscallResult);
 
 /// Dispatch signal handling syscalls
-pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
+pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult<i64>{
     match syscall_id {
         // Signal operations
         0x5000 => sys_kill(args),           // kill
@@ -30,7 +30,7 @@ pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
 /// Send a signal to a process
 /// Arguments: [pid, sig]
 /// Returns: 0 on success, error on failure
-fn sys_kill(args: &[u64]) -> SyscallResult {
+fn sys_kill(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::ipc::signal_enhanced::*;
     
@@ -74,7 +74,7 @@ fn sys_kill(args: &[u64]) -> SyscallResult {
 /// Set signal action
 /// Arguments: [sig, act_ptr, oldact_ptr]
 /// Returns: 0 on success, error on failure
-fn sys_sigaction(args: &[u64]) -> SyscallResult {
+fn sys_sigaction(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::{copyin, copyout};
     use crate::ipc::signal::{SigAction, SIG_DFL, SIG_IGN};
@@ -146,7 +146,7 @@ fn sys_sigaction(args: &[u64]) -> SyscallResult {
 /// Simple signal handling (BSD compatibility)
 /// Arguments: [sig, handler]
 /// Returns: previous handler on success, error on failure
-fn sys_signal(args: &[u64]) -> SyscallResult {
+fn sys_signal(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::ipc::signal::{SigAction, SigActionFlags, SIG_DFL, SIG_IGN};
     
@@ -205,7 +205,7 @@ fn sys_signal(args: &[u64]) -> SyscallResult {
 /// Change signal mask
 /// Arguments: [how, set_ptr, oldset_ptr]
 /// Returns: 0 on success, error on failure
-fn sys_sigprocmask(args: &[u64]) -> SyscallResult {
+fn sys_sigprocmask(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::{copyin, copyout};
     use crate::ipc::signal::{SigSet, SIG_BLOCK, SIG_UNBLOCK, SIG_SETMASK};
@@ -281,7 +281,7 @@ fn sys_sigprocmask(args: &[u64]) -> SyscallResult {
 /// Check for pending signals
 /// Arguments: [set_ptr]
 /// Returns: 0 on success, error on failure
-fn sys_sigpending(args: &[u64]) -> SyscallResult {
+fn sys_sigpending(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyout;
     use crate::ipc::signal::SigSet;
@@ -319,7 +319,7 @@ fn sys_sigpending(args: &[u64]) -> SyscallResult {
     Ok(0)
 }
 
-fn sys_sigsuspend(args: &[u64]) -> SyscallResult {
+fn sys_sigsuspend(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyin;
     use crate::ipc::signal::SigSet;
@@ -377,7 +377,7 @@ fn sys_sigsuspend(args: &[u64]) -> SyscallResult {
     Err(SyscallError::Interrupted)
 }
 
-fn sys_sigaltstack(args: &[u64]) -> SyscallResult {
+fn sys_sigaltstack(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::{copyin, copyout};
 
@@ -448,7 +448,7 @@ fn sys_sigaltstack(args: &[u64]) -> SyscallResult {
     Ok(0)
 }
 
-fn sys_pause(_args: &[u64]) -> SyscallResult {
+fn sys_pause(_args: &[u64]) -> SyscallResult{
     // pause() suspends execution until a signal is delivered
     // It always returns -1 with EINTR
 
@@ -470,7 +470,7 @@ fn sys_pause(_args: &[u64]) -> SyscallResult {
     Err(SyscallError::Interrupted)
 }
 
-fn sys_rt_sigaction(args: &[u64]) -> SyscallResult {
+fn sys_rt_sigaction(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::{copyin, copyout};
     use crate::ipc::signal::{SigAction, SigActionFlags, SIG_DFL, SIG_IGN};
@@ -545,7 +545,7 @@ fn sys_rt_sigaction(args: &[u64]) -> SyscallResult {
     Ok(0)
 }
 
-fn sys_rt_sigprocmask(args: &[u64]) -> SyscallResult {
+fn sys_rt_sigprocmask(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::{copyin, copyout};
     use crate::ipc::signal::{SigSet, SIG_BLOCK, SIG_UNBLOCK, SIG_SETMASK};
@@ -624,7 +624,7 @@ fn sys_rt_sigprocmask(args: &[u64]) -> SyscallResult {
     Ok(0)
 }
 
-fn sys_rt_sigpending(args: &[u64]) -> SyscallResult {
+fn sys_rt_sigpending(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyout;
     use crate::ipc::signal::SigSet;
@@ -668,7 +668,7 @@ fn sys_rt_sigpending(args: &[u64]) -> SyscallResult {
     Ok(0)
 }
 
-fn sys_rt_sigtimedwait(args: &[u64]) -> SyscallResult {
+fn sys_rt_sigtimedwait(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::{copyin, copyout};
     use crate::ipc::signal::{SigSet, SigInfo};
@@ -782,7 +782,7 @@ fn sys_rt_sigtimedwait(args: &[u64]) -> SyscallResult {
     }
 }
 
-fn sys_rt_sigqueueinfo(args: &[u64]) -> SyscallResult {
+fn sys_rt_sigqueueinfo(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyin;
     use crate::ipc::signal::SigInfo;
@@ -837,7 +837,7 @@ fn sys_rt_sigqueueinfo(args: &[u64]) -> SyscallResult {
     }
 }
 
-fn sys_rt_sigsuspend(args: &[u64]) -> SyscallResult {
+fn sys_rt_sigsuspend(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyin;
     use crate::ipc::signal::SigSet;
@@ -900,7 +900,7 @@ fn sys_rt_sigsuspend(args: &[u64]) -> SyscallResult {
     Err(SyscallError::Interrupted)
 }
 
-fn sys_tkill(args: &[u64]) -> SyscallResult {
+fn sys_tkill(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
 
     let args = extract_args(args, 2)?;
@@ -938,7 +938,7 @@ fn sys_tkill(args: &[u64]) -> SyscallResult {
     }
 }
 
-fn sys_tgkill(args: &[u64]) -> SyscallResult {
+fn sys_tgkill(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
 
     let args = extract_args(args, 3)?;

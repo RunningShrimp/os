@@ -4,7 +4,7 @@
 //! It includes functions for thread creation, synchronization, and management.
 
 use crate::api::{SyscallError, KernelErrorExt};
-use crate::subsystems::syscalls::common::SyscallResult;
+use crate::subsystems::syscalls::common::SyscallResult
 
 /// Thread control structure
 pub struct ThreadControl;
@@ -559,7 +559,7 @@ pub fn is_timeout_expired(timeout: Option<u64>) -> bool {
 /// * `args` - System call arguments
 ///
 /// # Returns
-/// * `SyscallResult` - System call result
+/// * `SyscallResult<i64> - System call result
 pub fn dispatch(syscall_num: u32, args: &[u64]) -> SyscallResult<i64> {
     // Placeholder implementation - in a real system this would route to the appropriate handler
     match syscall_num {

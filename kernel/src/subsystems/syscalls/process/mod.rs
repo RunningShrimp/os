@@ -4,8 +4,8 @@
 
 use alloc::sync::Arc;
 
-use crate::{error::Result, subsystems::syscalls::{interface::{SyscallHandler, SyscallNumber}, common::{SyscallArgs, SyscallResult}}};
-
+use nos_api::syscall::interface::{SyscallHandler, SyscallNumber, SyscallArgs, SyscallResult};
+use nos_api::Result;
 /// 进程管理系统调用处理器
 pub struct ProcessSyscallHandler {
     // 实际实现中这里会有具体字段
@@ -19,22 +19,21 @@ impl ProcessSyscallHandler {
 }
 
 impl SyscallHandler for ProcessSyscallHandler {
-    fn handle(&self, args: &[u64]) -> SyscallResult<i64> {
+    fn handle(&mut self, number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult> {
         // For process syscalls, we need to dispatch based on syscall number
         // But the trait interface doesn't provide the syscall number
         // This suggests we need a different approach - possibly multiple handlers
         // For now, return invalid syscall since we can't determine which one was called
-        Err(SyscallError::InvalidSyscall(self.get_syscall_number()))
+        Err(nos_api::error::Error::SystemError("Not implemented".to_string()).into())
     }
 
-    fn get_syscall_number(&self) -> SyscallNumber {
-        // This handler shouldn't be called directly for specific syscalls
-        // Each process syscall should have its own handler
-        0 // Default process syscall number
-    }
-
-    fn get_name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "process_syscall_handler"
+    }
+
+    fn supports(&self, number: SyscallNumber) -> bool {
+        // Placeholder implementation
+        false
     }
 }
 

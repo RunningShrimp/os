@@ -1,6 +1,6 @@
 //! GLib extensions and related syscalls
 
-use super::common::{SyscallError, SyscallResult};
+use super::common::{SyscallError, SyscallResult);
 use crate::subsystems::sync::Mutex;
 use alloc::{collections::VecDeque, string::String, vec::Vec};
 use core::sync::atomic::{AtomicU32, Ordering};
@@ -997,7 +997,7 @@ pub fn get_memfd_instance(idx: usize) -> Option<&'static mut MemFdInstance> {
 // Public function for file.rs to access inotify instances
 
 /// Dispatch GLib-related syscalls and extensions
-pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
+pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult<i64>{
     match syscall_id {
         // GLib extensions and related operations
         0xB000 => sys_getrandom(args),      // getrandom
@@ -1026,7 +1026,7 @@ pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
 
 // Placeholder implementations - to be replaced with actual syscall logic
 
-fn sys_getrandom(args: &[u64]) -> SyscallResult {
+fn sys_getrandom(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyout;
     
@@ -1080,7 +1080,7 @@ fn sys_getrandom(args: &[u64]) -> SyscallResult {
     Ok(actual_len as u64)
 }
 
-fn sys_memfd_create(args: &[u64]) -> SyscallResult {
+fn sys_memfd_create(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -1162,7 +1162,7 @@ fn sys_memfd_create(args: &[u64]) -> SyscallResult {
     Ok(fd as u64)
 }
 
-fn sys_eventfd(args: &[u64]) -> SyscallResult {
+fn sys_eventfd(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 1 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -1194,7 +1194,7 @@ fn sys_eventfd(args: &[u64]) -> SyscallResult {
     Ok(fd as u64)
 }
 
-fn sys_eventfd2(args: &[u64]) -> SyscallResult {
+fn sys_eventfd2(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -1243,7 +1243,7 @@ fn sys_eventfd2(args: &[u64]) -> SyscallResult {
     Ok(fd as u64)
 }
 
-fn sys_timerfd_create(args: &[u64]) -> SyscallResult {
+fn sys_timerfd_create(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -1286,7 +1286,7 @@ fn sys_timerfd_create(args: &[u64]) -> SyscallResult {
     Ok(fd as u64)
 }
 
-fn sys_timerfd_settime(args: &[u64]) -> SyscallResult {
+fn sys_timerfd_settime(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 4 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -1355,7 +1355,7 @@ fn sys_timerfd_settime(args: &[u64]) -> SyscallResult {
     }
 }
 
-fn sys_timerfd_gettime(args: &[u64]) -> SyscallResult {
+fn sys_timerfd_gettime(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -1410,7 +1410,7 @@ fn sys_timerfd_gettime(args: &[u64]) -> SyscallResult {
     }
 }
 
-fn sys_signalfd(args: &[u64]) -> SyscallResult {
+fn sys_signalfd(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 3 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -1423,7 +1423,7 @@ fn sys_signalfd(args: &[u64]) -> SyscallResult {
     sys_signalfd4(&[fd as u64, mask_ptr as u64, flags as u64])
 }
 
-fn sys_signalfd4(args: &[u64]) -> SyscallResult {
+fn sys_signalfd4(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 3 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -1584,11 +1584,11 @@ pub fn get_eventfd_instance(idx: usize) -> Option<&'static mut EventFdInstance> 
     }
 }
 
-fn sys_inotify_init(_args: &[u64]) -> SyscallResult {
+fn sys_inotify_init(_args: &[u64]) -> SyscallResult<i64>{
     sys_inotify_init1(&[0])
 }
 
-fn sys_inotify_init1(args: &[u64]) -> SyscallResult {
+fn sys_inotify_init1(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 1 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -1620,7 +1620,7 @@ fn sys_inotify_init1(args: &[u64]) -> SyscallResult {
     Ok(fd as u64)
 }
 
-fn sys_inotify_add_watch(args: &[u64]) -> SyscallResult {
+fn sys_inotify_add_watch(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 3 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -1672,7 +1672,7 @@ fn sys_inotify_add_watch(args: &[u64]) -> SyscallResult {
     }
 }
 
-fn sys_inotify_rm_watch(args: &[u64]) -> SyscallResult {
+fn sys_inotify_rm_watch(args: &[u64]) -> SyscallResult<i64>{
     if args.len() < 2 {
         return Err(SyscallError::InvalidArgument);
     }

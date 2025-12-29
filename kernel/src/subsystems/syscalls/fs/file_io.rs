@@ -3,7 +3,7 @@
 //! Implements read, write, open, close, fstat, lseek, dup, dup2, fcntl, poll, select
 
 use crate::fs::file::{FILE_TABLE, FileType, file_alloc, file_close, file_read, file_write, file_stat, file_lseek, file_unsubscribe};
-use crate::subsystems::syscalls::common::{SyscallError, SyscallResult, extract_args};
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult extract_args}
 use crate::subsystems::sync::Mutex;
 use alloc::string::ToString;
 use core::sync::atomic::{AtomicUsize, Ordering};
@@ -265,7 +265,7 @@ pub fn sys_close(fd: i32) -> isize {
 }
 
 /// Dispatch file I/O syscalls
-pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
+pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult<i64>{
     match syscall_id {
         0x2000 => sys_open_impl(args),     // open
         0x2001 => sys_close_impl(args),    // close
@@ -280,7 +280,7 @@ pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
 }
 
 /// Syscall implementation wrappers that return SyscallResult
-fn sys_open_impl(args: &[u64]) -> SyscallResult {
+fn sys_open_impl(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 3)?;
     let path_ptr = args[0] as *const u8;
     let flags = args[1] as i32;
@@ -353,7 +353,7 @@ fn sys_open_impl(args: &[u64]) -> SyscallResult {
     Ok(fd as u64)
 }
 
-fn sys_read_impl(args: &[u64]) -> SyscallResult {
+fn sys_read_impl(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 3)?;
     let fd = args[0] as i32;
     let buf_ptr = args[1] as *mut u8;
@@ -380,7 +380,7 @@ fn sys_read_impl(args: &[u64]) -> SyscallResult {
     }
 }
 
-fn sys_write_impl(args: &[u64]) -> SyscallResult {
+fn sys_write_impl(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 3)?;
     let fd = args[0] as i32;
     let buf_ptr = args[1] as *const u8;
@@ -407,7 +407,7 @@ fn sys_write_impl(args: &[u64]) -> SyscallResult {
     }
 }
 
-fn sys_close_impl(args: &[u64]) -> SyscallResult {
+fn sys_close_impl(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 1)?;
     let fd = args[0] as i32;
     
@@ -442,7 +442,7 @@ fn sys_close_impl(args: &[u64]) -> SyscallResult {
     Ok(0)
 }
 
-fn sys_lseek_impl(args: &[u64]) -> SyscallResult {
+fn sys_lseek_impl(args: &[u64]) -> SyscallResult<i64>{
    let args = extract_args(args, 3)?;
    let fd = args[0] as i32;
    let offset = args[1] as i64;
@@ -465,7 +465,7 @@ fn sys_lseek_impl(args: &[u64]) -> SyscallResult {
    }
 }
 
-fn sys_fstat_impl(args: &[u64]) -> SyscallResult {
+fn sys_fstat_impl(args: &[u64]) -> SyscallResult<i64>{
    let args = extract_args(args, 2)?;
    let fd = args[0] as i32;
    let statbuf_ptr = args[1] as *mut crate::posix::stat;
@@ -511,7 +511,7 @@ fn sys_fstat_impl(args: &[u64]) -> SyscallResult {
 }
 
 /// Implementation of syscall 0x2006: stat
-fn sys_stat_impl(args: &[u64]) -> SyscallResult {
+fn sys_stat_impl(args: &[u64]) -> SyscallResult<i64>{
     let args = extract_args(args, 2)?;
     let path_ptr = args[0] as *const u8;
     let statbuf_ptr = args[1] as *mut crate::posix::stat;

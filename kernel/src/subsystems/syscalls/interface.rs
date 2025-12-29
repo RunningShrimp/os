@@ -47,7 +47,7 @@ pub trait SyscallDispatcher {
     /// * `args` - System call arguments
     ///
     /// # Returns
-    /// * `SyscallResult` - Result of the system call
+    /// * `SyscallResult<i64> - Result of the system call
     fn dispatch(&self, num: SyscallNumber, args: &[u64]) -> SyscallResult<()>;
 
     /// Check if a system call is supported
@@ -109,7 +109,7 @@ pub trait SyscallHandler {
     /// * `args` - System call arguments
     ///
     /// # Returns
-    /// * `SyscallResult` - Result of the system call
+    /// * `SyscallResult<i64> - Result of the system call
     fn handle(&self, args: &[u64]) -> SyscallResult<()>;
 }
 

@@ -1,9 +1,9 @@
 //! Signal handling syscalls (simplified version)
 
-use super::common::{SyscallError, SyscallResult};
+use super::common::{SyscallError, SyscallResult);
 
 /// Dispatch signal handling syscalls
-pub fn dispatch(syscall_id: u32, _args: &[u64]) -> SyscallResult {
+pub fn dispatch(syscall_id: u32, _args: &[u64]) -> SyscallResult<i64>{
     match syscall_id {
         // Signal operations - temporarily disabled
         0x5000..=0x5FFF => Err(SyscallError::NotSupported),

@@ -208,22 +208,22 @@ pub use nos_api::Result as ApiResult;
 // ============================================================================
 
 /// Atomic boolean type
-pub use alloc::sync::AtomicBool;
+pub use core::sync::atomic::AtomicBool;
 
 /// Atomic usize type
-pub use alloc::sync::AtomicUsize;
+pub use core::sync::atomic::AtomicUsize;
 
 /// Atomic u64 type
-pub use alloc::sync::AtomicU64;
+pub use core::sync::atomic::AtomicU64;
 
 /// Atomic u32 type
-pub use alloc::sync::AtomicU32;
+pub use core::sync::atomic::AtomicU32;
 
 /// Atomic i32 type
-pub use alloc::sync::AtomicI32;
+pub use core::sync::atomic::AtomicI32;
 
 /// Atomic pointer type
-pub use alloc::sync::AtomicPtr;
+pub use core::sync::atomic::AtomicPtr;
 
 // ============================================================================
 // Smart Pointer Types
