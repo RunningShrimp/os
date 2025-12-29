@@ -28,8 +28,6 @@
 //! - [`hugepage`]: 大页支持（2MB、1GB）
 //! - [`compress`]: 内存压缩
 
-// Import kernel prelude for common types
-use crate::prelude::*;
 //! - [`numa`]: NUMA 感知内存分配
 //! - [`prefetch`]: 内存预取优化
 //! - [`percpu_allocator`]: Per-CPU 分配器
@@ -160,6 +158,8 @@ use crate::prelude::*;
 //! - [`crate::subsystems::process`]: 进程地址空间管理
 //! - [`crate::arch::memory_layout`]: 架构特定的内存布局
 //! - [`crate::security::aslr`]: 地址空间布局随机化
+// Import kernel prelude for common types
+use crate::prelude::*;
 
 // Note: nos-mm re-export removed since crate::mm module doesn't exist
 // Memory management functionality is now provided directly by this module

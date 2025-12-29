@@ -1,0 +1,272 @@
+warning: unexpected `cfg` condition value: `async`
+warning: unexpected `cfg` condition value: `async`
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: unexpected `cfg` condition value: `journaling_fs`
+warning: unexpected `cfg` condition value: `lazy_init`
+warning: unexpected `cfg` condition value: `net_stack`
+warning: unexpected `cfg` condition value: `lazy_init`
+warning: unexpected `cfg` condition value: `graphics_subsystem`
+warning: unexpected `cfg` condition value: `lazy_init`
+warning: unexpected `cfg` condition value: `web_engine`
+warning: unexpected `cfg` condition value: `observability`
+warning: unused import: `nos_error_handling::kernel_integration::ErrorType as NosErrorType`
+warning: unused imports: `ServiceStats` and `SyscallHandler`
+warning: unused import: `alloc::vec::Vec`
+warning: unused import: `crate::prelude::*`
+warning: unexpected `cfg` condition value: `strict_boot`
+warning: unexpected `cfg` condition value: `strict_boot`
+warning: unused imports: `EIO` and `ENOMEM`
+warning: unused import: `crate::prelude::*`
+warning: private item shadows public glob re-export
+warning: unused import: `crate::FileMode`
+warning: unused imports: `BSIZE`, `BufFlags`, `Buf`, and `CacheKey`
+warning: unused import: `FileMode`
+warning: unused import: `AtomicU32`
+warning: unused imports: `ProcessId` and `Process`
+warning: unused imports: `UnifiedError` and `collections::HashMap`
+warning: unused imports: `BufFlags`, `Dirent`, `DiskInode`, `InodeType`, and `SuperBlock`
+warning: unused imports: `BufCache`, `BufFlags`, `DIRSIZ`, `Dirent`, `DiskInode`, `FS_MAGIC`, `IPB`, `NINODE`, `ROOTINO`, `SuperBlock`, and `get_fs`
+warning: unused import: `UnifiedError`
+warning: unused import: `alloc::vec::Vec`
+warning: unused import: `get_current_time`
+warning: unused imports: `MqNotifyType`, `error::IntoFrameworkError`, `get_current_process`, `get_process_by_pid`, and `types::stubs::VfsNode`
+warning: unused import: `EINVAL`
+warning: unused imports: `ENOMEM` and `EPERM`
+warning: unused import: `ETIMEDOUT`
+warning: unused imports: `EINVAL` and `ENOMEM`
+warning: unused import: `error::UnifiedError`
+warning: unnecessary parentheses around assigned value
+warning: unused import: `sync::Arc`
+warning: unused import: `crate::prelude::*`
+warning: unused import: `Thread`
+warning: unused import: `collections::BTreeMap`
+warning: unused import: `alloc::sync::Arc`
+warning: unused import: `spin::Mutex`
+warning: unused import: `Proc`
+warning: unused imports: `SchedParam` and `Thread`
+warning: unused import: `SchedParam`
+warning: unnecessary parentheses around block return value
+warning: unused import: `alloc::sync::Arc`
+warning: unused import: `crate::prelude::*`
+warning: unused imports: `AioOffsetT`, `aio_reqprio_t`, `aio_sigevent_t`, and `off_t`
+warning: unused import: `crate::subsystems::mm::vm`
+warning: unused import: `nos_api::Result`
+warning: unused import: `syscall_result::*`
+warning: unused import: `UnifiedError`
+warning: unused import: `UnifiedError`
+warning: unused imports: `KernelError` and `UnifiedError`
+warning: unused import: `SyscallCategory`
+warning: unused import: `crate::api::SyscallError as InterfaceSyscallError`
+warning: unused import: `crate::subsystems::syscalls::api::SyscallError as ApiSyscallError`
+warning: unused import: `c_void`
+warning: unused imports: `EPOLLERR`, `EPOLLHUP`, `EPOLLIN`, `EPOLLOUT`, and `EpollEventInfo`
+warning: unused import: `sync::Arc`
+warning: unused import: `crate::subsystems::syscalls::common::SyscallArgs`
+warning: unused import: `nos_api::syscall::SyscallResult`
+warning: unused imports: `SyscallError` and `UnifiedError`
+warning: unused imports: `VfsError` and `error::UnifiedError`
+warning: unused import: `alloc::string::ToString`
+warning: unused import: `super::types::*`
+warning: unused import: `error::UnifiedError`
+warning: unused import: `error::UnifiedError`
+warning: ambiguous glob re-exports
+warning: unused import: `crate::subsystems::syscalls::common::SyscallArgs`
+warning: unused import: `crate::error::Result`
+warning: unused import: `super::types::*`
+warning: unused imports: `IpcError`, `SHM_PERM_READ`, `SHM_PERM_WRITE`, `error::UnifiedError`, and `register_rpc_procedure`
+warning: unused imports: `collections::BTreeMap`, `string::String`, and `sync::Arc`
+warning: unused import: `AtomicUsize`
+warning: unused import: `crate::subsystems::syscalls::common::SyscallArgs`
+warning: unused import: `crate::error::Result`
+warning: unused import: `core::time::Duration`
+warning: unused imports: `SYS_WRITE` and `common::SyscallResult`
+warning: unused import: `crate::error::UnifiedError`
+warning: unused imports: `error::UnifiedError` and `get_syscall_category`
+warning: ambiguous glob re-exports
+warning: unused import: `vec::Vec`
+warning: unused import: `error::UnifiedError`
+warning: unused import: `ToString`
+warning: unused import: `error::UnifiedError`
+warning: variant `SA_NODEFER` should have an upper camel case name
+warning: variant `SA_ONSTACK` should have an upper camel case name
+warning: variant `SA_RESTART` should have an upper camel case name
+warning: variant `SA_RESETHAND` should have an upper camel case name
+warning: variant `SA_SIGINFO` should have an upper camel case name
+warning: variant `SIG_BLOCK` should have an upper camel case name
+warning: variant `SIG_UNBLOCK` should have an upper camel case name
+warning: variant `SIG_SETMASK` should have an upper camel case name
+warning: variant `SS_DISABLE` should have an upper camel case name
+warning: variant `SS_ONSTACK` should have an upper camel case name
+warning: unused import: `sync::Arc`
+warning: unused import: `crate::subsystems::syscalls::common::SyscallArgs`
+warning: unused import: `nos_api::Result`
+warning: unused imports: `KernelErrorExt` and `SyscallError`
+warning: type `FUTEX_WAIT_QUEUE` should have an upper camel case name
+warning: unused import: `core::sync::atomic`
+warning: unused imports: `collections::VecDeque` and `sync::Arc`
+warning: unused import: `crate::subsystems::syscalls::common::SyscallArgs`
+warning: unused import: `crate::error::Result`
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: ambiguous glob re-exports
+warning: unused import: `alloc::sync::Arc`
+warning: unused import: `error::UnifiedError`
+warning: unused import: `UnifiedError`
+warning: unused imports: `KernelError` and `UnifiedError`
+warning: unused import: `crate::subsystems::mm::buddy`
+warning: unused imports: `AllocatorStats`, `SyscallStatsSnapshot`, `UnifiedSyscallStats`, `monitoring::get_perf_stats`, and `slab`
+warning: unused import: `println`
+warning: unexpected `cfg` condition value: `link_phys_end`
+warning: unexpected `cfg` condition value: `link_phys_end`
+warning: unexpected `cfg` condition value: `link_phys_end`
+warning: unused import: `crate::subsystems::mm::types::*`
+warning: unused import: `alloc::sync::Arc`
+warning: unused import: `crate::subsystems::sync::Mutex`
+warning: unused import: `crate::subsystems::mm::types::*`
+warning: unused import: `VmSpace`
+warning: unused import: `alloc::vec::Vec`
+warning: unused import: `crate::subsystems::sync::Mutex`
+warning: unused import: `crate::subsystems::mm::types::*`
+warning: unused imports: `VmError` and `VmSpace`
+warning: unused import: `alloc::sync::Arc`
+warning: unused import: `flags`
+warning: unused import: `buddy`
+warning: unexpected `cfg` condition value: `hpage_2mb`
+warning: unexpected `cfg` condition value: `hpage_1gb`
+warning: unused import: `spin::mutex::Mutex`
+warning: unused imports: `PAGE_SIZE`, `VmArea`, and `VmSpace`
+warning: unused import: `core::sync::atomic`
+warning: unused import: `vec::Vec`
+warning: unused import: `AtomicAllocationStats`
+warning: unused imports: `page_round_down` and `page_round_up`
+warning: unused import: `mm::unified_stats::ExtendedAllocationStats`
+warning: unnecessary parentheses around assigned value
+warning: unused import: `DerefMut`
+warning: unused import: `crate::process::thread::current_thread`
+warning: unused import: `crate::process::sleep`
+warning: unused import: `spin::Mutex`
+warning: unused import: `core::hint::spin_loop`
+warning: unused import: `alloc::sync::Arc`
+warning: unused import: `crate::cpu`
+warning: unused import: `collections::BTreeMap`
+warning: unused import: `AtomicUsize`
+warning: unused imports: `FUTEX_WAIT_QUEUE`, `FutexWaiter`, `PiFutexData`, `error::SyscallError`, `remove_futex_waiter`, and `wake_futex_waiters`
+warning: unused imports: `FUTEX_WAIT_QUEUE`, `remove_futex_waiter`, and `wake_futex_waiters`
+warning: unused imports: `EACCES` and `ENOMEM`
+warning: unused imports: `ENOMEM` and `EPERM`
+warning: unused imports: `EACCES`, `ENOMEM`, and `EPERM`
+warning: unused import: `EACCES`
+warning: unused imports: `EACCES` and `ENOMEM`
+warning: unused import: `format`
+warning: unused imports: `ENOENT` and `subsystems`
+warning: unused import: `core::ptr`
+warning: unused import: `Hasher`
+warning: unused import: `alloc::string::String`
+warning: unused import: `format`
+warning: unused import: `spin::Mutex`
+warning: unused import: `core::ptr`
+warning: unused import: `alloc::vec::Vec`
+warning: unused import: `alloc::sync::Arc`
+warning: unused import: `crate::subsystems::mm::vm`
+warning: unused import: `crate::mm`
+warning: unused import: `MemoryPermissions::*`
+warning: unused import: `format`
+warning: unused import: `format`
+warning: unused import: `format`
+warning: unused import: `crate::compat::DefaultHasherBuilder`
+warning: unused import: `crate::syscalls`
+warning: unused import: `AtomicUsize`
+warning: unused imports: `FUTEX_WAIT_QUEUE`, `FutexWaiter`, `PiFutexData`, `common::SyscallError`, `remove_futex_waiter`, and `wake_futex_waiters`
+warning: unused imports: `FUTEX_WAIT_QUEUE`, `remove_futex_waiter`, and `wake_futex_waiters`
+warning: unused import: `AtomicUsize`
+warning: unused import: `error::VfsError`
+warning: unused import: `Ordering`
+warning: unused import: `types::*`
+warning: unused import: `AtomicU32`
+warning: unused import: `drivers::BlockDevice`
+warning: unused import: `FileMode::*`
+warning: unused import: `VfsError::*`
+warning: unused import: `Mount::*`
+warning: unused import: `types::*`
+warning: unused imports: `FileAttr as FsFileAttr` and `FileMode as VfsInterfaceFileMode`
+warning: unused import: `DirEntry as FsDirEntry`
+warning: unused import: `error::*`
+warning: unused import: `fs::*`
+warning: unused import: `mount::*`
+warning: ambiguous glob re-exports
+warning: type `pid_t` should have an upper camel case name
+warning: type `uid_t` should have an upper camel case name
+warning: type `gid_t` should have an upper camel case name
+warning: type `mode_t` should have an upper camel case name
+warning: unused import: `AtomicUsize`
+warning: unused import: `Ordering`
+warning: unused imports: `EventDispatcher`, `MemoryEventData`, `ProcessEventData`, and `SystemEventData`
+warning: unused import: `AuditSeverity`
+warning: unused import: `security::audit::AuditSeverity`
+warning: unused imports: `AuditEventType` and `AuditSeverity`
+warning: unused import: `core::str::FromStr`
+warning: unused import: `compat::loader::OpenFlags`
+warning: unused import: `core::str::FromStr`
+warning: unused import: `c_long`
+warning: private item shadows public glob re-export
+warning: unused import: `string::String`
+warning: unused import: `spin::Mutex`
+warning: unused import: `core::sync::atomic`
+warning: unused import: `spin::Mutex`
+warning: type `mode_t` should have an upper camel case name
+warning: type `clock_t` should have an upper camel case name
+warning: type `off_t` should have an upper camel case name
+warning: type `aio_reqprio_t` should have an upper camel case name
+warning: type `ssize_t` should have an upper camel case name
+warning: type `size_t` should have an upper camel case name
+warning: unnecessary parentheses around block return value
+warning: unused import: `core::num::NonZeroU64`
+warning: unused import: `core::ptr`
+warning: unused import: `ProcState`
+warning: unused imports: `Pid as ProcPid`, `ProcEntry as ShardedProcEntry`, `ShardedProcTable`, and `get_sharded_table`
+warning: unused imports: `RcuProcTable`, `RcuReadGuard`, `get_rcu_table`, and `rcu_read_lock`
+warning: private item shadows public glob re-export
+warning: unused import: `RNG_INSTANCE`
+warning: unused import: `syscall::SyscallResult`
+warning: unused imports: `MemoryRegionType` and `initialize_aslr`
+warning: unused imports: `AuditConfig`, `AuditSeverity as Severity`, `ComplianceLevel`, `SecurityAuditResult`, `SecurityAuditor`, `SecurityCategory`, `SecurityFinding`, and `SecurityScore`
+warning: unused imports: `MEMORY_AUDITOR`, `MemoryAuditConfig`, `MemoryAuditResult`, `MemoryAuditor`, `MemorySafetyFinding`, `MemoryStatistics`, `MemoryUsage`, `get_memory_usage`, `record_allocation`, `record_deallocation`, and `run_memory_audit`
+warning: unused import: `init_security`
+warning: unexpected `cfg` condition value: `alloc`
+warning: unused import: `nos_api::Result`
+warning: use of deprecated enum `nos_error_handling::kernel_integration::ErrorType`: Implementation should be in kernel/src/error, not here
+warning: use of deprecated unit variant `nos_error_handling::kernel_integration::ErrorType::RuntimeError`: Implementation should be in kernel/src/error, not here
+warning: use of deprecated unit variant `nos_error_handling::kernel_integration::ErrorType::LogicError`: Implementation should be in kernel/src/error, not here
+warning: use of deprecated unit variant `nos_error_handling::kernel_integration::ErrorType::ResourceError`: Implementation should be in kernel/src/error, not here
+warning: use of deprecated unit variant `nos_error_handling::kernel_integration::ErrorType::PermissionError`: Implementation should be in kernel/src/error, not here
+warning: use of deprecated unit variant `nos_error_handling::kernel_integration::ErrorType::NetworkError`: Implementation should be in kernel/src/error, not here
+warning: use of deprecated unit variant `nos_error_handling::kernel_integration::ErrorType::IOError`: Implementation should be in kernel/src/error, not here
+warning: use of deprecated unit variant `nos_error_handling::kernel_integration::ErrorType::MemoryError`: Implementation should be in kernel/src/error, not here
+warning: use of deprecated unit variant `nos_error_handling::kernel_integration::ErrorType::SystemCallError`: Implementation should be in kernel/src/error, not here
+warning: use of deprecated unit variant `nos_error_handling::kernel_integration::ErrorType::ValidationError`: Implementation should be in kernel/src/error, not here
+warning: use of deprecated unit variant `nos_error_handling::kernel_integration::ErrorType::TimeoutError`: Implementation should be in kernel/src/error, not here
+warning: use of deprecated unit variant `nos_error_handling::kernel_integration::ErrorType::CancellationError`: Implementation should be in kernel/src/error, not here
+warning: use of deprecated unit variant `nos_error_handling::kernel_integration::ErrorType::SystemError`: Implementation should be in kernel/src/error, not here
+warning: `kernel` (lib) generated 271 warnings
