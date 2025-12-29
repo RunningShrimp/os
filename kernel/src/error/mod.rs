@@ -5,7 +5,19 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
+
+/// Result type for the kernel
+pub type Result<T> = core::result::Result<T, crate::api::error::Error>;
+
+/// Kernel error type - unified error representation
+pub type KernelError = UnifiedError;
+
+/// Kernel result type
+pub type KernelResult<T> = UnifiedResult<T>;
+
+/// Syscall result type
+pub type SyscallResult<T> = core::result::Result<T, SyscallError>;
 
 /// Initialize error handling subsystem
 pub fn init() -> crate::error::UnifiedResult<()> {
@@ -22,6 +34,7 @@ pub fn shutdown() -> crate::error::UnifiedResult<()> {
 }
 
 // Re-export submodules
+pub mod error_types;
 pub mod panic_handler;
 pub mod recovery;
 pub mod unified;
@@ -45,6 +58,18 @@ pub use unified_framework::{
     FrameworkErrorHandler, FrameworkErrorManager, FrameworkResult, IntoFrameworkError,
     init_framework, shutdown_framework,
 };
+
+// KernelErrorExt trait for error conversion
+pub trait KernelErrorExt {
+    /// Convert to POSIX errno
+    fn to_errno(&self) -> i32;
+
+    /// Get error message
+    fn message(&self) -> &str;
+}
+
+// Export error types for compatibility
+pub use error_types::{ErrorType, from_nos_error_type, to_nos_error_type};
 
 // Health monitoring
 pub mod health;
@@ -294,3 +319,37 @@ impl ErrorHandler for DefaultErrorHandler {
 pub fn init_default_handlers() {
     get_error_manager().add_handler(Box::new(DefaultErrorHandler));
 }
+
+/// Create a new error with the given message
+///
+/// This is a convenience function for creating UnifiedError instances
+/// with a custom message.
+pub fn create_error(message: &str) -> UnifiedError {
+    UnifiedError::FileSystemError(FileSystemError::GenericError(message.to_string()))
+}
+
+/// Create a new error with a specific error type
+///
+/// This is a convenience function for creating typed errors.
+pub fn create_error_with_type(error_type: ErrorType, message: &str) -> UnifiedError {
+    match error_type {
+        ErrorType::Memory => UnifiedError::MemoryError(MemoryError::GenericError(message.to_string())),
+        ErrorType::FileSystem => UnifiedError::FileSystemError(FileSystemError::GenericError(message.to_string())),
+        ErrorType::Network => UnifiedError::NetworkError(NetworkError::GenericError(message.to_string())),
+        ErrorType::Process => UnifiedError::ProcessError(ProcessError::GenericError(message.to_string())),
+        ErrorType::Security => UnifiedError::SecurityError(SecurityError::AccessDenied),
+        ErrorType::Syscall => UnifiedError::SyscallError(SyscallError::InvalidArgument),
+    }
+}
+
+/// Error type enumeration for error creation
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ErrorType {
+    Memory,
+    FileSystem,
+    Network,
+    Process,
+    Security,
+    Syscall,
+}
+

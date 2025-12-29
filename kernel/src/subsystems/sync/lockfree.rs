@@ -10,11 +10,9 @@
 //! - Read-Copy-Update (RCU) patterns
 
 use spin::Mutex;
-use core::sync::atomic;
+use core::sync::atomic::{AtomicUsize, Ordering};
 use core::ptr;
-use core::sync::atomic;
 use alloc::sync::Arc;
-use core::sync::atomic;
 
 // ============================================================================
 // Lock-free Counter with Fetch-Ops

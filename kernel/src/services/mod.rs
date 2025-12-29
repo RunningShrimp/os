@@ -15,14 +15,29 @@ use crate::error::KernelError;
 pub fn init() -> Result<(), KernelError> {
     // Initialize the service registry
     registry::init()?;
-    
+
     // Initialize the service discovery
     discovery::init()?;
-    
+
     // Initialize the service manager
     manager::init()?;
-    
+
     log::info!("Services subsystem initialized");
+    Ok(())
+}
+
+/// Shutdown the services subsystem
+pub fn shutdown() -> Result<(), KernelError> {
+    // Shutdown the service manager
+    manager::shutdown()?;
+
+    // Shutdown the service discovery
+    discovery::shutdown()?;
+
+    // Shutdown the service registry
+    registry::shutdown()?;
+
+    log::info!("Services subsystem shutdown");
     Ok(())
 }
 
@@ -39,4 +54,12 @@ pub fn get_discovery() -> &'static discovery::ServiceDiscovery {
 /// Get the service manager
 pub fn get_manager() -> &'static manager::ServiceManager {
     manager::get_manager()
-}pub mod driver;
+}
+
+pub mod driver;
+
+// Re-export driver module and its items
+// Device types are now re-exported from platform::device
+pub use driver::{get_driver_manager, DriverManager};
+// Re-export device types from platform for convenience
+pub use crate::platform::device::{DeviceResources, DeviceStatus, DeviceType};

@@ -18,7 +18,28 @@ use spin::Mutex;
 // Import println macro
 #[allow(unused_imports)]
 use crate::println;
-use nos_error_handling::{error_recovery::ExecutionStatus, diagnostic_tools::LogLevel, fault_tolerance::ConditionType};
+
+// Simple replacements for missing types
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExecutionStatus {
+    Success,
+    Failed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LogLevel {
+    Info,
+    Warning,
+    Error,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConditionType {
+    Resource,
+    Load,
+    ErrorRate,
+    Performance,
+}
 
 /// 优雅降级管理器
 pub struct GracefulDegradationManager {

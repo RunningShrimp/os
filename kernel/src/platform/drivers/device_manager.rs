@@ -25,10 +25,10 @@ use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use spin::Mutex;
 
-use crate::{
-    services::driver::{DeviceResources, DeviceStatus, DeviceType},
-    time,
-};
+use crate::time;
+
+// Use canonical device types from platform::device
+use crate::platform::device::{DeviceResources, DeviceStatus, DeviceType};
 
 // Placeholder resource types
 pub struct MemoryResource {
@@ -792,10 +792,10 @@ impl DeviceManager {
                 class_code: Some(0x010802), // Mass Storage
                 resources: DeviceResources {
                     memory_regions: vec![],
+                    irq_lines: vec![],
                     io_ports: vec![],
-                    irqs: vec![],
                     dma_channels: vec![],
-                    clocks: vec![],
+                    irqs: vec![],
                 },
                 status: DeviceStatus::Unknown,
                 driver_name: None,
@@ -1009,10 +1009,10 @@ impl DeviceManager {
             class_code: Some(0x000000),
             resources: DeviceResources {
                 memory_regions: vec![],
+                irq_lines: vec![],
                 io_ports: vec![],
-                irqs: vec![],
                 dma_channels: vec![],
-                clocks: vec![],
+                irqs: vec![],
             },
             status: DeviceStatus::Unknown,
             driver_name: None,

@@ -8,9 +8,15 @@
 
 use alloc::{sync::Arc, vec::Vec};
 
-use nos_api::{SyscallHandler, syscall::SyscallResult};
+use crate::subsystems::syscalls::interface::{SyscallHandler};
+use crate::subsystems::syscalls::interface::{SyscallNumber};
+use crate::subsystems::syscalls::common::SyscallArgs;
+use crate::error::Result;
 
 use crate::{error::SyscallError, subsystems::sync::Mutex};
+
+// Import extract_args from common module
+use crate::subsystems::syscalls::common::extract_args;
 
 /// EventFd flags (Linux compatible)
 pub mod flags {
@@ -124,13 +130,16 @@ impl EventFdHandler {
 }
 
 impl SyscallHandler for EventFdHandler {
-    fn handle(&self, args: &[u64]) -> Result<u64, SyscallError> {
-        // This is a placeholder - actual dispatch is done via syscall numbers
-        Err(SyscallError::InvalidSyscall(0))
+    fn handle(&self, args: &[u64]) -> SyscallResult<i64> {
+        // For now, we don't have specific handler logic here
+        // Individual syscall functions like sys_eventfd are called directly
+        Err(SyscallError::InvalidSyscall(self.get_syscall_number()))
     }
 
-    fn get_syscall_number(&self) -> u32 {
-        0 // Will be set during registration
+    fn get_syscall_number(&self) -> SyscallNumber {
+        // This should be the specific syscall number this handler handles
+        // For now, return a placeholder that should be overridden by specific handlers
+        0x9005 // Default eventfd syscall number
     }
 
     fn get_name(&self) -> &'static str {
@@ -141,7 +150,7 @@ impl SyscallHandler for EventFdHandler {
 /// eventfd system call (legacy, always uses flags=0)
 /// Arguments: [initval]
 /// Returns: file descriptor on success, error on failure
-pub fn sys_eventfd(args: &[u64]) -> SyscallResult {
+pub fn sys_eventfd(args: &[u64]) -> SyscallResult<i64> {
     let args = extract_args(args, 1)?;
     let initval = args[0] as u32;
     sys_eventfd2(&[initval as u64, 0])
@@ -150,7 +159,7 @@ pub fn sys_eventfd(args: &[u64]) -> SyscallResult {
 /// eventfd2 system call
 /// Arguments: [initval, flags]
 /// Returns: file descriptor on success, error on failure
-pub fn sys_eventfd2(args: &[u64]) -> SyscallResult {
+pub fn sys_eventfd2(args: &[u64]) -> SyscallResult<i64> {
     let args = extract_args(args, 2)?;
 
     let initval = args[0] as u32;

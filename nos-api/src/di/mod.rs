@@ -26,6 +26,7 @@ pub type DefaultContainer = Container;
 /// Dependency injection container
 pub struct Container {
     /// Registered services
+    #[allow(dead_code)]
     services: RwLock<BTreeMap<TypeId, Box<dyn Any + Send + Sync>>>,
     /// Service factories
     factories: RwLock<BTreeMap<TypeId, Arc<dyn ServiceFactory>>>,

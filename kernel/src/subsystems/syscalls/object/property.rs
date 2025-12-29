@@ -19,7 +19,7 @@ pub extern "C" fn sys_glib_object_set_property(
     instance_id: u64,
     name: *const c_char,
     value: u64,
-) -> SyscallResult {
+) -> SyscallResult<i32> {
     crate::println!(
         "[glib_object] 设置属性: instance={}, name={}, value={}",
         instance_id,
@@ -92,7 +92,7 @@ pub extern "C" fn sys_glib_object_get_property(
     instance_id: u64,
     name: *const c_char,
     value: *mut u64,
-) -> SyscallResult {
+) -> SyscallResult<i32> {
     crate::println!("[glib_object] 获取属性: instance={}", instance_id);
 
     // 验证参数

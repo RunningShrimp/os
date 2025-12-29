@@ -4,12 +4,14 @@
 // supporting both legacy direct boot and modern bootloader interfaces.
 
 extern crate alloc;
-use core::ptr;
 
 // Re-export unified boot parameters from nos-api
 pub use nos_api::boot::{
     BootParameters, BootProtocolType, FramebufferInfo, MemoryMap, MemoryMapEntry, MemoryType,
 };
+
+// Boot parameter validation
+pub mod validator;
 
 // Helper functions for compatibility
 impl BootParameters {
@@ -76,34 +78,70 @@ static mut BOOT_INITIALIZED: bool = false;
 
 /// Initialize boot information from bootloader parameters
 pub fn init_from_boot_parameters(params: *const BootParameters) {
+    use crate::platform::boot::validator::{BootParameterValidator, ValidationSeverity};
+
     unsafe {
         if !BOOT_INITIALIZED {
-            // Validate boot parameters
-            if !nos_api::boot::validate_boot_parameters(params) {
-                crate::println!("[boot] Warning: Invalid boot parameters, using defaults");
-                BOOT_PARAMETERS = Some(BootParameters::new());
-            } else {
-                let params_ref = &*params;
+            // Perform comprehensive validation
+            let validation_result = BootParameterValidator::validate(params);
 
-                // Verify version compatibility
-                if !params_ref.is_version_compatible() {
-                    crate::println!(
-                        "[boot] ERROR: Boot parameters version {} is not compatible with kernel \
-                         (requires version {})",
-                        params_ref.version,
-                        BootParameters::VERSION
-                    );
-                    // In production, this should be fatal
-                    #[cfg(feature = "strict_boot")]
-                    {
-                        crate::panic!("Incompatible boot parameters version");
+            // Handle validation results
+            if !validation_result.is_valid {
+                crate::println!("[boot] Boot parameter validation detected issues:");
+
+                for (error, severity) in validation_result.get_errors() {
+                    match severity {
+                        ValidationSeverity::Critical => {
+                            crate::println!("[boot]   [CRITICAL] {}", error.description());
+                        }
+                        ValidationSeverity::Error => {
+                            crate::println!("[boot]   [ERROR] {}", error.description());
+                        }
+                        ValidationSeverity::Warning => {
+                            crate::println!("[boot]   [WARNING] {}", error.description());
+                        }
                     }
                 }
 
-                // Verify architecture match
+                // Handle critical errors
+                if !validation_result.is_acceptable() {
+                    crate::println!("[boot] CRITICAL: Cannot continue with invalid boot parameters");
+
+                    #[cfg(feature = "strict_boot")]
+                    {
+                        crate::panic!("Critical boot parameter validation failures");
+                    }
+
+                    #[cfg(not(feature = "strict_boot"))]
+                    {
+                        crate::println!("[boot] Falling back to default boot parameters");
+                        BOOT_PARAMETERS = Some(BootParameters::new());
+                        BOOT_INITIALIZED = true;
+                        return;
+                    }
+                }
+            } else {
+                crate::println!("[boot] Boot parameter validation: PASSED");
+            }
+
+            // Validation passed or acceptable - use the parameters
+            if !params.is_null() {
+                let params_ref = &*params;
+
+                // Additional version compatibility check
+                if !params_ref.is_version_compatible() {
+                    crate::println!(
+                        "[boot] WARNING: Boot parameters version {} may not be fully compatible \
+                         (kernel version {})",
+                        params_ref.version,
+                        BootParameters::VERSION
+                    );
+                }
+
+                // Additional architecture verification
                 if !params_ref.validate_architecture() {
                     crate::println!(
-                        "[boot] ERROR: Architecture mismatch - boot params: {}, kernel: {}",
+                        "[boot] WARNING: Architecture mismatch detected - boot params: {}, kernel: {}",
                         params_ref.architecture_name(),
                         {
                             #[cfg(target_arch = "x86_64")]
@@ -128,20 +166,13 @@ pub fn init_from_boot_parameters(params: *const BootParameters) {
                             }
                         }
                     );
-                    #[cfg(feature = "strict_boot")]
-                    {
-                        crate::panic!("Architecture mismatch in boot parameters");
-                    }
-                }
-
-                // Verify pointer validity for optional fields
-                if params_ref.has_command_line() {
-                    // Would need to verify command_line pointer is valid
-                    // For now, just check it's not null
                 }
 
                 BOOT_PARAMETERS = Some(*params_ref);
+            } else {
+                BOOT_PARAMETERS = Some(BootParameters::new());
             }
+
             BOOT_INITIALIZED = true;
         }
     }

@@ -4,7 +4,7 @@
 
 use alloc::sync::Arc;
 
-use nos_api::{Result, interfaces::SyscallHandler};
+use crate::{error::Result, subsystems::syscalls::{interface::{SyscallHandler, SyscallNumber}, common::SyscallArgs}};
 
 pub mod dispatch;
 pub mod handlers;
@@ -25,120 +25,108 @@ impl FsSyscallHandler {
 }
 
 impl SyscallHandler for FsSyscallHandler {
-    fn handle(&self, args: &[usize]) -> isize {
-        // 占位符实现
-        match args.get(0) {
-            Some(&0) => self.sys_open(args),
-            Some(&1) => self.sys_close(args),
-            Some(&2) => self.sys_read(args),
-            Some(&3) => self.sys_write(args),
-            Some(&4) => self.sys_lseek(args),
-            Some(&5) => self.sys_stat(args),
-            // Journaling system calls
-            Some(&10) => self.sys_journal_begin(args),
-            Some(&11) => self.sys_journal_commit(args),
-            Some(&12) => self.sys_journal_abort(args),
-            Some(&13) => self.sys_journal_enable(args),
-            Some(&14) => self.sys_journal_status(args),
-            Some(&15) => self.sys_journal_stats(args),
-            Some(&16) => self.sys_journal_checkpoint(args),
-            Some(&17) => self.sys_journal_recovery_status(args),
-            _ => -1,
-        }
+    fn handle(&self, args: &[u64]) -> SyscallResult<i64> {
+        // For FS syscalls, we need to dispatch based on syscall number
+        // But the trait interface doesn't provide the syscall number
+        // This suggests we need a different approach - possibly multiple handlers
+        // For now, return invalid syscall since we can't determine which one was called
+        Err(SyscallError::InvalidSyscall(self.get_syscall_number()))
     }
 
-    fn name(&self) -> &str {
+    fn get_syscall_number(&self) -> SyscallNumber {
+        // This handler shouldn't be called directly for specific syscalls
+        // Each FS syscall should have its own handler
+        0 // Default FS syscall number
+    }
+
+    fn get_name(&self) -> &'static str {
         "fs_syscall_handler"
-    }
-
-    fn syscall_number(&self) -> usize {
-        100 // 文件系统系统调用范围
     }
 }
 
 impl FsSyscallHandler {
     /// 打开文件
-    fn sys_open(&self, _args: &[usize]) -> isize {
+    fn sys_open(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
         // 占位符实现
-        0
+        Ok(SyscallResult::success(0))
     }
 
     /// 关闭文件
-    fn sys_close(&self, _args: &[usize]) -> isize {
+    fn sys_close(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
         // 占位符实现
-        0
+        Ok(SyscallResult::success(0))
     }
 
     /// 读取文件
-    fn sys_read(&self, _args: &[usize]) -> isize {
+    fn sys_read(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
         // 占位符实现
-        0
+        Ok(SyscallResult::success(0))
     }
 
     /// 写入文件
-    fn sys_write(&self, _args: &[usize]) -> isize {
+    fn sys_write(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
         // 占位符实现
-        0
+        Ok(SyscallResult::success(0))
     }
 
     /// 文件定位
-    fn sys_lseek(&self, _args: &[usize]) -> isize {
+    fn sys_lseek(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
         // 占位符实现
-        0
+        Ok(SyscallResult::success(0))
     }
 
     /// 获取文件状态
-    fn sys_stat(&self, _args: &[usize]) -> isize {
+    fn sys_stat(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
         // 占位符实现
-        0
+        Ok(SyscallResult::success(0))
     }
 
     /// 开始日志事务
-    fn sys_journal_begin(&self, _args: &[usize]) -> isize {
+    fn sys_journal_begin(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
         // 占位符实现
-        0
+        Ok(SyscallResult::success(0))
     }
 
     /// 提交日志事务
-    fn sys_journal_commit(&self, _args: &[usize]) -> isize {
+    fn sys_journal_commit(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
         // 占位符实现
-        0
+        Ok(SyscallResult::success(0))
     }
 
     /// 中止日志事务
-    fn sys_journal_abort(&self, _args: &[usize]) -> isize {
+    fn sys_journal_abort(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
         // 占位符实现
-        0
+        Ok(SyscallResult::success(0))
     }
 
     /// 启用/禁用日志记录
-    fn sys_journal_enable(&self, _args: &[usize]) -> isize {
+    fn sys_journal_enable(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
         // 占位符实现
-        0
+        Ok(SyscallResult::success(0))
     }
 
     /// 获取日志状态
-    fn sys_journal_status(&self, _args: &[usize]) -> isize {
+    fn sys_journal_status(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
         // 占位符实现
-        0
+        Ok(SyscallResult::success(0))
     }
 
     /// 获取日志统计信息
-    fn sys_journal_stats(&self, _args: &[usize]) -> isize {
+    fn sys_journal_stats(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
         // 占位符实现
-        0
+        Ok(SyscallResult::success(0))
     }
 
     /// 日志检查点
-    fn sys_journal_checkpoint(&self, _args: &[usize]) -> isize {
+    fn sys_journal_checkpoint(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
         // 占位符实现
-        0
+        Ok(SyscallResult::success(0))
     }
 
     /// 获取恢复状态
-    fn sys_journal_recovery_status(&self, _args: &[usize]) -> isize {
+    fn sys_journal_recovery_status(&mut self, _args: &SyscallArgs) -> Result<SyscallResult> {
         // 占位符实现
-        0
+        Ok(SyscallResult::success(0))
     }
 }
 

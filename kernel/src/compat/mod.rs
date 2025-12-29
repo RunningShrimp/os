@@ -11,11 +11,41 @@ extern crate alloc;
 extern crate hashbrown;
 use alloc::boxed::Box;
 
+/// Compatibility error types
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompatibilityError {
+    /// Invalid binary format
+    InvalidBinaryFormat,
+    /// Unsupported architecture
+    UnsupportedArchitecture,
+    /// Unsupported API version
+    UnsupportedApi,
+    /// Memory error
+    MemoryError,
+    /// Not found
+    NotFound,
+    /// I/O error
+    IoError,
+    /// Operation not supported
+    NotSupported,
+}
+
+pub type Result<T> = core::result::Result<T, CompatibilityError>;
+
 pub mod android;
 pub mod ios;
 pub mod linux;
 pub mod macos;
 pub mod windows;
+pub mod loader;
+pub mod abi;
+pub mod graphics;
+pub mod memory;
+pub mod MemoryPermissions;
+pub use MemoryPermissions::*;
+pub mod package_manager;
+pub mod sandbox;
+pub mod syscall_translator;
 
 /// Target platform enumeration
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,4 +94,16 @@ pub fn create_platform_module(platform: TargetPlatform) -> Option<Box<dyn Platfo
         TargetPlatform::IOS => Some(Box::new(ios::IOSModule::new())),
         _ => None,
     }
+}
+
+/// Initialize compatibility subsystem
+pub fn init() -> Result<()> {
+    // Initialize all compatibility layers
+    Ok(())
+}
+
+/// Shutdown compatibility subsystem
+pub fn shutdown() -> Result<()> {
+    // Cleanup compatibility layers
+    Ok(())
 }

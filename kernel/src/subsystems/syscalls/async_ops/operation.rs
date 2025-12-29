@@ -27,7 +27,7 @@ pub extern "C" fn sys_glib_async_read(
     callback: *mut c_void,
     user_data: *mut c_void,
     timeout: u32,
-) -> SyscallResult {
+) -> SyscallResult<i64> {
     crate::println!(
         "[glib_async] 提交异步读: context={}, fd={}, size={}, offset={}, timeout={}",
         context_id,
@@ -145,7 +145,7 @@ pub extern "C" fn sys_glib_async_write(
     callback: *mut c_void,
     user_data: *mut c_void,
     timeout: u32,
-) -> SyscallResult {
+) -> SyscallResult<i64> {
     crate::println!(
         "[glib_async] 提交异步写: context={}, fd={}, size={}, offset={}, timeout={}",
         context_id,
@@ -241,7 +241,7 @@ pub extern "C" fn sys_glib_async_write(
 /// * 成功时返回0
 /// * 失败时返回负数错误码
 #[no_mangle]
-pub extern "C" fn sys_glib_async_cancel(operation_id: u64) -> SyscallResult {
+pub extern "C" fn sys_glib_async_cancel(operation_id: u64) -> SyscallResult<i32> {
     crate::println!("[glib_async] 取消异步操作: {}", operation_id);
 
     // 验证参数
@@ -306,7 +306,7 @@ pub extern "C" fn sys_glib_async_query(
     status: *mut AsyncOperationStatus,
     bytes_completed: *mut usize,
     error_code: *mut c_int,
-) -> SyscallResult {
+) -> SyscallResult<i32> {
     crate::println!("[glib_async] 查询操作状态: {}", operation_id);
 
     // 验证参数
@@ -365,7 +365,7 @@ pub extern "C" fn sys_glib_async_complete(
     operation_id: u64,
     bytes_transferred: usize,
     error_code: c_int,
-) -> SyscallResult {
+) -> SyscallResult<i32> {
     crate::println!(
         "[glib_async] 完成异步操作: ID={}, bytes={}, error={}",
         operation_id,
@@ -438,7 +438,7 @@ pub extern "C" fn sys_glib_async_complete(
 /// * 超时时返回-62 (ETIMEDOUT)
 /// * 失败时返回负数错误码
 #[no_mangle]
-pub extern "C" fn sys_glib_async_wait(operation_id: u64, timeout: u32) -> SyscallResult {
+pub extern "C" fn sys_glib_async_wait(operation_id: u64, timeout: u32) -> SyscallResult<i32> {
     crate::println!("[glib_async] 等待异步操作完成: ID={}, timeout={}", operation_id, timeout);
 
     // 验证参数

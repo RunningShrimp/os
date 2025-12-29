@@ -1,12 +1,21 @@
 //! Simple RAM file system for testing
+//!
+//! RamFS 是一个简单的内存文件系统，支持：
+//! - 常规文件和目录
+//! - 符号链接
+//! - 文件锁
+//! - 扩展属性
 
 extern crate alloc;
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use alloc::sync::Arc;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use super::{
+    core::{FileSystemType, FsStats, SuperBlock},
     dir::DirEntry,
     error::*,
-    fs::{FileSystemType, FsStats, InodeOps, SuperBlock},
+    inode::{FileLock, InodeOps},
     types::*,
 };
 use crate::subsystems::sync::Mutex;
@@ -82,6 +91,12 @@ struct RamFsInode {
     children: Mutex<BTreeMap<String, Arc<dyn InodeOps>>>,
     // For symlinks
     target: Mutex<Option<String>>,
+    // File locks
+    locks: Mutex<Vec<FileLock>>,
+    // Extended attributes (name -> value)
+    xattrs: Mutex<BTreeMap<String, Vec<u8>>>,
+    // Inode number
+    ino: u64,
 }
 
 impl RamFsInode {
@@ -97,6 +112,9 @@ impl RamFsInode {
             data: Mutex::new(Vec::new()),
             children: Mutex::new(BTreeMap::new()),
             target: Mutex::new(None),
+            locks: Mutex::new(Vec::new()),
+            xattrs: Mutex::new(BTreeMap::new()),
+            ino,
         }
     }
 
@@ -111,6 +129,9 @@ impl RamFsInode {
             data: Mutex::new(Vec::new()),
             children: Mutex::new(BTreeMap::new()),
             target: Mutex::new(None),
+            locks: Mutex::new(Vec::new()),
+            xattrs: Mutex::new(BTreeMap::new()),
+            ino,
         }
     }
 
@@ -126,6 +147,9 @@ impl RamFsInode {
             data: Mutex::new(Vec::new()),
             children: Mutex::new(BTreeMap::new()),
             target: Mutex::new(Some(target.to_string())),
+            locks: Mutex::new(Vec::new()),
+            xattrs: Mutex::new(BTreeMap::new()),
+            ino,
         }
     }
 }
@@ -321,6 +345,120 @@ impl InodeOps for RamFsInode {
         attr.size = data.len() as u64;
 
         Ok(buf.len())
+    }
+
+    fn truncate(&self, size: u64) -> VfsResult<()> {
+        let mut data = self.data.lock();
+        data.resize(size as usize, 0);
+
+        // Update size
+        let mut attr = self.attr.lock();
+        attr.size = size;
+
+        Ok(())
+    }
+
+    fn get_file_lock(&self, _cmd: u32, lock: &FileLock) -> VfsResult<u64> {
+        let mut locks = self.locks.lock();
+
+        // 检查冲突
+        for existing_lock in locks.iter() {
+            if existing_lock.lock_type == 1 // F_WRLCK
+                && lock.lock_type == 1
+                && existing_lock.start == lock.start
+                && existing_lock.len == lock.len
+            {
+                return Err(VfsError::PermissionDenied);
+            }
+        }
+
+        // 添加锁
+        let lock_id = self.ino as u64 * 1000 + locks.len() as u64;
+        locks.push(lock.clone());
+
+        crate::println!(
+            "ramfs: acquired lock {} on inode {} for process {}",
+            lock_id,
+            self.ino,
+            lock.pid
+        );
+
+        Ok(lock_id)
+    }
+
+    fn release_file_lock(&self, lock: &FileLock) -> VfsResult<()> {
+        let mut locks = self.locks.lock();
+
+        let initial_len = locks.len();
+        locks.retain(|l| {
+            !(l.pid == lock.pid && l.start == lock.start && l.len == lock.len)
+        });
+
+        if locks.len() == initial_len {
+            return Err(VfsError::NotFound);
+        }
+
+        crate::println!(
+            "ramfs: released lock on inode {} for process {}",
+            self.ino,
+            lock.pid
+        );
+
+        Ok(())
+    }
+
+    fn set_xattr(&self, name: &str, value: &[u8], _flags: u32) -> VfsResult<()> {
+        let mut xattrs = self.xattrs.lock();
+        xattrs.insert(name.to_string(), value.to_vec());
+
+        crate::println!("ramfs: set xattr '{}' on inode {}", name, self.ino);
+
+        Ok(())
+    }
+
+    fn get_xattr(&self, name: &str, value: &mut [u8]) -> VfsResult<usize> {
+        let xattrs = self.xattrs.lock();
+
+        if let Some(attr_value) = xattrs.get(name) {
+            if value.len() < attr_value.len() {
+                return Err(VfsError::InvalidInput);
+            }
+
+            value[..attr_value.len()].copy_from_slice(attr_value);
+            Ok(attr_value.len())
+        } else {
+            Err(VfsError::NotFound)
+        }
+    }
+
+    fn remove_xattr(&self, name: &str) -> VfsResult<()> {
+        let mut xattrs = self.xattrs.lock();
+
+        xattrs.remove(name).ok_or(VfsError::NotFound)?;
+
+        crate::println!("ramfs: removed xattr '{}' on inode {}", name, self.ino);
+
+        Ok(())
+    }
+
+    fn list_xattr(&self, list: &mut [u8]) -> VfsResult<usize> {
+        let xattrs = self.xattrs.lock();
+
+        let mut offset = 0;
+        for name in xattrs.keys() {
+            let name_bytes = name.as_bytes();
+            let name_len = name_bytes.len() + 1; // null terminator
+
+            if offset + name_len > list.len() {
+                return Err(VfsError::InvalidInput);
+            }
+
+            list[offset..offset + name_bytes.len()].copy_from_slice(name_bytes);
+            list[offset + name_bytes.len()] = 0;
+            offset += name_len;
+        }
+
+        Ok(offset)
     }
 }
 

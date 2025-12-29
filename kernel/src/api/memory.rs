@@ -10,9 +10,9 @@ use alloc::{string::String, vec::Vec};
 use crate::{
     error::{
         unified::UnifiedError,
-        unified_framework::{FrameworkError, FrameworkResult, IntoFrameworkError},
+        unified_framework::{FrameworkError, IntoFrameworkError},
     },
-    types::stubs::{gid_t, pid_t, uid_t},
+    types::stubs::{pid_t},
 };
 
 /// Memory manager trait

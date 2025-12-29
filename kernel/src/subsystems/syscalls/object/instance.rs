@@ -15,7 +15,7 @@ use super::*;
 pub extern "C" fn sys_glib_object_instance_create(
     type_id: u64,
     object_ptr: *mut c_void,
-) -> SyscallResult {
+) -> SyscallResult<i32> {
     crate::println!("[glib_object] 创建对象实例: type={}, ptr={:p}", type_id, object_ptr);
 
     // 验证参数
@@ -86,7 +86,7 @@ pub extern "C" fn sys_glib_object_instance_create(
 /// * 成功时返回新的引用计数
 /// * 失败时返回负数错误码
 #[no_mangle]
-pub extern "C" fn sys_glib_object_ref(instance_id: u64) -> SyscallResult {
+pub extern "C" fn sys_glib_object_ref(instance_id: u64) -> SyscallResult<i32> {
     crate::println!("[glib_object] 增加引用: instance={}", instance_id);
 
     // 验证参数
@@ -124,7 +124,7 @@ pub extern "C" fn sys_glib_object_ref(instance_id: u64) -> SyscallResult {
 /// * 成功时返回新的引用计数
 /// * 失败时返回负数错误码
 #[no_mangle]
-pub extern "C" fn sys_glib_object_unref(instance_id: u64) -> SyscallResult {
+pub extern "C" fn sys_glib_object_unref(instance_id: u64) -> SyscallResult<i32> {
     crate::println!("[glib_object] 减少引用: instance={}", instance_id);
 
     // 验证参数

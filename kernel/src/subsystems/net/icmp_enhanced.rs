@@ -4,7 +4,7 @@
 //! like path MTU discovery, traceroute support, and enhanced error handling.
 
 extern crate alloc;
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 
 // Re-export existing ICMP functionality
 pub use super::icmp::*;
@@ -916,8 +916,8 @@ impl EnhancedIcmpPacket {
                     bytes.extend_from_slice(&addr.preference_level.to_be_bytes());
                 }
             },
-            IcmpMessageData::RouterSolicitation(msg) => {
-                bytes.extend_from_slice(&msg.reserved.to_be_bytes());
+            IcmpMessageData::RouterSolicitation => {
+                // Router solicitation has no data to serialize
             },
         }
 

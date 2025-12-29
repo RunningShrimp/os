@@ -10,7 +10,7 @@ use alloc::{string::String, vec::Vec};
 use crate::{
     error::{
         unified::UnifiedError,
-        unified_framework::{FrameworkError, FrameworkResult, IntoFrameworkError},
+        unified_framework::{FrameworkError, IntoFrameworkError},
     },
     posix::mode_t,
     types::stubs::{gid_t, pid_t, uid_t},

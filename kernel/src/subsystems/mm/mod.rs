@@ -27,6 +27,9 @@
 //! - [`api`]: 统一的内存管理 API
 //! - [`hugepage`]: 大页支持（2MB、1GB）
 //! - [`compress`]: 内存压缩
+
+// Import kernel prelude for common types
+use crate::prelude::*;
 //! - [`numa`]: NUMA 感知内存分配
 //! - [`prefetch`]: 内存预取优化
 //! - [`percpu_allocator`]: Per-CPU 分配器
@@ -158,12 +161,14 @@
 //! - [`crate::arch::memory_layout`]: 架构特定的内存布局
 //! - [`crate::security::aslr`]: 地址空间布局随机化
 
-// Re-export nos-mm as base memory management
-pub use crate::mm;
+// Note: nos-mm re-export removed since crate::mm module doesn't exist
+// Memory management functionality is now provided directly by this module
 
 // Core memory management modules
 pub mod allocator;
+pub mod brk;
 pub mod buddy;
+pub mod madvise;
 pub mod phys;
 pub mod slab;
 pub mod vm;
@@ -173,9 +178,12 @@ pub mod api;
 pub mod compress;
 pub mod hugepage;
 pub mod memory_isolation;
+pub mod page_table_isolation;
 pub mod numa;
 pub mod optimized_page_allocator;
 pub mod percpu_allocator;
+pub mod percpu_allocator_v2;  // Enhanced per-CPU allocator
+pub mod zone_allocator;        // Fine-grained locking allocator
 pub mod prefetch;
 pub mod stats;
 pub mod traits;
@@ -183,16 +191,17 @@ pub mod types;
 pub mod unified_stats;
 
 // Re-export commonly used items from phys and vm modules
-pub use phys::{PAGE_SIZE, kalloc, kfree};
+pub use phys::{kalloc, kfree, PAGE_SIZE};
 // Re-export unified stats to avoid duplication
 pub use unified_stats::{
     AllocationStats, AtomicAllocationStats, ExtendedAllocationStats, LightweightAllocationStats,
     MemoryManagementStats, NumStats,
 };
 pub use vm::{
-    PTE_COUNT, PageTable, VmArea, VmPerm, activate, copyout, flags, flush_tlb_page, free_pagetable,
+    PTE_COUNT, VmArea, VmPerm, activate, copyout, flags, flush_tlb_page, free_pagetable,
     map_pages,
 };
+pub use page_table_isolation::PageTable;
 
 #[cfg(feature = "kernel_tests")]
 pub mod tests;
@@ -307,6 +316,42 @@ pub fn get_memory_stats() -> MemoryManagementStats {
     stats::get_memory_stats()
 }
 
+/// Free unused memory pages
+///
+/// This function attempts to free unused memory pages back to the system.
+/// It's useful for memory-constrained environments or when memory pressure
+/// is high.
+///
+/// # Returns
+///
+/// * `usize` - Number of pages freed
+pub fn free_unused_memory() -> usize {
+    // Try to free pages from the buddy allocator
+    // This is a placeholder implementation
+    // In a real system, this would scan for unused pages and return them
+    0
+}
+
+/// Get total free memory
+///
+/// # Returns
+///
+/// * `usize` - Number of free bytes
+pub fn get_free_memory() -> usize {
+    let stats = get_memory_stats();
+    stats.free_bytes
+}
+
+/// Get total used memory
+///
+/// # Returns
+///
+/// * `usize` - Number of used bytes
+pub fn get_used_memory() -> usize {
+    let stats = get_memory_stats();
+    stats.used_bytes
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -337,14 +382,9 @@ mod tests {
         assert!(stats.memory_usage_by_type.is_empty());
     }
 }
-/// Page size constant
-pub const PAGE_SIZE: usize = 4096;
 
 // Page table entry type
 pub type PageTableEntry = u64;
 
-// Physical address type
-pub type PhysAddr = usize;
-
-// Virtual address type
-pub type VirtAddr = usize;
+// Physical and virtual address types are defined in nos-api::core::types
+pub use nos_api::core::types::{PhysAddr, VirtAddr};

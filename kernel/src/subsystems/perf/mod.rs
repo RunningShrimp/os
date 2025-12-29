@@ -8,5 +8,5 @@ pub use monitor::{
 pub use profiler::{
     CallGraph, ExportFormat, Frame, FrameType, FunctionInfo, Profiler, ProfilerGuard,
     ProfilingConfig, ProfilingEvent, ProfilingMode, ProfilingSample, ProfilingSession,
-    ProfilingStatistics, profile_function,
+    ProfilingStatistics,
 };

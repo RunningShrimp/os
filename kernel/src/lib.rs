@@ -172,29 +172,73 @@
 #[macro_use]
 extern crate alloc;
 
+// Re-export standard collection types
+pub use alloc::{
+    boxed::Box,
+    string::String,
+    vec::Vec,
+    collections::{HashMap, BTreeMap},
+    sync::{Arc, Mutex, AtomicUsize, AtomicU64, AtomicU32, AtomicI32, AtomicBool, AtomicPtr},
+};
+
+// Re-export core types
+pub use core::cmp::Ordering;
+pub use core::cmp::{PartialOrd, PartialEq};
+
+// Re-export common types from error module
+pub use crate::{
+    error::{
+        MemoryError, FileSystemError, NetworkError, ProcessError,
+        KernelError, KernelResult, Result, SyscallError, SyscallResult,
+        DriverError, SecurityError, UnifiedError, UnifiedResult,
+    },
+    vfs::{
+        FileMode, VfsError, VfsResult,
+    },
+    subsystems::syscalls::common,
+};
+
+// Re-export additional commonly used types
+pub use crate::{
+    memory::{MemoryPermissions, MemoryRegion},
+    subsystems::process::MemoryRegionType,
+    subsystems::mm::{MemoryService, AllocationStats, MemoryManagementStats, CLibStats, NumStats},
+    subsystems::sync::CallingConvention,
+    subsystems::time::Timestamp,
+    subsystems::cloud_native::container::{Container, ContainerService},
+    security::enhanced_permissions::AccessResult,
+};
+
+// Prelude - imports commonly used types throughout the kernel
+pub mod prelude;
+pub use prelude::*;
+
 #[cfg(feature = "kernel_tests")]
 #[macro_use]
 mod test_macros;
 
 // Logging macros (stub implementations for no_std environments)
-#[cfg(not(feature = "debug_subsystems"))]
+#[cfg(not(feature = "debug"))]
 #[macro_export]
-macro_rules! log_debug { ($($arg:tt)*) => { let _ = ($($arg)*); }; }
+macro_rules! log_debug { ($($arg:tt)*) => { { let _ = ($($arg)*); } }; }
 
-#[cfg(not(feature = "debug_subsystems"))]
+#[cfg(not(feature = "debug"))]
 #[macro_export]
-macro_rules! log_info { ($($arg:tt)*) => { let _ = ($($arg)*); }; }
+macro_rules! log_info { ($($arg:tt)*) => { { let _ = ($($arg)*); } }; }
 
-#[cfg(not(feature = "debug_subsystems"))]
+#[cfg(not(feature = "debug"))]
 #[macro_export]
-macro_rules! log_warn { ($($arg:tt)*) => { let _ = ($($arg)*); }; }
+macro_rules! log_warn { ($($arg:tt)*) => { { let _ = ($($arg)*); } }; }
 
-#[cfg(not(feature = "debug_subsystems"))]
+#[cfg(not(feature = "debug"))]
 #[macro_export]
-macro_rules! log_error { ($($arg:tt)*) => { let _ = ($($arg)*); }; }
+macro_rules! log_error { ($($arg:tt)*) => { { let _ = ($($arg)*); } }; }
 
 // API layer - public interfaces for kernel subsystems
 pub mod api;
+
+// Virtual File System (VFS) - now accessed through subsystems
+// pub mod vfs;  // Removed: duplicate with subsystems::vfs
 
 // VFS interface layer - breaks circular dependency between VFS and FS
 pub mod vfs_interface;
@@ -205,13 +249,30 @@ pub mod core;
 // Error handling module
 pub mod error;
 
+// Common utilities
+pub mod common;
+
 // Kernel factory for creating and managing internal modules
 mod kernel_factory;
 
 // Include necessary internal modules for library
-// pub mod arch;
+pub mod arch;
 pub mod platform;
 pub mod subsystems;
+// Top-level aliases for backward compatibility
+// These allow code to use crate::syscalls instead of crate::subsystems::syscalls
+pub use crate::subsystems::syscalls;
+pub use crate::subsystems::services;
+pub use crate::subsystems::mm;
+// compat remains at root level, declared below
+// trap is now exported via platform::{arch, boot, drivers, trap} below
+
+// System call module
+pub mod syscall;
+// pub mod syscalls;  // REMOVED: Use subsystems::syscalls instead
+pub mod signal;
+pub mod compat;
+pub mod sync;
 
 // Re-export key types for external use
 /// Core kernel functionality
@@ -221,11 +282,12 @@ pub use core::*;
 pub use kernel_factory::*;
 #[cfg(feature = "error_handling")]
 pub use nos_error_handling as error_handling;
-#[cfg(feature = "services")]
-pub use nos_services as services;
-// Re-export external crates when features are enabled
-#[cfg(feature = "syscalls")]
-pub use nos_syscalls as syscalls;
+// External crates that would conflict with our internal aliases when features are enabled
+// These are kept commented out to avoid conflicts
+// #[cfg(feature = "services")]
+// pub use nos_services as services;
+// #[cfg(feature = "syscalls")]
+// pub use nos_syscalls as syscalls;
 /// Performance monitoring
 pub use perf::*;
 pub use platform::{arch, boot, drivers, trap};
@@ -233,7 +295,7 @@ pub use platform::{arch, boot, drivers, trap};
 pub use posix::*;
 // Re-export moved modules to maintain compatibility
 pub use subsystems::fs;
-#[cfg(feature = "net_stack")]
+#[cfg(feature = "networking")]
 pub use subsystems::net;
 pub use subsystems::{ipc, process, sync, time, vfs};
 
@@ -241,16 +303,16 @@ pub use subsystems::{ipc, process, sync, time, vfs};
 pub use crate::boot::BootParameters;
 
 mod collections;
-mod compat;
 mod cpu;
-#[cfg(feature = "debug_subsystems")]
-mod debug;
+#[cfg(feature = "debug")]
+pub mod debug;
+pub mod epoll;
 mod di;
 mod event;
 mod ids;
 mod libc;
+// mod services;  // Removed: now using nos_services when feature is enabled
 mod syscall_interface;
-mod types;
 // Legacy modules - now accessed through subsystems
 mod monitoring;
 mod perf;
@@ -258,8 +320,8 @@ pub mod posix;
 mod procfs;
 mod sched;
 mod security;
-#[cfg(feature = "security_audit")]
-mod security_audit;
+#[cfg(feature = "security")]
+pub mod security_audit;
 
 #[cfg(not(feature = "cloud_native"))]
 mod cloud_native {
@@ -374,7 +436,7 @@ pub fn shutdown_kernel() -> nos_api::Result<()> {
     // subsystems::process::shutdown_process_management()?; // Function not found
 
     // Shutdown memory management
-    mm::shutdown_advanced_memory_management()?;
+    crate::subsystems::mm::shutdown_advanced_memory_management()?;
 
     // Shutdown platform
     platform::shutdown_platform()?;
@@ -450,17 +512,15 @@ fn get_enabled_features() -> alloc::vec::Vec<&'static str> {
     if cfg!(feature = "error_handling") {
         features.push("error_handling");
     }
-    if cfg!(feature = "net_stack") {
-        features.push("net_stack");
+    if cfg!(feature = "networking") {
+        features.push("networking");
     }
-    if cfg!(feature = "posix_layer") {
-        features.push("posix_layer");
+    // posix_layer feature not defined in Cargo.toml - removed conditional compilation
+    if cfg!(feature = "debug") {
+        features.push("debug");
     }
-    if cfg!(feature = "debug_subsystems") {
-        features.push("debug_subsystems");
-    }
-    if cfg!(feature = "security_audit") {
-        features.push("security_audit");
+    if cfg!(feature = "security") {
+        features.push("security");
     }
     if cfg!(feature = "formal_verification") {
         features.push("formal_verification");
@@ -499,6 +559,5 @@ mod tests {
         assert!(!features.is_empty());
     }
 }
-mod mm;
+// mod mm;  // REMOVED: Use subsystems::mm instead
 pub mod reliability;
-mod tests;

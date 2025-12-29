@@ -12,8 +12,7 @@ use alloc::{format, string::String, vec::Vec};
 use core::panic::PanicInfo;
 
 use crate::{
-    error::{ErrorContext, ErrorSeverity, UnifiedError, handle_error},
-    log_error, log_info,
+    error::{UnifiedError, handle_error},
 };
 
 /// Structured crash information

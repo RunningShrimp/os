@@ -3,22 +3,27 @@
 //! This module implements the system call handlers for POSIX message queues.
 //! It provides the interface between user space and the kernel message queue implementation.
 
-use alloc::{string::String, vec::Vec};
+use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{ptr, slice};
+
+// Import nos_api for error types
+use nos_api;
 
 // use crate::subsystems::fs::Path;
 use crate::subsystems::time::{Timespec, get_current_time};
 use crate::{
     api::{
         error::{KernelError, Result},
-        syscall::{SyscallArgs, SyscallError, SyscallHandler, SyscallNumber, SyscallResult},
+        syscall::{SyscallArgs, SyscallHandler, SyscallNumber, SyscallResult},
     },
+    error::IntoFrameworkError,
     subsystems::{
         ipc::{
             mqueue,
             mqueue::{MqAttr, MqNotify, MqNotifyType, MqOpenFlags},
         },
         process::{get_current_process, get_process_by_pid},
+        syscalls::interface::SyscallError,
     },
     types::stubs::VfsNode,
 };
@@ -30,7 +35,15 @@ const MQ_NAME_MAX: usize = 255;
 pub struct MqOpenHandler;
 
 impl SyscallHandler for MqOpenHandler {
-    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult> {
+    fn get_syscall_number(&self) -> SyscallNumber {
+        101 // CommonSyscall::MqOpen
+    }
+
+    fn get_name(&self) -> &'static str {
+        "mq_open"
+    }
+
+    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> core::result::Result<SyscallResult, nos_api::Error> {
         let name_ptr = args.arg0 as *const u8;
         let flags = args.arg1 as u32;
         let mode = args.arg2 as u32;
@@ -75,21 +88,21 @@ impl SyscallHandler for MqOpenHandler {
             Err(e) => Ok(SyscallResult::Error(e.into())),
         }
     }
-
-    fn name(&self) -> &str {
-        "mq_open"
-    }
-
-    fn supports(&self, number: SyscallNumber) -> bool {
-        number == 101 // CommonSyscall::MqOpen
-    }
 }
 
 /// Message queue close system call handler
 pub struct MqCloseHandler;
 
 impl SyscallHandler for MqCloseHandler {
-    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult> {
+    fn get_syscall_number(&self) -> SyscallNumber {
+        102 // CommonSyscall::MqClose
+    }
+
+    fn get_name(&self) -> &'static str {
+        "mq_close"
+    }
+
+    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> core::result::Result<SyscallResult, nos_api::Error> {
         let mqd = args.arg0 as i32;
 
         match mqueue::mq_close(mqd) {
@@ -97,21 +110,21 @@ impl SyscallHandler for MqCloseHandler {
             Err(e) => Ok(SyscallResult::Error(e.into())),
         }
     }
-
-    fn name(&self) -> &str {
-        "mq_close"
-    }
-
-    fn supports(&self, number: SyscallNumber) -> bool {
-        number == 102 // CommonSyscall::MqClose
-    }
 }
 
 /// Message queue get attributes system call handler
 pub struct MqGetattrHandler;
 
 impl SyscallHandler for MqGetattrHandler {
-    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult> {
+    fn get_syscall_number(&self) -> SyscallNumber {
+        103 // CommonSyscall::MqGetattr
+    }
+
+    fn get_name(&self) -> &'static str {
+        "mq_getattr"
+    }
+
+    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> core::result::Result<SyscallResult, nos_api::Error> {
         let mqd = args.arg0 as i32;
         let attr_ptr = args.arg1 as *mut MqAttr;
 
@@ -130,21 +143,21 @@ impl SyscallHandler for MqGetattrHandler {
             Err(e) => Ok(SyscallResult::Error(e.into())),
         }
     }
-
-    fn name(&self) -> &str {
-        "mq_getattr"
-    }
-
-    fn supports(&self, number: SyscallNumber) -> bool {
-        number == 103 // CommonSyscall::MqGetattr
-    }
 }
 
 /// Message queue set attributes system call handler
 pub struct MqSetattrHandler;
 
 impl SyscallHandler for MqSetattrHandler {
-    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult> {
+    fn get_syscall_number(&self) -> SyscallNumber {
+        104 // CommonSyscall::MqSetattr
+    }
+
+    fn get_name(&self) -> &'static str {
+        "mq_setattr"
+    }
+
+    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> core::result::Result<SyscallResult, nos_api::Error> {
         let mqd = args.arg0 as i32;
         let new_attr_ptr = args.arg1 as *const MqAttr;
         let old_attr_ptr = args.arg2 as *mut MqAttr;
@@ -168,21 +181,21 @@ impl SyscallHandler for MqSetattrHandler {
             Err(e) => Ok(SyscallResult::Error(e.into())),
         }
     }
-
-    fn name(&self) -> &str {
-        "mq_setattr"
-    }
-
-    fn supports(&self, number: SyscallNumber) -> bool {
-        number == 104 // CommonSyscall::MqSetattr
-    }
 }
 
 /// Message queue timed send system call handler
 pub struct MqTimedsendHandler;
 
 impl SyscallHandler for MqTimedsendHandler {
-    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult> {
+    fn get_syscall_number(&self) -> SyscallNumber {
+        105 // CommonSyscall::MqTimedsend
+    }
+
+    fn get_name(&self) -> &'static str {
+        "mq_timedsend"
+    }
+
+    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> core::result::Result<SyscallResult, nos_api::Error> {
         let mqd = args.arg0 as i32;
         let msg_ptr = args.arg1 as *const u8;
         let msg_len = args.arg2 as usize;
@@ -209,21 +222,21 @@ impl SyscallHandler for MqTimedsendHandler {
             Err(e) => Ok(SyscallResult::Error(e.into())),
         }
     }
-
-    fn name(&self) -> &str {
-        "mq_timedsend"
-    }
-
-    fn supports(&self, number: SyscallNumber) -> bool {
-        number == 105 // CommonSyscall::MqTimedsend
-    }
 }
 
 /// Message queue timed receive system call handler
 pub struct MqTimedreceiveHandler;
 
 impl SyscallHandler for MqTimedreceiveHandler {
-    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult> {
+    fn get_syscall_number(&self) -> SyscallNumber {
+        106 // CommonSyscall::MqTimedreceive
+    }
+
+    fn get_name(&self) -> &'static str {
+        "mq_timedreceive"
+    }
+
+    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> core::result::Result<SyscallResult, nos_api::Error> {
         let mqd = args.arg0 as i32;
         let msg_ptr = args.arg1 as *mut u8;
         let msg_len = args.arg2 as usize;
@@ -262,21 +275,21 @@ impl SyscallHandler for MqTimedreceiveHandler {
             Err(e) => Ok(SyscallResult::Error(e.into())),
         }
     }
-
-    fn name(&self) -> &str {
-        "mq_timedreceive"
-    }
-
-    fn supports(&self, number: SyscallNumber) -> bool {
-        number == 106 // CommonSyscall::MqTimedreceive
-    }
 }
 
 /// Message queue notify system call handler
 pub struct MqNotifyHandler;
 
 impl SyscallHandler for MqNotifyHandler {
-    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult> {
+    fn get_syscall_number(&self) -> SyscallNumber {
+        107 // CommonSyscall::MqNotify
+    }
+
+    fn get_name(&self) -> &'static str {
+        "mq_notify"
+    }
+
+    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> core::result::Result<SyscallResult, nos_api::Error> {
         let mqd = args.arg0 as i32;
         let notify_ptr = args.arg1 as *const MqNotify;
 
@@ -292,21 +305,21 @@ impl SyscallHandler for MqNotifyHandler {
             Err(e) => Ok(SyscallResult::Error(e.into())),
         }
     }
-
-    fn name(&self) -> &str {
-        "mq_notify"
-    }
-
-    fn supports(&self, number: SyscallNumber) -> bool {
-        number == 107 // CommonSyscall::MqNotify
-    }
 }
 
 /// Message queue get/set attributes system call handler
 pub struct MqGetsetattrHandler;
 
 impl SyscallHandler for MqGetsetattrHandler {
-    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult> {
+    fn get_syscall_number(&self) -> SyscallNumber {
+        108 // CommonSyscall::MqGetsetattr
+    }
+
+    fn get_name(&self) -> &'static str {
+        "mq_getsetattr"
+    }
+
+    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> core::result::Result<SyscallResult, nos_api::Error> {
         let mqd = args.arg0 as i32;
         let new_attr_ptr = args.arg1 as *const MqAttr;
         let old_attr_ptr = args.arg2 as *mut MqAttr;
@@ -330,26 +343,18 @@ impl SyscallHandler for MqGetsetattrHandler {
             Err(e) => Ok(SyscallResult::Error(e.into())),
         }
     }
-
-    fn name(&self) -> &str {
-        "mq_getsetattr"
-    }
-
-    fn supports(&self, number: SyscallNumber) -> bool {
-        number == 108 // CommonSyscall::MqGetsetattr
-    }
 }
 
 /// Helper trait for reading C-style strings from user space
 trait CStringReader {
     /// Read a C-style string from user space
-    fn read_cstr(&self, ptr: *const u8) -> Result<String, ()>;
+    fn read_cstr(&self, ptr: *const u8) -> Result<String>;
 }
 
 impl CStringReader for MqOpenHandler {
-    fn read_cstr(&self, ptr: *const u8) -> Result<String, ()> {
+    fn read_cstr(&self, ptr: *const u8) -> Result<String> {
         if ptr.is_null() {
-            return Err(());
+            return Err(KernelError::InvalidArgument);
         }
 
         let mut buf = Vec::new();
@@ -367,11 +372,11 @@ impl CStringReader for MqOpenHandler {
 
             // Prevent infinite loops
             if offset > MQ_NAME_MAX + 1 {
-                return Err(());
+                return Err(KernelError::InvalidArgument);
             }
         }
 
-        String::from_utf8(buf).map_err(|_| ())
+        String::from_utf8(buf).map_err(|_| KernelError::InvalidArgument)
     }
 }
 
@@ -382,7 +387,7 @@ impl CStringReader for MqOpenHandler {
 /// Register all message queue system call handlers
 pub fn register_handlers(
     dispatcher: &mut dyn crate::api::syscall::SyscallDispatcher,
-) -> Result<(), KernelError> {
+) -> Result<()> {
     dispatcher.register_handler(101, Box::new(MqOpenHandler));
     dispatcher.register_handler(102, Box::new(MqCloseHandler));
     dispatcher.register_handler(103, Box::new(MqGetattrHandler));

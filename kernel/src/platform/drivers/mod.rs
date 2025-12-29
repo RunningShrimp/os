@@ -13,7 +13,8 @@ pub mod usb;
 pub mod virtio_gpu;
 
 // Re-export driver manager functions
-pub use crate::services::driver::get_driver_manager;
+//#[cfg(feature = "services")]
+//pub use crate::services::driver::get_driver_manager;
 use crate::{posix, subsystems::sync::Mutex};
 
 // ============================================================================

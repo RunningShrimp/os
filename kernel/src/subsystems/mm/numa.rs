@@ -13,7 +13,7 @@ use core::{
 
 use nos_api::{Error, Result};
 
-use crate::subsystems::{mm::unified_stats::AtomicAllocationStats, sync::Mutex};
+use crate::subsystems::{mm::unified_stats::{AllocationStats, AtomicAllocationStats}, sync::Mutex};
 
 /// NUMA node identifier
 pub type NodeId = usize;

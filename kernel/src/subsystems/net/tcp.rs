@@ -7,6 +7,7 @@ use alloc::vec::Vec;
 
 use super::ipv4::Ipv4Addr;
 
+pub mod congestion;
 pub mod manager;
 pub mod state;
 

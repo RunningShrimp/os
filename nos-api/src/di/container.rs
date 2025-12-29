@@ -6,7 +6,7 @@ use alloc::{
     collections::{BTreeMap, VecDeque},
     sync::{Arc, Weak},
     vec::Vec,
-    string::String,
+    string::{String, ToString},
     boxed::Box,
     format,
 };

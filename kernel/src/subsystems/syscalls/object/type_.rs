@@ -21,7 +21,7 @@ pub extern "C" fn sys_glib_object_type_register(
     parent_type: u64,
     type_size: usize,
     flags: u32,
-) -> SyscallResult {
+) -> SyscallResult<i32> {
     crate::println!(
         "[glib_object] 注册对象类型: parent={}, size={}, flags=0x{:x}",
         parent_type,
@@ -125,7 +125,7 @@ pub extern "C" fn sys_glib_object_type_register(
 pub extern "C" fn sys_glib_object_type_info(
     type_id: u64,
     info: *mut GObjectTypeInfo,
-) -> SyscallResult {
+) -> SyscallResult<i32> {
     crate::println!("[glib_object] 获取类型信息: {}", type_id);
 
     // 验证参数

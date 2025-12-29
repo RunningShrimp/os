@@ -17,7 +17,7 @@ use super::*;
 pub extern "C" fn sys_glib_async_context_create(
     name: *const c_char,
     max_operations: usize,
-) -> SyscallResult {
+) -> SyscallResult<i32> {
     crate::println!("[glib_async] 创建异步I/O上下文: max_ops={}", max_operations);
 
     // 验证参数
@@ -98,7 +98,7 @@ pub extern "C" fn sys_glib_async_context_stats(
     active_ops: *mut usize,
     successful_ops: *mut usize,
     failed_ops: *mut usize,
-) -> SyscallResult {
+) -> SyscallResult<i32> {
     crate::println!("[glib_async] 获取上下文统计: {}", context_id);
 
     // 验证参数
@@ -152,7 +152,7 @@ pub extern "C" fn sys_glib_async_context_stats(
 /// * 成功时返回0
 /// * 失败时返回负数错误码
 #[no_mangle]
-pub extern "C" fn sys_glib_async_context_destroy(context_id: u64) -> SyscallResult {
+pub extern "C" fn sys_glib_async_context_destroy(context_id: u64) -> SyscallResult<i32> {
     crate::println!("[glib_async] 销毁异步上下文: {}", context_id);
 
     // 验证参数

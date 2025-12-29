@@ -8,7 +8,7 @@ use alloc::string::ToString;
 
 use super::types::*;
 // use crate::subsystems::syscalls::common::{SyscallError};
-use crate::error::UnifiedError;
+use crate::{error::UnifiedError, vfs::VfsError};
 
 /// Handle chdir system call - change current working directory
 pub fn handle_chdir(args: &[u64]) -> Result<u64, KernelError> {
@@ -35,7 +35,7 @@ pub fn handle_chdir(args: &[u64]) -> Result<u64, KernelError> {
     let mut path_buf = [0u8; MAX_PATH_LEN];
     let path_len = unsafe {
         crate::subsystems::mm::vm::copyinstr(
-            pagetable as *mut crate::subsystems::mm::vm::PageTable,
+            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
             pathname_ptr,
             path_buf.as_mut_ptr(),
             MAX_PATH_LEN,
@@ -158,7 +158,7 @@ pub fn handle_getcwd(args: &[u64]) -> Result<u64, KernelError> {
     // Copy path to user buffer
     unsafe {
         crate::subsystems::mm::vm::copyout(
-            pagetable as *mut crate::subsystems::mm::vm::PageTable,
+            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
             buf_ptr,
             cwd_bytes.as_ptr(),
             cwd_bytes.len(),
@@ -166,7 +166,7 @@ pub fn handle_getcwd(args: &[u64]) -> Result<u64, KernelError> {
         .map_err(|_| KernelError::BadAddress)?;
         // Null terminate
         crate::subsystems::mm::vm::copyout(
-            pagetable as *mut crate::subsystems::mm::vm::PageTable,
+            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
             buf_ptr + cwd_bytes.len(),
             [0u8].as_ptr(),
             1,
@@ -203,7 +203,7 @@ pub fn handle_mkdir(args: &[u64]) -> Result<u64, KernelError> {
     let mut path_buf = [0u8; MAX_PATH_LEN];
     let path_len = unsafe {
         crate::subsystems::mm::vm::copyinstr(
-            pagetable as *mut crate::subsystems::mm::vm::PageTable,
+            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
             pathname_ptr,
             path_buf.as_mut_ptr(),
             MAX_PATH_LEN,
@@ -263,7 +263,7 @@ pub fn handle_rmdir(args: &[u64]) -> Result<u64, KernelError> {
     let mut path_buf = [0u8; MAX_PATH_LEN];
     let path_len = unsafe {
         crate::subsystems::mm::vm::copyinstr(
-            pagetable as *mut crate::subsystems::mm::vm::PageTable,
+            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
             pathname_ptr,
             path_buf.as_mut_ptr(),
             MAX_PATH_LEN,
@@ -364,7 +364,7 @@ pub fn handle_unlink(args: &[u64]) -> Result<u64, KernelError> {
     let mut path_buf = [0u8; MAX_PATH_LEN];
     let path_len = unsafe {
         crate::subsystems::mm::vm::copyinstr(
-            pagetable as *mut crate::subsystems::mm::vm::PageTable,
+            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
             pathname_ptr,
             path_buf.as_mut_ptr(),
             MAX_PATH_LEN,
@@ -426,7 +426,7 @@ pub fn handle_rename(args: &[u64]) -> Result<u64, KernelError> {
 
     let old_path_len = unsafe {
         crate::subsystems::mm::vm::copyinstr(
-            pagetable as *mut crate::subsystems::mm::vm::PageTable,
+            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
             oldpath_ptr,
             old_path_buf.as_mut_ptr(),
             MAX_PATH_LEN,
@@ -436,7 +436,7 @@ pub fn handle_rename(args: &[u64]) -> Result<u64, KernelError> {
 
     let new_path_len = unsafe {
         crate::subsystems::mm::vm::copyinstr(
-            pagetable as *mut crate::subsystems::mm::vm::PageTable,
+            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
             newpath_ptr,
             new_path_buf.as_mut_ptr(),
             MAX_PATH_LEN,
@@ -606,7 +606,7 @@ pub fn handle_readlink(args: &[u64]) -> Result<u64, KernelError> {
 
     unsafe {
         crate::subsystems::mm::vm::copyout(
-            pagetable as *mut crate::subsystems::mm::vm::PageTable,
+            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
             buf_ptr,
             target_bytes.as_ptr(),
             copy_len,
@@ -614,7 +614,7 @@ pub fn handle_readlink(args: &[u64]) -> Result<u64, KernelError> {
         .map_err(|_| KernelError::BadAddress)?;
         // Null terminate
         crate::subsystems::mm::vm::copyout(
-            pagetable as *mut crate::subsystems::mm::vm::PageTable,
+            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
             buf_ptr + copy_len,
             [0u8].as_ptr(),
             1,
@@ -775,7 +775,7 @@ pub fn handle_stat(args: &[u64]) -> Result<u64, KernelError> {
     }
 
     let pathname_ptr = args[0] as usize;
-    let statbuf_ptr = args[1] as *mut crate::posix::stat;
+    let statbuf_ptr = args[1] as *mut crate::posix::Stat;
 
     if statbuf_ptr.is_null() {
         return Err(KernelError::BadAddress);
@@ -792,10 +792,10 @@ pub fn handle_stat(args: &[u64]) -> Result<u64, KernelError> {
     let stat_buf = file_attr_to_stat(&attr);
     unsafe {
         crate::subsystems::mm::vm::copyout(
-            pagetable as *mut crate::subsystems::mm::vm::PageTable,
+            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
             statbuf_ptr as usize,
             &stat_buf as *const _ as *const u8,
-            core::mem::size_of::<crate::posix::stat>(),
+            core::mem::size_of::<crate::posix::Stat>(),
         )
         .map_err(|_| KernelError::BadAddress)?;
     }
@@ -810,7 +810,7 @@ pub fn handle_lstat(args: &[u64]) -> Result<u64, KernelError> {
     }
 
     let pathname_ptr = args[0] as usize;
-    let statbuf_ptr = args[1] as *mut crate::posix::stat;
+    let statbuf_ptr = args[1] as *mut crate::posix::Stat;
 
     if statbuf_ptr.is_null() {
         return Err(KernelError::BadAddress);
@@ -834,10 +834,10 @@ pub fn handle_lstat(args: &[u64]) -> Result<u64, KernelError> {
     let stat_buf = file_attr_to_stat(&attr);
     unsafe {
         crate::subsystems::mm::vm::copyout(
-            pagetable as *mut crate::subsystems::mm::vm::PageTable,
+            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
             statbuf_ptr as usize,
             &stat_buf as *const _ as *const u8,
-            core::mem::size_of::<crate::posix::stat>(),
+            core::mem::size_of::<crate::posix::Stat>(),
         )
         .map_err(|_| KernelError::BadAddress)?;
     }
@@ -880,6 +880,136 @@ pub fn handle_access(args: &[u64]) -> Result<u64, KernelError> {
     } else if uid == file_uid {
         (0o400, 0o200, 0o100)
     } else if gid == file_gid {
+        (0o040, 0o020, 0o010)
+    } else {
+        (0o004, 0o002, 0o001)
+    };
+
+    // Check requested permissions
+    if mode & crate::posix::R_OK != 0 && file_mode & r_bit == 0 {
+        return Err(KernelError::PermissionDenied);
+    }
+    if mode & crate::posix::W_OK != 0 && file_mode & w_bit == 0 {
+        return Err(KernelError::PermissionDenied);
+    }
+    if mode & crate::posix::X_OK != 0 && file_mode & x_bit == 0 {
+        return Err(KernelError::PermissionDenied);
+    }
+
+    Ok(0)
+}
+
+/// Handle faccessat system call - check file access permissions (AT-aware)
+///
+/// faccessat 是 access 的 AT-aware 版本，支持：
+/// - AT_FDCWD: 使用当前工作目录作为相对路径的基础
+/// - AT_EACCESS: 使用有效 UID/GID 而非真实 UID/GID 检查
+/// - AT_SYMLINK_NOFOLLOW: 不跟随符号链接
+///
+/// # POSIX 语义
+///
+/// faccessat 遵循 POSIX.1-2008，提供比 access 更灵活的权限检查。
+/// 主要优势是可以基于目录文件描述符进行相对路径检查。
+pub fn handle_faccessat(args: &[u64]) -> Result<u64, KernelError> {
+    if args.len() != 4 {
+        return Err(KernelError::InvalidArgument);
+    }
+
+    let dirfd = args[0] as i32;
+    let pathname_ptr = args[1] as usize;
+    let mode = args[2] as i32;
+    let flags = args[3] as i32;
+
+    // faccessat 的标志常量 (如果尚未定义在 posix 模块中)
+    const AT_FDCWD: i32 = -100;
+    const AT_EACCESS: i32 = 0x200;
+    const AT_SYMLINK_NOFOLLOW: i32 = 0x100;
+
+    let (pagetable, cwd_path, ruid, rgid) = get_process_context_full()?;
+
+    // 确定使用哪个 UID/GID 进行权限检查
+    let (check_uid, check_gid) = if flags & AT_EACCESS != 0 {
+        // 使用有效 UID/GID
+        let pid = crate::process::myproc().ok_or(KernelError::NotFound)?;
+        let proc_table = crate::process::manager::PROC_TABLE.lock();
+        let proc = proc_table.find_ref(pid).ok_or(KernelError::NotFound)?;
+        (proc.euid, proc.egid)
+    } else {
+        // 使用真实 UID/GID (RUID)
+        (ruid, rgid)
+    };
+
+    // 解析路径
+    let abs_path = if dirfd == AT_FDCWD {
+        // 使用当前工作目录
+        read_and_resolve_path(pagetable as usize, pathname_ptr, &cwd_path)?
+    } else {
+        // 使用目录文件描述符
+        let file_idx = crate::process::fdlookup(dirfd).ok_or(KernelError::BadFileDescriptor)?;
+
+        // 从文件描述符获取路径
+        let table = crate::fs::file::FILE_TABLE.lock();
+        let file = table.get(file_idx).ok_or(KernelError::BadFileDescriptor)?;
+
+        // 简化实现：目前只支持目录文件描述符
+        // 完整实现需要从文件描述符提取路径信息
+        if file.ftype != crate::fs::file::FileType::Vfs {
+            return Err(KernelError::NotADirectory);
+        }
+
+        // 获取相对路径并解析
+        let rel_path = read_path_from_user(pagetable as usize, pathname_ptr)?;
+
+        // TODO: 从文件描述符获取目录路径并与相对路径拼接
+        // 简化实现：暂时使用当前工作目录
+        read_and_resolve_path(pagetable as usize, pathname_ptr, &cwd_path)?
+    };
+
+    // F_OK check (文件存在性)
+    if mode == crate::posix::F_OK {
+        let vfs = crate::vfs::vfs();
+        // 检查文件是否存在
+        if flags & AT_SYMLINK_NOFOLLOW != 0 {
+            // 不跟随符号链接
+            let _dentry = vfs
+                .lookup_path(&abs_path)
+                .map_err(|_| KernelError::NotFound)?;
+        } else {
+            // 跟随符号链接
+            let _attr = vfs.stat(&abs_path).map_err(|_| KernelError::NotFound)?;
+        }
+        return Ok(0);
+    }
+
+    // Get file attributes and check permissions
+    let vfs = crate::vfs::vfs();
+
+    // 根据 AT_SYMLINK_NOFOLLOW 标志决定是否跟随符号链接
+    let attr = if flags & AT_SYMLINK_NOFOLLOW != 0 {
+        // 不跟随符号链接 - 使用 lstat
+        let dentry = vfs
+            .lookup_path(&abs_path)
+            .map_err(|_| KernelError::NotFound)?;
+        dentry.lock().inode.getattr().map_err(|_| KernelError::IoError)?
+    } else {
+        // 跟随符号链接 - 使用 stat
+        vfs.stat(&abs_path).map_err(|_| KernelError::NotFound)?
+    };
+
+    let file_mode = attr.mode.0;
+    let file_uid = attr.uid;
+    let file_gid = attr.gid;
+
+    // Determine permission bits to check
+    let (r_bit, w_bit, x_bit) = if check_uid == 0 {
+        // Root has access to everything
+        if (mode & crate::posix::X_OK) != 0 && (file_mode & 0o111) == 0 {
+            return Err(KernelError::PermissionDenied);
+        }
+        return Ok(0);
+    } else if check_uid == file_uid {
+        (0o400, 0o200, 0o100)
+    } else if check_gid == file_gid {
         (0o040, 0o020, 0o010)
     } else {
         (0o004, 0o002, 0o001)
@@ -997,7 +1127,7 @@ fn read_path_from_user(pagetable: usize, ptr: usize) -> Result<alloc::string::St
 
     let path_len = unsafe {
         crate::subsystems::mm::vm::copyinstr(
-            pagetable as *mut crate::subsystems::mm::vm::PageTable,
+            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
             ptr,
             path_buf.as_mut_ptr(),
             MAX_PATH_LEN,
@@ -1021,8 +1151,8 @@ fn read_and_resolve_path(
 }
 
 /// Convert VFS FileAttr to POSIX stat structure
-fn file_attr_to_stat(attr: &crate::vfs::types::FileAttr) -> crate::posix::stat {
-    crate::posix::stat {
+fn file_attr_to_stat(attr: &crate::vfs::types::FileAttr) -> crate::posix::Stat {
+    crate::posix::Stat {
         st_dev: 0, // Device ID (not implemented)
         st_ino: attr.ino,
         st_mode: attr.mode.0,
@@ -1064,6 +1194,7 @@ pub fn get_supported_syscalls() -> alloc::vec::Vec<u32> {
         0x7010, // stat
         0x7011, // lstat
         0x7012, // access
+        0x7014, // faccessat
         0x7013, // readdir/getdents
     ]
 }

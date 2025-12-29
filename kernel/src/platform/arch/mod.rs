@@ -1,6 +1,7 @@
 // Architecture abstraction layer
 // Provides a unified interface for architecture-specific operations
 
+use crate::prelude::*;
 use core::arch::asm;
 
 /// x86_64 specific functions
@@ -21,7 +22,7 @@ pub mod x86_64 {
 }
 
 // Re-export memory_layout from top-level arch module
-pub use crate::arch::memory_layout;
+pub use crate::arch;
 
 /// Early hardware initialization (called before any other init)
 pub fn early_init() {

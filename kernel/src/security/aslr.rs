@@ -684,8 +684,8 @@ impl AslrSubsystem {
                 0.0
             },
             average_entropy: avg_entropy,
-            high_entropy_processes,
-            low_entropy_processes,
+            high_entropy_processes: high_entropy,
+            low_entropy_processes: low_entropy,
             mitigation_effectiveness: if stats.mitigations_applied > 0 {
                 (stats.mitigations_applied - stats.successful_bypasses) as f32
                     / stats.mitigations_applied as f32

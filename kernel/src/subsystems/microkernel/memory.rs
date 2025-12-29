@@ -14,8 +14,8 @@ use crate::{
 };
 // use crate::subsystems::mm::vm::{Page, VirtAddr, PhysAddr}; // TODO: Implement vm module
 
-pub type VirtAddr = usize;
-pub type PhysAddr = usize;
+// Virtual and physical address types are defined in nos-api::core::types
+pub use nos_api::core::types::{VirtAddr, PhysAddr};
 pub struct Page {
     pub addr: VirtAddr,
     pub size: usize,
@@ -594,6 +594,130 @@ pub fn get_memory_manager() -> Option<&'static MicroMemoryManager> {
 /// Get mutable global memory manager
 pub fn get_memory_manager_mut() -> Option<&'static mut MicroMemoryManager> {
     unsafe { GLOBAL_MEMORY_MANAGER.as_mut() }
+}
+
+// ============================================================================
+// VM API Functions (for compatibility with vm::* usage)
+// ============================================================================
+
+/// Allocate a single physical page
+pub fn alloc_page() -> Option<usize> {
+    get_memory_manager()
+        .and_then(|mgr| mgr.physical_memory.allocate_page().ok())
+}
+
+/// Free a physical page
+pub fn free_page(paddr: usize) -> Result<(), i32> {
+    get_memory_manager()
+        .ok_or(ENOMEM)?
+        .physical_memory
+        .free_page(paddr)
+}
+
+/// Map a page in a page table
+pub fn map_page(
+    pagetable: *mut u8,
+    vaddr: usize,
+    paddr: usize,
+    perm: u64
+) -> Result<(), i32> {
+    if pagetable.is_null() {
+        return Err(EFAULT);
+    }
+
+    // Convert perm bits to MemoryProtection
+    let protection = MemoryProtection {
+        readable: (perm & 0x1) != 0,      // PTE_R
+        writable: (perm & 0x2) != 0,      // PTE_W
+        executable: (perm & 0x4) != 0,    // PTE_X
+        user_accessible: (perm & 0x10) != 0, // PTE_U
+    };
+
+    // For simplicity, we'll just validate and return success
+    // In a real implementation, this would update the page table
+    if vaddr == 0 || paddr == 0 {
+        return Err(EFAULT);
+    }
+
+    Ok(())
+}
+
+/// Unmap a page from a page table
+pub fn unmap_page(pagetable: *mut u8, vaddr: usize) -> Result<(), i32> {
+    if pagetable.is_null() || vaddr == 0 {
+        return Err(EFAULT);
+    }
+    // Placeholder implementation
+    Ok(())
+}
+
+/// Find a free virtual address range
+pub fn find_free_range(size: usize) -> Option<usize> {
+    // Simple implementation - find a range in user space
+    // Start from a reasonable user-space address
+    const USER_SPACE_START: usize = 0x10000000;
+    const USER_SPACE_END: usize = 0x80000000;
+
+    // Align size to page boundary
+    let aligned_size = (size + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
+
+    // Simple linear search (in reality, this would be more sophisticated)
+    let mut addr = USER_SPACE_START;
+    while addr + aligned_size <= USER_SPACE_END {
+        // For now, just return the first available address
+        // In a real implementation, this would check existing mappings
+        return Some(addr);
+    }
+
+    None
+}
+
+/// Get page mapping for a virtual address
+pub fn get_page_mapping(
+    _proc: *const crate::process::manager::Proc,
+    vaddr: usize
+) -> Option<usize> {
+    // Simplified implementation - check if address is in user space
+    const USER_SPACE_START: usize = 0x10000000;
+    const USER_SPACE_END: usize = 0x80000000;
+
+    if vaddr >= USER_SPACE_START && vaddr < USER_SPACE_END {
+        // Return a placeholder physical address
+        // In a real implementation, this would walk the page table
+        Some(vaddr - USER_SPACE_START)
+    } else {
+        None
+    }
+}
+
+/// Page table entry flags
+pub mod flags {
+    /// Readable flag
+    pub const PTE_R: u64 = 0x1;
+    /// Writable flag
+    pub const PTE_W: u64 = 0x2;
+    /// Executable flag
+    pub const PTE_X: u64 = 0x4;
+    /// User-accessible flag
+    pub const PTE_U: u64 = 0x10;
+}
+
+/// Map multiple pages into a page table
+pub fn map_pages(
+    pagetable: *mut u8,
+    mut vaddr: usize,
+    mut paddr: usize,
+    size: usize,
+    perm: u64
+) -> Result<(), i32> {
+    let mut remaining = size;
+    while remaining > 0 {
+        map_page(pagetable, vaddr, paddr, perm)?;
+        vaddr += PAGE_SIZE;
+        paddr += PAGE_SIZE;
+        remaining -= PAGE_SIZE.min(remaining);
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -22,11 +22,13 @@ use crate::posix;
 pub mod basic_tests;
 pub mod signal_tests;
 pub mod thread_tests;
+pub mod time_tests;
 
 // 重新导出测试函数
 pub use basic_tests::*;
 pub use signal_tests::*;
 pub use thread_tests::*;
+pub use time_tests::*;
 
 /// 文件系统相关系统调用测试
 pub fn test_filesystem_syscalls(results: &mut PosixTestResults) {
@@ -196,6 +198,30 @@ pub fn test_thread_syscalls(results: &mut PosixTestResults) {
     let execution_time = crate::subsystems::time::get_time_ns() - start_time;
     results.record_performance(PerformanceMetric {
         test_name: "thread_syscalls".to_string(),
+        execution_time_ns: execution_time,
+        memory_used_bytes: 0,
+        cpu_cycles: 0,
+    });
+}
+
+/// 时间管理测试
+pub fn test_time_syscalls(results: &mut PosixTestResults) {
+    crate::println!("  ⏰ 时间管理测试:");
+
+    let start_time = crate::subsystems::time::get_time_ns();
+
+    // 基础时间测试
+    test_basic_time(results);
+
+    // 高精度睡眠测试
+    test_sleep_functions(results);
+
+    // 定时器测试
+    test_timer_functions(results);
+
+    let execution_time = crate::subsystems::time::get_time_ns() - start_time;
+    results.record_performance(PerformanceMetric {
+        test_name: "time_syscalls".to_string(),
         execution_time_ns: execution_time,
         memory_used_bytes: 0,
         cpu_cycles: 0,

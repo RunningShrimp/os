@@ -15,6 +15,7 @@ pub mod visualization;
 
 // 新拆分的子模块
 pub mod analyzer;
+pub mod boot_log;
 pub mod breakpoint;
 pub mod manager;
 pub mod plugin;

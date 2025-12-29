@@ -165,8 +165,32 @@ pub struct SocketOptions {
     pub sndbuf: u32,
     /// SO_RCVBUF - Receive buffer size
     pub rcvbuf: u32,
-    /// TCP_NODELAY (for TCP sockets)
+    /// TCP_NODELAY (for TCP sockets) - disable Nagle's algorithm
     pub nodelay: bool,
+    /// TCP_CORK - accumulate data for maximal throughput
+    pub cork: bool,
+    /// TCP_KEEPIDLE - seconds before sending keepalive probes
+    pub keepidle: u32,
+    /// TCP_KEEPINTVL - seconds between keepalive probes
+    pub keepintvl: u32,
+    /// TCP_KEEPCNT - number of keepalive probes before dropping
+    pub keepcnt: u32,
+    /// TCP_DEFER_ACCEPT - defer accept until data arrives
+    pub defer_accept: u32,
+    /// TCP_FASTOPEN - enable TCP Fast Open
+    pub fastopen: bool,
+    /// SO_TIMESTAMP - enable receive timestamps
+    pub timestamp: bool,
+    /// SO_TIMESTAMPNS - enable nanosecond timestamps
+    pub timestamp_ns: bool,
+    /// TCP_QUICKACK - enable quick ACK mode
+    pub quickack: bool,
+    /// TCP_SYNCNT - number of SYN retransmits
+    pub syncnt: u32,
+    /// TCP_WINDOW_CLAMP - clamp window size
+    pub window_clamp: u32,
+    /// TCP_USER_TIMEOUT - TCP user timeout
+    pub user_timeout: u32,
 }
 
 /// Linger option
@@ -190,6 +214,18 @@ impl SocketOptions {
             sndbuf: 65536,
             rcvbuf: 65536,
             nodelay: false,
+            cork: false,
+            keepidle: 7200,      // 2 hours
+            keepintvl: 75,       // 75 seconds
+            keepcnt: 9,          // 9 probes
+            defer_accept: 0,     // disabled
+            fastopen: false,
+            timestamp: false,
+            timestamp_ns: false,
+            quickack: false,
+            syncnt: 6,           // 6 SYN retransmits
+            window_clamp: 0,     // no clamp
+            user_timeout: 0,     // use default
         }
     }
 
@@ -216,6 +252,43 @@ impl SocketOptions {
                 self.rcvbuf = size;
             },
             SocketOption::NoDelay(value) => self.nodelay = value,
+            SocketOption::Cork(value) => self.cork = value,
+            SocketOption::KeepIdle(value) => {
+                if value > 32767 {
+                    return Err(SocketError::InvalidValue);
+                }
+                self.keepidle = value;
+            },
+            SocketOption::KeepIntvl(value) => {
+                if value > 32767 {
+                    return Err(SocketError::InvalidValue);
+                }
+                self.keepintvl = value;
+            },
+            SocketOption::KeepCnt(value) => {
+                if value > 127 {
+                    return Err(SocketError::InvalidValue);
+                }
+                self.keepcnt = value;
+            },
+            SocketOption::DeferAccept(value) => {
+                if value > 60 {
+                    return Err(SocketError::InvalidValue);
+                }
+                self.defer_accept = value;
+            },
+            SocketOption::FastOpen(value) => self.fastopen = value,
+            SocketOption::Timestamp(value) => self.timestamp = value,
+            SocketOption::TimestampNs(value) => self.timestamp_ns = value,
+            SocketOption::QuickAck(value) => self.quickack = value,
+            SocketOption::Syncnt(value) => {
+                if value > 127 {
+                    return Err(SocketError::InvalidValue);
+                }
+                self.syncnt = value;
+            },
+            SocketOption::WindowClamp(value) => self.window_clamp = value,
+            SocketOption::UserTimeout(value) => self.user_timeout = value,
         }
         Ok(())
     }
@@ -237,6 +310,18 @@ impl SocketOptions {
             SocketOption::SndBuf(_) => SocketOptionValue::U32(self.sndbuf),
             SocketOption::RcvBuf(_) => SocketOptionValue::U32(self.rcvbuf),
             SocketOption::NoDelay(_) => SocketOptionValue::Bool(self.nodelay),
+            SocketOption::Cork(_) => SocketOptionValue::Bool(self.cork),
+            SocketOption::KeepIdle(_) => SocketOptionValue::U32(self.keepidle),
+            SocketOption::KeepIntvl(_) => SocketOptionValue::U32(self.keepintvl),
+            SocketOption::KeepCnt(_) => SocketOptionValue::U32(self.keepcnt),
+            SocketOption::DeferAccept(_) => SocketOptionValue::U32(self.defer_accept),
+            SocketOption::FastOpen(_) => SocketOptionValue::Bool(self.fastopen),
+            SocketOption::Timestamp(_) => SocketOptionValue::Bool(self.timestamp),
+            SocketOption::TimestampNs(_) => SocketOptionValue::Bool(self.timestamp_ns),
+            SocketOption::QuickAck(_) => SocketOptionValue::Bool(self.quickack),
+            SocketOption::Syncnt(_) => SocketOptionValue::U32(self.syncnt),
+            SocketOption::WindowClamp(_) => SocketOptionValue::U32(self.window_clamp),
+            SocketOption::UserTimeout(_) => SocketOptionValue::U32(self.user_timeout),
         })
     }
 }
@@ -252,6 +337,18 @@ pub enum SocketOption {
     SndBuf(u32),
     RcvBuf(u32),
     NoDelay(bool),
+    Cork(bool),
+    KeepIdle(u32),
+    KeepIntvl(u32),
+    KeepCnt(u32),
+    DeferAccept(u32),
+    FastOpen(bool),
+    Timestamp(bool),
+    TimestampNs(bool),
+    QuickAck(bool),
+    Syncnt(u32),
+    WindowClamp(u32),
+    UserTimeout(u32),
 }
 
 /// Socket option values

@@ -12,8 +12,9 @@ use core::time::Duration;
 
 use crate::{
     subsystems::syscalls::{
-        SYS_BATCH, SYS_CLOSE, SYS_GETPID, SYS_READ, SYS_WRITE, common::SyscallResult, dispatch,
+        SYS_BATCH, SYS_CLOSE, SYS_GETPID, SYS_READ, SYS_WRITE, common::SyscallResult,
     },
+    subsystems::syscalls::fast_path::dispatch,
     tests::TestResult,
 };
 

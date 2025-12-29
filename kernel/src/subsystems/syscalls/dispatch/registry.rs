@@ -8,16 +8,13 @@
 //! 
 //! 服务注册表是整个服务管理系统的核心，负责维护所有已注册服务的信息。
 
-use crate::error::UnifiedError;
+use crate::error::{UnifiedError, KernelError, Result};
 use crate::subsystems::syscalls::services::traits::*;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use spin::Mutex;
-
-// 定义本地Result类型别名
-pub type Result<T> = core::result::Result<T, KernelError>;
 /// Version struct for syscall versioning (semantic versioning: major.minor.patch)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Version {

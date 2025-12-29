@@ -262,7 +262,7 @@ pub mod inotify_tests {
 /// EventFd test module
 pub mod eventfd_tests {
     use super::*;
-    use crate::subsystems::syscalls::glib::eventfd_flags;
+    use crate::subsystems::syscalls::eventfd::flags as eventfd_flags;
 
     /// Test basic eventfd functionality
     pub fn test_eventfd_basic() -> TestResult {
@@ -396,7 +396,7 @@ pub mod eventfd_tests {
 /// SignalFd test module
 pub mod signalfd_tests {
     use super::*;
-    use crate::subsystems::syscalls::glib::signalfd_flags;
+    use crate::subsystems::syscalls::signalfd::flags as signalfd_flags;
 
     /// Test basic signalfd functionality
     pub fn test_signalfd_basic() -> TestResult {
@@ -490,7 +490,7 @@ pub mod signalfd_tests {
 /// TimerFd test module
 pub mod timerfd_tests {
     use super::*;
-    use crate::subsystems::syscalls::glib::timerfd_flags;
+    use crate::subsystems::syscalls::timerfd::flags as timerfd_flags;
     use crate::posix::Itimerspec;
 
     /// Test basic timerfd functionality

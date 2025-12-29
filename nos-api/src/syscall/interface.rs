@@ -1,6 +1,6 @@
 //! System call handler interface
 
-use alloc::boxed::Box;
+use alloc::{boxed::Box, vec::Vec};
 
 use crate::{
     error::Result,
@@ -32,6 +32,25 @@ pub trait SyscallDispatcher {
 
     /// Returns the number of registered handlers
     fn handler_count(&self) -> usize;
+
+    /// Returns syscall statistics
+    fn get_stats(&self) -> SyscallStats;
+
+    /// Lists all registered handlers
+    fn list_handlers(&self) -> Vec<(usize, &str)>;
+}
+
+/// System call statistics
+#[derive(Debug, Default, Clone)]
+pub struct SyscallStats {
+    /// Total number of system calls
+    pub total_calls: u64,
+    /// Number of successful system calls
+    pub successful_calls: u64,
+    /// Number of failed system calls
+    pub failed_calls: u64,
+    /// Average execution time in nanoseconds
+    pub avg_execution_time_ns: u64,
 }
 
 /// Trait for system call validation

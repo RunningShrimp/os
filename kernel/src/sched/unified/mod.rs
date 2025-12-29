@@ -3,6 +3,7 @@
 //! Provides unified scheduling interface
 
 use nos_api::Result;
+use crate::subsystems::process::thread::Tid;
 
 /// Unified scheduler
 pub struct UnifiedScheduler {
@@ -25,4 +26,11 @@ pub fn init_unified_scheduler() -> Result<()> {
 pub fn get_unified_scheduler() -> Option<&'static UnifiedScheduler> {
     static SCHEDULER: UnifiedScheduler = UnifiedScheduler::new();
     Some(&SCHEDULER)
+}
+
+/// Unified scheduling function
+/// Returns the next thread ID to schedule, or None if no thread is available
+pub fn unified_schedule() -> Option<Tid> {
+    use crate::sched::O1Scheduler;
+    O1Scheduler::schedule_next().map(|tid| tid as Tid)
 }

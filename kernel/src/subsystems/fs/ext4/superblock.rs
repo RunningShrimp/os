@@ -3,9 +3,8 @@
 //! 提供Ext4超级块的读取、写入和管理功能
 
 extern crate alloc;
-use alloc::vec::Vec;
 use crate::drivers::BlockDevice;
-use crate::subsystems::fs::ext4::{Ext4FileSystem, EXT4_MAGIC};
+use crate::subsystems::fs::ext4::Ext4FileSystem;
 
 /// Ext4 file system state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

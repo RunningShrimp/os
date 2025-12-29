@@ -1,4 +1,33 @@
-//! x86_64 architecture-specific functions
+//! x86_64 architecture implementation
+
+pub mod interrupts;
+pub mod memory;
+
+/// Initialize x86_64-specific subsystems
+pub fn initialize() -> Result<(), &'static str> {
+    crate::println!("x86_64: Initializing architecture subsystems");
+
+    // Initialize memory management
+    memory::initialize()?;
+
+    // Initialize interrupt handling
+    interrupts::initialize()?;
+
+    Ok(())
+}
+
+/// Shutdown x86_64-specific subsystems
+pub fn shutdown() -> Result<(), &'static str> {
+    crate::println!("x86_64: Shutting down architecture subsystems");
+
+    // Shutdown interrupt handling
+    interrupts::shutdown()?;
+
+    // Shutdown memory management
+    memory::shutdown()?;
+
+    Ok(())
+}
 
 /// Read Time-Stamp Counter
 #[inline]

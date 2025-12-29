@@ -28,7 +28,7 @@ pub fn can_use(syscall_num: u32) -> bool {
 pub fn dispatch(
     syscall_num: u32,
     args: &[u64],
-) -> Option<crate::subsystems::syscalls::common::SyscallResult> {
+) -> Option<crate::subsystems::syscalls::common::SyscallResult<i64>> {
     hot_syscalls::dispatch_fast_path(syscall_num, args)
 }
 

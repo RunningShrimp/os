@@ -16,7 +16,9 @@ use alloc::sync::Arc;
 use crate::compat::*;
 use crate::subsystems::mm::vm;
 use crate::mm;
+
 /// Memory layout manager for cross-platform processes
+pub struct MemoryLayoutManager {
     /// Platform-specific memory layouts
     memory_layouts: BTreeMap<TargetPlatform, PlatformMemoryLayout>,
     /// Allocated memory regions

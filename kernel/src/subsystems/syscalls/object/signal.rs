@@ -1,7 +1,5 @@
 // Object signal management functions
 
-use core::ptr;
-
 use super::*;
 
 /// 注册对象信号
@@ -25,7 +23,7 @@ pub extern "C" fn sys_glib_object_signal_register(
     param_count: usize,
     return_type: u64,
     flags: u32,
-) -> SyscallResult {
+) -> SyscallResult<i32> {
     crate::println!(
         "[glib_object] 注册信号: type={}, params={}, return={}, flags=0x{:x}",
         type_id,
@@ -133,7 +131,7 @@ pub extern "C" fn sys_glib_object_signal_emit(
     signal_id: u64,
     args: *const u64,
     arg_count: usize,
-) -> SyscallResult {
+) -> SyscallResult<i32> {
     crate::println!(
         "[glib_object] 发射信号: instance={}, signal={}, args={}",
         instance_id,

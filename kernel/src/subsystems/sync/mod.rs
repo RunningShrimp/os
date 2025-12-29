@@ -3,11 +3,26 @@
 //
 // SMP-safe implementation with proper memory barriers and interrupt handling.
 
+// Import kernel prelude for common types
+use crate::prelude::*;
+
 use core::{
     cell::UnsafeCell,
     ops::{Deref, DerefMut},
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
+
+// Declare submodules
+pub mod mutex;
+pub mod sleeplock;
+pub mod rwlock;
+pub mod spinlock;
+pub mod once;
+pub mod primitives;
+pub mod priority_mutex;
+pub mod realtime;
+pub mod rcu;
+pub mod interrupts;
 
 // ============================================================================
 // Interrupt control for SMP safety
@@ -180,12 +195,6 @@ impl RawSpinLock {
     }
 }
 
-pub mod primitives;
-
-#[cfg(feature = "realtime")]
-pub mod realtime;
-
-pub mod rcu;
 
 #[cfg(feature = "kernel_tests")]
 pub mod tests;
@@ -256,164 +265,10 @@ impl Drop for SpinLockIrqGuard<'_> {
 }
 
 // ============================================================================
-// Mutex<T> - Spinlock protecting data with RAII guard
+// Re-export Mutex types from mutex submodule
 // ============================================================================
 
-/// A mutual exclusion primitive protecting data of type T
-pub struct Mutex<T: ?Sized> {
-    lock: RawSpinLock,
-    data: UnsafeCell<T>,
-}
-
-// Safety: Mutex provides synchronized access
-unsafe impl<T: ?Sized + Send> Sync for Mutex<T> {}
-unsafe impl<T: ?Sized + Send> Send for Mutex<T> {}
-
-impl<T> Mutex<T> {
-    /// Creates a new mutex protecting the given data
-    pub const fn new(data: T) -> Self {
-        Self { lock: RawSpinLock::new(), data: UnsafeCell::new(data) }
-    }
-
-    /// Consumes the mutex and returns the inner data
-    pub fn into_inner(self) -> T {
-        self.data.into_inner()
-    }
-}
-
-impl<T: ?Sized> Mutex<T> {
-    /// Acquires the mutex, blocking until available
-    pub fn lock(&self) -> MutexGuard<'_, T> {
-        self.lock.lock();
-        MutexGuard { mutex: self }
-    }
-
-    /// Attempts to acquire the mutex without blocking
-    pub fn try_lock(&self) -> Option<MutexGuard<'_, T>> {
-        if self.lock.try_lock() {
-            Some(MutexGuard { mutex: self })
-        } else {
-            None
-        }
-    }
-
-    /// Returns a mutable reference to the underlying data
-    /// This is safe because we have &mut self
-    pub fn get_mut(&mut self) -> &mut T {
-        self.data.get_mut()
-    }
-
-    /// Check if the mutex is currently locked
-    pub fn is_locked(&self) -> bool {
-        self.lock.is_locked()
-    }
-
-    /// Force unlock - unsafe, only use in panic handlers
-    /// # Safety
-    /// Caller must ensure no other code is using the lock
-    pub unsafe fn force_unlock(&self) {
-        self.lock.unlock();
-    }
-}
-
-impl<T: ?Sized + Default> Default for Mutex<T> {
-    fn default() -> Self {
-        Self::new(Default::default())
-    }
-}
-
-/// RAII guard for Mutex
-pub struct MutexGuard<'a, T: ?Sized> {
-    mutex: &'a Mutex<T>,
-}
-
-impl<T: ?Sized> Deref for MutexGuard<'_, T> {
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        // Safety: We hold the lock
-        unsafe { &*self.mutex.data.get() }
-    }
-}
-
-impl<T: ?Sized> DerefMut for MutexGuard<'_, T> {
-    fn deref_mut(&mut self) -> &mut T {
-        // Safety: We hold the lock exclusively
-        unsafe { &mut *self.mutex.data.get() }
-    }
-}
-
-impl<T: ?Sized> Drop for MutexGuard<'_, T> {
-    fn drop(&mut self) {
-        self.mutex.lock.unlock();
-    }
-}
-
-// ============================================================================
-// MutexIrq<T> - Mutex that disables interrupts
-// ============================================================================
-
-/// A mutex that disables interrupts while held
-/// Use this when the protected data might be accessed from interrupt handlers
-pub struct MutexIrq<T: ?Sized> {
-    lock: SpinLockIrq,
-    data: UnsafeCell<T>,
-}
-
-unsafe impl<T: ?Sized + Send> Sync for MutexIrq<T> {}
-unsafe impl<T: ?Sized + Send> Send for MutexIrq<T> {}
-
-impl<T> MutexIrq<T> {
-    pub const fn new(data: T) -> Self {
-        Self { lock: SpinLockIrq::new(), data: UnsafeCell::new(data) }
-    }
-
-    pub fn into_inner(self) -> T {
-        self.data.into_inner()
-    }
-}
-
-impl<T: ?Sized> MutexIrq<T> {
-    /// Acquire the lock with interrupts disabled
-    pub fn lock(&self) -> MutexIrqGuard<'_, T> {
-        let guard = self.lock.lock();
-        MutexIrqGuard { mutex: self, _guard: guard }
-    }
-
-    pub fn try_lock(&self) -> Option<MutexIrqGuard<'_, T>> {
-        self.lock
-            .try_lock()
-            .map(|guard| MutexIrqGuard { mutex: self, _guard: guard })
-    }
-
-    pub fn get_mut(&mut self) -> &mut T {
-        self.data.get_mut()
-    }
-
-    pub fn is_locked(&self) -> bool {
-        self.lock.is_locked()
-    }
-}
-
-/// RAII guard for MutexIrq
-pub struct MutexIrqGuard<'a, T: ?Sized> {
-    mutex: &'a MutexIrq<T>,
-    _guard: SpinLockIrqGuard<'a>,
-}
-
-impl<T: ?Sized> Deref for MutexIrqGuard<'_, T> {
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        unsafe { &*self.mutex.data.get() }
-    }
-}
-
-impl<T: ?Sized> DerefMut for MutexIrqGuard<'_, T> {
-    fn deref_mut(&mut self) -> &mut T {
-        unsafe { &mut *self.mutex.data.get() }
-    }
-}
+pub use mutex::{Mutex, MutexGuard, MutexIrq, MutexIrqGuard};
 
 // ============================================================================
 // Once - One-time initialization primitive
@@ -526,223 +381,21 @@ impl<T, F: FnOnce() -> T> Deref for Lazy<T, F> {
 }
 
 // ============================================================================
-// Sleeplock - Lock that allows sleeping (for I/O operations)
+// Re-export Sleeplock and RwLock from their submodules
 // ============================================================================
 
-/// A lock that can be held during sleeping operations
-/// Unlike spinlocks, sleeplocks yield the CPU while waiting
-pub struct Sleeplock<T: ?Sized> {
-    locked: AtomicBool,
-    // Process ID of lock holder (0 if unlocked)
-    holder: AtomicUsize,
-    data: UnsafeCell<T>,
+pub use sleeplock::{Sleeplock, SleeplockGuard};
+pub use rwlock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+
+// Legacy re-exports for backward compatibility
+
+/// Initialize synchronization subsystem
+pub fn initialize() {
+    // Initialize global synchronization primitives
+    // Most initialization is done statically via const constructors
 }
 
-unsafe impl<T: ?Sized + Send> Sync for Sleeplock<T> {}
-unsafe impl<T: ?Sized + Send> Send for Sleeplock<T> {}
-
-impl<T> Sleeplock<T> {
-    pub const fn new(data: T) -> Self {
-        Self {
-            locked: AtomicBool::new(false),
-            holder: AtomicUsize::new(0),
-            data: UnsafeCell::new(data),
-        }
-    }
-
-    pub fn into_inner(self) -> T {
-        self.data.into_inner()
-    }
-}
-
-impl<T: ?Sized> Sleeplock<T> {
-    /// Acquire the sleeplock
-    /// In a full implementation, this would sleep instead of spin
-    pub fn lock(&self) -> SleeplockGuard<'_, T> {
-        // TODO: Implement proper sleep/wakeup when scheduler is ready
-        // For now, use a simple spin with yield to reduce CPU usage
-        let mut spin_count = 0;
-        while self
-            .locked
-            .compare_exchange_weak(false, true, Ordering::Acquire, Ordering::Relaxed)
-            .is_err()
-        {
-            // In real implementation: yield CPU and sleep
-            core::hint::spin_loop();
-            spin_count += 1;
-
-            // After many spins, yield to reduce CPU contention
-            if spin_count > 1000 {
-                // TODO: Call scheduler yield when available
-                spin_count = 0;
-            }
-        }
-        SleeplockGuard { lock: self }
-    }
-
-    pub fn try_lock(&self) -> Option<SleeplockGuard<'_, T>> {
-        if self
-            .locked
-            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-            .is_ok()
-        {
-            Some(SleeplockGuard { lock: self })
-        } else {
-            None
-        }
-    }
-
-    /// Check if holding the lock
-    pub fn holding(&self) -> bool {
-        self.locked.load(Ordering::Relaxed)
-    }
-}
-
-pub struct SleeplockGuard<'a, T: ?Sized> {
-    lock: &'a Sleeplock<T>,
-}
-
-impl<T: ?Sized> Deref for SleeplockGuard<'_, T> {
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        unsafe { &*self.lock.data.get() }
-    }
-}
-
-impl<T: ?Sized> DerefMut for SleeplockGuard<'_, T> {
-    fn deref_mut(&mut self) -> &mut T {
-        unsafe { &mut *self.lock.data.get() }
-    }
-}
-
-impl<T: ?Sized> Drop for SleeplockGuard<'_, T> {
-    fn drop(&mut self) {
-        self.lock.holder.store(0, Ordering::Relaxed);
-        self.lock.locked.store(false, Ordering::Release);
-        // TODO: Wakeup waiting processes when scheduler is ready
-        // This would involve calling the scheduler to wakeup processes waiting on this lock
-        crate::println!("[sync] SleepLock released - would wakeup waiting processes");
-    }
-}
-
-// ============================================================================
-// RwLock - Reader-writer lock
-// ============================================================================
-
-const WRITER_BIT: usize = 1 << (usize::BITS - 1);
-
-/// A reader-writer lock allowing multiple readers or one writer
-pub struct RwLock<T: ?Sized> {
-    // Upper bit = writer, lower bits = reader count
-    state: AtomicUsize,
-    data: UnsafeCell<T>,
-}
-
-unsafe impl<T: ?Sized + Send> Send for RwLock<T> {}
-unsafe impl<T: ?Sized + Send + Sync> Sync for RwLock<T> {}
-
-impl<T> RwLock<T> {
-    pub const fn new(data: T) -> Self {
-        Self { state: AtomicUsize::new(0), data: UnsafeCell::new(data) }
-    }
-
-    pub fn into_inner(self) -> T {
-        self.data.into_inner()
-    }
-}
-
-impl<T: ?Sized> RwLock<T> {
-    pub fn read(&self) -> RwLockReadGuard<'_, T> {
-        loop {
-            let state = self.state.load(Ordering::Relaxed);
-            // Wait if there's a writer
-            if state & WRITER_BIT != 0 {
-                core::hint::spin_loop();
-                continue;
-            }
-            // Try to increment reader count
-            if self
-                .state
-                .compare_exchange_weak(state, state + 1, Ordering::Acquire, Ordering::Relaxed)
-                .is_ok()
-            {
-                return RwLockReadGuard { lock: self };
-            }
-        }
-    }
-
-    pub fn write(&self) -> RwLockWriteGuard<'_, T> {
-        loop {
-            // Try to set writer bit when no readers and no other writer
-            if self
-                .state
-                .compare_exchange_weak(0, WRITER_BIT, Ordering::Acquire, Ordering::Relaxed)
-                .is_ok()
-            {
-                return RwLockWriteGuard { lock: self };
-            }
-            core::hint::spin_loop();
-        }
-    }
-
-    pub fn try_read(&self) -> Option<RwLockReadGuard<'_, T>> {
-        let state = self.state.load(Ordering::Relaxed);
-        if state & WRITER_BIT != 0 {
-            return None;
-        }
-        self.state
-            .compare_exchange(state, state + 1, Ordering::Acquire, Ordering::Relaxed)
-            .ok()
-            .map(|_| RwLockReadGuard { lock: self })
-    }
-
-    pub fn try_write(&self) -> Option<RwLockWriteGuard<'_, T>> {
-        self.state
-            .compare_exchange(0, WRITER_BIT, Ordering::Acquire, Ordering::Relaxed)
-            .ok()
-            .map(|_| RwLockWriteGuard { lock: self })
-    }
-}
-
-pub struct RwLockReadGuard<'a, T: ?Sized> {
-    lock: &'a RwLock<T>,
-}
-
-impl<T: ?Sized> Deref for RwLockReadGuard<'_, T> {
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        unsafe { &*self.lock.data.get() }
-    }
-}
-
-impl<T: ?Sized> Drop for RwLockReadGuard<'_, T> {
-    fn drop(&mut self) {
-        self.lock.state.fetch_sub(1, Ordering::Release);
-    }
-}
-
-pub struct RwLockWriteGuard<'a, T: ?Sized> {
-    lock: &'a RwLock<T>,
-}
-
-impl<T: ?Sized> Deref for RwLockWriteGuard<'_, T> {
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        unsafe { &*self.lock.data.get() }
-    }
-}
-
-impl<T: ?Sized> DerefMut for RwLockWriteGuard<'_, T> {
-    fn deref_mut(&mut self) -> &mut T {
-        unsafe { &mut *self.lock.data.get() }
-    }
-}
-
-impl<T: ?Sized> Drop for RwLockWriteGuard<'_, T> {
-    fn drop(&mut self) {
-        self.lock.state.store(0, Ordering::Release);
-    }
+/// Shutdown synchronization subsystem
+pub fn shutdown() {
+    // Cleanup synchronization resources
 }

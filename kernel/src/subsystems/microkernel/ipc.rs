@@ -18,6 +18,9 @@ use crate::{
     subsystems::sync::Mutex,
 };
 
+// Re-export vm module functions from microkernel memory
+use crate::subsystems::microkernel::memory as vm;
+
 /// IPC message structure
 #[derive(Debug, Clone)]
 pub struct IpcMessage {
@@ -742,18 +745,18 @@ impl IpcManager {
             Some(a) => a,
             None => {
                 // Find free virtual address range
-                crate::subsystems::mm::vm::find_free_range(shm.size).ok_or(ENOMEM)?
+                vm::find_free_range(shm.size).ok_or(ENOMEM)?
             },
         };
 
         // Map physical pages to virtual address space
         let paddr = shm.paddr.0;
-        let perm = crate::subsystems::mm::vm::flags::PTE_U
-            | crate::subsystems::mm::vm::flags::PTE_R
-            | crate::subsystems::mm::vm::flags::PTE_W;
+        let perm = vm::flags::PTE_U
+            | vm::flags::PTE_R
+            | vm::flags::PTE_W;
 
         unsafe {
-            crate::subsystems::mm::vm::map_pages(pagetable, va, paddr, shm.size, perm)
+            vm::map_pages(pagetable, va, paddr, shm.size, perm)
                 .map_err(|_| EFAULT)?;
         }
 
@@ -787,8 +790,8 @@ impl IpcManager {
             let mut current = addr;
             let end = addr + shm.size;
             while current < end {
-                crate::subsystems::mm::vm::unmap_page(pagetable, current).map_err(|_| EFAULT)?;
-                current += crate::subsystems::mm::PAGE_SIZE;
+                let _ = vm::unmap_page(pagetable, current);
+                current += vm::PAGE_SIZE;
             }
         }
 

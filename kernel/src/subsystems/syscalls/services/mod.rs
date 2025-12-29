@@ -202,7 +202,7 @@ impl ServiceSystem {
     /// # 返回值
     ///
     /// * `Result<(), KernelError>` - 启动结果
-    pub fn start_all_services(&self) -> Result<(), nos_error_handling::unified::KernelError> {
+    pub fn start_all_services(&self) -> Result<(), KernelError> {
         let startup_order = self.registry.calculate_startup_order()?;
 
         for service_name in startup_order {
@@ -221,7 +221,7 @@ impl ServiceSystem {
     /// # 返回值
     ///
     /// * `Result<(), KernelError>` - 停止结果
-    pub fn stop_all_services(&self) -> Result<(), nos_error_handling::unified::KernelError> {
+    pub fn stop_all_services(&self) -> Result<(), KernelError> {
         let startup_order = self.registry.calculate_startup_order()?;
 
         // 按相反顺序停止服务

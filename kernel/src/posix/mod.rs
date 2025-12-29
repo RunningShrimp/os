@@ -125,6 +125,7 @@ pub mod fcntl;
 pub mod file_modes;
 pub mod open_flags;
 pub mod seek;
+pub mod socket;
 pub mod stat;
 pub mod types;
 
@@ -132,7 +133,7 @@ pub mod types;
 // Public Exports
 // ============================================================================
 
-pub use self::{aio::*, fcntl::*, file_modes::*, open_flags::*, seek::*, stat::*, types::*};
+pub use self::{aio::*, fcntl::*, file_modes::*, open_flags::*, seek::*, socket::*, stat::*, types::*};
 
 // ============================================================================
 // Thread support
@@ -156,7 +157,7 @@ pub mod session;
 pub mod shm;
 pub mod timer;
 
-pub use self::{mqueue::*, semaphore::*, shm::*, thread::*, timer::*};
+pub use self::{advanced_signal::*, mqueue::*, semaphore::*, shm::*, thread::*, timer::*};
 // ============================================================================
 // Re-export from libc for compatibility
 // ============================================================================
@@ -216,13 +217,6 @@ pub struct IpcPerm {
 pub type TimerT = i32;
 
 #[repr(C)]
-pub struct SigEvent {
-    pub sigev_value: usize,
-    pub sigev_signo: i32,
-    pub sigev_notify: i32,
-}
-
-#[repr(C)]
 pub struct Itimerspec {
     pub it_interval: Timespec,
     pub it_value: Timespec,
@@ -246,3 +240,85 @@ pub struct SigInfoT {
 
 pub const SIGRTMIN: i32 = 34;
 pub const SIGRTMAX: i32 = 64;
+
+// ============================================================================
+// Clock Constants
+// ============================================================================
+pub const CLOCK_REALTIME: i32 = 0;
+pub const CLOCK_MONOTONIC: i32 = 1;
+pub const CLOCK_PROCESS_CPUTIME_ID: i32 = 2;
+pub const CLOCK_THREAD_CPUTIME_ID: i32 = 3;
+pub const CLOCK_MONOTONIC_RAW: i32 = 4;
+pub const CLOCK_REALTIME_COARSE: i32 = 5;
+pub const CLOCK_MONOTONIC_COARSE: i32 = 6;
+pub const CLOCK_REALTIME_ALARM: i32 = 7;
+pub const CLOCK_BOOTTIME: i32 = 8;
+pub const CLOCK_BOOTTIME_ALARM: i32 = 9;
+
+// ============================================================================
+// Timer Constants
+// ============================================================================
+pub const TIMER_ABSTIME: i32 = 1;
+
+// ============================================================================
+// Signal Event Constants
+// ============================================================================
+pub const SIGEV_SIGNAL: i32 = 0;
+pub const SIGEV_NONE: i32 = 1;
+pub const SIGEV_THREAD: i32 = 2;
+
+// ============================================================================
+// Signal Union and Event Types
+// ============================================================================
+#[repr(C)]
+pub union SigVal {
+    pub sival_int: i32,
+    pub sival_ptr: usize,
+}
+
+impl Clone for SigVal {
+    fn clone(&self) -> Self {
+        unsafe { core::ptr::read(self) }
+    }
+}
+
+impl Copy for SigVal {}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct SigEvent {
+    pub sigev_value: SigVal,
+    pub sigev_signo: i32,
+    pub sigev_notify: i32,
+    pub sigev_notify_function: usize,
+    pub sigev_notify_attributes: usize,
+}
+
+impl Default for SigEvent {
+    fn default() -> Self {
+        Self {
+            sigev_value: SigVal { sival_int: 0 },
+            sigev_signo: 0,
+            sigev_notify: SIGEV_NONE,
+            sigev_notify_function: 0,
+            sigev_notify_attributes: 0,
+        }
+    }
+}
+
+// ============================================================================
+// Timespec Methods
+// ============================================================================
+impl Timespec {
+    pub const fn zero() -> Self {
+        Self { tv_sec: 0, tv_nsec: 0 }
+    }
+
+    pub const fn new(tv_sec: i64, tv_nsec: i64) -> Self {
+        Self { tv_sec, tv_nsec }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.tv_sec >= 0 && self.tv_nsec >= 0 && self.tv_nsec < 1_000_000_000
+    }
+}

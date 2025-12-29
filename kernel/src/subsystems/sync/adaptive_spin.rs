@@ -10,11 +10,9 @@
 //! - Hyper-Threading (SMT) awareness
 
 use core::hint::spin_loop;
-use core::sync::atomic;
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::cell::Cell;
-use core::sync::atomic;
 use core::time::Duration;
-use core::sync::atomic;
 
 // ============================================================================
 // Backoff Strategies

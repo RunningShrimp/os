@@ -1,9 +1,14 @@
+// Import kernel prelude for common types
+use crate::prelude::*;
+
 pub mod fs;
 pub mod ipc;
 pub mod microkernel;
 pub mod net;
 pub mod perf;
 pub mod process;
+pub mod scheduler;
+pub mod services;
 pub mod syscalls;
 
 // Flattened modules from deep nesting
@@ -14,7 +19,6 @@ pub mod sync;
 pub mod time;
 
 // Optional subsystems (feature-gated)
-#[cfg(feature = "cloud_native")]
 pub mod cloud_native;
 
 #[cfg(feature = "formal_verification")]

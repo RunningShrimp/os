@@ -10,7 +10,8 @@ use super::{
     types::{MapFlags, MappingType, MemoryMapping, MemoryProtection},
 };
 use crate::subsystems::{
-    mm::vm::{PAGE_SIZE, PageTable, VmArea, VmPerm, flags, flush_tlb_page, map_pages},
+    mm::vm::{PAGE_SIZE, VmArea, VmPerm, flags, flush_tlb_page, map_pages},
+    mm::page_table_isolation::PageTable,
     process::myproc,
     sync::Mutex,
 };

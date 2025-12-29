@@ -1,14 +1,11 @@
 //! Priority-Based Mutex with Starvation Prevention
 
 use spin::Mutex;
-use core::sync::atomic;
+use core::sync::atomic::{AtomicU32, AtomicU8, Ordering};
 use core::hint::spin_loop;
-use core::sync::atomic;
 use alloc::sync::Arc;
-use core::sync::atomic;
 
 use crate::cpu;
-use core::sync::atomic;
 
 const MAX_PRIORITY: u8 = 255;
 const DEFAULT_PRIORITY: u8 = 128;
@@ -37,7 +34,7 @@ impl<T> PriorityMutex<T> {
                 Ordering::Acquire,
                 Ordering::Relaxed
             ).is_ok() {
-                self.holder.store(crate::0u32 as u32, Ordering::Relaxed);
+                self.holder.store(0, Ordering::Relaxed);
                 return Some(PriorityMutexGuard { mutex: self, priority });
             }
         }
@@ -47,7 +44,7 @@ impl<T> PriorityMutex<T> {
     
     pub fn unlock(&self, priority: u8) {
         let current_holder = self.holder.load(Ordering::Relaxed);
-        if current_holder == crate::0u32 as u32 {
+        if current_holder == 0 {
             self.state.store(0, Ordering::Release);
         }
     }

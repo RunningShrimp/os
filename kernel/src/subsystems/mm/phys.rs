@@ -3,11 +3,37 @@
 
 use core::ptr;
 
-// Re-export types from nos-mm
-pub use nos_mm::physical::{
-    PAGE_SHIFT, PAGE_SIZE, PhysAddr, addr_to_pfn, page_round_down, page_round_up, pfn_to_addr,
-};
-pub use nos_mm::virtual_mem::VirtAddr;
+// Memory types and constants
+pub const PAGE_SHIFT: usize = 12;
+pub const PAGE_SIZE: usize = 1 << PAGE_SHIFT;
+
+/// Physical address
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PhysAddr(pub usize);
+
+/// Virtual address
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VirtAddr(pub usize);
+
+/// Convert address to page frame number
+pub fn addr_to_pfn(addr: usize) -> usize {
+    addr >> PAGE_SHIFT
+}
+
+/// Convert page frame number to address
+pub fn pfn_to_addr(pfn: usize) -> usize {
+    pfn << PAGE_SHIFT
+}
+
+/// Round address down to page boundary
+pub fn page_round_down(addr: usize) -> usize {
+    addr & !(PAGE_SIZE - 1)
+}
+
+/// Round address up to page boundary
+pub fn page_round_up(addr: usize) -> usize {
+    (addr + PAGE_SIZE - 1) & !(PAGE_SIZE - 1)
+}
 
 use crate::{
     println,

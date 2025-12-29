@@ -14,7 +14,7 @@ use crate::libc::error::{
 
 /// 数学常量
 pub mod math_constants {
-    use super::c_double;
+    use crate::libc::c_double;
     /// π (pi)
     pub const M_PI: c_double = 3.14159265358979323846;
     /// e (自然对数底)

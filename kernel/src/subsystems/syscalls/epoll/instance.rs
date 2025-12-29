@@ -1,6 +1,7 @@
 //! Core epoll instance management functions
 
 use super::*;
+use crate::subsystems::fs::epoll::EpollEventInfo;
 
 /// 创建GLib专用epoll实例
 ///
@@ -62,7 +63,7 @@ pub extern "C" fn sys_glib_epoll_create() -> EpollResult<c_int> {
 /// * 成功时返回0
 /// * 失败时返回负数错误码
 #[no_mangle]
-pub extern "C" fn sys_glib_epoll_add_source(epfd: c_int, fd: c_int, events: u32) -> SyscallResult {
+pub extern "C" fn sys_glib_epoll_add_source(epfd: c_int, fd: c_int, events: u32) -> SyscallResult<i32> {
     crate::println!("[glib_epoll] 添加事件源: epfd={}, fd={}, events=0x{:x}", epfd, fd, events);
 
     // 验证参数
@@ -104,10 +105,9 @@ pub extern "C" fn sys_glib_epoll_add_source(epfd: c_int, fd: c_int, events: u32)
     }
 
     // 创建epoll事件
-    let mut epoll_event = EpollEvent {
+    let epoll_event = EpollEventInfo {
         events,
         data: fd as u64, // 使用fd作为data
-        ..Default::default()
     };
 
     // 添加到epoll
@@ -146,7 +146,7 @@ pub extern "C" fn sys_glib_epoll_add_source(epfd: c_int, fd: c_int, events: u32)
 /// * 成功时返回0
 /// * 失败时返回负数错误码
 #[no_mangle]
-pub extern "C" fn sys_glib_epoll_remove_source(epfd: c_int, fd: c_int) -> SyscallResult {
+pub extern "C" fn sys_glib_epoll_remove_source(epfd: c_int, fd: c_int) -> SyscallResult<i32> {
     crate::println!("[glib_epoll] 移除事件源: epfd={}, fd={}", epfd, fd);
 
     // 验证参数
@@ -202,7 +202,7 @@ pub extern "C" fn sys_glib_epoll_wait(
     events: *mut EpollEvent,
     maxevents: c_int,
     timeout: c_int,
-) -> SyscallResult {
+) -> SyscallResult<i32> {
     crate::println!(
         "[glib_epoll] 等待事件: epfd={}, maxevents={}, timeout={}",
         epfd,
@@ -290,7 +290,7 @@ pub extern "C" fn sys_glib_epoll_mod_source(
     fd: c_int,
     events: u32,
     op: c_int,
-) -> SyscallResult {
+) -> SyscallResult<i32> {
     crate::println!(
         "[glib_epoll] 修改事件源: epfd={}, fd={}, events=0x{:x}, op={}",
         epfd,
@@ -315,7 +315,7 @@ pub extern "C" fn sys_glib_epoll_mod_source(
     }
 
     // 创建epoll事件
-    let epoll_event = EpollEvent { events, data: fd as u64, ..Default::default() };
+    let epoll_event = EpollEventInfo { events, data: fd as u64 };
 
     // 执行操作
     let result = match op {
@@ -395,7 +395,7 @@ pub extern "C" fn sys_glib_epoll_mod_source(
 /// * 成功时返回0
 /// * 失败时返回负数错误码
 #[no_mangle]
-pub extern "C" fn sys_glib_epoll_close(epfd: c_int) -> SyscallResult {
+pub extern "C" fn sys_glib_epoll_close(epfd: c_int) -> SyscallResult<i32> {
     crate::println!("[glib_epoll] 关闭epoll实例: {}", epfd);
 
     // 验证参数

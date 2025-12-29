@@ -16,21 +16,24 @@ pub struct EpollInst {
 impl EpollInst { pub fn new() -> Self { Self { items: Vec::new() } } }
 
 static EPOLL_TABLE: Mutex<BTreeMap<i32, EpollInst>> = Mutex::new(BTreeMap::new());
+static mut IDG: i32 = 0;
 // println removed for no_std compatibility
 
 pub fn epoll_create(_size: i32) -> i32 {
     // println removed for no_std compatibility
-    let id = *idg;
-    *idg += 1;
-    // println removed for no_std compatibility
-    // println removed for no_std compatibility
-    t.insert(id, EpollInst::new());
-    id
+    unsafe {
+        let id = IDG;
+        IDG += 1;
+        let mut table = EPOLL_TABLE.lock();
+        table.insert(id, EpollInst::new());
+        id
+    }
 }
 
 pub fn epoll_ctl(epfd: i32, op: i32, fd: i32, events: i32) -> isize {
     // println removed for no_std compatibility
-    let inst = match t.get_mut(&epfd) { Some(i) => i, None => return crate::syscalls::E_BADARG };
+    let mut table = EPOLL_TABLE.lock();
+    let inst = match table.get_mut(&epfd) { Some(i) => i, None => return crate::syscalls::E_BADARG };
     match op {
         1 /* EPOLL_CTL_ADD */ => {
             // prevent duplicates
@@ -63,7 +66,8 @@ pub fn epoll_wait(epfd: i32, events_ptr: usize, maxevents: i32, timeout: i32) ->
         // println removed for no_std compatibility
         {
             // println removed for no_std compatibility
-            let inst = match t.get(&epfd) { Some(i) => i, None => return crate::syscalls::E_BADARG };
+            let table = EPOLL_TABLE.lock();
+            let inst = match table.get(&epfd) { Some(i) => i, None => return crate::syscalls::E_BADARG };
             for it in inst.items.iter() {
                 let idx = match crate::process::fdlookup(it.fd) { Some(i) => i, None => continue };
                 let ev = crate::file::file_poll(idx) as i32;

@@ -22,6 +22,7 @@ use alloc::{
     vec::Vec,
 };
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use core::time::Duration;
 
 use spin::Mutex;
 

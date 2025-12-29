@@ -591,6 +591,7 @@ impl TestCase for SyscallTestCase {
 }
 
 /// Get current time in microseconds
+#[allow(dead_code)]
 fn get_time_us() -> u64 {
     // In a real implementation, this would use a high-precision timer
     static TIME_COUNTER: AtomicU64 = AtomicU64::new(0);

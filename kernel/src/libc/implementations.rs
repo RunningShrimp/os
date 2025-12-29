@@ -19,7 +19,7 @@ use core::ffi::{c_char, c_double, c_int, c_uint, c_void};
 // 导入增强库模块
 use crate::libc::string_lib::EnhancedStringLib;
 use crate::libc::{
-    CLibInterface,
+    CLibInterface, DivT, LDivT,
     env_lib::{EnhancedEnvManager, EnvConfig},
     math_lib::EnhancedMathLib,
     random_lib::{EnhancedRandomGenerator, RandomConfig},

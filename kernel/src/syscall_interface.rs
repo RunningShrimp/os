@@ -26,6 +26,12 @@ pub trait SyscallDispatcher {
     /// # Returns
     /// * `SyscallStats` - System call statistics
     fn get_stats(&self) -> SyscallStats;
+
+    /// List all registered syscall handlers
+    ///
+    /// # Returns
+    /// * `Vec<(usize, &str)>` - List of syscall numbers and names
+    fn list_handlers(&self) -> Vec<(usize, &str)>;
 }
 
 /// System call statistics
@@ -79,6 +85,15 @@ pub trait ServiceManager {
     /// # Returns
     /// * `Vec<&str>` - List of service names
     fn list_services(&self) -> Vec<&str>;
+
+    /// Unregister a service by name
+    ///
+    /// # Arguments
+    /// * `name` - Service name to unregister
+    ///
+    /// # Returns
+    /// * `Result<()>` - Success or error
+    fn unregister_service(&mut self, name: &str) -> Result<()>;
 
     /// Get service statistics
     ///
@@ -152,6 +167,12 @@ pub trait Service {
     /// # Returns
     /// * `ServiceHealth` - Service health
     fn get_health(&self) -> ServiceHealth;
+
+    /// Downcast to Any trait object for dynamic typing
+    ///
+    /// # Returns
+    /// * `&dyn std::any::Any` - Reference to Any trait object
+    fn as_any(&self) -> &dyn std::any::Any;
 }
 
 /// Service lifecycle status

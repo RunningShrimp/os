@@ -583,8 +583,8 @@ macro_rules! return_error {
 }
 
 /// 从其他错误类型转换为统一错误
-impl From<crate::subsystems::syscalls::common::SyscallError> for UnifiedError {
-    fn from(err: crate::subsystems::syscalls::common::SyscallError) -> Self {
+impl From<crate::subsystems::syscalls::api::SyscallError> for UnifiedError {
+    fn from(err: crate::subsystems::syscalls::api::SyscallError) -> Self {
         UnifiedError::SyscallError(SyscallError::from(err))
     }
 }
@@ -607,88 +607,6 @@ impl From<crate::subsystems::mm::api::VmError> for UnifiedError {
     }
 }
 
-/// 从系统调用错误转换为统一错误中的系统调用错误
-impl From<crate::subsystems::syscalls::common::SyscallError> for SyscallError {
-    fn from(err: crate::subsystems::syscalls::common::SyscallError) -> Self {
-        match err {
-            crate::subsystems::syscalls::common::SyscallError::InvalidSyscall => {
-                SyscallError::InvalidSyscall
-            },
-            crate::subsystems::syscalls::common::SyscallError::PermissionDenied => {
-                SyscallError::PermissionDenied
-            },
-            crate::subsystems::syscalls::common::SyscallError::InvalidArgument => {
-                SyscallError::InvalidArgument
-            },
-            crate::subsystems::syscalls::common::SyscallError::NotFound => SyscallError::NotFound,
-            crate::subsystems::syscalls::common::SyscallError::OutOfMemory => {
-                SyscallError::OutOfMemory
-            },
-            crate::subsystems::syscalls::common::SyscallError::Interrupted => {
-                SyscallError::Interrupted
-            },
-            crate::subsystems::syscalls::common::SyscallError::IoError => SyscallError::IoError,
-            crate::subsystems::syscalls::common::SyscallError::WouldBlock => {
-                SyscallError::WouldBlock
-            },
-            crate::subsystems::syscalls::common::SyscallError::NotSupported => {
-                SyscallError::NotSupported
-            },
-            crate::subsystems::syscalls::common::SyscallError::BadFileDescriptor => {
-                SyscallError::BadFileDescriptor
-            },
-            crate::subsystems::syscalls::common::SyscallError::TooManyOpenFiles => {
-                SyscallError::TooManyOpenFiles
-            },
-            crate::subsystems::syscalls::common::SyscallError::NoBufferSpace => {
-                SyscallError::NoBufferSpace
-            },
-            crate::subsystems::syscalls::common::SyscallError::NotADirectory => {
-                SyscallError::NotADirectory
-            },
-            crate::subsystems::syscalls::common::SyscallError::IsADirectory => {
-                SyscallError::IsADirectory
-            },
-            crate::subsystems::syscalls::common::SyscallError::DirectoryNotEmpty => {
-                SyscallError::DirectoryNotEmpty
-            },
-            crate::subsystems::syscalls::common::SyscallError::FileExists => {
-                SyscallError::FileExists
-            },
-            crate::subsystems::syscalls::common::SyscallError::CrossDeviceLink => {
-                SyscallError::CrossDeviceLink
-            },
-            crate::subsystems::syscalls::common::SyscallError::FileTooBig => {
-                SyscallError::FileTooBig
-            },
-            crate::subsystems::syscalls::common::SyscallError::NoSpaceLeft => {
-                SyscallError::NoSpaceLeft
-            },
-            crate::subsystems::syscalls::common::SyscallError::BadAddress => {
-                SyscallError::BadAddress
-            },
-            crate::subsystems::syscalls::common::SyscallError::DeadlockWouldOccur => {
-                SyscallError::DeadlockWouldOccur
-            },
-            crate::subsystems::syscalls::common::SyscallError::NameTooLong => {
-                SyscallError::NameTooLong
-            },
-            crate::subsystems::syscalls::common::SyscallError::TooManySymlinks => {
-                SyscallError::TooManySymlinks
-            },
-            crate::subsystems::syscalls::common::SyscallError::ConnectionRefused => {
-                SyscallError::ConnectionRefused
-            },
-            crate::subsystems::syscalls::common::SyscallError::ConnectionReset => {
-                SyscallError::ConnectionReset
-            },
-            crate::subsystems::syscalls::common::SyscallError::BrokenPipe => {
-                SyscallError::BrokenPipe
-            },
-            crate::subsystems::syscalls::common::SyscallError::TimedOut => SyscallError::TimedOut,
-        }
-    }
-}
 
 /// 从文件系统错误转换为统一错误中的文件系统错误
 impl From<crate::subsystems::fs::api::error::FsError> for FileSystemError {

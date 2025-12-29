@@ -8,15 +8,11 @@
 //! - Deadlock detection and timeout support
 
 use core::cell::UnsafeCell;
-use core::sync::atomic;
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::ptr::{null_mut, NonNull};
-use core::sync::atomic;
 use core::time::Duration;
-use core::sync::atomic;
 use alloc::sync::Arc;
-use core::sync::atomic;
 use alloc::vec::Vec;
-use core::sync::atomic;
 
 // ============================================================================
 // Lock Modes and Policies

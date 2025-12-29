@@ -16,6 +16,7 @@ pub mod icmp;
 pub mod icmp_enhanced; // Enhanced ICMP features (optional: extended ICMP types, traceroute, ping)
 pub mod interface;
 pub mod ipv4;
+pub mod ipv6;
 pub mod packet;
 pub mod processor;
 pub mod route;
@@ -23,6 +24,15 @@ pub mod socket;
 pub mod tcp;
 pub mod udp;
 pub mod zero_copy; // POSIX-compatible network API (required for socket syscalls)
+
+// Test modules
+#[cfg(test)]
+pub mod ipv6_tests;
+#[cfg(test)]
+pub mod tcp {
+    #[cfg(test)]
+    pub mod congestion_tests;
+}
 
 // 只在需要的地方使用日志系统
 // use crate::{log_info, log_error};
@@ -368,6 +378,15 @@ pub use self::{
     },
     interface::{Interface, InterfaceConfig},
     ipv4::{Ipv4Addr, Ipv4Header, Ipv4Packet},
+    ipv6::{
+        ExtensionHeader, Ipv6Addr, Ipv6Error, Ipv6Header, Ipv6Packet,
+        MulticastScope, DEFAULT_MTU as IPV6_DEFAULT_MTU, DEFAULT_HOP_LIMIT,
+    }, // Re-export IPv6 types
+    ipv6::icmpv6::{
+        Icmpv6DstUnreachableCode, Icmpv6Error, Icmpv6Packet, Icmpv6Processor, Icmpv6TimeExceededCode,
+        Icmpv6Type, NdpCache, NdpEntry, NdpState,
+    }, // Re-export ICMPv6 types
+    ipv6::route::{Ipv6RouteEntry, Ipv6RouteManager, Ipv6RoutingTable, Ipv6RoutingTableStats}, // Re-export IPv6 routing types
     processor::{NetworkProcessor, PacketResult},
     route::{RouteEntry, RouteLookupResult, RouteManager, RoutingTable, RoutingTableStats},
     socket::{
@@ -379,6 +398,10 @@ pub use self::{
         WindowScaleOption,
         manager::{TcpConnection, TcpConnectionManager},
         state::TcpStateMachine,
+        congestion::{
+            CongestionControl, Bbr, BbrState, Cubic, Reno,
+            create_congestion_control,
+        },
     },
     udp::{UdpHeader, UdpPacket, UdpSocket},
 };

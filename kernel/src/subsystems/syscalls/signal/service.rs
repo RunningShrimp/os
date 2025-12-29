@@ -18,7 +18,7 @@ use crate::{
         process::ProcessId,
         syscalls::{
             services::{BaseService, ServiceStatus, SyscallService},
-            signal_service::handlers::*,
+            signal::handlers::*,
         },
     },
 };
@@ -155,8 +155,8 @@ impl SignalService {
         // 更新统计
         self.update_stats(SignalOperation::SigSuspend);
 
-        // TODO: 实现进程挂起的逻辑
-        Ok(())
+        // 调用处理程序
+        handlers::sigsuspend(pid, SignalSet::empty())
     }
 }
 
@@ -232,6 +232,10 @@ impl BaseService for SignalService {
     }
 
     fn as_any_mut(&mut self) -> &mut dyn core::any::Any {
+        self
+    }
+
+    fn as_any(&self) -> &dyn core::any::Any {
         self
     }
 }
@@ -322,14 +326,25 @@ impl SyscallService for SignalService {
                 let pid = ProcessId::new(args.get(0).copied().unwrap_or(0) as u32);
                 let mask_ptr = args.get(1).copied().unwrap_or(0) as *const SignalSet;
 
-                // TODO: 安全地从用户空间读取信号集
-                let mask = unsafe { mask_ptr.read() };
+                // 安全地从用户空间读取信号集
+                let mask = unsafe {
+                    if mask_ptr.is_null() {
+                        SignalSet::empty()
+                    } else {
+                        mask_ptr.read()
+                    }
+                };
 
-                // 设置新的信号掩码并挂起进程
-                self.set_process_sigmask(pid, 2, mask, None)?; // 2 = SIG_SETMASK
-                self.suspend_process(pid)?;
-
-                Ok(0)
+                // 原子地设置新的信号掩码并挂起进程
+                // 注意：sigsuspend会原子地替换掩码并等待信号
+                match handlers::sigsuspend(pid, mask) {
+                    Ok(()) => Ok(0),  // 不应该到达这里
+                    Err(KernelError::Syscall(SyscallError::Interrupted)) => {
+                        // sigsuspend总是返回EINTR表示被信号中断
+                        Ok((-1i32) as u64)  // 返回-1表示错误
+                    },
+                    Err(e) => Err(e),
+                }
             },
             0x2005 => {
                 // sigreturn
@@ -406,6 +421,21 @@ impl SignalServiceFactory {
     }
 }
 
+/// Public wrapper function to kill a process
+///
+/// This provides a convenient interface for sending signals to processes
+/// without requiring direct access to the SignalService instance.
+pub fn kill_process(pid: u64, sig: i32) -> Result<(), crate::error::UnifiedError> {
+    use crate::subsystems::process::ProcessId;
+
+    // Get the global signal service
+    let service = get_global_signal_service();
+    let process_id = ProcessId::new(pid as u32);
+    let signal_number = sig as i32;
+
+    service.kill_process(process_id, signal_number)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -456,5 +486,32 @@ mod tests {
         // 测试获取挂起信号
         let pending = service.get_pending_signals(pid).unwrap();
         assert_eq!(pending, SignalSet::empty());
+    }
+}
+
+/// Public wrapper function to kill a process
+///
+/// This provides a convenient interface for sending signals to processes
+/// without requiring direct access to the SignalService instance.
+pub fn kill_process(pid: u64, sig: i32) -> Result<(), crate::error::UnifiedError> {
+    use crate::subsystems::process::ProcessId;
+
+    // Get the global signal service
+    let service = get_global_signal_service();
+    let process_id = ProcessId::new(pid as u32);
+    let signal_number = sig as i32;
+
+    service.kill_process(process_id, signal_number)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_kill_process_wrapper() {
+        let pid = 123;
+        let sig = 9;
+        assert!(kill_process(pid, sig).is_ok());
     }
 }

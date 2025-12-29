@@ -133,12 +133,22 @@ pub mod memory_audit;
 pub mod memory_security;
 pub mod stack_canaries;
 
+// P2 Priority Security Features (optional, feature-gated)
+#[cfg(feature = "cfi")]
+pub mod cfi;
+
+#[cfg(feature = "shadow_stack")]
+pub mod shadow_stack;
+
+#[cfg(feature = "memory_encryption")]
+pub mod encrypted_memory;
+
 // 只导出在其他地方直接使用的安全函数
 use aslr::AslrSubsystem;
 pub use aslr::{MemoryRegionType, initialize_aslr, is_aslr_enabled, randomize_memory_region};
 pub use audit::{
     AuditConfig, ComplianceLevel, SecurityAuditResult, SecurityAuditor, SecurityCategory,
-    SecurityFinding, SecurityScore, Severity,
+    SecurityFinding, SecurityScore, AuditSeverity as Severity,
 };
 pub use enhanced_permissions::init_permission_manager;
 pub use memory_audit::{

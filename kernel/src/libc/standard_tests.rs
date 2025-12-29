@@ -14,7 +14,6 @@
 use core::ffi::{c_char, c_int, c_uint};
 
 use crate::libc::*;
-pub type size_t = usize;
 
 /// 测试结果统计
 #[derive(Debug, Default)]

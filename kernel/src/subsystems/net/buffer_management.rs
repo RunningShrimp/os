@@ -11,6 +11,7 @@
 
 extern crate alloc;
 use alloc::{
+    boxed::Box,
     collections::{BTreeMap, VecDeque},
     string::String,
     sync::Arc,

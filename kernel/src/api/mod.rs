@@ -7,14 +7,19 @@
 //! The API layer separates the interface from the implementation,
 //! allowing for better modularity and testability.
 
+pub mod adapter;
 pub mod context;
 pub mod error;
 pub mod interfaces;
 pub mod memory;
 pub mod process;
 pub mod syscall;
+pub mod syscall_id;
 
 // Re-export common types for convenience
+// 从adapter模块导出API适配器类型（优先级最高）
+pub use adapter::*;
+
 // 从syscall模块导出类型，但排除KernelError以避免与error模块冲突
 pub use context::*;
 // 从error模块导出所有类型，包括KernelError
@@ -37,3 +42,4 @@ pub use process::{
     MemoryRegion as ProcessMemoryRegion, MemoryRegionType as ProcessMemoryRegionType,
 };
 pub use syscall::{KernelErrorExt, SyscallError};
+pub use syscall_id as kernel_syscall_id;

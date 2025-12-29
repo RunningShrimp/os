@@ -8,7 +8,6 @@ use alloc::{
     collections::BTreeMap,
     string::{String, ToString},
 };
-use core::sync::atomic::{AtomicU64, Ordering};
 
 use spin::Mutex;
 

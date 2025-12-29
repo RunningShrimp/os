@@ -5,14 +5,15 @@
 
 extern crate alloc;
 
-pub mod file;
-pub mod malware;
-pub mod network;
-pub mod process;
-pub mod registry;
-pub mod syscall;
-pub mod types;
-pub mod user;
+// 重新导出所有子模块类型（临时，后续会移动到这里）
+pub use self::file::*;
+pub use self::malware::*;
+pub use self::network::*;
+pub use self::process::*;
+pub use self::registry::*;
+pub use self::syscall::*;
+pub use self::types::*;
+pub use self::user::*;
 
 // 临时：保留原有文件作为过渡
 // TODO: 逐步拆分到各个子模块，将代码从host_ids.rs移动到对应的子模块

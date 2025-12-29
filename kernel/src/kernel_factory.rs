@@ -2,11 +2,28 @@
 //!
 //! 本模块提供工厂模式创建和管理内核内部模块，减少lib.rs的直接依赖。
 
-// use nos_api::interfaces::EventPublisher;
 use alloc::{sync::Arc, vec::Vec};
+use spin::Mutex;
+use nos_api::{di::Container, Result};
 
-use nos_syscalls::SyscallDispatcher;
+// Import API adapter types for cleaner interfaces
+use crate::api::adapter::{
+    Service, ServiceInfo, SyscallHandler, EventPublisher,
+    InterfaceServiceStats, BasicEvent,
+};
 
+/// Simple service locator
+pub struct ServiceLocator {
+    container: Arc<Container>,
+}
+
+impl ServiceLocator {
+    pub fn new(container: Arc<Container>) -> Self {
+        Self { container }
+    }
+}
+
+use crate::subsystems::syscalls::interface::SyscallDispatcher;
 use crate::syscall_interface::ServiceManager;
 
 /// 内核工厂，负责创建和管理内核组件
@@ -137,29 +154,32 @@ impl SyscallDispatcher for PlaceholderSyscallDispatcher {
         -1
     }
 
-    fn get_stats(&self) -> nos_api::interfaces::SyscallStats {
+    fn get_stats(&self) -> crate::subsystems::syscalls::interface::SyscallStats {
         // 占位符实现
-        nos_api::interfaces::SyscallStats {
+        crate::subsystems::syscalls::interface::SyscallStats {
             total_calls: 0,
             successful_calls: 0,
             failed_calls: 0,
-            avg_execution_time_ns: 0,
-            calls_by_type: alloc::collections::BTreeMap::new(),
+            avg_execution_time_ns: 0.0,
         }
     }
 
     fn register_handler(
         &mut self,
         _syscall_num: usize,
-        _handler: alloc::sync::Arc<dyn nos_api::interfaces::SyscallHandler>,
+        _handler: Box<dyn SyscallHandler>,
     ) -> Result<()> {
         // 占位符实现
         Ok(())
     }
 
-    fn unregister_handler(&mut self, _syscall_num: usize) -> Result<()> {
+    fn unregister_handler(&mut self, _syscall_num: usize) {
         // 占位符实现
-        Ok(())
+    }
+
+    fn list_handlers(&self) -> Vec<(usize, &str)> {
+        // 占位符实现
+        Vec::new()
     }
 }
 
@@ -177,7 +197,7 @@ impl PlaceholderServiceManager {
 impl ServiceManager for PlaceholderServiceManager {
     fn register_service(
         &mut self,
-        _service: alloc::sync::Arc<dyn nos_api::interfaces::Service>,
+        _service: Arc<dyn Service>,
     ) -> Result<()> {
         // 占位符实现
         Ok(())
@@ -191,19 +211,19 @@ impl ServiceManager for PlaceholderServiceManager {
     fn get_service(
         &self,
         _service_id: &str,
-    ) -> Option<alloc::sync::Arc<dyn nos_api::interfaces::Service>> {
+    ) -> Option<Arc<dyn Service>> {
         // 占位符实现
         None
     }
 
-    fn list_services(&self) -> Vec<nos_api::interfaces::ServiceInfo> {
+    fn list_services(&self) -> Vec<ServiceInfo> {
         // 占位符实现
         Vec::new()
     }
 
-    fn get_stats(&self) -> nos_api::interfaces::ServiceStats {
+    fn get_stats(&self) -> InterfaceServiceStats {
         // 占位符实现
-        nos_api::interfaces::ServiceStats {
+        InterfaceServiceStats {
             registered_services: 0,
             running_services: 0,
             total_requests: 0,
@@ -226,14 +246,14 @@ impl PlaceholderEventPublisher {
 }
 
 impl EventPublisher for PlaceholderEventPublisher {
-    fn publish(&self, _event: alloc::sync::Arc<dyn nos_api::event::Event>) -> Result<()> {
+    fn publish(&self, _event: alloc::sync::Arc<BasicEvent>) -> Result<()> {
         // 占位符实现
         Ok(())
     }
 
     fn publish_batch(
         &self,
-        _events: Vec<alloc::sync::Arc<dyn nos_api::event::Event>>,
+        _events: Vec<alloc::sync::Arc<BasicEvent>>,
     ) -> Result<()> {
         // 占位符实现
         Ok(())
@@ -242,7 +262,7 @@ impl EventPublisher for PlaceholderEventPublisher {
 
 /// 全局内核工厂实例
 static mut GLOBAL_KERNEL_FACTORY: Option<KernelFactory> = None;
-static KERNEL_FACTORY_INIT: core::sync::Mutex<bool> = core::sync::Mutex::new(false);
+static KERNEL_FACTORY_INIT: Mutex<bool> = Mutex::new(false);
 
 /// 初始化全局内核工厂
 pub fn init_kernel_factory() -> Result<()> {

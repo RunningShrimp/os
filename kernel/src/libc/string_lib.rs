@@ -8,10 +8,7 @@
 //! - 安全字符串操作：strlcpy, strlcat等
 //! - 高性能算法优化
 
-pub type SizeT = usize;
-
-#[allow(non_camel_case_types)]
-pub type size_t = SizeT;
+// SizeT and size_t are defined in interface.rs
 use crate::{
     libc::error::{errno::EINVAL, set_errno},
     reliability::ERANGE,
@@ -721,13 +718,7 @@ impl Default for EnhancedStringLib {
     }
 }
 
-// 类型别名
-pub type CLong = isize;
-#[allow(non_camel_case_types)]
-pub type c_long = CLong;
-pub type CUlong = usize;
-#[allow(non_camel_case_types)]
-pub type c_ulong = CUlong;
+// CLong, c_long, CUlong, and c_ulong are defined in interface.rs
 
 // 导出全局字符串处理库实例
 pub static STRING_LIB: EnhancedStringLib = EnhancedStringLib;

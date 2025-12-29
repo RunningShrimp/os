@@ -6,11 +6,11 @@
 
 extern crate alloc;
 
-use alloc::{format, string::String};
-use core::{any::Any, fmt};
+use alloc::{boxed::Box, format, string::String};
+use core::fmt;
 
 // Re-export existing unified error types
-use super::unified::*;
+use super::{unified::*, ErrorAction};
 
 /// Unified error result type
 pub type FrameworkResult<T> = core::result::Result<T, FrameworkError>;

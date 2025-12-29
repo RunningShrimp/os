@@ -96,6 +96,16 @@ pub trait SuperBlock: Send + Sync {
 
     /// 获取文件系统统计信息
     fn statfs(&self) -> Result<FilesystemStats, VfsError>;
+
+    /// 获取文件系统类型
+    fn fs_type(&self) -> &dyn FileSystemType {
+        todo!()
+    }
+
+    /// 同步文件系统
+    fn sync(&self) -> Result<(), VfsError> {
+        Ok(())
+    }
 }
 
 /// Inode trait - 表示文件系统中的文件/目录
@@ -143,6 +153,62 @@ pub trait Inode: Send + Sync {
 
     /// 软链接目标
     fn symlink_target(&self) -> Option<String>;
+
+    // Additional methods to match InodeOps trait
+    /// 设置文件属性
+    fn setattr(&self, attr: &FileAttr) -> Result<(), VfsError> {
+        let _ = attr;
+        Err(VfsError::NotSupported)
+    }
+
+    /// 检查目录是否为空
+    fn is_empty(&self) -> Result<bool, VfsError> {
+        Ok(true)
+    }
+
+    /// 创建硬链接
+    fn link(&self, name: &str, inode: Arc<dyn Inode>) -> Result<(), VfsError> {
+        let _ = (name, inode);
+        Err(VfsError::NotSupported)
+    }
+
+    /// 创建符号链接
+    fn symlink(&self, name: &str, target: &str) -> Result<Arc<dyn Inode>, VfsError> {
+        let _ = (name, target);
+        Err(VfsError::NotSupported)
+    }
+
+    /// 读取符号链接目标
+    fn readlink(&self) -> Result<String, VfsError> {
+        Err(VfsError::NotASymlink)
+    }
+
+    /// 同步文件
+    fn sync(&self) -> Result<(), VfsError> {
+        Err(VfsError::NotSupported)
+    }
+
+    /// 截断文件
+    fn truncate(&self, size: u64) -> Result<(), VfsError> {
+        let _ = size;
+        Err(VfsError::NotSupported)
+    }
+
+    /// 重命名
+    fn rename(&self, old_name: &str, new_name: &str) -> Result<(), VfsError> {
+        let _ = (old_name, new_name);
+        Err(VfsError::NotSupported)
+    }
+
+    /// 获取 inode 号
+    fn ino(&self) -> u64 {
+        0
+    }
+
+    /// 获取文件模式
+    fn mode(&self) -> FileMode {
+        FileMode(0)
+    }
 }
 
 /// 挂载点 trait

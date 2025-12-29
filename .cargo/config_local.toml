@@ -1,0 +1,12 @@
+# 项目级 cargo 配置
+# 临时使用官方源以获取最新版本的依赖包
+
+[source.crates-io]
+registry = "https://index.crates.io/"
+
+# 如果需要重新启用 ustc 镜像（当同步完成后）：
+# [source.crates-io]
+# replace-with = 'ustc'
+#
+# [source.ustc]
+# registry = "sparse+https://mirrors.ustc.edu.cn/crates.io-index/"

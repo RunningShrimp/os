@@ -10,8 +10,7 @@ extern crate alloc;
 
 use core::str::FromStr;
 
-#[allow(non_camel_case_types)]
-pub type size_t = SizeT;
+// size_t is defined in interface.rs
 use core::{
     ptr::null_mut,
     sync::atomic::{AtomicUsize, Ordering},
@@ -34,6 +33,18 @@ pub enum FileOpenMode {
     ReadPlus,   // "r+"
     WritePlus,  // "w+"
     AppendPlus, // "a+"
+}
+
+/// C文件模式 (fopen模式字符串对应的枚举)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CFileMode {
+    Read,           // "r"
+    Write,          // "w"
+    Append,         // "a"
+    ReadWrite,      // 内部使用
+    ReadPlus,       // "r+"
+    WritePlus,      // "w+"
+    AppendPlus,     // "a+"
 }
 
 /// 缓冲区类型
@@ -835,10 +846,7 @@ impl Default for EnhancedIOManager {
     }
 }
 
-/// 类型别名
-pub type CLong = isize;
-#[allow(non_camel_case_types)]
-pub type c_long = CLong;
+// CLong and c_long are defined in interface.rs
 
 // 获取标准流的函数
 pub unsafe fn stdin() -> *mut CFile {

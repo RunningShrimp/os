@@ -28,11 +28,7 @@ pub trait GLibEpollManager {
     fn get_instance_stats(&self, epfd: c_int) -> Result<GLibEpollInstance, ()>;
 }
 
-impl Default for GLibEpollManager {
-    fn default() -> Self {
-        Self
-    }
-}
+// Note: GLibEpollManager is a trait, not a concrete type, so Default is not implemented
 
 impl GLibEpollManager for () {
     fn create_epoll_instance(&mut self) -> Result<c_int, c_int> {

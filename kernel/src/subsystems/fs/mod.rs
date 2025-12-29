@@ -114,8 +114,10 @@ use alloc::{collections::BTreeMap, string::String, sync::Arc};
 use spin::Once;
 
 use crate::subsystems::sync::Mutex;
+use crate::{subsystems::fs::api::error::FsError, vfs::Mount};
 
 pub mod api;
+pub mod epoll;
 pub mod ext2;
 pub mod ext4;
 pub mod ext4_persistence;
@@ -127,6 +129,7 @@ pub mod fs_impl;
 pub mod journaling_fs;
 pub mod journaling_wrapper;
 pub mod recovery;
+pub mod xattr;
 
 #[cfg(feature = "kernel_tests")]
 pub mod tests;
@@ -149,11 +152,11 @@ pub use recovery::{DEFAULT_CHECKPOINT_INTERVAL, MAX_SNAPSHOTS, SNAPSHOT_MAGIC};
 /// Manages filesystem types, mount points, and provides unified VFS operations
 pub struct VfsManager {
     /// Registered filesystem types
-    fs_types: Mutex<BTreeMap<String, Arc<dyn crate::vfs::fs::FileSystemType>>>,
+    fs_types: Mutex<BTreeMap<String, Arc<dyn crate::vfs::FileSystemType>>>,
     /// Mount points
-    mounts: Mutex<BTreeMap<String, Arc<crate::vfs::mount::Mount>>>,
+    mounts: Mutex<BTreeMap<String, Arc<crate::vfs::Mount>>>,
     /// Root filesystem mount point (if mounted)
-    root_mounted: Mutex<Option<Arc<crate::vfs::mount::Mount>>>,
+    root_mounted: Mutex<Option<Arc<crate::vfs::Mount>>>,
 }
 
 impl VfsManager {
@@ -169,13 +172,13 @@ impl VfsManager {
     /// Register a new filesystem type
     pub fn register_fs(
         &self,
-        fs_type: Arc<dyn crate::vfs::fs::FileSystemType>,
-    ) -> Result<(), crate::vfs::error::VfsError> {
+        fs_type: Arc<dyn crate::vfs::FileSystemType>,
+    ) -> Result<(), FsError> {
         let mut fs_types = self.fs_types.lock();
         let name = fs_type.name().to_string();
 
         if fs_types.contains_key(&name) {
-            return Err(crate::vfs::error::VfsError::Exists);
+            return Err(FsError::Exists);
         }
 
         fs_types.insert(name, fs_type);
@@ -195,26 +198,26 @@ impl VfsManager {
         mount_point: &str,
         device: Option<&str>,
         flags: u32,
-    ) -> Result<(), crate::vfs::error::VfsError> {
+    ) -> Result<(), FsError> {
         // Get filesystem type
         let fs_types = self.fs_types.lock();
         let fs_type = fs_types
             .get(fs_type_name)
-            .ok_or(crate::vfs::error::VfsError::NotFound)?;
+            .ok_or(FsError::NotFound)?;
 
         // Mount the filesystem
         let superblock = fs_type.mount(device, flags)?;
 
         // Create mount point
         let mount =
-            Arc::new(crate::vfs::mount::Mount::new(mount_point.to_string(), superblock, flags));
+            Arc::new(Mount::new(mount_point.to_string(), superblock, flags));
 
         // Register mount point
         let mut mounts = self.mounts.lock();
 
         // Check if mount point already exists
         if mounts.contains_key(mount_point) {
-            return Err(crate::vfs::error::VfsError::Busy);
+            return Err(FsError::Busy);
         }
 
         // Special handling for root mount
@@ -228,7 +231,7 @@ impl VfsManager {
     }
 
     /// Unmount a filesystem
-    pub fn unmount(&self, mount_point: &str) -> Result<(), crate::vfs::error::VfsError> {
+    pub fn unmount(&self, mount_point: &str) -> Result<(), FsError> {
         let mut mounts = self.mounts.lock();
 
         if let Some(mount) = mounts.remove(mount_point) {
@@ -243,16 +246,16 @@ impl VfsManager {
 
             Ok(())
         } else {
-            Err(crate::vfs::error::VfsError::NotFound)
+            Err(FsError::NotFound)
         }
     }
 
     /// Verify root filesystem is mounted and accessible
-    pub fn verify_root(&self) -> Result<(), crate::vfs::error::VfsError> {
+    pub fn verify_root(&self) -> Result<(), FsError> {
         let root_mounted = self.root_mounted.lock();
 
         if root_mounted.is_none() {
-            return Err(crate::vfs::error::VfsError::NotMounted);
+            return Err(FsError::NotMounted);
         }
 
         // Try to access root inode
@@ -267,7 +270,7 @@ impl VfsManager {
     pub fn stat(
         &self,
         path: &str,
-    ) -> Result<crate::vfs::types::FileAttr, crate::vfs::error::VfsError> {
+    ) -> Result<crate::vfs::types::FileAttr, FsError> {
         // For now, only support root path
         if path == "/" {
             let root_mounted = self.root_mounted.lock();
@@ -277,7 +280,7 @@ impl VfsManager {
             }
         }
 
-        Err(crate::vfs::error::VfsError::NotFound)
+        Err(FsError::NotFound)
     }
 
     /// Create a new directory
@@ -285,10 +288,10 @@ impl VfsManager {
         &self,
         path: &str,
         mode: crate::vfs::types::FileMode,
-    ) -> Result<(), crate::vfs::error::VfsError> {
+    ) -> Result<(), FsError> {
         // TODO: Implement directory creation
         // For now, return error as this requires path resolution
-        Err(crate::vfs::error::VfsError::NotSupported)
+        Err(FsError::NotSupported)
     }
 
     /// Create a new file
@@ -296,10 +299,10 @@ impl VfsManager {
         &self,
         path: &str,
         mode: crate::vfs::types::FileMode,
-    ) -> Result<(), crate::vfs::error::VfsError> {
+    ) -> Result<(), FsError> {
         // TODO: Implement file creation
         // For now, return error as this requires path resolution
-        Err(crate::vfs::error::VfsError::NotSupported)
+        Err(FsError::NotSupported)
     }
 
     /// Write to a file
@@ -308,17 +311,17 @@ impl VfsManager {
         path: &str,
         data: &[u8],
         offset: u64,
-    ) -> Result<usize, crate::vfs::error::VfsError> {
+    ) -> Result<usize, FsError> {
         // TODO: Implement file writing
         // For now, return error as this requires path resolution
-        Err(crate::vfs::error::VfsError::NotSupported)
+        Err(FsError::NotSupported)
     }
 
     /// Delete a file or directory
-    pub fn unlink(&self, path: &str) -> Result<(), crate::vfs::error::VfsError> {
+    pub fn unlink(&self, path: &str) -> Result<(), FsError> {
         // TODO: Implement file/directory deletion
         // For now, return error as this requires path resolution
-        Err(crate::vfs::error::VfsError::NotSupported)
+        Err(FsError::NotSupported)
     }
 
     /// Check if root filesystem is mounted
@@ -342,17 +345,17 @@ pub fn mount(
     mount_point: &str,
     device: Option<&str>,
     flags: u32,
-) -> Result<(), crate::vfs::error::VfsError> {
+) -> Result<(), FsError> {
     vfs().mount(fs_type, mount_point, device, flags)
 }
 
 /// Unmount a filesystem (global convenience function)
-pub fn unmount(mount_point: &str) -> Result<(), crate::vfs::error::VfsError> {
+pub fn unmount(mount_point: &str) -> Result<(), FsError> {
     vfs().unmount(mount_point)
 }
 
 /// Verify root filesystem is mounted and accessible (global convenience function)
-pub fn verify_root() -> Result<(), crate::vfs::error::VfsError> {
+pub fn verify_root() -> Result<(), FsError> {
     vfs().verify_root()
 }
 
@@ -364,6 +367,7 @@ pub fn verify_root() -> Result<(), crate::vfs::error::VfsError> {
 /// - File system cache
 /// - File permissions
 /// - File locking
+/// - Extended attributes
 pub fn init() -> nos_api::Result<()> {
     // Initialize VFS manager (already initialized on first access)
     let _ = vfs();
@@ -376,6 +380,9 @@ pub fn init() -> nos_api::Result<()> {
 
     // Initialize file locking
     file_locking::init();
+
+    // Initialize extended attributes
+    xattr::init();
 
     // Initialize file system implementations
     fs_impl::init();

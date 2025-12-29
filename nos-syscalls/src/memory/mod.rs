@@ -2,7 +2,7 @@
 //!
 //! This module provides memory management system calls.
 
-use alloc::string::ToString;
+use alloc::{boxed::Box, string::ToString};
 
 use nos_api::Result;
 

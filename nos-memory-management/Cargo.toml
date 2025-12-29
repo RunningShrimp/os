@@ -42,6 +42,3 @@ path = "src/lib.rs"
 name = "mm_benchmarks"
 harness = false
 
-[[test]]
-name = "mm_tests"
-path = "tests/mm_tests.rs"

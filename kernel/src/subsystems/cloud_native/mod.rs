@@ -374,3 +374,13 @@ pub fn stop_container(container_id: container::ContainerId) -> Result<(), i32> {
     let service = get_service().ok_or(EIO)?;
     service.stop_container(container_id)
 }
+
+// Re-export required types for external visibility
+pub use crate::subsystems::cloud_native::container::ContainerManager;
+pub struct KubernetesIntegration;
+
+pub fn init_container() -> Result<(), nos_api::Error> {
+    // Delegate to the existing init_container_manager function
+    let _ = crate::subsystems::cloud_native::container::init_container_manager();
+    Ok(())
+}

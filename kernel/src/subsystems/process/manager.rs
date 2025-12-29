@@ -22,7 +22,7 @@ use crate::{
     subsystems::{
         mm::{
             PAGE_SIZE, kalloc, kfree,
-            vm::{PageTable, free_pagetable},
+            page_table_isolation::PageTable, free_pagetable,
         },
         sync::Mutex,
     },

@@ -4,6 +4,9 @@
 
 use nos_api::Result;
 
+pub mod syscall_result;
+pub mod syscall_id;
+
 /// System call error type
 #[derive(Debug, Clone)]
 pub enum SyscallError {
@@ -13,11 +16,14 @@ pub enum SyscallError {
     IoError,
 }
 
-/// System call result type
-pub type SyscallResult<T = isize> = nos_api::Result<T>;
+/// System call result type - re-exported from nos_api
+/// Note: We use nos_api's SyscallResult (an enum) rather than a type alias
+pub use nos_api::syscall::types::SyscallResult;
 
 /// Error module
 pub mod error {
     pub use super::SyscallError as Error;
-    pub type Result<T = isize> = super::SyscallResult<T>;
+    pub use nos_api::syscall::types::SyscallResult as Result;
 }
+
+pub use syscall_result::*;

@@ -4,14 +4,12 @@
 // with proper memory barriers for SMP safety.
 
 use core::cell::UnsafeCell;
-use core::sync::atomic;
+use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use crate::cpu::cpuid;
-use core::sync::atomic;
 
 // Import interrupt control functions
 use super::interrupts::{push_off, pop_off};
-use core::sync::atomic;
 
 /// Raw spinlock for low-level synchronization
 /// This version includes proper memory barriers for SMP safety
@@ -164,5 +162,73 @@ impl Drop for SpinLockIrqGuard<'_> {
     }
 }
 
-// Legacy compatibility alias
-pub type SpinLock = RawSpinLock;
+// ============================================================================
+// SpinLock - Standard spinlock with RAII guard
+// ============================================================================
+
+/// Standard spinlock with RAII guard
+pub struct SpinLock<T> {
+    inner: RawSpinLock,
+    data: UnsafeCell<T>,
+}
+
+unsafe impl<T: ?Sized + Send> Send for SpinLock<T> {}
+unsafe impl<T: ?Sized + Send + Sync> Sync for SpinLock<T> {}
+
+impl<T> SpinLock<T> {
+    pub const fn new(data: T) -> Self {
+        Self {
+            inner: RawSpinLock::new(),
+            data: UnsafeCell::new(data),
+        }
+    }
+
+    #[inline]
+    pub fn lock(&self) -> SpinLockGuard<'_, T> {
+        self.inner.lock();
+        SpinLockGuard {
+            lock: self,
+        }
+    }
+
+    #[inline]
+    pub fn try_lock(&self) -> Option<SpinLockGuard<'_, T>> {
+        if self.inner.try_lock() {
+            Some(SpinLockGuard {
+                lock: self,
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    pub fn is_locked(&self) -> bool {
+        self.inner.is_locked()
+    }
+}
+
+/// RAII guard for SpinLock
+pub struct SpinLockGuard<'a, T> {
+    lock: &'a SpinLock<T>,
+}
+
+impl<'a, T> Drop for SpinLockGuard<'a, T> {
+    fn drop(&mut self) {
+        self.lock.inner.unlock();
+    }
+}
+
+impl<'a, T> core::ops::Deref for SpinLockGuard<'a, T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.lock.data.get() }
+    }
+}
+
+impl<'a, T> core::ops::DerefMut for SpinLockGuard<'a, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { &mut *self.lock.data.get() }
+    }
+}
+

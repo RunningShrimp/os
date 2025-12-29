@@ -9,10 +9,10 @@
 
 use alloc::{string::String, sync::Arc, vec::Vec};
 
-use crate::error::UnifiedError;
+use crate::error::{UnifiedError, KernelError};
 
-// 定义Result类型别名，使用KernelError作为错误类型
-pub type Result<T> = core::result::Result<T, KernelError>;
+// Import Result from error module to avoid duplication
+pub use crate::error::Result;
 
 /// 基础服务特征
 ///
@@ -95,6 +95,11 @@ pub trait Service: Send + Sync + core::fmt::Debug {
     ///
     /// 返回指向该service对象的可变Any引用，允许向下转换为具体类型。
     fn as_any_mut(&mut self) -> &mut dyn core::any::Any;
+
+    /// 获取任意引用，用于trait对象向下转换
+    ///
+    /// 返回指向该service对象的Any引用，允许向下转换为具体类型。
+    fn as_any(&self) -> &dyn core::any::Any;
 }
 
 /// 系统调用服务特征

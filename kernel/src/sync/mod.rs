@@ -261,6 +261,8 @@ impl RawSpinLock {
 }
 
 pub mod primitives;
+pub mod Mutex;
+pub use Mutex::*;
 
 #[cfg(feature = "realtime")]
 pub mod realtime;

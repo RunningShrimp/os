@@ -34,7 +34,7 @@ log = { workspace = true }
 heapless = { version = "0.8.0", default-features = false }
 
 # Math library for no_std environment
-libm = "0.2.11"
+libm = "0.2.15"
 
 # Test dependencies
 [dev-dependencies]
@@ -44,7 +44,7 @@ mockall = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 bincode = { workspace = true }
-tarpaulin = "0.27"
+# tarpaulin = "0.27"  # Temporarily disabled - not available in current registry
 
 [features]
 default = ["networking", "syscalls", "services", "error_handling", "huge_pages"]
@@ -65,6 +65,13 @@ huge_pages = []
 advanced_syscalls = ["syscalls"]
 realtime = []
 log = []
+# P2 Priority Security Features
+cfi = []
+shadow_stack = []
+memory_encryption = ["sev", "tme"]
+sev = []
+tme = []
+formal_verification = []
 
 # Features说明：
 # baremetal: 裸机启动与汇编路径（global_asm/trap/context switch等），用于真实目标板或无操作系统环境

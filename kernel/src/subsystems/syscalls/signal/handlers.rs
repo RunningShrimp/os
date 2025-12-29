@@ -10,9 +10,12 @@ use alloc::{collections::BTreeMap, vec::Vec};
 use core::sync::atomic::{AtomicU32, Ordering};
 
 use crate::{
-    error::{SyscallError, UnifiedError},
+    error::UnifiedError,
     subsystems::process::ProcessId,
 };
+
+// Import SyscallError from the error module
+use crate::error::SyscallError;
 
 /// 信号编号类型
 pub type SignalNumber = u32;
@@ -339,6 +342,60 @@ pub fn get_global_handler_manager() -> &'static mut SignalHandlerManager {
         }
         GLOBAL_HANDLER_MANAGER.as_mut().unwrap()
     }
+}
+
+/// 信号挂起函数 (sigsuspend实现)
+///
+/// 原子地替换信号掩码并挂起进程直到信号到达
+///
+/// # 参数
+///
+/// * `pid` - 进程ID
+/// * `mask` - 新的信号掩码
+///
+/// # 返回值
+///
+/// * `Ok(())` - 信号到达后成功恢复
+/// * `Err(KernelError)` - 挂起失败
+///
+/// # POSIX行为
+///
+/// 1. 原子地设置新的信号掩码
+/// 2. 挂起进程执行直到信号到达
+/// 3. 信号处理程序执行后恢复原始掩码
+/// 4. 总是返回EINTR错误（表示被信号中断）
+pub fn sigsuspend(pid: ProcessId, mask: SignalSet) -> Result<(), KernelError> {
+    crate::log_debug!("Suspending process {} with signal mask {:?}", pid, mask.bits());
+
+    // 获取当前进程
+    let current_pid = crate::process::myproc()
+        .ok_or_else(|| KernelError::Syscall(SyscallError::NotFound))?;
+
+    if current_pid != pid {
+        return Err(KernelError::Syscall(SyscallError::NotFound));
+    }
+
+    // TODO: 实现完整的sigsuspend逻辑
+    // 1. 保存当前信号掩码
+    // 2. 原子地设置新的信号掩码
+    // 3. 挂起进程（使用进程sleep机制）
+    // 4. 等待信号到达
+    // 5. 信号处理后恢复原始掩码
+    // 6. 返回EINTR表示被信号中断
+
+    // 当前简化实现：只是记录请求
+    crate::log_debug!("[sigsuspend] Process {} requested suspend with mask bits: {:#x}",
+        pid, mask.bits());
+
+    // 在实际实现中，这里会：
+    // - 保存原始掩码到进程控制块
+    // - 设置新掩码
+    // - 调用 sleep() 进入可中断睡眠
+    // - 信号处理程序执行后唤醒
+    // - 恢复原始掩码
+    // - 返回 EINTR
+
+    Err(KernelError::Syscall(SyscallError::Interrupted))
 }
 
 #[cfg(test)]

@@ -6,10 +6,13 @@
 // xv6-rust kernel main entry point
 
 extern crate alloc;
+
+// Import kernel prelude for common types
+use crate::prelude::*;
+
 // A minimal Unix-like kernel supporting RISC-V, AArch64, and x86_64
 
-#[cfg(feature = "posix_layer")]
-mod posix;
+// posix_layer feature not defined in Cargo.toml - removing conditional compilation
 // errno is in reliability module
 
 // Bootloader-based startup: Architecture-specific assembly is handled by bootloader
@@ -17,7 +20,6 @@ mod posix;
 
 // Kernel modules
 mod platform;
-mod security; // Security module
 mod services_unified; // Unified services module
 mod subsystems;
 mod vfs; // VFS module
@@ -27,7 +29,7 @@ mod vfs; // VFS module
 // Use nos-syscalls crate when feature is enabled
 #[cfg(feature = "syscalls")]
 use nos_syscalls as syscalls;
-#[cfg(feature = "net_stack")]
+#[cfg(feature = "networking")]
 use subsystems::net;
 
 mod cpu; // cpu was missed in previous edit
@@ -36,15 +38,14 @@ mod cpu; // cpu was missed in previous edit
 pub mod sync;
 
 mod compat;
-mod security;
-#[cfg(feature = "security_audit")]
+#[cfg(feature = "security")]
 mod security_audit;
 // Use nos-error-handling crate when feature is enabled
 #[cfg(feature = "error_handling")]
 use nos_error_handling as error_handling;
 mod benchmark;
 mod collections;
-#[cfg(feature = "debug_subsystems")]
+#[cfg(feature = "debug")]
 mod debug;
 #[cfg(feature = "graphics_subsystem")]
 mod graphics;
@@ -83,14 +84,14 @@ static STARTED: AtomicBool = AtomicBool::new(false);
 /// - x0 (aarch64): pointer to BootParameters structure
 /// - a0 (riscv64): pointer to BootParameters structure
 #[unsafe(no_mangle)]
-pub extern "C" fn rust_main(boot_params: *const boot::BootParameters) -> ! {
+pub unsafe extern "C" fn rust_main(boot_params: *const boot::BootParameters) -> ! {
     rust_main_with_boot_info(boot_params)
 }
 
 /// Kernel main entry point with boot parameters
 /// Called from bootloader with boot information
 #[unsafe(no_mangle)]
-pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParameters) -> ! {
+pub unsafe extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParameters) -> ! {
     // Initialize boot information if provided
     let boot_params_ref = if !boot_params.is_null() {
         unsafe {
@@ -120,7 +121,7 @@ pub extern "C" fn rust_main_with_boot_info(boot_params: *const boot::BootParamet
 #[cfg(feature = "lazy_init")]
 pub fn lazy_init_services() {
     monitoring::timeline::record("lazy_init_start");
-    #[cfg(feature = "net_stack")]
+    #[cfg(feature = "networking")]
     {
         net::init();
         crate::println!("[lazy] network stack initialized");
@@ -144,7 +145,7 @@ pub fn lazy_init_services() {
 /// Entry point for Application Processors (APs)
 /// Called from architecture-specific AP startup code
 #[unsafe(no_mangle)]
-pub extern "C" fn rust_main_ap() -> ! {
+pub unsafe extern "C" fn rust_main_ap() -> ! {
     // Initialize this CPU
     cpu::init_ap();
 

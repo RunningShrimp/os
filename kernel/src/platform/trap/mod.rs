@@ -310,7 +310,7 @@ kernelvec:
 
 #[cfg(all(feature = "baremetal", target_arch = "riscv64"))]
 #[unsafe(no_mangle)]
-pub extern "C" fn kerneltrap_rust() {
+pub unsafe extern "C" fn kerneltrap_rust() {
     riscv64::kerneltrap();
 }
 
@@ -405,6 +405,32 @@ pub fn init() {
     #[cfg(target_arch = "x86_64")]
     {
         // IDT setup would go here
+    }
+}
+
+/// Initialize trap handling (alias for init)
+pub fn initialize() {
+    init();
+}
+
+/// Shutdown trap handling
+pub fn shutdown() {
+    // Disable trap handling
+    #[cfg(target_arch = "riscv64")]
+    unsafe {
+        // Disable interrupts
+        core::arch::asm!("csrci sstatus, 2"); // Clear SIE bit
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        // Disable interrupts
+        core::arch::asm!("msr daifset, #2"); // Set IRQ mask
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    {
+        // Disable interrupts would go here
     }
 }
 

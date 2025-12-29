@@ -3,9 +3,14 @@
 //! This module defines unified error types for the kernel.
 //! It provides a consistent error handling mechanism across all modules.
 
+use alloc::{boxed::Box, string::String, vec::Vec};
 use crate::error::{
     unified::UnifiedError,
     unified_framework::{FrameworkError, FrameworkResult, IntoFrameworkError},
+    MemoryError,
+    FileSystemError,
+    NetworkError,
+    ProcessError,
 };
 
 /// Kernel error type - migrated to unified framework
@@ -16,6 +21,9 @@ pub type KernelError = FrameworkError;
 
 /// Kernel result type - migrated to unified framework
 pub type KernelResult<T> = FrameworkResult<T>;
+
+/// Generic Result type using KernelError
+pub type Result<T> = core::result::Result<T, KernelError>;
 
 /// Convert UnifiedError to KernelError (FrameworkError)
 impl IntoFrameworkError for UnifiedError {

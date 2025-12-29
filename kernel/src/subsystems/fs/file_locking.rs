@@ -8,7 +8,7 @@
 extern crate alloc;
 use alloc::{collections::BTreeMap, vec::Vec};
 // use alloc::string::String;
-// use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 // use crate::subsystems::process::{Process, ProcessId};
 // use crate::subsystems::fs::file_permissions::FilePermissions;

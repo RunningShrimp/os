@@ -1180,3 +1180,9 @@ pub fn run_forensic_analysis(time_range: (u64, u64)) -> Result<ForensicReport, &
         Err("Security audit subsystem not initialized")
     }
 }
+
+// Re-export security audit types from security::audit
+pub use crate::security::audit::{
+    AuditEvent, AuditSeverity, AuditCategory, AuditResult, AuditLogger,
+    AuditStats, SecurityMetrics, AlertHandler,
+};

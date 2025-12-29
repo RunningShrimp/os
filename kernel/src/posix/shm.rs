@@ -11,6 +11,9 @@ use crate::{
     subsystems::sync::Mutex,
 };
 
+// Re-export vm module functions from microkernel memory
+use crate::subsystems::microkernel::memory as vm;
+
 /// Shared memory segment
 #[derive(Debug)]
 struct SharedMemorySegment {

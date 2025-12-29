@@ -1,9 +1,12 @@
 // SMP (Symmetric Multi-Processing) Support
 // Per-CPU data structures and multi-core management
 
-use core::cell::UnsafeCell;
+use core::{cell::UnsafeCell, sync::atomic::{AtomicBool, AtomicUsize}};
 
 use crate::process::{Context, Pid};
+
+// AP startup synchronization
+pub mod ap_sync;
 /// Maximum number of CPUs supported
 pub const NCPU: usize = 8;
 

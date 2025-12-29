@@ -3,10 +3,10 @@
 //! This module provides configurable, dynamic error recovery strategies
 //! that integrate with error statistics and monitoring.
 
-use alloc::{collections::BTreeMap, string::String, vec::Vec};
-use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use alloc::{collections::BTreeMap, string::String};
+use core::sync::atomic::{AtomicBool, Ordering};
 
-use super::{ErrorAction, ErrorContext, ErrorSeverity, ErrorStats, UnifiedError};
+use super::{ErrorContext, ErrorSeverity, ErrorStats, UnifiedError};
 use crate::subsystems::sync::Mutex;
 
 /// Recovery strategy configuration

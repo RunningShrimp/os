@@ -8,7 +8,6 @@ use core::{
 };
 
 use crate::{
-    arch::cpuid,
     subsystems::{mm::allocator::HybridAllocator, sync::Once},
 };
 
@@ -298,7 +297,7 @@ pub fn current_cpu_allocator() -> &'static PerCpuLocalAllocator {
     if !PER_CPU_ALLOCATORS_INIT.is_completed() {
         init_percpu_allocators();
     }
-    let cpu_id = cpu_id() as usize;
+    let cpu_id = crate::cpu::cpuid() as usize;
     unsafe {
         PER_CPU_ALLOCATORS
             .as_ref()

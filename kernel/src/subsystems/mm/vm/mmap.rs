@@ -232,7 +232,7 @@ pub fn sys_msync(addr: usize, length: usize, flags: MsyncFlags) -> SyscallResult
 #[derive(Debug, Clone, Copy)]
 pub struct MsyncFlags {
     /// 异步同步
-    pub async: bool,
+    pub r#async: bool,
     /// 使同步无效
     pub invalidate: bool,
     /// 同步元数据
@@ -270,7 +270,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_mmap anonymous() {
+    fn test_mmap_anonymous() {
         let result = sys_mmap(None, 4096, MapFlags::PROT_READ, -1, 0);
         assert!(result.is_ok());
     }

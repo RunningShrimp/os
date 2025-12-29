@@ -14,7 +14,7 @@
 
 extern crate alloc;
 
-use core::ffi::{c_char, c_int, c_uint, c_void};
+use core::ffi::{c_char, c_double, c_int, c_uint, c_void};
 // 核心接口和 errors handling
 pub mod config;
 pub mod error;
@@ -47,6 +47,8 @@ pub mod io_tests;
 #[cfg(test)]
 pub mod standard_tests; // 重新导出核心组件
 pub use interface::*;
+
+// Re-export core FFI types (already imported above)
 // 错误处理函数 - 直接使用 error 模块中的函数，不需要重新导出
 
 // 重导出实现

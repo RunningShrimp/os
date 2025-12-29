@@ -3,6 +3,7 @@
 //! 本模块提供内核核心功能，合并自nos-kernel-core。
 
 use nos_api::Result;
+use alloc::vec::Vec;
 
 /// Kernel initialization module
 pub mod init;
@@ -72,14 +73,14 @@ fn get_enabled_features() -> Vec<String> {
     #[cfg(feature = "log")]
     features.push("log".to_string());
 
-    #[cfg(feature = "debug_subsystems")]
-    features.push("debug_subsystems".to_string());
+    #[cfg(feature = "debug")]
+    features.push("debug".to_string());
 
     #[cfg(feature = "formal_verification")]
     features.push("formal_verification".to_string());
 
-    #[cfg(feature = "security_audit")]
-    features.push("security_audit".to_string());
+    #[cfg(feature = "security")]
+    features.push("security".to_string());
 
     features
 }

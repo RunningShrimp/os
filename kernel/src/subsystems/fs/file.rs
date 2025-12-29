@@ -6,12 +6,9 @@ use alloc::{sync::Arc, vec::Vec};
 
 use crate::{
     ipc::pipe::Pipe,
-    perf::{
-        core::{SyscallStatsSnapshot, UnifiedSyscallStats},
-        monitoring::get_perf_stats,
-    },
     posix, process,
     subsystems::sync::{Mutex, Sleeplock},
+    vfs::FileMode,
 };
 
 /// Maximum open files per process

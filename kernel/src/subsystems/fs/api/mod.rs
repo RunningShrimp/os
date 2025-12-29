@@ -4,6 +4,8 @@
 //! module. Internal implementation details are hidden.
 
 extern crate alloc;
+use alloc::vec::Vec;
+use crate::vfs::FileMode;
 
 pub mod error;
 pub mod traits;
@@ -502,7 +504,7 @@ pub mod attr_ops {
         }
 
         // Update file permissions (preserve file type bits)
-        let file_mode = vfs::FileMode::new((attr.mode.0 & 0o170000) | (mode & 0o7777));
+        let file_mode = crate::vfs::FileMode::new((attr.mode.0 & 0o170000) | (mode & 0o7777));
         let mut new_attr = attr;
         new_attr.mode = file_mode;
 

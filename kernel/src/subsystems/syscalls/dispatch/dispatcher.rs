@@ -8,10 +8,11 @@
 //! 
 //! 分发器是系统调用处理的核心组件，负责将系统调用请求路由到相应的服务。
 
-use crate::error::UnifiedError;
+use crate::error::{UnifiedError, KernelError};
 use crate::subsystems::syscalls::services::traits::*;
 use crate::subsystems::syscalls::services::registry::{ServiceRegistry, Version};
-use crate::subsystems::syscalls::security::{SyscallSecurityValidator, SecurityContext, SecurityLevel, SecurityValidationResult, ResourceAccess, AccessControlManager, Permission, ResourceType};
+use crate::subsystems::syscalls::security::{SyscallSecurityValidator, SecurityContext, SecurityLevel, SecurityValidationResult, ResourceAccess, AccessControlManager, Permission};
+use crate::subsystems::syscalls::security::access_control::ResourceType;
 use crate::reliability::{FaultManager, FaultType, FaultSeverity, CheckpointManager, CheckpointType, ErrorLogManager, LogLevel};
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};

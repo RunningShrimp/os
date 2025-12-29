@@ -5,7 +5,7 @@
 
 extern crate alloc;
 
-use alloc::{collections::VecDeque, vec::Vec};
+use alloc::{boxed::Box, collections::VecDeque, vec::Vec};
 use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use spin::Mutex;

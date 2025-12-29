@@ -1,7 +1,18 @@
 pub mod arch;
 pub mod boot;
+pub mod device;
 pub mod drivers;
 pub mod trap;
+pub mod mmio;
+
+// Re-export device types for convenience
+pub use device::{DeviceResources, DeviceStatus, DeviceType, IoPortRange, MemoryRegion};
+
+// Re-export MMIO functions
+pub use mmio::{
+    mmio_read8, mmio_read16, mmio_read32, mmio_read64,
+    mmio_write8, mmio_write16, mmio_write32, mmio_write64,
+};
 
 use nos_api::Result;
 

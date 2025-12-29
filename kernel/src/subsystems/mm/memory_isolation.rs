@@ -19,7 +19,8 @@ use spin::mutex::Mutex;
 use crate::subsystems::{
     mm::{
         PAGE_SIZE,
-        vm::{PageTable, VmArea, VmPerm, VmSpace},
+        vm::{VmArea, VmPerm, VmSpace},
+        page_table_isolation::PageTable,
     },
     sync::Mutex as NosMutex,
 };

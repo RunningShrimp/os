@@ -4,3 +4,6 @@ pub mod bios_calls;
 pub mod bios_int_executor;
 pub mod bios_realmode;
 pub mod e820_detection;
+
+// Re-export E820 functionality
+pub use e820_detection::*;

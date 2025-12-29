@@ -10,7 +10,7 @@ extern crate alloc;
 use alloc::collections::VecDeque;
 use core::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
-use crate::{arch::cpuid, subsystems::sync::SpinLock};
+use crate::{subsystems::sync::SpinLock};
 
 /// 默认时间片（单位：ticks）
 pub const DEFAULT_TIMESLICE: u32 = 4;
@@ -115,7 +115,7 @@ pub mod syscall {
 
     use super::O1Scheduler;
     use crate::{
-        arch::cpuid, error::SyscallError, process::thread::Tid, subsystems::time::get_time_ns,
+        error::SyscallError, process::thread::Tid, subsystems::time::get_time_ns,
     };
 
     /// 用户态 hint 调度：tid, prio, cpu_hint
@@ -498,6 +498,15 @@ impl O1Scheduler {
     }
 }
 pub mod unified;
+
+// Concurrent performance optimizations
+pub mod sharded_table;
+pub mod rcu_table;
+
+// Re-export optimized tables
+pub use sharded_table::{ShardedProcTable, get_sharded_table, Pid as ProcPid, ProcEntry as ShardedProcEntry};
+pub use rcu_table::{RcuProcTable, get_rcu_table, rcu_read_lock, RcuReadGuard};
+
 /// Run function with global scheduler
 pub fn with_global<F, R>(f: F) -> R
 where

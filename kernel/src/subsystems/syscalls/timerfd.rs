@@ -9,12 +9,18 @@
 
 use alloc::{collections::VecDeque, sync::Arc, vec::Vec};
 
-use nos_api::{SyscallHandler, syscall::SyscallResult};
+use crate::subsystems::syscalls::interface::{SyscallHandler};
+use crate::subsystems::syscalls::interface::{SyscallNumber};
+use crate::subsystems::syscalls::common::SyscallArgs;
+use crate::error::Result;
 
 use crate::{
     error::SyscallError,
     subsystems::{sync::Mutex, time},
 };
+
+// Import extract_args from common module
+use crate::subsystems::syscalls::common::extract_args;
 
 /// TimerFd flags (Linux compatible)
 pub mod flags {
@@ -158,13 +164,16 @@ impl TimerFdHandler {
 }
 
 impl SyscallHandler for TimerFdHandler {
-    fn handle(&self, args: &[u64]) -> Result<u64, SyscallError> {
-        // This is a placeholder - actual dispatch is done via syscall numbers
-        Err(SyscallError::InvalidSyscall(0))
+    fn handle(&self, args: &[u64]) -> SyscallResult<i64> {
+        // For now, we don't have specific handler logic here
+        // Individual syscall functions like sys_timerfd_create are called directly
+        Err(SyscallError::InvalidSyscall(self.get_syscall_number()))
     }
 
-    fn get_syscall_number(&self) -> u32 {
-        0 // Will be set during registration
+    fn get_syscall_number(&self) -> SyscallNumber {
+        // This should be the specific syscall number this handler handles
+        // For now, return a placeholder that should be overridden by specific handlers
+        0x9000 // Default timerfd syscall number
     }
 
     fn get_name(&self) -> &'static str {
@@ -175,7 +184,7 @@ impl SyscallHandler for TimerFdHandler {
 /// timerfd_create system call
 /// Arguments: [clockid, flags]
 /// Returns: file descriptor on success, error on failure
-pub fn sys_timerfd_create(args: &[u64]) -> SyscallResult {
+pub fn sys_timerfd_create(args: &[u64]) -> SyscallResult<i64> {
     let args = extract_args(args, 2)?;
 
     let clockid = args[0] as i32;
@@ -232,7 +241,7 @@ pub fn sys_timerfd_create(args: &[u64]) -> SyscallResult {
 /// timerfd_settime system call
 /// Arguments: [fd, flags, new_value_ptr, old_value_ptr]
 /// Returns: 0 on success, error on failure
-pub fn sys_timerfd_settime(args: &[u64]) -> SyscallResult {
+pub fn sys_timerfd_settime(args: &[u64]) -> SyscallResult<i64> {
     let args = extract_args(args, 4)?;
 
     let fd = args[0] as i32;
@@ -327,7 +336,7 @@ pub fn sys_timerfd_settime(args: &[u64]) -> SyscallResult {
 /// timerfd_gettime system call
 /// Arguments: [fd, curr_value_ptr]
 /// Returns: 0 on success, error on failure
-pub fn sys_timerfd_gettime(args: &[u64]) -> SyscallResult {
+pub fn sys_timerfd_gettime(args: &[u64]) -> SyscallResult<i64> {
     let args = extract_args(args, 2)?;
 
     let fd = args[0] as i32;

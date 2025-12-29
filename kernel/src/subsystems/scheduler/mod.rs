@@ -1,5 +1,5 @@
 //! Scheduler Subsystem
-//! 
+//!
 //! This module provides comprehensive scheduling capabilities for the NOS kernel,
 //! including real-time scheduling, priority-based scheduling, and CPU affinity.
 
@@ -17,3 +17,14 @@ pub use realtime::{
 pub use unified::{
     UnifiedScheduler, init_unified_scheduler, get_unified_scheduler, unified_schedule,
 };
+
+// Export required types for external visibility
+pub struct CpuScheduler;
+
+pub fn schedule_next() -> Option<Task> {
+    // For now, return None as a placeholder
+    // In a real implementation, this would schedule the next task
+    None
+}
+
+pub struct Task;

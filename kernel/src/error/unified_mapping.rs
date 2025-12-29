@@ -8,14 +8,19 @@
 //!
 //! This ensures consistent error reporting across all layers of the kernel.
 
+use crate::error::ErrorType;
+use crate::error::error_types::from_nos_error_type;
+
+#[allow(deprecated)]
 use nos_error_handling::kernel_integration::ErrorType as NosErrorType;
 
 use crate::{
-    error::unified::UnifiedError,
+    error::unified::{UnifiedError, MemoryError, FileSystemError, NetworkError},
     subsystems::syscalls::{
         api::syscall_result::SyscallError as ApiSyscallError,
-        interface::SyscallError as InterfaceSyscallError,
+        interface::InterfaceSyscallError,
     },
+    error::unified::SyscallError as UnifiedSyscallError,
 };
 
 /// POSIX errno values
@@ -208,8 +213,10 @@ pub struct UnifiedErrorMapper {
     unified_to_errno: alloc::collections::BTreeMap<UnifiedError, Errno>,
     /// Mapping from ApiSyscallError to Errno
     api_syscall_to_errno: alloc::collections::BTreeMap<ApiSyscallError, Errno>,
-    /// Mapping from NosErrorType to Errno
+    /// Mapping from external NosErrorType to Errno (deprecated - should use local ErrorType)
     nos_error_to_errno: alloc::collections::BTreeMap<NosErrorType, Errno>,
+    /// Mapping from local ErrorType to Errno
+    local_error_to_errno: alloc::collections::BTreeMap<ErrorType, Errno>,
     // Note: InterfaceSyscallError mapping is handled directly in map_interface_syscall_error
     // because some variants have data and can't be used as BTreeMap keys
 }
@@ -221,6 +228,7 @@ impl UnifiedErrorMapper {
             unified_to_errno: alloc::collections::BTreeMap::new(),
             api_syscall_to_errno: alloc::collections::BTreeMap::new(),
             nos_error_to_errno: alloc::collections::BTreeMap::new(),
+            local_error_to_errno: alloc::collections::BTreeMap::new(),
         };
 
         mapper.init_default_mappings();
@@ -316,7 +324,7 @@ impl UnifiedErrorMapper {
         // Note: InterfaceSyscallError::InvalidSyscall has data, so we handle it specially in
         // map_interface_syscall_error
 
-        // Map NosErrorType to Errno
+        // Map NosErrorType to Errno (deprecated - kept for backward compatibility)
         self.nos_error_to_errno
             .insert(NosErrorType::RuntimeError, Errno::EIO);
         self.nos_error_to_errno
@@ -341,6 +349,32 @@ impl UnifiedErrorMapper {
             .insert(NosErrorType::CancellationError, Errno::ECANCELED);
         self.nos_error_to_errno
             .insert(NosErrorType::SystemError, Errno::EIO);
+
+        // Map local ErrorType to Errno (recommended)
+        self.local_error_to_errno
+            .insert(ErrorType::RuntimeError, Errno::EIO);
+        self.local_error_to_errno
+            .insert(ErrorType::LogicError, Errno::EINVAL);
+        self.local_error_to_errno
+            .insert(ErrorType::ResourceError, Errno::ENOMEM);
+        self.local_error_to_errno
+            .insert(ErrorType::PermissionError, Errno::EACCES);
+        self.local_error_to_errno
+            .insert(ErrorType::NetworkError, Errno::ECONNREFUSED);
+        self.local_error_to_errno
+            .insert(ErrorType::IOError, Errno::EIO);
+        self.local_error_to_errno
+            .insert(ErrorType::MemoryError, Errno::ENOMEM);
+        self.local_error_to_errno
+            .insert(ErrorType::SystemCallError, Errno::ENOSYS);
+        self.local_error_to_errno
+            .insert(ErrorType::ValidationError, Errno::EINVAL);
+        self.local_error_to_errno
+            .insert(ErrorType::TimeoutError, Errno::ETIMEDOUT);
+        self.local_error_to_errno
+            .insert(ErrorType::CancellationError, Errno::ECANCELED);
+        self.local_error_to_errno
+            .insert(ErrorType::SystemError, Errno::EIO);
     }
 
     /// Map UnifiedError to Errno
@@ -430,12 +464,28 @@ impl UnifiedErrorMapper {
         }
     }
 
-    /// Map NosErrorType to Errno
+    /// Map NosErrorType to Errno (deprecated - kept for backward compatibility)
+    #[allow(deprecated)]
     pub fn map_nos_error_type(&self, error: &NosErrorType) -> Errno {
         self.nos_error_to_errno
             .get(error)
             .copied()
             .unwrap_or(Errno::EIO)
+    }
+
+    /// Map local ErrorType to Errno (recommended)
+    pub fn map_error_type(&self, error: &ErrorType) -> Errno {
+        self.local_error_to_errno
+            .get(error)
+            .copied()
+            .unwrap_or(Errno::EIO)
+    }
+
+    /// Convert external nos-error-handling ErrorType to local ErrorType and map to Errno
+    #[allow(deprecated)]
+    pub fn map_converted_nos_error(&self, nos_error: &NosErrorType) -> Errno {
+        let local_error = from_nos_error_type(nos_error);
+        self.map_error_type(&local_error)
     }
 
     /// Convert any error to Errno (generic mapping)

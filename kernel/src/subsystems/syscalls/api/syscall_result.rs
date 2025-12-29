@@ -1,11 +1,11 @@
 //! System call result type definitions.
 //!
 //! This module defines the standard result type used by all system calls.
+//! Note: SyscallResult is now re-exported from nos_api to avoid ambiguity
 
-/// System call result type.
-///
-/// Returns either a successful value (u64) or an error code (SyscallError).
-pub type SyscallResult<T = u64> = core::result::Result<T, SyscallError>;
+/// System call result type - re-exported from nos_api
+/// This is an enum with Success/Error variants, not a Result type
+pub use nos_api::syscall::types::SyscallResult;
 
 /// System call error codes.
 ///

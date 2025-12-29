@@ -8,10 +8,10 @@ extern crate alloc;
 use alloc::{collections::BTreeMap, vec::Vec};
 
 // use alloc::string::String;
-// use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 // use crate::drivers::BlockDevice;
-// use crate::subsystems::sync::{Mutex, Sleeplock};
+use crate::sync::Mutex;
 use crate::subsystems::fs::{BSIZE, BufFlags, Dirent, DiskInode, InodeType, SuperBlock};
 
 /// Journaling file system constants

@@ -5,9 +5,7 @@
 use alloc::collections::BTreeMap;
 use core::sync::atomic;
 use spin::Mutex;
-use core::sync::atomic;
 use alloc::vec::Vec;
-use core::sync::atomic;
 /// Futex wait queue
 pub static FUTEX_WAIT_QUEUE: Mutex<FutexWaitQueue> = Mutex::new(FutexWaitQueue::new());
 

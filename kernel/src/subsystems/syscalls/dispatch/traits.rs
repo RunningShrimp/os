@@ -7,14 +7,11 @@
 //! 
 //! 这些特征为依赖注入和服务发现机制提供了统一的接口规范。
 
-use crate::error::UnifiedError;
+use crate::error::{UnifiedError, KernelError, Result};
 use alloc::sync::Arc;
 use alloc::string::String;
 use alloc::vec::Vec;
-use crate::subsystems::syscalls::mm::service::MemoryService;
-
-// 定义Result类型别名，使用KernelError作为错误类型
-pub type Result<T> = core::result::Result<T, KernelError>;
+use crate::subsystems::syscalls::memory::service::MemoryService;
 
 /// 基础服务特征
 /// 

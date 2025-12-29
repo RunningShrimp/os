@@ -10,4 +10,5 @@ pub mod performance_profiling;
 pub mod post;
 
 // Re-export key diagnostics components
+pub use boot_failure_logger::*;
 pub use collector::{BootDiagnostics, GraphicsStatus, HardwareInfo};

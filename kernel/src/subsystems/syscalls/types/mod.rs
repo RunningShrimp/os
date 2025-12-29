@@ -86,9 +86,9 @@ pub struct SyscallContext {
     pub flags: usize,
 }
 
-/// 系统调用结果
+/// 系统调用执行结果（包含详细元数据）
 #[derive(Debug, Clone)]
-pub struct SyscallResult {
+pub struct SyscallExecutionResult {
     /// 返回值
     pub return_value: isize,
     /// 错误码

@@ -2,9 +2,15 @@
 //!
 //! 本模块提供网络相关的系统调用处理。
 
+pub mod interface;
+pub mod socket;
+
 use alloc::sync::Arc;
 
-use nos_api::{Result, interfaces::SyscallHandler};
+use crate::subsystems::syscalls::interface::{SyscallHandler};
+use crate::subsystems::syscalls::interface::{SyscallNumber};
+use crate::subsystems::syscalls::common::SyscallArgs;
+use crate::error::Result;
 
 use crate::subsystems::net::enhanced_network_manager;
 
@@ -22,26 +28,22 @@ impl NetworkSyscallHandler {
 }
 
 impl SyscallHandler for NetworkSyscallHandler {
-    fn handle(&self, args: &[usize]) -> isize {
-        // 占位符实现
-        match args.get(0) {
-            Some(&0) => self.sys_socket(args),
-            Some(&1) => self.sys_bind(args),
-            Some(&2) => self.sys_connect(args),
-            Some(&3) => self.sys_listen(args),
-            Some(&4) => self.sys_accept(args),
-            Some(&5) => self.sys_send(args),
-            Some(&6) => self.sys_recv(args),
-            _ => -1,
-        }
+    fn handle(&self, args: &[u64]) -> SyscallResult<i64> {
+        // For network syscalls, we need to dispatch based on syscall number
+        // But the trait interface doesn't provide the syscall number
+        // This suggests we need a different approach - possibly multiple handlers
+        // For now, return invalid syscall since we can't determine which one was called
+        Err(SyscallError::InvalidSyscall(self.get_syscall_number()))
     }
 
-    fn name(&self) -> &str {
+    fn get_syscall_number(&self) -> SyscallNumber {
+        // This handler shouldn't be called directly for specific syscalls
+        // Each network syscall should have its own handler
+        0x4000 // Default network syscall number
+    }
+
+    fn get_name(&self) -> &'static str {
         "network_syscall_handler"
-    }
-
-    fn syscall_number(&self) -> usize {
-        300 // 网络系统调用范围
     }
 }
 

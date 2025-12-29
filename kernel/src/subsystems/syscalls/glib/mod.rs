@@ -1,10 +1,12 @@
 //! GLib file descriptor API
 
 pub mod inotify;
-pub mod eventfd;
-pub mod signalfd;
-pub mod timerfd;
 pub mod memfd;
+
+// Simple re-exports for GLib modules
+pub use crate::subsystems::syscalls::eventfd::*;
+pub use crate::subsystems::syscalls::signalfd::*;
+pub use crate::subsystems::syscalls::timerfd::*;
 
 // Inotify flags module
 pub mod inotify_flags {

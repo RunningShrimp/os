@@ -36,7 +36,7 @@ fn main() {
 /// UEFI entry point
 #[cfg(feature = "uefi_support")]
 #[unsafe(no_mangle)]
-pub extern "efiapi" fn efi_main(
+pub unsafe extern "efiapi" fn efi_main(
     image_handle: uefi::Handle,
     system_table: *const uefi_raw::table::system::SystemTable,
 ) -> uefi_raw::Status {

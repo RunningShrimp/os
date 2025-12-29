@@ -115,6 +115,7 @@
 //! - [`crate::subsystems::syscalls::process`]: 进程相关系统调用
 
 pub mod context_switch;
+pub mod credentials;
 pub mod dynamic_linker;
 pub mod elf;
 pub mod exec;
@@ -122,8 +123,10 @@ pub mod fd_cache;
 pub mod lock_optimized; // Optional: Optimized locking with RW locks and fine-grained locks
 pub mod manager;
 pub mod rcu_table;
+pub mod rlimit;
 pub mod thread;
 pub mod thread_cancellation;
+pub mod vfork;
 
 #[cfg(feature = "kernel_tests")]
 pub mod tests;

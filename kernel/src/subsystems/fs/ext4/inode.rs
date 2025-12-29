@@ -3,10 +3,7 @@
 //! 提供Ext4 inode的读取、写入和管理功能
 
 extern crate alloc;
-use alloc::vec::Vec;
-use alloc::collections::BTreeMap;
-use crate::subsystems::sync::Mutex;
-use crate::subsystems::fs::ext4::{Ext4FileSystem, Ext4SuperBlock};
+use crate::subsystems::fs::ext4::Ext4FileSystem;
 
 /// Ext4 inode structure
 #[derive(Debug, Clone, Copy)]

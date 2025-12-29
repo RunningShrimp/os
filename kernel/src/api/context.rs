@@ -10,8 +10,8 @@ use crate::{
         error::KernelError,
         memory::{MemoryManager, ProcessMemoryManager},
         process::{ProcessManager, ThreadManager},
-        syscall::{SyscallContext, SyscallDispatcher},
     },
+    subsystems::syscalls::interface::{SyscallDispatcher, SyscallContext},
     subsystems::sync::Mutex,
 };
 

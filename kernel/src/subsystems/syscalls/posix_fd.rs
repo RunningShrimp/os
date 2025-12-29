@@ -4,7 +4,7 @@
 //! with the unified dispatcher.
 
 use super::{
-    dispatch::unified::{FastPathHandler, get_unified_dispatcher},
+    dispatch::unified::get_unified_dispatcher,
     eventfd::{sys_eventfd, sys_eventfd2},
     signalfd::{sys_signalfd, sys_signalfd4},
     timerfd::{sys_timerfd_create, sys_timerfd_gettime, sys_timerfd_settime},

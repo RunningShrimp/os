@@ -2,7 +2,7 @@
 
 use core::fmt;
 extern crate alloc;
-use alloc::{format, string::String};
+use alloc::{format, string::{String, ToString}};
 
 /// Common error type used throughout NOS operating system
 #[derive(Debug, Clone)]

@@ -4,7 +4,7 @@
 //! that adds journaling capabilities for transactional operations and crash recovery.
 
 extern crate alloc;
-use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use alloc::{boxed::Box, collections::BTreeMap, string::String, vec::Vec};
 
 use super::journaling_fs::{JfsError, JournalTransaction, JournalingFileSystem};
 // Sleeplock在当前文件中未使用，暂时注释掉

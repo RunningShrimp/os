@@ -4,7 +4,10 @@
 
 use alloc::sync::Arc;
 
-use nos_api::{Result, interfaces::SyscallHandler};
+use crate::subsystems::syscalls::interface::{SyscallHandler};
+use crate::subsystems::syscalls::interface::{SyscallNumber};
+use crate::subsystems::syscalls::common::SyscallArgs;
+use crate::error::Result;
 
 pub mod enhanced_handlers;
 
@@ -21,52 +24,22 @@ impl IpcSyscallHandler {
 }
 
 impl SyscallHandler for IpcSyscallHandler {
-    fn handle(&self, args: &[usize]) -> isize {
-        // 占位符实现
-        match args.get(0) {
-            Some(&0) => self.sys_pipe(args),
-            Some(&1) => self.sys_msgget(args),
-            Some(&2) => self.sys_msgsnd(args),
-            Some(&3) => self.sys_msgrcv(args),
-            Some(&4) => self.sys_semget(args),
-            Some(&5) => self.sys_semop(args),
-            Some(&6) => self.sys_shmget(args),
-            Some(&7) => self.sys_shmat(args),
-            // Enhanced IPC system calls
-            Some(&10) => self.sys_enhanced_msgq_create(args),
-            Some(&11) => self.sys_enhanced_msgq_send(args),
-            Some(&12) => self.sys_enhanced_msgq_recv(args),
-            Some(&13) => self.sys_enhanced_shm_create(args),
-            Some(&14) => self.sys_enhanced_shm_attach(args),
-            Some(&15) => self.sys_enhanced_shm_detach(args),
-            Some(&16) => self.sys_enhanced_shm_delete(args),
-            Some(&17) => self.sys_enhanced_sem_create(args),
-            Some(&18) => self.sys_enhanced_sem_wait(args),
-            Some(&19) => self.sys_enhanced_sem_signal(args),
-            Some(&20) => self.sys_enhanced_mutex_create(args),
-            Some(&21) => self.sys_enhanced_mutex_lock(args),
-            Some(&22) => self.sys_enhanced_mutex_unlock(args),
-            Some(&23) => self.sys_enhanced_cond_create(args),
-            Some(&24) => self.sys_enhanced_cond_wait(args),
-            Some(&25) => self.sys_enhanced_cond_signal(args),
-            Some(&26) => self.sys_enhanced_cond_broadcast(args),
-            Some(&27) => self.sys_enhanced_event_create(args),
-            Some(&28) => self.sys_enhanced_event_wait(args),
-            Some(&29) => self.sys_enhanced_event_trigger(args),
-            Some(&30) => self.sys_enhanced_rpc_create_endpoint(args),
-            Some(&31) => self.sys_enhanced_rpc_call(args),
-            Some(&32) => self.sys_enhanced_rpc_complete(args),
-            Some(&33) => self.sys_enhanced_rpc_get_result(args),
-            _ => -1,
-        }
+    fn handle(&self, args: &[u64]) -> SyscallResult<i64> {
+        // For IPC syscalls, we need to dispatch based on syscall number
+        // But the trait interface doesn't provide the syscall number
+        // This suggests we need a different approach - possibly multiple handlers
+        // For now, return invalid syscall since we can't determine which one was called
+        Err(SyscallError::InvalidSyscall(self.get_syscall_number()))
     }
 
-    fn name(&self) -> &str {
+    fn get_syscall_number(&self) -> SyscallNumber {
+        // This handler shouldn't be called directly for specific syscalls
+        // Each IPC syscall should have its own handler
+        0x5000 // Default IPC syscall number
+    }
+
+    fn get_name(&self) -> &'static str {
         "ipc_syscall_handler"
-    }
-
-    fn syscall_number(&self) -> usize {
-        400 // IPC系统调用范围
     }
 }
 

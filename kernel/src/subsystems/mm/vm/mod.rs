@@ -22,12 +22,13 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::subsystems::sync::Mutex;
 use crate::subsystems::mm::types::*;
-use crate::subsystems::mm::PageTable;
+use crate::subsystems::mm::page_table_isolation::PageTable;
 
 // 导出子模块
 pub mod mmap;
 pub mod protection;
 pub mod lock;
+pub mod arch;
 
 // 重新导出常用类型和函数
 pub use mmap::*;
@@ -280,3 +281,85 @@ impl core::fmt::Display for VmError {
 }
 
 impl core::error::Error for VmError {}
+
+// ============================================================================
+// Missing constants and functions for compatibility
+// ============================================================================
+
+/// Page size
+pub const PAGE_SIZE: usize = 4096;
+
+/// Page table entry count (stub)
+pub const PTE_COUNT: usize = 512;
+
+/// Virtual memory area (stub)
+#[derive(Debug, Clone)]
+pub struct VmArea {
+    pub start: usize,
+    pub end: usize,
+    pub flags: usize,
+}
+
+/// Virtual memory permissions (stub)
+#[derive(Debug, Clone, Copy)]
+pub struct VmPerm {
+    pub read: bool,
+    pub write: bool,
+    pub execute: bool,
+}
+
+/// Memory flags (stub)
+pub mod flags {
+    /// Read permission
+    pub const READ: usize = 1;
+    /// Write permission
+    pub const WRITE: usize = 2;
+    /// Execute permission
+    pub const EXEC: usize = 4;
+    /// User accessible
+    pub const USER: usize = 8;
+}
+
+/// Copy page table (stub)
+pub fn copy_pagetable() -> Result<(), crate::subsystems::mm::MemoryError> {
+    Ok(())
+}
+
+/// Copy from kernel to user (stub)
+pub fn copyin(dst: *mut u8, src: &[u8], len: usize) -> Result<(), crate::subsystems::mm::MemoryError> {
+    // Stub implementation
+    Ok(())
+}
+
+/// Copy string from kernel to user (stub)
+pub fn copyinstr(dst: *mut u8, src: &[u8], maxlen: usize) -> Result<(usize, bool), crate::subsystems::mm::MemoryError> {
+    // Stub implementation
+    Ok((0, false))
+}
+
+/// Copy from user to kernel (stub)
+pub fn copyout(dst: &mut [u8], src: *const u8, len: usize) -> Result<(), crate::subsystems::mm::MemoryError> {
+    // Stub implementation
+    Ok(())
+}
+
+/// Activate virtual memory (stub)
+pub fn activate() {
+    // Stub implementation
+}
+
+/// Free page table (stub)
+pub fn free_pagetable() {
+    // Stub implementation
+}
+
+/// Map pages (stub)
+pub fn map_pages(start: usize, size: usize, flags: usize) -> Result<(), crate::subsystems::mm::MemoryError> {
+    // Stub implementation
+    Ok(())
+}
+
+/// Flush TLB page (stub)
+pub fn flush_tlb_page(addr: usize) {
+    // Stub implementation
+}

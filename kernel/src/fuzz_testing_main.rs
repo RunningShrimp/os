@@ -14,7 +14,7 @@ const FUZZ_MAX_INPUT_SIZE: usize = 1024;
 
 /// Fuzz testing entry point
 #[unsafe(no_mangle)]
-pub extern "C" fn _start() -> ! {
+pub unsafe extern "C" fn _start() -> ! {
     // Initialize the fuzz testing framework
     fuzz_framework::initialize();
 

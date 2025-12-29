@@ -20,13 +20,15 @@
 //! - **Monitoring**: Track performance and errors
 //! - **Resilience**: Graceful error handling
 
-// Unified dispatcher (recommended)
-pub mod unified;
-
 // Legacy dispatcher implementations (deprecated, will be removed)
 pub mod dispatcher;
 pub mod registry;
 pub mod traits;
+
+// Unified dispatcher (recommended)
+// Note: Included via path attribute to avoid module system conflicts
+#[path = "unified.rs"]
+pub mod unified_impl;
 
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
@@ -35,15 +37,31 @@ use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use crate::subsystems::sync::Mutex;
 
 use super::interface::{
-    SyscallDispatcher, SyscallHandler, SyscallContext, SyscallError,
+    SyscallDispatcher, SyscallHandler, SyscallContext,
     SyscallResult, SyscallCategory, get_syscall_category,
 };
+use crate::api::SyscallError as InterfaceSyscallError;
+use crate::subsystems::syscalls::api::SyscallError as ApiSyscallError;
 
 // Re-export unified dispatcher as the default
-pub use unified::{
-    UnifiedSyscallDispatcher, UnifiedDispatcherConfig, DispatchStats,
-    init_unified_dispatcher, get_unified_dispatcher, unified_batch_dispatch,
+pub use unified_impl::*;
+
+// Re-export unified dispatcher with shorter name for compatibility
+pub use unified_impl::{
+    UnifiedSyscallDispatcher as UnifiedDispatcher,
+    UnifiedDispatcherConfig,
+    init_unified_dispatcher,
+    get_unified_dispatcher,
+    unified_batch_dispatch,
 };
+
+// Public exports for backward compatibility
+pub mod unified {
+    pub use super::UnifiedSyscallDispatcher;
+    pub use super::UnifiedDispatcherConfig;
+    pub use super::get_unified_dispatcher;
+    pub use super::unified_batch_dispatch;
+}
 
 /// Dispatcher configuration
 ///
@@ -361,7 +379,7 @@ impl SyscallDispatcherImpl {
 }
 
 impl SyscallDispatcher for SyscallDispatcherImpl {
-    fn dispatch(&self, num: u32, args: &[u64]) -> SyscallResult {
+    fn dispatch(&self, num: u32, args: &[u64]) -> SyscallResult<()> {
         let start_time = if self.config.enable_monitoring {
             Some(0) // Placeholder for current time
         } else {
@@ -431,6 +449,22 @@ impl SyscallDispatcher for SyscallDispatcherImpl {
     
     fn get_context(&self) -> &dyn SyscallContext {
         self.context.as_ref()
+    }
+
+    fn get_stats(&self) -> super::interface::SyscallStats {
+        super::interface::SyscallStats {
+            total_calls: self.stats.total_calls(),
+            successful_calls: self.stats.successful_calls(),
+            failed_calls: self.stats.failed_calls(),
+            avg_execution_time_ns: self.stats.avg_execution_time_ns(),
+        }
+    }
+
+    fn list_handlers(&self) -> Vec<(usize, &str)> {
+        let cache = self.handler_cache.lock();
+        cache.iter()
+            .map(|(&num, info)| (num as usize, info.handler.get_name()))
+            .collect()
     }
 }
 

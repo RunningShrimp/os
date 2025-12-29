@@ -673,7 +673,7 @@ pub fn handle_stat(args: &[u64]) -> Result<u64, KernelError> {
     }
 
     let pathname_ptr = args[0] as usize;
-    let statbuf_ptr = args[1] as *mut crate::posix::stat;
+    let statbuf_ptr = args[1] as *mut crate::posix::Stat;
 
     if statbuf_ptr.is_null() {
         return Err(KernelError::BadAddress);
@@ -690,7 +690,7 @@ pub fn handle_stat(args: &[u64]) -> Result<u64, KernelError> {
     let stat_buf = file_attr_to_stat(&attr);
     unsafe {
         crate::subsystems::mm::vm::copyout(pagetable as *mut crate::subsystems::mm::vm::PageTable, statbuf_ptr as usize,
-            &stat_buf as *const _ as *const u8, core::mem::size_of::<crate::posix::stat>())
+            &stat_buf as *const _ as *const u8, core::mem::size_of::<crate::posix::Stat>())
             .map_err(|_| KernelError::BadAddress)?;
     }
 
@@ -704,7 +704,7 @@ pub fn handle_lstat(args: &[u64]) -> Result<u64, KernelError> {
     }
 
     let pathname_ptr = args[0] as usize;
-    let statbuf_ptr = args[1] as *mut crate::posix::stat;
+    let statbuf_ptr = args[1] as *mut crate::posix::Stat;
 
     if statbuf_ptr.is_null() {
         return Err(KernelError::BadAddress);
@@ -722,7 +722,7 @@ pub fn handle_lstat(args: &[u64]) -> Result<u64, KernelError> {
     let stat_buf = file_attr_to_stat(&attr);
     unsafe {
         crate::subsystems::mm::vm::copyout(pagetable as *mut crate::subsystems::mm::vm::PageTable, statbuf_ptr as usize,
-            &stat_buf as *const _ as *const u8, core::mem::size_of::<crate::posix::stat>())
+            &stat_buf as *const _ as *const u8, core::mem::size_of::<crate::posix::Stat>())
             .map_err(|_| KernelError::BadAddress)?;
     }
 
@@ -895,8 +895,8 @@ fn read_and_resolve_path(pagetable: usize, ptr: usize, cwd: &Option<alloc::strin
 }
 
 /// Convert VFS FileAttr to POSIX stat structure
-fn file_attr_to_stat(attr: &crate::vfs::types::FileAttr) -> crate::posix::stat {
-    crate::posix::stat {
+fn file_attr_to_stat(attr: &crate::vfs::types::FileAttr) -> crate::posix::Stat {
+    crate::posix::Stat {
         st_dev: 0,  // Device ID (not implemented)
         st_ino: attr.ino,
         st_mode: attr.mode.0,

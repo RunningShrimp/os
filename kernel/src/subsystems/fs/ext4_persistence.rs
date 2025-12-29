@@ -7,8 +7,8 @@
 
 extern crate alloc;
 use alloc::{collections::BTreeMap, string::String, vec::Vec};
-// use crate::subsystems::sync::{Sleeplock, Mutex};
-// use crate::subsystems::fs::fs_impl::{BSIZE, BufFlags, Buf, BufCache, CacheKey};
+use crate::subsystems::sync::Mutex;
+use crate::subsystems::fs::fs_impl::{BSIZE, BufFlags, Buf, BufCache, CacheKey};
 // use crate::subsystems::fs::ext4::{Ext4SuperBlock, Ext4GroupDesc, Ext4Inode, EXT4_MAGIC};
 // use crate::subsystems::fs::ext4_enhanced::*;
 // use crate::subsystems::fs::journaling_fs::{JournalingFileSystem, JournalEntry,

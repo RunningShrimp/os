@@ -19,7 +19,12 @@ use spin::Mutex;
 
 use crate::{
     reliability::{EACCES, EINVAL, EIO, ENOENT, ENOMEM, EPERM},
-    subsystems::cloud_native::oci::OciLinuxNamespaceType,
+    subsystems::{
+        cloud_native::oci::OciLinuxNamespaceType,
+        syscalls::network::interface::{
+            set_interface_mtu, create_bridge, interface_up, add_interface_address,
+        },
+    },
 };
 
 /// 命名空间类型
@@ -503,7 +508,7 @@ impl Namespace {
     /// 设置环回接口
     fn setup_loopback_interface(&self, interface: &NetworkInterface) -> Result<(), i32> {
         // 启用环回接口
-        crate::syscalls::network::interface_up(&interface.name)?;
+        interface_up(&interface.name)?;
 
         // 设置IP地址
         for ip in &interface.ip_addresses {
@@ -520,16 +525,16 @@ impl Namespace {
         crate::syscalls::network::create_veth_pair(&interface.name, &peer_name)?;
 
         // 启用接口
-        crate::syscalls::network::interface_up(&interface.name)?;
+        interface_up(&interface.name)?;
 
         // 设置IP地址
         for ip in &interface.ip_addresses {
-            crate::syscalls::network::add_interface_address(&interface.name, ip, "")?;
+            add_interface_address(&interface.name, ip, "")?;
         }
 
         // 设置MTU
         if let Some(mtu) = interface.mtu {
-            crate::syscalls::network::set_interface_mtu(&interface.name, mtu)?;
+            set_interface_mtu(&interface.name, mtu)?;
         }
 
         Ok(())
@@ -538,19 +543,19 @@ impl Namespace {
     /// 设置网桥接口
     fn setup_bridge_interface(&self, interface: &NetworkInterface) -> Result<(), i32> {
         // 创建网桥
-        crate::syscalls::network::create_bridge(&interface.name)?;
+        create_bridge(&interface.name)?;
 
         // 启用网桥
-        crate::syscalls::network::interface_up(&interface.name)?;
+        interface_up(&interface.name)?;
 
         // 设置IP地址
         for ip in &interface.ip_addresses {
-            crate::syscalls::network::add_interface_address(&interface.name, ip, "")?;
+            add_interface_address(&interface.name, ip, "")?;
         }
 
         // 设置MTU
         if let Some(mtu) = interface.mtu {
-            crate::syscalls::network::set_interface_mtu(&interface.name, mtu)?;
+            set_interface_mtu(&interface.name, mtu)?;
         }
 
         Ok(())

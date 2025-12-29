@@ -13,28 +13,37 @@ pub mod syscall_ids {
     pub const SYSCALL_FORK: u64 = 2;
     pub const SYSCALL_EXIT: u64 = 3;
     pub const SYSCALL_WAIT4: u64 = 4;
-    
+
     /// File I/O system calls
     pub const SYSCALL_OPEN: u64 = 5;
     pub const SYSCALL_CLOSE: u64 = 6;
     pub const SYSCALL_READ: u64 = 7;
     pub const SYSCALL_WRITE: u64 = 8;
     pub const SYSCALL_LSEEK: u64 = 9;
-    
+
     /// Memory management system calls
     pub const SYSCALL_MMAP: u64 = 10;
     pub const SYSCALL_MUNMAP: u64 = 11;
     pub const SYSCALL_MPROTECT: u64 = 12;
-    
+
     /// Network system calls
     pub const SYSCALL_SOCKET: u64 = 13;
     pub const SYSCALL_BIND: u64 = 14;
     pub const SYSCALL_LISTEN: u64 = 15;
     pub const SYSCALL_ACCEPT: u64 = 16;
     pub const SYSCALL_CONNECT: u64 = 17;
-    
+
     /// Other system calls
     pub const SYSCALL_GETPID: u64 = 18;
     pub const SYSCALL_GETUID: u64 = 19;
     pub const SYSCALL_TIME: u64 = 20;
 }
+
+// Legacy constants for compatibility
+pub use syscall_ids::*;
+
+pub const SYS_BATCH: u64 = 999;
+pub const SYS_CLOSE: u64 = syscall_ids::SYSCALL_CLOSE;
+pub const SYS_GETPID: u64 = syscall_ids::SYSCALL_GETPID;
+pub const SYS_READ: u64 = syscall_ids::SYSCALL_READ;
+pub const SYS_WRITE: u64 = syscall_ids::SYSCALL_WRITE;

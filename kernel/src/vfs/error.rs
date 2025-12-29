@@ -17,6 +17,10 @@ pub enum VfsError {
     IoError,
     NotSupported,
     InvalidOperation,
+    Loop,
+    TooManyLinks,
+    NotASymlink,
+    InvalidInput,
 }
 
 pub type VfsResult<T> = Result<T, VfsError>;

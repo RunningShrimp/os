@@ -2,6 +2,12 @@
 //!
 //! Provides reliability, checkpoint, and fault tolerance features
 
+pub mod errno;
+pub mod graceful_degradation;
+
+pub use errno::*;
+pub use graceful_degradation::*;
+
 use nos_api::Result;
 
 /// Checkpoint manager

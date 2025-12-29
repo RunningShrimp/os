@@ -678,6 +678,7 @@ impl SecuritySandbox {
         use core::sync::atomic::{AtomicU64, Ordering};
         static TIMESTAMP_MS: AtomicU64 = AtomicU64::new(0);
         TIMESTAMP_MS.fetch_add(1, Ordering::SeqCst)
+    }
 }
 
 /// Create a new security sandbox

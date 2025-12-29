@@ -197,6 +197,39 @@ impl SyscallDispatcher for CoreSyscallDispatcher {
         
         None
     }
+
+    fn get_stats(&self) -> SyscallStats {
+        SyscallStats {
+            total_calls: 0, // TODO: Add tracking
+            successful_calls: 0,
+            failed_calls: 0,
+            avg_execution_time_ns: 0,
+        }
+    }
+
+    fn list_handlers(&self) -> Vec<(usize, &str)> {
+        let mut handlers = Vec::new();
+
+        // Add fast path handlers
+        {
+            let fast_handlers = self.fast_path_handlers.lock();
+            for (&num, _) in fast_handlers.iter() {
+                if let Some(name) = self.get_syscall_name_by_number(num) {
+                    handlers.push((num as usize, name));
+                }
+            }
+        }
+
+        // Add regular handlers
+        {
+            let handlers_map = self.handlers.lock();
+            for (&num, handler) in handlers_map.iter() {
+                handlers.push((num as usize, handler.get_name()));
+            }
+        }
+
+        handlers
+    }
 }
 
 impl CoreSyscallDispatcher {

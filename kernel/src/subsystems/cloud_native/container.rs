@@ -18,7 +18,10 @@ use spin::Mutex;
 
 use crate::{
     reliability::{EINVAL, EIO, ENOENT, ENOMEM, EPERM},
-    subsystems::cloud_native::oci::{OciContainerSpec, OciProcess, OciRoot, OciUser},
+    subsystems::{
+        cloud_native::oci::{OciContainerSpec, OciProcess, OciRoot, OciUser},
+        syscalls::signal::service::kill_process,
+    },
 };
 
 /// 容器ID类型
@@ -450,7 +453,7 @@ impl Container {
 
         if let Some(pid) = self.pid {
             // 发送SIGSTOP信号
-            crate::syscalls::process::kill_process(pid as u64, 19)?; // SIGSTOP
+            kill_process(pid as u64, 19)?; // SIGSTOP
         }
 
         self.state = ContainerState::Paused;
@@ -467,7 +470,7 @@ impl Container {
 
         if let Some(pid) = self.pid {
             // 发送SIGCONT信号
-            crate::syscalls::process::kill_process(pid as u64, 18)?; // SIGCONT
+            crate::subsystems::syscalls::process::kill_process(pid as u64, 18)?; // SIGCONT
         }
 
         self.state = ContainerState::Running;
@@ -693,7 +696,7 @@ impl Container {
 
         // 设置主机名
         if let Some(ref hostname) = self.config.network.hostname {
-            crate::syscalls::process::set_hostname_for_process(
+            crate::subsystems::syscalls::process::set_hostname_for_process(
                 self.pid.unwrap_or(0) as u64,
                 hostname,
             )?;

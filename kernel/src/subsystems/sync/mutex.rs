@@ -4,7 +4,6 @@
 // data of type T, with RAII guard for automatic
 // lock release.
 
-use spin::Mutex;
 use core::cell::UnsafeCell;
 use core::ops::{Deref, DerefMut};
 
@@ -170,7 +169,7 @@ impl<T: ?Sized + Default> Default for MutexIrq<T> {
 /// RAII guard for MutexIrq
 pub struct MutexIrqGuard<'a, T: ?Sized> {
     mutex: &'a MutexIrq<T>,
-    _guard: <SpinLockIrq as super::spinlock::SpinLockIrqGuard<'a>>,
+    _guard: super::spinlock::SpinLockIrqGuard<'a>,
 }
 
 impl<T: ?Sized> Deref for MutexIrqGuard<'_, T> {

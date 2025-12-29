@@ -1,31 +1,13 @@
-[build]
-rustflags = ["-D", "warnings"]
+# 项目级 cargo 配置
+# 临时使用官方源以获取最新版本的依赖包
 
-[target.x86_64-unknown-none]
-rustflags = ["-D", "warnings"]
+[source.crates-io]
+registry = "sparse+https://index.crates.io/"
+# 禁用全局的 ustc 镜像替换
+# 这样可以获取到最新版本的依赖包（如 spin 0.13.0, riscv 0.15.1）
 
-[target.aarch64-unknown-none]
-rustflags = ["-D", "warnings"]
-
-[target."targets/aarch64-nostd.json"]
-linker = "rust-lld"
-rustflags = ["-Clink-arg=-Tkernel/linker-aarch64.ld"]
-
-[alias]
-k-aarch64 = "run -p xtask -- kernel aarch64"
-k-riscv64 = "run -p xtask -- kernel riscv64"
-k-x86_64 = "run -p xtask -- kernel x86_64"
-u-aarch64 = "run -p xtask -- user aarch64"
-u-riscv64 = "run -p xtask -- user riscv64"
-u-x86_64 = "run -p xtask -- user x86_64"
-k-dev = "build -p kernel --features observability,debug_subsystems,lazy_init"
-k-perf = "build -p kernel --features fast_syscall,zero_copy,batch_syscalls,net_opt,sched_opt"
-k-min = "build -p kernel --features observability"
-
-[target."targets/riscv64-nostd.json"]
-linker = "rust-lld"
-rustflags = ["-Clink-arg=-Tkernel/linker-riscv64.ld"]
-
-[target."targets/x86_64-nostd.json"]
-linker = "rust-lld"
-rustflags = ["-Clink-arg=-Tkernel/linker-x86_64.ld"]
+# 如果需要重新启用 ustc 镜像（当同步完成后）：
+# 1. 删除或注释上面的 [source.crates-io] 部分
+# 2. 取消下面的注释：
+# [source.crates-io]
+# replace-with = 'ustc'

@@ -1,6 +1,6 @@
 //! Service registry implementation
 
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::{boxed::Box, string::{String, ToString}, vec::Vec};
 
 use hashbrown::HashMap;
 
@@ -21,8 +21,10 @@ struct ServiceEntry {
     /// Service instance
     service: Box<dyn Service>,
     /// Service metadata
+    #[allow(dead_code)]
     metadata: ServiceMetadata,
     /// Service status
+    #[allow(dead_code)]
     status: ServiceStatus,
 }
 

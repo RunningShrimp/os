@@ -3,6 +3,7 @@
 //! This module provides the core kernel initialization logic that is shared
 //! between bootloader-based startup and library-based initialization.
 
+use crate::prelude::*;
 use crate::platform::boot::BootParameters;
 
 /// Core kernel initialization function
@@ -112,8 +113,8 @@ pub fn init_kernel_core(boot_params: Option<&BootParameters>) {
     // Initialize and mount VFS root (ramfs)
     crate::vfs::ramfs::init();
     crate::vfs::ext4::init();
-    crate::vfs::procfs::fs::init();
-    crate::vfs::sysfs::fs::init();
+    crate::vfs::procfs::init();
+    crate::vfs::sysfs::init();
 
     // Try to mount ramfs first, fall back to tmpfs if it fails
     let root_mounted = match crate::vfs::mount("ramfs", "/", None, 0) {
@@ -214,8 +215,9 @@ pub fn init_kernel_core(boot_params: Option<&BootParameters>) {
     // Initialize unified system call dispatcher
     #[cfg(feature = "syscalls")]
     {
-        let config = UnifiedDispatcherConfig::default();
-        init_unified_dispatcher(config);
+        // Use the unified_impl module directly since re-exports don't work properly
+        let config = crate::subsystems::syscalls::dispatch::unified_impl::UnifiedDispatcherConfig::default();
+        crate::subsystems::syscalls::dispatch::unified_impl::init_unified_dispatcher(config);
         crate::println!("[boot] unified syscall dispatcher initialized");
 
         // Register POSIX file descriptor system calls (timerfd, eventfd, signalfd)
@@ -280,7 +282,7 @@ pub fn init_kernel_core(boot_params: Option<&BootParameters>) {
         },
     }
 
-    #[cfg(feature = "security_audit")]
+    #[cfg(feature = "security")]
     {
         crate::security_audit::init_security_audit().expect("Security audit initialization failed");
         crate::println!("[boot] security audit initialized");
@@ -312,11 +314,14 @@ pub fn init_kernel_core(boot_params: Option<&BootParameters>) {
     }
 
     // Initialize fault diagnosis system
-    crate::debug::fault_diagnosis::create_fault_diagnosis_engine()
-        .lock()
-        .init()
-        .expect("Fault diagnosis initialization failed");
-    crate::println!("[boot] fault diagnosis system initialized");
+    #[cfg(feature = "debug")]
+    {
+        crate::debug::fault_diagnosis::create_fault_diagnosis_engine()
+            .lock()
+            .init()
+            .expect("Fault diagnosis initialization failed");
+        crate::println!("[boot] fault diagnosis system initialized");
+    }
 
     // Initialize graceful degradation system
     crate::reliability::graceful_degradation::create_graceful_degradation_manager()
@@ -330,7 +335,7 @@ pub fn init_kernel_core(boot_params: Option<&BootParameters>) {
         .expect("Health integration initialization failed");
     crate::println!("[boot] health monitoring integration initialized");
 
-    #[cfg(feature = "debug_subsystems")]
+    #[cfg(feature = "debug")]
     {
         crate::debug::init().expect("Debugging system initialization failed");
         crate::println!("[boot] debugging system initialized");

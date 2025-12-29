@@ -95,7 +95,7 @@ static NEXT_SIGNAL_ID: AtomicUsize = AtomicUsize::new(1);
 pub static mut GLIB_OBJECT_MANAGER: () = ();
 
 /// 获取GLib对象管理器引用
-pub fn get_glib_object_manager() -> &'static dyn super::manager::GObjectManager {
+pub fn get_glib_object_manager() -> &'static dyn manager::GObjectManager {
     unsafe { &GLIB_OBJECT_MANAGER }
 }
 

@@ -16,7 +16,7 @@ use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 // BlockDevice在当前文件中未使用，暂时注释掉
 // use crate::platform::drivers::BlockDevice;crate::subsystems::fs::fs_cache::FsCache;
 // use crate::platform::drivers::BlockDevice;
-use crate::error::UnifiedError;
+use crate::error::{UnifiedError, KernelError};
 use crate::subsystems::sync::Mutex;
 
 // ============================================================================

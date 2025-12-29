@@ -15,8 +15,11 @@ use core::{
 };
 
 use crate::{
-    fs::epoll::{EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLOUT, EpollEvent, EpollManager},
-    subsystems::{sync::Mutex, syscalls::SyscallResult},
+    subsystems::{
+        fs::epoll::{EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLOUT, EpollEvent, EpollEventInfo, EpollManager},
+        sync::Mutex,
+        syscalls::SyscallResult,
+    },
 };
 
 /// GLib epoll error types
@@ -59,7 +62,7 @@ static NEXT_EPOLL_ID: AtomicUsize = AtomicUsize::new(1);
 pub static mut GLIB_EPOLL_MANAGER: () = ();
 
 /// 获取GLib事件循环管理器引用
-pub fn get_glib_epoll_manager() -> &'static dyn super::manager::GLibEpollManager {
+pub fn get_glib_epoll_manager() -> &'static dyn manager::GLibEpollManager {
     unsafe { &GLIB_EPOLL_MANAGER }
 }
 

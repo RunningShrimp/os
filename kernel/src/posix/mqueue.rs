@@ -121,13 +121,16 @@ static MQD_TABLE: Mutex<BTreeMap<usize, alloc::sync::Arc<MessageQueue>>> =
 pub const MQ_DEFAULT_ATTR: MqAttr =
     MqAttr { mq_maxmsg: 10, mq_msgsize: 8192, mq_curmsgs: 0, mq_flags: 0 };
 
-/// Open flags
-pub const O_RDONLY: i32 = 0;
-pub const O_WRONLY: i32 = 1;
-pub const O_RDWR: i32 = 2;
-pub const O_CREAT: i32 = 0o40;
-pub const O_EXCL: i32 = 0x80;
-pub const O_NONBLOCK: i32 = 0o400;
+// Note: O_* flags are now imported from open_flags module to avoid duplication
+// The mqueue-specific open flags are now using MQ_ prefix instead
+
+/// Message queue open flags (use MQ_ prefix to avoid conflict with POSIX O_ flags)
+pub const MQ_RDONLY: i32 = 0;
+pub const MQ_WRONLY: i32 = 1;
+pub const MQ_RDWR: i32 = 2;
+pub const MQ_CREAT: i32 = 0o40;
+pub const MQ_EXCL: i32 = 0x80;
+pub const MQ_NONBLOCK: i32 = 0o400;
 
 /// Notification methods
 pub const MQ_SIGNAL: i32 = 1;
@@ -250,7 +253,7 @@ fn send_notification(mq: &MessageQueue) {
 /// * Message queue descriptor on success
 /// * -1 on error
 #[unsafe(no_mangle)]
-pub extern "C" fn mq_open(
+pub unsafe extern "C" fn mq_open(
     name: *const i8,
     oflag: i32,
     _mode: crate::posix::Mode,
@@ -367,7 +370,7 @@ pub extern "C" fn mq_open(
 /// * 0 on success
 /// * -1 on error
 #[unsafe(no_mangle)]
-pub extern "C" fn mq_close(mqd: i32) -> i32 {
+pub unsafe extern "C" fn mq_close(mqd: i32) -> i32 {
     if mqd < 0 {
         return -(errno::EBADF as i32);
     }
@@ -396,7 +399,7 @@ pub extern "C" fn mq_close(mqd: i32) -> i32 {
 /// * 0 on success
 /// * -1 on error
 #[unsafe(no_mangle)]
-pub extern "C" fn mq_unlink(name: *const i8) -> i32 {
+pub unsafe extern "C" fn mq_unlink(name: *const i8) -> i32 {
     // Convert name to string
     let name_str = if name.is_null() {
         return -(errno::EINVAL as i32);
@@ -451,7 +454,7 @@ pub extern "C" fn mq_unlink(name: *const i8) -> i32 {
 /// * 0 on success
 /// * -1 on error
 #[unsafe(no_mangle)]
-pub extern "C" fn mq_send(
+pub unsafe extern "C" fn mq_send(
     mqd: i32,
     msg_ptr: *const core::ffi::c_void,
     msg_len: usize,
@@ -548,7 +551,7 @@ pub extern "C" fn mq_send(
 /// * Message length on success
 /// * -1 on error
 #[unsafe(no_mangle)]
-pub extern "C" fn mq_receive(
+pub unsafe extern "C" fn mq_receive(
     mqd: i32,
     msg_ptr: *mut core::ffi::c_void,
     msg_len: usize,
@@ -620,7 +623,7 @@ pub extern "C" fn mq_receive(
 /// * 0 on success
 /// * -1 on error
 #[unsafe(no_mangle)]
-pub extern "C" fn mq_getattr(mqd: i32, attr: *mut MqAttr) -> i32 {
+pub unsafe extern "C" fn mq_getattr(mqd: i32, attr: *mut MqAttr) -> i32 {
     if mqd < 0 || attr.is_null() {
         return -(errno::EINVAL as i32);
     }
@@ -668,7 +671,7 @@ pub extern "C" fn mq_getattr(mqd: i32, attr: *mut MqAttr) -> i32 {
 /// * 0 on success
 /// * -1 on error
 #[unsafe(no_mangle)]
-pub extern "C" fn mq_setattr(mqd: i32, attr: *const MqAttr) -> i32 {
+pub unsafe extern "C" fn mq_setattr(mqd: i32, attr: *const MqAttr) -> i32 {
     if mqd < 0 || attr.is_null() {
         return -(errno::EINVAL as i32);
     }
@@ -719,7 +722,7 @@ pub extern "C" fn mq_setattr(mqd: i32, attr: *const MqAttr) -> i32 {
 /// * 0 on success
 /// * -1 on error
 #[unsafe(no_mangle)]
-pub extern "C" fn mq_notify(mqd: i32, notification: *const MqNotify) -> i32 {
+pub unsafe extern "C" fn mq_notify(mqd: i32, notification: *const MqNotify) -> i32 {
     if mqd < 0 || notification.is_null() {
         return -(errno::EINVAL as i32);
     }

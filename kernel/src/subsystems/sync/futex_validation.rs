@@ -11,7 +11,7 @@ use core::sync::atomic::{AtomicI32, Ordering};
 use crate::{
     error::SyscallError,
     subsystems::{
-        mm::vm::PageTable,
+        mm::page_table_isolation::PageTable,
         syscalls::thread::{
             FUTEX_WAIT_QUEUE, FutexWaiter, PiFutexData, add_futex_waiter, futex_lock_pi,
             futex_requeue, futex_trylock_pi, futex_unlock_pi, futex_wait_timeout,

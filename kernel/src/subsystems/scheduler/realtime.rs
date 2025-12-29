@@ -484,10 +484,16 @@ impl RealtimeScheduler {
             params: &'a mut RealtimeTaskParams,
         }
         
-        impl<'a> DerefMut for TaskRef<'a> {
+        impl<'a> Deref for TaskRef<'a> {
             type Target = RealtimeTaskParams;
-            
-            fn deref_mut(&mut self) -> &mut Self::Target {
+
+            fn deref(&self) -> &Self::Target {
+                self.params
+            }
+        }
+
+        impl<'a> DerefMut for TaskRef<'a> {
+            fn deref_mut(&mut self) -> &mut RealtimeTaskParams {
                 self.params
             }
         }

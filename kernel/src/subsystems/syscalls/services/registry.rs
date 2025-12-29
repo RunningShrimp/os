@@ -17,10 +17,7 @@ use alloc::{
 
 use spin::Mutex;
 
-use crate::{error::UnifiedError, subsystems::syscalls::services::traits::*};
-
-// 定义本地Result类型别名
-pub type Result<T> = core::result::Result<T, KernelError>;
+use crate::{error::{UnifiedError, KernelError, Result}, subsystems::syscalls::services::traits::*};
 /// Version struct for syscall versioning (semantic versioning: major.minor.patch)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Version {

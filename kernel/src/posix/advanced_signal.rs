@@ -8,11 +8,35 @@
 //! - Real-time signal support (SIGRTMIN-SIGRTMAX)
 
 use alloc::{collections::VecDeque, sync::Arc};
+use core::ffi::c_void;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::{process::Pid as ProcessId, subsystems::microkernel::scheduler};
 /// Maximum number of pending signals per process
 pub const MAX_PENDING_SIGNALS: usize = 64;
+
+/// Signal information structure for queued signals
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct SigInfoT {
+    pub si_signo: i32,
+    pub si_errno: i32,
+    pub si_code: i32,
+    pub si_pid: ProcessId,
+    pub si_uid: crate::posix::Uid,
+    pub si_status: i32,
+    pub si_utime: crate::posix::ClockT,
+    pub si_stime: crate::posix::ClockT,
+    pub si_value: SigVal,
+    pub si_timerid: i32,
+    pub si_overrun: i32,
+    pub si_addr: *mut c_void,
+    pub si_band: i32,
+    pub si_fd: i32,
+}
+
+/// Signal cause codes
+pub const SI_QUEUE: i32 = 0; /* Queue signal from sigqueue */
 
 /// Signal queue entry for queued signals
 #[derive(Clone)]
@@ -228,6 +252,12 @@ pub enum SignalQueueError {
     /// Process not found
     ProcessNotFound,
 }
+
+/// Signal stack type
+pub type StackT = *mut u8;
+
+/// Minimum signal stack size
+pub const MINSIGSTKSZ: usize = 2048;
 
 /// Alternate signal stack management
 #[derive(Debug)]

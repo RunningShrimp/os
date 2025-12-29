@@ -112,6 +112,10 @@
 
 extern crate alloc;
 
+// Import kernel prelude for common types
+use crate::prelude::*;
+
+pub mod core;
 pub mod dentry;
 pub mod devices;
 pub mod dir;
@@ -119,20 +123,43 @@ pub mod error;
 pub mod ext4;
 pub mod file;
 pub mod fs;
+pub mod FileMode;
+pub mod VfsError;
+pub mod Mount;
+pub use FileMode::*;
+pub use VfsError::*;
+pub use Mount::*;
+pub mod inode;
 pub mod kernel;
 pub mod mount;
+pub mod path;
 pub mod procfs;
 pub mod ramfs;
 pub mod sysfs;
+pub mod symlink;
 pub mod tmpfs;
 pub mod types;
 
+pub use core::*;
 pub use dentry::*;
 pub use dir::*;
 pub use error::*;
 pub use file::*;
 pub use fs::*;
+pub use inode::*;
 pub use mount::*;
+pub use ramfs::*;
+pub use sysfs::*;
+
+/// Mount a filesystem at the specified path
+///
+/// This is a convenience function for mounting filesystems.
+/// It delegates to the VFS manager's mount function.
+pub fn mount(fs_type: &str, device: Option<&str>, mount_point: &str, flags: u32) -> VfsResult<()> {
+    crate::subsystems::fs::vfs().mount(fs_type, device, mount_point, flags)
+}
+pub use path::*;
+pub use symlink::*;
 pub use types::*;
 
 /// Get the global VFS manager instance

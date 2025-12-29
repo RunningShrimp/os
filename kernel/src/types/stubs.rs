@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 use heapless::String as HeaplessString;
 
 // Microkernel IPC types - using real implementations
-pub use crate::microkernel::service_registry::ServiceId;
+pub use crate::subsystems::microkernel::service_registry::ServiceId;
 pub use crate::subsystems::microkernel::ipc::IpcMessage as Message;
 
 /// Message type for IPC communication

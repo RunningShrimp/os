@@ -26,7 +26,8 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, Ordering};
 
-use super::common::{SyscallError, SyscallResult, extract_args};
+use super::common::{SyscallResult, extract_args};
+use crate::api::SyscallError;
 use crate::fs::file::FILE_TABLE;
 use crate::process::{myproc, NOFILE};
 use crate::posix::{off_t, aiocb, AioOffsetT, aio_reqprio_t, aio_sigevent_t, AIO_CANCELED, AIO_NOTCANCELED, AIO_ALLDONE, LIO_READ, LIO_WRITE, SIGEV_SIGNAL};
@@ -403,7 +404,7 @@ fn send_completion_notification(aiocb_ptr: *mut aiocb) {
 }
 
 /// Dispatch AIO syscalls
-pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
+pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult<i64> {
     match syscall_id {
         0xC000 => sys_aio_read(args),       // aio_read
         0xC001 => sys_aio_write(args),      // aio_write
@@ -419,7 +420,7 @@ pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult {
 /// aio_read system call
 /// Arguments: [aiocb_ptr]
 /// Returns: 0 on success, -1 on error
-fn sys_aio_read(args: &[u64]) -> SyscallResult {
+fn sys_aio_read(args: &[u64]) -> SyscallResult<i64> {
     let args = extract_args(args, 1)?;
     
     let aiocb_ptr = args[0] as *mut aiocb;
@@ -442,7 +443,7 @@ fn sys_aio_read(args: &[u64]) -> SyscallResult {
 /// aio_write system call
 /// Arguments: [aiocb_ptr]
 /// Returns: 0 on success, -1 on error
-fn sys_aio_write(args: &[u64]) -> SyscallResult {
+fn sys_aio_write(args: &[u64]) -> SyscallResult<i64> {
     let args = extract_args(args, 1)?;
     
     let aiocb_ptr = args[0] as *mut aiocb;
@@ -465,7 +466,7 @@ fn sys_aio_write(args: &[u64]) -> SyscallResult {
 /// aio_fsync system call
 /// Arguments: [mode, aiocb_ptr]
 /// Returns: 0 on success, -1 on error
-fn sys_aio_fsync(args: &[u64]) -> SyscallResult {
+fn sys_aio_fsync(args: &[u64]) -> SyscallResult<i64> {
     let args = extract_args(args, 2)?;
     
     let mode = args[0] as i32;
@@ -499,7 +500,7 @@ fn sys_aio_fsync(args: &[u64]) -> SyscallResult {
 /// aio_return system call
 /// Arguments: [aiocb_ptr]
 /// Returns: Return value of operation, or -1 on error
-fn sys_aio_return(args: &[u64]) -> SyscallResult {
+fn sys_aio_return(args: &[u64]) -> SyscallResult<i64> {
     let args = extract_args(args, 1)?;
     
     let aiocb_ptr = args[0] as *mut aiocb;
@@ -549,7 +550,7 @@ fn sys_aio_return(args: &[u64]) -> SyscallResult {
 /// aio_error system call
 /// Arguments: [aiocb_ptr]
 /// Returns: 0 if completed, EINPROGRESS if in progress, error code otherwise
-fn sys_aio_error(args: &[u64]) -> SyscallResult {
+fn sys_aio_error(args: &[u64]) -> SyscallResult<i64> {
     let args = extract_args(args, 1)?;
     
     let aiocb_ptr = args[0] as *mut aiocb;
@@ -584,7 +585,7 @@ fn sys_aio_error(args: &[u64]) -> SyscallResult {
 /// aio_cancel system call
 /// Arguments: [fd, aiocb_ptr]
 /// Returns: AIO_CANCELED if cancelled, AIO_NOTCANCELED if not, AIO_ALLDONE if already done
-fn sys_aio_cancel(args: &[u64]) -> SyscallResult {
+fn sys_aio_cancel(args: &[u64]) -> SyscallResult<i64> {
     let args = extract_args(args, 2)?;
     
     let fd = args[0] as i32;
@@ -605,7 +606,7 @@ fn sys_aio_cancel(args: &[u64]) -> SyscallResult {
 /// lio_listio system call
 /// Arguments: [mode, list_ptr, nent, aiocb_ptr]
 /// Returns: 0 on success, -1 on error
-fn sys_lio_listio(args: &[u64]) -> SyscallResult {
+fn sys_lio_listio(args: &[u64]) -> SyscallResult<i64> {
     let args = extract_args(args, 4)?;
     
     let mode = args[0] as i32;
@@ -753,7 +754,7 @@ fn find_operation_by_aiocb(aiocb_ptr: *mut aiocb) -> Result<usize, i32> {
 }
 
 /// Cancel all operations for a file descriptor
-fn cancel_all_operations_for_fd(fd: i32, pid: usize) -> SyscallResult {
+fn cancel_all_operations_for_fd(fd: i32, pid: usize) -> SyscallResult<i64> {
     let mut operations_to_cancel = Vec::new();
     
     // Find operations to cancel
@@ -792,7 +793,7 @@ fn cancel_all_operations_for_fd(fd: i32, pid: usize) -> SyscallResult {
 }
 
 /// Cancel a specific operation
-fn cancel_specific_operation(aiocb_ptr: *mut aiocb, pid: usize) -> SyscallResult {
+fn cancel_specific_operation(aiocb_ptr: *mut aiocb, pid: usize) -> SyscallResult<i64> {
     let operation_id = find_operation_by_aiocb(aiocb_ptr).map_err(|_| SyscallError::InvalidArgument)?;
     
     // Check if operation belongs to this process

@@ -458,6 +458,34 @@ impl AuxEntry {
     }
 }
 
+/// Auxiliary vector types
+#[repr(usize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuxType {
+    /// Null entry
+    Null = 0,
+    /// Ignored
+    Ignore = 1,
+    /// File executable
+    Execfn = 2,
+    /// PT_interp location
+    Platform = 3,
+    /// Random data
+    Random = 258,
+    /// Base address
+    Base = 25,
+    /// Flags
+    Flags = 26,
+    /// Entry address
+    Entry = 7,
+    /// Program headers
+    Phdr = 3,
+    /// Program header size
+    Phent = 4,
+    /// Number of program headers
+    Phnum = 5,
+}
+
 // ============================================================================
 // Stack Setup for New Process
 // ============================================================================

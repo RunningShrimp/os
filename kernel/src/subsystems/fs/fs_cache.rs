@@ -13,11 +13,11 @@ use alloc::{
 };
 
 // use alloc::sync::Arc;
-// use core::sync::atomic::{AtomicU64, AtomicU32, AtomicBool, AtomicU8, Ordering};
-// use crate::subsystems::sync::{Sleeplock, Mutex};
+use core::sync::atomic::{AtomicU64, AtomicU32, AtomicBool, Ordering};
+use crate::sync::Mutex;
 // use crate::subsystems::fs::fs_impl::{Buf, BufFlags, BufCache, CacheKey};
 use crate::platform::drivers::BlockDevice;
-use crate::{collections::HashMap, error::UnifiedError};
+use crate::{collections::HashMap, error::{UnifiedError, KernelError}};
 
 // ============================================================================
 // File System Cache Constants and Types

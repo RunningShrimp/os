@@ -484,14 +484,14 @@ impl DocGenerator {
             writeln!(file, "<h1>{}</h1>", module.name)?;
 
             if !module.description.is_empty() {
-                writeln!(file, "<p>{}</p>", module.description);
+                writeln!(file, "<p>{}</p>", module.description)?;
             }
 
             for fn_doc in &module.functions {
                 writeln!(file, "<h2>{}</h2>", fn_doc.name)?;
-                writeln!(file, "<pre><code>{}</code></pre>", fn_doc.signature);
+                writeln!(file, "<pre><code>{}</code></pre>", fn_doc.signature)?;
                 if !fn_doc.description.is_empty() {
-                    writeln!(file, "<p>{}</p>", fn_doc.description);
+                    writeln!(file, "<p>{}</p>", fn_doc.description)?;
                 }
             }
 

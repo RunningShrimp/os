@@ -117,8 +117,8 @@ static NEXT_CONTEXT_ID: AtomicUsize = AtomicUsize::new(1);
 pub static mut GLIB_ASYNC_MANAGER: () = ();
 
 /// 获取GLib异步I/O管理器引用
-pub fn get_glib_async_manager() -> &'static dyn super::manager::GAsyncManager {
-    unsafe { &GLIB_ASYNC_MANAGER }
+pub fn get_glib_async_manager() -> &'static mut dyn manager::GAsyncManager {
+    unsafe { &mut GLIB_ASYNC_MANAGER }
 }
 
 pub mod context;

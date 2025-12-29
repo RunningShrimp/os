@@ -8,9 +8,15 @@
 
 use alloc::{collections::VecDeque, sync::Arc, vec::Vec};
 
-use nos_api::{SyscallHandler, syscall::SyscallResult};
+use crate::subsystems::syscalls::interface::{SyscallHandler};
+use crate::subsystems::syscalls::interface::{SyscallNumber};
+use crate::subsystems::syscalls::common::SyscallArgs;
+use crate::error::Result;
 
 use crate::{error::SyscallError, subsystems::sync::Mutex};
+
+// Import extract_args from common module
+use crate::subsystems::syscalls::common::extract_args;
 
 /// SignalFd flags (Linux compatible)
 pub mod flags {
@@ -188,13 +194,16 @@ impl SignalFdHandler {
 }
 
 impl SyscallHandler for SignalFdHandler {
-    fn handle(&self, args: &[u64]) -> Result<u64, SyscallError> {
-        // This is a placeholder - actual dispatch is done via syscall numbers
-        Err(SyscallError::InvalidSyscall(0))
+    fn handle(&self, args: &[u64]) -> SyscallResult<i64> {
+        // For now, we don't have specific handler logic here
+        // Individual syscall functions like sys_signalfd are called directly
+        Err(SyscallError::InvalidSyscall(self.get_syscall_number()))
     }
 
-    fn get_syscall_number(&self) -> u32 {
-        0 // Will be set during registration
+    fn get_syscall_number(&self) -> SyscallNumber {
+        // This should be the specific syscall number this handler handles
+        // For now, return a placeholder that should be overridden by specific handlers
+        0x9003 // Default signalfd syscall number
     }
 
     fn get_name(&self) -> &'static str {
@@ -205,7 +214,7 @@ impl SyscallHandler for SignalFdHandler {
 /// signalfd system call (legacy, always uses flags=0)
 /// Arguments: [fd, mask_ptr]
 /// Returns: file descriptor on success, error on failure
-pub fn sys_signalfd(args: &[u64]) -> SyscallResult {
+pub fn sys_signalfd(args: &[u64]) -> SyscallResult<i64> {
     let args = extract_args(args, 2)?;
     let fd = args[0] as i32;
     let mask_ptr = args[1] as usize;
@@ -218,7 +227,7 @@ pub fn sys_signalfd(args: &[u64]) -> SyscallResult {
 /// signalfd4 system call
 /// Arguments: [fd, mask_ptr, flags]
 /// Returns: file descriptor on success, error on failure
-pub fn sys_signalfd4(args: &[u64]) -> SyscallResult {
+pub fn sys_signalfd4(args: &[u64]) -> SyscallResult<i64> {
     let args = extract_args(args, 3)?;
 
     let fd = args[0] as i32;

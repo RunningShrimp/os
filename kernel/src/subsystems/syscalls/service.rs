@@ -6,7 +6,8 @@
 //! - 与服务注册器的集成
 //! - 信号处理程序管理
 
-use nos_error_handling::unified::{Error, KernelError};
+use crate::error::unified::{UnifiedError, KernelResult};
+use crate::api::KernelError;
 use crate::subsystems::syscalls::signal::handlers;
 use crate::subsystems::syscalls::services::{Service, ServiceStatus, SyscallService};
 use alloc::string::String;
@@ -358,6 +359,10 @@ impl Service for SignalService {
     }
 
     fn as_any_mut(&mut self) -> &mut dyn core::any::Any {
+        self
+    }
+
+  fn as_any(&self) -> &dyn core::any::Any {
         self
     }
 }

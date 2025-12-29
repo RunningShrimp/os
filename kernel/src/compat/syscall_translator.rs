@@ -36,6 +36,7 @@ impl core::hash::Hasher for CustomHasher {
 
 use crate::compat::*;
 use crate::syscalls;
+use crate::subsystems::syscalls::thread::dispatch;
 
 /// Foreign system call representation
 #[derive(Debug, Clone, PartialEq, Eq)]

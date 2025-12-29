@@ -5,9 +5,8 @@
 // memory barriers for SMP safety.
 
 use core::cell::UnsafeCell;
-use core::sync::atomic;
+use core::sync::atomic::{AtomicUsize, Ordering};
 use core::ops::{Deref, DerefMut};
-use core::sync::atomic;
 
 const WRITER_BIT: usize = 1 << (usize::BITS - 1);
 

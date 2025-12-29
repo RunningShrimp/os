@@ -77,16 +77,19 @@ impl<T: 'static + Send + Sync + Default> ServiceFactory for KernelServiceFactory
         TypeId::of::<T>()
     }
 
-    fn metadata(&self) -> &ServiceMetadata {
-        static METADATA: ServiceMetadata = ServiceMetadata {
-            name: core::any::type_name::<T>(),
-            version: "1.0.0",
-            description: "Kernel service factory",
+    fn metadata(&self) -> &'static ServiceMetadata {
+        // This pattern doesn't work with generics due to Rust's limitations
+        // For now, we'll create a simple default metadata
+        // In a real implementation, this would need to be handled differently
+        static DEFAULT_METADATA: ServiceMetadata = ServiceMetadata {
+            name: "Generic Kernel Service".to_string(),
+            version: "1.0.0".to_string(),
+            description: "Generic kernel service factory".to_string(),
             dependencies: Vec::new(),
             scope: ServiceScope::Transient,
             lazy: false,
         };
-        &METADATA
+        &DEFAULT_METADATA
     }
 }
 
