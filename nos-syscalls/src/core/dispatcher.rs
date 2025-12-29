@@ -2,15 +2,11 @@
 //!
 //! This module provides the core system call dispatch mechanism.
 
-use {
-    alloc::{
-        boxed::Box,
-        collections::BTreeMap,
-        format,
-    },
-    nos_api::Error,
-    crate::{SyscallHandler, SyscallStats},
-};
+use alloc::{boxed::Box, collections::BTreeMap, format};
+
+use nos_api::Error;
+
+use crate::{SyscallHandler, SyscallStats};
 
 /// System call dispatcher
 #[allow(clippy::should_implement_trait)]
@@ -44,29 +40,31 @@ impl SyscallDispatcher {
     /// Dispatch a system call
     pub fn dispatch(&self, id: u32, args: &[usize]) -> nos_api::Result<isize> {
         let start_time = crate::time::get_timestamp();
-        
+
         // Get the handler
-        let handler = self.handlers.get(&id)
-            .ok_or_else(|| {
-                Error::NotFound(format!("System call {} not found", id))
-            })?;
-        
+        let handler = self
+            .handlers
+            .get(&id)
+            .ok_or_else(|| Error::NotFound(format!("System call {} not found", id)))?;
+
         // Execute the handler
         let result = handler.execute(args);
-        
+
         // Update statistics
         let mut stats = self.stats.write();
         stats.total_calls += 1;
         *stats.calls_by_type.entry(id).or_insert(0) += 1;
-        
+
         let end_time = crate::time::get_timestamp();
         let execution_time = end_time - start_time;
-        stats.avg_execution_time = (stats.avg_execution_time * (stats.total_calls - 1) + execution_time) / stats.total_calls;
-        
+        stats.avg_execution_time = (stats.avg_execution_time * (stats.total_calls - 1)
+            + execution_time)
+            / stats.total_calls;
+
         if result.is_err() {
             stats.error_count += 1;
         }
-        
+
         result
     }
 
@@ -75,10 +73,6 @@ impl SyscallDispatcher {
         self.stats.read().clone()
     }
 }
-
-
-
-
 
 /// Global system call dispatcher
 static GLOBAL_DISPATCHER: spin::Mutex<Option<SyscallDispatcher>> = spin::Mutex::new(None);
@@ -116,7 +110,7 @@ pub fn shutdown_dispatcher() -> nos_api::Result<()> {
 pub fn register_handlers() -> nos_api::Result<()> {
     let mut dispatcher = get_dispatcher_mut();
     let dispatcher = dispatcher.as_mut().unwrap();
-    
+
     // Register core system calls
     crate::fs::register_handlers(dispatcher)?;
     crate::process::register_handlers(dispatcher)?;
@@ -126,16 +120,16 @@ pub fn register_handlers() -> nos_api::Result<()> {
     crate::signal::register_handlers(dispatcher)?;
     crate::memory::register_handlers(dispatcher)?;
     crate::time::register_handlers(dispatcher)?;
-    
+
     // Register optimized syscall path
     crate::optimized_syscall_path::register_handlers(dispatcher)?;
-    
+
     // Register adaptive scheduler
     crate::adaptive_scheduler::register_handlers(dispatcher)?;
-    
+
     // Register performance monitoring
     crate::performance_monitor::register_handlers(dispatcher)?;
-    
+
     // Register advanced system calls
     #[cfg(feature = "advanced_syscalls")]
     {
@@ -143,7 +137,7 @@ pub fn register_handlers() -> nos_api::Result<()> {
         crate::async_ops::register_syscalls(dispatcher)?;
         crate::epoll::register_syscalls(dispatcher)?;
     }
-    
+
     Ok(())
 }
 
@@ -172,11 +166,11 @@ mod tests {
         fn execute(&self, _args: &[usize]) -> nos_api::Result<isize> {
             Ok(self.result)
         }
-        
+
         fn name(&self) -> &str {
             self.name
         }
-        
+
         fn id(&self) -> u32 {
             100
         }
@@ -185,18 +179,15 @@ mod tests {
     #[test]
     fn test_dispatcher() {
         let mut dispatcher = SyscallDispatcher::new();
-        
+
         // Register a test handler
-        let handler = TestHandler {
-            name: "test",
-            result: 42,
-        };
+        let handler = TestHandler { name: "test", result: 42 };
         dispatcher.register_handler(100, Box::new(handler));
-        
+
         // Dispatch the system call
         let result = dispatcher.dispatch(100, &[]);
         assert_eq!(result.unwrap(), 42);
-        
+
         // Check statistics
         let stats = dispatcher.get_stats();
         assert_eq!(stats.total_calls, 1);

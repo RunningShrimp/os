@@ -1,4 +1,3 @@
-
 #[cfg(target_arch = "aarch64")]
 pub struct GicV3 {
     dist_base: usize,
@@ -12,9 +11,13 @@ impl GicV3 {
     }
 
     #[inline]
-    fn d32(&self, off: usize) -> *mut u32 { (self.dist_base + off) as *mut u32 }
+    fn d32(&self, off: usize) -> *mut u32 {
+        (self.dist_base + off) as *mut u32
+    }
     #[inline]
-    fn r32(&self, off: usize) -> *mut u32 { (self.redist_base + off) as *mut u32 }
+    fn r32(&self, off: usize) -> *mut u32 {
+        (self.redist_base + off) as *mut u32
+    }
 
     pub fn enable(&self) {
         // Enable system register interface and CPU group 1
@@ -30,7 +33,9 @@ impl GicV3 {
         crate::subsystems::mm::mmio_write32(self.r32(0x0014), waker & !(1 << 1));
         loop {
             waker = crate::subsystems::mm::mmio_read32(self.r32(0x0014) as *const u32);
-            if (waker & (1 << 2)) == 0 { break; }
+            if (waker & (1 << 2)) == 0 {
+                break;
+            }
             core::hint::spin_loop();
         }
 

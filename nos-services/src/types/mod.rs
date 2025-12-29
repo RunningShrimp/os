@@ -4,9 +4,7 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
 /// Service type constants
 pub mod service_type {
@@ -25,8 +23,7 @@ pub mod service_type {
 }
 
 /// Service priority
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum ServicePriority {
     /// Low priority
     Low = 0,
@@ -39,10 +36,8 @@ pub enum ServicePriority {
     Critical = 3,
 }
 
-
 /// Service dependency
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct ServiceDependency {
     /// Service name
     pub name: String,
@@ -121,8 +116,7 @@ pub enum ServiceEventType {
 }
 
 /// Service health status
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ServiceHealthStatus {
     /// Service is healthy
     Healthy,
@@ -134,7 +128,6 @@ pub enum ServiceHealthStatus {
     #[default]
     Unknown,
 }
-
 
 /// Service metrics
 #[derive(Debug, Clone)]
@@ -175,7 +168,6 @@ impl Default for ServiceMetrics {
     }
 }
 
-
 impl Default for ServiceEndpoint {
     fn default() -> Self {
         Self {
@@ -211,7 +203,7 @@ mod tests {
         assert!(ServicePriority::Low < ServicePriority::Normal);
         assert!(ServicePriority::Normal < ServicePriority::High);
         assert!(ServicePriority::High < ServicePriority::Critical);
-        
+
         assert_eq!(ServicePriority::default(), ServicePriority::Normal);
     }
 
@@ -223,7 +215,7 @@ mod tests {
             max_version: Some("2.0.0".to_string()),
             required: true,
         };
-        
+
         assert_eq!(dependency.name, "test_service");
         assert_eq!(dependency.min_version, "1.0.0");
         assert_eq!(dependency.max_version, Some("2.0.0".to_string()));

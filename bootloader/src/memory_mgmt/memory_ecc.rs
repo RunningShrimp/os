@@ -221,7 +221,7 @@ impl EccManager {
     pub fn get_dimm_mut(&mut self, slot_id: u32) -> Option<&mut EccDimmInfo> {
         let dimm_count = self.dimm_count;
         let dimms_ptr = self.dimms.as_mut_ptr();
-        
+
         for i in 0..dimm_count {
             unsafe {
                 if let Some(d) = (*dimms_ptr.add(i)).as_mut() {
@@ -247,14 +247,14 @@ impl EccManager {
                     if let Some(d) = self.get_dimm_mut(error.cpu_id) {
                         d.report_single_bit_error();
                     }
-                }
+                },
                 EccErrorType::MultiBitError => {
                     self.total_uncorrectable += 1;
                     if let Some(d) = self.get_dimm_mut(error.cpu_id) {
                         d.report_multi_bit_error();
                     }
-                }
-                EccErrorType::NoError => {}
+                },
+                EccErrorType::NoError => {},
             }
 
             true

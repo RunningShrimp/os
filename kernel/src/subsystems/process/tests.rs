@@ -4,11 +4,9 @@
 
 #[cfg(feature = "kernel_tests")]
 pub mod process_tests {
-    use alloc::string::String;
-    use alloc::vec::Vec;
-    use crate::{test_assert_eq, test_assert};
-    use crate::tests::TestResult;
-    use crate::process;
+    use alloc::{string::String, vec::Vec};
+
+    use crate::{process, test_assert, test_assert_eq, tests::TestResult};
 
     /// Test process getpid
     pub fn test_getpid() -> TestResult {
@@ -37,7 +35,10 @@ pub mod process_tests {
         let duration = end_time - start_time;
 
         // Should be very fast (<100 ticks on test hardware)
-        test_assert!(duration < 100, alloc::format!("Process lookup took too long: {} ticks", duration));
+        test_assert!(
+            duration < 100,
+            alloc::format!("Process lookup took too long: {} ticks", duration)
+        );
 
         Ok(())
     }
@@ -155,7 +156,10 @@ pub mod process_tests {
 
         // Initially all FDs should be None
         for i in 0..crate::process::NOFILE {
-            test_assert!(proc.ofile[i].is_none(), alloc::format!("FD {} should be None initially", i));
+            test_assert!(
+                proc.ofile[i].is_none(),
+                alloc::format!("FD {} should be None initially", i)
+            );
         }
 
         // Allocate some FDs
@@ -512,4 +516,3 @@ pub mod process_tests {
 // ============================================================================
 // Memory management tests
 // ============================================================================
-

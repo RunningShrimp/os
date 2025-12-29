@@ -4,18 +4,20 @@
 //! protocol layers (Ethernet, IP, TCP, UDP, ICMP).
 
 extern crate alloc;
-use alloc::vec::Vec;
-use alloc::collections::BTreeMap;
-use super::packet::{Packet, PacketType};
-use super::device::NetworkDevice;
-use super::interface::Interface;
-use super::arp::{ArpProcessor, ArpPacket};
-use super::ipv4::{Ipv4Addr, Ipv4Packet};
-use super::icmp::{IcmpPacket, IcmpProcessor};
-use super::udp::{UdpPacket, UdpSocket};
-use super::tcp::{TcpPacket, TcpSocket, TcpState};
-use super::route::RoutingTable;
-use super::fragment::FragmentReassembler;
+use alloc::{collections::BTreeMap, vec::Vec};
+
+use super::{
+    arp::{ArpPacket, ArpProcessor},
+    device::NetworkDevice,
+    fragment::FragmentReassembler,
+    icmp::{IcmpPacket, IcmpProcessor},
+    interface::Interface,
+    ipv4::{Ipv4Addr, Ipv4Packet},
+    packet::{Packet, PacketType},
+    route::RoutingTable,
+    tcp::{TcpPacket, TcpSocket, TcpState},
+    udp::{UdpPacket, UdpSocket},
+};
 
 /// Socket key for HashMap lookup
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -133,8 +135,8 @@ impl NetworkProcessor {
         packet: Packet,
         interface: &Interface,
     ) -> Result<PacketResult, ProcessorError> {
-        let _arp_packet = ArpPacket::from_bytes(packet.data())
-            .map_err(|_| ProcessorError::InvalidPacket)?;
+        let _arp_packet =
+            ArpPacket::from_bytes(packet.data()).map_err(|_| ProcessorError::InvalidPacket)?;
 
         let response = {
             let mut arp_cache = interface.arp_cache().lock();
@@ -164,8 +166,8 @@ impl NetworkProcessor {
         interface: &Interface,
     ) -> Result<PacketResult, ProcessorError> {
         // Parse IPv4 packet
-        let ipv4_packet = Ipv4Packet::from_bytes(packet.data())
-            .map_err(|_| ProcessorError::InvalidPacket)?;
+        let ipv4_packet =
+            Ipv4Packet::from_bytes(packet.data()).map_err(|_| ProcessorError::InvalidPacket)?;
 
         // Check if packet is for this interface
         let is_for_me = interface.is_my_address(ipv4_packet.header.dest_addr);
@@ -187,50 +189,41 @@ impl NetworkProcessor {
         }
 
         // Handle fragmentation and reassembly
-        let reassembled_data = self.reassembler.process_fragment(
-            &ipv4_packet.header,
-            &ipv4_packet.payload,
-        )?;
+        let reassembled_data = self
+            .reassembler
+            .process_fragment(&ipv4_packet.header, &ipv4_packet.payload)?;
 
         let payload = match reassembled_data {
             Some(data) => {
                 // Packet was reassembled from fragments
-                let reassembled_packet = Ipv4Packet::from_header_and_payload(
-                    ipv4_packet.header.clone(),
-                    data,
-                );
+                let reassembled_packet =
+                    Ipv4Packet::from_header_and_payload(ipv4_packet.header.clone(), data);
                 reassembled_packet.payload
-            }
+            },
             None => {
                 // Not fragmented or incomplete
                 return Ok(PacketResult::Success);
-            }
+            },
         };
 
         // Process based on protocol
         match ipv4_packet.header.protocol {
-            super::ipv4::protocols::ICMP => {
-                self.process_icmp_packet(
-                    ipv4_packet.header.source_addr,
-                    ipv4_packet.header.dest_addr,
-                    &payload,
-                    interface,
-                )
-            }
-            super::ipv4::protocols::TCP => {
-                self.process_tcp_packet(
-                    ipv4_packet.header.source_addr,
-                    ipv4_packet.header.dest_addr,
-                    &payload,
-                )
-            }
-            super::ipv4::protocols::UDP => {
-                self.process_udp_packet(
-                    ipv4_packet.header.source_addr,
-                    ipv4_packet.header.dest_addr,
-                    &payload,
-                )
-            }
+            super::ipv4::protocols::ICMP => self.process_icmp_packet(
+                ipv4_packet.header.source_addr,
+                ipv4_packet.header.dest_addr,
+                &payload,
+                interface,
+            ),
+            super::ipv4::protocols::TCP => self.process_tcp_packet(
+                ipv4_packet.header.source_addr,
+                ipv4_packet.header.dest_addr,
+                &payload,
+            ),
+            super::ipv4::protocols::UDP => self.process_udp_packet(
+                ipv4_packet.header.source_addr,
+                ipv4_packet.header.dest_addr,
+                &payload,
+            ),
             _ => Ok(PacketResult::Drop),
         }
     }
@@ -243,14 +236,12 @@ impl NetworkProcessor {
         data: &[u8],
         interface: &Interface,
     ) -> Result<PacketResult, ProcessorError> {
-        let icmp_packet = IcmpPacket::from_bytes(data)
-            .map_err(|_| ProcessorError::InvalidPacket)?;
+        let icmp_packet =
+            IcmpPacket::from_bytes(data).map_err(|_| ProcessorError::InvalidPacket)?;
 
-        let response = self.icmp_processor.process_packet(
-            src_addr,
-            dest_addr,
-            icmp_packet,
-        );
+        let response = self
+            .icmp_processor
+            .process_packet(src_addr, dest_addr, icmp_packet);
 
         if let Some(response_packet) = response {
             // Create IPv4 packet for ICMP response
@@ -278,14 +269,10 @@ impl NetworkProcessor {
         dst_addr: Ipv4Addr,
         data: &[u8],
     ) -> Result<PacketResult, ProcessorError> {
-        let tcp_packet = TcpPacket::from_bytes(data)
-            .map_err(|_| ProcessorError::InvalidPacket)?;
+        let tcp_packet = TcpPacket::from_bytes(data).map_err(|_| ProcessorError::InvalidPacket)?;
 
         // Find matching TCP socket using BTreeMap for O(log n) lookup
-        let socket_key = SocketKey {
-            local_ip: dst_addr,
-            local_port: tcp_packet.src_port(),
-        };
+        let socket_key = SocketKey { local_ip: dst_addr, local_port: tcp_packet.src_port() };
 
         if let Some(socket) = self.tcp_sockets.get(&socket_key) {
             // Process the packet with the matching socket
@@ -306,7 +293,11 @@ impl NetworkProcessor {
             // Handle data packets
             if tcp_packet.payload.len() > 0 {
                 // TODO: Buffer received data
-                crate::log_info!("TCP received {} bytes from {}", tcp_packet.payload.len(), src_addr);
+                crate::log_info!(
+                    "TCP received {} bytes from {}",
+                    tcp_packet.payload.len(),
+                    src_addr
+                );
             }
 
             self.tcp_sockets.insert(socket_key, socket);
@@ -324,14 +315,10 @@ impl NetworkProcessor {
         dst_addr: Ipv4Addr,
         data: &[u8],
     ) -> Result<PacketResult, ProcessorError> {
-        let udp_packet = UdpPacket::from_bytes(data)
-            .map_err(|_| ProcessorError::InvalidPacket)?;
+        let udp_packet = UdpPacket::from_bytes(data).map_err(|_| ProcessorError::InvalidPacket)?;
 
         // Find matching UDP socket using BTreeMap for O(log n) lookup
-        let socket_key = SocketKey {
-            local_ip: dst_addr,
-            local_port: udp_packet.dst_port(),
-        };
+        let socket_key = SocketKey { local_ip: dst_addr, local_port: udp_packet.dst_port() };
 
         // First try exact match
         if let Some(mut socket) = self.udp_sockets.get(&socket_key).cloned() {
@@ -415,9 +402,7 @@ impl NetworkProcessor {
         error_data.extend_from_slice(&original_data[..core::cmp::min(original_data.len(), 28)]);
 
         let icmp_packet = super::icmp::IcmpPacket::new(
-            icmp_type,
-            icmp_code,
-            0, // Rest of header (would be set appropriately)
+            icmp_type, icmp_code, 0, // Rest of header (would be set appropriately)
             error_data,
         );
 
@@ -459,7 +444,7 @@ impl NetworkProcessor {
                 let ipv4_packet = Ipv4Packet::from_bytes(packet.data())
                     .map_err(|_| ProcessorError::InvalidPacket)?;
                 Ok(ipv4_packet.header.dest_addr)
-            }
+            },
             _ => Err(ProcessorError::UnsupportedPacketType),
         }
     }

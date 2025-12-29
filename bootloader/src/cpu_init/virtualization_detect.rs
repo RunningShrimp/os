@@ -205,7 +205,7 @@ impl VirtualizationDetector {
         // Returns: EBX=0x756E6547 ('Genu'), EDX=0x49656E69 ('ineI'), ECX=0x6C65746E ('letn')
         // for Intel, or EBX=0x68747541 ('Auth'), EDX=0x69746E41 ('itne'), ECX=0x444D4163 ('cAMD')
         // for AMD
-        
+
         self.cpu_vendor = CpuVendor::Intel; // Simulated detection
         self.cpu_info.vendor = self.cpu_vendor;
         self.cpu_vendor
@@ -215,14 +215,14 @@ impl VirtualizationDetector {
     pub fn detect_vmx(&mut self) -> bool {
         // CPUID 0x01, ECX bit 5 (VMX flag)
         // If set, VMX is supported
-        
+
         self.vmx_caps.supported = true;
-        
+
         // Check additional capabilities with CPUID 0x05 (MSR list)
         self.vmx_caps.ept_support = true;
         self.vmx_caps.vpid_support = true;
         self.vmx_caps.unrestricted_guest = true;
-        
+
         self.vmx_caps.supported
     }
 
@@ -230,14 +230,14 @@ impl VirtualizationDetector {
     pub fn detect_svm(&mut self) -> bool {
         // CPUID 0x80000001, ECX bit 2 (SVM flag)
         // If set, SVM is supported
-        
+
         self.svm_caps.supported = false; // Simulated
-        
+
         if self.svm_caps.supported {
             self.svm_caps.npt_support = true;
             self.svm_caps.asid_support = true;
         }
-        
+
         self.svm_caps.supported
     }
 
@@ -251,7 +251,7 @@ impl VirtualizationDetector {
         self.cpu_features.cmov = true;
         self.cpu_features.tsc = true;
         self.cpu_features.rdwrmsr = true;
-        
+
         true
     }
 
@@ -259,17 +259,17 @@ impl VirtualizationDetector {
     pub fn detect_all(&mut self) -> bool {
         self.detect_vendor();
         self.detect_features();
-        
+
         let has_vmx = self.detect_vmx();
         let has_svm = self.detect_svm();
-        
+
         self.virt_tech = match (has_vmx, has_svm) {
             (true, true) => VirtualizationTech::Both,
             (true, false) => VirtualizationTech::VTx,
             (false, true) => VirtualizationTech::SVM,
             (false, false) => VirtualizationTech::None,
         };
-        
+
         self.detected = true;
         true
     }
@@ -289,9 +289,7 @@ impl VirtualizationDetector {
         match self.virt_tech {
             VirtualizationTech::VTx => self.vmx_caps.is_usable(),
             VirtualizationTech::SVM => self.svm_caps.is_usable(),
-            VirtualizationTech::Both => {
-                self.vmx_caps.is_usable() || self.svm_caps.is_usable()
-            }
+            VirtualizationTech::Both => self.vmx_caps.is_usable() || self.svm_caps.is_usable(),
             VirtualizationTech::None => false,
         }
     }
@@ -379,10 +377,10 @@ mod tests {
     fn test_vmx_capabilities_usable() {
         let mut vmx = VmxCapabilities::new();
         assert!(!vmx.is_usable());
-        
+
         vmx.supported = true;
         assert!(vmx.is_usable());
-        
+
         vmx.locked = true;
         assert!(!vmx.is_usable());
     }
@@ -398,10 +396,10 @@ mod tests {
     fn test_svm_capabilities_usable() {
         let mut svm = SvmCapabilities::new();
         assert!(!svm.is_usable());
-        
+
         svm.supported = true;
         assert!(svm.is_usable());
-        
+
         svm.locked = true;
         assert!(!svm.is_usable());
     }
@@ -493,7 +491,7 @@ mod tests {
         info.family = 6;
         info.model = 158;
         info.stepping = 10;
-        
+
         assert_eq!(info.family, 6);
         assert_eq!(info.model, 158);
     }
@@ -502,7 +500,7 @@ mod tests {
     fn test_detection_report() {
         let mut detector = VirtualizationDetector::new();
         detector.detect_all();
-        
+
         let report = detector.detection_report();
         assert_eq!(report.vendor, CpuVendor::Intel);
         assert_ne!(report.virt_tech, VirtualizationTech::None);
@@ -513,7 +511,7 @@ mod tests {
         let mut detector = VirtualizationDetector::new();
         detector.detect_vmx();
         detector.vmx_caps.locked = true;
-        
+
         assert!(!detector.is_virtualization_usable());
     }
 
@@ -537,7 +535,7 @@ mod tests {
         features.pae = true;
         features.msr = true;
         features.apic = true;
-        
+
         assert!(features.pae);
         assert!(features.msr);
         assert!(features.apic);
@@ -555,14 +553,14 @@ mod tests {
     fn test_virtualization_tech_detection() {
         let mut detector = VirtualizationDetector::new();
         detector.detect_all();
-        
+
         match detector.get_virt_tech() {
             VirtualizationTech::VTx => assert!(detector.vmx_caps.supported),
             VirtualizationTech::SVM => assert!(detector.svm_caps.supported),
             VirtualizationTech::Both => {
                 assert!(detector.vmx_caps.supported);
                 assert!(detector.svm_caps.supported);
-            }
+            },
             VirtualizationTech::None => assert!(!detector.has_virtualization()),
         }
     }

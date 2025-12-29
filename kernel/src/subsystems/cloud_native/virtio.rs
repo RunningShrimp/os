@@ -5,15 +5,12 @@
 
 extern crate alloc;
 
-use alloc::format;
-use crate::reliability::{EINVAL, ENOENT, ENOMEM, EIO, EACCES, EAGAIN};
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use spin::Mutex;
-use alloc::vec;
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::{collections::BTreeMap, format, string::String, sync::Arc, vec, vec::Vec};
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+
+use spin::Mutex;
+
+use crate::reliability::{EACCES, EAGAIN, EINVAL, EIO, ENOENT, ENOMEM};
 
 /// VirtIO设备类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -234,12 +231,7 @@ impl VirtIODevice {
                 size: queue_config.size,
                 descriptors: VirtIODeviceDescriptors {
                     descriptors: vec![
-                        VirtIODeviceDescriptor {
-                            addr: 0,
-                            len: 0,
-                            next: 0,
-                            flags: 0,
-                        };
+                        VirtIODeviceDescriptor { addr: 0, len: 0, next: 0, flags: 0 };
                         queue_config.size as usize
                     ],
                     count: queue_config.size,
@@ -254,13 +246,7 @@ impl VirtIODevice {
                 used_ring: VirtIOUsedRing {
                     flags: 0,
                     idx: 0,
-                    ring: vec![
-                        VirtIOUsedElement {
-                            id: 0,
-                            len: 0,
-                        };
-                        queue_config.size as usize
-                    ],
+                    ring: vec![VirtIOUsedElement { id: 0, len: 0 }; queue_config.size as usize],
                     avail_event: None,
                 },
                 last_used_index: 0,
@@ -492,7 +478,11 @@ impl VirtIODevice {
     }
 
     /// 添加到可用环
-    fn add_to_available_ring(&self, queue: &mut VirtIOQueue, descriptor_index: usize) -> Result<(), i32> {
+    fn add_to_available_ring(
+        &self,
+        queue: &mut VirtIOQueue,
+        descriptor_index: usize,
+    ) -> Result<(), i32> {
         let index = queue.available_ring.idx as usize % queue.size as usize;
         queue.available_ring.ring[index] = descriptor_index as u16;
         queue.available_ring.idx = (queue.available_ring.idx + 1) % queue.size;
@@ -515,42 +505,42 @@ impl VirtIODevice {
     fn queue_configs(&self) -> Vec<Arc<Mutex<VirtIOQueue>>> {
         self.queues.clone()
     }
-    
+
     /// 优化设备性能
     pub fn optimize_device_performance(&mut self) -> Result<(), i32> {
         // 优化所有队列
         for i in 0..self.queues.len() {
             self.optimize_queue_performance(i as u16)?;
         }
-        
+
         // 启用中断合并（如果支持）
         // 启用MSI-X（如果支持）
         // 优化描述符对齐
-        
+
         crate::println!("[virtio] Optimized device performance for {}", self.name);
         Ok(())
     }
-    
+
     /// 优化队列性能
     pub fn optimize_queue_performance(&mut self, queue_index: u16) -> Result<(), i32> {
         if queue_index as usize >= self.queues.len() {
             return Err(EINVAL);
         }
-        
+
         let queue = self.queues[queue_index as usize].lock();
-        
+
         // 优化队列大小（如果太小）
         if queue.size < 256 {
             // 在实际实现中，这里会重新配置队列大小
             crate::println!("[virtio] Queue {} size is small, consider increasing", queue_index);
         }
-        
+
         // 启用事件索引（如果支持）
         // 启用间接描述符（如果支持）
-        
+
         // 优化描述符对齐
         // 在实际实现中，这里会确保描述符页对齐
-        
+
         crate::println!("[virtio] Optimized queue {} performance", queue_index);
         Ok(())
     }
@@ -569,7 +559,12 @@ impl VirtIODevice {
         let mut queue = self.queues[queue_index].lock();
         queue.interrupt_enabled = enabled;
 
-        crate::println!("[virtio] Set queue {} interrupt to {} for {}", queue_index, enabled, self.name);
+        crate::println!(
+            "[virtio] Set queue {} interrupt to {} for {}",
+            queue_index,
+            enabled,
+            self.name
+        );
         Ok(())
     }
 }
@@ -595,7 +590,11 @@ impl VirtIOManager {
     }
 
     /// 注册VirtIO设备
-    pub fn register_device(&mut self, device_type: VirtIODeviceType, config: VirtIODeviceConfig) -> Result<u32, i32> {
+    pub fn register_device(
+        &mut self,
+        device_type: VirtIODeviceType,
+        config: VirtIODeviceConfig,
+    ) -> Result<u32, i32> {
         let device_id = self.next_device_id.fetch_add(1, Ordering::SeqCst) as u32;
 
         let mut device = VirtIODevice::new(device_id, device_type, config);
@@ -658,7 +657,7 @@ impl VirtIOManager {
             vendor_id: 0x1AF4,
             device_type: VirtIODeviceType::Network,
             features: VirtIODeviceFeatures {
-                basic_features: 0x8000000000000000, // VERSION_1
+                basic_features: 0x8000000000000000,           // VERSION_1
                 device_specific_features: 0x0000000000000001, // MAC
             },
             queue_configs: vec![
@@ -689,25 +688,26 @@ impl VirtIOManager {
             vendor_id: 0x1AF4,
             device_type: VirtIODeviceType::Block,
             features: VirtIODeviceFeatures {
-                basic_features: 0x8000000000000000, // VERSION_1
+                basic_features: 0x8000000000000000,           // VERSION_1
                 device_specific_features: 0x0000000000000001, // RO
             },
-            queue_configs: vec![
-                VirtIOQueueConfig {
-                    size: 128,
-                    descriptor_alignment: 16,
-                    ring_size: 128,
-                    event_suppression: false,
-                    indirect_descriptors: true,
-                },
-            ],
+            queue_configs: vec![VirtIOQueueConfig {
+                size: 128,
+                descriptor_alignment: 16,
+                ring_size: 128,
+                event_suppression: false,
+                indirect_descriptors: true,
+            }],
             config_space_size: 8,
             config_space: vec![0; 8],
         };
 
         self.register_device(VirtIODeviceType::Block, block_config)?;
 
-        crate::println!("[virtio] Device scan completed. Found {} devices", self.get_device_count());
+        crate::println!(
+            "[virtio] Device scan completed. Found {} devices",
+            self.get_device_count()
+        );
         Ok(())
     }
 
@@ -765,9 +765,7 @@ pub fn initialize_virtio_devices() -> Result<(), i32> {
 
 /// 获取VirtIO管理器引用
 pub fn get_virtio_manager() -> Option<&'static VirtIOManager> {
-    unsafe {
-        VIRTIO_MANAGER.as_ref()
-    }
+    unsafe { VIRTIO_MANAGER.as_ref() }
 }
 
 /// 获取VirtIO设备数量
@@ -828,7 +826,12 @@ pub fn receive_network_packet(device_id: u32, buffer: &mut [u8]) -> Result<usize
 }
 
 /// 读写块设备
-pub fn read_block_device(device_id: u32, lba: u32, sectors: u16, buffer: &mut [u8]) -> Result<(), i32> {
+pub fn read_block_device(
+    device_id: u32,
+    lba: u32,
+    sectors: u16,
+    buffer: &mut [u8],
+) -> Result<(), i32> {
     let manager = get_virtio_manager().ok_or(EIO)?;
     let device = manager.get_device(device_id).ok_or(ENOENT)?;
 

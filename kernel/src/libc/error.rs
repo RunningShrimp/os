@@ -3,8 +3,9 @@
 //! 提供统一的errno错误码管理和错误处理功能，确保所有C库实现使用一致的错误处理机制。
 
 use core::ffi::c_int;
-use core::sync::atomic::{AtomicI32, Ordering};
+
 use heapless::Vec;
+
 use crate::subsystems::sync::Mutex;
 
 /// 全局errno变量
@@ -454,7 +455,15 @@ pub fn error_stats_string() -> alloc::string::String {
     out.push_str(&alloc::format!("last_error: {} ({})\n", st.last_error, strerror(st.last_error)));
     out.push_str("recent: [");
     for (i, e) in st.error_history.iter().enumerate() {
-        out.push_str(&alloc::format!("{}{}", e, if i + 1 < st.error_history.len() { "," } else { "" }));
+        out.push_str(&alloc::format!(
+            "{}{}",
+            e,
+            if i + 1 < st.error_history.len() {
+                ","
+            } else {
+                ""
+            }
+        ));
     }
     out.push_str("]\n");
     out
@@ -470,7 +479,15 @@ pub fn error_stats_json() -> alloc::string::String {
     out.push_str(&alloc::format!("  \"last_error_str\": \"{}\",\n", strerror(st.last_error)));
     out.push_str("  \"recent\": [");
     for (i, e) in st.error_history.iter().enumerate() {
-        out.push_str(&alloc::format!("{}{}", e, if i + 1 < st.error_history.len() { "," } else { "" }));
+        out.push_str(&alloc::format!(
+            "{}{}",
+            e,
+            if i + 1 < st.error_history.len() {
+                ","
+            } else {
+                ""
+            }
+        ));
     }
     out.push_str(" ]\n}\n");
     out

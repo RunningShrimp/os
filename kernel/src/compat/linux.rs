@@ -9,11 +9,9 @@
 
 extern crate alloc;
 
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::collections::BTreeMap;
-use crate::compat::*;
+use alloc::{collections::BTreeMap, string::String};
 
+use crate::compat::*;
 /// Linux compatibility module
 pub struct LinuxModule {
     syscall_table: LinuxSyscallTable,
@@ -51,7 +49,6 @@ impl PlatformModule for LinuxModule {
     fn shutdown(&mut self) -> Result<(), &'static str> {
         Ok(())
     }
-
 }
 
 /// Linux system call table
@@ -62,9 +59,7 @@ pub struct LinuxSyscallTable {
 
 impl LinuxSyscallTable {
     pub fn new() -> Self {
-        let mut table = Self {
-            syscalls: BTreeMap::new(),
-        };
+        let mut table = Self { syscalls: BTreeMap::new() };
 
         table.register_core_syscalls();
         table

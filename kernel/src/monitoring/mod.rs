@@ -2,8 +2,8 @@
 //!
 //! Provides system monitoring and metrics collection for production environments.
 
-pub mod metrics;
-pub mod health;
 pub mod alerting;
-pub mod timeline;
+pub mod health;
 pub mod health_integration;
+pub mod metrics;
+pub mod timeline;

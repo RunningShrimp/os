@@ -1,7 +1,6 @@
 //! Process information (/proc/[pid])
 
 extern crate alloc;
-use alloc::{boxed::Box, string::String, string::ToString, sync::Arc, vec::Vec};
 use crate::subsystems::sync::Mutex;
 use crate::vfs::{
     error::*,

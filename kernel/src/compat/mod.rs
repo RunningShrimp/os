@@ -11,11 +11,11 @@ extern crate alloc;
 extern crate hashbrown;
 use alloc::boxed::Box;
 
-pub mod windows;
-pub mod macos;
-pub mod linux;
 pub mod android;
 pub mod ios;
+pub mod linux;
+pub mod macos;
+pub mod windows;
 
 /// Target platform enumeration
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,11 +52,7 @@ impl core::hash::BuildHasher for DefaultHasherBuilder {
     }
 }
 
-
-
-
 // Platform module factory
-
 
 /// Create platform module for given target
 pub fn create_platform_module(platform: TargetPlatform) -> Option<Box<dyn PlatformModule>> {

@@ -4,7 +4,12 @@
 macro_rules! test_assert {
     ($cond:expr) => {
         if !($cond) {
-            crate::println!("[kernel_test] ASSERTION FAILED at {}:{}: {}", file!(), line!(), stringify!($cond));
+            crate::println!(
+                "[kernel_test] ASSERTION FAILED at {}:{}: {}",
+                file!(),
+                line!(),
+                stringify!($cond)
+            );
             return false;
         }
     };
@@ -20,15 +25,24 @@ macro_rules! test_assert {
 macro_rules! test_assert_eq {
     ($left:expr, $right:expr) => {
         if ($left) != ($right) {
-            crate::println!("[kernel_test] ASSERTION FAILED: {:?} != {:?} (expected {:?})",
-                           $left, $right, $right);
+            crate::println!(
+                "[kernel_test] ASSERTION FAILED: {:?} != {:?} (expected {:?})",
+                $left,
+                $right,
+                $right
+            );
             return false;
         }
     };
     ($left:expr, $right:expr, $msg:expr) => {
         if ($left) != ($right) {
-            crate::println!("[kernel_test] ASSERTION FAILED: {:?} != {:?} (expected {:?}): {}",
-                           $left, $right, $right, $msg);
+            crate::println!(
+                "[kernel_test] ASSERTION FAILED: {:?} != {:?} (expected {:?}): {}",
+                $left,
+                $right,
+                $right,
+                $msg
+            );
             return false;
         }
     };
@@ -38,15 +52,22 @@ macro_rules! test_assert_eq {
 macro_rules! test_assert_ne {
     ($left:expr, $right:expr) => {
         if ($left) == ($right) {
-            crate::println!("[kernel_test] ASSERTION FAILED: {:?} == {:?} (should be different)",
-                           $left, $right);
+            crate::println!(
+                "[kernel_test] ASSERTION FAILED: {:?} == {:?} (should be different)",
+                $left,
+                $right
+            );
             return false;
         }
     };
     ($left:expr, $right:expr, $msg:expr) => {
         if ($left) == ($right) {
-            crate::println!("[kernel_test] ASSERTION FAILED: {:?} == {:?} (should be different): {}",
-                           $left, $right, $msg);
+            crate::println!(
+                "[kernel_test] ASSERTION FAILED: {:?} == {:?} (should be different): {}",
+                $left,
+                $right,
+                $msg
+            );
             return false;
         }
     };

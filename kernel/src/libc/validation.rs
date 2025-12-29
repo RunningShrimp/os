@@ -4,7 +4,6 @@
 
 extern crate alloc;
 use alloc::vec::Vec;
-use crate::libc::interface::CLibInterface;
 use crate::libc::implementations::create_unified_c_lib;
 
 /// 快速验证C库基本功能

@@ -191,9 +191,7 @@ pub struct MemoryManager {
 
 impl MemoryManager {
     pub fn new() -> Self {
-        Self {
-            total_memory: AtomicU64::new(0),
-        }
+        Self { total_memory: AtomicU64::new(0) }
     }
 
     /// Get total memory
@@ -201,5 +199,3 @@ impl MemoryManager {
         self.total_memory.load(Ordering::SeqCst)
     }
 }
-
-

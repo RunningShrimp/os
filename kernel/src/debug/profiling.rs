@@ -1,7 +1,6 @@
 // 性能分析模块
 
 extern crate alloc;
-//
 // 提供全面的性能分析功能，包括CPU性能分析、内存性能分析、
 // 函数调用分析、热点分析和性能优化建议。
 //
@@ -14,21 +13,25 @@ extern crate alloc;
 // - 优化建议生成
 // - 性能数据可视化
 
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::{format, vec};
-use alloc::string::String;
-use alloc::string::ToString;
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use core::time::Duration;
-use spin::Mutex;
+use alloc::{
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
+use core::{
+    sync::atomic::{AtomicU64, AtomicUsize, Ordering},
+    time::Duration,
+};
 
-use crate::time;
+use spin::Mutex;
 
 // Import println macro
 #[allow(unused_imports)]
 use crate::println;
+use crate::time;
 
 /// 性能分析器类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -407,7 +410,11 @@ impl Profiler {
     }
 
     /// 记录函数调用开始
-    pub fn function_enter(&self, function_name: String, module_name: Option<String>) -> Result<(), ProfilingError> {
+    pub fn function_enter(
+        &self,
+        function_name: String,
+        module_name: Option<String>,
+    ) -> Result<(), ProfilingError> {
         if !self.is_profiling.load(Ordering::SeqCst) {
             return Ok(());
         }
@@ -441,7 +448,9 @@ impl Profiler {
         // 移除栈帧
         let mut call_stack = self.call_stack.lock();
         if let Some(index) = call_stack.iter().position(|f| {
-            f.function_name.as_ref().map_or(false, |name| name == &function_name)
+            f.function_name
+                .as_ref()
+                .map_or(false, |name| name == &function_name)
         }) {
             call_stack.remove(index);
         }
@@ -491,7 +500,9 @@ impl Profiler {
         }
 
         // 更新统计
-        self.statistics.total_samples_collected.fetch_add(1, Ordering::SeqCst);
+        self.statistics
+            .total_samples_collected
+            .fetch_add(1, Ordering::SeqCst);
 
         Ok(())
     }
@@ -532,22 +543,29 @@ impl Profiler {
     }
 
     /// 更新函数统计
-    fn update_function_statistics(&self, function_name: &str, timestamp: u64, is_entry: bool) -> Result<(), ProfilingError> {
+    fn update_function_statistics(
+        &self,
+        function_name: &str,
+        timestamp: u64,
+        is_entry: bool,
+    ) -> Result<(), ProfilingError> {
         let mut stats = self.function_stats.lock();
 
-        let stat = stats.entry(function_name.to_string()).or_insert_with(|| FunctionStatistics {
-            function_name: function_name.to_string(),
-            call_count: 0,
-            total_time: 0,
-            min_time: u64::MAX,
-            max_time: 0,
-            avg_time: 0.0,
-            cpu_time: 0,
-            memory_allocated: 0,
-            memory_freed: 0,
-            last_call_time: 0,
-            call_stacks: Vec::new(),
-        });
+        let stat = stats
+            .entry(function_name.to_string())
+            .or_insert_with(|| FunctionStatistics {
+                function_name: function_name.to_string(),
+                call_count: 0,
+                total_time: 0,
+                min_time: u64::MAX,
+                max_time: 0,
+                avg_time: 0.0,
+                cpu_time: 0,
+                memory_allocated: 0,
+                memory_freed: 0,
+                last_call_time: 0,
+                call_stacks: Vec::new(),
+            });
 
         if is_entry {
             // 函数入口
@@ -568,7 +586,10 @@ impl Profiler {
     }
 
     /// 识别热点函数
-    fn identify_hotspots(&self, function_stats: &BTreeMap<String, FunctionStatistics>) -> Result<Vec<HotspotFunction>, ProfilingError> {
+    fn identify_hotspots(
+        &self,
+        function_stats: &BTreeMap<String, FunctionStatistics>,
+    ) -> Result<Vec<HotspotFunction>, ProfilingError> {
         let mut hotspots: Vec<HotspotFunction> = Vec::new();
         let total_time: u64 = function_stats.values().map(|s| s.total_time).sum();
 
@@ -582,7 +603,8 @@ impl Profiler {
             if time_percentage >= self.config.hotspot_threshold {
                 let hotspot_score = self.calculate_hotspot_score(stat, time_percentage);
                 let optimization_potential = self.assess_optimization_potential(stat);
-                let optimization_suggestions = self.generate_function_optimization_suggestions(function_name, stat);
+                let optimization_suggestions =
+                    self.generate_function_optimization_suggestions(function_name, stat);
 
                 hotspots.push(HotspotFunction {
                     function_name: function_name.clone(),
@@ -629,7 +651,11 @@ impl Profiler {
     }
 
     /// 生成函数优化建议
-    fn generate_function_optimization_suggestions(&self, function_name: &str, stat: &FunctionStatistics) -> Vec<String> {
+    fn generate_function_optimization_suggestions(
+        &self,
+        function_name: &str,
+        stat: &FunctionStatistics,
+    ) -> Vec<String> {
         let mut suggestions = Vec::new();
 
         let avg_time_ms = stat.avg_time / 1000000.0;
@@ -655,7 +681,10 @@ impl Profiler {
     }
 
     /// 计算性能指标
-    fn calculate_performance_metrics(&self, samples: &[PerformanceSample]) -> Result<PerformanceMetrics, ProfilingError> {
+    fn calculate_performance_metrics(
+        &self,
+        samples: &[PerformanceSample],
+    ) -> Result<PerformanceMetrics, ProfilingError> {
         if samples.is_empty() {
             return Ok(PerformanceMetrics {
                 total_execution_time: 0,
@@ -676,24 +705,31 @@ impl Profiler {
         let total_cpu_usage: f64 = samples.iter().map(|s| s.cpu_usage).sum();
         let avg_cpu_usage = total_cpu_usage / samples.len() as f64;
 
-        let memory_usage_values: Vec<u64> = samples.iter().map(|s| s.memory_info.current_usage).collect();
+        let memory_usage_values: Vec<u64> = samples
+            .iter()
+            .map(|s| s.memory_info.current_usage)
+            .collect();
         let memory_peak = memory_usage_values.iter().max().copied().unwrap_or(0);
-        let memory_average = memory_usage_values.iter().sum::<u64>() / memory_usage_values.len() as u64;
+        let memory_average =
+            memory_usage_values.iter().sum::<u64>() / memory_usage_values.len() as u64;
 
         Ok(PerformanceMetrics {
             total_execution_time,
             cpu_usage_percentage: avg_cpu_usage,
             memory_peak,
             memory_average,
-            context_switches: 0, // 需要从系统获取
-            page_faults: 0,      // 需要从系统获取
-            cache_misses: 0,     // 需要从硬件计数器获取
+            context_switches: 0,      // 需要从系统获取
+            page_faults: 0,           // 需要从系统获取
+            cache_misses: 0,          // 需要从硬件计数器获取
             branch_mispredictions: 0, // 需要从硬件计数器获取
         })
     }
 
     /// 生成优化建议
-    fn generate_optimization_suggestions(&self, hotspots: &[HotspotFunction]) -> Vec<OptimizationSuggestion> {
+    fn generate_optimization_suggestions(
+        &self,
+        hotspots: &[HotspotFunction],
+    ) -> Vec<OptimizationSuggestion> {
         let mut suggestions = Vec::new();
 
         for (i, hotspot) in hotspots.iter().take(10).enumerate() {
@@ -713,7 +749,10 @@ impl Profiler {
                         hotspot.function_name, hotspot.time_percentage
                     ),
                     target_function: Some(hotspot.function_name.clone()),
-                    expected_improvement: format!("预计可减少 {}% 的执行时间", hotspot.time_percentage * 0.5),
+                    expected_improvement: format!(
+                        "预计可减少 {}% 的执行时间",
+                        hotspot.time_percentage * 0.5
+                    ),
                     implementation_complexity: ImplementationComplexity::Medium,
                     implementation_steps: vec![
                         "分析函数的算法复杂度".to_string(),
@@ -810,9 +849,15 @@ impl PerformanceAnalysisEngine {
         let mut profilers = self.active_profilers.lock();
         profilers.insert(id.clone(), profiler);
 
-        self.statistics.active_profilers.store(profilers.len(), Ordering::SeqCst);
+        self.statistics
+            .active_profilers
+            .store(profilers.len(), Ordering::SeqCst);
 
-        crate::println!("[profiling] 创建 {} 分析器: {}", profiler_type_as_string(profiler_type), id);
+        crate::println!(
+            "[profiling] 创建 {} 分析器: {}",
+            profiler_type_as_string(profiler_type),
+            id
+        );
 
         Ok(id)
     }
@@ -820,7 +865,8 @@ impl PerformanceAnalysisEngine {
     /// 获取分析器
     pub fn get_profiler(&self, profiler_id: &str) -> Result<Arc<Profiler>, ProfilingError> {
         let profilers = self.active_profilers.lock();
-        profilers.get(profiler_id)
+        profilers
+            .get(profiler_id)
             .cloned()
             .ok_or(ProfilingError::ProfilerNotFound(profiler_id.to_string()))
     }
@@ -860,8 +906,12 @@ impl PerformanceAnalysisEngine {
             results.insert(result.analysis_id.clone(), result.clone());
 
             // 更新统计
-            self.statistics.active_profilers.store(profilers.len(), Ordering::SeqCst);
-            self.statistics.total_profiling_sessions.fetch_add(1, Ordering::SeqCst);
+            self.statistics
+                .active_profilers
+                .store(profilers.len(), Ordering::SeqCst);
+            self.statistics
+                .total_profiling_sessions
+                .fetch_add(1, Ordering::SeqCst);
 
             Ok(result)
         } else {
@@ -870,9 +920,15 @@ impl PerformanceAnalysisEngine {
     }
 
     /// 获取分析结果
-    pub fn get_analysis_result(&self, analysis_id: &str) -> Result<ProfilingResult, ProfilingError> {
+    pub fn get_analysis_result(
+        &self,
+        analysis_id: &str,
+    ) -> Result<ProfilingResult, ProfilingError> {
         let results = self.analysis_results.lock();
-        results.get(analysis_id).cloned().ok_or(ProfilingError::AnalysisNotFound(analysis_id.to_string()))
+        results
+            .get(analysis_id)
+            .cloned()
+            .ok_or(ProfilingError::AnalysisNotFound(analysis_id.to_string()))
     }
 
     /// 获取所有分析结果
@@ -885,22 +941,26 @@ impl PerformanceAnalysisEngine {
     pub fn get_statistics(&self) -> ProfilingStatistics {
         ProfilingStatistics {
             total_profiling_sessions: AtomicU64::new(
-                self.statistics.total_profiling_sessions.load(Ordering::SeqCst)
+                self.statistics
+                    .total_profiling_sessions
+                    .load(Ordering::SeqCst),
             ),
             total_samples_collected: AtomicU64::new(
-                self.statistics.total_samples_collected.load(Ordering::SeqCst)
+                self.statistics
+                    .total_samples_collected
+                    .load(Ordering::SeqCst),
             ),
             total_function_calls: AtomicU64::new(
-                self.statistics.total_function_calls.load(Ordering::SeqCst)
+                self.statistics.total_function_calls.load(Ordering::SeqCst),
             ),
             active_profilers: AtomicUsize::new(
-                self.statistics.active_profilers.load(Ordering::SeqCst)
+                self.statistics.active_profilers.load(Ordering::SeqCst),
             ),
             data_collected_size: AtomicU64::new(
-                self.statistics.data_collected_size.load(Ordering::SeqCst)
+                self.statistics.data_collected_size.load(Ordering::SeqCst),
             ),
             analysis_time_total: AtomicU64::new(
-                self.statistics.analysis_time_total.load(Ordering::SeqCst)
+                self.statistics.analysis_time_total.load(Ordering::SeqCst),
             ),
         }
     }

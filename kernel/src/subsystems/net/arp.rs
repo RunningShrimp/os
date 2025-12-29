@@ -3,10 +3,11 @@
 //! This module provides ARP functionality for mapping IPv4 addresses to MAC addresses.
 
 extern crate alloc;
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU64, Ordering};
-use core::time::Duration;
+use alloc::{collections::BTreeMap, vec::Vec};
+use core::{
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
 
 use super::device::MacAddr;
 // use super::packet::Packet;
@@ -250,12 +251,12 @@ impl ArpHeader {
         }
 
         let sender_mac = MacAddr::new([
-            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13]
+            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13],
         ]);
         let sender_ip = Ipv4Addr::from_be_bytes([bytes[14], bytes[15], bytes[16], bytes[17]]);
 
         let target_mac = MacAddr::new([
-            bytes[18], bytes[19], bytes[20], bytes[21], bytes[22], bytes[23]
+            bytes[18], bytes[19], bytes[20], bytes[21], bytes[22], bytes[23],
         ]);
         let target_ip = Ipv4Addr::from_be_bytes([bytes[24], bytes[25], bytes[26], bytes[27]]);
 
@@ -273,11 +274,7 @@ impl ArpHeader {
     }
 
     /// Create ARP request
-    pub fn request(
-        sender_mac: MacAddr,
-        sender_ip: Ipv4Addr,
-        target_ip: Ipv4Addr,
-    ) -> Self {
+    pub fn request(sender_mac: MacAddr, sender_ip: Ipv4Addr, target_ip: Ipv4Addr) -> Self {
         Self::new(
             ArpHardwareType::Ethernet,
             ArpProtocolType::Ipv4,
@@ -385,9 +382,9 @@ impl ArpCache {
     pub fn new() -> Self {
         Self {
             entries: BTreeMap::new(),
-            max_size: 1024, // Configurable
+            max_size: 1024,                        // Configurable
             timeout: Duration::from_secs(60 * 20), // 20 minutes default
-            cleanup_interval: 60, // Clean up every 60 seconds
+            cleanup_interval: 60,                  // Clean up every 60 seconds
             last_cleanup: AtomicU64::new(0),
         }
     }
@@ -428,9 +425,8 @@ impl ArpCache {
         let now = ArpEntry::current_time();
         let threshold = now.saturating_sub(self.timeout.as_secs());
 
-        self.entries.retain(|_, entry| {
-            entry.permanent || entry.last_accessed >= threshold
-        });
+        self.entries
+            .retain(|_, entry| entry.permanent || entry.last_accessed >= threshold);
     }
 
     /// Get cache statistics
@@ -438,7 +434,9 @@ impl ArpCache {
         ArpCacheStats {
             entries: self.entries.len(),
             max_size: self.max_size,
-            permanent_entries: self.entries.values()
+            permanent_entries: self
+                .entries
+                .values()
                 .filter(|entry| entry.permanent)
                 .count(),
         }
@@ -452,7 +450,8 @@ impl ArpCache {
     /// Remove the oldest entry
     fn remove_oldest(&mut self) {
         // Find the oldest entry key first
-        let oldest_key = self.entries
+        let oldest_key = self
+            .entries
             .iter()
             .min_by_key(|(_, entry)| entry.created_at)
             .map(|(ip, _)| *ip);
@@ -530,13 +529,13 @@ impl ArpProcessor {
                     );
                     return Ok(Some(reply));
                 }
-            }
+            },
             ArpOperation::Reply => {
                 // Cache the reply information (already done above)
-            }
+            },
             _ => {
                 // Other operations not supported yet
-            }
+            },
         }
 
         Ok(None)

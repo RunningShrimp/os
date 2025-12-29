@@ -1,18 +1,16 @@
 /// Threat Intelligence Module for IDS
-
 extern crate alloc;
-///
+use alloc::{string::String, sync::Arc, vec::Vec};
+use core::sync::atomic::{AtomicU64, Ordering};
+
 /// This module implements threat intelligence integration to enhance
 /// intrusion detection with external threat data.
-
-use crate::subsystems::sync::{SpinLock, Mutex};
-use crate::collections::HashMap;
-use crate::compat::DefaultHasherBuilder;
-use crate::subsystems::time::{SystemTime, UNIX_EPOCH};
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::string::String;
-use core::sync::atomic::{AtomicU64, Ordering};
+use crate::subsystems::sync::{Mutex, SpinLock};
+use crate::{
+    collections::HashMap,
+    compat::DefaultHasherBuilder,
+    subsystems::time::{SystemTime, UNIX_EPOCH},
+};
 
 /// Threat intelligence source type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -260,13 +258,19 @@ impl ThreatIntelligence {
     }
 
     /// Initialize threat intelligence engine with config
-    pub fn init(&mut self, _config: &crate::ids::ThreatIntelligenceConfig) -> Result<(), &'static str> {
+    pub fn init(
+        &mut self,
+        _config: &crate::ids::ThreatIntelligenceConfig,
+    ) -> Result<(), &'static str> {
         // For now, no-op initialization
         Ok(())
     }
 
     /// Update intelligence data with new threat feeds
-    pub fn update_intelligence(&mut self, data: Vec<crate::ids::ThreatData>) -> Result<(), &'static str> {
+    pub fn update_intelligence(
+        &mut self,
+        data: Vec<crate::ids::ThreatData>,
+    ) -> Result<(), &'static str> {
         for d in data {
             // Insert simple indicator placeholders
             let id = self.indicator_counter.fetch_add(1, Ordering::SeqCst);
@@ -296,7 +300,10 @@ impl ThreatIntelligence {
     }
 
     /// Check whether a DetectionSource is considered a threat according to indicators
-    pub fn is_threat_source(&mut self, source: &crate::ids::DetectionSource) -> Result<bool, &'static str> {
+    pub fn is_threat_source(
+        &mut self,
+        source: &crate::ids::DetectionSource,
+    ) -> Result<bool, &'static str> {
         let _lock = self.engine_lock.lock();
 
         // Only check network-related sources for now
@@ -319,16 +326,20 @@ impl ThreatIntelligence {
                         continue;
                     }
 
-                    if ind.indicator_type == IndicatorType::Domain && self.check_domain_match(&source.source_address, value) {
+                    if ind.indicator_type == IndicatorType::Domain
+                        && self.check_domain_match(&source.source_address, value)
+                    {
                         return Ok(true);
                     }
-                    if ind.indicator_type == IndicatorType::IPAddress && &source.source_address == value {
+                    if ind.indicator_type == IndicatorType::IPAddress
+                        && &source.source_address == value
+                    {
                         return Ok(true);
                     }
                 }
 
                 Ok(false)
-            }
+            },
             // For non-network sources we don't have intelligence yet
             _ => Ok(false),
         }
@@ -351,10 +362,12 @@ impl ThreatIntelligence {
             self.indicator_counter.fetch_add(1, Ordering::Relaxed);
         }
 
-        self.indicators.insert(indicator.value.clone(), indicator.clone());
+        self.indicators
+            .insert(indicator.value.clone(), indicator.clone());
 
         // Update type index
-        let type_indicators = self.indicators_by_type
+        let type_indicators = self
+            .indicators_by_type
             .entry(indicator.indicator_type)
             .or_insert_with(Vec::new);
 
@@ -366,7 +379,11 @@ impl ThreatIntelligence {
     }
 
     /// Check if a value matches any threat indicators
-    pub fn check_indicator(&mut self, value: &str, context: &HashMap<String, String>) -> Vec<ThreatMatch> {
+    pub fn check_indicator(
+        &mut self,
+        value: &str,
+        context: &HashMap<String, String>,
+    ) -> Vec<ThreatMatch> {
         let _lock = self.engine_lock.lock();
 
         let mut matches = Vec::new();
@@ -438,7 +455,9 @@ impl ThreatIntelligence {
         for (indicator_value, indicator) in &self.indicators {
             if indicator.active && !self.is_expired(indicator.expires_at) {
                 if indicator.indicator_type == IndicatorType::Domain {
-                    if self.is_subdomain(domain, indicator_value) || self.is_subdomain(indicator_value, domain) {
+                    if self.is_subdomain(domain, indicator_value)
+                        || self.is_subdomain(indicator_value, domain)
+                    {
                         return Some(indicator);
                     }
                 }
@@ -485,7 +504,8 @@ impl ThreatIntelligence {
 
     /// Get recent threat matches
     pub fn get_recent_matches(&self, count: usize) -> Vec<ThreatMatch> {
-        self.recent_matches.iter()
+        self.recent_matches
+            .iter()
             .rev()
             .take(count)
             .cloned()
@@ -539,7 +559,9 @@ impl ThreatIntelligence {
         for value in expired_values {
             if let Some(indicator) = self.indicators.remove(&value) {
                 // Update type index
-                if let Some(type_indicators) = self.indicators_by_type.get_mut(&indicator.indicator_type) {
+                if let Some(type_indicators) =
+                    self.indicators_by_type.get_mut(&indicator.indicator_type)
+                {
                     type_indicators.retain(|v| v != &value);
                 }
             }
@@ -564,9 +586,9 @@ impl ThreatIntelligence {
 
     /// Check domain match
     fn check_domain_match(&self, value: &str, indicator: &str) -> bool {
-        value == indicator ||
-        value.ends_with(&format!(".{}", indicator)) ||
-        indicator.ends_with(&format!(".{}", value))
+        value == indicator
+            || value.ends_with(&format!(".{}", indicator))
+            || indicator.ends_with(&format!(".{}", value))
     }
 
     /// Check URL match
@@ -592,7 +614,11 @@ impl ThreatIntelligence {
     }
 
     /// Create a threat match
-    fn create_threat_match(&self, indicator: ThreatIndicator, context: &HashMap<String, String>) -> ThreatMatch {
+    fn create_threat_match(
+        &self,
+        indicator: ThreatIndicator,
+        context: &HashMap<String, String>,
+    ) -> ThreatMatch {
         let id = self.match_counter.fetch_add(1, Ordering::Relaxed);
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -612,20 +638,20 @@ impl ThreatIntelligence {
             ThreatSeverity::Critical => {
                 actions.push(String::from("Block immediately"));
                 actions.push(String::from("Escalate to security team"));
-            }
+            },
             ThreatSeverity::High => {
                 actions.push(String::from("Monitor closely"));
                 actions.push(String::from("Consider blocking"));
-            }
+            },
             ThreatSeverity::Medium => {
                 actions.push(String::from("Log for investigation"));
-            }
+            },
             ThreatSeverity::Low => {
                 actions.push(String::from("Monitor if possible"));
-            }
+            },
             ThreatSeverity::Info => {
                 actions.push(String::from("Record for intelligence"));
-            }
+            },
         }
 
         ThreatMatch {
@@ -657,26 +683,34 @@ impl ThreatIntelligence {
         // 4. Add indicators to the database
 
         // For now, we'll add some sample indicators
-        let sample_indicators = vec![
-            ThreatIndicator {
-                value: String::from("192.168.100.1"),
-                indicator_type: IndicatorType::IPAddress,
-                description: String::from("Known malicious IP"),
-                confidence: ThreatConfidence::High,
-                severity: ThreatSeverity::High,
-                source: feed.feed_type,
-                first_seen: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
-                last_seen: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
-                expires_at: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() + 86400,
-                threat_actors: vec![String::from("TestActor")],
-                malware_families: Vec::new(),
-                campaigns: Vec::new(),
-                tags: vec![String::from("malware")],
-                references: Vec::new(),
-                context: HashMap::with_hasher(DefaultHasherBuilder),
-                active: true,
-            },
-        ];
+        let sample_indicators = vec![ThreatIndicator {
+            value: String::from("192.168.100.1"),
+            indicator_type: IndicatorType::IPAddress,
+            description: String::from("Known malicious IP"),
+            confidence: ThreatConfidence::High,
+            severity: ThreatSeverity::High,
+            source: feed.feed_type,
+            first_seen: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            last_seen: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            expires_at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs()
+                + 86400,
+            threat_actors: vec![String::from("TestActor")],
+            malware_families: Vec::new(),
+            campaigns: Vec::new(),
+            tags: vec![String::from("malware")],
+            references: Vec::new(),
+            context: HashMap::with_hasher(DefaultHasherBuilder),
+            active: true,
+        }];
 
         for indicator in sample_indicators {
             self.add_indicator(indicator);
@@ -730,7 +764,10 @@ pub fn create_threat_intelligence() -> Arc<Mutex<ThreatIntelligence>> {
 }
 
 /// Export threat intelligence data
-pub fn export_threat_intelligence(indicators: &[ThreatIndicator], actors: &[ThreatActor]) -> String {
+pub fn export_threat_intelligence(
+    indicators: &[ThreatIndicator],
+    actors: &[ThreatActor],
+) -> String {
     let mut output = String::from("Threat Intelligence Export\n");
     output.push_str("==========================\n\n");
 
@@ -743,7 +780,10 @@ pub fn export_threat_intelligence(indicators: &[ThreatIndicator], actors: &[Thre
         if indicator.severity >= ThreatSeverity::High {
             output.push_str(&format!(
                 "{} ({:?}) - {} - Severity: {:?}\n",
-                indicator.value, indicator.indicator_type, indicator.description, indicator.severity
+                indicator.value,
+                indicator.indicator_type,
+                indicator.description,
+                indicator.severity
             ));
         }
     }

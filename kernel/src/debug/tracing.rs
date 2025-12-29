@@ -1,7 +1,6 @@
 // 系统跟踪模块
 
 extern crate alloc;
-//
 // 提供全面的系统跟踪功能，包括事件跟踪、执行流跟踪、
 // 系统调用跟踪和分布式跟踪支持。
 //
@@ -14,22 +13,25 @@ extern crate alloc;
 // - 性能分析集成
 // - 实时跟踪监控
 
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::format;
-use alloc::boxed::Box;
-use alloc::string::String;
-use alloc::string::ToString;
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use core::time::Duration;
-use spin::Mutex;
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
+use core::{
+    sync::atomic::{AtomicU64, AtomicUsize, Ordering},
+    time::Duration,
+};
 
-use crate::time;
+use spin::Mutex;
 
 // Import println macro
 #[allow(unused_imports)]
 use crate::println;
+use crate::time;
 
 /// 跟踪级别
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -360,7 +362,9 @@ impl Tracer {
         // 限制事件数量
         if events.len() > self.config.max_events {
             events.remove(0);
-            self.statistics.dropped_events.fetch_add(1, Ordering::SeqCst);
+            self.statistics
+                .dropped_events
+                .fetch_add(1, Ordering::SeqCst);
         }
 
         // 更新统计
@@ -370,7 +374,11 @@ impl Tracer {
     }
 
     /// 开始段
-    pub fn start_span(&self, operation_name: String, parent_id: Option<String>) -> Result<String, TraceError> {
+    pub fn start_span(
+        &self,
+        operation_name: String,
+        parent_id: Option<String>,
+    ) -> Result<String, TraceError> {
         if !self.enabled.load(Ordering::SeqCst) {
             return Ok(String::new());
         }
@@ -405,7 +413,9 @@ impl Tracer {
         let mut spans = self.spans.lock();
         spans.insert(span_id.clone(), span.clone());
         self.statistics.total_spans.fetch_add(1, Ordering::SeqCst);
-        self.statistics.active_spans.store(spans.len(), Ordering::SeqCst);
+        self.statistics
+            .active_spans
+            .store(spans.len(), Ordering::SeqCst);
 
         // 添加到活动段栈
         let mut stack = self.active_span_stack.lock();
@@ -458,7 +468,9 @@ impl Tracer {
             stack.remove(index);
         }
 
-        self.statistics.active_spans.store(spans.len(), Ordering::SeqCst);
+        self.statistics
+            .active_spans
+            .store(spans.len(), Ordering::SeqCst);
 
         // 记录段结束事件
         self.record_event(TraceEvent {
@@ -487,7 +499,12 @@ impl Tracer {
     }
 
     /// 记录日志
-    pub fn log(&self, span_id: Option<&str>, level: TraceLevel, message: String) -> Result<(), TraceError> {
+    pub fn log(
+        &self,
+        span_id: Option<&str>,
+        level: TraceLevel,
+        message: String,
+    ) -> Result<(), TraceError> {
         if !self.enabled.load(Ordering::SeqCst) {
             return Ok(());
         }
@@ -530,7 +547,11 @@ impl Tracer {
     }
 
     /// 获取事件
-    pub fn get_events(&self, start_time: Option<u64>, end_time: Option<u64>) -> Result<Vec<TraceEvent>, TraceError> {
+    pub fn get_events(
+        &self,
+        start_time: Option<u64>,
+        end_time: Option<u64>,
+    ) -> Result<Vec<TraceEvent>, TraceError> {
         let events = self.events.lock();
 
         let filtered_events: Vec<TraceEvent> = events
@@ -582,7 +603,9 @@ impl Tracer {
         spans.retain(|_, s| s.start_time >= cutoff_time);
 
         // 更新统计
-        self.statistics.active_spans.store(spans.len(), Ordering::SeqCst);
+        self.statistics
+            .active_spans
+            .store(spans.len(), Ordering::SeqCst);
 
         Ok(())
     }
@@ -635,7 +658,8 @@ impl TraceEngine {
     /// 获取跟踪器
     pub fn get_tracer(&self, trace_id: &str) -> Result<Arc<Tracer>, TraceError> {
         let tracers = self.tracers.lock();
-        tracers.get(trace_id)
+        tracers
+            .get(trace_id)
             .cloned()
             .ok_or(TraceError::TracerNotFound(trace_id.to_string()))
     }
@@ -726,7 +750,8 @@ impl TraceExporter for ConsoleExporter {
 
             let message = event.message.as_deref().unwrap_or("");
 
-            crate::println!("[{}] {} [{}:{}] {}",
+            crate::println!(
+                "[{}] {} [{}:{}] {}",
                 level_str,
                 event.timestamp,
                 event.component,
@@ -746,7 +771,8 @@ impl TraceExporter for ConsoleExporter {
                 0
             };
 
-            crate::println!("Span: {} -> {} ({}ns)",
+            crate::println!(
+                "Span: {} -> {} ({}ns)",
                 span.operation_name,
                 span.service_name,
                 duration
@@ -834,7 +860,8 @@ pub fn init() -> Result<(), TraceError> {
 /// 获取全局跟踪引擎
 pub fn get_trace_engine() -> Result<Arc<TraceEngine>, TraceError> {
     let engine = TRACE_ENGINE.lock();
-    engine.as_ref()
+    engine
+        .as_ref()
         .cloned()
         .ok_or(TraceError::SystemError("跟踪引擎未初始化".to_string()))
 }

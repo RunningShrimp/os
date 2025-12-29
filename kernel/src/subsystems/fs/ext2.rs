@@ -13,18 +13,16 @@
 //! - File system recovery
 
 extern crate alloc;
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::sync::Arc;
-use core::sync::atomic::{AtomicU64, AtomicU32, Ordering};
+use alloc::{collections::BTreeMap, string::String, sync::Arc, vec::Vec};
+use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+
 use spin::Mutex;
 
-use crate::time;
 use super::api::{
-    FileHandle, DirEntry, PathComponent, FsError,
-    FileOperations, DirectoryOperations, PathOperations
+    DirEntry, DirectoryOperations, FileHandle, FileOperations, FsError, PathComponent,
+    PathOperations,
 };
+use crate::time;
 
 /// Ext2 superblock
 #[derive(Debug, Clone)]
@@ -356,7 +354,7 @@ pub struct Ext2OpenFile {
 impl FileOperations for Ext2OpenFile {
     fn read(&self, offset: u64, buffer: &mut [u8]) -> Result<usize, FsError> {
         let ext2_inode = self.fs.read_inode(self.inode)?;
-        
+
         if !ext2_inode.is_regular_file() {
             return Err(FsError::IsADirectory);
         }
@@ -365,8 +363,9 @@ impl FileOperations for Ext2OpenFile {
             return Ok(0);
         }
 
-        let bytes_to_read = core::cmp::min(buffer.len(), (ext2_inode.size as u64 - offset) as usize);
-        
+        let bytes_to_read =
+            core::cmp::min(buffer.len(), (ext2_inode.size as u64 - offset) as usize);
+
         // In a real implementation, this would read the actual file data
         // For now, just fill with zeros
         for i in 0..bytes_to_read {
@@ -383,7 +382,7 @@ impl FileOperations for Ext2OpenFile {
         }
 
         let mut ext2_inode = self.fs.read_inode(self.inode)?;
-        
+
         if !ext2_inode.is_regular_file() {
             return Err(FsError::IsADirectory);
         }
@@ -396,7 +395,7 @@ impl FileOperations for Ext2OpenFile {
 
         self.fs.write_inode(self.inode, &ext2_inode)?;
         self.fs.stats.write_ops.fetch_add(1, Ordering::Relaxed);
-        
+
         Ok(buffer.len())
     }
 
@@ -411,7 +410,7 @@ impl FileOperations for Ext2OpenFile {
         }
 
         let mut ext2_inode = self.fs.read_inode(self.inode)?;
-        
+
         if !ext2_inode.is_regular_file() {
             return Err(FsError::IsADirectory);
         }
@@ -455,7 +454,7 @@ impl DirectoryOperations for Ext2OpenDir {
 
         // Allocate new inode
         let new_inode = self.fs.allocate_inode()?;
-        
+
         // Create directory inode
         let dir_inode = Ext2Inode {
             mode: (mode & 0x0FFF) | 0x4000, // Directory type
@@ -484,11 +483,26 @@ impl DirectoryOperations for Ext2OpenDir {
         self.fs.write_inode(new_inode, &dir_inode)?;
 
         // Add entry to parent directory
-        self.fs.add_directory_entry(self.inode, new_inode, name, super::api::DirEntryType::Directory)?;
-        
+        self.fs.add_directory_entry(
+            self.inode,
+            new_inode,
+            name,
+            super::api::DirEntryType::Directory,
+        )?;
+
         // Add . and .. entries to new directory
-        self.fs.add_directory_entry(new_inode, new_inode, ".", super::api::DirEntryType::Directory)?;
-        self.fs.add_directory_entry(new_inode, self.inode, "..", super::api::DirEntryType::Directory)?;
+        self.fs.add_directory_entry(
+            new_inode,
+            new_inode,
+            ".",
+            super::api::DirEntryType::Directory,
+        )?;
+        self.fs.add_directory_entry(
+            new_inode,
+            self.inode,
+            "..",
+            super::api::DirEntryType::Directory,
+        )?;
 
         Ok(())
     }
@@ -500,9 +514,9 @@ impl DirectoryOperations for Ext2OpenDir {
 
         // Find directory entry
         let entry = self.find_entry(name).ok_or(FsError::FileNotFound)?;
-        
+
         let dir_inode = self.fs.read_inode(entry.inode)?;
-        
+
         if !dir_inode.is_directory() {
             return Err(FsError::NotADirectory);
         }
@@ -514,7 +528,7 @@ impl DirectoryOperations for Ext2OpenDir {
 
         // Remove entry from parent directory
         self.fs.remove_directory_entry(self.inode, name)?;
-        
+
         // Free the directory inode
         self.fs.free_inode(entry.inode);
 
@@ -562,7 +576,7 @@ impl Ext2FileSystem {
     pub fn new(device_id: String, mount_options: Ext2MountOptions) -> Result<Self, FsError> {
         // In a real implementation, this would read the superblock from the device
         let superblock = Self::read_superblock(&device_id)?;
-        
+
         if !superblock.is_valid() {
             return Err(FsError::CorruptedFileSystem);
         }
@@ -617,7 +631,8 @@ impl Ext2FileSystem {
             first_ino: 11,
             inode_size: 128,
             block_group_nr: 0,
-            feature_compat: 0x00000028, // EXT2_FEATURE_COMPAT_EXT_ATTR | EXT2_FEATURE_COMPAT_DIR_INDEX
+            feature_compat: 0x00000028, /* EXT2_FEATURE_COMPAT_EXT_ATTR |
+                                         * EXT2_FEATURE_COMPAT_DIR_INDEX */
             feature_incompat: 0x00000000,
             feature_ro_compat: 0x00000000,
             uuid: [0; 16],
@@ -642,7 +657,10 @@ impl Ext2FileSystem {
     }
 
     /// Read block group descriptors from device
-    fn read_block_group_descriptors(device_id: &str, superblock: &Ext2Superblock) -> Result<Vec<Ext2BlockGroupDesc>, FsError> {
+    fn read_block_group_descriptors(
+        device_id: &str,
+        superblock: &Ext2Superblock,
+    ) -> Result<Vec<Ext2BlockGroupDesc>, FsError> {
         let group_count = superblock.block_group_count();
         let mut groups = Vec::with_capacity(group_count as usize);
 
@@ -731,7 +749,7 @@ impl Ext2FileSystem {
     fn free_inode(&self, inode_num: u32) {
         // In a real implementation, this would clear the inode in the bitmap
         self.stats.free_inodes.fetch_add(1, Ordering::Relaxed);
-        
+
         // Remove from cache
         {
             let mut cache = self.inode_cache.lock();
@@ -753,7 +771,9 @@ impl Ext2FileSystem {
     fn free_block(&self, block_num: u32) {
         // In a real implementation, this would clear the block in the bitmap
         self.stats.free_blocks.fetch_add(1, Ordering::Relaxed);
-        self.stats.block_deallocations.fetch_add(1, Ordering::Relaxed);
+        self.stats
+            .block_deallocations
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Read a block from disk
@@ -810,24 +830,19 @@ impl Ext2FileSystem {
         // 3. Create an Ext2OpenFile instance
         // For now, we'll use a default inode (1)
         let inode = 1;
-        
-        let open_file = Ext2OpenFile {
-            fs: Arc::new(self.clone()),
-            inode,
-            position: 0,
-            flags,
-            mode,
-        };
-        
+
+        let open_file =
+            Ext2OpenFile { fs: Arc::new(self.clone()), inode, position: 0, flags, mode };
+
         // Allocate a file handle
         let handle = self.next_file_handle.fetch_add(1, Ordering::Relaxed);
-        
+
         // Store the open file
         {
             let mut open_files = self.open_files.lock();
             open_files.insert(handle, open_file);
         }
-        
+
         Ok(handle)
     }
 
@@ -839,35 +854,30 @@ impl Ext2FileSystem {
         // 3. Create an Ext2OpenDir instance
         // For now, we'll use a default inode (2)
         let inode = 2;
-        
-        let open_dir = Ext2OpenDir {
-            fs: Arc::new(self.clone()),
-            inode,
-            position: 0,
-        };
-        
+
+        let open_dir = Ext2OpenDir { fs: Arc::new(self.clone()), inode, position: 0 };
+
         // Allocate a file handle
         let handle = self.next_file_handle.fetch_add(1, Ordering::Relaxed);
-        
+
         // Store the open directory
         {
             let mut open_files = self.open_files.lock();
-            open_files.insert(handle, Ext2OpenFile {
-                fs: open_dir.fs.clone(),
-                inode: open_dir.inode,
-                position: open_dir.position,
-                flags,
-                mode: 0,
-            });
+            open_files.insert(
+                handle,
+                Ext2OpenFile {
+                    fs: open_dir.fs.clone(),
+                    inode: open_dir.inode,
+                    position: open_dir.position,
+                    flags,
+                    mode: 0,
+                },
+            );
         }
-        
+
         Ok(handle)
     }
 }
-
-
-
-
 
 impl PathOperations for Ext2FileSystem {
     fn parse(&self, follow_symlinks: bool) -> Result<Vec<PathComponent>, FsError> {
@@ -891,17 +901,23 @@ impl PathOperations for Ext2FileSystem {
         if component.is_empty() {
             return String::from("/");
         }
-        
+
         let mut result = String::from("/");
         result.push_str(component);
-        
+
         result
     }
 }
 
 impl Ext2FileSystem {
     /// Add an entry to a directory
-    fn add_directory_entry(&self, dir_inode: u32, inode: u32, name: &str, entry_type: super::api::DirEntryType) -> Result<(), FsError> {
+    fn add_directory_entry(
+        &self,
+        dir_inode: u32,
+        inode: u32,
+        name: &str,
+        entry_type: super::api::DirEntryType,
+    ) -> Result<(), FsError> {
         // In a real implementation, this would add the entry to the actual directory
         Ok(())
     }
@@ -915,19 +931,15 @@ impl Ext2FileSystem {
     /// Check if a directory is empty
     fn is_directory_empty(&self, inode: u32) -> Result<bool, FsError> {
         // Create a temporary Ext2OpenDir instance to list entries
-        let open_dir = Ext2OpenDir {
-            fs: Arc::new(self.clone()),
-            inode,
-            position: 0,
-        };
-        
+        let open_dir = Ext2OpenDir { fs: Arc::new(self.clone()), inode, position: 0 };
+
         let entries = open_dir.list_entries()?;
-        
+
         // Check for only . and .. entries
         if entries.len() <= 2 {
             return Ok(true);
         }
-        
+
         Ok(false)
     }
 }
@@ -947,16 +959,20 @@ impl Default for Ext2MountOptions {
 }
 
 /// Global ext2 file system instances
-static EXT2_FILESYSTEMS: once_cell::sync::Lazy<Mutex<BTreeMap<String, Arc<Ext2FileSystem>>>> = 
+static EXT2_FILESYSTEMS: once_cell::sync::Lazy<Mutex<BTreeMap<String, Arc<Ext2FileSystem>>>> =
     once_cell::sync::Lazy::new(|| Mutex::new(BTreeMap::new()));
 
 /// Mount an ext2 file system
-pub fn mount_ext2(device_id: String, mount_point: String, options: Ext2MountOptions) -> Result<(), FsError> {
+pub fn mount_ext2(
+    device_id: String,
+    mount_point: String,
+    options: Ext2MountOptions,
+) -> Result<(), FsError> {
     let fs = Arc::new(Ext2FileSystem::new(device_id.clone(), options)?);
-    
+
     let mut filesystems = EXT2_FILESYSTEMS.lock();
     filesystems.insert(mount_point, fs);
-    
+
     log::info!("Mounted ext2 file system from {} at {}", device_id, mount_point);
     Ok(())
 }
@@ -964,11 +980,11 @@ pub fn mount_ext2(device_id: String, mount_point: String, options: Ext2MountOpti
 /// Unmount an ext2 file system
 pub fn unmount_ext2(mount_point: &str) -> Result<(), FsError> {
     let mut filesystems = EXT2_FILESYSTEMS.lock();
-    
+
     if let Some(fs) = filesystems.remove(mount_point) {
         // Sync the file system before unmounting
         fs.sync()?;
-        
+
         log::info!("Unmounted ext2 file system at {}", mount_point);
         Ok(())
     } else {
@@ -985,7 +1001,10 @@ pub fn get_ext2_filesystem(mount_point: &str) -> Option<Arc<Ext2FileSystem>> {
 /// List all mounted ext2 file systems
 pub fn list_mounted_ext2_filesystems() -> Vec<(String, String)> {
     let filesystems = EXT2_FILESYSTEMS.lock();
-    filesystems.iter().map(|(mount_point, fs)| (mount_point.clone(), fs.device_id.clone())).collect()
+    filesystems
+        .iter()
+        .map(|(mount_point, fs)| (mount_point.clone(), fs.device_id.clone()))
+        .collect()
 }
 
 /// Initialize ext2 file system support

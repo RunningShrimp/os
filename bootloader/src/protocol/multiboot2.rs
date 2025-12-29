@@ -40,10 +40,10 @@ pub fn parse_multiboot2(magic: u32, _info_ptr: usize) -> Option<BootInfo> {
 
     log::debug!("Parsing Multiboot2 boot information");
     let boot_info = BootInfo::new(BootProtocolType::Multiboot2);
-    
+
     // Stub: Just return basic info
     // Full parsing would require careful tag processing
     // For now, we just recognize multiboot2 was used
-    
+
     Some(boot_info)
 }

@@ -1,7 +1,6 @@
 //! C标准库时间函数实现
 
 extern crate alloc;
-//
 // 提供完整的time.h时间函数支持，包括：
 // - 时间获取：time, clock, gettimeofday
 // - 时间转换：localtime, gmtime, mktime, asctime, ctime
@@ -10,19 +9,16 @@ extern crate alloc;
 // - 高精度时间支持
 
 use alloc::format;
-use core::ffi::{c_char, c_int};
-use crate::libc::interface::{size_t, c_long, time_t};
-pub type SusecondsT = i64;
+
+use crate::libc::interface::{c_long, size_t, time_t};
 #[allow(non_camel_case_types)]
 pub type suseconds_t = SusecondsT;
-use crate::libc::error::set_errno;
-use crate::libc::error::errno::EINVAL;
+use crate::libc::error::{errno::EINVAL, set_errno};
 
 /// 时间常量
 pub mod time_constants {
     use crate::libc::interface::{c_long, c_longlong, time_t};
     /// 每秒的微秒数
-    pub const USEC_PER_SEC: c_long = 1_000_000;
     /// 每秒的纳秒数
     pub const NSEC_PER_SEC: c_longlong = 1_000_000_000;
     /// 1970年1月1日到1900年1月1日的秒数
@@ -253,9 +249,8 @@ impl EnhancedTimeLib {
         let formatted = self.format_asc_time(tm);
 
         // 分配内存并复制字符串
-        let layout = unsafe {
-            core::alloc::Layout::from_size_align(formatted.len() + 1, 1).unwrap()
-        };
+        let layout =
+            unsafe { core::alloc::Layout::from_size_align(formatted.len() + 1, 1).unwrap() };
         let str_ptr = unsafe { alloc::alloc::alloc(layout) as *mut c_char };
 
         if !str_ptr.is_null() {
@@ -281,16 +276,20 @@ impl EnhancedTimeLib {
     }
 
     /// 格式化时间（strftime）
-    pub fn strftime(&self, s: *mut c_char, maxsize: size_t, format: *const c_char, timeptr: *const Tm) -> size_t {
+    pub fn strftime(
+        &self,
+        s: *mut c_char,
+        maxsize: size_t,
+        format: *const c_char,
+        timeptr: *const Tm,
+    ) -> size_t {
         if s.is_null() || format.is_null() || timeptr.is_null() || maxsize == 0 {
             set_errno(EINVAL);
             return 0;
         }
 
         let tm = unsafe { *timeptr };
-        let format_str = unsafe {
-            core::ffi::CStr::from_ptr(format).to_str().unwrap_or("")
-        };
+        let format_str = unsafe { core::ffi::CStr::from_ptr(format).to_str().unwrap_or("") };
 
         let mut written = 0;
         let mut format_chars = format_str.chars().peekable();
@@ -304,79 +303,79 @@ impl EnhancedTimeLib {
                                 s,
                                 written,
                                 maxsize,
-                                &format!("{:04}", tm.tm_year + 1900)
+                                &format!("{:04}", tm.tm_year + 1900),
                             );
-                        }
+                        },
                         Some('m') => {
                             written += self.write_to_buffer(
                                 s,
                                 written,
                                 maxsize,
-                                &format!("{:02}", tm.tm_mon + 1)
+                                &format!("{:02}", tm.tm_mon + 1),
                             );
-                        }
+                        },
                         Some('d') => {
                             written += self.write_to_buffer(
                                 s,
                                 written,
                                 maxsize,
-                                &format!("{:02}", tm.tm_mday)
+                                &format!("{:02}", tm.tm_mday),
                             );
-                        }
+                        },
                         Some('H') => {
                             written += self.write_to_buffer(
                                 s,
                                 written,
                                 maxsize,
-                                &format!("{:02}", tm.tm_hour)
+                                &format!("{:02}", tm.tm_hour),
                             );
-                        }
+                        },
                         Some('M') => {
                             written += self.write_to_buffer(
                                 s,
                                 written,
                                 maxsize,
-                                &format!("{:02}", tm.tm_min)
+                                &format!("{:02}", tm.tm_min),
                             );
-                        }
+                        },
                         Some('S') => {
                             written += self.write_to_buffer(
                                 s,
                                 written,
                                 maxsize,
-                                &format!("{:02}", tm.tm_sec)
+                                &format!("{:02}", tm.tm_sec),
                             );
-                        }
+                        },
                         Some('A') => {
                             let day_name = self.get_day_name(tm.tm_wday);
                             written += self.write_to_buffer(s, written, maxsize, day_name);
-                        }
+                        },
                         Some('a') => {
                             let day_abbr = self.get_day_abbr(tm.tm_wday);
                             written += self.write_to_buffer(s, written, maxsize, day_abbr);
-                        }
+                        },
                         Some('B') => {
                             let month_name = self.get_month_name(tm.tm_mon);
                             written += self.write_to_buffer(s, written, maxsize, month_name);
-                        }
+                        },
                         Some('b') => {
                             let month_abbr = self.get_month_abbr(tm.tm_mon);
                             written += self.write_to_buffer(s, written, maxsize, month_abbr);
-                        }
+                        },
                         Some('%') => {
                             written += self.write_char_to_buffer(s, written, maxsize, b'%');
-                        }
+                        },
                         Some(ch) => {
                             // 未知格式说明符，按原样输出
                             written += self.write_char_to_buffer(s, written, maxsize, b'%');
                             written += self.write_char_to_buffer(s, written, maxsize, ch as u8);
-                        }
+                        },
                         None => break,
                     }
-                }
+                },
                 Some(ch) => {
                     written += self.write_char_to_buffer(s, written, maxsize, ch as u8);
-                }
+                },
                 None => break,
             }
         }
@@ -507,7 +506,11 @@ impl EnhancedTimeLib {
         // 计算月份天数
         let month_days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
         for m in 0..month {
-            total_days += if m == 1 && self.is_leap_year(year) { 29 } else { month_days[m as usize] };
+            total_days += if m == 1 && self.is_leap_year(year) {
+                29
+            } else {
+                month_days[m as usize]
+            };
         }
 
         // 加上当月天数（减1，因为tm_mday从1开始）
@@ -625,7 +628,13 @@ impl EnhancedTimeLib {
     }
 
     /// 写入字符串到缓冲区
-    fn write_to_buffer(&self, buffer: *mut c_char, pos: size_t, maxsize: size_t, s: &str) -> size_t {
+    fn write_to_buffer(
+        &self,
+        buffer: *mut c_char,
+        pos: size_t,
+        maxsize: size_t,
+        s: &str,
+    ) -> size_t {
         if pos >= maxsize {
             return 0;
         }
@@ -645,7 +654,13 @@ impl EnhancedTimeLib {
     }
 
     /// 写入字符到缓冲区
-    fn write_char_to_buffer(&self, buffer: *mut c_char, pos: size_t, maxsize: size_t, ch: u8) -> size_t {
+    fn write_char_to_buffer(
+        &self,
+        buffer: *mut c_char,
+        pos: size_t,
+        maxsize: size_t,
+        ch: u8,
+    ) -> size_t {
         if pos < maxsize - 1 {
             unsafe {
                 *buffer.add(pos) = ch as c_char;
@@ -673,29 +688,62 @@ pub fn time(tloc: *mut time_t) -> time_t {
 }
 #[inline]
 pub fn gettimeofday(tp: *mut Timeval, tzp: *mut Timezone) -> c_int {
-    unsafe { TIME_LIB.get_or_insert_with(EnhancedTimeLib::new).gettimeofday(tp, tzp) }
+    unsafe {
+        TIME_LIB
+            .get_or_insert_with(EnhancedTimeLib::new)
+            .gettimeofday(tp, tzp)
+    }
 }
 #[inline]
 pub fn localtime(timer: *const time_t) -> *mut Tm {
-    unsafe { TIME_LIB.get_or_insert_with(EnhancedTimeLib::new).localtime(timer) }
+    unsafe {
+        TIME_LIB
+            .get_or_insert_with(EnhancedTimeLib::new)
+            .localtime(timer)
+    }
 }
 #[inline]
 pub fn gmtime(timer: *const time_t) -> *mut Tm {
-    unsafe { TIME_LIB.get_or_insert_with(EnhancedTimeLib::new).gmtime(timer) }
+    unsafe {
+        TIME_LIB
+            .get_or_insert_with(EnhancedTimeLib::new)
+            .gmtime(timer)
+    }
 }
 #[inline]
 pub fn mktime(timeptr: *mut Tm) -> time_t {
-    unsafe { TIME_LIB.get_or_insert_with(EnhancedTimeLib::new).mktime(timeptr) }
+    unsafe {
+        TIME_LIB
+            .get_or_insert_with(EnhancedTimeLib::new)
+            .mktime(timeptr)
+    }
 }
 #[inline]
 pub fn asctime(timeptr: *const Tm) -> *mut c_char {
-    unsafe { TIME_LIB.get_or_insert_with(EnhancedTimeLib::new).asctime(timeptr) }
+    unsafe {
+        TIME_LIB
+            .get_or_insert_with(EnhancedTimeLib::new)
+            .asctime(timeptr)
+    }
 }
 #[inline]
 pub fn ctime(timer: *const time_t) -> *mut c_char {
-    unsafe { TIME_LIB.get_or_insert_with(EnhancedTimeLib::new).ctime(timer) }
+    unsafe {
+        TIME_LIB
+            .get_or_insert_with(EnhancedTimeLib::new)
+            .ctime(timer)
+    }
 }
 #[inline]
-pub fn strftime(s: *mut c_char, maxsize: size_t, format: *const c_char, timeptr: *const Tm) -> size_t {
-    unsafe { TIME_LIB.get_or_insert_with(EnhancedTimeLib::new).strftime(s, maxsize, format, timeptr) }
+pub fn strftime(
+    s: *mut c_char,
+    maxsize: size_t,
+    format: *const c_char,
+    timeptr: *const Tm,
+) -> size_t {
+    unsafe {
+        TIME_LIB
+            .get_or_insert_with(EnhancedTimeLib::new)
+            .strftime(s, maxsize, format, timeptr)
+    }
 }

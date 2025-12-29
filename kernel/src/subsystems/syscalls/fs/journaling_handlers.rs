@@ -2,10 +2,13 @@
 //!
 //! This module contains system call handlers for journaling file system operations.
 
-use super::types::*;
-use crate::error::UnifiedError;
 use alloc::string::ToString;
-use crate::subsystems::fs::{get_jfs_wrapper, JournalStats};
+
+use super::types::*;
+use crate::{
+    error::UnifiedError,
+    subsystems::fs::{JournalStats, get_jfs_wrapper},
+};
 
 /// Handle journal_begin system call - begin a new transaction
 pub fn handle_journal_begin(args: &[u64]) -> Result<u64, KernelError> {
@@ -14,7 +17,7 @@ pub fn handle_journal_begin(args: &[u64]) -> Result<u64, KernelError> {
     }
 
     let jfs_wrapper = get_jfs_wrapper().ok_or(KernelError::NotSupported)?;
-    
+
     match jfs_wrapper.begin_transaction() {
         Ok(tx_id) => Ok(tx_id),
         Err(_) => Err(KernelError::IoError),
@@ -29,7 +32,7 @@ pub fn handle_journal_commit(args: &[u64]) -> Result<u64, KernelError> {
 
     let tx_id = args[0];
     let jfs_wrapper = get_jfs_wrapper().ok_or(KernelError::NotSupported)?;
-    
+
     match jfs_wrapper.commit_transaction(tx_id) {
         Ok(()) => Ok(0),
         Err(_) => Err(KernelError::IoError),
@@ -44,7 +47,7 @@ pub fn handle_journal_abort(args: &[u64]) -> Result<u64, KernelError> {
 
     let tx_id = args[0];
     let jfs_wrapper = get_jfs_wrapper().ok_or(KernelError::NotSupported)?;
-    
+
     match jfs_wrapper.abort_transaction(tx_id) {
         Ok(()) => Ok(0),
         Err(_) => Err(KernelError::IoError),
@@ -59,7 +62,7 @@ pub fn handle_journal_enable(args: &[u64]) -> Result<u64, KernelError> {
 
     let enabled = args[0] != 0;
     let jfs_wrapper = get_jfs_wrapper().ok_or(KernelError::NotSupported)?;
-    
+
     jfs_wrapper.set_journaling(enabled);
     Ok(0)
 }
@@ -71,8 +74,12 @@ pub fn handle_journal_status(args: &[u64]) -> Result<u64, KernelError> {
     }
 
     let jfs_wrapper = get_jfs_wrapper().ok_or(KernelError::NotSupported)?;
-    
-    let status = if jfs_wrapper.is_journaling_enabled() { 1 } else { 0 };
+
+    let status = if jfs_wrapper.is_journaling_enabled() {
+        1
+    } else {
+        0
+    };
     Ok(status)
 }
 
@@ -89,12 +96,12 @@ pub fn handle_journal_stats(args: &[u64]) -> Result<u64, KernelError> {
 
     let jfs_wrapper = get_jfs_wrapper().ok_or(KernelError::NotSupported)?;
     let stats = jfs_wrapper.get_journal_stats();
-    
+
     // Copy stats to user space
     unsafe {
         *stats_ptr = stats;
     }
-    
+
     Ok(0)
 }
 
@@ -105,7 +112,7 @@ pub fn handle_journal_checkpoint(args: &[u64]) -> Result<u64, KernelError> {
     }
 
     let jfs_wrapper = get_jfs_wrapper().ok_or(KernelError::NotSupported)?;
-    
+
     match jfs_wrapper.checkpoint() {
         Ok(()) => Ok(0),
         Err(_) => Err(KernelError::IoError),
@@ -119,7 +126,7 @@ pub fn handle_journal_recovery_status(args: &[u64]) -> Result<u64, KernelError> 
     }
 
     let jfs_wrapper = get_jfs_wrapper().ok_or(KernelError::NotSupported)?;
-    
+
     let status = if jfs_wrapper.is_in_recovery() { 1 } else { 0 };
     Ok(status)
 }

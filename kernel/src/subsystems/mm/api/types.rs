@@ -2,7 +2,7 @@
 // These types follow the MM_MODULE_API_BOUNDARIES_DESIGN.md
 
 /// Memory protection properties
-/// 
+///
 /// Define memory page protection attributes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MemoryProtection {
@@ -19,17 +19,17 @@ impl MemoryProtection {
     pub const fn read_only() -> Self {
         Self { readable: true, writable: false, executable: false }
     }
-    
+
     /// Create read-write protection
     pub const fn read_write() -> Self {
         Self { readable: true, writable: true, executable: false }
     }
-    
+
     /// Create read-write-execute protection
     pub const fn read_write_execute() -> Self {
         Self { readable: true, writable: true, executable: true }
     }
-    
+
     /// Create execute-only protection
     pub const fn execute_only() -> Self {
         Self { readable: false, writable: false, executable: true }
@@ -37,7 +37,7 @@ impl MemoryProtection {
 }
 
 /// Memory mapping flags
-/// 
+///
 /// Define memory mapping behavior flags
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MapFlags {
@@ -63,7 +63,7 @@ impl Default for MapFlags {
 }
 
 /// Memory mapping object
-/// 
+///
 /// Represent a memory mapping region
 #[derive(Debug, Clone)]
 pub struct MemoryMapping {
@@ -95,7 +95,7 @@ pub enum MappingType {
 }
 
 /// Memory stats
-/// 
+///
 /// System memory usage statistics
 #[derive(Debug, Clone, Default)]
 pub struct MemoryStats {
@@ -112,7 +112,7 @@ pub struct MemoryStats {
 }
 
 /// Memory pool stats
-/// 
+///
 /// Memory pool usage statistics
 #[derive(Debug, Clone)]
 pub struct MemoryPoolStats {
@@ -129,7 +129,7 @@ pub struct MemoryPoolStats {
 }
 
 /// Physical page structure
-/// 
+///
 /// Represents a physical page in memory
 #[derive(Debug, Clone, Copy)]
 pub struct PhysicalPage {

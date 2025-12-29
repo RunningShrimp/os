@@ -8,15 +8,18 @@
 //! and use the RCU mechanism, while writes create a new copy of the table
 //! and update the pointer atomically.
 
-use crate::subsystems::process::manager::{Pid, Proc, ProcTable, ProcState, NPROC};
-use crate::subsystems::sync::{Mutex, rcu};
 use core::sync::atomic::{AtomicPtr, Ordering};
 
+use crate::subsystems::{
+    process::manager::{NPROC, Pid, Proc, ProcState, ProcTable},
+    sync::{Mutex, rcu},
+};
+
 /// RCU-protected process table
-/// 
+///
 /// This structure uses an atomic pointer to the process table,
 /// allowing lock-free reads while writes are serialized.
-/// 
+///
 /// Since ProcTable doesn't implement Clone, we use a hybrid approach:
 /// - Reads use RCU-style lock-free access
 /// - Writes still require a mutex but update atomically
@@ -42,14 +45,12 @@ impl RcuProcTable {
     }
 
     /// Read the process table (lock-free)
-    /// 
+    ///
     /// Returns a guard that provides read access to the table.
     /// The guard automatically handles quiescent state tracking.
     pub fn read(&self) -> RcuProcTableGuard {
         let ptr = self.table.load(Ordering::Acquire);
-        RcuProcTableGuard {
-            table_ptr: ptr,
-        }
+        RcuProcTableGuard { table_ptr: ptr }
     }
 
     /// Get a process by PID (lock-free read)
@@ -65,7 +66,7 @@ impl RcuProcTable {
     }
 
     /// Get mutable access to the table (requires write lock)
-    /// 
+    ///
     /// This function provides mutable access for updates.
     /// The table pointer is updated atomically after the update.
     pub fn with_write<F, R>(&self, updater: F) -> R
@@ -83,18 +84,18 @@ impl RcuProcTable {
     }
 
     /// Replace the entire process table (requires write lock)
-    /// 
+    ///
     /// This function replaces the table and schedules the old one
     /// for deletion after a grace period.
     pub fn replace(&self, new_table: ProcTable) {
         let _write_guard = self.write_lock.lock();
-        let old_ptr = self.table.swap(Box::into_raw(Box::new(new_table)), Ordering::Release);
-        
+        let old_ptr = self
+            .table
+            .swap(Box::into_raw(Box::new(new_table)), Ordering::Release);
+
         // Schedule old table for deletion after grace period
-        rcu::call_rcu(Box::new(move || {
-            unsafe {
-                let _ = Box::from_raw(old_ptr);
-            }
+        rcu::call_rcu(Box::new(move || unsafe {
+            let _ = Box::from_raw(old_ptr);
         }));
     }
 
@@ -110,20 +111,17 @@ impl RcuProcTable {
     }
 
     /// Iterate over all processes (lock-free read)
-    /// 
+    ///
     /// Note: The iterator holds an RCU read guard, so it should be
     /// used quickly and not held across blocking operations.
     pub fn iter(&self) -> ProcTableIterator {
         let guard = self.read();
-        ProcTableIterator {
-            _guard: guard,
-            index: 0,
-        }
+        ProcTableIterator { _guard: guard, index: 0 }
     }
 }
 
 /// Guard for RCU-protected process table reads
-/// 
+///
 /// This guard tracks the quiescent state for RCU.
 pub struct RcuProcTableGuard {
     table_ptr: *const ProcTable,
@@ -138,9 +136,7 @@ impl RcuProcTableGuard {
                 // Get the raw pointer to the process
                 let proc_ptr = proc_ref as *const Proc;
                 Some(ProcRef {
-                    _guard: RcuProcTableGuard {
-                        table_ptr: self.table_ptr,
-                    },
+                    _guard: RcuProcTableGuard { table_ptr: self.table_ptr },
                     proc: proc_ptr,
                 })
             } else {
@@ -181,7 +177,7 @@ impl Drop for RcuProcTableGuard {
 }
 
 /// Reference to a process (for compatibility with existing code)
-/// 
+///
 /// This is a wrapper around &Proc that maintains the RCU guard.
 pub struct ProcRef {
     _guard: RcuProcTableGuard,
@@ -190,7 +186,7 @@ pub struct ProcRef {
 
 impl ProcRef {
     /// Get a reference to the process
-    /// 
+    ///
     /// # Safety
     /// The returned reference is valid as long as the guard is held.
     pub unsafe fn as_ref(&self) -> &Proc {
@@ -221,10 +217,10 @@ impl Iterator for ProcTableIterator {
             if self.index >= NPROC {
                 return None;
             }
-            
+
             let proc = &table.procs[self.index];
             self.index += 1;
-            
+
             if proc.state == ProcState::Unused {
                 self.next() // Skip unused processes
             } else {
@@ -256,7 +252,7 @@ pub fn get_rcu_proc_table() -> Option<&'static RcuProcTable> {
     if !RCU_PROC_TABLE_INIT.is_completed() {
         init_rcu_proc_table();
     }
-    
+
     unsafe {
         RCU_PROC_TABLE.lock().as_ref().map(|table| {
             // This is safe because we only access it after initialization
@@ -272,7 +268,5 @@ pub fn find_process_rcu(pid: Pid) -> Option<ProcRef> {
 
 /// Get process table length using RCU (lock-free read)
 pub fn proc_table_len_rcu() -> usize {
-    get_rcu_proc_table()
-        .map(|table| table.len())
-        .unwrap_or(0)
+    get_rcu_proc_table().map(|table| table.len()).unwrap_or(0)
 }

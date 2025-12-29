@@ -7,18 +7,17 @@
 //! - sched_rr_get_interval() - Round-robin time slice
 //! - sched_setaffinity() / sched_getaffinity() - CPU affinity management
 
-use crate::posix::Pid;
-use crate::subsystems::sync::Mutex;
 use alloc::collections::BTreeMap;
 
+use crate::{posix::Pid, subsystems::sync::Mutex};
 
 /// Scheduling policies
-pub const SCHED_NORMAL: i32 = 0;    // Normal (non-real-time) scheduling
-pub const SCHED_FIFO: i32 = 1;      // First-in, first-out real-time scheduling
-pub const SCHED_RR: i32 = 2;        // Round-robin real-time scheduling
-pub const SCHED_BATCH: i32 = 3;      // Batch scheduling (Linux-specific)
-pub const SCHED_IDLE: i32 = 5;       // Idle scheduling (Linux-specific)
-pub const SCHED_DEADLINE: i32 = 6;   // Deadline scheduling (Linux-specific)
+pub const SCHED_NORMAL: i32 = 0; // Normal (non-real-time) scheduling
+pub const SCHED_FIFO: i32 = 1; // First-in, first-out real-time scheduling
+pub const SCHED_RR: i32 = 2; // Round-robin real-time scheduling
+pub const SCHED_BATCH: i32 = 3; // Batch scheduling (Linux-specific)
+pub const SCHED_IDLE: i32 = 5; // Idle scheduling (Linux-specific)
+pub const SCHED_DEADLINE: i32 = 6; // Deadline scheduling (Linux-specific)
 
 /// Scheduling parameters structure
 #[derive(Debug, Clone, Copy)]
@@ -43,13 +42,11 @@ impl SchedParam {
     pub fn is_valid_for_policy(&self, policy: i32) -> bool {
         match policy {
             SCHED_NORMAL | SCHED_BATCH | SCHED_IDLE => self.sched_priority == 0,
-            SCHED_FIFO | SCHED_RR => {
-                self.sched_priority >= 1 && self.sched_priority <= 99
-            }
+            SCHED_FIFO | SCHED_RR => self.sched_priority >= 1 && self.sched_priority <= 99,
             SCHED_DEADLINE => {
                 // Deadline scheduling uses different parameters
                 false
-            }
+            },
             _ => false,
         }
     }
@@ -104,7 +101,10 @@ impl CpuSet {
 
     /// Get the number of CPUs set
     pub fn count(&self) -> usize {
-        self.bits.iter().map(|word| word.count_ones() as usize).sum()
+        self.bits
+            .iter()
+            .map(|word| word.count_ones() as usize)
+            .sum()
     }
 
     /// Get the first CPU set in the set
@@ -145,8 +145,14 @@ impl CpuSet {
             let start = i * 8;
             if start + 8 <= bytes.len() {
                 bits[i] = u64::from_le_bytes([
-                    bytes[start], bytes[start + 1], bytes[start + 2], bytes[start + 3],
-                    bytes[start + 4], bytes[start + 5], bytes[start + 6], bytes[start + 7],
+                    bytes[start],
+                    bytes[start + 1],
+                    bytes[start + 2],
+                    bytes[start + 3],
+                    bytes[start + 4],
+                    bytes[start + 5],
+                    bytes[start + 6],
+                    bytes[start + 7],
                 ]);
             }
         }
@@ -302,7 +308,7 @@ impl SchedRegistry {
     pub const fn new() -> Self {
         Self {
             processes: BTreeMap::new(),
-            cpu_count: 1, // Will be updated during init
+            cpu_count: 1,                     // Will be updated during init
             default_rr_timeslice: 10_000_000, // 10ms
         }
     }
@@ -479,7 +485,7 @@ pub fn sched_rr_get_interval(pid: Pid) -> Result<u64, SchedError> {
             } else {
                 Err(SchedError::InvalidPolicy)
             }
-        }
+        },
         None => Err(SchedError::ProcessNotFound),
     }
 }
@@ -518,14 +524,14 @@ pub fn sched_getaffinity(pid: Pid, cpusetsize: usize) -> Result<CpuSet, SchedErr
     match registry.get(pid) {
         Some(info) => {
             let mut affinity = info.affinity.clone();
-            
+
             // Mask out CPUs beyond the requested size
             for cpu in cpusetsize..1024 {
                 affinity.clear(cpu);
             }
-            
+
             Ok(affinity)
-        }
+        },
         None => Err(SchedError::ProcessNotFound),
     }
 }
@@ -533,13 +539,13 @@ pub fn sched_getaffinity(pid: Pid, cpusetsize: usize) -> Result<CpuSet, SchedErr
 /// Initialize real-time scheduling subsystem
 pub fn init_realtime() {
     crate::println!("[sched] Initializing POSIX real-time scheduling subsystem");
-    
+
     // Detect CPU count (simplified)
     let cpu_count = 4; // In real implementation, would detect actual CPU count
-    
+
     let mut registry = SCHED_REGISTRY.lock();
     registry.init(cpu_count);
-    
+
     crate::println!("[sched] Real-time scheduling initialized");
     crate::println!("[sched] Available scheduling policies:");
     crate::println!("[sched]   SCHED_NORMAL ({})", SCHED_NORMAL);
@@ -549,21 +555,24 @@ pub fn init_realtime() {
     crate::println!("[sched]   SCHED_IDLE ({})", SCHED_IDLE);
     crate::println!("[sched]   SCHED_DEADLINE ({})", SCHED_DEADLINE);
     crate::println!("[sched] Real-time priority range: 1-99");
-    crate::println!("[sched] Default RR timeslice: {}ms", registry.default_rr_timeslice / 1_000_000);
+    crate::println!(
+        "[sched] Default RR timeslice: {}ms",
+        registry.default_rr_timeslice / 1_000_000
+    );
 }
 
 /// Cleanup real-time scheduling subsystem
 pub fn cleanup_realtime() {
     crate::println!("[sched] Cleaning up POSIX real-time scheduling subsystem");
-    
+
     let registry = SCHED_REGISTRY.lock();
     let stats = registry.get_stats();
-    
+
     crate::println!("[sched] Cleanup stats:");
     crate::println!("[sched]   Total processes: {}", stats.total_processes);
     crate::println!("[sched]   Real-time processes: {}", stats.realtime_processes);
     crate::println!("[sched]   Total CPU time: {}ms", stats.total_cpu_time_ms);
     crate::println!("[sched]   CPU count: {}", stats.cpu_count);
-    
+
     // Note: We don't clear the registry here as it might be needed for cleanup
 }

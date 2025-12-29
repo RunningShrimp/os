@@ -3,7 +3,6 @@
 /// Provides safe, bounds-checked ELF loading with comprehensive validation.
 /// Addresses critical security issues with unsafe memory access.
 
-
 /// ELF64 File Header
 #[derive(Debug, Clone, Copy)]
 pub struct ElfFileHeader {
@@ -128,12 +127,7 @@ pub struct LoadedSegment {
 impl ElfLoader {
     /// Create new ELF loader
     pub fn new(file_data: *const u8, file_size: usize) -> Self {
-        Self {
-            file_data,
-            file_size,
-            segments: [None; 16],
-            segment_count: 0,
-        }
+        Self { file_data, file_size, segments: [None; 16], segment_count: 0 }
     }
 
     /// Validate and parse ELF header
@@ -199,7 +193,8 @@ impl ElfLoader {
         let header = self.parse_header()?;
 
         // Validate program header table location
-        let phdr_end = header.e_phoff
+        let phdr_end = header
+            .e_phoff
             .checked_add((header.e_phnum as u64) * (header.e_phentsize as u64))
             .ok_or(ElfLoadError::InvalidPhdrOffset)?;
 
@@ -331,14 +326,8 @@ mod tests {
 
     #[test]
     fn test_error_messages() {
-        assert_eq!(
-            ElfLoadError::InvalidMagic.as_str(),
-            "Invalid ELF magic number"
-        );
-        assert_eq!(
-            ElfLoadError::InvalidElfClass.as_str(),
-            "Not an ELF64 file"
-        );
+        assert_eq!(ElfLoadError::InvalidMagic.as_str(), "Invalid ELF magic number");
+        assert_eq!(ElfLoadError::InvalidElfClass.as_str(), "Not an ELF64 file");
     }
 
     #[test]

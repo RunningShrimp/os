@@ -8,13 +8,12 @@
 //! - seteuid() / setegid() - Set effective user/group ID
 //! - setreuid() / setregid() - Set real/effective user/group ID
 
-use crate::posix::{Uid, Gid, Pid, Mode};
-use crate::subsystems::sync::Mutex;
-use alloc::collections::BTreeMap;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::vec::Vec;
+use alloc::{
+    collections::BTreeMap,
+    string::{String, ToString},
+};
 
+use crate::subsystems::sync::Mutex;
 
 /// POSIX capability structure
 #[derive(Debug, Clone, Copy)]
@@ -38,47 +37,43 @@ pub struct CapData {
 
 impl Default for CapData {
     fn default() -> Self {
-        Self {
-            effective: 0,
-            permitted: 0,
-            inheritable: 0,
-        }
+        Self { effective: 0, permitted: 0, inheritable: 0 }
     }
 }
 
 /// Capability constants (Linux capability format)
-pub const CAP_CHOWN: u32 = 0;            // Change file ownership
-pub const CAP_DAC_OVERRIDE: u32 = 1;       // Override DAC access
-pub const CAP_DAC_READ_SEARCH: u32 = 2;    // Read/search files/directories
-pub const CAP_FOWNER: u32 = 3;            // Change file ownership
-pub const CAP_FSETID: u32 = 4;            // Set file set ID
-pub const CAP_KILL: u32 = 5;               // Kill processes
-pub const CAP_SETGID: u32 = 6;             // Set group ID
-pub const CAP_SETUID: u32 = 7;             // Set user ID
-pub const CAP_SETPCAP: u32 = 8;            // Set process capabilities
-pub const CAP_LINUX_IMMUTABLE: u32 = 9;    // Linux immutable
-pub const CAP_NET_BIND_SERVICE: u32 = 10;   // Bind to privileged ports
-pub const CAP_NET_BROADCAST: u32 = 11;    // Broadcast packets
-pub const CAP_NET_ADMIN: u32 = 12;         // Network administration
-pub const CAP_NET_RAW: u32 = 13;            // Use raw sockets
-pub const CAP_IPC_LOCK: u32 = 14;          // Lock IPC resources
-pub const CAP_IPC_OWNER: u32 = 15;         // Own IPC resources
-pub const CAP_SYS_MODULE: u32 = 16;        // Load kernel modules
-pub const CAP_SYS_RAWIO: u32 = 17;         // Raw I/O operations
-pub const CAP_SYS_CHROOT: u32 = 18;        // Change root directory
-pub const CAP_SYS_PTRACE: u32 = 19;        // Trace processes
-pub const CAP_SYS_PACCT: u32 = 20;         // Process accounting
-pub const CAP_SYS_ADMIN: u32 = 21;         // System administration
-pub const CAP_SYS_BOOT: u32 = 22;          // Boot system
-pub const CAP_SYS_NICE: u32 = 23;          // Change process priority
-pub const CAP_SYS_RESOURCE: u32 = 24;       // Resource limits
-pub const CAP_SYS_TIME: u32 = 25;          // Set system time
-pub const CAP_SYS_TTY_CONFIG: u32 = 26;    // Configure terminals
-pub const CAP_MKNOD: u32 = 27;             // Create device nodes
-pub const CAP_LEASE: u32 = 28;              // File leases
-pub const CAP_AUDIT_WRITE: u32 = 29;        // Write audit logs
-pub const CAP_AUDIT_CONTROL: u32 = 30;       // Control audit subsystem
-pub const CAP_SETFCAP: u32 = 31;           // Set file capabilities
+pub const CAP_CHOWN: u32 = 0; // Change file ownership
+pub const CAP_DAC_OVERRIDE: u32 = 1; // Override DAC access
+pub const CAP_DAC_READ_SEARCH: u32 = 2; // Read/search files/directories
+pub const CAP_FOWNER: u32 = 3; // Change file ownership
+pub const CAP_FSETID: u32 = 4; // Set file set ID
+pub const CAP_KILL: u32 = 5; // Kill processes
+pub const CAP_SETGID: u32 = 6; // Set group ID
+pub const CAP_SETUID: u32 = 7; // Set user ID
+pub const CAP_SETPCAP: u32 = 8; // Set process capabilities
+pub const CAP_LINUX_IMMUTABLE: u32 = 9; // Linux immutable
+pub const CAP_NET_BIND_SERVICE: u32 = 10; // Bind to privileged ports
+pub const CAP_NET_BROADCAST: u32 = 11; // Broadcast packets
+pub const CAP_NET_ADMIN: u32 = 12; // Network administration
+pub const CAP_NET_RAW: u32 = 13; // Use raw sockets
+pub const CAP_IPC_LOCK: u32 = 14; // Lock IPC resources
+pub const CAP_IPC_OWNER: u32 = 15; // Own IPC resources
+pub const CAP_SYS_MODULE: u32 = 16; // Load kernel modules
+pub const CAP_SYS_RAWIO: u32 = 17; // Raw I/O operations
+pub const CAP_SYS_CHROOT: u32 = 18; // Change root directory
+pub const CAP_SYS_PTRACE: u32 = 19; // Trace processes
+pub const CAP_SYS_PACCT: u32 = 20; // Process accounting
+pub const CAP_SYS_ADMIN: u32 = 21; // System administration
+pub const CAP_SYS_BOOT: u32 = 22; // Boot system
+pub const CAP_SYS_NICE: u32 = 23; // Change process priority
+pub const CAP_SYS_RESOURCE: u32 = 24; // Resource limits
+pub const CAP_SYS_TIME: u32 = 25; // Set system time
+pub const CAP_SYS_TTY_CONFIG: u32 = 26; // Configure terminals
+pub const CAP_MKNOD: u32 = 27; // Create device nodes
+pub const CAP_LEASE: u32 = 28; // File leases
+pub const CAP_AUDIT_WRITE: u32 = 29; // Write audit logs
+pub const CAP_AUDIT_CONTROL: u32 = 30; // Control audit subsystem
+pub const CAP_SETFCAP: u32 = 31; // Set file capabilities
 
 /// Password database entry
 #[derive(Debug, Clone)]
@@ -313,15 +308,20 @@ impl SecurityRegistry {
     /// Initialize the registry with default entries
     pub fn init(&mut self) {
         // Add default password entries
-        self.password_db.insert("root".to_string(), PasswdEntry::root());
-        self.password_db.insert("guest".to_string(), PasswdEntry::guest());
-        self.password_db.insert("nobody".to_string(), PasswdEntry::nobody());
-        
+        self.password_db
+            .insert("root".to_string(), PasswdEntry::root());
+        self.password_db
+            .insert("guest".to_string(), PasswdEntry::guest());
+        self.password_db
+            .insert("nobody".to_string(), PasswdEntry::nobody());
+
         // Add default group entries
         self.group_db.insert("root".to_string(), GroupEntry::root());
-        self.group_db.insert("wheel".to_string(), GroupEntry::wheel());
-        self.group_db.insert("nogroup".to_string(), GroupEntry::nobody());
-        
+        self.group_db
+            .insert("wheel".to_string(), GroupEntry::wheel());
+        self.group_db
+            .insert("nogroup".to_string(), GroupEntry::nobody());
+
         crate::println!("[security] Security registry initialized with default users and groups");
     }
 
@@ -345,7 +345,11 @@ impl SecurityRegistry {
     }
 
     /// Set process credentials
-    pub fn set_process_credentials(&mut self, pid: Pid, creds: ProcessCredentials) -> Result<(), SecurityError> {
+    pub fn set_process_credentials(
+        &mut self,
+        pid: Pid,
+        creds: ProcessCredentials,
+    ) -> Result<(), SecurityError> {
         if self.process_credentials.contains_key(&pid) {
             return Err(SecurityError::ResourceBusy);
         }
@@ -426,54 +430,58 @@ pub struct SecurityStats {
 /// Get process capabilities
 pub fn capget(pid: Pid, header: &mut CapHeader, data: &mut CapData) -> Result<(), SecurityError> {
     let mut registry = SECURITY_REGISTRY.lock();
-    
+
     // Get process credentials
-    let creds = registry.get_process_credentials(pid)
+    let creds = registry
+        .get_process_credentials(pid)
         .ok_or(SecurityError::UserNotFound)?;
-    
+
     // Fill header
     header.version = 0x20080522; // Linux capability version 3
     header.pid = 1;
-    
+
     // Fill data
     *data = creds.capabilities;
-    
+
     Ok(())
 }
 
 /// Set process capabilities
 pub fn capset(pid: Pid, header: &CapHeader, data: &CapData) -> Result<(), SecurityError> {
     let mut registry = SECURITY_REGISTRY.lock();
-    
+
     // Check permissions
     let current_pid = match crate::process::myproc() {
         Some(p) => p,
         None => return Err(SecurityError::PermissionDenied),
     };
-    
+
     // Only root can set capabilities for other processes
     if pid != current_pid {
-        let current_creds = registry.get_process_credentials(current_pid)
+        let current_creds = registry
+            .get_process_credentials(current_pid)
             .ok_or(SecurityError::UserNotFound)?;
-        
+
         if !current_creds.is_root() {
             return Err(SecurityError::PermissionDenied);
         }
     }
-    
+
     // Get and update process credentials
-    let creds = registry.process_credentials.get_mut(&pid)
+    let creds = registry
+        .process_credentials
+        .get_mut(&pid)
         .ok_or(SecurityError::UserNotFound)?;
-    
+
     creds.capabilities = *data;
-    
+
     Ok(())
 }
 
 /// Get password entry by name
 pub fn getpwnam(name: &str) -> Result<PasswdEntry, SecurityError> {
     let registry = SECURITY_REGISTRY.lock();
-    
+
     match registry.getpwnam(name) {
         Some(entry) => Ok(entry.clone()),
         None => Err(SecurityError::UserNotFound),
@@ -483,7 +491,7 @@ pub fn getpwnam(name: &str) -> Result<PasswdEntry, SecurityError> {
 /// Get password entry by UID
 pub fn getpwuid(uid: Uid) -> Result<PasswdEntry, SecurityError> {
     let registry = SECURITY_REGISTRY.lock();
-    
+
     match registry.getpwuid(uid) {
         Some(entry) => Ok(entry.clone()),
         None => Err(SecurityError::UserNotFound),
@@ -493,7 +501,7 @@ pub fn getpwuid(uid: Uid) -> Result<PasswdEntry, SecurityError> {
 /// Get group entry by name
 pub fn getgrnam(name: &str) -> Result<GroupEntry, SecurityError> {
     let registry = SECURITY_REGISTRY.lock();
-    
+
     match registry.getgrnam(name) {
         Some(entry) => Ok(entry.clone()),
         None => Err(SecurityError::GroupNotFound),
@@ -503,7 +511,7 @@ pub fn getgrnam(name: &str) -> Result<GroupEntry, SecurityError> {
 /// Get group entry by GID
 pub fn getgrgid(gid: Gid) -> Result<GroupEntry, SecurityError> {
     let registry = SECURITY_REGISTRY.lock();
-    
+
     match registry.getgrgid(gid) {
         Some(entry) => Ok(entry.clone()),
         None => Err(SecurityError::GroupNotFound),
@@ -516,17 +524,19 @@ pub fn setuid(ruid: Uid, euid: Uid) -> Result<(), SecurityError> {
         Some(p) => p,
         None => return Err(SecurityError::PermissionDenied),
     };
-    
+
     let mut registry = SECURITY_REGISTRY.lock();
-    
+
     // Get or create process credentials
     if !registry.process_credentials.contains_key(&current_pid) {
         let mut creds = ProcessCredentials::new();
         creds.set_uids(ruid, euid);
-        registry.set_process_credentials(current_pid, creds).unwrap();
+        registry
+            .set_process_credentials(current_pid, creds)
+            .unwrap();
     }
     let creds = registry.process_credentials.get_mut(&current_pid).unwrap();
-    
+
     creds.set_uids(ruid, euid);
     Ok(())
 }
@@ -537,17 +547,19 @@ pub fn setgid(rgid: Gid, egid: Gid) -> Result<(), SecurityError> {
         Some(p) => p,
         None => return Err(SecurityError::PermissionDenied),
     };
-    
+
     let mut registry = SECURITY_REGISTRY.lock();
-    
+
     // Get or create process credentials
     if !registry.process_credentials.contains_key(&current_pid) {
         let mut creds = ProcessCredentials::new();
         creds.set_gids(rgid, egid);
-        registry.set_process_credentials(current_pid, creds).unwrap();
+        registry
+            .set_process_credentials(current_pid, creds)
+            .unwrap();
     }
     let creds = registry.process_credentials.get_mut(&current_pid).unwrap();
-    
+
     creds.set_gids(rgid, egid);
     Ok(())
 }
@@ -558,17 +570,19 @@ pub fn seteuid(euid: Uid) -> Result<(), SecurityError> {
         Some(p) => p,
         None => return Err(SecurityError::PermissionDenied),
     };
-    
+
     let mut registry = SECURITY_REGISTRY.lock();
-    
+
     // Get or create process credentials
     if !registry.process_credentials.contains_key(&current_pid) {
         let mut creds = ProcessCredentials::new();
         creds.effective_uid = euid;
-        registry.set_process_credentials(current_pid, creds).unwrap();
+        registry
+            .set_process_credentials(current_pid, creds)
+            .unwrap();
     }
     let creds = registry.process_credentials.get_mut(&current_pid).unwrap();
-    
+
     creds.effective_uid = euid;
     Ok(())
 }
@@ -579,17 +593,19 @@ pub fn setegid(egid: Gid) -> Result<(), SecurityError> {
         Some(p) => p,
         None => return Err(SecurityError::PermissionDenied),
     };
-    
+
     let mut registry = SECURITY_REGISTRY.lock();
-    
+
     // Get or create process credentials
     if !registry.process_credentials.contains_key(&current_pid) {
         let mut creds = ProcessCredentials::new();
         creds.effective_gid = egid;
-        registry.set_process_credentials(current_pid, creds).unwrap();
+        registry
+            .set_process_credentials(current_pid, creds)
+            .unwrap();
     }
     let creds = registry.process_credentials.get_mut(&current_pid).unwrap();
-    
+
     creds.effective_gid = egid;
     Ok(())
 }
@@ -600,18 +616,20 @@ pub fn setreuid(ruid: Uid, euid: Uid) -> Result<(), SecurityError> {
         Some(p) => p,
         None => return Err(SecurityError::PermissionDenied),
     };
-    
+
     let mut registry = SECURITY_REGISTRY.lock();
-    
+
     // Get or create process credentials
     if !registry.process_credentials.contains_key(&current_pid) {
         let mut creds = ProcessCredentials::new();
         creds.set_uids(ruid, euid);
         creds.save_ids();
-        registry.set_process_credentials(current_pid, creds).unwrap();
+        registry
+            .set_process_credentials(current_pid, creds)
+            .unwrap();
     }
     let creds = registry.process_credentials.get_mut(&current_pid).unwrap();
-    
+
     creds.set_uids(ruid, euid);
     Ok(())
 }
@@ -622,18 +640,20 @@ pub fn setregid(rgid: Gid, egid: Gid) -> Result<(), SecurityError> {
         Some(p) => p,
         None => return Err(SecurityError::PermissionDenied),
     };
-    
+
     let mut registry = SECURITY_REGISTRY.lock();
-    
+
     // Get or create process credentials
     if !registry.process_credentials.contains_key(&current_pid) {
         let mut creds = ProcessCredentials::new();
         creds.set_gids(rgid, egid);
         creds.save_ids();
-        registry.set_process_credentials(current_pid, creds).unwrap();
+        registry
+            .set_process_credentials(current_pid, creds)
+            .unwrap();
     }
     let creds = registry.process_credentials.get_mut(&current_pid).unwrap();
-    
+
     creds.set_gids(rgid, egid);
     Ok(())
 }
@@ -641,10 +661,10 @@ pub fn setregid(rgid: Gid, egid: Gid) -> Result<(), SecurityError> {
 /// Initialize POSIX security subsystem
 pub fn init_security() {
     crate::println!("[security] Initializing POSIX security subsystem");
-    
+
     let mut registry = SECURITY_REGISTRY.lock();
     registry.init();
-    
+
     crate::println!("[security] POSIX security subsystem initialized");
     crate::println!("[security] Capability management enabled");
     crate::println!("[security] Password database queries enabled");
@@ -655,16 +675,16 @@ pub fn init_security() {
 /// Cleanup POSIX security subsystem
 pub fn cleanup_security() {
     crate::println!("[security] Cleaning up POSIX security subsystem");
-    
+
     let registry = SECURITY_REGISTRY.lock();
     let stats = registry.get_stats();
-    
+
     crate::println!("[security] Cleanup stats:");
     crate::println!("[security]   Total processes: {}", stats.total_processes);
     crate::println!("[security]   Total users: {}", stats.total_users);
     crate::println!("[security]   Total groups: {}", stats.total_groups);
     crate::println!("[security]   Next UID: {}", stats.next_uid);
     crate::println!("[security]   Next GID: {}", stats.next_gid);
-    
+
     // Note: We don't clear the registry here as it might be needed for cleanup
 }

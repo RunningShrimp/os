@@ -103,13 +103,7 @@ pub struct PciDeviceInfo {
 
 impl PciDeviceInfo {
     /// Create PCI device information
-    pub fn new(
-        bus: u8,
-        slot: u8,
-        function: u8,
-        vendor_id: u16,
-        device_id: u16,
-    ) -> Self {
+    pub fn new(bus: u8, slot: u8, function: u8, vendor_id: u16, device_id: u16) -> Self {
         PciDeviceInfo {
             bus,
             slot,
@@ -283,7 +277,7 @@ impl PciEnumerator {
                     0x01 => storage_count += 1,
                     0x02 => network_count += 1,
                     0x06 => bridge_count += 1,
-                    _ => {}
+                    _ => {},
                 }
             }
         }
@@ -402,11 +396,11 @@ mod tests {
     fn test_pci_enumerator_device_count() {
         let mut enumerator = PciEnumerator::new();
         assert_eq!(enumerator.device_count(), 0);
-        
+
         // Add device manually for testing
         let device = PciDeviceInfo::new(0, 5, 0, 0x8086, 0x1234);
         enumerator.add_device(device);
-        
+
         assert_eq!(enumerator.device_count(), 1);
     }
 
@@ -452,14 +446,14 @@ mod tests {
     #[test]
     fn test_pci_enumerator_multiple_devices() {
         let mut enumerator = PciEnumerator::new();
-        
+
         for i in 0..5 {
             let device = PciDeviceInfo::new(0, i, 0, 0x8086, 0x1000 + i as u16);
             enumerator.add_device(device);
         }
 
         assert_eq!(enumerator.device_count(), 5);
-        
+
         for i in 0..5 {
             let device = enumerator.get_device(i);
             assert!(device.is_some());
@@ -499,7 +493,7 @@ mod tests {
     #[test]
     fn test_pci_enumerator_count_by_type() {
         let mut enumerator = PciEnumerator::new();
-        
+
         for i in 0..3 {
             let mut device = PciDeviceInfo::new(0, i, 0, 0x8086, 0x1000 + i as u16);
             device.class_code = 0x02; // Network
@@ -534,7 +528,7 @@ mod tests {
     #[test]
     fn test_mixed_device_types_enumeration() {
         let mut enumerator = PciEnumerator::new();
-        
+
         let mut storage = PciDeviceInfo::new(0, 0, 0, 0x8086, 0x1000);
         storage.class_code = 0x01;
         enumerator.add_device(storage);

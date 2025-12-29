@@ -1,5 +1,5 @@
 /// RISC-V 64-bit (riscv64) Architecture Module
-/// 
+///
 /// Provides:
 /// - RISC-V extensions detection
 /// - SBI (Supervisor Binary Interface) support
@@ -11,23 +11,23 @@
 /// RISC-V Extensions Detection
 #[derive(Debug, Clone, Copy)]
 pub struct RiscV64Extensions {
-    pub has_i: bool,            // Base integer ISA
-    pub has_m: bool,            // Integer multiply/divide
-    pub has_a: bool,            // Atomic instructions
-    pub has_f: bool,            // Floating-point (32-bit)
-    pub has_d: bool,            // Floating-point (64-bit)
-    pub has_q: bool,            // Floating-point (128-bit)
-    pub has_l: bool,            // Decimal floating-point
-    pub has_c: bool,            // Compressed instructions
-    pub has_b: bool,            // Bit manipulation
-    pub has_k: bool,            // Cryptographic extensions
-    pub has_p: bool,            // Packed SIMD
-    pub has_j: bool,            // Dynamically translated languages
-    pub has_v: bool,            // Vector extension
-    pub has_zicsr: bool,        // Control/Status Register
-    pub has_zifencei: bool,     // Fence instruction
-    pub has_svpbmt: bool,       // Page-Based Memory Types
-    pub has_svinval: bool,      // TLB invalidate extension
+    pub has_i: bool,        // Base integer ISA
+    pub has_m: bool,        // Integer multiply/divide
+    pub has_a: bool,        // Atomic instructions
+    pub has_f: bool,        // Floating-point (32-bit)
+    pub has_d: bool,        // Floating-point (64-bit)
+    pub has_q: bool,        // Floating-point (128-bit)
+    pub has_l: bool,        // Decimal floating-point
+    pub has_c: bool,        // Compressed instructions
+    pub has_b: bool,        // Bit manipulation
+    pub has_k: bool,        // Cryptographic extensions
+    pub has_p: bool,        // Packed SIMD
+    pub has_j: bool,        // Dynamically translated languages
+    pub has_v: bool,        // Vector extension
+    pub has_zicsr: bool,    // Control/Status Register
+    pub has_zifencei: bool, // Fence instruction
+    pub has_svpbmt: bool,   // Page-Based Memory Types
+    pub has_svinval: bool,  // TLB invalidate extension
 }
 
 impl RiscV64Extensions {
@@ -70,23 +70,57 @@ impl RiscV64Extensions {
     /// Count available extensions
     pub fn extension_count(&self) -> usize {
         let mut count = 0;
-        if self.has_i { count += 1; }
-        if self.has_m { count += 1; }
-        if self.has_a { count += 1; }
-        if self.has_f { count += 1; }
-        if self.has_d { count += 1; }
-        if self.has_q { count += 1; }
-        if self.has_l { count += 1; }
-        if self.has_c { count += 1; }
-        if self.has_b { count += 1; }
-        if self.has_k { count += 1; }
-        if self.has_p { count += 1; }
-        if self.has_j { count += 1; }
-        if self.has_v { count += 1; }
-        if self.has_zicsr { count += 1; }
-        if self.has_zifencei { count += 1; }
-        if self.has_svpbmt { count += 1; }
-        if self.has_svinval { count += 1; }
+        if self.has_i {
+            count += 1;
+        }
+        if self.has_m {
+            count += 1;
+        }
+        if self.has_a {
+            count += 1;
+        }
+        if self.has_f {
+            count += 1;
+        }
+        if self.has_d {
+            count += 1;
+        }
+        if self.has_q {
+            count += 1;
+        }
+        if self.has_l {
+            count += 1;
+        }
+        if self.has_c {
+            count += 1;
+        }
+        if self.has_b {
+            count += 1;
+        }
+        if self.has_k {
+            count += 1;
+        }
+        if self.has_p {
+            count += 1;
+        }
+        if self.has_j {
+            count += 1;
+        }
+        if self.has_v {
+            count += 1;
+        }
+        if self.has_zicsr {
+            count += 1;
+        }
+        if self.has_zifencei {
+            count += 1;
+        }
+        if self.has_svpbmt {
+            count += 1;
+        }
+        if self.has_svinval {
+            count += 1;
+        }
         count
     }
 }
@@ -94,9 +128,9 @@ impl RiscV64Extensions {
 /// RISC-V Privilege Levels
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PrivilegeLevel {
-    User = 0,          // User mode (U)
-    Supervisor = 1,    // Supervisor mode (S)
-    Machine = 3,       // Machine mode (M)
+    User = 0,       // User mode (U)
+    Supervisor = 1, // Supervisor mode (S)
+    Machine = 3,    // Machine mode (M)
 }
 
 impl PrivilegeLevel {
@@ -121,18 +155,18 @@ pub struct SbiInterface {
 
 #[derive(Debug, Clone, Copy)]
 pub enum SbiFunction {
-    SetTimer,           // Set timer
-    ConsolePutchar,     // Output character
-    GetChar,            // Input character
-    CpuShutdown,        // CPU shutdown
-    Reset,              // System reset
+    SetTimer,       // Set timer
+    ConsolePutchar, // Output character
+    GetChar,        // Input character
+    CpuShutdown,    // CPU shutdown
+    Reset,          // System reset
 }
 
 impl SbiInterface {
     /// Create new SBI interface
     pub fn new() -> Self {
         Self {
-            version: 0x00010000,  // SBI 1.0
+            version: 0x00010000, // SBI 1.0
             available: false,
         }
     }
@@ -153,29 +187,29 @@ impl SbiInterface {
         // In real implementation: use ecall with a6/a7 registers
         // a6 = extension ID, a7 = function ID
         // arguments passed in a0-a5
-        
+
         match function {
             SbiFunction::SetTimer => {
                 // Timer set call
                 let _ = args;
                 Ok(0)
-            }
+            },
             SbiFunction::ConsolePutchar => {
                 // Console output
                 Ok(0)
-            }
+            },
             SbiFunction::GetChar => {
                 // Console input
                 Ok(0)
-            }
+            },
             SbiFunction::CpuShutdown => {
                 // Shutdown
                 Ok(0)
-            }
+            },
             SbiFunction::Reset => {
                 // System reset
                 Ok(0)
-            }
+            },
         }
     }
 
@@ -199,9 +233,9 @@ pub struct PmpEntry {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PmpAddressing {
     Disabled = 0,
-    Tor = 1,            // Top of Range
-    Na4 = 2,            // Naturally aligned 4-byte region
-    Napot = 3,          // Naturally aligned power-of-two region
+    Tor = 1,   // Top of Range
+    Na4 = 2,   // Naturally aligned 4-byte region
+    Napot = 3, // Naturally aligned power-of-two region
 }
 
 pub struct PmpManager {
@@ -212,10 +246,7 @@ pub struct PmpManager {
 impl PmpManager {
     /// Create new PMP manager
     pub fn new() -> Self {
-        Self {
-            entries: [None; 16],
-            entry_count: 0,
-        }
+        Self { entries: [None; 16], entry_count: 0 }
     }
 
     /// Add PMP entry
@@ -258,22 +289,22 @@ impl PmpManager {
 /// Virtual Memory Modes
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum VirtualMemoryMode {
-    Mbare,      // No translation (physical addressing)
-    Sv32,       // 32-bit virtual addressing (RV32)
-    Sv39,       // 39-bit virtual addressing (RV64)
-    Sv48,       // 48-bit virtual addressing (RV64)
-    Sv57,       // 57-bit virtual addressing (RV64)
+    Mbare, // No translation (physical addressing)
+    Sv32,  // 32-bit virtual addressing (RV32)
+    Sv39,  // 39-bit virtual addressing (RV64)
+    Sv48,  // 48-bit virtual addressing (RV64)
+    Sv57,  // 57-bit virtual addressing (RV64)
 }
 
 impl VirtualMemoryMode {
     /// Get recommended VM mode for RV64
     pub fn recommended_rv64() -> Self {
-        VirtualMemoryMode::Sv48  // 48-bit is standard for bootloader
+        VirtualMemoryMode::Sv48 // 48-bit is standard for bootloader
     }
 
     /// Get page size for mode
     pub fn page_size(&self) -> u64 {
-        4096  // All modes use 4KB base page size
+        4096 // All modes use 4KB base page size
     }
 
     /// Get levels of page table
@@ -292,7 +323,7 @@ impl VirtualMemoryMode {
 pub struct HartManager {
     pub hart_id: u32,
     pub hart_count: u32,
-    pub harts: [bool; 64],  // Track which harts are available
+    pub harts: [bool; 64], // Track which harts are available
 }
 
 impl HartManager {
@@ -303,11 +334,7 @@ impl HartManager {
             harts[hart_id as usize] = true;
         }
 
-        Self {
-            hart_id,
-            hart_count: 1,
-            harts,
-        }
+        Self { hart_id, hart_count: 1, harts }
     }
 
     /// Add hart
@@ -352,16 +379,16 @@ pub struct RiscV64BootConfig {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum RiscV64BootMode {
-    SbiCall,        // Use SBI calls
-    DirectBoot,     // Direct boot
-    OpenSbi,        // OpenSBI bootloader
+    SbiCall,    // Use SBI calls
+    DirectBoot, // Direct boot
+    OpenSbi,    // OpenSBI bootloader
 }
 
 impl RiscV64BootConfig {
     /// Initialize RISC-V boot configuration
     pub fn initialize(hart_id: u32) -> Self {
         let extensions = RiscV64Extensions::detect();
-        
+
         Self {
             extensions,
             privilege: PrivilegeLevel::current(),

@@ -1,7 +1,7 @@
 //! Core types used throughout NOS operating system
 
-use core::fmt;
 use alloc::string::String;
+use core::fmt;
 
 /// Process identifier type
 pub type Pid = u32;

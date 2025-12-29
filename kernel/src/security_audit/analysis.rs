@@ -1,21 +1,25 @@
 // Analysis Module for Security Audit
 
 extern crate alloc;
-//
 // 分析模块，负责实时和批量的安全审计数据分析
 
-use alloc::format;
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::string::ToString;
+use alloc::{
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
 use core::sync::atomic::{AtomicU64, Ordering};
+
 use spin::Mutex;
 
+use super::{
+    AnalysisConfig, AnalysisType, AnomalyDetectionConfig, BehaviorAnalysisConfig,
+    TrendAnalysisConfig,
+};
 use crate::security::audit::{AuditEvent, AuditEventType, AuditSeverity};
-use super::{AnalysisConfig, AnalysisType, AnomalyDetectionConfig, BehaviorAnalysisConfig, TrendAnalysisConfig};
 
 /// 事件分析器
 pub struct EventAnalyzer {
@@ -515,8 +519,12 @@ impl EventAnalyzer {
         self.config = config.clone();
 
         // 初始化各个分析器
-        self.anomaly_detector.lock().init(&config.anomaly_detection)?;
-        self.behavior_analyzer.lock().init(&config.behavior_analysis)?;
+        self.anomaly_detector
+            .lock()
+            .init(&config.anomaly_detection)?;
+        self.behavior_analyzer
+            .lock()
+            .init(&config.behavior_analysis)?;
         self.trend_analyzer.lock().init(&config.trend_analysis)?;
 
         crate::println!("[EventAnalyzer] Event analyzer initialized");
@@ -528,7 +536,11 @@ impl EventAnalyzer {
         let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         // 异常检测
-        if self.config.analysis_types.contains(&AnalysisType::AnomalyDetection) {
+        if self
+            .config
+            .analysis_types
+            .contains(&AnalysisType::AnomalyDetection)
+        {
             let anomaly_result = self.anomaly_detector.lock().detect_anomaly(event)?;
             if let Some(anomaly) = anomaly_result {
                 self.handle_anomaly_detection(&anomaly)?;
@@ -536,7 +548,11 @@ impl EventAnalyzer {
         }
 
         // 行为分析
-        if self.config.analysis_types.contains(&AnalysisType::BehaviorAnalysis) {
+        if self
+            .config
+            .analysis_types
+            .contains(&AnalysisType::BehaviorAnalysis)
+        {
             let behavior_result = self.behavior_analyzer.lock().analyze_behavior(event)?;
             self.handle_behavior_analysis(&behavior_result)?;
         }
@@ -561,25 +577,37 @@ impl EventAnalyzer {
             stats.anomalies_detected += 1;
         }
 
-        crate::println!("[EventAnalyzer] Anomaly detected: score={:.2}, type={:?}",
-                 anomaly.anomaly_score, anomaly.anomaly_type);
+        crate::println!(
+            "[EventAnalyzer] Anomaly detected: score={:.2}, type={:?}",
+            anomaly.anomaly_score,
+            anomaly.anomaly_type
+        );
 
         Ok(())
     }
 
     /// 处理行为分析结果
-    fn handle_behavior_analysis(&mut self, analysis: &BehaviorAnalysis) -> Result<(), &'static str> {
+    fn handle_behavior_analysis(
+        &mut self,
+        analysis: &BehaviorAnalysis,
+    ) -> Result<(), &'static str> {
         {
             let mut stats = self.stats.lock();
             stats.behavior_analyses += 1;
 
-            if matches!(analysis.behavior_classification, BehaviorClassification::Anomalous | BehaviorClassification::Malicious) {
+            if matches!(
+                analysis.behavior_classification,
+                BehaviorClassification::Anomalous | BehaviorClassification::Malicious
+            ) {
                 stats.anomalous_behaviors += 1;
             }
         }
 
-        crate::println!("[EventAnalyzer] Behavior analysis: score={:.2}, risk={:?}",
-                 analysis.behavior_score, analysis.risk_level);
+        crate::println!(
+            "[EventAnalyzer] Behavior analysis: score={:.2}, risk={:?}",
+            analysis.behavior_score,
+            analysis.risk_level
+        );
 
         Ok(())
     }
@@ -598,8 +626,14 @@ impl EventAnalyzer {
     }
 
     /// 执行关联分析
-    pub fn run_correlation_analysis(&mut self, events: &[AuditEvent]) -> Result<Vec<CorrelationResult>, &'static str> {
-        let correlations = self.correlation_analyzer.lock().analyze_correlations(events)?;
+    pub fn run_correlation_analysis(
+        &mut self,
+        events: &[AuditEvent],
+    ) -> Result<Vec<CorrelationResult>, &'static str> {
+        let correlations = self
+            .correlation_analyzer
+            .lock()
+            .analyze_correlations(events)?;
 
         {
             let mut stats = self.stats.lock();
@@ -643,7 +677,7 @@ impl AnomalyDetector {
                     parameters: BTreeMap::new(),
                     status: AlgorithmStatus::Ready,
                 });
-            }
+            },
             super::AnomalyAlgorithm::Statistical => {
                 self.algorithms.push(DetectionAlgorithm {
                     id: 2,
@@ -652,15 +686,18 @@ impl AnomalyDetector {
                     parameters: BTreeMap::new(),
                     status: AlgorithmStatus::Ready,
                 });
-            }
-            _ => {}
+            },
+            _ => {},
         }
 
         Ok(())
     }
 
     /// 检测异常
-    pub fn detect_anomaly(&mut self, event: &AuditEvent) -> Result<Option<AnomalyDetection>, &'static str> {
+    pub fn detect_anomaly(
+        &mut self,
+        event: &AuditEvent,
+    ) -> Result<Option<AnomalyDetection>, &'static str> {
         // 简化的异常检测逻辑
         let anomaly_score = self.calculate_anomaly_score(event)?;
         let threshold = 0.8;
@@ -726,11 +763,11 @@ impl BehaviorAnalyzer {
             match model_type {
                 super::BehaviorModel::UserBehavior => {
                     // 加载用户行为模型
-                }
+                },
                 super::BehaviorModel::SystemBehavior => {
                     // 加载系统行为模型
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
 
@@ -738,7 +775,10 @@ impl BehaviorAnalyzer {
     }
 
     /// 分析行为
-    pub fn analyze_behavior(&mut self, event: &AuditEvent) -> Result<BehaviorAnalysis, &'static str> {
+    pub fn analyze_behavior(
+        &mut self,
+        event: &AuditEvent,
+    ) -> Result<BehaviorAnalysis, &'static str> {
         let behavior_score = self.calculate_behavior_score(event)?;
         let risk_level = self.determine_risk_level(behavior_score);
         let behavior_classification = self.classify_behavior(behavior_score, event);
@@ -775,7 +815,7 @@ impl BehaviorAnalyzer {
             AuditEventType::Authentication => score += 0.2,
             AuditEventType::FileAccess => score += 0.1,
             AuditEventType::Network => score += 0.15,
-            _ => {}
+            _ => {},
         }
 
         Ok((score as f64).min(1.0))
@@ -821,12 +861,15 @@ impl TrendAnalyzer {
     /// 初始化趋势分析器
     pub fn init(&mut self, config: &TrendAnalysisConfig) -> Result<(), &'static str> {
         // 初始化时间序列
-        self.time_series.insert("event_count".to_string(), TimeSeries {
-            identifier: "event_count".to_string(),
-            data_points: Vec::new(),
-            time_interval: 3600, // 1 hour
-            unit: "count".to_string(),
-        });
+        self.time_series.insert(
+            "event_count".to_string(),
+            TimeSeries {
+                identifier: "event_count".to_string(),
+                data_points: Vec::new(),
+                time_interval: 3600, // 1 hour
+                unit: "count".to_string(),
+            },
+        );
 
         Ok(())
     }
@@ -874,7 +917,10 @@ impl CorrelationAnalyzer {
     }
 
     /// 分析关联性
-    pub fn analyze_correlations(&mut self, events: &[AuditEvent]) -> Result<Vec<CorrelationResult>, &'static str> {
+    pub fn analyze_correlations(
+        &mut self,
+        events: &[AuditEvent],
+    ) -> Result<Vec<CorrelationResult>, &'static str> {
         let mut results = Vec::new();
 
         // 简化的关联分析
@@ -922,7 +968,8 @@ impl CorrelationAnalyzer {
 
         // 时间相近（1小时内）
         let time_diff = (event1.timestamp as i64 - event2.timestamp as i64).abs();
-        if time_diff < 3600_000_000_000 { // 1 hour in nanoseconds
+        if time_diff < 3600_000_000_000 {
+            // 1 hour in nanoseconds
             correlation += 0.2;
         }
 

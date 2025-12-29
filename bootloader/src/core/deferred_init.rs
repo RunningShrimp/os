@@ -5,8 +5,10 @@
 //! - Network initialization (optional)
 //! - Diagnostic systems (optional)
 
-use core::cell::UnsafeCell;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::{
+    cell::UnsafeCell,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 /// Deferred initialization state
 pub struct DeferredInit<T> {
@@ -28,12 +30,11 @@ impl<T> DeferredInit<T> {
 
     /// Initialize the value (one-time only)
     pub fn init(&self, value: T) -> Result<(), T> {
-        if self.initialized.compare_exchange(
-            false,
-            true,
-            Ordering::Release,
-            Ordering::Relaxed,
-        ).is_ok() {
+        if self
+            .initialized
+            .compare_exchange(false, true, Ordering::Release, Ordering::Relaxed)
+            .is_ok()
+        {
             // SAFETY: We just verified no other thread has initialized
             unsafe {
                 *self.value.get() = Some(value);
@@ -49,9 +50,7 @@ impl<T> DeferredInit<T> {
     pub fn get(&self) -> Option<&T> {
         if self.initialized.load(Ordering::Acquire) {
             // SAFETY: We verified initialization and it's immutable after
-            unsafe {
-                (*self.value.get()).as_ref()
-            }
+            unsafe { (*self.value.get()).as_ref() }
         } else {
             None
         }
@@ -122,14 +121,14 @@ impl BootPhaseController {
                 } else {
                     BootPhase::Graphics
                 }
-            }
+            },
             BootPhase::Graphics => {
                 if self.skip_network {
                     BootPhase::KernelLoad
                 } else {
                     BootPhase::Network
                 }
-            }
+            },
             BootPhase::Network => BootPhase::KernelLoad,
             BootPhase::KernelLoad => BootPhase::Validation,
             BootPhase::Validation => BootPhase::Ready,
@@ -162,7 +161,7 @@ mod tests {
     fn test_deferred_init() {
         let slot: DeferredInit<i32> = DeferredInit::new();
         assert!(!slot.is_initialized());
-        
+
         assert!(slot.init(42).is_ok());
         assert!(slot.is_initialized());
         assert_eq!(slot.get(), Some(&42));
@@ -172,7 +171,7 @@ mod tests {
     fn test_boot_phase() {
         let mut controller = BootPhaseController::new();
         assert_eq!(controller.current(), BootPhase::Hardware);
-        
+
         controller.advance();
         assert_eq!(controller.current(), BootPhase::Memory);
     }

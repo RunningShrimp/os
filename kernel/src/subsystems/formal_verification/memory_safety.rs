@@ -1,20 +1,17 @@
 // Memory Safety Verification Module
 
 extern crate alloc;
-//
 // 内存安全验证模块
 // 验证内存相关的安全属性，包括空指针、缓冲区溢出等
 
-use hashbrown::{HashMap, HashSet};
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::{format, vec};
+use alloc::{collections::BTreeMap, format, sync::Arc, vec, vec::Vec};
 use core::sync::atomic::Ordering;
+
+use hashbrown::{HashMap, HashSet};
 use spin::Mutex;
-use crate::compat::DefaultHasherBuilder;
 
 use super::*;
+use crate::compat::DefaultHasherBuilder;
 
 /// 内存安全验证器
 pub struct MemorySafetyVerifier {
@@ -67,7 +64,10 @@ impl MemorySafetyVerifier {
     }
 
     /// 验证内存安全
-    pub fn verify_memory_safety(&mut self, targets: &[VerificationTarget]) -> Result<Vec<VerificationResult>, &'static str> {
+    pub fn verify_memory_safety(
+        &mut self,
+        targets: &[VerificationTarget],
+    ) -> Result<Vec<VerificationResult>, &'static str> {
         if !self.running.load(Ordering::SeqCst) {
             return Err("Memory safety verifier is not running");
         }

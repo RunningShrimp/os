@@ -3,12 +3,9 @@
 /// Provides low-level coordination of boot stages and hardware interaction.
 /// Manages technical boot flow from initialization to kernel handoff.
 /// This is distinct from Application layer orchestration which handles business use cases.
-
 use crate::{
-    boot_stage::boot_config::BootConfig,
-    kernel_if::{kernel_loader::KernelLoader},
-    core::boot_sequence::BootSequence,
-    utils::error::BootError,
+    boot_stage::boot_config::BootConfig, core::boot_sequence::BootSequence,
+    kernel_if::kernel_loader::KernelLoader, utils::error::BootError,
 };
 
 /// Memory map entry from E820
@@ -30,12 +27,7 @@ pub struct MemoryMap {
 impl MemoryMap {
     pub fn new() -> Self {
         Self {
-            entries: [MemoryMapEntry {
-                base_addr: 0,
-                length: 0,
-                mem_type: 0,
-                acpi_attrs: 0,
-            }; 32],
+            entries: [MemoryMapEntry { base_addr: 0, length: 0, mem_type: 0, acpi_attrs: 0 }; 32],
             entry_count: 0,
         }
     }
@@ -94,28 +86,28 @@ impl<'a> BootCoordinator<'a> {
     /// Detect system hardware using low-level interfaces
     /// This method handles hardware detection at the boot stage level,
     /// focusing on technical aspects rather than business logic.
-    pub fn detect_hardware(&mut self) -> Result<crate::domain::boot_services::HardwareInfo, BootError> {
+    pub fn detect_hardware(
+        &mut self,
+    ) -> Result<crate::domain::boot_services::HardwareInfo, BootError> {
         // Implementation would use low-level hardware detection
         // For now, return a placeholder
         Ok(crate::domain::boot_services::HardwareInfo::new())
     }
 
-
-
     /// Load kernel from disk
     pub fn load_kernel(&mut self) -> Result<(), BootError> {
         // TODO: Replace with actual disk read using bios_calls
         // For now, we'll simulate loading an ELF kernel from a buffer
-        
+
         // In a real implementation, this would:
         // 1. Read kernel from disk using INT 0x13 via bios_services.disk.read_sectors()
         // 2. Allocate memory for kernel loading
         // 3. Parse ELF format and load segments into memory
         // 4. Update boot_info with kernel address and size
-        
+
         // Placeholder: Simulate reading from disk by creating a minimal valid ELF header
         // This is just to demonstrate the parsing functionality
-        
+
         let kernel_data = &[]; // TODO: Replace with actual read data
 
         // Try to load the kernel
@@ -126,7 +118,7 @@ impl<'a> BootCoordinator<'a> {
                 // TODO: Implement memory allocation and actual loading
 
                 Ok(())
-            }
+            },
             Err(_) => Err(BootError::KernelLoadFailed),
         }
     }
@@ -143,7 +135,7 @@ impl<'a> BootCoordinator<'a> {
         // 2. Validate kernel entry point is in usable memory
         // 3. Check kernel segment permissions and alignments
         // 4. Verify kernel compatibility with bootloader
-        
+
         // Basic validation: Check if kernel address is reasonable
         let boot_info = self.boot_info.as_ref().unwrap();
         if boot_info.kernel_addr < 0x100000 || boot_info.kernel_size == 0 {
@@ -166,7 +158,7 @@ impl<'a> BootCoordinator<'a> {
 
         let boot_info = BootInfo {
             memory_map,
-            kernel_addr: 0x100000, // Traditional kernel load address
+            kernel_addr: 0x100000,    // Traditional kernel load address
             kernel_size: 1024 * 1024, // 1MB kernel size (mock)
             cmdline,
         };
@@ -216,14 +208,14 @@ mod tests {
     fn test_memory_map() {
         let mut memory_map = MemoryMap::new();
         assert_eq!(memory_map.entry_count, 0);
-        
+
         let entry = MemoryMapEntry {
             base_addr: 0,
             length: 1024 * 1024,
             mem_type: 1,
             acpi_attrs: 0,
         };
-        
+
         assert!(memory_map.add_entry(entry).is_ok());
         assert_eq!(memory_map.entry_count, 1);
         assert_eq!(memory_map.total_ram(), 1024 * 1024);
@@ -231,13 +223,7 @@ mod tests {
 
     #[test]
     fn test_boot_error_messages() {
-        assert_eq!(
-            BootError::MemoryMapError.description(),
-            "Memory map error"
-        );
-        assert_eq!(
-            BootError::KernelLoadFailed.description(),
-            "Failed to load kernel"
-        );
+        assert_eq!(BootError::MemoryMapError.description(), "Memory map error");
+        assert_eq!(BootError::KernelLoadFailed.description(), "Failed to load kernel");
     }
 }

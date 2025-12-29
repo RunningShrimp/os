@@ -3,10 +3,8 @@
 //! 测试各个子系统之间的集成和交互
 
 use crate::error::UnifiedError;
-use crate::test::{TestResult, kernel_test};
 use crate::core::sync::Mutex;
 use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
 use core::time::Duration;
 
 /// 集成测试结果

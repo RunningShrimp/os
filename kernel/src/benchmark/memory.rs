@@ -5,6 +5,7 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
+
 use crate::subsystems::time::hrtime_nanos;
 
 /// Memory benchmark results
@@ -27,31 +28,31 @@ pub struct MemoryBenchmarkResult {
 /// Benchmark memory allocation
 pub fn benchmark_allocation(size: usize, count: usize) -> MemoryBenchmarkResult {
     let start_time = hrtime_nanos();
-    
+
     let mut allocations = Vec::with_capacity(count);
     for _ in 0..count {
         let alloc_start = hrtime_nanos();
         let ptr = crate::subsystems::mm::kalloc(size);
         let alloc_end = hrtime_nanos();
-        
+
         if let Some(addr) = ptr {
             allocations.push((addr, alloc_end - alloc_start));
         }
     }
-    
+
     // Free allocations
     for (addr, _) in &allocations {
         unsafe {
             crate::subsystems::mm::kfree(*addr, size);
         }
     }
-    
+
     let end_time = hrtime_nanos();
     let total_time = end_time - start_time;
     let avg_time = allocations.iter().map(|(_, t)| *t).sum::<u64>() / allocations.len() as u64;
     let total_bytes = (allocations.len() * size) as u64;
     let throughput = (total_bytes as f64 * 1_000_000_000.0) / total_time as f64 / (1024.0 * 1024.0);
-    
+
     MemoryBenchmarkResult {
         name: "allocation",
         allocation_size: size,
@@ -66,9 +67,9 @@ pub fn benchmark_allocation(size: usize, count: usize) -> MemoryBenchmarkResult 
 pub fn benchmark_memory_access(size: usize, iterations: usize) -> MemoryBenchmarkResult {
     // Allocate buffer
     let buf = crate::subsystems::mm::kalloc(size).expect("Failed to allocate");
-    
+
     let start_time = hrtime_nanos();
-    
+
     // Sequential write
     for i in 0..iterations {
         unsafe {
@@ -76,7 +77,7 @@ pub fn benchmark_memory_access(size: usize, iterations: usize) -> MemoryBenchmar
             *ptr = (i & 0xFF) as u8;
         }
     }
-    
+
     // Sequential read
     let mut sum = 0u64;
     for i in 0..iterations {
@@ -85,18 +86,18 @@ pub fn benchmark_memory_access(size: usize, iterations: usize) -> MemoryBenchmar
             sum += *ptr as u64;
         }
     }
-    
+
     let end_time = hrtime_nanos();
     let total_time = end_time - start_time;
-    
+
     // Free buffer
     unsafe {
         crate::subsystems::mm::kfree(buf, size);
     }
-    
+
     let total_bytes = (iterations * core::mem::size_of::<u8>()) as u64;
     let throughput = (total_bytes as f64 * 1_000_000_000.0) / total_time as f64 / (1024.0 * 1024.0);
-    
+
     MemoryBenchmarkResult {
         name: "memory_access",
         allocation_size: size,
@@ -110,25 +111,24 @@ pub fn benchmark_memory_access(size: usize, iterations: usize) -> MemoryBenchmar
 /// Run all memory benchmarks
 pub fn run_all_memory_benchmarks() {
     crate::println!("[benchmark] Running memory benchmarks...");
-    
+
     // Small allocation benchmark
     let small_result = benchmark_allocation(64, 1000);
     crate::println!("[benchmark] Small allocations (64B, 1000x):");
     crate::println!("  Average time: {} ns", small_result.avg_allocation_time_ns);
     crate::println!("  Throughput: {:.2} MB/s", small_result.throughput_mb_per_sec);
-    
+
     // Large allocation benchmark
     let large_result = benchmark_allocation(4096, 100);
     crate::println!("[benchmark] Large allocations (4KB, 100x):");
     crate::println!("  Average time: {} ns", large_result.avg_allocation_time_ns);
     crate::println!("  Throughput: {:.2} MB/s", large_result.throughput_mb_per_sec);
-    
+
     // Memory access benchmark
     let access_result = benchmark_memory_access(4096, 10000);
     crate::println!("[benchmark] Memory access (4KB buffer, 10000 iterations):");
     crate::println!("  Average time: {} ns", access_result.avg_allocation_time_ns);
     crate::println!("  Throughput: {:.2} MB/s", access_result.throughput_mb_per_sec);
-    
+
     crate::println!("[benchmark] Memory benchmarks completed");
 }
-

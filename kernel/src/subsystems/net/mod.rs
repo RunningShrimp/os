@@ -7,30 +7,30 @@ extern crate alloc;
 
 use alloc::string::ToString;
 
-pub mod packet;
-pub mod interface;
-pub mod device;
 pub mod arp;
-pub mod ipv4;
+pub mod buffer_management;
+pub mod device;
+pub mod enhanced_network;
+pub mod fragment;
 pub mod icmp;
 pub mod icmp_enhanced; // Enhanced ICMP features (optional: extended ICMP types, traceroute, ping)
-pub mod udp;
-pub mod tcp;
-pub mod route;
-pub mod buffer_management;
-pub mod fragment;
+pub mod interface;
+pub mod ipv4;
+pub mod packet;
 pub mod processor;
+pub mod route;
 pub mod socket;
-pub mod zero_copy;
-pub mod enhanced_network; // POSIX-compatible network API (required for socket syscalls)
+pub mod tcp;
+pub mod udp;
+pub mod zero_copy; // POSIX-compatible network API (required for socket syscalls)
 
 // 只在需要的地方使用日志系统
 // use crate::{log_info, log_error};
 
 // Import packet pool and other essential types
-use packet::{PacketPool};
-
 use core::sync::atomic::{AtomicU32, Ordering};
+
+use packet::PacketPool;
 
 /// Global network configuration and state
 pub struct NetworkStack {
@@ -104,7 +104,9 @@ impl NetworkStack {
         let interface = self.find_route(dest_ip)?;
 
         // Send the packet
-        interface.send_packet(packet).map_err(|e| NetworkError::from(e))
+        interface
+            .send_packet(packet)
+            .map_err(|e| NetworkError::from(e))
     }
 
     /// Send a batch of packets; stops on first error and returns number successfully queued.
@@ -144,7 +146,9 @@ impl NetworkStack {
         if len > buffer.capacity() {
             return Err(NetworkError::PacketTooLarge);
         }
-        unsafe { buffer.set_length(len); }
+        unsafe {
+            buffer.set_length(len);
+        }
         let mut packet = Packet::from_buffer(buffer, packet_type);
         packet.size = len;
         self.send_packet(packet, dest_ip)
@@ -160,8 +164,7 @@ impl NetworkStack {
         }
 
         // Default route (first interface)
-        self.interfaces.first()
-            .ok_or(NetworkError::NoRouteToHost)
+        self.interfaces.first().ok_or(NetworkError::NoRouteToHost)
     }
 
     /// Get the enhanced network manager
@@ -232,7 +235,6 @@ pub fn init() {
 
 /// Initialize additional network interfaces
 fn init_network_interfaces() {
-
     // Try to detect and initialize available network devices
     // For now, we'll create a mock Ethernet interface for testing
     #[cfg(debug_assertions)]
@@ -245,6 +247,7 @@ fn init_network_interfaces() {
 #[cfg(debug_assertions)]
 fn create_mock_ethernet_interface() {
     use alloc::sync::Arc;
+
     use crate::net::interface::InterfaceConfig;
 
     // Create a mock network device (would normally be detected from hardware)
@@ -275,7 +278,8 @@ pub fn configure_interface(name: &str, config: &InterfaceConfig) -> Result<u32, 
     let stack = network_stack();
 
     // Find existing interface by name and get mutable reference
-    let interface_id = stack.interfaces()
+    let interface_id = stack
+        .interfaces()
         .iter()
         .find(|interface| interface.name() == name)
         .map(|interface| interface.id());
@@ -338,46 +342,46 @@ pub fn enhanced_network_manager_mut() -> &'static mut enhanced_network::Enhanced
     network_stack().enhanced_manager_mut()
 }
 
+// Module imports
+use alloc::{string::String, sync::Arc, vec::Vec};
+
 /// Re-export for use in other modules
 pub use self::packet::{Packet, PacketBuffer, PacketType};
-pub use self::interface::{Interface, InterfaceConfig};
-pub use self::device::{NetworkDevice, NetworkDeviceType};
-pub use self::arp::{ArpCache, ArpEntry};
-pub use self::ipv4::{Ipv4Addr, Ipv4Header, Ipv4Packet};
-pub use self::icmp::{IcmpPacket, IcmpType, IcmpCode, IcmpError};
-pub use self::icmp_enhanced::{
-    EnhancedIcmpProcessor, EnhancedIcmpPacket, ExtendedIcmpType, IcmpMessageData,
-    IcmpConfig, IcmpComprehensiveStats, IcmpSendOptions, TracerouteHop, PingReply, PingResult
+pub use self::{
+    arp::{ArpCache, ArpEntry},
+    buffer_management::{
+        BufferError, BufferFlags, BufferHandle, BufferMetadata, BufferOwner, BufferPool,
+        BufferStats, BufferType, GlobalBufferStats, NetworkBuffer, NetworkBufferManager, PoolStats,
+        ProtocolData,
+    },
+    device::{NetworkDevice, NetworkDeviceType},
+    enhanced_network::{
+        AddressFamily, EnhancedNetworkManager, EnhancedSocket,
+        NetworkError as EnhancedNetworkError, NetworkStats, SocketAddress,
+        SocketType as EnhancedSocketType,
+    },
+    fragment::{FragmentReassembler, Fragmenter, ReassemblyEntry},
+    icmp::{IcmpCode, IcmpError, IcmpPacket, IcmpType},
+    icmp_enhanced::{
+        EnhancedIcmpPacket, EnhancedIcmpProcessor, ExtendedIcmpType, IcmpComprehensiveStats,
+        IcmpConfig, IcmpMessageData, IcmpSendOptions, PingReply, PingResult, TracerouteHop,
+    },
+    interface::{Interface, InterfaceConfig},
+    ipv4::{Ipv4Addr, Ipv4Header, Ipv4Packet},
+    processor::{NetworkProcessor, PacketResult},
+    route::{RouteEntry, RouteLookupResult, RouteManager, RoutingTable, RoutingTableStats},
+    socket::{
+        ProtocolFamily, Socket, SocketAddr, SocketEntry, SocketOptions, SocketState, SocketType,
+    },
+    tcp::{
+        EnhancedTcpStats, MssOption, SackBlock, SackOption, TcpConfig, TcpError, TcpHeader,
+        TcpOption, TcpOptionKind, TcpPacket, TcpSocket, TcpState, TimestampOption,
+        WindowScaleOption,
+        manager::{TcpConnection, TcpConnectionManager},
+        state::TcpStateMachine,
+    },
+    udp::{UdpHeader, UdpPacket, UdpSocket},
 };
-pub use self::udp::{UdpHeader, UdpPacket, UdpSocket};
-pub use self::tcp::{
-    TcpHeader, TcpPacket, TcpState, TcpSocket, TcpOption, TcpOptionKind,
-    MssOption, WindowScaleOption, TimestampOption, SackOption, SackBlock,
-    EnhancedTcpStats, TcpConfig, TcpError
-};
-pub use self::tcp::state::TcpStateMachine;
-pub use self::tcp::manager::{TcpConnection, TcpConnectionManager};
-pub use self::route::{RouteEntry, RoutingTable, RouteManager, RouteLookupResult, RoutingTableStats};
-pub use self::fragment::{FragmentReassembler, Fragmenter, ReassemblyEntry};
-pub use self::processor::{NetworkProcessor, PacketResult};
-pub use self::socket::{
-    Socket, SocketType, ProtocolFamily, SocketAddr,
-    SocketOptions, SocketEntry, SocketState
-};
-pub use self::buffer_management::{
-    NetworkBuffer, NetworkBufferManager, BufferHandle, BufferType, BufferFlags,
-    BufferMetadata, BufferOwner, ProtocolData, BufferStats, BufferPool,
-    PoolStats, GlobalBufferStats, BufferError
-};
-pub use self::enhanced_network::{
-    EnhancedNetworkManager, EnhancedSocket, SocketType as EnhancedSocketType,
-    AddressFamily, SocketAddress, NetworkStats, NetworkError as EnhancedNetworkError
-};
-
-// Module imports
-use alloc::sync::Arc;
-use alloc::string::String;
-use alloc::vec::Vec;
 use crate::subsystems::sync::Once;
 
 // Forward declarations (will be implemented in submodules)

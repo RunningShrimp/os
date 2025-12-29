@@ -3,9 +3,7 @@
 //! This module provides security audit functionality for tracking
 //! security-related events and operations.
 
-use alloc::collections::BTreeMap;
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
 /// Audit event severity levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -150,10 +148,7 @@ pub struct SecurityAuditor {
 
 impl SecurityAuditor {
     pub fn new() -> Self {
-        Self {
-            enabled: false,
-            audit_log: Vec::new(),
-        }
+        Self { enabled: false, audit_log: Vec::new() }
     }
 
     pub fn enable(&mut self) {
@@ -223,11 +218,7 @@ pub struct SecurityFinding {
 
 impl SecurityFinding {
     pub fn new(category: SecurityCategory, severity: AuditSeverity, description: &str) -> Self {
-        Self {
-            category,
-            severity,
-            description: String::from(description),
-        }
+        Self { category, severity, description: String::from(description) }
     }
 }
 
@@ -240,10 +231,7 @@ pub struct SecurityScore {
 
 impl SecurityScore {
     pub fn new() -> Self {
-        Self {
-            base_score: 100,
-            penalty: 0,
-        }
+        Self { base_score: 100, penalty: 0 }
     }
 
     pub fn total(&self) -> u32 {

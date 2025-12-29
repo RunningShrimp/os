@@ -16,11 +16,11 @@ pub fn init_interrupts() {
 fn init_x86_64_interrupts() {
     // Set up IDT (Interrupt Descriptor Table)
     // For bootloader, we typically just set up basic handlers
-    
+
     unsafe {
         // Disable interrupts during setup
         core::arch::asm!("cli");
-        
+
         // Load IDT (simplified - in real bootloader would need full IDT)
         // For now, just leave interrupts disabled
         core::arch::asm!("cli");

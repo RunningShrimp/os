@@ -1,20 +1,17 @@
 // Specification Language Module
 
 extern crate alloc;
-//
 // 规约语言模块
 // 定义形式化规约语言，用于描述系统属性和行为
 
-use hashbrown::{HashMap, HashSet};
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::boxed::Box;
+use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
 use core::sync::atomic::Ordering;
+
+use hashbrown::{HashMap, HashSet};
 use spin::Mutex;
-use crate::compat::DefaultHasherBuilder;
 
 use super::*;
+use crate::compat::DefaultHasherBuilder;
 
 /// 规约语言解释器
 pub struct SpecLanguageInterpreter {
@@ -59,9 +56,7 @@ pub struct SpecSemanticAnalyzer {
 
 impl Clone for SpecSemanticAnalyzer {
     fn clone(&self) -> Self {
-        Self {
-            symbol_table: self.symbol_table.clone(),
-        }
+        Self { symbol_table: self.symbol_table.clone() }
     }
 }
 

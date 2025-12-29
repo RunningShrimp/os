@@ -5,12 +5,12 @@
 
 extern crate alloc;
 
-use alloc::sync::Arc;
-use alloc::collections::BTreeMap;
-use crate::subsystems::sync::Mutex;
-use crate::reliability::{EOK, EINVAL, ENOENT, EPERM, EAGAIN};
-use crate::posix::{TimerT, ClockId, SigEvent, Itimerspec, Timespec, Pid};
+use alloc::{collections::BTreeMap, sync::Arc};
 
+use crate::{
+    posix::{ClockId, Itimerspec, Pid, SigEvent, TimerT, Timespec},
+    subsystems::sync::Mutex,
+};
 /// Timer state
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum TimerState {
@@ -30,7 +30,10 @@ mod tests {
         // Set expiry a short time in the future
         let now_ns = crate::subsystems::time::timestamp_nanos();
         let future_ns = now_ns + 2_000_000_000; // 2 seconds
-        timer.expiry_time = Timespec { tv_sec: (future_ns / 1_000_000_000) as i64, tv_nsec: (future_ns % 1_000_000_000) as i64 };
+        timer.expiry_time = Timespec {
+            tv_sec: (future_ns / 1_000_000_000) as i64,
+            tv_nsec: (future_ns % 1_000_000_000) as i64,
+        };
         timer.state = TimerState::Armed;
 
         let rem = timer.get_remaining();
@@ -63,7 +66,13 @@ struct Timer {
 }
 
 impl Timer {
-    fn new(id: usize, clock_id: ClockId, sigevent: SigEvent, owner_pid: Pid, owner_tid: Option<usize>) -> Self {
+    fn new(
+        id: usize,
+        clock_id: ClockId,
+        sigevent: SigEvent,
+        owner_pid: Pid,
+        owner_tid: Option<usize>,
+    ) -> Self {
         Self {
             id,
             clock_id,
@@ -113,7 +122,8 @@ impl Timer {
         };
 
         // Convert expiry_time and now into nanoseconds (i128 to avoid overflow)
-        let expiry_ns = (self.expiry_time.tv_sec as i128) * 1_000_000_000i128 + (self.expiry_time.tv_nsec as i128);
+        let expiry_ns = (self.expiry_time.tv_sec as i128) * 1_000_000_000i128
+            + (self.expiry_time.tv_nsec as i128);
         let now_ns_i = (now.tv_sec as i128) * 1_000_000_000i128 + (now.tv_nsec as i128);
 
         if now_ns_i >= expiry_ns {
@@ -138,9 +148,10 @@ impl Timer {
         }
 
         // Check if timer has expired
-        if current_time.tv_sec > self.expiry_time.tv_sec ||
-           (current_time.tv_sec == self.expiry_time.tv_sec && current_time.tv_nsec >= self.expiry_time.tv_nsec) {
-
+        if current_time.tv_sec > self.expiry_time.tv_sec
+            || (current_time.tv_sec == self.expiry_time.tv_sec
+                && current_time.tv_nsec >= self.expiry_time.tv_nsec)
+        {
             // Handle expiration
             self.state = TimerState::Expired;
             self.overrun_count += 1;
@@ -173,25 +184,33 @@ impl Timer {
         match self.sigevent.sigev_notify {
             crate::posix::SIGEV_SIGNAL => {
                 // Send signal to process
-                let _ = crate::ipc::signal::kill(self.owner_pid as usize, self.sigevent.sigev_signo as u32);
-            }
+                let _ = crate::ipc::signal::kill(
+                    self.owner_pid as usize,
+                    self.sigevent.sigev_signo as u32,
+                );
+            },
             crate::posix::SIGEV_THREAD => {
                 // Lightweight thread notification: in full implementation we would
                 // create a proper kernel thread to run the provided notification
                 // function. For now we log the desired behavior so the system
                 // remains safe and observable.
-                crate::println!("[timer] thread notification requested (SIGEV_THREAD) for timer={} owner_pid={} owner_tid={:?}", self.id, self.owner_pid, self.owner_tid);
-            }
+                crate::println!(
+                    "[timer] thread notification requested (SIGEV_THREAD) for timer={} \
+                     owner_pid={} owner_tid={:?}",
+                    self.id,
+                    self.owner_pid,
+                    self.owner_tid
+                );
+            },
             _ => {
                 // No notification
-            }
+            },
         }
     }
 }
 
 /// Global timer registry
-static TIMER_REGISTRY: Mutex<BTreeMap<usize, Arc<Mutex<Timer>>>> =
-    Mutex::new(BTreeMap::new());
+static TIMER_REGISTRY: Mutex<BTreeMap<usize, Arc<Mutex<Timer>>>> = Mutex::new(BTreeMap::new());
 
 /// Next timer ID
 static NEXT_TIMER_ID: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(1);
@@ -223,10 +242,10 @@ pub unsafe extern "C" fn timer_create(
 
     // Validate clock ID
     match clock_id {
-        crate::posix::CLOCK_REALTIME |
-        crate::posix::CLOCK_MONOTONIC |
-        crate::posix::CLOCK_PROCESS_CPUTIME_ID |
-        crate::posix::CLOCK_THREAD_CPUTIME_ID => {}
+        crate::posix::CLOCK_REALTIME
+        | crate::posix::CLOCK_MONOTONIC
+        | crate::posix::CLOCK_PROCESS_CPUTIME_ID
+        | crate::posix::CLOCK_THREAD_CPUTIME_ID => {},
         _ => return EINVAL,
     }
 
@@ -262,7 +281,8 @@ pub unsafe extern "C" fn timer_create(
     let mut registry = TIMER_REGISTRY.lock();
 
     // Check timer limit per process
-    let timer_count = registry.values()
+    let timer_count = registry
+        .values()
         .filter(|t| t.lock().owner_pid as i32 == current_pid)
         .count();
 
@@ -432,19 +452,19 @@ pub unsafe extern "C" fn clock_gettime(clock_id: ClockId, tp: *mut Timespec) -> 
         crate::posix::CLOCK_REALTIME => {
             // TODO: Get real-time clock
             Timespec::new(0, 0)
-        }
+        },
         crate::posix::CLOCK_MONOTONIC => {
             // TODO: Get monotonic clock
             Timespec::new(0, 0)
-        }
+        },
         crate::posix::CLOCK_PROCESS_CPUTIME_ID => {
             // TODO: Get process CPU time
             Timespec::new(0, 0)
-        }
+        },
         crate::posix::CLOCK_THREAD_CPUTIME_ID => {
             // TODO: Get thread CPU time
             Timespec::new(0, 0)
-        }
+        },
         _ => return EINVAL,
     };
 
@@ -490,11 +510,11 @@ pub unsafe extern "C" fn clock_getres(clock_id: ClockId, res: *mut Timespec) -> 
         crate::posix::CLOCK_REALTIME | crate::posix::CLOCK_MONOTONIC => {
             // Typically 1ms or better
             Timespec::new(0, 1_000_000) // 1ms
-        }
+        },
         crate::posix::CLOCK_PROCESS_CPUTIME_ID | crate::posix::CLOCK_THREAD_CPUTIME_ID => {
             // CPU time clocks usually have nanosecond resolution
             Timespec::new(0, 1) // 1ns
-        }
+        },
         _ => return EINVAL,
     };
 

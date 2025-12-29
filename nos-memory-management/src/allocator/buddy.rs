@@ -2,9 +2,8 @@
 
 extern crate alloc;
 
-use core::alloc::Layout;
-use core::ptr::null_mut;
 use alloc::vec::Vec;
+use core::{alloc::Layout, ptr::null_mut};
 
 /// Buddy allocator that manages memory blocks of power-of-2 sizes
 pub struct OptimizedBuddyAllocator {
@@ -22,7 +21,7 @@ pub struct OptimizedBuddyAllocator {
 }
 
 /// A block in the buddy allocator free list.
-/// 
+///
 /// This represents a free memory block that can be allocated or split into smaller blocks.
 pub struct BuddyBlock {
     /// Pointer to the next free block in the same size class.
@@ -56,11 +55,7 @@ impl OptimizedBuddyAllocator {
             min_order: 0,
             max_order: 31,
             total_blocks: 0,
-            statistics: AllocatorStats {
-                allocated: 0,
-                freed: 0,
-                fragmentation: 0,
-            },
+            statistics: AllocatorStats { allocated: 0, freed: 0, fragmentation: 0 },
         }
     }
 
@@ -70,7 +65,8 @@ impl OptimizedBuddyAllocator {
     /// - `heap_start` and `heap_end` must point to valid, contiguous memory that is accessible
     /// - The memory region must be aligned to `min_block_size` boundaries
     /// - `min_block_size` must be a power of 2 and greater than 0
-    /// - The caller must ensure no other code accesses this memory region while the allocator is in use
+    /// - The caller must ensure no other code accesses this memory region while the allocator is in
+    ///   use
     pub unsafe fn init(&mut self, heap_start: usize, heap_end: usize, min_block_size: usize) {
         self.heap_start = heap_start;
         self.heap_end = heap_end;
@@ -79,7 +75,7 @@ impl OptimizedBuddyAllocator {
         // Calculate the total number of minimum-sized blocks
         let total_size = heap_end - heap_start;
         self.total_blocks = total_size / min_block_size;
-        
+
         // Initialize bitmap
         let bitmap_size = self.total_blocks.div_ceil(64);
         self.bitmap = Vec::with_capacity(bitmap_size);
@@ -98,7 +94,7 @@ impl OptimizedBuddyAllocator {
                 (*block).size = heap_end - heap_start;
                 (*block).next = null_mut();
             }
-            
+
             // Find the appropriate free list for this block
             let order = unsafe { self.get_order((*block).size) };
             if order < 32 {
@@ -114,7 +110,7 @@ impl OptimizedBuddyAllocator {
     pub fn alloc(&mut self, layout: Layout) -> *mut u8 {
         let size = layout.size();
         let align = layout.align();
-        
+
         // Round up to minimum block size
         let required_size = if size < self.min_block_size {
             self.min_block_size
@@ -136,30 +132,30 @@ impl OptimizedBuddyAllocator {
                 // Split blocks if necessary
                 let mut current_order = i;
                 let current_block = block;
-                
+
                 while current_order > order {
                     current_order -= 1;
                     let block_size = 1 << (self.min_order + current_order);
-                    
+
                     // Calculate buddy address
                     let buddy_addr = (current_block as usize) + block_size;
                     let buddy_block = buddy_addr as *mut BuddyBlock;
-                    
+
                     // Split the block - mark both as free in their respective lists
                     unsafe {
                         (*current_block).size = block_size;
                         (*buddy_block).size = block_size;
-                        
+
                         // Add buddy to current order free list
                         (*buddy_block).next = self.free_lists[current_order];
                         self.free_lists[current_order] = buddy_block;
                     }
                 }
-                
+
                 // Mark block as allocated in bitmap
                 let block_idx = (current_block as usize - self.heap_start) / self.min_block_size;
                 let num_blocks = required_size / self.min_block_size;
-                
+
                 // Update bitmap - set all bits for this block
                 for i in 0..num_blocks {
                     let bit_idx = block_idx + i;
@@ -167,12 +163,12 @@ impl OptimizedBuddyAllocator {
                     let bit = bit_idx % 64;
                     self.bitmap[word_idx] |= 1 << bit;
                 }
-                
+
                 // Align the returned pointer
                 let aligned_ptr = align_up(current_block as usize, align) as *mut u8;
-                
+
                 self.statistics.allocated += required_size;
-                
+
                 return aligned_ptr;
             }
         }
@@ -199,11 +195,11 @@ impl OptimizedBuddyAllocator {
         }
 
         let block = ptr as *mut BuddyBlock;
-        
+
         // Mark block as free in bitmap
         let block_idx = (block as usize - self.heap_start) / self.min_block_size;
         let num_blocks = block_size / self.min_block_size;
-        
+
         // Update bitmap - clear all bits for this block
         for i in 0..num_blocks {
             let bit_idx = block_idx + i;
@@ -211,7 +207,7 @@ impl OptimizedBuddyAllocator {
             let bit = bit_idx % 64;
             self.bitmap[word_idx] &= !(1 << bit);
         }
-        
+
         // Add back to free list
         unsafe {
             (*block).size = block_size;
@@ -236,7 +232,7 @@ impl OptimizedBuddyAllocator {
             if buddy.is_null() {
                 return;
             }
-            
+
             // Check if buddy is actually free in bitmap
             let buddy_idx = (buddy as usize - self.heap_start) / self.min_block_size;
             let buddy_in_bitmap = self.is_block_free(buddy_idx, order + 1);
@@ -269,7 +265,7 @@ impl OptimizedBuddyAllocator {
     fn find_buddy(&self, block: *mut BuddyBlock, order: usize) -> *mut BuddyBlock {
         let block_size = 1 << (self.min_order + order);
         let buddy_addr = (block as usize) ^ block_size;
-        
+
         if buddy_addr >= self.heap_start && buddy_addr < self.heap_end {
             buddy_addr as *mut BuddyBlock
         } else {
@@ -280,17 +276,17 @@ impl OptimizedBuddyAllocator {
     /// Check if a block is free in the bitmap
     fn is_block_free(&self, block_idx: usize, order: usize) -> bool {
         let num_blocks = 1 << (order - self.min_order);
-        
+
         for i in 0..num_blocks {
             let bit_idx = block_idx + i;
             let word_idx = bit_idx / 64;
             let bit = bit_idx % 64;
-            
+
             if self.bitmap[word_idx] & (1 << bit) != 0 {
                 return false;
             }
         }
-        
+
         true
     }
 
@@ -315,18 +311,18 @@ impl OptimizedBuddyAllocator {
     fn get_order(&self, size: usize) -> usize {
         let mut order = 0;
         let mut current_size = self.min_block_size;
-        
+
         // Skip the loop if size is exactly the minimum block size
         if size == self.min_block_size {
             return order;
         }
-        
+
         // Find the order where current_size >= size
         while current_size < size && order < 31 {
             current_size *= 2;
             order += 1;
         }
-        
+
         order
     }
 
@@ -385,8 +381,10 @@ mod tests {
     #[test]
     fn test_buddy_alloc() {
         let mut alloc = OptimizedBuddyAllocator::new();
-        unsafe { alloc.init(0x1000, 0x10000, 0x1000); }
-        
+        unsafe {
+            alloc.init(0x1000, 0x10000, 0x1000);
+        }
+
         let layout = Layout::from_size_align(256, 8).unwrap();
         let ptr = alloc.alloc(layout);
         assert!(!ptr.is_null());

@@ -18,9 +18,7 @@ pub struct UefiBootServicesTable {
             memory: *mut u64,
         ) -> u64,
     >,
-    pub free_pages: Option<
-        unsafe extern "efiapi" fn(memory: u64, pages: u64) -> u64,
-    >,
+    pub free_pages: Option<unsafe extern "efiapi" fn(memory: u64, pages: u64) -> u64>,
     pub get_memory_map: Option<
         unsafe extern "efiapi" fn(
             memory_map_size: *mut usize,
@@ -31,15 +29,9 @@ pub struct UefiBootServicesTable {
         ) -> u64,
     >,
     pub allocate_pool: Option<
-        unsafe extern "efiapi" fn(
-            pool_type: u32,
-            size: usize,
-            buffer: *mut *mut c_void,
-        ) -> u64,
+        unsafe extern "efiapi" fn(pool_type: u32, size: usize, buffer: *mut *mut c_void) -> u64,
     >,
-    pub free_pool: Option<
-        unsafe extern "efiapi" fn(buffer: *mut c_void) -> u64,
-    >,
+    pub free_pool: Option<unsafe extern "efiapi" fn(buffer: *mut c_void) -> u64>,
 
     // Event & Timer Services
     pub create_event: Option<
@@ -51,12 +43,10 @@ pub struct UefiBootServicesTable {
             event: *mut *mut c_void,
         ) -> u64,
     >,
-    pub set_timer: Option<
-        unsafe extern "efiapi" fn(event: *mut c_void, typ: u32, trigger: u64) -> u64,
-    >,
-    pub wait_for_event: Option<
-        unsafe extern "efiapi" fn(num_events: usize, events: *mut *mut c_void) -> u64,
-    >,
+    pub set_timer:
+        Option<unsafe extern "efiapi" fn(event: *mut c_void, typ: u32, trigger: u64) -> u64>,
+    pub wait_for_event:
+        Option<unsafe extern "efiapi" fn(num_events: usize, events: *mut *mut c_void) -> u64>,
     pub signal_event: Option<unsafe extern "efiapi" fn(event: *mut c_void) -> u64>,
     pub close_event: Option<unsafe extern "efiapi" fn(event: *mut c_void) -> u64>,
     pub check_event: Option<unsafe extern "efiapi" fn(event: *mut c_void) -> u64>,
@@ -96,9 +86,7 @@ pub struct UefiBootServicesTable {
             image_handle: *mut *mut c_void,
         ) -> u64,
     >,
-    pub start_image: Option<
-        unsafe extern "efiapi" fn(image_handle: *mut c_void) -> u64,
-    >,
+    pub start_image: Option<unsafe extern "efiapi" fn(image_handle: *mut c_void) -> u64>,
     pub exit: Option<
         unsafe extern "efiapi" fn(
             image_handle: *mut c_void,
@@ -107,14 +95,11 @@ pub struct UefiBootServicesTable {
             exit_data: *mut *mut u8,
         ) -> u64,
     >,
-    pub unload_image: Option<
-        unsafe extern "efiapi" fn(image_handle: *mut c_void) -> u64,
-    >,
+    pub unload_image: Option<unsafe extern "efiapi" fn(image_handle: *mut c_void) -> u64>,
 
     // Miscellaneous Services
-    pub exit_boot_services: Option<
-        unsafe extern "efiapi" fn(image_handle: *mut c_void, map_key: usize) -> u64,
-    >,
+    pub exit_boot_services:
+        Option<unsafe extern "efiapi" fn(image_handle: *mut c_void, map_key: usize) -> u64>,
 }
 
 /// UEFI Runtime Services function pointers
@@ -134,7 +119,7 @@ pub struct UefiRuntimeServicesTable {
 /// UEFI System Table header
 #[repr(C)]
 pub struct UefiSystemTableHeader {
-    pub signature: u64,           // "IBI\x20SYS" = 0x5453595320494249
+    pub signature: u64, // "IBI\x20SYS" = 0x5453595320494249
     pub revision: u32,
     pub header_size: u32,
     pub crc32: u32,
@@ -210,14 +195,8 @@ pub struct UefiBootContext {
 }
 
 impl UefiBootContext {
-    pub fn new(
-        system_table: *mut UefiSystemTable,
-        image_handle: *mut c_void,
-    ) -> Self {
-        Self {
-            system_table,
-            image_handle,
-        }
+    pub fn new(system_table: *mut UefiSystemTable, image_handle: *mut c_void) -> Self {
+        Self { system_table, image_handle }
     }
 
     /// Get memory map from UEFI
@@ -254,22 +233,14 @@ impl UefiBootContext {
     }
 
     /// Allocate memory pages
-    pub unsafe fn allocate_pages(
-        &self,
-        pages: u64,
-    ) -> Result<u64, &'static str> {
+    pub unsafe fn allocate_pages(&self, pages: u64) -> Result<u64, &'static str> {
         let st = &*self.system_table;
         let bs = &*st.boot_services;
 
         if let Some(alloc) = bs.allocate_pages {
             let mut addr: u64 = 0;
 
-            let status = alloc(
-                ALLOCATE_ANY_PAGES,
-                EFI_LOADER_DATA,
-                pages,
-                &mut addr,
-            );
+            let status = alloc(ALLOCATE_ANY_PAGES, EFI_LOADER_DATA, pages, &mut addr);
 
             if status == EFI_SUCCESS {
                 crate::drivers::console::write_str("Pages allocated\n");
@@ -335,9 +306,7 @@ impl UefiBootContext {
 }
 
 /// Validate UEFI System Table
-pub unsafe fn validate_uefi_system_table(
-    st: *const UefiSystemTable,
-) -> Result<(), &'static str> {
+pub unsafe fn validate_uefi_system_table(st: *const UefiSystemTable) -> Result<(), &'static str> {
     if st.is_null() {
         return Err("Null system table");
     }

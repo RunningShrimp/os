@@ -5,16 +5,17 @@
 //! are triggered by domain events, enabling loose coupling between
 //! boot components.
 
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use alloc::vec;
-use alloc::string::{String, ToString};
-use alloc::boxed::Box;
-use alloc::format;
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 
 use crate::domain::events::{
-    DomainEvent, BootPhaseCompletedEvent,
-    GraphicsInitializedEvent, KernelLoadedEvent
+    BootPhaseCompletedEvent, DomainEvent, GraphicsInitializedEvent, KernelLoadedEvent,
 };
 
 /// Boot state enumeration
@@ -207,7 +208,7 @@ impl EventDrivenStateManager {
             max_history_size,
             error_recovery_enabled,
         };
-        
+
         manager.initialize_transition_rules();
         manager
     }
@@ -222,14 +223,12 @@ impl EventDrivenStateManager {
         // Hardware detection transitions
         self.transition_rules.insert(
             BootState::Initial,
-            vec![
-                StateTransitionRule {
-                    target_state: BootState::HardwareDetection,
-                    triggering_events: vec!["BootPhaseStarted"],
-                    condition: None,
-                    action: Some(Box::new(HardwareDetectionAction::default())),
-                },
-            ],
+            vec![StateTransitionRule {
+                target_state: BootState::HardwareDetection,
+                triggering_events: vec!["BootPhaseStarted"],
+                condition: None,
+                action: Some(Box::new(HardwareDetectionAction::default())),
+            }],
         );
 
         self.transition_rules.insert(
@@ -239,7 +238,9 @@ impl EventDrivenStateManager {
                     target_state: BootState::MemoryInitialization,
                     triggering_events: vec!["BootPhaseCompleted"],
                     condition: Some(Box::new(|event, _state| {
-                        if let Some(phase_event) = event.as_any().downcast_ref::<BootPhaseCompletedEvent>() {
+                        if let Some(phase_event) =
+                            event.as_any().downcast_ref::<BootPhaseCompletedEvent>()
+                        {
                             phase_event.phase_name == "hardware_detection" && phase_event.success
                         } else {
                             false
@@ -264,7 +265,9 @@ impl EventDrivenStateManager {
                     target_state: BootState::GraphicsInitialization,
                     triggering_events: vec!["BootPhaseCompleted"],
                     condition: Some(Box::new(|event, _state| {
-                        if let Some(phase_event) = event.as_any().downcast_ref::<BootPhaseCompletedEvent>() {
+                        if let Some(phase_event) =
+                            event.as_any().downcast_ref::<BootPhaseCompletedEvent>()
+                        {
                             phase_event.phase_name == "memory_initialization" && phase_event.success
                         } else {
                             false
@@ -331,7 +334,9 @@ impl EventDrivenStateManager {
                     target_state: BootState::BootParameterSetup,
                     triggering_events: vec!["BootPhaseCompleted"],
                     condition: Some(Box::new(|event, _state| {
-                        if let Some(phase_event) = event.as_any().downcast_ref::<BootPhaseCompletedEvent>() {
+                        if let Some(phase_event) =
+                            event.as_any().downcast_ref::<BootPhaseCompletedEvent>()
+                        {
                             phase_event.phase_name == "kernel_validation" && phase_event.success
                         } else {
                             false
@@ -356,7 +361,9 @@ impl EventDrivenStateManager {
                     target_state: BootState::ReadyForKernel,
                     triggering_events: vec!["BootPhaseCompleted"],
                     condition: Some(Box::new(|event, _state| {
-                        if let Some(phase_event) = event.as_any().downcast_ref::<BootPhaseCompletedEvent>() {
+                        if let Some(phase_event) =
+                            event.as_any().downcast_ref::<BootPhaseCompletedEvent>()
+                        {
                             phase_event.phase_name == "boot_parameter_setup" && phase_event.success
                         } else {
                             false
@@ -381,7 +388,9 @@ impl EventDrivenStateManager {
                     target_state: BootState::BootCompleted,
                     triggering_events: vec!["BootPhaseCompleted"],
                     condition: Some(Box::new(|event, _state| {
-                        if let Some(phase_event) = event.as_any().downcast_ref::<BootPhaseCompletedEvent>() {
+                        if let Some(phase_event) =
+                            event.as_any().downcast_ref::<BootPhaseCompletedEvent>()
+                        {
                             phase_event.phase_name == "kernel_execution" && phase_event.success
                         } else {
                             false
@@ -419,19 +428,19 @@ impl EventDrivenStateManager {
     pub fn handle_event(&mut self, event: &dyn DomainEvent) -> Result<(), &'static str> {
         let event_type = event.event_type();
         let timestamp = event.timestamp();
-        
+
         // Get current state
         let current_state = self.current_state;
-        
+
         // Check if there are transition rules for current state
         let matching_rule = if let Some(rules) = self.transition_rules.get(&current_state) {
             rules.iter().find(|rule| {
                 // Check if event type matches rule
                 if rule.triggering_events.contains(&event_type) {
                     // Check condition if present
-                    rule.condition.as_ref().map_or(true, |condition| {
-                        condition(event, &current_state)
-                    })
+                    rule.condition
+                        .as_ref()
+                        .map_or(true, |condition| condition(event, &current_state))
                 } else {
                     false
                 }
@@ -439,13 +448,13 @@ impl EventDrivenStateManager {
         } else {
             None
         };
-        
+
         // If we found a matching rule, execute the transition
         if let Some(rule) = matching_rule {
             // Execute transition
             let previous_state = current_state;
             let target_state = rule.target_state;
-            
+
             // Create transition context
             let mut context = StateTransitionContext::new(
                 previous_state,
@@ -453,34 +462,38 @@ impl EventDrivenStateManager {
                 format!("{}:{}", event_type, event.as_string()),
                 timestamp,
             );
-            
+
             // Add event metadata
             for (key, value) in event.metadata() {
                 context = context.with_metadata(key.to_string(), value);
             }
-            
+
             // Execute action if present
             let action_result = if let Some(ref action) = rule.action {
                 action.execute(&context)
             } else {
                 Ok(())
             };
-            
+
             // Update state
             self.current_state = target_state;
-            
+
             // Add to history
             self.add_to_history(context);
-            
+
             // Check action result after all mutable operations
             action_result?;
-            
-            log::info!("State transition: {} -> {} triggered by {}", 
-                     previous_state.as_str(), target_state.as_str(), event_type);
-            
+
+            log::info!(
+                "State transition: {} -> {} triggered by {}",
+                previous_state.as_str(),
+                target_state.as_str(),
+                event_type
+            );
+
             return Ok(());
         }
-        
+
         Ok(())
     }
 
@@ -492,18 +505,22 @@ impl EventDrivenStateManager {
     pub fn force_transition(&mut self, new_state: BootState, reason: &str) {
         let previous_state = self.current_state;
         self.current_state = new_state;
-        
+
         let context = StateTransitionContext::new(
             previous_state,
             new_state,
             format!("forced: {}", reason),
             self.get_timestamp(),
         );
-        
+
         self.add_to_history(context);
-        
-        log::warn!("Forced state transition: {} -> {} due to {}", 
-                  previous_state.as_str(), new_state.as_str(), reason);
+
+        log::warn!(
+            "Forced state transition: {} -> {} due to {}",
+            previous_state.as_str(),
+            new_state.as_str(),
+            reason
+        );
     }
 
     /// Check if transition is valid
@@ -521,18 +538,18 @@ impl EventDrivenStateManager {
     /// Get state transition statistics
     pub fn get_transition_stats(&self) -> StateTransitionStats {
         let mut stats = StateTransitionStats::new();
-        
+
         for context in &self.transition_history {
             stats.add_transition(context.previous_state, context.current_state);
         }
-        
+
         stats
     }
 
     /// Add transition to history
     fn add_to_history(&mut self, context: StateTransitionContext) {
         self.transition_history.push(context);
-        
+
         // Maintain history size limit
         while self.transition_history.len() > self.max_history_size {
             self.transition_history.remove(0);
@@ -553,13 +570,13 @@ impl EventDrivenStateManager {
         if !self.error_recovery_enabled {
             return Err("Error recovery is disabled");
         }
-        
+
         if self.current_state.allows_recovery() {
             log::info!("Attempting error recovery from state: {}", self.current_state.as_str());
-            
+
             // Force transition to recovery state
             self.force_transition(BootState::Recovery, "error recovery");
-            
+
             // In a real implementation, this would trigger recovery procedures
             Ok(())
         } else {
@@ -587,10 +604,7 @@ pub struct StateTransitionStats {
 impl StateTransitionStats {
     /// Create new state transition statistics
     pub fn new() -> Self {
-        Self {
-            transition_counts: BTreeMap::new(),
-            total_transitions: 0,
-        }
+        Self { transition_counts: BTreeMap::new(), total_transitions: 0 }
     }
 
     /// Add transition to statistics
@@ -599,7 +613,11 @@ impl StateTransitionStats {
         self.total_transitions += 1;
         // Validate that the transition is allowed
         if !from_state.valid_transitions().contains(&to_state) {
-            log::warn!("Invalid state transition attempted: {} -> {}", from_state.as_str(), to_state.as_str());
+            log::warn!(
+                "Invalid state transition attempted: {} -> {}",
+                from_state.as_str(),
+                to_state.as_str()
+            );
         }
     }
 }
@@ -612,8 +630,16 @@ impl StateTransitionAction for HardwareDetectionAction {
         log::info!("Hardware detection action executed at timestamp: {}", context.timestamp);
         log::debug!("Transition event: {}", context.triggering_event);
         // Validate state transition is allowed
-        if context.previous_state.valid_transitions().contains(&context.current_state) {
-            log::trace!("State transition validated: {} -> {}", context.previous_state.as_str(), context.current_state.as_str());
+        if context
+            .previous_state
+            .valid_transitions()
+            .contains(&context.current_state)
+        {
+            log::trace!(
+                "State transition validated: {} -> {}",
+                context.previous_state.as_str(),
+                context.current_state.as_str()
+            );
             Ok(())
         } else {
             Err("Invalid state transition for hardware detection")
@@ -621,7 +647,9 @@ impl StateTransitionAction for HardwareDetectionAction {
     }
 }
 impl Default for HardwareDetectionAction {
-    fn default() -> Self { Self }
+    fn default() -> Self {
+        Self
+    }
 }
 
 struct MemoryInitializationAction;
@@ -638,7 +666,9 @@ impl StateTransitionAction for MemoryInitializationAction {
     }
 }
 impl Default for MemoryInitializationAction {
-    fn default() -> Self { Self }
+    fn default() -> Self {
+        Self
+    }
 }
 
 struct GraphicsInitializationAction;
@@ -659,7 +689,9 @@ impl StateTransitionAction for GraphicsInitializationAction {
     }
 }
 impl Default for GraphicsInitializationAction {
-    fn default() -> Self { Self }
+    fn default() -> Self {
+        Self
+    }
 }
 
 struct KernelLoadingAction;
@@ -680,7 +712,9 @@ impl StateTransitionAction for KernelLoadingAction {
     }
 }
 impl Default for KernelLoadingAction {
-    fn default() -> Self { Self }
+    fn default() -> Self {
+        Self
+    }
 }
 
 struct KernelValidationAction;
@@ -701,7 +735,9 @@ impl StateTransitionAction for KernelValidationAction {
     }
 }
 impl Default for KernelValidationAction {
-    fn default() -> Self { Self }
+    fn default() -> Self {
+        Self
+    }
 }
 
 struct BootParameterSetupAction;
@@ -724,7 +760,9 @@ impl StateTransitionAction for BootParameterSetupAction {
     }
 }
 impl Default for BootParameterSetupAction {
-    fn default() -> Self { Self }
+    fn default() -> Self {
+        Self
+    }
 }
 
 struct ReadyForKernelAction;
@@ -746,7 +784,9 @@ impl StateTransitionAction for ReadyForKernelAction {
     }
 }
 impl Default for ReadyForKernelAction {
-    fn default() -> Self { Self }
+    fn default() -> Self {
+        Self
+    }
 }
 
 struct BootCompletedAction;
@@ -761,7 +801,9 @@ impl StateTransitionAction for BootCompletedAction {
     }
 }
 impl Default for BootCompletedAction {
-    fn default() -> Self { Self }
+    fn default() -> Self {
+        Self
+    }
 }
 
 struct BootFailedAction;
@@ -781,7 +823,9 @@ impl StateTransitionAction for BootFailedAction {
     }
 }
 impl Default for BootFailedAction {
-    fn default() -> Self { Self }
+    fn default() -> Self {
+        Self
+    }
 }
 
 struct RecoveryAction;
@@ -792,7 +836,9 @@ impl StateTransitionAction for RecoveryAction {
     }
 }
 impl Default for RecoveryAction {
-    fn default() -> Self { Self }
+    fn default() -> Self {
+        Self
+    }
 }
 
 #[cfg(test)]
@@ -801,8 +847,16 @@ mod tests {
 
     #[test]
     fn test_boot_state_transitions() {
-        assert!(BootState::Initial.valid_transitions().contains(&BootState::HardwareDetection));
-        assert!(!BootState::BootCompleted.valid_transitions().contains(&BootState::HardwareDetection));
+        assert!(
+            BootState::Initial
+                .valid_transitions()
+                .contains(&BootState::HardwareDetection)
+        );
+        assert!(
+            !BootState::BootCompleted
+                .valid_transitions()
+                .contains(&BootState::HardwareDetection)
+        );
         assert!(BootState::BootFailed.allows_recovery());
         assert!(!BootState::ReadyForKernel.allows_recovery());
     }
@@ -817,14 +871,15 @@ mod tests {
     #[test]
     fn test_event_driven_transition() {
         let mut manager = EventDrivenStateManager::with_default_settings();
-        
+
         // Start hardware detection
         let start_event = Box::new(BootPhaseStartedEvent::new("hardware_detection", 1000));
         assert!(manager.handle_event(start_event.as_ref()).is_ok());
         assert_eq!(manager.current_state(), BootState::HardwareDetection);
-        
+
         // Complete hardware detection
-        let complete_event = Box::new(BootPhaseCompletedEvent::new("hardware_detection", 2000, true));
+        let complete_event =
+            Box::new(BootPhaseCompletedEvent::new("hardware_detection", 2000, true));
         assert!(manager.handle_event(complete_event.as_ref()).is_ok());
         assert_eq!(manager.current_state(), BootState::MemoryInitialization);
     }
@@ -832,11 +887,11 @@ mod tests {
     #[test]
     fn test_error_recovery() {
         let mut manager = EventDrivenStateManager::new(10, true);
-        
+
         // Force into failed state
         manager.force_transition(BootState::BootFailed, "test failure");
         assert_eq!(manager.current_state(), BootState::BootFailed);
-        
+
         // Attempt recovery
         assert!(manager.attempt_error_recovery().is_ok());
         assert_eq!(manager.current_state(), BootState::Recovery);
@@ -845,15 +900,15 @@ mod tests {
     #[test]
     fn test_transition_history() {
         let mut manager = EventDrivenStateManager::with_default_settings();
-        
+
         // Perform some transitions
         manager.force_transition(BootState::HardwareDetection, "test1");
         manager.force_transition(BootState::MemoryInitialization, "test2");
         manager.force_transition(BootState::GraphicsInitialization, "test3");
-        
+
         let history = manager.transition_history();
         assert_eq!(history.len(), 3);
-        
+
         let stats = manager.get_transition_stats();
         assert_eq!(stats.total_transitions, 3);
     }
@@ -861,10 +916,10 @@ mod tests {
     #[test]
     fn test_invalid_transition() {
         let mut manager = EventDrivenStateManager::with_default_settings();
-        
+
         // Try invalid transition
         assert!(!manager.is_valid_transition(BootState::Initial, BootState::KernelLoading));
-        
+
         // Force transition should still work
         manager.force_transition(BootState::KernelLoading, "forced");
         assert_eq!(manager.current_state(), BootState::KernelLoading);

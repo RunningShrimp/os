@@ -4,10 +4,9 @@
 
 #[cfg(feature = "kernel_tests")]
 pub mod alloc_tests {
-    use crate::{test_assert_eq, test_assert};
-    use crate::tests::TestResult;
-    use alloc::boxed::Box;
-    use alloc::vec::Vec;
+    use alloc::{boxed::Box, vec::Vec};
+
+    use crate::{test_assert, test_assert_eq, tests::TestResult};
 
     /// Test basic Box allocation
     pub fn test_box_alloc() -> TestResult {
@@ -69,11 +68,14 @@ pub mod alloc_tests {
 #[cfg(feature = "kernel_tests")]
 pub mod memory_tests {
     use alloc::vec::Vec;
-    use crate::{test_assert_eq, test_assert, test_assert_ne};
-    use crate::tests::TestResult;
-    use crate::subsystems::syscalls::memory::{sys_mmap, sys_munmap};
-    use crate::posix::{PROT_READ, PROT_WRITE, PROT_EXEC, MAP_SHARED, MAP_PRIVATE, MAP_ANONYMOUS};
-    use crate::reliability::{EOK as E_OK, EINVAL as E_INVAL, ENOENT as E_NOENT, EINVAL as E_BADARG};
+
+    use crate::{
+        posix::{MAP_ANONYMOUS, MAP_PRIVATE, MAP_SHARED, PROT_EXEC, PROT_READ, PROT_WRITE},
+        reliability::{EINVAL as E_INVAL, EINVAL as E_BADARG, ENOENT as E_NOENT, EOK as E_OK},
+        subsystems::syscalls::memory::{sys_mmap, sys_munmap},
+        test_assert, test_assert_eq, test_assert_ne,
+        tests::TestResult,
+    };
 
     /// Test anonymous memory mapping
     pub fn test_mmap_anonymous() -> TestResult {
@@ -84,7 +86,7 @@ pub mod memory_tests {
             (PROT_READ | PROT_WRITE) as u32,
             (MAP_PRIVATE | MAP_ANONYMOUS) as u32,
             -1, // no file descriptor
-            0
+            0,
         );
 
         test_assert!(addr > 0, "mmap should return a valid address");
@@ -97,10 +99,14 @@ pub mod memory_tests {
             (PROT_READ | PROT_WRITE) as u32,
             (MAP_PRIVATE | MAP_ANONYMOUS | 0x10) as u32, // MAP_FIXED
             -1,
-            0
+            0,
         );
 
-        test_assert_eq!(addr2 as usize, specific_addr as usize, "MAP_FIXED should use specific address");
+        test_assert_eq!(
+            addr2 as usize,
+            specific_addr as usize,
+            "MAP_FIXED should use specific address"
+        );
 
         // Test unmap
         let result = sys_munmap(addr as *mut u8, 4096);
@@ -121,7 +127,7 @@ pub mod memory_tests {
             PROT_READ as u32,
             (MAP_PRIVATE | MAP_ANONYMOUS) as u32,
             -1,
-            0
+            0,
         );
 
         test_assert!(addr > 0, "read-only mmap should succeed");
@@ -133,7 +139,7 @@ pub mod memory_tests {
             (PROT_READ | PROT_WRITE) as u32,
             (MAP_PRIVATE | MAP_ANONYMOUS) as u32,
             -1,
-            0
+            0,
         );
 
         test_assert!(addr2 > 0, "read-write mmap should succeed");
@@ -145,7 +151,7 @@ pub mod memory_tests {
             (PROT_READ | PROT_EXEC) as u32,
             (MAP_PRIVATE | MAP_ANONYMOUS) as u32,
             -1,
-            0
+            0,
         );
 
         test_assert!(addr3 > 0, "read-exec mmap should succeed");
@@ -161,14 +167,8 @@ pub mod memory_tests {
     /// Test mmap error conditions
     pub fn test_mmap_errors() -> TestResult {
         // Test zero length
-        let result = sys_mmap(
-            core::ptr::null_mut(),
-            0,
-            PROT_READ as u32,
-            MAP_ANONYMOUS as u32,
-            -1,
-            0
-        );
+        let result =
+            sys_mmap(core::ptr::null_mut(), 0, PROT_READ as u32, MAP_ANONYMOUS as u32, -1, 0);
         test_assert_eq!(result, E_INVAL as isize, "zero length should return EINVAL");
 
         // Test invalid protection flags
@@ -178,7 +178,7 @@ pub mod memory_tests {
             0xFF, // Invalid flags
             MAP_ANONYMOUS as u32,
             -1,
-            0
+            0,
         );
         test_assert_eq!(result2, E_INVAL as isize, "invalid protection should return EINVAL");
 
@@ -189,7 +189,7 @@ pub mod memory_tests {
             PROT_READ as u32,
             0, // No mapping flags
             -1,
-            0
+            0,
         );
         test_assert_eq!(result3, E_INVAL as isize, "missing MAP flag should return EINVAL");
 
@@ -200,7 +200,7 @@ pub mod memory_tests {
             PROT_READ as u32,
             (MAP_SHARED | MAP_PRIVATE) as u32,
             -1,
-            0
+            0,
         );
         test_assert_eq!(result4, E_INVAL as isize, "both MAP flags should return EINVAL");
 
@@ -211,7 +211,7 @@ pub mod memory_tests {
             PROT_READ as u32,
             MAP_SHARED as u32,
             -1, // No FD for non-anonymous mapping
-            0
+            0,
         );
         test_assert_eq!(result5, E_BADARG as isize, "non-anonymous mapping without FD should fail");
 
@@ -244,7 +244,7 @@ pub mod memory_tests {
             (PROT_READ | PROT_WRITE) as u32,
             (MAP_PRIVATE | MAP_ANONYMOUS) as u32,
             -1,
-            0
+            0,
         );
 
         test_assert!(addr > 0, "large mmap should succeed");
@@ -268,7 +268,7 @@ pub mod memory_tests {
                 (PROT_READ | PROT_WRITE) as u32,
                 (MAP_PRIVATE | MAP_ANONYMOUS) as u32,
                 -1,
-                0
+                0,
             );
 
             test_assert!(addr > 0, alloc::format!("mmap {} should succeed", i));
@@ -305,8 +305,16 @@ pub mod memory_tests {
         test_assert_ne!(page1, page2, "Allocated pages should be different");
 
         // Test alignment (should be page-aligned)
-        test_assert_eq!(page1 as usize % crate::subsystems::mm::PAGE_SIZE, 0, "Page should be aligned");
-        test_assert_eq!(page2 as usize % crate::subsystems::mm::PAGE_SIZE, 0, "Page should be aligned");
+        test_assert_eq!(
+            page1 as usize % crate::subsystems::mm::PAGE_SIZE,
+            0,
+            "Page should be aligned"
+        );
+        test_assert_eq!(
+            page2 as usize % crate::subsystems::mm::PAGE_SIZE,
+            0,
+            "Page should be aligned"
+        );
 
         // Free pages
         unsafe {
@@ -323,13 +331,17 @@ pub mod memory_tests {
         test_assert!(!page.is_null(), "Page allocation should succeed");
 
         // Free the page
-        unsafe { crate::subsystems::mm::kfree(page); }
+        unsafe {
+            crate::subsystems::mm::kfree(page);
+        }
 
         // Allocate again - should succeed (page reuse)
         let page2 = crate::subsystems::mm::kalloc();
         test_assert!(!page2.is_null(), "Page allocation after free should succeed");
 
-        unsafe { crate::subsystems::mm::kfree(page2); }
+        unsafe {
+            crate::subsystems::mm::kfree(page2);
+        }
 
         Ok(())
     }
@@ -339,12 +351,20 @@ pub mod memory_tests {
         // Test single page allocation
         let page1 = crate::subsystems::mm::kalloc_pages(1);
         test_assert!(!page1.is_null(), "Single page allocation should succeed");
-        test_assert_eq!(page1 as usize % crate::subsystems::mm::PAGE_SIZE, 0, "Page should be aligned");
+        test_assert_eq!(
+            page1 as usize % crate::subsystems::mm::PAGE_SIZE,
+            0,
+            "Page should be aligned"
+        );
 
         // Test multiple page allocation
         let pages2 = crate::subsystems::mm::kalloc_pages(4); // 4 contiguous pages
         test_assert!(!pages2.is_null(), "4-page allocation should succeed");
-        test_assert_eq!(pages2 as usize % crate::subsystems::mm::PAGE_SIZE, 0, "Pages should be aligned");
+        test_assert_eq!(
+            pages2 as usize % crate::subsystems::mm::PAGE_SIZE,
+            0,
+            "Pages should be aligned"
+        );
 
         // Test zero page allocation (should return null)
         let pages0 = crate::subsystems::mm::kalloc_pages(0);
@@ -372,14 +392,18 @@ pub mod memory_tests {
 
         // Free all pages
         for page in allocations {
-            unsafe { crate::subsystems::mm::kfree(page); }
+            unsafe {
+                crate::subsystems::mm::kfree(page);
+            }
         }
 
         // Allocate again to verify pages were freed
         for i in 0..50 {
             let page = crate::subsystems::mm::kalloc();
             test_assert!(!page.is_null(), alloc::format!("Re-allocation {} should succeed", i));
-            unsafe { crate::subsystems::mm::kfree(page); }
+            unsafe {
+                crate::subsystems::mm::kfree(page);
+            }
         }
 
         Ok(())
@@ -499,7 +523,9 @@ pub mod memory_tests {
         test_assert_eq!(total_pages_after, total_pages, "Total pages should not change");
         // Note: free_pages_after might not decrease immediately due to caching
 
-        unsafe { crate::subsystems::mm::kfree(page); }
+        unsafe {
+            crate::subsystems::mm::kfree(page);
+        }
 
         Ok(())
     }
@@ -569,7 +595,9 @@ pub mod memory_tests {
 
         // Free some small allocations (creating holes)
         for i in (0..small_allocs.len()).step_by(2) {
-            unsafe { crate::subsystems::mm::kfree(small_allocs[i]); }
+            unsafe {
+                crate::subsystems::mm::kfree(small_allocs[i]);
+            }
         }
 
         // Allocate more small pages (should reuse freed memory)
@@ -581,10 +609,14 @@ pub mod memory_tests {
 
         // Free everything
         for page in small_allocs {
-            unsafe { crate::subsystems::mm::kfree(page); }
+            unsafe {
+                crate::subsystems::mm::kfree(page);
+            }
         }
         for pages in large_allocs {
-            unsafe { crate::subsystems::mm::kfree(pages); }
+            unsafe {
+                crate::subsystems::mm::kfree(pages);
+            }
         }
 
         Ok(())
@@ -596,20 +628,30 @@ pub mod memory_tests {
         for _ in 0..10 {
             let page = crate::subsystems::mm::kalloc();
             test_assert!(!page.is_null());
-            test_assert_eq!(page as usize % crate::subsystems::mm::PAGE_SIZE, 0,
-                alloc::format!("Page {:p} should be page-aligned", page));
+            test_assert_eq!(
+                page as usize % crate::subsystems::mm::PAGE_SIZE,
+                0,
+                alloc::format!("Page {:p} should be page-aligned", page)
+            );
 
-            unsafe { crate::subsystems::mm::kfree(page); }
+            unsafe {
+                crate::subsystems::mm::kfree(page);
+            }
         }
 
         // Test multi-page allocations
         for pages in [2, 4, 8, 16] {
             let block = crate::subsystems::mm::kalloc_pages(pages);
             test_assert!(!block.is_null());
-            test_assert_eq!(block as usize % crate::subsystems::mm::PAGE_SIZE, 0,
-                alloc::format!("{}-page block {:p} should be page-aligned", pages, block));
+            test_assert_eq!(
+                block as usize % crate::subsystems::mm::PAGE_SIZE,
+                0,
+                alloc::format!("{}-page block {:p} should be page-aligned", pages, block)
+            );
 
-            unsafe { crate::subsystems::mm::kfree(block); }
+            unsafe {
+                crate::subsystems::mm::kfree(block);
+            }
         }
 
         Ok(())
@@ -622,16 +664,18 @@ pub mod memory_tests {
         let mut failed_count = 0;
 
         // Try to allocate as many pages as possible
-        for i in 0..1000 {  // Arbitrary large number
+        for i in 0..1000 {
+            // Arbitrary large number
             let page = crate::subsystems::mm::kalloc();
             if page.is_null() {
                 failed_count += 1;
-                if failed_count > 5 {  // Stop after several failures
+                if failed_count > 5 {
+                    // Stop after several failures
                     break;
                 }
             } else {
                 allocations.push(page);
-                failed_count = 0;  // Reset failure count
+                failed_count = 0; // Reset failure count
             }
         }
 
@@ -640,13 +684,17 @@ pub mod memory_tests {
 
         // Free all allocations
         for page in allocations {
-            unsafe { crate::subsystems::mm::kfree(page); }
+            unsafe {
+                crate::subsystems::mm::kfree(page);
+            }
         }
 
         // Should be able to allocate again after freeing
         let page = crate::subsystems::mm::kalloc();
         test_assert!(!page.is_null(), "Should be able to allocate after freeing all memory");
-        unsafe { crate::subsystems::mm::kfree(page); }
+        unsafe {
+            crate::subsystems::mm::kfree(page);
+        }
 
         Ok(())
     }

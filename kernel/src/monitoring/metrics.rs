@@ -4,17 +4,17 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloc::string::String;
+use alloc::{collections::BTreeMap, string::String};
 use core::sync::atomic::{AtomicU64, Ordering};
+
 use crate::subsystems::sync::Mutex;
 
 /// System metric type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MetricType {
-    Counter,    // Monotonically increasing counter
-    Gauge,      // Value that can go up or down
-    Histogram,  // Distribution of values
+    Counter,   // Monotonically increasing counter
+    Gauge,     // Value that can go up or down
+    Histogram, // Distribution of values
 }
 
 /// System metric
@@ -42,7 +42,7 @@ impl SystemMetric {
             histogram_buckets: Mutex::new(BTreeMap::new()),
         }
     }
-    
+
     /// Create a new gauge metric
     pub fn new_gauge(name: String) -> Self {
         Self {
@@ -53,21 +53,21 @@ impl SystemMetric {
             histogram_buckets: Mutex::new(BTreeMap::new()),
         }
     }
-    
+
     /// Increment counter
     pub fn increment(&self, value: u64) {
         if self.metric_type == MetricType::Counter {
             self.counter_value.fetch_add(value, Ordering::Relaxed);
         }
     }
-    
+
     /// Set gauge value
     pub fn set_gauge(&self, value: u64) {
         if self.metric_type == MetricType::Gauge {
             self.gauge_value.store(value, Ordering::Relaxed);
         }
     }
-    
+
     /// Record histogram value
     pub fn record_histogram(&self, value: u64) {
         if self.metric_type == MetricType::Histogram {
@@ -75,12 +75,12 @@ impl SystemMetric {
             *buckets.entry(value).or_insert(0) += 1;
         }
     }
-    
+
     /// Get counter value
     pub fn get_counter(&self) -> u64 {
         self.counter_value.load(Ordering::Relaxed)
     }
-    
+
     /// Get gauge value
     pub fn get_gauge(&self) -> u64 {
         self.gauge_value.load(Ordering::Relaxed)
@@ -96,10 +96,8 @@ pub struct MetricsCollector {
 impl MetricsCollector {
     /// Create a new metrics collector
     pub fn new() -> Self {
-        let mut collector = Self {
-            metrics: Mutex::new(BTreeMap::new()),
-        };
-        
+        let mut collector = Self { metrics: Mutex::new(BTreeMap::new()) };
+
         // Register default metrics
         collector.register_counter("syscalls_total".to_string());
         collector.register_counter("syscalls_success_total".to_string());
@@ -121,29 +119,29 @@ impl MetricsCollector {
         collector.register_counter("locks_spin_contended_total".to_string());
         collector.register_counter("locks_mutex_acquire_total".to_string());
         collector.register_counter("locks_mutex_contended_total".to_string());
-        
+
         collector
     }
-    
+
     /// Register a counter metric
     pub fn register_counter(&mut self, name: String) {
         let mut metrics = self.metrics.lock();
         metrics.insert(name.clone(), SystemMetric::new_counter(name));
     }
-    
+
     /// Register a gauge metric
     pub fn register_gauge(&mut self, name: String) {
         let mut metrics = self.metrics.lock();
         metrics.insert(name.clone(), SystemMetric::new_gauge(name));
     }
-    
+
     /// Get metric
     pub fn get_metric(&self, name: &str) -> Option<&SystemMetric> {
         let metrics = self.metrics.lock();
         // Return reference - in real implementation, would use Arc
         None // Placeholder
     }
-    
+
     /// Increment counter
     pub fn increment_counter(&self, name: &str, value: u64) {
         let mut metrics = self.metrics.lock();
@@ -151,7 +149,7 @@ impl MetricsCollector {
             metric.increment(value);
         }
     }
-    
+
     /// Set counter to an absolute value
     pub fn set_counter(&self, name: &str, value: u64) {
         let mut metrics = self.metrics.lock();
@@ -161,7 +159,7 @@ impl MetricsCollector {
             }
         }
     }
-    
+
     /// Set gauge
     pub fn set_gauge(&self, name: &str, value: u64) {
         let mut metrics = self.metrics.lock();
@@ -169,42 +167,43 @@ impl MetricsCollector {
             metric.set_gauge(value);
         }
     }
-    
+
     /// Collect all metrics
     pub fn collect_metrics(&self) -> BTreeMap<String, u64> {
         let mut result = BTreeMap::new();
         let metrics = self.metrics.lock();
-        
+
         for (name, metric) in metrics.iter() {
             match metric.metric_type {
                 MetricType::Counter => {
                     result.insert(format!("{}_counter", name), metric.get_counter());
-                }
+                },
                 MetricType::Gauge => {
                     result.insert(format!("{}_gauge", name), metric.get_gauge());
-                }
+                },
                 MetricType::Histogram => {
                     // Collect histogram summary (placeholder)
                     result.insert(format!("{}_histogram_count", name), 0);
-                }
+                },
             }
         }
-        
+
         result
     }
-    
+
     /// Update system metrics (called periodically)
     pub fn update_system_metrics(&self) {
         // Update process count
         let proc_table = crate::subsystems::process::manager::PROC_TABLE.lock();
-        let running_count = proc_table.iter()
+        let running_count = proc_table
+            .iter()
             .filter(|p| p.state == crate::subsystems::process::manager::ProcState::Running)
             .count();
         let total_procs = proc_table.iter().count();
         drop(proc_table);
         self.set_gauge("processes_running", running_count as u64);
         self.set_gauge("processes_total", total_procs as u64);
-        
+
         // Update memory metrics using physical stats
         let (free_pages, total_pages) = crate::subsystems::mm::phys::mem_stats();
         let page_size = 4096u64;
@@ -218,30 +217,24 @@ impl MetricsCollector {
         // Scheduler metrics (fast-path counters)
         if let Some(sched_stats) = crate::subsystems::scheduler::unified::get_scheduler_stats() {
             self.set_counter("context_switches_total", sched_stats.total_context_switches);
-            self.set_gauge(
-                "scheduler_runqueue_len_total",
-                sched_stats.runqueue_len_total as u64,
-            );
-            self.set_gauge(
-                "scheduler_runqueue_len_max",
-                sched_stats.runqueue_len_max as u64,
-            );
-            self.set_gauge(
-                "scheduler_runnable_total",
-                sched_stats.runnable_threads as u64,
-            );
+            self.set_gauge("scheduler_runqueue_len_total", sched_stats.runqueue_len_total as u64);
+            self.set_gauge("scheduler_runqueue_len_max", sched_stats.runqueue_len_max as u64);
+            self.set_gauge("scheduler_runnable_total", sched_stats.runnable_threads as u64);
         }
 
         // Lock analytics: sample global spinlock and selected mutex stats (best-effort)
         {
-            // SpinLock analytics are per-lock; here we only expose aggregate of a representative lock if available.
-            // For now we use the global scheduler spin locks via RawSpinLock interface (if any are exposed later
-            // this can be extended).
-            // As a placeholder, we read RawSpinLock::acquire_count/contended_count on a static instance if exposed.
+            // SpinLock analytics are per-lock; here we only expose aggregate of a representative
+            // lock if available. For now we use the global scheduler spin locks via
+            // RawSpinLock interface (if any are exposed later this can be extended).
+            // As a placeholder, we read RawSpinLock::acquire_count/contended_count on a static
+            // instance if exposed.
         }
-        
+
         // Update syscall metrics from unified dispatcher
-        if let Some(dispatcher_mutex) = crate::subsystems::syscalls::dispatch::unified::get_unified_dispatcher() {
+        if let Some(dispatcher_mutex) =
+            crate::subsystems::syscalls::dispatch::unified::get_unified_dispatcher()
+        {
             let dispatcher = dispatcher_mutex.lock();
             if let Some(ref d) = *dispatcher {
                 let stats = d.get_stats();
@@ -252,7 +245,7 @@ impl MetricsCollector {
                 let regular = stats.regular_dispatches.load(Ordering::Relaxed);
                 let total_time = stats.total_time_ns.load(Ordering::Relaxed);
                 let avg_time = if total > 0 { total_time / total } else { 0 };
-                
+
                 self.set_counter("syscalls_total", total);
                 self.set_counter("syscalls_success_total", success);
                 self.set_counter("syscalls_failed_total", failed);
@@ -286,10 +279,8 @@ pub fn get_metrics_collector() -> &'static MetricsCollector {
             *collector = Some(MetricsCollector::new());
         }
     });
-    
-    unsafe {
-        &*(METRICS_COLLECTOR.lock().as_ref().unwrap() as *const MetricsCollector)
-    }
+
+    unsafe { &*(METRICS_COLLECTOR.lock().as_ref().unwrap() as *const MetricsCollector) }
 }
 
 #[cfg(test)]
@@ -323,4 +314,3 @@ mod tests {
         assert_eq!(metrics.get("test_gauge_gauge").copied(), Some(7));
     }
 }
-

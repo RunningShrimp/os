@@ -5,9 +5,7 @@
 //! - Text mode for BIOS/serial console systems
 //! - Lazy initialization for performance
 
-use crate::utils::error::Result;
-use crate::graphics::Color;
-use crate::alloc::string::ToString;
+use crate::{alloc::string::ToString, graphics::Color, utils::error::Result};
 
 /// UI Mode selection
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,14 +30,9 @@ pub struct MenuOption {
 impl MenuOption {
     /// Create new menu option
     pub fn new(id: u8, name: &'static str, description: &'static str) -> Self {
-        Self {
-            id,
-            name,
-            description,
-            callback: None,
-        }
+        Self { id, name, description, callback: None }
     }
-    
+
     /// Create menu option with callback
     pub fn with_callback(
         id: u8,
@@ -47,12 +40,7 @@ impl MenuOption {
         description: &'static str,
         callback: fn() -> Result<()>,
     ) -> Self {
-        Self {
-            id,
-            name,
-            description,
-            callback: Some(callback),
-        }
+        Self { id, name, description, callback: Some(callback) }
     }
 }
 
@@ -134,28 +122,30 @@ impl BootMenu {
             };
         }
     }
-    
+
     /// Process keyboard input and return selected option ID
     pub fn process_input(&mut self, key: u8) -> Option<u8> {
         match key {
             // Arrow keys (ANSI escape sequences: 27, 91, [A/B)
             // This handles the final byte after ESC[
-            b'A' => { // Up arrow
+            b'A' => {
+                // Up arrow
                 self.select_previous();
                 None
-            }
-            
-            b'B' => { // Down arrow
+            },
+
+            b'B' => {
+                // Down arrow
                 self.select_next();
                 None
-            }
-            
+            },
+
             // Enter key
             b'\n' | b'\r' => {
                 // Return selected option ID
                 self.get_selected().map(|opt| opt.id)
-            }
-            
+            },
+
             _ => None,
         }
     }
@@ -167,29 +157,39 @@ impl BootMenu {
         // This check prevents extreme cases but allows rendering to proceed with safe positioning
         let _min_width = 400;
         let _min_height = 300;
-        log::trace!("Rendering graphical menu with screen dimensions {}x{}", renderer.width(), renderer.height());
-        
+        log::trace!(
+            "Rendering graphical menu with screen dimensions {}x{}",
+            renderer.width(),
+            renderer.height()
+        );
+
         // Clear screen with blue background
         renderer.clear_screen(Color::rgb(0, 51, 102))?;
-        
+
         // Menu dimensions and positioning
         let menu_width = 400;
         let menu_height = (self.option_count as u32) * 60 + 40;
-        
+
         // Calculate centered position with safe underflow handling
         let menu_x = (renderer.width().saturating_sub(menu_width)) / 2;
         let menu_y = (renderer.height().saturating_sub(menu_height)) / 2;
-        
+
         // Draw menu background
-        renderer.draw_filled_rect(menu_x, menu_y, menu_width, menu_height, Color::rgb(240, 240, 240))?;
-        
+        renderer.draw_filled_rect(
+            menu_x,
+            menu_y,
+            menu_width,
+            menu_height,
+            Color::rgb(240, 240, 240),
+        )?;
+
         // Draw menu items
         for i in 0..self.option_count {
             if let Some(_option) = self.options[i] {
                 log::trace!("Rendering menu option {}", i);
                 let item_y = menu_y + 20 + (i as u32) * 60;
                 let item_height = 50;
-                
+
                 // Highlight selected item
                 if i == self.selected as usize {
                     renderer.draw_filled_rect(
@@ -197,10 +197,10 @@ impl BootMenu {
                         item_y,
                         menu_width - 20,
                         item_height,
-                        Color::rgb(0, 153, 255)
+                        Color::rgb(0, 153, 255),
                     )?;
                 }
-                
+
                 // Draw item text (simplified - would need font rendering)
                 // For now, draw colored rectangles as placeholders for text
                 let text_color = if i == self.selected as usize {
@@ -208,27 +208,21 @@ impl BootMenu {
                 } else {
                     Color::black()
                 };
-                
+
                 // Draw name text placeholder
-                renderer.draw_filled_rect(
-                    menu_x + 20,
-                    item_y + 10,
-                    200,
-                    15,
-                    text_color
-                )?;
-                
+                renderer.draw_filled_rect(menu_x + 20, item_y + 10, 200, 15, text_color)?;
+
                 // Draw description text placeholder
                 renderer.draw_filled_rect(
                     menu_x + 20,
                     item_y + 30,
                     350,
                     12,
-                    Color::rgb(100, 100, 100)
+                    Color::rgb(100, 100, 100),
                 )?;
             }
         }
-        
+
         Ok(())
     }
 
@@ -238,11 +232,11 @@ impl BootMenu {
         for _ in 0..20 {
             crate::drivers::console::write_str("\n");
         }
-        
+
         // Print menu title
         crate::drivers::console::write_str("Boot Menu\n");
         crate::drivers::console::write_str("========\n\n");
-        
+
         // Print menu options
         for i in 0..self.option_count {
             if let Some(option) = self.options[i] {
@@ -251,7 +245,7 @@ impl BootMenu {
                 } else {
                     "  "
                 };
-                
+
                 crate::drivers::console::write_str(prefix);
                 crate::drivers::console::write_str(option.id.to_string().as_str());
                 crate::drivers::console::write_str(": ");
@@ -262,10 +256,10 @@ impl BootMenu {
                 crate::drivers::console::write_str("\n\n");
             }
         }
-        
+
         // Print instructions
         crate::drivers::console::write_str("Use ↑/↓ to navigate, Enter to select\n");
-        
+
         Ok(())
     }
 
@@ -298,30 +292,30 @@ mod tests {
     fn test_menu_positioning_safe_underflow() {
         // Test that menu positioning handles low resolution gracefully
         let menu = BootMenu::new(UIMode::Graphical);
-        
+
         // Simulate menu width/height calculations
         let menu_width = 400;
         let menu_height = (3 as u32) * 60 + 40; // 3 options
-        
+
         // Test with resolution smaller than menu
         let small_width: i32 = 300;
         let small_height: i32 = 200;
-        
+
         // Calculate positions using the same logic as render_graphical
         let menu_x = (small_width.saturating_sub(menu_width)) / 2;
         let menu_y = (small_height.saturating_sub(menu_height)) / 2;
-        
+
         // Verify positions don't underflow (remain >= 0)
         assert!(menu_x >= 0);
         assert!(menu_y >= 0);
-        
+
         // Test with large resolution
         let large_width: i32 = 800;
         let large_height: i32 = 600;
-        
+
         let menu_x_large = (large_width.saturating_sub(menu_width)) / 2;
         let menu_y_large = (large_height.saturating_sub(menu_height)) / 2;
-        
+
         // Verify centered positioning for large resolutions
         assert_eq!(menu_x_large, (800 - 400) / 2);
         assert_eq!(menu_y_large, (600 - 220) / 2); // 3 options: 3*60+40=220

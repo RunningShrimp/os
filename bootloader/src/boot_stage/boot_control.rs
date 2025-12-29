@@ -2,12 +2,13 @@
 ///
 /// Provides high-level control over complete boot process with detailed
 /// status tracking, error recovery, and boot event monitoring.
-
 use alloc::format;
 use alloc::string::String;
-use crate::boot_stage::boot_manager::BootManager;
-use crate::boot_stage::boot_validation::FinalSystemCheck;
-use crate::bios::e820_detection::E820MemoryMap;
+
+use crate::{
+    bios::e820_detection::E820MemoryMap,
+    boot_stage::{boot_manager::BootManager, boot_validation::FinalSystemCheck},
+};
 
 /// Boot execution state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,10 +50,7 @@ impl ExecutionState {
     pub fn is_terminal(&self) -> bool {
         matches!(
             self,
-            Self::ReadyForTransfer
-                | Self::TransferringControl
-                | Self::Failed
-                | Self::Halted
+            Self::ReadyForTransfer | Self::TransferringControl | Self::Failed | Self::Halted
         )
     }
 
@@ -142,12 +140,12 @@ impl BootController {
     }
 
     /// Verify kernel integrity
-    pub fn verify_kernel(
-        &mut self,
-        signature: u32,
-        checksum: u32,
-    ) -> Result<(), &'static str> {
-        if self.boot_manager.verify_kernel(signature, checksum).is_err() {
+    pub fn verify_kernel(&mut self, signature: u32, checksum: u32) -> Result<(), &'static str> {
+        if self
+            .boot_manager
+            .verify_kernel(signature, checksum)
+            .is_err()
+        {
             self.state = ExecutionState::Failed;
             return Err("Kernel verification failed");
         }
@@ -260,10 +258,7 @@ impl BootController {
                 "No"
             }
         ));
-        report.push_str(&format!(
-            "  Failed: {}\n",
-            if self.has_failed() { "Yes" } else { "No" }
-        ));
+        report.push_str(&format!("  Failed: {}\n", if self.has_failed() { "Yes" } else { "No" }));
 
         report
     }
@@ -284,9 +279,11 @@ mod tests {
 
     #[test]
     fn test_execution_state_description() {
-        assert!(ExecutionState::Initializing
-            .description()
-            .contains("Initializing"));
+        assert!(
+            ExecutionState::Initializing
+                .description()
+                .contains("Initializing")
+        );
     }
 
     #[test]

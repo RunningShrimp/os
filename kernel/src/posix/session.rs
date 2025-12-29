@@ -2,9 +2,9 @@
 //!
 //! 仅提供占位实现与数据结构，后续需与进程表、TTY 层正式对接。
 
-use crate::process::manager::Pid;
-use crate::subsystems::sync::Mutex;
 use alloc::collections::BTreeMap;
+
+use crate::{process::manager::Pid, subsystems::sync::Mutex};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SessionInfo {
@@ -50,4 +50,3 @@ pub fn set_tty(pid: Pid, tty: u32) -> Result<(), ()> {
     entry.tty = Some(tty);
     Ok(())
 }
-

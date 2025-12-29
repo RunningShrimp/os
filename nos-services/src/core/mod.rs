@@ -5,31 +5,32 @@
 use nos_api::Result;
 extern crate alloc;
 
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use alloc::boxed::Box;
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 /// Service trait
 pub trait Service: Send + Sync {
     /// Start the service
     fn start(&self) -> Result<()>;
-    
+
     /// Stop the service
     fn stop(&self) -> Result<()>;
-    
+
     /// Get the service name
     fn name(&self) -> &str;
-    
+
     /// Get the service type
     fn service_type(&self) -> u32;
-    
+
     /// Get the service status
     fn status(&self) -> ServiceStatus {
         ServiceStatus::Stopped
     }
-    
+
     /// Check if the service is healthy
     fn is_healthy(&self) -> bool {
         true
@@ -94,25 +95,25 @@ impl Default for ServiceConfig {
 pub trait ServiceManager: Send + Sync {
     /// Register a service
     fn register_service(&mut self, name: &str, service: Box<dyn Service>) -> Result<u32>;
-    
+
     /// Unregister a service
     fn unregister_service(&mut self, id: u32) -> Result<()>;
-    
+
     /// Start a service
     fn start_service(&mut self, id: u32) -> Result<()>;
-    
+
     /// Stop a service
     fn stop_service(&mut self, id: u32) -> Result<()>;
-    
+
     /// Get a service by ID
     fn get_service(&self, id: u32) -> Option<&dyn Service>;
-    
+
     /// Get a service by name
     fn get_service_by_name(&self, name: &str) -> Option<&dyn Service>;
-    
+
     /// List all services
     fn list_services(&self) -> alloc::vec::Vec<ServiceInfo>;
-    
+
     /// Get service statistics
     fn get_stats(&self) -> ServiceStats;
 }
@@ -137,8 +138,7 @@ pub struct ServiceInfo {
 }
 
 /// Service statistics
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct ServiceStats {
     /// Total number of services
     pub total_services: u64,
@@ -154,7 +154,6 @@ pub struct ServiceStats {
     pub total_restarts: u64,
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -168,15 +167,15 @@ mod tests {
         fn start(&self) -> Result<()> {
             Ok(())
         }
-        
+
         fn stop(&self) -> Result<()> {
             Ok(())
         }
-        
+
         fn name(&self) -> &str {
             self.name
         }
-        
+
         fn service_type(&self) -> u32 {
             self.service_type
         }
@@ -184,11 +183,8 @@ mod tests {
 
     #[test]
     fn test_service() {
-        let service = TestService {
-            name: "test_service",
-            service_type: 1,
-        };
-        
+        let service = TestService { name: "test_service", service_type: 1 };
+
         assert_eq!(service.name(), "test_service");
         assert_eq!(service.service_type(), 1);
         assert_eq!(service.status(), ServiceStatus::Stopped);

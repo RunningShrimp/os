@@ -7,20 +7,22 @@ extern crate alloc;
 
 extern crate hashbrown;
 
-use alloc::collections::BTreeMap;
-use hashbrown::{HashMap, HashSet};
-use alloc::collections::binary_heap::BinaryHeap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::{format, vec};
-use alloc::boxed::Box;
+use alloc::{
+    boxed::Box,
+    collections::{BTreeMap, binary_heap::BinaryHeap},
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
 use core::sync::atomic::{AtomicU64, Ordering};
+
+use hashbrown::{HashMap, HashSet};
 use spin::Mutex;
-use crate::compat::DefaultHasherBuilder;
 
 use super::*;
+use crate::compat::DefaultHasherBuilder;
 
 /// 模型检查器
 pub struct ModelChecker {
@@ -517,7 +519,10 @@ impl ModelChecker {
     }
 
     /// 执行模型检查
-    pub fn check_models(&mut self, targets: &[VerificationTarget]) -> Result<Vec<VerificationResult>, &'static str> {
+    pub fn check_models(
+        &mut self,
+        targets: &[VerificationTarget],
+    ) -> Result<Vec<VerificationResult>, &'static str> {
         if !self.running.load(Ordering::SeqCst) {
             return Err("Model checker is not running");
         }
@@ -549,22 +554,19 @@ impl ModelChecker {
     }
 
     /// 检查特定规范
-    pub fn check_specification(&mut self, spec: &TemporalLogicFormula) -> Result<ModelCheckingResult, &'static str> {
+    pub fn check_specification(
+        &mut self,
+        spec: &TemporalLogicFormula,
+    ) -> Result<ModelCheckingResult, &'static str> {
         let _start_time_ms = 0u64; // TODO: Implement proper timestamp
 
         let result = match self.config.algorithm {
-            ModelCheckingAlgorithm::ExplicitState => {
-                self.explicit_state_checking(spec)
-            }
-            ModelCheckingAlgorithm::Bounded => {
-                self.bounded_model_checking(spec)
-            }
-            ModelCheckingAlgorithm::Symbolic => {
-                self.symbolic_model_checking(spec)
-            }
+            ModelCheckingAlgorithm::ExplicitState => self.explicit_state_checking(spec),
+            ModelCheckingAlgorithm::Bounded => self.bounded_model_checking(spec),
+            ModelCheckingAlgorithm::Symbolic => self.symbolic_model_checking(spec),
             _ => {
                 self.explicit_state_checking(spec) // 默认使用显式状态检查
-            }
+            },
         };
 
         let elapsed_ms = 0u64; // TODO: Implement proper timestamp
@@ -588,25 +590,25 @@ impl ModelChecker {
     }
 
     /// 显式状态模型检查
-    fn explicit_state_checking(&mut self, spec: &TemporalLogicFormula) -> Result<CheckResult, &'static str> {
+    fn explicit_state_checking(
+        &mut self,
+        spec: &TemporalLogicFormula,
+    ) -> Result<CheckResult, &'static str> {
         match self.config.exploration_strategy {
-            ExplorationStrategy::DepthFirst => {
-                self.depth_first_search(spec)
-            }
-            ExplorationStrategy::BreadthFirst => {
-                self.breadth_first_search(spec)
-            }
-            ExplorationStrategy::Heuristic => {
-                self.heuristic_search(spec)
-            }
+            ExplorationStrategy::DepthFirst => self.depth_first_search(spec),
+            ExplorationStrategy::BreadthFirst => self.breadth_first_search(spec),
+            ExplorationStrategy::Heuristic => self.heuristic_search(spec),
             _ => {
                 self.depth_first_search(spec) // 默认使用深度优先搜索
-            }
+            },
         }
     }
 
     /// 深度优先搜索
-    fn depth_first_search(&mut self, spec: &TemporalLogicFormula) -> Result<CheckResult, &'static str> {
+    fn depth_first_search(
+        &mut self,
+        spec: &TemporalLogicFormula,
+    ) -> Result<CheckResult, &'static str> {
         // 初始化搜索
         let mut stack = Vec::new();
         let mut visited = HashSet::with_hasher(DefaultHasherBuilder);
@@ -669,7 +671,10 @@ impl ModelChecker {
     }
 
     /// 广度优先搜索
-    fn breadth_first_search(&mut self, spec: &TemporalLogicFormula) -> Result<CheckResult, &'static str> {
+    fn breadth_first_search(
+        &mut self,
+        spec: &TemporalLogicFormula,
+    ) -> Result<CheckResult, &'static str> {
         // 初始化搜索
         let mut queue = Vec::new();
         let mut visited = HashSet::with_hasher(DefaultHasherBuilder);
@@ -733,7 +738,10 @@ impl ModelChecker {
     }
 
     /// 启发式搜索
-    fn heuristic_search(&mut self, spec: &TemporalLogicFormula) -> Result<CheckResult, &'static str> {
+    fn heuristic_search(
+        &mut self,
+        spec: &TemporalLogicFormula,
+    ) -> Result<CheckResult, &'static str> {
         // 初始化队列（简化为 FIFO）
         let mut queue = alloc::collections::VecDeque::new();
         let mut visited = HashSet::with_hasher(DefaultHasherBuilder);
@@ -797,7 +805,10 @@ impl ModelChecker {
     }
 
     /// 有界模型检查
-    fn bounded_model_checking(&mut self, spec: &TemporalLogicFormula) -> Result<CheckResult, &'static str> {
+    fn bounded_model_checking(
+        &mut self,
+        spec: &TemporalLogicFormula,
+    ) -> Result<CheckResult, &'static str> {
         // 实现有界模型检查算法
         // 这里简化为有限深度的搜索
         let max_bound = 10; // 简化的界限
@@ -816,7 +827,10 @@ impl ModelChecker {
     }
 
     /// 符号模型检查
-    fn symbolic_model_checking(&mut self, _spec: &TemporalLogicFormula) -> Result<CheckResult, &'static str> {
+    fn symbolic_model_checking(
+        &mut self,
+        _spec: &TemporalLogicFormula,
+    ) -> Result<CheckResult, &'static str> {
         // 符号模型检查的简化实现
         // 在实际实现中会使用BDD或其他符号表示
         Ok(CheckResult::Inconclusive)
@@ -919,39 +933,45 @@ impl ModelChecker {
             LogicExpression::Atomic(prop) => {
                 // 简化的原子命题评估
                 self.evaluate_atomic_proposition(state, prop)
-            }
-            LogicExpression::Not(expr) => {
-                !self.violates_property(state, &TemporalLogicFormula {
+            },
+            LogicExpression::Not(expr) => !self.violates_property(
+                state,
+                &TemporalLogicFormula {
                     id: 0,
                     name: "temp".to_string(),
                     formula_type: spec.formula_type,
                     expression: (**expr).clone(),
                     description: "".to_string(),
                     verification_status: VerificationStatus::NotStarted,
-                })
-            }
+                },
+            ),
             LogicExpression::And(left, right) => {
-                self.violates_property(state, &TemporalLogicFormula {
-                    id: 0,
-                    name: "temp".to_string(),
-                    formula_type: spec.formula_type,
-                    expression: (**left).clone(),
-                    description: "".to_string(),
-                    verification_status: VerificationStatus::NotStarted,
-                }) ||
-                self.violates_property(state, &TemporalLogicFormula {
-                    id: 0,
-                    name: "temp".to_string(),
-                    formula_type: spec.formula_type,
-                    expression: (**right).clone(),
-                    description: "".to_string(),
-                    verification_status: VerificationStatus::NotStarted,
-                })
-            }
+                self.violates_property(
+                    state,
+                    &TemporalLogicFormula {
+                        id: 0,
+                        name: "temp".to_string(),
+                        formula_type: spec.formula_type,
+                        expression: (**left).clone(),
+                        description: "".to_string(),
+                        verification_status: VerificationStatus::NotStarted,
+                    },
+                ) || self.violates_property(
+                    state,
+                    &TemporalLogicFormula {
+                        id: 0,
+                        name: "temp".to_string(),
+                        formula_type: spec.formula_type,
+                        expression: (**right).clone(),
+                        description: "".to_string(),
+                        verification_status: VerificationStatus::NotStarted,
+                    },
+                )
+            },
             _ => {
                 // 其他逻辑表达式的简化处理
                 false
-            }
+            },
         }
     }
 
@@ -984,7 +1004,10 @@ impl ModelChecker {
     }
 
     /// 转换为通用验证结果
-    fn convert_to_verification_result(&self, model_result: &ModelCheckingResult) -> VerificationResult {
+    fn convert_to_verification_result(
+        &self,
+        model_result: &ModelCheckingResult,
+    ) -> VerificationResult {
         let status = match model_result.result {
             CheckResult::PropertyHolds => VerificationStatus::Verified,
             CheckResult::PropertyViolated => VerificationStatus::Failed,
@@ -1007,7 +1030,11 @@ impl ModelChecker {
                 states_checked: model_result.states_explored,
                 paths_explored: model_result.states_explored,
                 lemmas_proved: 0,
-                bugs_found: if matches!(model_result.result, CheckResult::PropertyViolated) { 1 } else { 0 },
+                bugs_found: if matches!(model_result.result, CheckResult::PropertyViolated) {
+                    1
+                } else {
+                    0
+                },
                 properties_verified: 1,
                 rules_applied: 0,
                 max_depth: model_result.max_depth_reached,

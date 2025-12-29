@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion, black_box};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
 // Mock buffer cache implementation for benchmarking
 // In a real scenario, this would use the actual BufCache implementation
@@ -24,11 +24,7 @@ struct MockBuf {
 
 impl MockBuf {
     fn new() -> Self {
-        Self {
-            data: [0; 1024],
-            refcnt: 0,
-            valid: false,
-        }
+        Self { data: [0; 1024], refcnt: 0, valid: false }
     }
 }
 
@@ -38,9 +34,7 @@ struct MockBufCacheLinear {
 
 impl MockBufCacheLinear {
     fn new(capacity: usize) -> Self {
-        Self {
-            bufs: (0..capacity).map(|_| MockBuf::new()).collect(),
-        }
+        Self { bufs: (0..capacity).map(|_| MockBuf::new()).collect() }
     }
 
     fn find_buffer(&mut self, dev: u32, blockno: u32) -> Option<usize> {

@@ -1,3 +1,97 @@
+//! # 网络子系统
+//!
+//! 提供网络协议栈和零拷贝 I/O 优化。
+//!
+//! ## 概述
+//!
+//! 网络子系统实现完整的网络协议栈，包括：
+//! - **零拷贝 I/O**: 减少数据复制，提高性能
+//! - **TCP/UDP**: 传输层协议
+//! - **IPv4**: 网络层协议
+//! - **Socket 接口**: 标准 POSIX socket API
+//! - **网络驱动**: 网卡驱动接口
+//!
+//! ## 主要组件
+//!
+//! - [`NetworkManager`]: 网络管理器
+//! - [`NetworkInterface`]: 网络接口抽象
+//! - [`zero_copy_io`]: 零拷贝 I/O 实现
+//! - [`ZeroCopyNetworkManager`]: 零拷贝网络管理器
+//!
+//! ## 网络协议栈
+//!
+//! ```
+//! 应用层
+//!     ├── Socket API
+//! 传输层
+//!     ├── TCP
+//!     └── UDP
+//! 网络层
+//!     ├── IPv4
+//!     ├── ICMP
+//!     └── ARP
+//! 数据链路层
+//!     ├── 网卡驱动
+//!     └── DMA
+//! ```
+//!
+//! ## 使用示例
+//!
+//! ### 创建 TCP Socket
+//!
+//! ```no_run
+//! use kernel::network::{socket, SocketFamily, SocketType, SocketProtocol};
+//!
+//! // 创建 TCP socket
+//! let sockfd = socket(SocketFamily::AF_INET, SocketType::SOCK_STREAM, SocketProtocol::IPPROTO_TCP)?;
+//!
+//! // 连接到服务器
+//! // connect(sockfd, ...)?;
+//! # Ok::<(), nos_api::Error>(())
+//! ```
+//!
+//! ### 零拷贝网络 I/O
+//!
+//! ```no_run
+//! use kernel::network::zero_copy_io::{ZeroCopySocket, ZeroCopyConfig};
+//!
+//! // 创建零拷贝 socket
+//! let config = ZeroCopyConfig::default();
+//! let socket = ZeroCopySocket::new(config)?;
+//!
+//! // 零拷贝发送
+//! // socket.send_zero_copy(data)?;
+//! # Ok::<(), nos_api::Error>(())
+//! ```
+//!
+//! ## 设计决策
+//!
+//! ### 零拷贝优化
+//!
+//! 使用零拷贝技术减少开销：
+//! - DMA 直接传输
+//! - 共享内存缓冲区
+//! - 避免 CPU 复制
+//!
+//! ### 高性能协议栈
+//!
+//! 优化网络协议栈性能：
+//! - 批量包处理
+//! - 锁优化（无锁队列）
+//! - 中断聚合
+//!
+//! ## 性能特征
+//!
+//! - **吞吐量**: > 10 Gbps（取决于硬件）
+//! - **延迟**: < 10μs（本地回环）
+//! - **零拷贝增益**: 30-50% 性能提升
+//!
+//! ## 相关模块
+//!
+//! - [`crate::subsystems::net`]: 更完整的网络子系统实现
+//! - [`crate::subsystems::syscalls::network`]: 网络系统调用
+//! - [`crate::platform::drivers`]: 网卡驱动
+
 //! Network subsystem
 //!
 //! This module provides network functionality including zero-copy I/O optimizations.

@@ -5,13 +5,12 @@
 //! - 轻量骨架，便于后续接入调度策略与抢占逻辑。
 //! - 提供全局访问封装，供系统调用层快速落地。
 
-
 extern crate alloc;
 
 use alloc::collections::VecDeque;
-use core::sync::atomic::{AtomicUsize, AtomicU32, AtomicU64, Ordering};
-use crate::subsystems::sync::SpinLock;
-use crate::arch::cpuid;
+use core::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
+
+use crate::{arch::cpuid, subsystems::sync::SpinLock};
 
 /// 默认时间片（单位：ticks）
 pub const DEFAULT_TIMESLICE: u32 = 4;
@@ -112,12 +111,12 @@ pub struct StatsSnapshot {
 
 /// 系统调用侧快速接口
 pub mod syscall {
-    use super::O1Scheduler;
-    use crate::process::thread::Tid;
-    use crate::error::SyscallError;
     use nos_api::syscall::SyscallResult;
-    use crate::subsystems::time::get_time_ns;
-    use crate::arch::cpuid;
+
+    use super::O1Scheduler;
+    use crate::{
+        arch::cpuid, error::SyscallError, process::thread::Tid, subsystems::time::get_time_ns,
+    };
 
     /// 用户态 hint 调度：tid, prio, cpu_hint
     pub const SYS_SCHED_ENQUEUE_HINT: u32 = 0xE011;
@@ -146,33 +145,32 @@ pub mod syscall {
 
         // 记录开始时间
         let start = get_time_ns();
-        
+
         // 添加任务到指定CPU
         O1Scheduler::add_task_to_cpu(tid, prio, cpu);
-        
+
         // 记录延迟
         let end = get_time_ns();
         let stats = O1Scheduler::get_cpu_scheduler(cpu).detailed_stats();
         stats.record_latency(end.saturating_sub(start));
-        
+
         Ok(0)
     }
 
     pub fn sched_pick_next(cpu_id: usize) -> Option<Tid> {
         O1Scheduler::peek_next_on_cpu(cpu_id).map(|tid| tid as Tid)
     }
-    
+
     /// 获取调度器统计信息
     pub fn sched_get_stats(cpu_id: usize) -> Result<StatsSnapshot, SyscallError> {
         if cpu_id >= MAX_CPUS {
             return Err(SyscallError::InvalidArgument);
         }
-        
+
         let scheduler = O1Scheduler::get_cpu_scheduler(cpu_id);
         Ok(scheduler.detailed_stats().snapshot())
     }
 }
-
 
 // 常量已移到文件顶部
 
@@ -204,23 +202,23 @@ impl PerCpuScheduler {
             _padding: [0; 64 - (28 + core::mem::size_of::<SchedulerStats>())],
         }
     }
-    
+
     /// 添加任务到就绪队列
     fn enqueue(&self, task_id: usize, priority: usize) {
         if priority >= MAX_PRIORITY {
             return;
         }
-        
+
         let queue = &self.ready_queues[priority];
         queue.lock().push_back(task_id);
-        
+
         // 设置优先级位
         let bitmask = 1u32 << (priority as u32 % 32);
         self.priority_bitmap.fetch_or(bitmask, Ordering::Release);
-        
+
         self.task_count.fetch_add(1, Ordering::Relaxed);
     }
-    
+
     /// 从就绪队列取出任务
     fn dequeue(&self) -> Option<usize> {
         // 查找最高优先级非空队列
@@ -228,81 +226,81 @@ impl PerCpuScheduler {
         if bitmap == 0 {
             return None;
         }
-        
+
         // 找到最高设置位（最高优先级）
         let highest_priority = bitmap.trailing_zeros() as usize;
         if highest_priority >= MAX_PRIORITY {
             return None;
         }
-        
+
         let queue = &self.ready_queues[highest_priority];
         let mut queue_guard = queue.lock();
-        
+
         if let Some(task_id) = queue_guard.pop_front() {
             // 如果队列变空，清除位图对应位
             if queue_guard.is_empty() {
                 let bitmask = 1u32 << (highest_priority as u32 % 32);
                 self.priority_bitmap.fetch_and(!bitmask, Ordering::Release);
             }
-            
+
             self.task_count.fetch_sub(1, Ordering::Relaxed);
             self.current_task.store(task_id as u32, Ordering::Relaxed);
-            
+
             // 记录调度统计
             self.stats.record_tick(false);
-            
+
             return Some(task_id);
         }
-        
+
         None
     }
-    
+
     /// 获取下一个要运行的任务（不取出）
     fn peek(&self) -> Option<usize> {
         let bitmap = self.priority_bitmap.load(Ordering::Acquire);
         if bitmap == 0 {
             return None;
         }
-        
+
         let highest_priority = bitmap.trailing_zeros() as usize;
         if highest_priority >= MAX_PRIORITY {
             return None;
         }
-        
+
         let queue = &self.ready_queues[highest_priority];
         let queue_guard = queue.lock();
         queue_guard.front().copied()
     }
-    
+
     /// 移除特定任务
     fn remove(&self, task_id: usize) -> bool {
         for priority in 0..MAX_PRIORITY {
             let queue = &self.ready_queues[priority];
             let mut queue_guard = queue.lock();
-            
+
             if let Some(pos) = queue_guard.iter().position(|&id| id == task_id) {
                 queue_guard.remove(pos);
-                
+
                 // 如果队列变空，清除位图对应位
                 if queue_guard.is_empty() {
                     let bitmask = 1u32 << (priority as u32 % 32);
                     self.priority_bitmap.fetch_and(!bitmask, Ordering::Release);
                 }
-                
+
                 self.task_count.fetch_sub(1, Ordering::Relaxed);
                 return true;
             }
         }
-        
+
         false
     }
-    
+
     /// 获取调度器统计
     fn stats(&self) -> (usize, usize, u32) {
         let count = self.task_count.load(Ordering::Relaxed);
         let current = self.current_task.load(Ordering::Relaxed);
         let bitmap = self.priority_bitmap.load(Ordering::Relaxed);
-        
+
         // 计算非空队列数量
         let mut queue_count = 0;
         for priority in 0..MAX_PRIORITY {
@@ -311,10 +309,10 @@ impl PerCpuScheduler {
                 queue_count += 1;
             }
         }
-        
+
         (count, queue_count, bitmap)
     }
-    
+
     /// 获取详细统计信息
     fn detailed_stats(&self) -> &SchedulerStats {
         &self.stats
@@ -322,7 +320,7 @@ impl PerCpuScheduler {
 }
 
 // 全局每CPU调度器数组
-static PER_CPU_SCHEDULERS: [PerCpuScheduler; MAX_CPUS] = 
+static PER_CPU_SCHEDULERS: [PerCpuScheduler; MAX_CPUS] =
     [const { PerCpuScheduler::new() }; MAX_CPUS];
 
 /// 获取当前CPU的调度器
@@ -344,77 +342,77 @@ impl O1Scheduler {
         }
         crate::log_debug!("O(1) scheduler initialized");
     }
-    
+
     /// 调度下一个任务
     pub fn schedule_next() -> Option<usize> {
         current_cpu_scheduler().dequeue()
     }
-    
+
     /// 添加任务到就绪队列
     pub fn add_task(task_id: usize, priority: usize) {
         current_cpu_scheduler().enqueue(task_id, priority);
     }
-    
+
     /// 移除任务
     pub fn remove_task(task_id: usize) -> bool {
         current_cpu_scheduler().remove(task_id)
     }
-    
+
     /// 获取下一个要运行的任务（不调度）
     pub fn peek_next() -> Option<usize> {
         current_cpu_scheduler().peek()
     }
-    
+
     /// 获取调度器统计信息
     pub fn get_stats() -> (usize, usize, u32) {
         current_cpu_scheduler().stats()
     }
-    
+
     /// 获取详细统计信息
     pub fn get_detailed_stats() -> &'static SchedulerStats {
         current_cpu_scheduler().detailed_stats()
     }
-    
+
     /// 获取指定CPU的调度器
     pub fn get_cpu_scheduler(cpu_id: usize) -> &'static PerCpuScheduler {
         &PER_CPU_SCHEDULERS[cpu_id % MAX_CPUS]
     }
-    
+
     /// 添加任务到指定CPU的就绪队列
     pub fn add_task_to_cpu(task_id: usize, priority: usize, cpu_id: usize) {
         let scheduler = Self::get_cpu_scheduler(cpu_id);
         scheduler.enqueue(task_id, priority);
     }
-    
+
     /// 从指定CPU移除任务
     pub fn remove_task_from_cpu(task_id: usize, cpu_id: usize) -> bool {
         let scheduler = Self::get_cpu_scheduler(cpu_id);
         scheduler.remove(task_id)
     }
-    
+
     /// 获取指定CPU的下一个任务
     pub fn peek_next_on_cpu(cpu_id: usize) -> Option<usize> {
         let scheduler = Self::get_cpu_scheduler(cpu_id);
         scheduler.peek()
     }
-    
+
     /// 负载均衡：将任务迁移到其他CPU
     pub fn load_balance() {
         // 简单的负载均衡策略：如果当前CPU任务过多，迁移一些到空闲CPU
         let (current_count, _, _) = current_cpu_scheduler().stats();
         let avg_load = Self::get_average_load();
-        
+
         if current_count > avg_load * 3 / 2 {
             // 需要迁移任务
             Self::migrate_tasks(current_count - avg_load);
         }
     }
-    
+
     /// 获取系统平均负载
     fn get_average_load() -> usize {
         let mut total = 0;
         let mut active_cpus = 0;
-        
+
         for scheduler in &PER_CPU_SCHEDULERS[..MAX_CPUS] {
             let (count, _, _) = scheduler.stats();
             if count > 0 {
@@ -422,10 +420,14 @@ impl O1Scheduler {
                 active_cpus += 1;
             }
         }
-        
-        if active_cpus > 0 { total / active_cpus } else { 0 }
+
+        if active_cpus > 0 {
+            total / active_cpus
+        } else {
+            0
+        }
     }
-    
+
     /// 迁移任务
     fn migrate_tasks(num_tasks: usize) {
         // 简化的任务迁移实现
@@ -494,9 +496,10 @@ impl O1Scheduler {
         let combined = timestamp.wrapping_mul(31).wrapping_add(cpu_id);
         (combined as u32)
     }
-}pub mod unified;
+}
+pub mod unified;
 /// Run function with global scheduler
-pub fn with_global<F, R>(f: F) -> R 
+pub fn with_global<F, R>(f: F) -> R
 where
     F: FnOnce() -> R,
 {

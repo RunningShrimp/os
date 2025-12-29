@@ -1,8 +1,8 @@
 //! /proc/sched 统计导出（占位）
 
-use crate::sched::{with_global, StatsSnapshot};
-use alloc::string::String;
-use alloc::fmt::Write;
+use alloc::{fmt::Write, string::String};
+
+use crate::sched::{StatsSnapshot, with_global};
 
 pub fn read_sched_stats() -> String {
     let mut out = String::new();
@@ -14,11 +14,7 @@ pub fn read_sched_stats() -> String {
                 let _ = writeln!(
                     s,
                     "cpu {}: ticks={} preempt={} voluntary={} latency={:?}",
-                    cpu,
-                    snap.ticks,
-                    snap.preemptions,
-                    snap.voluntary_switches,
-                    snap.latency_hist
+                    cpu, snap.ticks, snap.preemptions, snap.voluntary_switches, snap.latency_hist
                 );
             }
         }
@@ -30,13 +26,3 @@ pub fn read_sched_stats() -> String {
     }
     out
 }
-
-
-
-
-
-
-
-
-
-

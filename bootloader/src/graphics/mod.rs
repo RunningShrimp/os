@@ -8,13 +8,14 @@
 //! - Double buffering for flicker-free rendering
 //! - Dirty region tracking for performance optimization
 
-use core::ptr;
-use alloc::alloc::{alloc, dealloc, Layout};
-use alloc::vec::Vec;
-
+use alloc::{
+    alloc::{Layout, alloc, dealloc},
+    vec::Vec,
+};
 // Import SIMD instructions only for x86_64 target
 #[cfg(target_arch = "x86_64")]
-use core::arch::x86_64::{_mm_set1_epi32, _mm_storeu_si128, _mm_loadu_si128, __m128i};
+use core::arch::x86_64::{__m128i, _mm_loadu_si128, _mm_set1_epi32, _mm_storeu_si128};
+use core::ptr;
 
 // Import the unified FramebufferInfo from protocol
 use crate::protocol::FramebufferInfo;
@@ -64,17 +65,17 @@ impl Color {
     pub fn red() -> Self {
         Self::rgb(255, 0, 0)
     }
-    
+
     /// Green color (opaque)
     pub fn green() -> Self {
         Self::rgb(0, 255, 0)
     }
-    
+
     /// Blue color (opaque)
     pub fn blue() -> Self {
         Self::rgb(0, 0, 255)
     }
-    
+
     /// Cyan color (opaque)
     pub fn cyan() -> Self {
         Self::rgb(0, 255, 255)
@@ -91,11 +92,11 @@ mod tests {
     fn test_pitch_not_equal_width_times_four() {
         // Create a framebuffer with pitch != width*4 (simulating hardware alignment)
         let fb_info = FramebufferInfo::new(
-            0x10000000,   // Address
-            100,          // Width (pixels)
-            50,           // Height (pixels)
-            408,          // Pitch (bytes) = width*4 + 8 (extra padding)
-            32,           // BPP (32 bits = 4 bytes)
+            0x10000000, // Address
+            100,        // Width (pixels)
+            50,         // Height (pixels)
+            408,        // Pitch (bytes) = width*4 + 8 (extra padding)
+            32,         // BPP (32 bits = 4 bytes)
         );
 
         // Verify stride calculation is correct
@@ -118,17 +119,21 @@ mod tests {
     fn test_double_buffer_with_non_standard_pitch() {
         // Create a mock framebuffer info with pitch != width*4
         let fb_info = FramebufferInfo::new(
-            0x10000000,   // Fake address (not used in test)
-            800,          // Width
-            600,          // Height
-            3216,         // Pitch = 800*4 + 16 (extra padding)
-            32,           // BPP
+            0x10000000, // Fake address (not used in test)
+            800,        // Width
+            600,        // Height
+            3216,       // Pitch = 800*4 + 16 (extra padding)
+            32,         // BPP
         );
 
         // Test buffer size calculation
         let buffer_size = fb_info.buffer_size();
         assert_eq!(buffer_size, 600 * 3216, "Buffer size should be height * pitch");
-        assert_ne!(buffer_size, 600 * 800 * 4, "Buffer size should be different from width*height*4");
+        assert_ne!(
+            buffer_size,
+            600 * 800 * 4,
+            "Buffer size should be different from width*height*4"
+        );
     }
 
     /// Test DirtyRect overlap detection
@@ -153,13 +158,7 @@ mod tests {
     /// Test framebuffer bounds checking
     #[test]
     fn test_framebuffer_bounds_check() {
-        let fb_info = FramebufferInfo::new(
-            0x10000000,
-            100,
-            50,
-            408,
-            32,
-        );
+        let fb_info = FramebufferInfo::new(0x10000000, 100, 50, 408, 32);
 
         // Test in bounds
         assert!(fb_info.in_bounds(0, 0), "(0,0) should be in bounds");
@@ -172,8 +171,6 @@ mod tests {
         assert!(!fb_info.in_bounds(200, 100), "(200,100) should be out of bounds");
     }
 }
-
-
 
 /// 脏区域矩形，用于跟踪需要更新的屏幕区域
 #[derive(Debug, Clone, Copy)]
@@ -192,10 +189,10 @@ impl DirtyRect {
 
     /// 检查是否与另一个脏区域重叠
     pub fn overlaps(&self, other: &DirtyRect) -> bool {
-        self.x < other.x + other.width &&
-            self.x + self.width > other.x &&
-            self.y < other.y + other.height &&
-            self.y + self.height > other.y
+        self.x < other.x + other.width
+            && self.x + self.width > other.x
+            && self.y < other.y + other.height
+            && self.y + self.height > other.y
     }
 
     /// 合并两个脏区域，返回包含两者的最小矩形
@@ -204,13 +201,8 @@ impl DirtyRect {
         let y1 = self.y.min(other.y);
         let x2 = (self.x + self.width).max(other.x + other.width);
         let y2 = (self.y + self.height).max(other.y + other.height);
-        
-        DirtyRect {
-            x: x1,
-            y: y1,
-            width: x2 - x1,
-            height: y2 - y1,
-        }
+
+        DirtyRect { x: x1, y: y1, width: x2 - x1, height: y2 - y1 }
     }
 }
 
@@ -242,17 +234,16 @@ impl DoubleBuffer {
         // 使用pitch/4作为每行像素数（stride），而不是width
         let stride_pixels = (fb_info.pitch / 4) as usize; // ARGB8888每像素4字节
         let buffer_size = stride_pixels * fb_info.height as usize;
-        
+
         // 分配后台缓冲区内存，使用真实的帧缓冲区大小
         let layout = Layout::from_size_align(
             fb_info.pitch as usize * fb_info.height as usize, // 真实字节大小
-            8, // 8字节对齐
-        ).map_err(|_| "Invalid layout for back buffer")?;
-        
-        let back_buffer = unsafe {
-            alloc(layout) as *mut u32
-        };
-        
+            8,                                                // 8字节对齐
+        )
+        .map_err(|_| "Invalid layout for back buffer")?;
+
+        let back_buffer = unsafe { alloc(layout) as *mut u32 };
+
         if back_buffer.is_null() {
             return Err("Failed to allocate back buffer");
         }
@@ -273,7 +264,7 @@ impl DoubleBuffer {
         if self.rendering {
             return Err("Already rendering");
         }
-        
+
         self.rendering = true;
         self.clear_dirty_regions();
         Ok(())
@@ -284,7 +275,7 @@ impl DoubleBuffer {
         if !self.rendering {
             return Err("Not rendering");
         }
-        
+
         self.rendering = false;
         Ok(())
     }
@@ -312,7 +303,7 @@ impl DoubleBuffer {
         let total_bytes = self.fb_info.buffer_size();
         let total_pixels = self.buffer_size;
         log::trace!("Copying full framebuffer: {} pixels ({} bytes)", total_pixels, total_bytes);
-        
+
         unsafe {
             // 使用SIMD优化进行快速内存拷贝
             #[cfg(target_arch = "x86_64")]
@@ -320,12 +311,12 @@ impl DoubleBuffer {
                 let src = self.back_buffer as *const __m128i;
                 let dst = self.front_buffer as *mut __m128i;
                 let simd_iterations = total_bytes / 16; // 16字节 = 128位
-                
+
                 for i in 0..simd_iterations {
                     let data = _mm_loadu_si128(src.add(i));
                     _mm_storeu_si128(dst.add(i), data);
                 }
-                
+
                 // 处理剩余字节
                 let remaining_bytes = total_bytes % 16;
                 if remaining_bytes > 0 {
@@ -334,18 +325,14 @@ impl DoubleBuffer {
                     ptr::copy_nonoverlapping(src_remaining, dst_remaining, remaining_bytes);
                 }
             }
-            
+
             // 非x86_64平台使用常规拷贝
             #[cfg(not(target_arch = "x86_64"))]
             {
-                ptr::copy_nonoverlapping(
-                    self.back_buffer,
-                    self.front_buffer,
-                    total_pixels,
-                );
+                ptr::copy_nonoverlapping(self.back_buffer, self.front_buffer, total_pixels);
             }
         }
-        
+
         Ok(())
     }
 
@@ -360,34 +347,34 @@ impl DoubleBuffer {
     /// 复制指定区域
     fn copy_region(&self, region: &DirtyRect) -> Result<(), &'static str> {
         let fb = &self.fb_info;
-        
+
         // 边界检查
         if region.x >= fb.width || region.y >= fb.height {
             return Ok(()); // 超出边界的区域忽略
         }
-        
+
         // 计算实际复制的区域（裁剪到屏幕边界）
         let x_end = (region.x + region.width).min(fb.width);
         let y_end = (region.y + region.height).min(fb.height);
         let actual_width = x_end - region.x;
         let _actual_height = y_end - region.y;
         log::trace!("Copying region with dimensions {}x{}", actual_width, _actual_height);
-        
+
         // 使用pitch/4作为每行像素数（stride）
         let stride_pixels = (fb.pitch / 4) as usize;
-        
+
         unsafe {
             for y in region.y..y_end {
                 let src_offset = y as usize * stride_pixels + region.x as usize;
                 let dst_offset = y as usize * stride_pixels + region.x as usize;
-                
+
                 let src_ptr = self.back_buffer.add(src_offset);
                 let dst_ptr = self.front_buffer.add(dst_offset);
-                
+
                 ptr::copy_nonoverlapping(src_ptr, dst_ptr, actual_width as usize);
             }
         }
-        
+
         Ok(())
     }
 
@@ -396,7 +383,7 @@ impl DoubleBuffer {
         if !self.dirty_tracking_enabled || !self.rendering {
             return;
         }
-        
+
         // 尝试与现有脏区域合并
         let mut merged = false;
         for existing in &mut self.dirty_regions {
@@ -406,7 +393,7 @@ impl DoubleBuffer {
                 break;
             }
         }
-        
+
         if !merged {
             self.dirty_regions.push(region);
         }
@@ -453,7 +440,8 @@ impl Drop for DoubleBuffer {
             let layout = Layout::from_size_align(
                 self.fb_info.pitch as usize * self.fb_info.height as usize, // 与分配时保持一致
                 8,
-            ).unwrap();
+            )
+            .unwrap();
             unsafe {
                 dealloc(self.back_buffer as *mut u8, layout);
             }
@@ -470,19 +458,13 @@ pub struct GraphicsRenderer {
 impl GraphicsRenderer {
     /// Create new graphics renderer
     pub fn new(fb: FramebufferInfo) -> Self {
-        Self {
-            fb,
-            double_buffer: None,
-        }
+        Self { fb, double_buffer: None }
     }
 
     /// Create new graphics renderer with double buffering
     pub fn new_with_double_buffer(fb: FramebufferInfo) -> Result<Self, &'static str> {
         let double_buffer = DoubleBuffer::new(fb.clone())?;
-        Ok(Self {
-            fb,
-            double_buffer: Some(double_buffer),
-        })
+        Ok(Self { fb, double_buffer: Some(double_buffer) })
     }
 
     /// Initialize double buffering (if not already initialized)
@@ -598,18 +580,18 @@ impl GraphicsRenderer {
             {
                 // 创建4个颜色值的SIMD向量（16字节）
                 let simd_color = _mm_set1_epi32(color_val as i32);
-                
+
                 // 计算可被4整除的像素数
                 let simd_pixels = total_pixels & !3;
                 let simd_end = fb_ptr.add(simd_pixels);
-                
+
                 // 使用SIMD批量填充
                 let mut current_ptr = fb_ptr as *mut __m128i;
                 while current_ptr < simd_end as *mut _ {
                     _mm_storeu_si128(current_ptr, simd_color);
                     current_ptr = current_ptr.add(1);
                 }
-                
+
                 // 处理剩余像素
                 let remaining = fb_ptr.add(simd_pixels);
                 let end = fb_ptr.add(total_pixels);
@@ -619,7 +601,7 @@ impl GraphicsRenderer {
                     ptr = ptr.add(1);
                 }
             }
-            
+
             // 非x86_64平台使用常规块填充
             #[cfg(not(target_arch = "x86_64"))]
             {
@@ -772,9 +754,10 @@ impl GraphicsRenderer {
                 // 优化：每行使用连续的内存访问模式
                 let row_start = (y + row) as usize * stride_pixels + x as usize;
                 log::trace!("Drawing rectangle row at offset {}", row_start);
-                
+
                 // 使用 slice::fill 进行行级块填充，提高缓存命中率
-                let row_slice = core::slice::from_raw_parts_mut(fb_ptr.add(row_start), actual_width as usize);
+                let row_slice =
+                    core::slice::from_raw_parts_mut(fb_ptr.add(row_start), actual_width as usize);
                 row_slice.fill(color_val);
             }
         }
@@ -805,7 +788,7 @@ impl GraphicsRenderer {
 
         let fb_ptr = self.get_draw_buffer();
         let stride_pixels = (self.fb.pitch / 4) as usize; // ARGB8888: 4 bytes per pixel
-        
+
         // 计算脏区域边界
         let mut min_x = u32::MAX;
         let mut min_y = u32::MAX;
@@ -818,7 +801,7 @@ impl GraphicsRenderer {
                 if self.fb.in_bounds(x, y) {
                     let offset = y as usize * stride_pixels + x as usize;
                     ptr::write(fb_ptr.add(offset), color.as_argb8888());
-                    
+
                     // 更新脏区域边界
                     min_x = min_x.min(x);
                     min_y = min_y.min(y);
@@ -839,7 +822,13 @@ impl GraphicsRenderer {
     }
 
     /// 绘制文本字符（简化版本）
-    pub fn draw_char(&mut self, x: u32, y: u32, ch: char, color: Color) -> Result<(), &'static str> {
+    pub fn draw_char(
+        &mut self,
+        x: u32,
+        y: u32,
+        ch: char,
+        color: Color,
+    ) -> Result<(), &'static str> {
         // 简单的8x8字体数据（这里只实现几个基本字符）
         let font_data = match ch {
             'A' => [0x18, 0x3C, 0x66, 0x66, 0x7E, 0x66, 0x66, 0x00],
@@ -860,7 +849,7 @@ impl GraphicsRenderer {
                     if (byte >> (7 - col)) & 1 == 1 {
                         let px_x = x + col;
                         let px_y = y + row as u32;
-                        
+
                         if self.fb.in_bounds(px_x, px_y) {
                             let offset = px_y as usize * stride_pixels + px_x as usize;
                             ptr::write(fb_ptr.add(offset), color_val);
@@ -879,7 +868,13 @@ impl GraphicsRenderer {
     }
 
     /// 绘制文本字符串
-    pub fn draw_text(&mut self, x: u32, y: u32, text: &str, color: Color) -> Result<(), &'static str> {
+    pub fn draw_text(
+        &mut self,
+        x: u32,
+        y: u32,
+        text: &str,
+        color: Color,
+    ) -> Result<(), &'static str> {
         for (i, ch) in text.chars().enumerate() {
             let char_x = x + (i as u32) * 8; // 每个字符8像素宽
             self.draw_char(char_x, y, ch, color)?;
@@ -914,7 +909,7 @@ impl GraphicsRenderer {
         // 绘制主体部分（不包括圆角区域）
         let body_y_start = y + radius;
         let body_y_end = y + height - radius;
-        
+
         if body_y_start < body_y_end {
             // 绘制中间矩形部分
             self.draw_filled_rect(x, body_y_start, width, body_y_end - body_y_start, color)?;
@@ -938,7 +933,7 @@ impl GraphicsRenderer {
                             ptr::write(fb_ptr.add(offset), color_val);
                         }
                     }
-                    
+
                     // 右上角
                     let px = x + width - radius + dx;
                     let py = y + dy;
@@ -946,7 +941,7 @@ impl GraphicsRenderer {
                         let offset = py as usize * stride_pixels + px as usize;
                         ptr::write(fb_ptr.add(offset), color_val);
                     }
-                    
+
                     // 左下角
                     let px = x + dx;
                     let py = y + height - radius + dy;
@@ -954,7 +949,7 @@ impl GraphicsRenderer {
                         let offset = py as usize * stride_pixels + px as usize;
                         ptr::write(fb_ptr.add(offset), color_val);
                     }
-                    
+
                     // 右下角
                     let px = x + width - radius + dx;
                     let py = y + height - radius + dy;
@@ -993,7 +988,7 @@ mod tests {
         let rect1 = DirtyRect::new(10, 10, 50, 50);
         let rect2 = DirtyRect::new(30, 30, 50, 50);
         let rect3 = DirtyRect::new(100, 100, 50, 50);
-        
+
         assert!(rect1.overlaps(&rect2)); // 重叠
         assert!(!rect1.overlaps(&rect3)); // 不重叠
     }
@@ -1003,7 +998,7 @@ mod tests {
         let rect1 = DirtyRect::new(10, 10, 50, 50);
         let rect2 = DirtyRect::new(30, 30, 50, 50);
         let merged = rect1.merge(&rect2);
-        
+
         assert_eq!(merged.x, 10);
         assert_eq!(merged.y, 10);
         assert_eq!(merged.width, 70);
@@ -1051,7 +1046,7 @@ mod tests {
         let fb = FramebufferInfo::new(0x10000000, 800, 600, 3200, 32);
         let renderer = GraphicsRenderer::new_with_double_buffer(fb);
         assert!(renderer.is_ok());
-        
+
         let renderer = renderer.unwrap();
         assert_eq!(renderer.width(), 800);
         assert_eq!(renderer.height(), 600);
@@ -1062,14 +1057,18 @@ mod tests {
     fn test_double_buffer_rendering_cycle() {
         let fb = FramebufferInfo::new(0x10000000, 800, 600, 3200, 32);
         let mut renderer = GraphicsRenderer::new_with_double_buffer(fb).unwrap();
-        
+
         // 测试渲染周期
         assert!(renderer.begin_render().is_ok());
         assert!(renderer.clear_screen(Color::black()).is_ok());
         assert!(renderer.draw_pixel(100, 100, Color::red()).is_ok());
         assert!(renderer.draw_h_line(50, 50, 100, Color::green()).is_ok());
         assert!(renderer.draw_v_line(150, 50, 100, Color::blue()).is_ok());
-        assert!(renderer.draw_filled_rect(200, 200, 100, 50, Color::white()).is_ok());
+        assert!(
+            renderer
+                .draw_filled_rect(200, 200, 100, 50, Color::white())
+                .is_ok()
+        );
         assert!(renderer.end_render().is_ok());
         assert!(renderer.swap_buffers().is_ok());
     }
@@ -1078,13 +1077,13 @@ mod tests {
     fn test_batch_pixel_drawing() {
         let fb = FramebufferInfo::new(0x10000000, 800, 600, 3200, 32);
         let mut renderer = GraphicsRenderer::new_with_double_buffer(fb).unwrap();
-        
+
         let pixels = vec![
             (10, 10, Color::red()),
             (20, 20, Color::green()),
             (30, 30, Color::blue()),
         ];
-        
+
         assert!(renderer.begin_render().is_ok());
         assert!(renderer.draw_pixels_batch(&pixels).is_ok());
         assert!(renderer.end_render().is_ok());
@@ -1095,7 +1094,7 @@ mod tests {
     fn test_text_drawing() {
         let fb = FramebufferInfo::new(0x10000000, 800, 600, 3200, 32);
         let mut renderer = GraphicsRenderer::new_with_double_buffer(fb).unwrap();
-        
+
         assert!(renderer.begin_render().is_ok());
         assert!(renderer.draw_text(100, 100, "ABC", Color::white()).is_ok());
         assert!(renderer.end_render().is_ok());
@@ -1106,9 +1105,13 @@ mod tests {
     fn test_rounded_rect() {
         let fb = FramebufferInfo::new(0x10000000, 800, 600, 3200, 32);
         let mut renderer = GraphicsRenderer::new_with_double_buffer(fb).unwrap();
-        
+
         assert!(renderer.begin_render().is_ok());
-        assert!(renderer.draw_rounded_rect(100, 100, 200, 100, 10, Color::cyan()).is_ok());
+        assert!(
+            renderer
+                .draw_rounded_rect(100, 100, 200, 100, 10, Color::cyan())
+                .is_ok()
+        );
         assert!(renderer.end_render().is_ok());
         assert!(renderer.swap_buffers().is_ok());
     }
@@ -1117,16 +1120,20 @@ mod tests {
     fn test_dirty_tracking() {
         let fb = FramebufferInfo::new(0x10000000, 800, 600, 3200, 32);
         let mut renderer = GraphicsRenderer::new_with_double_buffer(fb).unwrap();
-        
+
         // 启用脏区域跟踪
         renderer.set_dirty_tracking(true);
-        
+
         assert!(renderer.begin_render().is_ok());
         assert!(renderer.draw_pixel(100, 100, Color::red()).is_ok());
-        assert!(renderer.draw_filled_rect(200, 200, 50, 50, Color::blue()).is_ok());
+        assert!(
+            renderer
+                .draw_filled_rect(200, 200, 50, 50, Color::blue())
+                .is_ok()
+        );
         assert!(renderer.end_render().is_ok());
         assert!(renderer.swap_buffers().is_ok());
-        
+
         // 禁用脏区域跟踪
         renderer.set_dirty_tracking(false);
         assert!(renderer.begin_render().is_ok());
@@ -1139,7 +1146,7 @@ mod tests {
     fn test_point_in_rect() {
         let fb = FramebufferInfo::new(0x10000000, 800, 600, 3200, 32);
         let renderer = GraphicsRenderer::new(fb);
-        
+
         assert!(renderer.point_in_rect(150, 250, 100, 200, 200, 100));
         assert!(!renderer.point_in_rect(50, 150, 100, 200, 200, 100));
         assert!(!renderer.point_in_rect(350, 350, 100, 200, 200, 100));

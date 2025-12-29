@@ -1,19 +1,19 @@
 //! Static Analyzer Module
-//! 
+//!
 //! This module provides comprehensive static analysis capabilities
 //! for the NOS kernel, including various analysis techniques and tools.
 
 pub use super::*;
 
 // Re-export all submodules
-pub mod types;
 pub mod ast;
 pub mod cfg;
 pub mod dataflow;
-pub mod pointer;
-pub mod side_effect;
 pub mod dead_code;
+pub mod pointer;
 pub mod security;
+pub mod side_effect;
+pub mod types;
 
 /// Static analyzer implementation
 pub struct StaticAnalyzer {
@@ -63,7 +63,10 @@ impl StaticAnalyzer {
     }
 
     /// Run static analysis
-    pub fn run_analysis(&mut self, analysis_type: types::AnalysisType) -> Result<Vec<types::StaticAnalysisResult>, crate::error::FrameworkError> {
+    pub fn run_analysis(
+        &mut self,
+        analysis_type: types::AnalysisType,
+    ) -> Result<Vec<types::StaticAnalysisResult>, crate::error::FrameworkError> {
         // Implementation will be moved here
         Ok(Vec::new())
     }

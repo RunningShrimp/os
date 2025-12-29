@@ -1,7 +1,8 @@
 // Object type management functions
 
-use super::*;
 use core::ffi::c_char;
+
+use super::*;
 
 /// 注册新的GLib对象类型
 ///
@@ -21,8 +22,12 @@ pub extern "C" fn sys_glib_object_type_register(
     type_size: usize,
     flags: u32,
 ) -> SyscallResult {
-    crate::println!("[glib_object] 注册对象类型: parent={}, size={}, flags=0x{:x}",
-        parent_type, type_size, flags);
+    crate::println!(
+        "[glib_object] 注册对象类型: parent={}, size={}, flags=0x{:x}",
+        parent_type,
+        type_size,
+        flags
+    );
 
     // 验证参数
     if name.is_null() {
@@ -137,7 +142,7 @@ pub extern "C" fn sys_glib_object_type_info(
             None => {
                 crate::println!("[glib_object] 对象类型不存在: {}", type_id);
                 return -2; // ENOENT
-            }
+            },
         }
     };
 

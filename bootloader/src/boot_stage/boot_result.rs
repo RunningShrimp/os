@@ -83,15 +83,15 @@ pub fn boot_halt(error: BootError) -> ! {
 pub fn boot_success(result: BootSuccess) -> ! {
     crate::drivers::console::write_str("Boot sequence complete.\n");
     crate::drivers::console::write_str("Transferring control to kernel...\n");
-    
+
     // Jump to kernel
     unsafe {
         #[cfg(target_arch = "x86_64")]
         core::arch::asm!("jmp {}", in(reg) result.kernel_entry);
-        
+
         #[cfg(target_arch = "aarch64")]
         core::arch::asm!("br {}", in(reg) result.kernel_entry);
-        
+
         #[cfg(target_arch = "riscv64")]
         core::arch::asm!("jr {}", in(reg) result.kernel_entry);
     }

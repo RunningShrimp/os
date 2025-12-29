@@ -5,7 +5,7 @@
 mod architecture_tests {
     // Test module for DDD architecture validation
     // Ensures proper layer isolation and dependency flow
-    
+
     #[test]
     fn test_domain_layer_isolation() {
         // Verifies domain layer has no infrastructure dependencies

@@ -2,7 +2,6 @@
 
 #[cfg(test)]
 use crate::kernel_if::kernel_loader::validate_kernel;
-
 #[cfg(test)]
 use crate::memory_mgmt::paging_setup::initialize_paging;
 
@@ -14,11 +13,7 @@ pub struct BootFlowTest {
 
 impl BootFlowTest {
     pub fn new(name: &'static str) -> Self {
-        Self {
-            name,
-            passed: false,
-            message: "",
-        }
+        Self { name, passed: false, message: "" }
     }
 
     pub fn run(&mut self, test_fn: fn() -> Result<(), &'static str>) {
@@ -26,11 +21,11 @@ impl BootFlowTest {
             Ok(()) => {
                 self.passed = true;
                 self.message = "PASS";
-            }
+            },
             Err(e) => {
                 self.passed = false;
                 self.message = e;
-            }
+            },
         }
     }
 
@@ -137,7 +132,11 @@ impl BootFlowTestSuite {
 
     /// Get the number of passed tests
     pub fn passed_count(&self) -> usize {
-        self.tests.iter().filter(|t| t.passed).take(self.count).count()
+        self.tests
+            .iter()
+            .filter(|t| t.passed)
+            .take(self.count)
+            .count()
     }
 }
 
@@ -214,7 +213,7 @@ mod tests {
         let _info = KernelLoadInfo {
             entry_point: 0x100000,
             image_size: 0x1000,
-            base_address: 0x80000000
+            base_address: 0x80000000,
         };
         assert!(true); // Just to avoid unused variable warning
     }

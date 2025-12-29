@@ -1,18 +1,19 @@
 // Proof Assistant Module
 
 extern crate alloc;
-//
 // 证明辅助模块
 // 提供交互式证明辅助功能
 
-use hashbrown::{HashMap, HashSet};
-use alloc::sync::Arc;
-use alloc::vec::Vec;
+use alloc::{sync::Arc, vec::Vec};
 use core::sync::atomic::Ordering;
+
+use hashbrown::{HashMap, HashSet};
 use spin::Mutex;
 
-use super::*;
-use super::theorem_prover::{ProofSession, Proof};
+use super::{
+    theorem_prover::{Proof, ProofSession},
+    *,
+};
 
 /// 证明辅助器
 pub struct ProofAssistant {
@@ -27,11 +28,7 @@ pub struct ProofAssistant {
 impl ProofAssistant {
     /// 创建新的证明辅助器
     pub fn new() -> Self {
-        Self {
-            id: 1,
-            current_session: None,
-            proof_history: Vec::new(),
-        }
+        Self { id: 1, current_session: None, proof_history: Vec::new() }
     }
 }
 

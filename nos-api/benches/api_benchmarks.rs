@@ -1,7 +1,8 @@
 //! API benchmarks
 
-use criterion::{criterion_group, criterion_main, Criterion};
 use core::hint::black_box;
+
+use criterion::{Criterion, criterion_group, criterion_main};
 
 fn bench_syscall_dispatch(c: &mut Criterion) {
     // TODO: Implement syscall dispatch benchmark

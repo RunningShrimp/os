@@ -4,12 +4,13 @@
 
 #[cfg(feature = "kernel_tests")]
 pub mod file_tests {
-    use alloc::string::String;
-    use alloc::vec::Vec;
-    use crate::{test_assert_eq, test_assert, test_assert_ne};
-    use crate::tests::skip_test;
-    use crate::tests::TestResult;
-    use crate::fs::file;
+    use alloc::{string::String, vec::Vec};
+
+    use crate::{
+        fs::file,
+        test_assert, test_assert_eq, test_assert_ne,
+        tests::{TestResult, skip_test},
+    };
 
     /// Test file descriptor allocation
     pub fn test_fd_alloc() -> TestResult {
@@ -43,8 +44,10 @@ pub mod file_tests {
         // All files should be unused initially
         for i in 0..crate::fs::NFILE {
             let file = table.get(i);
-            test_assert!(file.is_none() || !file.unwrap().is_valid(),
-                alloc::format!("File {} should be unused initially", i));
+            test_assert!(
+                file.is_none() || !file.unwrap().is_valid(),
+                alloc::format!("File {} should be unused initially", i)
+            );
         }
 
         Ok(())
@@ -77,13 +80,17 @@ pub mod file_tests {
         // Verify first file is freed
         let table = crate::vfs::FILE_TABLE.lock();
         let file1 = table.get(fd1_idx);
-        test_assert!(file1.is_none() || !file1.unwrap().is_valid(),
-            "Closed file should be invalid");
+        test_assert!(
+            file1.is_none() || !file1.unwrap().is_valid(),
+            "Closed file should be invalid"
+        );
 
         // Second file should still exist
         let file2 = table.get(fd2_idx);
-        test_assert!(file2.is_some() && file2.unwrap().is_valid(),
-            "Second file should still be valid");
+        test_assert!(
+            file2.is_some() && file2.unwrap().is_valid(),
+            "Second file should still be valid"
+        );
 
         // Close second file
         crate::vfs::file_close(fd2_idx);
@@ -117,8 +124,10 @@ pub mod file_tests {
 
         // File should be freed
         let file_final = table.get(fd);
-        test_assert!(file_final.is_none() || !file_final.unwrap().is_valid(),
-            "File should be freed after closing last ref");
+        test_assert!(
+            file_final.is_none() || !file_final.unwrap().is_valid(),
+            "File should be freed after closing last ref"
+        );
 
         Ok(())
     }
@@ -469,7 +478,8 @@ pub mod file_tests {
         // Test socket file creation (would need actual socket implementation)
         let socket_file = crate::fs::file_socket_new(
             crate::net::socket::Socket::Udp(Default::default()),
-            true, false
+            true,
+            false,
         );
 
         if let Some(fd) = socket_file {
@@ -546,4 +556,3 @@ pub mod file_tests {
 // ============================================================================
 // Pipe tests
 // ============================================================================
-

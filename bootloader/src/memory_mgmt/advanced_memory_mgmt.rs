@@ -6,10 +6,8 @@
 //! - NUMA support detection
 //! - Hugepage management
 
+use alloc::{format, string::String, vec::Vec};
 use core::fmt;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::format;
 
 /// Page size type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,27 +62,43 @@ impl PageTableFlags {
     /// Encode flags to u64
     pub fn encode(&self) -> u64 {
         let mut flags = 0u64;
-        if self.present { flags |= 0x1; }
-        if self.writable { flags |= 0x2; }
-        if self.user { flags |= 0x4; }
-        if self.write_through { flags |= 0x8; }
-        if self.cache_disable { flags |= 0x10; }
-        if self.accessed { flags |= 0x20; }
-        if self.dirty { flags |= 0x40; }
-        if self.huge { flags |= 0x80; }
-        if self.global { flags |= 0x100; }
-        if self.nx { flags |= 0x8000000000000000; }
+        if self.present {
+            flags |= 0x1;
+        }
+        if self.writable {
+            flags |= 0x2;
+        }
+        if self.user {
+            flags |= 0x4;
+        }
+        if self.write_through {
+            flags |= 0x8;
+        }
+        if self.cache_disable {
+            flags |= 0x10;
+        }
+        if self.accessed {
+            flags |= 0x20;
+        }
+        if self.dirty {
+            flags |= 0x40;
+        }
+        if self.huge {
+            flags |= 0x80;
+        }
+        if self.global {
+            flags |= 0x100;
+        }
+        if self.nx {
+            flags |= 0x8000000000000000;
+        }
         flags
     }
 }
 
 impl fmt::Display for PageTableFlags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "PTF {{ P:{} W:{} U:{} NX:{} }}",
-            self.present, self.writable, self.user, self.nx
-        )
+        write!(f, "PTF {{ P:{} W:{} U:{} NX:{} }}", self.present, self.writable, self.user, self.nx)
     }
 }
 
@@ -130,10 +144,10 @@ impl fmt::Display for PageTableEntry {
 /// Page table level
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PageTableLevel {
-    PML4,  // Level 4
-    PDPT,  // Level 3
-    PD,    // Level 2
-    PT,    // Level 1
+    PML4, // Level 4
+    PDPT, // Level 3
+    PD,   // Level 2
+    PT,   // Level 1
 }
 
 impl fmt::Display for PageTableLevel {
@@ -242,7 +256,10 @@ impl fmt::Display for MemoryRegion {
         write!(
             f,
             "Region {{ 0x{:x}-0x{:x}, size: {}KB, numa: {} }}",
-            self.start, self.end, self.size() / 1024, self.numa_node
+            self.start,
+            self.end,
+            self.size() / 1024,
+            self.numa_node
         )
     }
 }

@@ -2,14 +2,17 @@
 // Provides unified file interface for regular files, devices, and pipes
 
 extern crate alloc;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use crate::perf::monitoring::{get_perf_stats};
-use crate::perf::core::{UnifiedSyscallStats, SyscallStatsSnapshot};
-use crate::subsystems::sync::{Mutex, Sleeplock};
-use crate::process;
-use crate::posix;
-use crate::ipc::pipe::Pipe;
+use alloc::{sync::Arc, vec::Vec};
+
+use crate::{
+    ipc::pipe::Pipe,
+    perf::{
+        core::{SyscallStatsSnapshot, UnifiedSyscallStats},
+        monitoring::get_perf_stats,
+    },
+    posix, process,
+    subsystems::sync::{Mutex, Sleeplock},
+};
 
 /// Maximum open files per process
 pub const NOFILE: usize = 16;
@@ -46,18 +49,18 @@ pub struct File {
     pub readable: bool,
     pub writable: bool,
     pub status_flags: i32,
-    
+
     // For FD_INODE
-    pub inode: Option<u32>,  // Inode number
-    pub offset: usize,       // Current offset
-    
+    pub inode: Option<u32>, // Inode number
+    pub offset: usize,      // Current offset
+
     // For FD_PIPE
     pub pipe: Option<Arc<Sleeplock<Pipe>>>,
-    
+
     // For FD_DEVICE
     pub major: i16,
     pub minor: i16,
-    
+
     // For VFS file
     pub vfs_file: Option<crate::vfs::VfsFile>,
     pub event_subs: Vec<usize>,
@@ -148,7 +151,9 @@ impl File {
                     if (self.status_flags & crate::posix::O_NONBLOCK) != 0 {
                         let mut p = pipe.lock();
                         if p.nread == p.nwrite {
-                            return crate::reliability::errno::errno_neg(crate::reliability::errno::EAGAIN);
+                            return crate::reliability::errno::errno_neg(
+                                crate::reliability::errno::EAGAIN,
+                            );
                         }
                         match p.read(buf) {
                             Ok(n) => {
@@ -160,10 +165,10 @@ impl File {
                                     p.notify_read_ready();
                                 }
                                 return n as isize;
-                            }
+                            },
                             Err(_) => {
                                 return -1;
-                            }
+                            },
                         }
                     }
                     loop {
@@ -184,24 +189,24 @@ impl File {
                                 drop(p);
                                 process::wakeup(Arc::as_ptr(pipe) as usize | 0x02);
                                 return n as isize;
-                            }
+                            },
                             Err(_) => {
                                 return -1;
-                            }
+                            },
                         }
                     }
                 } else {
                     -1
                 }
-            }
+            },
             FileType::Inode => {
                 // Simplified: return 0 (EOF) for now
                 0
-            }
+            },
             FileType::Device => {
                 // Device read - simplified
                 -1
-            }
+            },
             FileType::Vfs => {
                 if let Some(ref mut vfs_file) = self.vfs_file {
                     let addr = buf.as_mut_ptr() as usize;
@@ -213,27 +218,31 @@ impl File {
                 } else {
                     -1
                 }
-            }
+            },
             FileType::None => -1,
             FileType::Socket => {
                 if let Some(ref mut socket) = self.socket {
                     match socket {
-                        crate::net::socket::Socket::Tcp(tcp_socket) => {
-                            match tcp_socket.recv(buf) {
-                                Ok(n) => n as isize,
-                                Err(_) => crate::reliability::errno::errno_neg(crate::reliability::errno::EIO),
-                            }
-                        }
+                        crate::net::socket::Socket::Tcp(tcp_socket) => match tcp_socket.recv(buf) {
+                            Ok(n) => n as isize,
+                            Err(_) => {
+                                crate::reliability::errno::errno_neg(crate::reliability::errno::EIO)
+                            },
+                        },
                         crate::net::socket::Socket::Udp(udp_socket) => {
                             match udp_socket.recv_from(buf) {
                                 Ok((n, _addr)) => n as isize,
-                                Err(_) => crate::reliability::errno::errno_neg(crate::reliability::errno::EIO),
+                                Err(_) => crate::reliability::errno::errno_neg(
+                                    crate::reliability::errno::EIO,
+                                ),
                             }
-                        }
+                        },
                         crate::net::socket::Socket::Raw(_raw_socket) => {
                             // Raw socket read not implemented
-                            crate::reliability::errno::errno_neg(crate::reliability::errno::EOPNOTSUPP)
-                        }
+                            crate::reliability::errno::errno_neg(
+                                crate::reliability::errno::EOPNOTSUPP,
+                            )
+                        },
                     }
                 } else {
                     -1
@@ -241,15 +250,20 @@ impl File {
             },
             FileType::Inotify => {
                 if let Some(instance_idx) = self.inotify_instance {
-                    if let Some(instance) = crate::syscalls::glib::get_inotify_instance(instance_idx) {
+                    if let Some(instance) =
+                        crate::syscalls::glib::get_inotify_instance(instance_idx)
+                    {
                         if instance.has_events() {
                             instance.read_events(buf) as isize
                         } else {
                             // No events available
                             if (self.status_flags & crate::posix::O_NONBLOCK) != 0 {
-                                crate::reliability::errno::errno_neg(crate::reliability::errno::EAGAIN)
+                                crate::reliability::errno::errno_neg(
+                                    crate::reliability::errno::EAGAIN,
+                                )
                             } else {
-                                // Block until events are available (simplified - should use proper blocking)
+                                // Block until events are available (simplified - should use proper
+                                // blocking)
                                 0
                             }
                         }
@@ -262,15 +276,21 @@ impl File {
             },
             FileType::EventFd => {
                 if let Some(instance_idx) = self.eventfd_instance {
-                    if let Some(instance) = crate::syscalls::glib::get_eventfd_instance(instance_idx) {
+                    if let Some(instance) =
+                        crate::syscalls::glib::get_eventfd_instance(instance_idx)
+                    {
                         let nonblock = (self.status_flags & crate::posix::O_NONBLOCK) != 0;
                         match instance.read(buf, nonblock) {
                             Ok(n) => n as isize,
                             Err(crate::syscalls::common::SyscallError::WouldBlock) => {
-                                crate::reliability::errno::errno_neg(crate::reliability::errno::EAGAIN)
+                                crate::reliability::errno::errno_neg(
+                                    crate::reliability::errno::EAGAIN,
+                                )
                             },
                             Err(crate::syscalls::common::SyscallError::InvalidArgument) => {
-                                crate::reliability::errno::errno_neg(crate::reliability::errno::EINVAL)
+                                crate::reliability::errno::errno_neg(
+                                    crate::reliability::errno::EINVAL,
+                                )
                             },
                             Err(_) => -1,
                         }
@@ -283,15 +303,21 @@ impl File {
             },
             FileType::Signalfd => {
                 if let Some(instance_idx) = self.signalfd_instance {
-                    if let Some(instance) = crate::syscalls::glib::get_signalfd_instance(instance_idx) {
+                    if let Some(instance) =
+                        crate::syscalls::glib::get_signalfd_instance(instance_idx)
+                    {
                         let nonblock = (self.status_flags & crate::posix::O_NONBLOCK) != 0;
                         match instance.read_signals(buf, nonblock) {
                             Ok(n) => n as isize,
                             Err(crate::syscalls::common::SyscallError::WouldBlock) => {
-                                crate::reliability::errno::errno_neg(crate::reliability::errno::EAGAIN)
+                                crate::reliability::errno::errno_neg(
+                                    crate::reliability::errno::EAGAIN,
+                                )
                             },
                             Err(crate::syscalls::common::SyscallError::InvalidArgument) => {
-                                crate::reliability::errno::errno_neg(crate::reliability::errno::EINVAL)
+                                crate::reliability::errno::errno_neg(
+                                    crate::reliability::errno::EINVAL,
+                                )
                             },
                             Err(_) => -1,
                         }
@@ -304,15 +330,21 @@ impl File {
             },
             FileType::TimerFd => {
                 if let Some(instance_idx) = self.timerfd_instance {
-                    if let Some(instance) = crate::syscalls::glib::get_timerfd_instance(instance_idx) {
+                    if let Some(instance) =
+                        crate::syscalls::glib::get_timerfd_instance(instance_idx)
+                    {
                         let nonblock = (self.status_flags & crate::posix::O_NONBLOCK) != 0;
                         match instance.read_expirations(buf, nonblock) {
                             Ok(n) => n as isize,
                             Err(crate::syscalls::common::SyscallError::WouldBlock) => {
-                                crate::reliability::errno::errno_neg(crate::reliability::errno::EAGAIN)
+                                crate::reliability::errno::errno_neg(
+                                    crate::reliability::errno::EAGAIN,
+                                )
                             },
                             Err(crate::syscalls::common::SyscallError::InvalidArgument) => {
-                                crate::reliability::errno::errno_neg(crate::reliability::errno::EINVAL)
+                                crate::reliability::errno::errno_neg(
+                                    crate::reliability::errno::EINVAL,
+                                )
                             },
                             Err(_) => -1,
                         }
@@ -325,16 +357,21 @@ impl File {
             },
             FileType::MemFd => {
                 if let Some(instance_idx) = self.memfd_instance {
-                    if let Some(instance) = crate::syscalls::glib::get_memfd_instance(instance_idx) {
+                    if let Some(instance) = crate::syscalls::glib::get_memfd_instance(instance_idx)
+                    {
                         // For memfd, we need to handle offset-based reads
                         // For now, implement a simple read from offset 0
                         match instance.read(0, buf) {
                             Ok(n) => n as isize,
                             Err(crate::syscalls::common::SyscallError::PermissionDenied) => {
-                                crate::reliability::errno::errno_neg(crate::reliability::errno::EPERM)
+                                crate::reliability::errno::errno_neg(
+                                    crate::reliability::errno::EPERM,
+                                )
                             },
                             Err(crate::syscalls::common::SyscallError::InvalidArgument) => {
-                                crate::reliability::errno::errno_neg(crate::reliability::errno::EINVAL)
+                                crate::reliability::errno::errno_neg(
+                                    crate::reliability::errno::EINVAL,
+                                )
                             },
                             Err(_) => -1,
                         }
@@ -362,10 +399,17 @@ impl File {
                         let mut p = pipe.lock();
                         if p.nwrite == p.nread + crate::ipc::pipe::PIPE_SIZE {
                             if !p.readopen {
-                                let _ = crate::process::kill_proc(crate::process::getpid(), crate::ipc::signal::SIGPIPE);
-                                return crate::reliability::errno::errno_neg(crate::reliability::errno::EPIPE);
+                                let _ = crate::process::kill_proc(
+                                    crate::process::getpid(),
+                                    crate::ipc::signal::SIGPIPE,
+                                );
+                                return crate::reliability::errno::errno_neg(
+                                    crate::reliability::errno::EPIPE,
+                                );
                             }
-                            return crate::reliability::errno::errno_neg(crate::reliability::errno::EAGAIN);
+                            return crate::reliability::errno::errno_neg(
+                                crate::reliability::errno::EAGAIN,
+                            );
                         }
                         match p.write(buf) {
                             Ok(n) => {
@@ -377,10 +421,10 @@ impl File {
                                     p.notify_write_ready();
                                 }
                                 return n as isize;
-                            }
+                            },
                             Err(_) => {
                                 return -1;
-                            }
+                            },
                         }
                     }
                     loop {
@@ -389,8 +433,13 @@ impl File {
                         if p.nwrite == p.nread + crate::ipc::pipe::PIPE_SIZE {
                             if !p.readopen {
                                 // No readers: send SIGPIPE and return EPIPE
-                                let _ = crate::process::kill_proc(crate::process::getpid(), crate::ipc::signal::SIGPIPE);
-                                return crate::reliability::errno::errno_neg(crate::reliability::errno::EPIPE);
+                                let _ = crate::process::kill_proc(
+                                    crate::process::getpid(),
+                                    crate::ipc::signal::SIGPIPE,
+                                );
+                                return crate::reliability::errno::errno_neg(
+                                    crate::reliability::errno::EPIPE,
+                                );
                             }
                             drop(p);
                             process::sleep(chan_write);
@@ -401,16 +450,16 @@ impl File {
                                 drop(p);
                                 process::wakeup(Arc::as_ptr(pipe) as usize | 0x01);
                                 return n as isize;
-                            }
+                            },
                             Err(_) => {
                                 return -1;
-                            }
+                            },
                         }
                     }
                 } else {
                     -1
                 }
-            }
+            },
             FileType::Inode => {
                 // TODO: Write to inode
                 if let Some(_inum) = self.inode {
@@ -418,17 +467,17 @@ impl File {
                 } else {
                     -1
                 }
-            }
+            },
             FileType::Device => {
                 // Write to device
                 match self.major {
                     1 => {
                         // Console device
                         crate::drivers::console_write(buf) as isize
-                    }
+                    },
                     _ => -1,
                 }
-            }
+            },
             FileType::Vfs => {
                 if let Some(ref mut vfs_file) = self.vfs_file {
                     // Convert buffer to address and length for VFS write
@@ -447,26 +496,30 @@ impl File {
                 } else {
                     -1
                 }
-            }
+            },
             FileType::None => -1,
             FileType::Socket => {
                 if let Some(ref mut socket) = self.socket {
                     match socket {
-                        crate::net::socket::Socket::Tcp(tcp_socket) => {
-                            match tcp_socket.send(buf) {
-                                Ok(n) => n as isize,
-                                Err(_) => crate::reliability::errno::errno_neg(crate::reliability::errno::EIO),
-                            }
-                        }
+                        crate::net::socket::Socket::Tcp(tcp_socket) => match tcp_socket.send(buf) {
+                            Ok(n) => n as isize,
+                            Err(_) => {
+                                crate::reliability::errno::errno_neg(crate::reliability::errno::EIO)
+                            },
+                        },
                         crate::net::socket::Socket::Udp(udp_socket) => {
                             // For UDP sockets, need destination address
                             // For now, just return error
-                            crate::reliability::errno::errno_neg(crate::reliability::errno::EDESTADDRREQ)
-                        }
+                            crate::reliability::errno::errno_neg(
+                                crate::reliability::errno::EDESTADDRREQ,
+                            )
+                        },
                         crate::net::socket::Socket::Raw(_raw_socket) => {
                             // Raw socket write not implemented
-                            crate::reliability::errno::errno_neg(crate::reliability::errno::EOPNOTSUPP)
-                        }
+                            crate::reliability::errno::errno_neg(
+                                crate::reliability::errno::EOPNOTSUPP,
+                            )
+                        },
                     }
                 } else {
                     -1
@@ -474,11 +527,15 @@ impl File {
             },
             FileType::EventFd => {
                 if let Some(instance_idx) = self.eventfd_instance {
-                    if let Some(instance) = crate::syscalls::glib::get_eventfd_instance(instance_idx) {
+                    if let Some(instance) =
+                        crate::syscalls::glib::get_eventfd_instance(instance_idx)
+                    {
                         match instance.write(buf) {
                             Ok(n) => n as isize,
                             Err(crate::syscalls::common::SyscallError::InvalidArgument) => {
-                                crate::reliability::errno::errno_neg(crate::reliability::errno::EINVAL)
+                                crate::reliability::errno::errno_neg(
+                                    crate::reliability::errno::EINVAL,
+                                )
                             },
                             Err(_) => -1,
                         }
@@ -495,16 +552,21 @@ impl File {
             },
             FileType::MemFd => {
                 if let Some(instance_idx) = self.memfd_instance {
-                    if let Some(instance) = crate::syscalls::glib::get_memfd_instance(instance_idx) {
+                    if let Some(instance) = crate::syscalls::glib::get_memfd_instance(instance_idx)
+                    {
                         // For memfd, we need to handle offset-based writes
                         // For now, implement a simple write at offset 0
                         match instance.write(0, buf) {
                             Ok(n) => n as isize,
                             Err(crate::syscalls::common::SyscallError::PermissionDenied) => {
-                                crate::reliability::errno::errno_neg(crate::reliability::errno::EPERM)
+                                crate::reliability::errno::errno_neg(
+                                    crate::reliability::errno::EPERM,
+                                )
                             },
                             Err(crate::syscalls::common::SyscallError::InvalidArgument) => {
-                                crate::reliability::errno::errno_neg(crate::reliability::errno::EINVAL)
+                                crate::reliability::errno::errno_neg(
+                                    crate::reliability::errno::EINVAL,
+                                )
                             },
                             Err(_) => -1,
                         }
@@ -524,14 +586,14 @@ impl File {
             FileType::Inode => {
                 self.offset = offset;
                 offset as isize
-            }
+            },
             FileType::Vfs => {
                 if let Some(ref mut vfs_file) = self.vfs_file {
                     vfs_file.seek(offset)
                 } else {
                     -1
                 }
-            }
+            },
             _ => -1,
         }
     }
@@ -554,7 +616,7 @@ impl FTable {
             free_list_initialized: false,
         }
     }
-    
+
     /// Initialize free list with all available file slots
     /// This is called lazily on first allocation to avoid const initialization issues
     fn ensure_free_list_initialized(&mut self) {
@@ -568,17 +630,17 @@ impl FTable {
     }
 
     /// Allocate a file structure using object pool
-    /// 
+    ///
     /// This function provides O(1) allocation by reusing freed file slots
     /// from the free_list, reducing memory fragmentation and allocation overhead.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Some(file_index)` if a file slot is available
     /// * `None` if all file slots are in use
     pub fn alloc(&mut self) -> Option<usize> {
         self.ensure_free_list_initialized();
-        
+
         // Try to get a slot from free list first (O(1))
         if let Some(idx) = self.free_list.pop() {
             let file = &mut self.files[idx];
@@ -589,7 +651,7 @@ impl FTable {
             }
             // If not free, continue to linear search
         }
-        
+
         // Fallback to linear search if free_list is empty or inconsistent
         // This should rarely happen in normal operation
         for (i, file) in self.files.iter_mut().enumerate() {
@@ -611,7 +673,7 @@ impl FTable {
     }
 
     /// Close a file (decrement reference count)
-    /// 
+    ///
     /// When the reference count reaches zero, the file is returned to the
     /// object pool for reuse, reducing memory fragmentation.
     pub fn close(&mut self, idx: usize) {
@@ -638,7 +700,7 @@ impl FTable {
                     }
                 }
             }
-            
+
             // Reset file to initial state
             file.ftype = FileType::None;
             file.pipe = None;
@@ -657,7 +719,7 @@ impl FTable {
             file.major = 0;
             file.minor = 0;
             file.event_subs.clear();
-            
+
             // Return to object pool for reuse (O(1))
             self.ensure_free_list_initialized();
             if self.free_list.len() < NFILE {
@@ -703,7 +765,11 @@ pub fn file_close(idx: usize) {
 }
 
 /// Create a new socket file
-pub fn file_socket_new(socket: crate::net::socket::Socket, readable: bool, writable: bool) -> Option<usize> {
+pub fn file_socket_new(
+    socket: crate::net::socket::Socket,
+    readable: bool,
+    writable: bool,
+) -> Option<usize> {
     let mut table = FILE_TABLE.lock();
     let idx = table.alloc()?;
 
@@ -776,7 +842,7 @@ pub fn file_stat(idx: usize) -> Result<crate::posix::Stat, ()> {
                         match vfs_file.stat() {
                             Ok(attr) => {
                                 let stat = crate::posix::Stat {
-                                    st_dev: 0,  // Simplified
+                                    st_dev: 0, // Simplified
                                     st_ino: attr.ino as crate::posix::Ino,
                                     st_mode: attr.mode.0 as crate::posix::Mode,
                                     st_nlink: attr.nlink as crate::posix::Nlink,
@@ -822,7 +888,7 @@ pub fn file_stat(idx: usize) -> Result<crate::posix::Stat, ()> {
                         st_ctime_nsec: 0,
                     };
                     Ok(stat)
-                }
+                },
             }
         },
         None => Err(()),
@@ -831,17 +897,18 @@ pub fn file_stat(idx: usize) -> Result<crate::posix::Stat, ()> {
 
 /// Open file
 pub fn file_open(path: &str, flags: u32, mode: u32) -> Result<usize, ()> {
-    use crate::vfs;
-    use crate::posix;
-    
+    use crate::{posix, vfs};
+
     match vfs::open(path, flags) {
         Ok(vfs_file) => {
             // Create a file entry
             let file = File {
                 ftype: FileType::Vfs,
                 ref_count: 1,
-                readable: (flags & (posix::O_RDONLY as u32)) != 0 || (flags & (posix::O_RDWR as u32)) != 0,
-                writable: (flags & (posix::O_WRONLY as u32)) != 0 || (flags & (posix::O_RDWR as u32)) != 0,
+                readable: (flags & (posix::O_RDONLY as u32)) != 0
+                    || (flags & (posix::O_RDWR as u32)) != 0,
+                writable: (flags & (posix::O_WRONLY as u32)) != 0
+                    || (flags & (posix::O_RDWR as u32)) != 0,
                 status_flags: 0,
                 fd: None,
                 pipe: None,
@@ -857,7 +924,7 @@ pub fn file_open(path: &str, flags: u32, mode: u32) -> Result<usize, ()> {
                 timerfd: None,
                 memfd: None,
             };
-            
+
             // Add to file table
             let mut table = FILE_TABLE.lock();
             for (i, f) in table.iter_mut().enumerate() {
@@ -866,7 +933,7 @@ pub fn file_open(path: &str, flags: u32, mode: u32) -> Result<usize, ()> {
                     return Ok(i);
                 }
             }
-            
+
             Err(())
         },
         Err(_) => Err(()),
@@ -880,14 +947,18 @@ pub fn file_subscribe(idx: usize, events: i16, chan: usize) {
             FileType::Pipe => {
                 if let Some(ref pipe) = f.pipe {
                     let mut p = pipe.lock();
-                    if (events & crate::posix::POLLIN) != 0 { p.subscribe_read(chan); }
-                    if (events & crate::posix::POLLOUT) != 0 { p.subscribe_write(chan); }
+                    if (events & crate::posix::POLLIN) != 0 {
+                        p.subscribe_read(chan);
+                    }
+                    if (events & crate::posix::POLLOUT) != 0 {
+                        p.subscribe_write(chan);
+                    }
                 }
-            }
+            },
             FileType::Device => {
                 crate::drivers::device_subscribe(f.major, f.minor, events, chan);
-            }
-            _ => {}
+            },
+            _ => {},
         }
     }
 }
@@ -902,11 +973,11 @@ pub fn file_unsubscribe(idx: usize, chan: usize) {
                     p.unsubscribe_read(chan);
                     p.unsubscribe_write(chan);
                 }
-            }
+            },
             FileType::Device => {
                 crate::drivers::device_unsubscribe(f.major, f.minor, chan);
-            }
-            _ => {}
+            },
+            _ => {},
         }
     }
 }
@@ -925,11 +996,11 @@ pub fn file_lseek(idx: usize, offset: i64, whence: i32) -> isize {
                     } else {
                         0
                     }
-                }
+                },
                 FileType::Inode => {
                     // Simplified: assume size is 0 for now
                     0
-                }
+                },
                 _ => return -1,
             };
 
@@ -949,7 +1020,7 @@ pub fn file_lseek(idx: usize, offset: i64, whence: i32) -> isize {
                 -1 => -1,
                 offset => offset,
             }
-        }
+        },
         None => -1,
     }
 }
@@ -957,25 +1028,36 @@ pub fn file_lseek(idx: usize, offset: i64, whence: i32) -> isize {
 pub fn file_poll(idx: usize) -> i16 {
     let mut ev: i16 = 0;
     let mut table = FILE_TABLE.lock();
-    let f = match table.get_mut(idx) { Some(x) => x, None => return posix::POLLERR };
+    let f = match table.get_mut(idx) {
+        Some(x) => x,
+        None => return posix::POLLERR,
+    };
     match f.ftype {
         FileType::Pipe => {
             if let Some(ref pipe) = f.pipe {
                 let p = pipe.lock();
                 let readable = p.nread < p.nwrite;
                 let writable = p.nwrite < p.nread + crate::ipc::pipe::PIPE_SIZE;
-                if readable { ev |= posix::POLLIN; }
-                if writable { ev |= posix::POLLOUT; }
-                if !p.readopen { ev |= posix::POLLHUP; }
+                if readable {
+                    ev |= posix::POLLIN;
+                }
+                if writable {
+                    ev |= posix::POLLOUT;
+                }
+                if !p.readopen {
+                    ev |= posix::POLLHUP;
+                }
             } else {
                 ev |= posix::POLLERR;
             }
-        }
+        },
         FileType::Device => {
             ev |= crate::drivers::device_poll(f.major, f.minor);
-        }
-        FileType::Socket => { ev |= posix::POLLERR; }
-        _ => {}
+        },
+        FileType::Socket => {
+            ev |= posix::POLLERR;
+        },
+        _ => {},
     }
     ev
 }
@@ -983,20 +1065,18 @@ pub fn file_poll(idx: usize) -> i16 {
 /// Truncate file
 pub fn file_truncate(idx: usize, size: u64) -> Result<(), ()> {
     match FILE_TABLE.lock().get_mut(idx) {
-        Some(f) => {
-            match f.ftype {
-                FileType::Vfs => {
-                    if let Some(ref vfs_file) = f.vfs_file {
-                        match vfs_file.truncate(size) {
-                            Ok(_) => Ok(()),
-                            Err(_) => Err(()),
-                        }
-                    } else {
-                        Err(())
+        Some(f) => match f.ftype {
+            FileType::Vfs => {
+                if let Some(ref vfs_file) = f.vfs_file {
+                    match vfs_file.truncate(size) {
+                        Ok(_) => Ok(()),
+                        Err(_) => Err(()),
                     }
-                },
-                _ => Err(()),
-            }
+                } else {
+                    Err(())
+                }
+            },
+            _ => Err(()),
         },
         None => Err(()),
     }
@@ -1007,7 +1087,7 @@ pub fn file_chmod(idx: usize, mode: u32) -> Result<(), ()> {
     // Get current process UID
     let current_uid = crate::process::getuid();
     let is_root = current_uid == 0;
-    
+
     match FILE_TABLE.lock().get_mut(idx) {
         Some(f) => {
             match f.ftype {
@@ -1019,10 +1099,12 @@ pub fn file_chmod(idx: usize, mode: u32) -> Result<(), ()> {
                                 if !is_root && attr.uid != current_uid {
                                     return Err(());
                                 }
-                                
+
                                 // Preserve the file type, only change the permissions
                                 let mut new_attr = attr;
-                                new_attr.mode = crate::vfs::FileMode::new((new_attr.mode.0 & !0o7777) | (mode & 0o7777));
+                                new_attr.mode = crate::vfs::FileMode::new(
+                                    (new_attr.mode.0 & !0o7777) | (mode & 0o7777),
+                                );
                                 match vfs_file.set_attr(&new_attr) {
                                     Ok(_) => Ok(()),
                                     Err(_) => Err(()),
@@ -1047,34 +1129,32 @@ pub fn file_chown(idx: usize, uid: u32, gid: u32) -> Result<(), ()> {
     // Get current process UID
     let current_uid = crate::process::getuid();
     let is_root = current_uid == 0;
-    
+
     // Only root can change file ownership
     if !is_root {
         return Err(());
     }
-    
+
     match FILE_TABLE.lock().get_mut(idx) {
-        Some(f) => {
-            match f.ftype {
-                FileType::Vfs => {
-                    if let Some(ref vfs_file) = f.vfs_file {
-                        match vfs_file.stat() {
-                            Ok(mut attr) => {
-                                attr.uid = uid;
-                                attr.gid = gid;
-                                match vfs_file.set_attr(&attr) {
-                                    Ok(_) => Ok(()),
-                                    Err(_) => Err(()),
-                                }
-                            },
-                            Err(_) => Err(()),
-                        }
-                    } else {
-                        Err(())
+        Some(f) => match f.ftype {
+            FileType::Vfs => {
+                if let Some(ref vfs_file) = f.vfs_file {
+                    match vfs_file.stat() {
+                        Ok(mut attr) => {
+                            attr.uid = uid;
+                            attr.gid = gid;
+                            match vfs_file.set_attr(&attr) {
+                                Ok(_) => Ok(()),
+                                Err(_) => Err(()),
+                            }
+                        },
+                        Err(_) => Err(()),
                     }
-                },
-                _ => Err(()),
-            }
+                } else {
+                    Err(())
+                }
+            },
+            _ => Err(()),
         },
         None => Err(()),
     }

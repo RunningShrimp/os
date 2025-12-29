@@ -2,7 +2,6 @@
 ///
 /// Actual disk reading using BIOS INT 0x13 AH=0x02 (read sectors).
 /// Supports CHS and LBA addressing modes.
-
 use alloc::vec::Vec;
 
 /// Disk error codes
@@ -60,11 +59,7 @@ pub struct CHSAddress {
 
 impl CHSAddress {
     pub fn new(cylinder: u16, head: u8, sector: u8) -> Self {
-        Self {
-            cylinder,
-            head,
-            sector,
-        }
+        Self { cylinder, head, sector }
     }
 
     /// Convert to LBA (assuming 512-byte sectors)
@@ -95,11 +90,7 @@ impl LBAAddress {
         let head = (temp % heads_per_cylinder as u32) as u8;
         let cylinder = (temp / heads_per_cylinder as u32) as u16;
 
-        CHSAddress {
-            cylinder,
-            head,
-            sector,
-        }
+        CHSAddress { cylinder, head, sector }
     }
 }
 
@@ -113,11 +104,7 @@ pub struct DiskReadRequest {
 
 impl DiskReadRequest {
     pub fn new(lba: u32, sector_count: u16, drive_number: u8) -> Self {
-        Self {
-            lba,
-            sector_count,
-            drive_number,
-        }
+        Self { lba, sector_count, drive_number }
     }
 
     /// Validate read request
@@ -150,12 +137,7 @@ pub struct DiskReadResult {
 
 impl DiskReadResult {
     pub fn new(lba: u32, sectors_read: u16) -> Self {
-        Self {
-            lba,
-            sectors_read,
-            data: Vec::new(),
-            error: None,
-        }
+        Self { lba, sectors_read, data: Vec::new(), error: None }
     }
 
     pub fn is_success(&self) -> bool {
@@ -173,11 +155,7 @@ pub struct DiskReader {
 impl DiskReader {
     /// Create new disk reader
     pub fn new(drive_number: u8) -> Self {
-        Self {
-            drive_number,
-            retry_count: 0,
-            max_retries: 3,
-        }
+        Self { drive_number, retry_count: 0, max_retries: 3 }
     }
 
     /// Read sectors from disk
@@ -187,7 +165,7 @@ impl DiskReader {
 
         // Reset retry count for this operation
         self.retry_count = 0;
-        
+
         // Implement retry logic
         loop {
             // In real implementation, would:
@@ -248,12 +226,8 @@ mod tests {
 
     #[test]
     fn test_disk_error_description() {
-        assert!(DiskError::ReadFailed
-            .description()
-            .contains("Read"));
-        assert!(DiskError::TimeoutError
-            .description()
-            .contains("Timeout"));
+        assert!(DiskError::ReadFailed.description().contains("Read"));
+        assert!(DiskError::TimeoutError.description().contains("Timeout"));
     }
 
     #[test]

@@ -2,8 +2,7 @@
 //!
 //! This module implements slab allocator for efficient small object allocation.
 
-use core::alloc::Layout;
-use core::ptr;
+use core::{alloc::Layout, ptr};
 
 /// Slab sizes (powers of 2 from 32 to 2048 bytes)
 pub const SLAB_SIZES: [usize; 7] = [32, 64, 128, 256, 512, 1024, 2048];
@@ -42,10 +41,7 @@ pub struct AllocatorStats {
 
 impl AllocatorStats {
     pub const fn new() -> Self {
-        Self {
-            used: 0,
-            allocated: 0,
-        }
+        Self { used: 0, allocated: 0 }
     }
 }
 
@@ -65,10 +61,7 @@ unsafe impl Send for OptimizedSlabAllocator {}
 
 impl OptimizedSlabAllocator {
     pub const fn uninitialized() -> Self {
-        Self {
-            slabs: [None; 7],
-            stats: AllocatorStats::new(),
-        }
+        Self { slabs: [None; 7], stats: AllocatorStats::new() }
     }
 
     /// Initialize the slab allocator with a memory region
@@ -76,12 +69,12 @@ impl OptimizedSlabAllocator {
         // Divide memory among all slab sizes
         let slab_size = size / SLAB_SIZES.len();
         let mut current_ptr = start;
-        
+
         for (i, &object_size) in SLAB_SIZES.iter().enumerate() {
             let slab_ptr = current_ptr as *mut Slab;
             (*slab_ptr).object_size = object_size;
             (*slab_ptr).next_free = &mut (*slab_ptr).objects[0];
-            
+
             // Initialize free list
             for j in 0..64 {
                 (*slab_ptr).objects[j].data = if j == 0 {
@@ -91,12 +84,13 @@ impl OptimizedSlabAllocator {
                     (slab_ptr as usize + offset) as *mut u8
                 };
                 (*slab_ptr).objects[j].in_use = false;
-                
+
                 if j < 63 {
-                    (*slab_ptr).objects[j].data = &mut (*slab_ptr).objects[j + 1] as *mut SlabObject as *mut u8;
+                    (*slab_ptr).objects[j].data =
+                        &mut (*slab_ptr).objects[j + 1] as *mut SlabObject as *mut u8;
                 }
             }
-            
+
             self.slabs[i] = Some(slab_ptr);
             current_ptr = (current_ptr as usize + slab_size) as *mut u8;
         }
@@ -105,7 +99,7 @@ impl OptimizedSlabAllocator {
     /// Allocate memory from slab
     pub unsafe fn alloc(&mut self, layout: Layout) -> *mut u8 {
         let size = layout.size();
-        
+
         // Find appropriate slab size
         for (i, &slab_size) in SLAB_SIZES.iter().enumerate() {
             if size <= slab_size {
@@ -122,7 +116,7 @@ impl OptimizedSlabAllocator {
                 break;
             }
         }
-        
+
         ptr::null_mut()
     }
 
@@ -131,13 +125,13 @@ impl OptimizedSlabAllocator {
         if ptr.is_null() {
             return;
         }
-        
+
         // Find which slab this pointer belongs to
         for i in 0..SLAB_SIZES.len() {
             if let Some(slab_ptr) = self.slabs[i] {
                 let slab_start = slab_ptr as usize;
                 let slab_end = slab_start + 64 * SLAB_SIZES[i];
-                
+
                 let ptr_addr = ptr as usize;
                 if ptr_addr >= slab_start && ptr_addr < slab_end {
                     // This pointer belongs to this slab

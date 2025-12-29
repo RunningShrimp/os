@@ -7,11 +7,9 @@
 //! - 边界检查
 //! - 统计信息准确性
 
-use crate::libc::interface::CLibInterface;
-use crate::libc::implementations::{create_unified_c_lib, UnifiedCLib};
-use core::ffi::{c_void, c_char};
 use alloc::vec::Vec;
 
+use crate::libc::implementations::{UnifiedCLib, create_unified_c_lib};
 /// 运行所有内存管理测试
 pub fn run_all_memory_tests() {
     crate::println!("\n=== C标准库内存管理测试 ===");
@@ -73,8 +71,13 @@ fn test_basic_allocation(libc: &UnifiedCLib) {
             let bytes = core::slice::from_raw_parts(ptr as *const u8, size);
             for (i, &byte) in bytes.iter().enumerate() {
                 if byte != (i % 256) as u8 {
-                    crate::println!("❌ 数据完整性检查失败，地址: {:#x}, 位置: {}, 期望: {}, 实际: {}",
-                        ptr as usize, i, i % 256, byte);
+                    crate::println!(
+                        "❌ 数据完整性检查失败，地址: {:#x}, 位置: {}, 期望: {}, 实际: {}",
+                        ptr as usize,
+                        i,
+                        i % 256,
+                        byte
+                    );
                     return;
                 }
             }
@@ -108,9 +111,11 @@ fn test_memory_leak_detection(libc: &UnifiedCLib) {
     }
 
     let stats_with_leaks = libc.get_stats();
-    crate::println!("  📊 泄漏后统计: 总分配={}, 活跃分配={}",
+    crate::println!(
+        "  📊 泄漏后统计: 总分配={}, 活跃分配={}",
         stats_with_leaks.allocations_total - initial_allocations,
-        stats_with_leaks.allocations_active - initial_active);
+        stats_with_leaks.allocations_active - initial_active
+    );
 
     // 释放一半的内存
     for i in (0..leaked_ptrs.len()).step_by(2) {
@@ -118,8 +123,10 @@ fn test_memory_leak_detection(libc: &UnifiedCLib) {
     }
 
     let stats_partial_cleanup = libc.get_stats();
-    crate::println!("  📊 部分清理后统计: 活跃分配={}",
-        stats_partial_cleanup.allocations_active - initial_active);
+    crate::println!(
+        "  📊 部分清理后统计: 活跃分配={}",
+        stats_partial_cleanup.allocations_active - initial_active
+    );
 
     // 清理剩余内存
     for i in (1..leaked_ptrs.len()).step_by(2) {
@@ -346,14 +353,21 @@ fn test_fragmentation_resistance(libc: &UnifiedCLib) {
 
     // 清理剩余内存
     for i in 0..ptrs.len() {
-        if i % 3 != 0 { // 跳过已释放的
+        if i % 3 != 0 {
+            // 跳过已释放的
             unsafe { libc.free(ptrs[i].0) };
         }
     }
 
-    crate::println!("  {} Fragmentation resistance test {}",
+    crate::println!(
+        "  {} Fragmentation resistance test {}",
         if success { "✅" } else { "⚠️  " },
-        if success { "passed" } else { "shows fragmentation may affect performance" });
+        if success {
+            "passed"
+        } else {
+            "shows fragmentation may affect performance"
+        }
+    );
 
     crate::println!("✅ 内存碎片化抵抗性测试完成");
 }

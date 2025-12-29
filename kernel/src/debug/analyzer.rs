@@ -5,11 +5,12 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use alloc::string::String;
-use crate::debug::breakpoint::SourceLocation;
-use crate::debug::session::{ProcessInfo, DebugLevel};
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
+
+use crate::debug::{
+    breakpoint::SourceLocation,
+    session::{DebugLevel, ProcessInfo},
+};
 
 /// 内存分析器
 #[derive(Debug, Clone)]

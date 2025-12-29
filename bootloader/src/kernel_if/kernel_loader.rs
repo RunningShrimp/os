@@ -18,18 +18,11 @@ impl KernelLoader {
         // Load ELF kernel
         let (entry_point, image_size) = load_elf_kernel(self.kernel_data)?;
 
-        Ok(KernelLoadInfo {
-            entry_point,
-            image_size,
-            base_address: 0x100000,
-        })
+        Ok(KernelLoadInfo { entry_point, image_size, base_address: 0x100000 })
     }
 
     /// Load kernel from UEFI filesystem
-    pub fn load_kernel_from_uefi(
-        &self,
-        _path: &[u8],
-    ) -> Result<KernelLoadInfo, &'static str> {
+    pub fn load_kernel_from_uefi(&self, _path: &[u8]) -> Result<KernelLoadInfo, &'static str> {
         crate::drivers::console::write_str("Loading kernel from UEFI filesystem\n");
 
         // In real implementation, would load from EFI partition
@@ -49,8 +42,7 @@ impl KernelLoader {
         // For now, use embedded kernel data
         self.load_kernel()
     }
-
-    }
+}
 
 pub struct KernelLoadInfo {
     pub entry_point: u64,
@@ -65,17 +57,17 @@ pub fn load_kernel_from_boot_protocol(
             crate::drivers::console::write_str("Loading via UEFI\n");
             // Would use UEFI boot services to load
             Err("UEFI kernel loading not yet implemented")
-        }
+        },
         BootProtocol::Multiboot2 => {
             crate::drivers::console::write_str("Loading via Multiboot2\n");
             // Would parse multiboot2 info for kernel location
             Err("Multiboot2 kernel loading not yet implemented")
-        }
+        },
         BootProtocol::Bios => {
             crate::drivers::console::write_str("Loading via BIOS\n");
             // Would use BIOS disk I/O
             Err("BIOS kernel loading not yet implemented")
-        }
+        },
     }
 }
 
@@ -100,9 +92,7 @@ pub fn validate_kernel(info: &KernelLoadInfo) -> Result<(), &'static str> {
 }
 
 /// Setup kernel execution environment
-pub fn prepare_kernel_execution(
-    info: &KernelLoadInfo,
-) -> Result<(), &'static str> {
+pub fn prepare_kernel_execution(info: &KernelLoadInfo) -> Result<(), &'static str> {
     // Validate kernel
     validate_kernel(info)?;
 

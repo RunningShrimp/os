@@ -1,9 +1,8 @@
 //! Process management types
 
-use crate::core::types::{Pid, Size};
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 
+use crate::core::types::{Pid, Size};
 
 /// Process creation flags
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -288,8 +287,6 @@ pub struct ThreadAttributes {
     /// Thread-specific data
     pub thread_specific_data: usize,
 }
-
-
 
 /// Process statistics
 #[derive(Debug, Clone)]

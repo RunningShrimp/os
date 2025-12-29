@@ -8,6 +8,6 @@ pub mod repository_factory;
 // 重新导出主要类型
 pub use memory_repository::MemoryRepository;
 pub use repository_factory::{
-    RepositoryFactory, DefaultRepositoryFactory, FactoryError, FactoryStats,
-    RepositoryFactoryConfig, SpecificRepositoryWrapper
+    DefaultRepositoryFactory, FactoryError, FactoryStats, RepositoryFactory,
+    RepositoryFactoryConfig, SpecificRepositoryWrapper,
 };

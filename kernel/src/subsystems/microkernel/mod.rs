@@ -3,15 +3,16 @@
 //! This module implements the microkernel layer that provides the most basic
 //! system services while maintaining security and stability.
 
-pub mod scheduler;
-pub mod memory;
-pub mod ipc;
 pub mod interrupt;
-pub mod timer;
+pub mod ipc;
+pub mod memory;
+pub mod scheduler;
 pub mod service_registry;
+pub mod timer;
 
-use crate::reliability::{ENOMEM, EINVAL};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+use crate::reliability::{EINVAL, ENOMEM};
 
 /// Microkernel initialization state
 static MICROKERNEL_INIT: AtomicBool = AtomicBool::new(false);
@@ -92,9 +93,7 @@ pub fn get_version() -> &'static str {
 
 /// Get microkernel build information
 pub fn get_build_info() -> &'static str {
-    concat!(
-        "Build: NOS Kernel v1.0.0"
-    )
+    concat!("Build: NOS Kernel v1.0.0")
 }
 
 #[cfg(test)]

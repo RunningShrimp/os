@@ -3,32 +3,22 @@
 //! This module provides memory management system calls.
 
 use alloc::string::ToString;
-use alloc::boxed::Box;
 
 use nos_api::Result;
-use crate::SyscallHandler;
-use crate::SyscallDispatcher;
+
+use crate::{SyscallDispatcher, SyscallHandler};
 
 /// Register memory system call handlers
 pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     // Register mmap system call
-    dispatcher.register_handler(
-        crate::types::SYS_MMAP,
-        Box::new(MmapHandler)
-    );
-    
+    dispatcher.register_handler(crate::types::SYS_MMAP, Box::new(MmapHandler));
+
     // Register munmap system call
-    dispatcher.register_handler(
-        crate::types::SYS_MUNMAP,
-        Box::new(MunmapHandler)
-    );
-    
+    dispatcher.register_handler(crate::types::SYS_MUNMAP, Box::new(MunmapHandler));
+
     // Register mprotect system call
-    dispatcher.register_handler(
-        crate::types::SYS_MPROTECT,
-        Box::new(MprotectHandler)
-    );
-    
+    dispatcher.register_handler(crate::types::SYS_MPROTECT, Box::new(MprotectHandler));
+
     Ok(())
 }
 
@@ -39,12 +29,12 @@ impl SyscallHandler for MmapHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_MMAP
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 6 {
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
         }
-        
+
         let addr = args[0] as *mut u8;
         let length = args[1];
         let prot = args[2] as u32;
@@ -59,11 +49,19 @@ impl SyscallHandler for MmapHandler {
         // flags: Mapping flags (MAP_SHARED, MAP_PRIVATE, etc.)
         // fd: File descriptor to map (or -1 for anonymous mapping)
         // offset: Offset in file to start mapping from
-        sys_trace_with_args!("mmap called with: addr={:?}, length={}, prot={}, flags={}, fd={}, offset={}", addr, length, prot, flags, fd, offset);
+        sys_trace_with_args!(
+            "mmap called with: addr={:?}, length={}, prot={}, flags={}, fd={}, offset={}",
+            addr,
+            length,
+            prot,
+            flags,
+            fd,
+            offset
+        );
 
         Ok(addr as isize) // Return the mapped address
     }
-    
+
     fn name(&self) -> &str {
         "mmap"
     }
@@ -76,23 +74,23 @@ impl SyscallHandler for MunmapHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_MUNMAP
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 2 {
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
         }
-        
+
         let addr = args[0] as *mut u8;
         let length = args[1];
-        
+
         // TODO: Implement actual munmap logic using parameters:
         // addr: Address of mapping to unmap
         // length: Length of mapping to unmap
         sys_trace_with_args!("munmap called with: addr={:?}, length={}", addr, length);
-        
+
         Ok(0)
     }
-    
+
     fn name(&self) -> &str {
         "munmap"
     }
@@ -105,25 +103,25 @@ impl SyscallHandler for MprotectHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_MPROTECT
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 3 {
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
         }
-        
+
         let addr = args[0] as *mut u8;
         let len = args[1];
         let prot = args[2] as u32;
-        
+
         // TODO: Implement actual mprotect logic using parameters:
         // addr: Address of memory to protect
         // len: Length of memory to protect
         // prot: New protection flags
         sys_trace_with_args!("mprotect called with: addr={:?}, len={}, prot={}", addr, len, prot);
-        
+
         Ok(0)
     }
-    
+
     fn name(&self) -> &str {
         "mprotect"
     }

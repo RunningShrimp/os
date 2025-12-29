@@ -1,17 +1,13 @@
-/// P0 Phase 2 Integration Example
-///
+#![allow(dead_code)]
+//! P0 Phase 2 Integration Example
 /// Demonstrates how all P0 Phase 2 modules work together
 /// to boot a kernel on x86_64 systems.
-
-#![allow(dead_code)]
-
 use nos_bootloader::{
     bios_realmode::RealModeExecutor,
     boot_orchestrator::{BootConfig, BootOrchestrator, BootStage},
-    e820_detection,
-    disk_io,
-    kernel_handoff::{BootInformation, BootProtocol},
+    disk_io, e820_detection,
     error_recovery::{BootError, ErrorRecovery},
+    kernel_handoff::{BootInformation, BootProtocol},
 };
 
 /// Complete boot workflow example
@@ -22,11 +18,11 @@ pub fn complete_boot_example() -> Result<(), &'static str> {
     // Step 2: Configure boot parameters
     let config = BootConfig {
         protocol: BootProtocol::Multiboot2,
-        boot_drive: 0x80,        // Primary hard disk
-        kernel_lba: 2048,        // Sector 2048
-        kernel_sectors: 512,     // ~256KB
+        boot_drive: 0x80,         // Primary hard disk
+        kernel_lba: 2048,         // Sector 2048
+        kernel_sectors: 512,      // ~256KB
         kernel_address: 0x100000, // Load at 1MB
-        kernel_entry: 0x100000,  // Entry point
+        kernel_entry: 0x100000,   // Entry point
         bootloader_name: "NOS Bootloader v0.2.0",
     };
 
@@ -121,12 +117,12 @@ pub fn boot_with_error_recovery() -> Result<(), &'static str> {
         Ok(()) => {
             println!("Boot successful");
             Ok(())
-        }
+        },
         Err(e) => {
             println!("Boot failed: {}", e);
             // In real implementation, would call recovery.report_error()
             Err(e)
-        }
+        },
     }
 }
 
@@ -146,10 +142,7 @@ pub fn detect_boot_environment() -> Result<(), &'static str> {
     println!("  Primary Disk: {} cylinders", drive_info.cylinders);
     println!("  Disk Heads: {}", drive_info.heads);
     println!("  Sectors/Track: {}", drive_info.sectors);
-    println!(
-        "  Disk Capacity: {} MB",
-        (drive_info.total_sectors() * 512) / 1024 / 1024
-    );
+    println!("  Disk Capacity: {} MB", (drive_info.total_sectors() * 512) / 1024 / 1024);
 
     Ok(())
 }

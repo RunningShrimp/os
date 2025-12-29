@@ -5,8 +5,7 @@
 
 extern crate alloc;
 use alloc::vec::Vec;
-use core::ptr::NonNull;
-use core::slice;
+use core::{ptr::NonNull, slice};
 
 /// Maximum packet size (including headers)
 pub const MAX_PACKET_SIZE: usize = 1518; // Ethernet MTU + headers
@@ -31,10 +30,8 @@ impl PacketBuffer {
             return Err(PacketError::InvalidSize);
         }
 
-        let layout = alloc::alloc::Layout::from_size_align(
-            capacity,
-            core::mem::align_of::<u8>()
-        ).map_err(|_| PacketError::InvalidSize)?;
+        let layout = alloc::alloc::Layout::from_size_align(capacity, core::mem::align_of::<u8>())
+            .map_err(|_| PacketError::InvalidSize)?;
 
         let ptr = unsafe { alloc::alloc::alloc(layout) };
         if ptr.is_null() {
@@ -128,16 +125,12 @@ impl PacketBuffer {
 
     /// Get a slice view of the data
     pub fn as_slice(&self) -> &[u8] {
-        unsafe {
-            slice::from_raw_parts(self.data.as_ptr(), self.length)
-        }
+        unsafe { slice::from_raw_parts(self.data.as_ptr(), self.length) }
     }
 
     /// Get a mutable slice view of the data
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
-        unsafe {
-            slice::from_raw_parts_mut(self.data.as_ptr() as *mut u8, self.length)
-        }
+        unsafe { slice::from_raw_parts_mut(self.data.as_ptr() as *mut u8, self.length) }
     }
 
     /// Reset the buffer (clear all data)
@@ -209,10 +202,9 @@ impl PacketBuffer {
 impl Drop for PacketBuffer {
     fn drop(&mut self) {
         unsafe {
-            let layout = alloc::alloc::Layout::from_size_align(
-                self.capacity,
-                core::mem::align_of::<u8>()
-            ).unwrap();
+            let layout =
+                alloc::alloc::Layout::from_size_align(self.capacity, core::mem::align_of::<u8>())
+                    .unwrap();
             alloc::alloc::dealloc(self.data.as_ptr(), layout);
         }
     }
@@ -364,13 +356,12 @@ impl Packet {
 
     /// Append data to packet
     pub fn append(&mut self, data: &[u8]) -> Result<usize, PacketError> {
-        self.buffer.write_bytes(data)
-            .map(|written| {
-                // Keep convenience fields in sync
-                let _ = self.payload.extend_from_slice(&data[..written]);
-                self.size = self.buffer.len();
-                written
-            })
+        self.buffer.write_bytes(data).map(|written| {
+            // Keep convenience fields in sync
+            let _ = self.payload.extend_from_slice(&data[..written]);
+            self.size = self.buffer.len();
+            written
+        })
     }
 
     /// Trim packet to specified length

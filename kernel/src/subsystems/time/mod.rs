@@ -3,8 +3,11 @@
 
 extern crate alloc;
 
-use core::sync::atomic::{AtomicU64, Ordering};
-use core::time::Duration;
+use core::{
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
+
 use crate::subsystems::sync::Mutex;
 
 /// Global tick counter
@@ -141,7 +144,7 @@ pub mod imp {
 #[cfg(target_arch = "x86_64")]
 pub mod imp {
     use core::sync::atomic::{AtomicU64, Ordering};
-    
+
     static TSC_FREQ: AtomicU64 = AtomicU64::new(0);
     static TSC_START: AtomicU64 = AtomicU64::new(0);
 
@@ -166,7 +169,7 @@ pub mod imp {
     pub fn init() {
         // Configure PIT channel 0 for 100 Hz
         let divisor: u16 = 11932; // 1193182 / 100
-        
+
         unsafe {
             // Command: channel 0, access mode lobyte/hibyte, mode 3 (square wave)
             core::arch::asm!("out dx, al", in("dx") 0x43u16, in("al") 0x36u8, options(nostack));
@@ -205,10 +208,10 @@ pub fn init() {
 /// Called on each timer interrupt
 pub fn tick() {
     let ticks = TICKS.fetch_add(1, Ordering::Relaxed);
-    
+
     // Set up next timer interrupt
     imp::set_next_timer();
-    
+
     // Wake up sleeping processes if needed
     wakeup_sleepers(ticks + 1);
     // crate::subsystems::mm::mmio_stats_periodic(ticks + 1); // Function not properly exported
@@ -253,7 +256,7 @@ struct Sleeper {
     chan: usize,
 }
 
-static SLEEP_QUEUE: Mutex<[Option<Sleeper>; MAX_SLEEPERS]> = 
+static SLEEP_QUEUE: Mutex<[Option<Sleeper>; MAX_SLEEPERS]> =
     Mutex::new([const { None }; MAX_SLEEPERS]);
 
 /// Add a process to the sleep queue
@@ -376,9 +379,7 @@ impl SystemTime {
 
     /// Creates a new `SystemTime` instance representing the current time
     pub fn now() -> SystemTime {
-        SystemTime {
-            ticks: imp::now_ticks(),
-        }
+        SystemTime { ticks: imp::now_ticks() }
     }
 
     /// Returns the amount of time elapsed from another `SystemTime` to this one

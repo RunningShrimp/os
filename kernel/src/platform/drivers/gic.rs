@@ -1,4 +1,3 @@
-
 #[cfg(target_arch = "aarch64")]
 pub struct GicV2 {
     dist_base: usize,

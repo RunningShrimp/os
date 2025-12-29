@@ -13,20 +13,19 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::{string::String, format};
-use core::sync::atomic::{AtomicU64, Ordering};
-use core::time::Duration;
+use alloc::{collections::BTreeMap, format, string::String, sync::Arc, vec::Vec};
+use core::{
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
+
 use spin::Mutex;
 
-use crate::time;
-use super::{metrics, profiling, monitoring};
-
+use super::{metrics, monitoring, profiling};
 // Import println macro
 #[allow(unused_imports)]
 use crate::println;
+use crate::time;
 
 /// 可视化图表类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -251,7 +250,12 @@ impl VisualizationEngine {
     }
 
     /// 创建新的可视化视图
-    pub fn create_view(&self, view_id: String, name: String, layout: Layout) -> Result<VisualizationView, VisualizationError> {
+    pub fn create_view(
+        &self,
+        view_id: String,
+        name: String,
+        layout: Layout,
+    ) -> Result<VisualizationView, VisualizationError> {
         let mut views = self.views.lock();
 
         if views.contains_key(&view_id) {
@@ -272,13 +276,19 @@ impl VisualizationEngine {
 
         views.insert(view_id, view.clone());
         self.statistics.total_views.fetch_add(1, Ordering::SeqCst);
-        self.statistics.active_views.store(views.len() as u64, Ordering::SeqCst);
+        self.statistics
+            .active_views
+            .store(views.len() as u64, Ordering::SeqCst);
 
         Ok(view)
     }
 
     /// 添加面板到视图
-    pub fn add_panel_to_view(&self, view_id: &str, panel: VisualizationPanel) -> Result<(), VisualizationError> {
+    pub fn add_panel_to_view(
+        &self,
+        view_id: &str,
+        panel: VisualizationPanel,
+    ) -> Result<(), VisualizationError> {
         let mut views = self.views.lock();
 
         if let Some(view) = views.get_mut(view_id) {
@@ -288,7 +298,9 @@ impl VisualizationEngine {
 
             view.panels.push(panel.clone());
             self.statistics.total_panels.fetch_add(1, Ordering::SeqCst);
-            self.statistics.active_panels.store(view.panels.len() as u64, Ordering::SeqCst);
+            self.statistics
+                .active_panels
+                .store(view.panels.len() as u64, Ordering::SeqCst);
 
             Ok(())
         } else {
@@ -297,28 +309,35 @@ impl VisualizationEngine {
     }
 
     /// 更新实时性能指标
-    pub fn update_realtime_metrics(&self, metric_name: &str, timestamp: u64, value: f64) -> Result<(), VisualizationError> {
+    pub fn update_realtime_metrics(
+        &self,
+        metric_name: &str,
+        timestamp: u64,
+        value: f64,
+    ) -> Result<(), VisualizationError> {
         // 更新所有相关面板
         let mut views = self.views.lock();
 
         for view in views.values_mut() {
             for panel in &mut view.panels {
                 // 仅更新系统指标面板和性能分析面板
-                if panel.panel_type == PanelType::SystemMetrics || panel.panel_type == PanelType::Profiling {
+                if panel.panel_type == PanelType::SystemMetrics
+                    || panel.panel_type == PanelType::Profiling
+                {
                     // 查找或创建数据系列
                     let series_index = panel.data_series.iter().position(|s| s.name == metric_name);
-                    
+
                     match series_index {
                         Some(index) => {
                             // 更新现有数据系列
                             let series = &mut panel.data_series[index];
                             series.data.push((timestamp, value));
-                            
+
                             // 限制数据点数量
                             if series.data.len() > panel.chart_config.max_data_points {
                                 series.data.remove(0);
                             }
-                        }
+                        },
                         None => {
                             // 创建新的数据系列
                             let new_series = DataSeries {
@@ -327,9 +346,9 @@ impl VisualizationEngine {
                                 color: self.generate_color(panel.data_series.len()),
                             };
                             panel.data_series.push(new_series);
-                        }
+                        },
                     }
-                    
+
                     panel.last_updated = timestamp;
                 }
             }
@@ -343,29 +362,29 @@ impl VisualizationEngine {
     /// 辅助函数：生成系列颜色
     fn generate_color(&self, index: usize) -> String {
         let colors = [
-            "#FF5733", "#33FF57", "#3357FF", "#F333FF", "#FF33A1",
-            "#FFC300", "#C70039", "#900C3F", "#581845", "#1ABC9C"
+            "#FF5733", "#33FF57", "#3357FF", "#F333FF", "#FF33A1", "#FFC300", "#C70039", "#900C3F",
+            "#581845", "#1ABC9C",
         ];
         colors[index % colors.len()].to_string()
     }
-    
+
     /// 从指标系统获取实时数据
     pub fn update_from_metrics(&self) -> Result<(), VisualizationError> {
         if let Ok(registry) = metrics::get_metric_registry() {
             if let Ok(metric_instances) = registry.get_all_metrics() {
                 for instance in metric_instances {
                     let timestamp = instance.last_updated;
-                    
+
                     match &instance.value {
                         metrics::MetricValue::Counter(value) => {
                             let metric_name = &instance.definition.name;
                             self.update_realtime_metrics(metric_name, timestamp, *value as f64)?;
-                        }
+                        },
                         metrics::MetricValue::Gauge(value) => {
                             let metric_name = &instance.definition.name;
                             self.update_realtime_metrics(metric_name, timestamp, *value)?;
-                        }
-                        _ => {}
+                        },
+                        _ => {},
                     }
                 }
             }
@@ -382,48 +401,48 @@ impl VisualizationEngine {
                 if let Ok(result) = profiler.get_analysis_result() {
                     // 处理性能分析结果
                     let timestamp = time::timestamp_millis();
-                    
+
                     // 提取性能指标
                     self.update_realtime_metrics(
                         "cpu_usage_percentage",
                         timestamp,
-                        result.performance_metrics.cpu_usage_percentage
+                        result.performance_metrics.cpu_usage_percentage,
                     )?;
-                    
+
                     self.update_realtime_metrics(
                         "memory_peak_bytes",
                         timestamp,
-                        result.performance_metrics.memory_peak as f64
+                        result.performance_metrics.memory_peak as f64,
                     )?;
-                    
+
                     self.update_realtime_metrics(
                         "context_switches",
                         timestamp,
-                        result.performance_metrics.context_switches as f64
+                        result.performance_metrics.context_switches as f64,
                     )?;
-                    
+
                     self.update_realtime_metrics(
                         "cache_misses",
                         timestamp,
-                        result.performance_metrics.cache_misses as f64
+                        result.performance_metrics.cache_misses as f64,
                     )?;
-                    
+
                     // 处理热点函数
                     for hotspot in &result.hotspots {
                         let hotspot_metric = format!("hotspot_{}_time", hotspot.function_name);
                         self.update_realtime_metrics(
                             &hotspot_metric,
                             timestamp,
-                            hotspot.time_percentage
+                            hotspot.time_percentage,
                         )?;
                     }
                 }
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// 渲染可视化数据
     pub fn render(&self) -> Result<String, VisualizationError> {
         // 简单的文本渲染实现，实际应该输出图形格式
@@ -431,22 +450,33 @@ impl VisualizationEngine {
 
         output.push_str("\n=== 性能监控可视化 ===\n");
         output.push_str(format!("更新时间: {}\n", time::timestamp_millis()).as_str());
-        output.push_str(format!("总视图数: {}\n", self.statistics.total_views.load(Ordering::SeqCst)).as_str());
-        output.push_str(format!("总面板数: {}\n", self.statistics.total_panels.load(Ordering::SeqCst)).as_str());
+        output.push_str(
+            format!("总视图数: {}\n", self.statistics.total_views.load(Ordering::SeqCst)).as_str(),
+        );
+        output.push_str(
+            format!("总面板数: {}\n", self.statistics.total_panels.load(Ordering::SeqCst)).as_str(),
+        );
         output.push_str("\n");
 
         let views = self.views.lock();
         for view in views.values() {
             output.push_str(format!("视图: {}\n", view.name).as_str());
-            
+
             for panel in &view.panels {
                 output.push_str(format!("  面板: {}\n", panel.title).as_str());
-                
+
                 for series in &panel.data_series {
-                    output.push_str(format!("    系列: {} ({}个数据点)\n", series.name, series.data.len()).as_str());
-                    
+                    output.push_str(
+                        format!("    系列: {} ({}个数据点)\n", series.name, series.data.len())
+                            .as_str(),
+                    );
+
                     // 显示最近的5个数据点
-                    let start = if series.data.len() > 5 { series.data.len() - 5 } else { 0 };
+                    let start = if series.data.len() > 5 {
+                        series.data.len() - 5
+                    } else {
+                        0
+                    };
                     for data in &series.data[start..] {
                         output.push_str(format!("      {}: {:.2}\n", data.0, data.1).as_str());
                     }
@@ -523,7 +553,7 @@ pub fn init() -> Result<(), VisualizationError> {
     let default_view = engine.create_view(
         "default".to_string(),
         "Performance Dashboard".to_string(),
-        Layout::DoubleColumn
+        Layout::DoubleColumn,
     )?;
 
     // 创建系统指标面板
@@ -549,7 +579,8 @@ pub fn init() -> Result<(), VisualizationError> {
 /// 获取全局可视化引擎
 pub fn get_visualization_engine() -> Result<Arc<VisualizationEngine>, VisualizationError> {
     let engine = VISUALIZATION_ENGINE.lock();
-    engine.as_ref()
+    engine
+        .as_ref()
         .cloned()
         .ok_or(VisualizationError::SystemError("可视化引擎未初始化".to_string()))
 }

@@ -1,5 +1,5 @@
 /// x86_64 Architecture Optimization Module
-/// 
+///
 /// Provides:
 /// - CPU feature detection (CPUID)
 /// - CPU optimization flags and tuning
@@ -26,7 +26,12 @@ mod dummy {
     }
     pub fn _mm_mfence() {}
     #[derive(Clone, Copy)]
-    pub struct CpuidResult { pub eax: u32, pub ebx: u32, pub ecx: u32, pub edx: u32 }
+    pub struct CpuidResult {
+        pub eax: u32,
+        pub ebx: u32,
+        pub ecx: u32,
+        pub edx: u32,
+    }
 }
 
 #[cfg(not(target_arch = "x86_64"))]
@@ -35,23 +40,23 @@ use dummy::__cpuid;
 /// CPU Features Detected via CPUID
 #[derive(Debug, Clone, Copy)]
 pub struct CpuFeatures {
-    pub has_pae: bool,           // Physical Address Extension
-    pub has_pse: bool,           // Page Size Extension (4MB)
-    pub has_apic: bool,          // Advanced Programmable Interrupt Controller
-    pub has_msr: bool,           // Model Specific Registers
-    pub has_pat: bool,           // Page Attribute Table
-    pub has_mtrr: bool,          // Memory Type Range Register
-    pub has_cx8: bool,           // CMPXCHG8B (64-bit compare and exchange)
-    pub has_nx: bool,            // No-Execute (NX) bit support
-    pub has_rdtscp: bool,        // RDTSCP instruction
-    pub has_smep: bool,          // Supervisor Mode Execution Protection
-    pub has_smap: bool,          // Supervisor Mode Access Prevention
-    pub has_umip: bool,          // User Mode Instruction Prevention
-    pub has_pku: bool,           // Protection Keys for User pages
-    pub has_avx: bool,           // Advanced Vector Extensions
-    pub has_avx2: bool,          // Advanced Vector Extensions 2
-    pub has_smx: bool,           // Secure Mode Extensions (TXT)
-    pub has_vmx: bool,           // Virtual Machine Extensions
+    pub has_pae: bool,    // Physical Address Extension
+    pub has_pse: bool,    // Page Size Extension (4MB)
+    pub has_apic: bool,   // Advanced Programmable Interrupt Controller
+    pub has_msr: bool,    // Model Specific Registers
+    pub has_pat: bool,    // Page Attribute Table
+    pub has_mtrr: bool,   // Memory Type Range Register
+    pub has_cx8: bool,    // CMPXCHG8B (64-bit compare and exchange)
+    pub has_nx: bool,     // No-Execute (NX) bit support
+    pub has_rdtscp: bool, // RDTSCP instruction
+    pub has_smep: bool,   // Supervisor Mode Execution Protection
+    pub has_smap: bool,   // Supervisor Mode Access Prevention
+    pub has_umip: bool,   // User Mode Instruction Prevention
+    pub has_pku: bool,    // Protection Keys for User pages
+    pub has_avx: bool,    // Advanced Vector Extensions
+    pub has_avx2: bool,   // Advanced Vector Extensions 2
+    pub has_smx: bool,    // Secure Mode Extensions (TXT)
+    pub has_vmx: bool,    // Virtual Machine Extensions
 }
 
 impl CpuFeatures {
@@ -80,45 +85,45 @@ impl CpuFeatures {
         // CPUID 0x00000001 - Feature Information
         unsafe {
             let cpuid_01 = __cpuid(0x00000001);
-            
+
             // EDX features
-            features.has_pse = (cpuid_01.edx & (1 << 3)) != 0;     // Page Size Extension
-            features.has_apic = (cpuid_01.edx & (1 << 9)) != 0;    // APIC
-            features.has_msr = (cpuid_01.edx & (1 << 5)) != 0;     // MSR
-            features.has_mtrr = (cpuid_01.edx & (1 << 12)) != 0;   // MTRR
-            features.has_pat = (cpuid_01.edx & (1 << 16)) != 0;    // PAT
-            features.has_cx8 = (cpuid_01.edx & (1 << 8)) != 0;     // CMPXCHG8B
-            
+            features.has_pse = (cpuid_01.edx & (1 << 3)) != 0; // Page Size Extension
+            features.has_apic = (cpuid_01.edx & (1 << 9)) != 0; // APIC
+            features.has_msr = (cpuid_01.edx & (1 << 5)) != 0; // MSR
+            features.has_mtrr = (cpuid_01.edx & (1 << 12)) != 0; // MTRR
+            features.has_pat = (cpuid_01.edx & (1 << 16)) != 0; // PAT
+            features.has_cx8 = (cpuid_01.edx & (1 << 8)) != 0; // CMPXCHG8B
+
             // ECX features
-            features.has_avx = (cpuid_01.ecx & (1 << 28)) != 0;    // AVX
-            features.has_smx = (cpuid_01.ecx & (1 << 6)) != 0;     // SMX
-            features.has_vmx = (cpuid_01.ecx & (1 << 5)) != 0;     // VMX
+            features.has_avx = (cpuid_01.ecx & (1 << 28)) != 0; // AVX
+            features.has_smx = (cpuid_01.ecx & (1 << 6)) != 0; // SMX
+            features.has_vmx = (cpuid_01.ecx & (1 << 5)) != 0; // VMX
         }
 
         // CPUID 0x80000001 - Extended Feature Information (requires extended CPUID support)
         unsafe {
             let cpuid_ext = __cpuid(0x80000001);
-            
+
             // EDX extended features
-            features.has_nx = (cpuid_ext.edx & (1 << 20)) != 0;    // NX bit
+            features.has_nx = (cpuid_ext.edx & (1 << 20)) != 0; // NX bit
             features.has_rdtscp = (cpuid_ext.edx & (1 << 27)) != 0; // RDTSCP
-            
+
             // ECX extended features
-            features.has_smap = (cpuid_ext.ecx & (1 << 20)) != 0;  // SMAP
-            features.has_smep = (cpuid_ext.ecx & (1 << 25)) != 0;  // SMEP (note: different position in some docs)
-            features.has_umip = (cpuid_ext.ecx & (1 << 2)) != 0;   // UMIP
-            features.has_pku = (cpuid_ext.ecx & (1 << 3)) != 0;    // PKU
+            features.has_smap = (cpuid_ext.ecx & (1 << 20)) != 0; // SMAP
+            features.has_smep = (cpuid_ext.ecx & (1 << 25)) != 0; // SMEP (note: different position in some docs)
+            features.has_umip = (cpuid_ext.ecx & (1 << 2)) != 0; // UMIP
+            features.has_pku = (cpuid_ext.ecx & (1 << 3)) != 0; // PKU
         }
 
         // CPUID 0x00000007 - Extended Features (Leaf 7)
         unsafe {
             let cpuid_07 = __cpuid(0x00000007);
-            
+
             // EBX extended features
-            features.has_smep = (cpuid_07.ebx & (1 << 7)) != 0;    // SMEP (correct position)
-            features.has_smap = (cpuid_07.ebx & (1 << 20)) != 0;   // SMAP (correct position)
-            features.has_avx2 = (cpuid_07.ebx & (1 << 5)) != 0;    // AVX2
-            features.has_pku = (cpuid_07.ecx & (1 << 3)) != 0;     // PKU (ECX)
+            features.has_smep = (cpuid_07.ebx & (1 << 7)) != 0; // SMEP (correct position)
+            features.has_smap = (cpuid_07.ebx & (1 << 20)) != 0; // SMAP (correct position)
+            features.has_avx2 = (cpuid_07.ebx & (1 << 5)) != 0; // AVX2
+            features.has_pku = (cpuid_07.ecx & (1 << 3)) != 0; // PKU (ECX)
         }
 
         // PAE detection (typically always present on x86_64)
@@ -175,24 +180,24 @@ impl CpuFeatures {
 /// CPU Optimization Settings
 #[derive(Debug, Clone, Copy)]
 pub struct CpuOptimization {
-    pub enable_smep: bool,          // Kernel execution protection
-    pub enable_smap: bool,          // Kernel memory access protection
-    pub enable_pku: bool,           // Memory protection keys
-    pub enable_nx: bool,            // Non-executable memory
-    pub enable_pae: bool,           // 36-bit physical addressing
-    pub enable_pat: bool,           // Page attribute table
-    pub enable_mtrr: bool,          // Memory type range registers
-    pub cache_mode: CacheMode,      // Cache strategy
-    pub performance_boost: bool,    // CPU-specific performance optimization
+    pub enable_smep: bool,       // Kernel execution protection
+    pub enable_smap: bool,       // Kernel memory access protection
+    pub enable_pku: bool,        // Memory protection keys
+    pub enable_nx: bool,         // Non-executable memory
+    pub enable_pae: bool,        // 36-bit physical addressing
+    pub enable_pat: bool,        // Page attribute table
+    pub enable_mtrr: bool,       // Memory type range registers
+    pub cache_mode: CacheMode,   // Cache strategy
+    pub performance_boost: bool, // CPU-specific performance optimization
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CacheMode {
-    Disabled,                       // No cache optimization
-    WriteBack,                      // Write-back (fastest)
-    WriteThrough,                   // Write-through (safe)
-    WriteProtected,                 // Write-protected (safe)
-    Uncacheable,                    // Uncacheable (slowest, for MMIO)
+    Disabled,       // No cache optimization
+    WriteBack,      // Write-back (fastest)
+    WriteThrough,   // Write-through (safe)
+    WriteProtected, // Write-protected (safe)
+    Uncacheable,    // Uncacheable (slowest, for MMIO)
 }
 
 impl CpuOptimization {
@@ -201,7 +206,7 @@ impl CpuOptimization {
         Self {
             enable_smep: true,
             enable_smap: true,
-            enable_pku: false,      // Disabled by default (requires explicit setup)
+            enable_pku: false, // Disabled by default (requires explicit setup)
             enable_nx: true,
             enable_pae: true,
             enable_pat: true,
@@ -214,13 +219,13 @@ impl CpuOptimization {
     /// Create optimized settings for boot time
     pub fn for_boot_time() -> Self {
         Self {
-            enable_smep: false,     // Disable during boot for compatibility
-            enable_smap: false,     // Disable during boot
+            enable_smep: false, // Disable during boot for compatibility
+            enable_smap: false, // Disable during boot
             enable_pku: false,
-            enable_nx: true,        // Always enable NX
+            enable_nx: true, // Always enable NX
             enable_pae: true,
             enable_pat: true,
-            enable_mtrr: false,     // Keep MTRR settings from firmware
+            enable_mtrr: false, // Keep MTRR settings from firmware
             cache_mode: CacheMode::WriteBack,
             performance_boost: true,
         }
@@ -313,21 +318,21 @@ impl CpuOptimization {
 
         // CR0 - System Control Register
         if self.enable_nx {
-            cr0 |= 1u64 << 31;  // WP (Write Protect)
+            cr0 |= 1u64 << 31; // WP (Write Protect)
         }
 
         // CR4 - Extended Control Register
         if self.enable_pae {
-            cr4 |= 1u64 << 5;   // PAE (Physical Address Extension)
+            cr4 |= 1u64 << 5; // PAE (Physical Address Extension)
         }
         if self.enable_smep {
-            cr4 |= 1u64 << 20;  // SMEP
+            cr4 |= 1u64 << 20; // SMEP
         }
         if self.enable_smap {
-            cr4 |= 1u64 << 21;  // SMAP
+            cr4 |= 1u64 << 21; // SMAP
         }
         if self.enable_pku {
-            cr4 |= 1u64 << 22;  // PKE
+            cr4 |= 1u64 << 22; // PKE
         }
 
         (cr0, cr4)
@@ -395,7 +400,7 @@ impl BiosInterruptSupport {
             0x15 |  // Miscellaneous services
             0x16 |  // Keyboard services
             0x17 |  // Printer services
-            0x19    // Bootstrap loader
+            0x19 // Bootstrap loader
         )
     }
 
@@ -427,10 +432,10 @@ pub struct X86_64BootConfig {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BootMode {
-    Legacy,         // Legacy BIOS
-    Uefi,           // UEFI
-    Multiboot2,     // Multiboot2
-    DirectBoot,     // Direct kernel boot
+    Legacy,     // Legacy BIOS
+    Uefi,       // UEFI
+    Multiboot2, // Multiboot2
+    DirectBoot, // Direct kernel boot
 }
 
 impl X86_64BootConfig {
@@ -438,7 +443,7 @@ impl X86_64BootConfig {
     pub fn initialize() -> Self {
         let features = CpuFeatures::detect();
         let optimization = CpuOptimization::for_boot_time();
-        
+
         Self {
             features,
             optimization,
@@ -450,7 +455,7 @@ impl X86_64BootConfig {
     /// Setup optimized x86_64 boot
     pub fn setup(&mut self, mode: BootMode) -> Result<(), &'static str> {
         self.boot_mode = mode;
-        
+
         // Apply optimizations if features available
         if self.features.has_critical_features() {
             self.optimization.apply(&self.features)?;
@@ -488,8 +493,8 @@ mod tests {
     #[test]
     fn test_cpu_feature_detection() {
         let features = CpuFeatures::detect();
-        assert!(features.has_pae);  // Always present on x86_64
-        assert!(features.has_nx);   // Always present on x86_64
+        assert!(features.has_pae); // Always present on x86_64
+        assert!(features.has_nx); // Always present on x86_64
     }
 
     #[test]
@@ -510,8 +515,8 @@ mod tests {
     #[test]
     fn test_optimization_for_boot_time() {
         let opt = CpuOptimization::for_boot_time();
-        assert!(!opt.enable_smep);  // Disabled for boot compatibility
-        assert!(!opt.enable_smap);  // Disabled for boot compatibility
+        assert!(!opt.enable_smep); // Disabled for boot compatibility
+        assert!(!opt.enable_smap); // Disabled for boot compatibility
         assert!(opt.enable_nx);
     }
 
@@ -526,8 +531,8 @@ mod tests {
     #[test]
     fn test_bios_interrupt_detection() {
         let bios = BiosInterruptSupport::new();
-        assert!(bios.is_interrupt_available(0x10));  // Video
-        assert!(bios.is_interrupt_available(0x13));  // Disk
+        assert!(bios.is_interrupt_available(0x10)); // Video
+        assert!(bios.is_interrupt_available(0x13)); // Disk
         assert!(!bios.is_interrupt_available(0x20)); // Not BIOS
     }
 

@@ -6,11 +6,10 @@
 
 extern crate alloc;
 
-
-use core::ptr::null_mut;
 use alloc::vec::Vec;
-use spin::Mutex;
+use core::ptr::null_mut;
 
+use spin::Mutex;
 
 /// Memory pool statistics.
 ///
@@ -41,7 +40,7 @@ pub struct MemoryPool {
 
 impl MemoryPool {
     /// Create a new memory pool
-    /// 
+    ///
     /// # Arguments
     ///
     /// * `base` - Base address of the memory pool
@@ -57,20 +56,25 @@ impl MemoryPool {
     /// - `alignment` must be a power of 2 and greater than 0
     /// - The caller must ensure no other code accesses this memory region while the pool is in use
     /// - The memory region must be aligned to the specified `alignment`
-    pub unsafe fn new(base: *mut u8, size: usize, block_size: usize, alignment: usize) -> Option<Self> {
+    pub unsafe fn new(
+        base: *mut u8,
+        size: usize,
+        block_size: usize,
+        alignment: usize,
+    ) -> Option<Self> {
         unsafe {
             // Calculate aligned block size
             let aligned_block_size = (block_size + alignment - 1) & !(alignment - 1);
-            
+
             // Calculate maximum number of blocks that fit in the pool
             let max_blocks = size / aligned_block_size;
             if max_blocks == 0 {
                 return None;
             }
-            
+
             // Initialize free list
             let mut free_list = null_mut();
-            
+
             // Chain all blocks together in the free list
             for i in (0..max_blocks).rev() {
                 let block = base.add(i * aligned_block_size);
@@ -98,14 +102,14 @@ impl MemoryPool {
             // Take the first block from the free list
             let block = self.free_list;
             self.free_list = *(block as *mut *mut u8);
-            
+
             self.used_blocks += 1;
             block
         }
     }
 
     /// Deallocate a block back to the memory pool
-    /// 
+    ///
     /// # Safety
     ///
     /// The pointer must have been allocated by this memory pool.
@@ -114,15 +118,17 @@ impl MemoryPool {
             // Validate the pointer belongs to this pool
             let ptr_usize = ptr as usize;
             let base_usize = self.base as usize;
-            
-            if ptr_usize < base_usize || ptr_usize >= base_usize + (self.total_blocks * self.block_size) {
+
+            if ptr_usize < base_usize
+                || ptr_usize >= base_usize + (self.total_blocks * self.block_size)
+            {
                 return; // Invalid pointer
             }
-            
+
             // Add back to the free list
             *(ptr as *mut *mut u8) = self.free_list;
             self.free_list = ptr;
-            
+
             self.used_blocks = self.used_blocks.saturating_sub(1);
         }
     }
@@ -163,9 +169,7 @@ struct MemoryPoolRegistry {
 
 impl MemoryPoolRegistry {
     const fn new() -> Self {
-        Self {
-            pools: Vec::new(),
-        }
+        Self { pools: Vec::new() }
     }
 }
 
@@ -182,8 +186,14 @@ static MEMORY_POOL_REGISTRY: Mutex<MemoryPoolRegistry> = Mutex::new(MemoryPoolRe
 /// - `alignment` must be a power of 2 and greater than 0
 /// - The caller must ensure no other code accesses this memory region while the pool is in use
 /// - The memory region must be aligned to the specified `alignment`
-/// - The caller must ensure that the memory region remains valid for the lifetime of the registered pool
-pub unsafe fn mempool_create(base: *mut u8, size: usize, block_size: usize, alignment: usize) -> Option<usize> {
+/// - The caller must ensure that the memory region remains valid for the lifetime of the registered
+///   pool
+pub unsafe fn mempool_create(
+    base: *mut u8,
+    size: usize,
+    block_size: usize,
+    alignment: usize,
+) -> Option<usize> {
     if let Some(pool) = unsafe { MemoryPool::new(base, size, block_size, alignment) } {
         let mut registry = MEMORY_POOL_REGISTRY.lock();
         let index = registry.pools.len();
@@ -232,7 +242,7 @@ pub fn mempool_stats(pool_id: usize) -> Option<PoolStats> {
 }
 
 /// Allocate from a memory pool with specified block size
-/// 
+///
 /// This function will find or create a memory pool with the requested block size
 pub fn mempool_alloc_sized(_block_size: usize, _alignment: usize) -> *mut u8 {
     // For now, we just return null. In a more sophisticated implementation,
@@ -242,7 +252,8 @@ pub fn mempool_alloc_sized(_block_size: usize, _alignment: usize) -> *mut u8 {
 
 /// Deallocate from a memory pool with specified block size
 ///
-/// This function will find the appropriate memory pool based on the block size and deallocate the pointer.
+/// This function will find the appropriate memory pool based on the block size and deallocate the
+/// pointer.
 ///
 /// # Safety
 ///
@@ -264,29 +275,29 @@ mod tests {
         // Allocate a buffer for testing
         let mut buffer = Vec::with_capacity(1024);
         buffer.resize(1024, 0);
-        
+
         unsafe {
             // Create a memory pool with 64-byte blocks
             let mut pool = MemoryPool::new(buffer.as_mut_ptr(), buffer.len(), 64, 8).unwrap();
-            
+
             // Allocate some blocks
             let ptr1 = pool.alloc();
             let ptr2 = pool.alloc();
             let ptr3 = pool.alloc();
-            
+
             assert!(!ptr1.is_null());
             assert!(!ptr2.is_null());
             assert!(!ptr3.is_null());
-            
+
             // Check that pool stats are correct
             let stats = pool.stats();
             assert_eq!(stats.used_blocks, 3);
-            
+
             // Deallocate a block
             pool.dealloc(ptr2);
             let stats2 = pool.stats();
             assert_eq!(stats2.used_blocks, 2);
-            
+
             // Allocate another block
             let ptr4 = pool.alloc();
             assert!(!ptr4.is_null());

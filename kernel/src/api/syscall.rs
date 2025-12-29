@@ -3,10 +3,15 @@
 //! This module defines the trait interfaces for system call dispatching
 //! and handling. It re-exports interfaces from nos-api to ensure consistency.
 
-pub use nos_api::syscall::interface::{SyscallDispatcher, SyscallHandler};
-pub use nos_api::syscall::types::{SyscallNumber, SyscallArgs, SyscallResult};
-use crate::error::unified_framework::{FrameworkError, IntoFrameworkError, FrameworkResult};
-use crate::error::unified::UnifiedError;
+pub use nos_api::syscall::{
+    interface::{SyscallDispatcher, SyscallHandler},
+    types::{SyscallArgs, SyscallNumber, SyscallResult},
+};
+
+use crate::error::{
+    unified::UnifiedError,
+    unified_framework::{FrameworkError, FrameworkResult, IntoFrameworkError},
+};
 
 // Migrated to unified error framework
 pub type KernelError = FrameworkError;
@@ -88,7 +93,6 @@ impl KernelErrorExt for FrameworkError {
         }
     }
 }
-
 
 /// System call context trait
 ///
@@ -181,20 +185,20 @@ pub mod syscall_numbers {
     pub const SYS_EXIT: u32 = 0x1003;
     pub const SYS_WAIT4: u32 = 0x1004;
     pub const SYS_KILL: u32 = 0x1005;
-    
+
     /// File I/O syscalls
     pub const SYS_READ: u32 = 0x2000;
     pub const SYS_WRITE: u32 = 0x2001;
     pub const SYS_OPEN: u32 = 0x2002;
     pub const SYS_CLOSE: u32 = 0x2003;
     pub const SYS_STAT: u32 = 0x2004;
-    
+
     /// Memory management syscalls
     pub const SYS_MMAP: u32 = 0x3000;
     pub const SYS_MUNMAP: u32 = 0x3001;
     pub const SYS_BRK: u32 = 0x3002;
     pub const SYS_MPROTECT: u32 = 0x3003;
-    
+
     /// Network syscalls
     pub const SYS_SOCKET: u32 = 0x4000;
     pub const SYS_BIND: u32 = 0x4001;

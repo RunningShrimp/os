@@ -5,14 +5,16 @@
 
 extern crate alloc;
 
-use alloc::format;
-use crate::reliability::{EINVAL, ENOENT, ENOMEM, EIO, EACCES};
-use alloc::collections::BTreeMap;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::vec::Vec;
-use alloc::vec;
+use alloc::{
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 use core::sync::atomic::{AtomicU64, Ordering};
+
+use crate::reliability::{EACCES, EINVAL, EIO, ENOENT, ENOMEM};
 
 /// OCI运行时配置
 #[derive(Debug, Clone)]
@@ -373,8 +375,7 @@ impl OciRuntime {
     pub fn start_container(&mut self, container_id: &str) -> Result<u32, i32> {
         let current_time = self.get_current_time();
 
-        let state = self.containers.get_mut(container_id)
-            .ok_or(ENOENT)?;
+        let state = self.containers.get_mut(container_id).ok_or(ENOENT)?;
 
         if state.state != OciSpecState::Created {
             return Err(EINVAL);
@@ -386,8 +387,7 @@ impl OciRuntime {
         let pid = self.create_process(&container_id_owned)?;
 
         // 重新获取并更新状态
-        let state = self.containers.get_mut(&container_id_owned)
-            .ok_or(EIO)?;
+        let state = self.containers.get_mut(&container_id_owned).ok_or(EIO)?;
         state.state = OciSpecState::Running;
         state.pid = Some(pid);
         state.started_at = Some(current_time);
@@ -402,8 +402,7 @@ impl OciRuntime {
 
         // 先获取PID，释放借用
         let pid = {
-            let state = self.containers.get_mut(container_id)
-                .ok_or(ENOENT)?;
+            let state = self.containers.get_mut(container_id).ok_or(ENOENT)?;
 
             if state.state != OciSpecState::Running {
                 return Err(EINVAL);
@@ -436,8 +435,7 @@ impl OciRuntime {
 
         // 更新状态
         let current_time = self.get_current_time();
-        let state = self.containers.get_mut(container_id)
-            .ok_or(ENOENT)?;
+        let state = self.containers.get_mut(container_id).ok_or(ENOENT)?;
         state.state = OciSpecState::Stopped;
         state.finished_at = Some(current_time);
 
@@ -447,8 +445,7 @@ impl OciRuntime {
 
     /// 删除容器
     pub fn delete_container(&mut self, container_id: &str) -> Result<(), i32> {
-        let state = self.containers.get(container_id)
-            .ok_or(ENOENT)?;
+        let state = self.containers.get(container_id).ok_or(ENOENT)?;
 
         if state.state == OciSpecState::Running {
             return Err(EINVAL);
@@ -471,8 +468,7 @@ impl OciRuntime {
 
     /// 杀死容器（发送信号）
     pub fn kill_container(&mut self, container_id: &str, signal: i32) -> Result<(), i32> {
-        let state = self.containers.get(container_id)
-            .ok_or(ENOENT)?;
+        let state = self.containers.get(container_id).ok_or(ENOENT)?;
 
         if state.state != OciSpecState::Running {
             return Err(EINVAL);
@@ -480,7 +476,12 @@ impl OciRuntime {
 
         if let Some(pid) = state.pid {
             self.send_signal(pid, signal)?;
-            crate::println!("[oci] Sent signal {} to container: {} (PID: {})", signal, container_id, pid);
+            crate::println!(
+                "[oci] Sent signal {} to container: {} (PID: {})",
+                signal,
+                container_id,
+                pid
+            );
             Ok(())
         } else {
             Err(EINVAL)
@@ -489,8 +490,7 @@ impl OciRuntime {
 
     /// 暂停容器
     pub fn pause_container(&mut self, container_id: &str) -> Result<(), i32> {
-        let state = self.containers.get_mut(container_id)
-            .ok_or(ENOENT)?;
+        let state = self.containers.get_mut(container_id).ok_or(ENOENT)?;
 
         if state.state != OciSpecState::Running {
             return Err(EINVAL);
@@ -508,8 +508,7 @@ impl OciRuntime {
 
     /// 恢复容器
     pub fn resume_container(&mut self, container_id: &str) -> Result<(), i32> {
-        let state = self.containers.get_mut(container_id)
-            .ok_or(ENOENT)?;
+        let state = self.containers.get_mut(container_id).ok_or(ENOENT)?;
 
         if state.state != OciSpecState::Paused {
             return Err(EINVAL);
@@ -532,23 +531,26 @@ impl OciRuntime {
 
     /// 更新容器状态（检查进程是否还在运行）
     pub fn update_container_state(&mut self, container_id: &str) -> Result<(), i32> {
-        let state = self.containers.get_mut(container_id)
-            .ok_or(ENOENT)?;
+        let state = self.containers.get_mut(container_id).ok_or(ENOENT)?;
 
         if let Some(pid) = state.pid {
             if state.state == OciSpecState::Running && !self.is_process_running(pid) {
                 // 进程已退出
                 state.state = OciSpecState::Exited;
                 state.finished_at = Some(self.get_current_time());
-                
+
                 // 获取退出代码
                 let table = crate::subsystems::process::manager::PROC_TABLE.lock();
                 if let Some(proc) = table.find_ref(pid as usize) {
                     state.exit_code = Some(proc.xstate);
                 }
-                
-                crate::println!("[oci] Container {} exited (PID: {}, exit code: {:?})", 
-                    container_id, pid, state.exit_code);
+
+                crate::println!(
+                    "[oci] Container {} exited (PID: {}, exit code: {:?})",
+                    container_id,
+                    pid,
+                    state.exit_code
+                );
             }
         }
 
@@ -591,7 +593,10 @@ impl OciRuntime {
         if let Some(ref linux) = spec.linux {
             for namespace in &linux.namespaces {
                 // 创建命名空间
-                crate::subsystems::cloud_native::namespaces::create_namespace(namespace.typ, namespace.path.clone())?;
+                crate::subsystems::cloud_native::namespaces::create_namespace(
+                    namespace.typ,
+                    namespace.path.clone(),
+                )?;
             }
         }
         Ok(())
@@ -600,14 +605,22 @@ impl OciRuntime {
     /// 设置根文件系统
     fn setup_rootfs(&self, spec: &OciContainerSpec) -> Result<(), i32> {
         // 挂载根文件系统
-        crate::subsystems::cloud_native::namespaces::mount_rootfs(&spec.root.path, spec.root.readonly)?;
+        crate::subsystems::cloud_native::namespaces::mount_rootfs(
+            &spec.root.path,
+            spec.root.readonly,
+        )?;
         Ok(())
     }
 
     /// 设置挂载点
     fn setup_mounts(&self, spec: &OciContainerSpec) -> Result<(), i32> {
         for mount in &spec.mounts {
-            crate::subsystems::cloud_native::namespaces::mount_device(&mount.source, &mount.destination, &mount.typ, &mount.options)?;
+            crate::subsystems::cloud_native::namespaces::mount_device(
+                &mount.source,
+                &mount.destination,
+                &mount.typ,
+                &mount.options,
+            )?;
         }
         Ok(())
     }
@@ -637,58 +650,57 @@ impl OciRuntime {
     /// 创建进程
     fn create_process(&self, container_id: &str) -> Result<u32, i32> {
         // 获取容器规范
-        let spec = self.containers.get(container_id)
-            .ok_or(ENOENT)?;
-        
+        let spec = self.containers.get(container_id).ok_or(ENOENT)?;
+
         // 构建clone标志，根据OCI规范中的namespaces
         let mut clone_flags: i32 = 0;
-        
+
         if let Some(ref linux) = spec.linux {
             for namespace in &linux.namespaces {
                 match namespace.typ {
                     OciLinuxNamespaceType::Mount => {
                         clone_flags |= crate::posix::CLONE_NEWNS;
-                    }
+                    },
                     OciLinuxNamespaceType::UTS => {
                         clone_flags |= crate::posix::CLONE_NEWUTS;
-                    }
+                    },
                     OciLinuxNamespaceType::IPC => {
                         clone_flags |= crate::posix::CLONE_NEWIPC;
-                    }
+                    },
                     OciLinuxNamespaceType::Network => {
                         clone_flags |= crate::posix::CLONE_NEWNET;
-                    }
+                    },
                     OciLinuxNamespaceType::PID => {
                         clone_flags |= crate::posix::CLONE_NEWPID;
-                    }
+                    },
                     OciLinuxNamespaceType::User => {
                         clone_flags |= crate::posix::CLONE_NEWUSER;
-                    }
+                    },
                     OciLinuxNamespaceType::Cgroup => {
                         // Cgroup namespace is not directly supported by clone flags
                         // It will be handled separately via cgroups subsystem
-                    }
+                    },
                 }
             }
         }
-        
+
         // 使用clone系统调用创建新进程，应用命名空间标志
         // clone参数: [flags, stack, parent_tid_ptr, child_tid_ptr, tls]
         // 对于容器，我们不需要特殊的stack或TLS，使用默认值
         let clone_args = [
-            clone_flags as u64,  // flags
-            0,                    // stack (0 = use default)
-            0,                    // parent_tid_ptr (0 = don't set)
-            0,                    // child_tid_ptr (0 = don't set)
-            0,                    // tls (0 = use default)
+            clone_flags as u64, // flags
+            0,                  // stack (0 = use default)
+            0,                  // parent_tid_ptr (0 = don't set)
+            0,                  // child_tid_ptr (0 = don't set)
+            0,                  // tls (0 = use default)
         ];
-        
+
         // 调用clone系统调用
         // sys_clone返回子进程PID（在父进程中）或0（在子进程中）
         match crate::subsystems::syscalls::thread::dispatch(0x8000, &clone_args) {
             Ok(child_pid_u64) => {
                 let child_pid = child_pid_u64 as u32;
-                
+
                 // 如果返回0，说明我们在子进程中，需要特殊处理
                 // 但在容器创建场景中，我们通常在父进程中，所以child_pid应该>0
                 if child_pid == 0 {
@@ -696,30 +708,46 @@ impl OciRuntime {
                     // 但目前我们主要在父进程中处理，所以返回错误
                     return Err(EINVAL);
                 }
-                
+
                 // 应用cgroup配置（如果指定）
                 if let Some(ref linux) = spec.linux {
                     if let Some(ref resources) = linux.resources {
                         if let Some(ref cgroups_path) = linux.cgroups_path {
                             // 将进程添加到指定的cgroup
-                            if let Err(e) = crate::subsystems::cloud_native::cgroups::add_process_to_cgroup(
-                                cgroups_path,
-                                child_pid,
-                            ) {
-                                crate::println!("[oci] Warning: Failed to add process {} to cgroup {}: {}", child_pid, cgroups_path, e);
+                            if let Err(e) =
+                                crate::subsystems::cloud_native::cgroups::add_process_to_cgroup(
+                                    cgroups_path,
+                                    child_pid,
+                                )
+                            {
+                                crate::println!(
+                                    "[oci] Warning: Failed to add process {} to cgroup {}: {}",
+                                    child_pid,
+                                    cgroups_path,
+                                    e
+                                );
                             }
                         }
-                        
+
                         // 应用资源限制
                         if let Err(e) = self.apply_resource_limits(resources) {
-                            crate::println!("[oci] Warning: Failed to apply resource limits for process {}: {}", child_pid, e);
+                            crate::println!(
+                                "[oci] Warning: Failed to apply resource limits for process {}: {}",
+                                child_pid,
+                                e
+                            );
                         }
                     }
                 }
-                
-                crate::println!("[oci] Created process {} for container {} with clone flags {:#x}", child_pid, container_id, clone_flags);
+
+                crate::println!(
+                    "[oci] Created process {} for container {} with clone flags {:#x}",
+                    child_pid,
+                    container_id,
+                    clone_flags
+                );
                 Ok(child_pid)
-            }
+            },
             Err(_) => Err(ENOMEM),
         }
     }
@@ -727,7 +755,7 @@ impl OciRuntime {
     /// 发送信号
     fn send_signal(&self, pid: u32, signal: i32) -> Result<(), i32> {
         crate::println!("[oci] Sending signal {} to PID {}", signal, pid);
-        
+
         // 使用kill系统调用发送信号
         // TODO: 实现真正的kill系统调用
         // 目前返回成功，实际实现需要调用sys_kill
@@ -797,9 +825,7 @@ pub fn initialize_oci_runtime(runtime_name: &str) -> Result<(), i32> {
 
 /// 获取OCI运行时引用
 pub fn get_oci_runtime() -> Option<&'static mut OciRuntime> {
-    unsafe {
-        OCI_RUNTIME.as_mut()
-    }
+    unsafe { OCI_RUNTIME.as_mut() }
 }
 
 /// 创建OCI容器

@@ -6,17 +6,22 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
-use alloc::boxed::Box;
-use core::sync::atomic::{AtomicUsize, AtomicU64, AtomicPtr, Ordering};
-use core::cell::UnsafeCell;
-use crate::subsystems::sync::{Mutex, RawSpinLock};
-use core::ops::{Deref, DerefMut};
-use core::ptr::null_mut;
-use core::time::Duration;
+use alloc::{boxed::Box, vec::Vec};
+use core::{
+    cell::UnsafeCell,
+    ops::{Deref, DerefMut},
+    ptr::null_mut,
+    sync::atomic::{AtomicPtr, AtomicU64, AtomicUsize, Ordering},
+    time::Duration,
+};
 
-use crate::process::thread::{current_thread, thread_table, ThreadState};
-use crate::process::sleep;
+use crate::{
+    process::{
+        sleep,
+        thread::{ThreadState, current_thread, thread_table},
+    },
+    subsystems::sync::{Mutex, RawSpinLock},
+};
 
 // ============================================================================
 // Enhanced Mutex with deadlock detection
@@ -119,15 +124,23 @@ impl<T: Send + Sync> MutexEnhanced<T> {
         self.lock.lock();
 
         // Check for deadlock in debug mode
-        if self.state.debug_mode && unsafe { *self.state.owner_tid.get() } == current_tid && !self.state.recursive {
+        if self.state.debug_mode
+            && unsafe { *self.state.owner_tid.get() } == current_tid
+            && !self.state.recursive
+        {
             // Potential deadlock detected
             self.lock.unlock();
-            panic!("Potential deadlock detected: thread {} trying to lock mutex already owned", current_tid);
+            panic!(
+                "Potential deadlock detected: thread {} trying to lock mutex already owned",
+                current_tid
+            );
         }
 
         // Handle recursive locking
         if self.state.recursive && unsafe { *self.state.owner_tid.get() } == current_tid {
-            unsafe { *self.state.lock_depth.get() += 1; }
+            unsafe {
+                *self.state.lock_depth.get() += 1;
+            }
             self.lock.unlock();
             return MutexEnhancedGuard { mutex: self };
         }
@@ -137,7 +150,9 @@ impl<T: Send + Sync> MutexEnhanced<T> {
         // Wait if mutex is already locked
         while unsafe { *self.state.owner_tid.get() } != 0 {
             contended = true;
-            unsafe { *self.state.waiters.get() += 1; }
+            unsafe {
+                *self.state.waiters.get() += 1;
+            }
 
             // Add current thread to wait queue (simplified)
             // In a real implementation, this would use a proper wait queue
@@ -151,17 +166,27 @@ impl<T: Send + Sync> MutexEnhanced<T> {
 
             // Re-acquire spinlock to check again
             self.lock.lock();
-            unsafe { *self.state.waiters.get() = (*self.state.waiters.get()).saturating_sub(1); }
+            unsafe {
+                *self.state.waiters.get() = (*self.state.waiters.get()).saturating_sub(1);
+            }
         }
 
         // Acquire the mutex
-        unsafe { *self.state.owner_tid.get() = current_tid; }
-        unsafe { *self.state.lock_depth.get() = 1; }
+        unsafe {
+            *self.state.owner_tid.get() = current_tid;
+        }
+        unsafe {
+            *self.state.lock_depth.get() = 1;
+        }
 
         // Update lock analytics
-        self.state.lock_acquire_count.fetch_add(1, Ordering::Relaxed);
+        self.state
+            .lock_acquire_count
+            .fetch_add(1, Ordering::Relaxed);
         if contended {
-            self.state.lock_contended_count.fetch_add(1, Ordering::Relaxed);
+            self.state
+                .lock_contended_count
+                .fetch_add(1, Ordering::Relaxed);
         }
 
         // Priority inheritance would be handled here
@@ -183,13 +208,19 @@ impl<T: Send + Sync> MutexEnhanced<T> {
 
         // Check if mutex is free
         if unsafe { *self.state.owner_tid.get() } == 0 {
-            unsafe { *self.state.owner_tid.get() = current_tid; }
-            unsafe { *self.state.lock_depth.get() = 1; }
+            unsafe {
+                *self.state.owner_tid.get() = current_tid;
+            }
+            unsafe {
+                *self.state.lock_depth.get() = 1;
+            }
             self.lock.unlock();
             Some(MutexEnhancedGuard { mutex: self })
         } else if self.state.recursive && unsafe { *self.state.owner_tid.get() } == current_tid {
             // Recursive acquisition
-            unsafe { *self.state.lock_depth.get() += 1; }
+            unsafe {
+                *self.state.lock_depth.get() += 1;
+            }
             self.lock.unlock();
             Some(MutexEnhancedGuard { mutex: self })
         } else {
@@ -233,11 +264,17 @@ impl<T: Send + Sync> Drop for MutexEnhancedGuard<'_, T> {
 
         // Decrease lock depth
         if unsafe { *self.mutex.state.lock_depth.get() } > 1 {
-            unsafe { *self.mutex.state.lock_depth.get() -= 1; }
+            unsafe {
+                *self.mutex.state.lock_depth.get() -= 1;
+            }
         } else {
             // Completely release the lock
-            unsafe { *self.mutex.state.owner_tid.get() = 0; }
-            unsafe { *self.mutex.state.lock_depth.get() = 0; }
+            unsafe {
+                *self.mutex.state.owner_tid.get() = 0;
+            }
+            unsafe {
+                *self.mutex.state.lock_depth.get() = 0;
+            }
 
             // Wake up waiting threads
             if unsafe { *self.mutex.state.waiters.get() } > 0 {
@@ -322,7 +359,11 @@ impl CondVar {
     }
 
     /// Wait with timeout
-    pub fn wait_timeout<T: Send + Sync>(&self, mutex: &MutexEnhanced<T>, timeout: Duration) -> bool {
+    pub fn wait_timeout<T: Send + Sync>(
+        &self,
+        mutex: &MutexEnhanced<T>,
+        timeout: Duration,
+    ) -> bool {
         // Simplified timeout implementation
         // In a real implementation, this would use a timer
         let timeout_ms = timeout.as_millis() as u64;
@@ -473,10 +514,16 @@ impl<T: Send + Sync> RwLockEnhanced<T> {
 
             // Try to acquire read lock
             let new_state = current_state + 1;
-            if self.state.compare_exchange_weak(
-                current_state, new_state,
-                Ordering::Acquire, Ordering::Relaxed
-            ).is_ok() {
+            if self
+                .state
+                .compare_exchange_weak(
+                    current_state,
+                    new_state,
+                    Ordering::Acquire,
+                    Ordering::Relaxed,
+                )
+                .is_ok()
+            {
                 return RwLockEnhancedReadGuard { lock: self };
             }
 
@@ -502,10 +549,11 @@ impl<T: Send + Sync> RwLockEnhanced<T> {
 
         // Try to acquire read lock
         let new_state = current_state + 1;
-        if self.state.compare_exchange(
-            current_state, new_state,
-            Ordering::Acquire, Ordering::Relaxed
-        ).is_ok() {
+        if self
+            .state
+            .compare_exchange(current_state, new_state, Ordering::Acquire, Ordering::Relaxed)
+            .is_ok()
+        {
             Some(RwLockEnhancedReadGuard { lock: self })
         } else {
             None
@@ -530,10 +578,11 @@ impl<T: Send + Sync> RwLockEnhanced<T> {
             // Check if lock is completely free
             if current_state == 0 {
                 // Try to acquire write lock
-                if self.state.compare_exchange_weak(
-                    0, WRITER_BIT,
-                    Ordering::Acquire, Ordering::Relaxed
-                ).is_ok() {
+                if self
+                    .state
+                    .compare_exchange_weak(0, WRITER_BIT, Ordering::Acquire, Ordering::Relaxed)
+                    .is_ok()
+                {
                     // Remove from writer queue
                     let mut queue = self.writer_queue.lock();
                     if let Some(pos) = queue.iter().position(|&tid| tid == current_tid) {
@@ -557,10 +606,11 @@ impl<T: Send + Sync> RwLockEnhanced<T> {
         // Check if lock is completely free
         if current_state == 0 {
             // Try to acquire write lock
-            if self.state.compare_exchange(
-                0, WRITER_BIT,
-                Ordering::Acquire, Ordering::Relaxed
-            ).is_ok() {
+            if self
+                .state
+                .compare_exchange(0, WRITER_BIT, Ordering::Acquire, Ordering::Relaxed)
+                .is_ok()
+            {
                 Some(RwLockEnhancedWriteGuard { lock: self })
             } else {
                 None
@@ -711,9 +761,10 @@ const PERCPU_QUEUE_CAPACITY: usize = 256;
 const CACHE_LINE_SIZE: usize = 64;
 
 /// Padding to align to cache line
-const CACHE_LINE_PADDING: usize = CACHE_LINE_SIZE -
-    (core::mem::size_of::<[Option<T>; PERCPU_QUEUE_CAPACITY]>() +
-     core::mem::size_of::<AtomicUsize>() * 2) % CACHE_LINE_SIZE;
+const CACHE_LINE_PADDING: usize = CACHE_LINE_SIZE
+    - (core::mem::size_of::<[Option<T>; PERCPU_QUEUE_CAPACITY]>()
+        + core::mem::size_of::<AtomicUsize>() * 2)
+        % CACHE_LINE_SIZE;
 
 // Safety: PerCpuLockFreeQueue provides thread-safe SPSC queue
 unsafe impl<T: Send> Send for PerCpuLockFreeQueue<T> {}
@@ -902,23 +953,15 @@ struct Node<T> {
 impl<T> ConcurrentQueue<T> {
     /// Create a new concurrent queue
     pub fn new() -> Self {
-        let dummy = Box::into_raw(Box::new(Node {
-            data: None,
-            next: AtomicPtr::new(null_mut()),
-        }));
+        let dummy = Box::into_raw(Box::new(Node { data: None, next: AtomicPtr::new(null_mut()) }));
 
-        Self {
-            head: AtomicPtr::new(dummy),
-            tail: AtomicPtr::new(dummy),
-        }
+        Self { head: AtomicPtr::new(dummy), tail: AtomicPtr::new(dummy) }
     }
 
     /// Push an item to the queue
     pub fn push(&self, item: T) {
-        let new_node = Box::into_raw(Box::new(Node {
-            data: Some(item),
-            next: AtomicPtr::new(null_mut()),
-        }));
+        let new_node =
+            Box::into_raw(Box::new(Node { data: Some(item), next: AtomicPtr::new(null_mut()) }));
 
         loop {
             let tail = self.tail.load(Ordering::Acquire);
@@ -926,19 +969,30 @@ impl<T> ConcurrentQueue<T> {
 
             if tail_next.is_null() {
                 // Tail is the last node, try to link new node
-                if unsafe { (*tail).next.compare_exchange_weak(
-                    null_mut(),
-                    new_node,
-                    Ordering::Release,
-                    Ordering::Relaxed
-                ).is_ok() } {
+                if unsafe {
+                    (*tail)
+                        .next
+                        .compare_exchange_weak(
+                            null_mut(),
+                            new_node,
+                            Ordering::Release,
+                            Ordering::Relaxed,
+                        )
+                        .is_ok()
+                } {
                     // Successfully linked, update tail
-                    self.tail.compare_exchange(tail, new_node, Ordering::Release, Ordering::Relaxed);
+                    self.tail.compare_exchange(
+                        tail,
+                        new_node,
+                        Ordering::Release,
+                        Ordering::Relaxed,
+                    );
                     break;
                 }
             } else {
                 // Tail was behind, try to advance it
-                self.tail.compare_exchange(tail, tail_next, Ordering::Release, Ordering::Relaxed);
+                self.tail
+                    .compare_exchange(tail, tail_next, Ordering::Release, Ordering::Relaxed);
             }
         }
     }
@@ -957,21 +1011,25 @@ impl<T> ConcurrentQueue<T> {
                 }
 
                 // Tail is behind, try to advance it
-                self.tail.compare_exchange(tail, head_next, Ordering::Release, Ordering::Relaxed);
+                self.tail
+                    .compare_exchange(tail, head_next, Ordering::Release, Ordering::Relaxed);
             } else {
                 // Try to advance head
-                if self.head.compare_exchange_weak(
-                    head,
-                    head_next,
-                    Ordering::Release,
-                    Ordering::Relaxed
-                ).is_ok() {
+                if self
+                    .head
+                    .compare_exchange_weak(head, head_next, Ordering::Release, Ordering::Relaxed)
+                    .is_ok()
+                {
                     // Successfully advanced head, extract data
                     let node = unsafe { Box::from_raw(head) };
                     let next_node = unsafe { Box::from_raw(head_next) };
 
                     let data = next_node.data;
-                    unsafe { (*head).next.store(next_node.next.into_inner(), Ordering::Relaxed) };
+                    unsafe {
+                        (*head)
+                            .next
+                            .store(next_node.next.into_inner(), Ordering::Relaxed)
+                    };
                     self.tail.store(head, Ordering::Release);
 
                     return data;
@@ -1015,9 +1073,7 @@ pub struct AtomicCounter {
 impl AtomicCounter {
     /// Create a new atomic counter
     pub const fn new(initial_value: u64) -> Self {
-        Self {
-            value: AtomicU64::new(initial_value),
-        }
+        Self { value: AtomicU64::new(initial_value) }
     }
 
     /// Increment and return the new value
@@ -1052,7 +1108,8 @@ impl AtomicCounter {
 
     /// Compare and swap
     pub fn compare_and_swap(&self, current: u64, new: u64) -> u64 {
-        self.value.compare_exchange(current, new, Ordering::SeqCst, Ordering::SeqCst)
+        self.value
+            .compare_exchange(current, new, Ordering::SeqCst, Ordering::SeqCst)
             .unwrap_or(current)
     }
 }
@@ -1101,7 +1158,8 @@ impl Barrier {
             let channel = self.channel.load(Ordering::SeqCst);
             let table = thread_table();
             for thread in table.iter_mut() {
-                if thread.state == ThreadState::Blocked && thread.wait_channel == (channel as usize) {
+                if thread.state == ThreadState::Blocked && thread.wait_channel == (channel as usize)
+                {
                     thread.wake();
                 }
             }
@@ -1157,12 +1215,16 @@ impl Semaphore {
         loop {
             let current = self.value.load(Ordering::Acquire);
             if current > 0 {
-                if self.value.compare_exchange_weak(
-                    current,
-                    current - 1,
-                    Ordering::Release,
-                    Ordering::Relaxed,
-                ).is_ok() {
+                if self
+                    .value
+                    .compare_exchange_weak(
+                        current,
+                        current - 1,
+                        Ordering::Release,
+                        Ordering::Relaxed,
+                    )
+                    .is_ok()
+                {
                     return;
                 }
             } else {
@@ -1197,12 +1259,9 @@ impl Semaphore {
     pub fn try_wait(&self) -> bool {
         let current = self.value.load(Ordering::Acquire);
         if current > 0 {
-            self.value.compare_exchange_weak(
-                current,
-                current - 1,
-                Ordering::Release,
-                Ordering::Relaxed,
-            ).is_ok()
+            self.value
+                .compare_exchange_weak(current, current - 1, Ordering::Release, Ordering::Relaxed)
+                .is_ok()
         } else {
             false
         }

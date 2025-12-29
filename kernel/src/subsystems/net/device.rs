@@ -6,8 +6,10 @@
 extern crate alloc;
 // Arc在当前文件中未使用，暂时注释掉
 // use alloc::sync::Arc;
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::sync::atomic::{AtomicU64, Ordering};
 
 /// Network device interface
@@ -97,12 +99,12 @@ impl MacAddr {
 
     /// Convert to u64
     pub fn to_u64(&self) -> u64 {
-        ((self.bytes[0] as u64) << 40) |
-        ((self.bytes[1] as u64) << 32) |
-        ((self.bytes[2] as u64) << 24) |
-        ((self.bytes[3] as u64) << 16) |
-        ((self.bytes[4] as u64) << 8) |
-        (self.bytes[5] as u64)
+        ((self.bytes[0] as u64) << 40)
+            | ((self.bytes[1] as u64) << 32)
+            | ((self.bytes[2] as u64) << 24)
+            | ((self.bytes[3] as u64) << 16)
+            | ((self.bytes[4] as u64) << 8)
+            | (self.bytes[5] as u64)
     }
 
     /// Check if MAC address is broadcast
@@ -122,9 +124,7 @@ impl MacAddr {
 
     /// Get broadcast MAC address
     pub const fn broadcast() -> Self {
-        Self {
-            bytes: [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
-        }
+        Self { bytes: [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF] }
     }
 
     /// Get zero MAC address
@@ -560,10 +560,16 @@ impl NetworkDevice for MockEthernetDevice {
     fn up(&self) -> Result<(), DeviceError> {
         // Note: This would need to be mutable to change is_up
         // For now, just return success
-        crate::log_info!("Mock Ethernet device '{}' is up with MAC {:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
-              self.name.clone(),
-              self.mac_addr.bytes[0], self.mac_addr.bytes[1], self.mac_addr.bytes[2],
-              self.mac_addr.bytes[3], self.mac_addr.bytes[4], self.mac_addr.bytes[5]);
+        crate::log_info!(
+            "Mock Ethernet device '{}' is up with MAC {:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+            self.name.clone(),
+            self.mac_addr.bytes[0],
+            self.mac_addr.bytes[1],
+            self.mac_addr.bytes[2],
+            self.mac_addr.bytes[3],
+            self.mac_addr.bytes[4],
+            self.mac_addr.bytes[5]
+        );
         Ok(())
     }
 

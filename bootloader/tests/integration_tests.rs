@@ -4,10 +4,7 @@
 //! testing the interaction between different components and validating end-to-end
 //! functionality.
 
-use std::path::Path;
-use std::process::Command;
-use std::thread;
-use std::time::Duration;
+use std::{path::Path, process::Command, thread, time::Duration};
 
 #[cfg(test)]
 mod integration_tests {
@@ -26,7 +23,7 @@ mod integration_tests {
                 "--target=x86_64-unknown-none",
                 "--no-default-features",
                 "--features=bios_full",
-                "--bin=bootloader"
+                "--bin=bootloader",
             ])
             .output();
 
@@ -51,15 +48,14 @@ mod integration_tests {
                         println!("Bootloader binary size: {} bytes", metadata.len());
                         assert!(metadata.len() > 0, "Bootloader binary should not be empty");
                     }
-
                 } else {
                     let stderr = String::from_utf8_lossy(&result.stderr);
                     panic!("BIOS bootloader compilation failed: {}", stderr);
                 }
-            }
+            },
             Err(e) => {
                 panic!("Failed to run cargo build: {}", e);
-            }
+            },
         }
     }
 
@@ -76,7 +72,7 @@ mod integration_tests {
                 "--target=x86_64-unknown-none",
                 "--no-default-features",
                 "--features=bios_full",
-                "--bin=bootloader"
+                "--bin=bootloader",
             ])
             .output();
 
@@ -92,17 +88,19 @@ mod integration_tests {
 
                         // Release build should be optimized and smaller
                         assert!(metadata.len() > 0, "Release binary should not be empty");
-                        assert!(metadata.len() < 1024 * 1024, "Release binary should be reasonable size");
+                        assert!(
+                            metadata.len() < 1024 * 1024,
+                            "Release binary should be reasonable size"
+                        );
                     }
-
                 } else {
                     let stderr = String::from_utf8_lossy(&result.stderr);
                     panic!("Release build failed: {}", stderr);
                 }
-            }
+            },
             Err(e) => {
                 panic!("Failed to run release build: {}", e);
-            }
+            },
         }
     }
 
@@ -118,7 +116,7 @@ mod integration_tests {
                 "--target=x86_64-unknown-none",
                 "--no-default-features",
                 "--features=bios_full,multiboot2_support",
-                "--bin=bootloader"
+                "--bin=bootloader",
             ])
             .output();
 
@@ -130,10 +128,10 @@ mod integration_tests {
                     let stderr = String::from_utf8_lossy(&result.stderr);
                     panic!("Multiboot2 bootloader compilation failed: {}", stderr);
                 }
-            }
+            },
             Err(e) => {
                 panic!("Failed to run cargo build: {}", e);
-            }
+            },
         }
     }
 
@@ -176,9 +174,7 @@ mod integration_tests {
 
         if Path::new(bootloader_path).exists() {
             // Use file command to check binary format
-            let output = Command::new("file")
-                .arg(bootloader_path)
-                .output();
+            let output = Command::new("file").arg(bootloader_path).output();
 
             match output {
                 Ok(result) => {
@@ -187,13 +183,15 @@ mod integration_tests {
                         println!("Binary format: {}", file_info);
 
                         // Should be an ELF or raw binary file
-                        assert!(file_info.contains("ELF") || file_info.contains("raw"),
-                                "Binary should be ELF or raw format");
+                        assert!(
+                            file_info.contains("ELF") || file_info.contains("raw"),
+                            "Binary should be ELF or raw format"
+                        );
                     }
-                }
+                },
                 Err(_) => {
                     println!("Warning: file command not available for format validation");
-                }
+                },
             }
         }
     }
@@ -233,10 +231,10 @@ mod integration_tests {
                 } else {
                     println!("? Bootloader output unclear - may need debugging");
                 }
-            }
+            },
             Err(e) => {
                 println!("QEMU test failed (QEMU may not be available): {}", e);
-            }
+            },
         }
     }
 
@@ -248,16 +246,19 @@ mod integration_tests {
         // This test creates a simulated memory map and validates
         // the memory management components can handle it
 
-        use nos_bootloader::memory::bios::{E820Entry, E820_TYPE_USABLE, E820_TYPE_RESERVED};
-        use nos_bootloader::protocol::multiboot2::{Multiboot2Protocol, create_e820_entry};
+        use nos_bootloader::{
+            memory::bios::{E820_TYPE_RESERVED, E820_TYPE_USABLE, E820Entry},
+            protocol::multiboot2::{Multiboot2Protocol, create_e820_entry},
+        };
 
         // Create a simulated memory map
         let e820_entries = vec![
-            create_e820_entry(0x00000000, 0x0009FC00, E820_TYPE_USABLE),    // 640KB conventional memory
-            create_e820_entry(0x0009FC00, 0x00000400, E820_TYPE_RESERVED),    // BIOS area
-            create_e820_entry(0x00100000, 0x00F00000, E820_TYPE_USABLE),    // 15MB extended memory
-            create_e820_entry(0x01000000, 0x00100000, E820_TYPE_RESERVED),    // Reserved area
-            create_e820_entry(0x01100000, 0x1F000000, E820_TYPE_USABLE),    // 511MB more memory
+            create_e820_entry(0x00000000, 0x0009FC00, E820_TYPE_USABLE), /* 640KB conventional
+                                                                          * memory */
+            create_e820_entry(0x0009FC00, 0x00000400, E820_TYPE_RESERVED), // BIOS area
+            create_e820_entry(0x00100000, 0x00F00000, E820_TYPE_USABLE),   // 15MB extended memory
+            create_e820_entry(0x01000000, 0x00100000, E820_TYPE_RESERVED), // Reserved area
+            create_e820_entry(0x01100000, 0x1F000000, E820_TYPE_USABLE),   // 511MB more memory
         ];
 
         assert_eq!(e820_entries.len(), 5, "Should have 5 memory map entries");
@@ -298,7 +299,7 @@ mod integration_tests {
     fn test_boot_menu_integration() {
         println!("Testing boot menu integration...");
 
-        use nos_bootloader::boot_menu::{create_default_config, BootMenuEntry};
+        use nos_bootloader::boot_menu::{BootMenuEntry, create_default_config};
 
         // Create a comprehensive boot menu configuration
         let config = create_default_config();
@@ -330,9 +331,11 @@ mod integration_tests {
     fn test_bios_component_interaction() {
         println!("Testing BIOS component interaction...");
 
-        use nos_bootloader::memory::bios::{BiosMemoryScanner, BiosMemoryManager};
-        use nos_bootloader::graphics::vbe::VbeController;
-        use nos_bootloader::boot_menu::{create_default_config};
+        use nos_bootloader::{
+            boot_menu::create_default_config,
+            graphics::vbe::VbeController,
+            memory::bios::{BiosMemoryManager, BiosMemoryScanner},
+        };
 
         // Initialize all BIOS components
         let mut memory_scanner = BiosMemoryScanner::new();
@@ -399,7 +402,10 @@ mod integration_tests {
         // Read and validate assembly file content
         let assembly_content = std::fs::read_to_string(assembly_path).unwrap();
         assert!(assembly_content.contains("_start:"), "Assembly file should have _start label");
-        assert!(assembly_content.contains(".section .text"), "Assembly file should have text section");
+        assert!(
+            assembly_content.contains(".section .text"),
+            "Assembly file should have text section"
+        );
 
         println!("Build system integration test completed");
     }
@@ -431,7 +437,11 @@ mod integration_tests {
         let mut protocol = nos_bootloader::protocol::multiboot2::Multiboot2Protocol::new();
         let init_result = protocol.initialize(&mut buffer[..], buffer.len());
         let protocol_time = start.elapsed();
-        println!("Multiboot2 protocol init: {:?} (success: {})", protocol_time, init_result.is_ok());
+        println!(
+            "Multiboot2 protocol init: {:?} (success: {})",
+            protocol_time,
+            init_result.is_ok()
+        );
         assert!(protocol_time.as_millis() < 10, "Multiboot2 protocol init should be fast");
 
         println!("Performance test completed");
@@ -453,7 +463,10 @@ mod integration_helpers {
 
     /// Check if QEMU is available for testing
     pub fn check_qemu_available() -> bool {
-        Command::new("qemu-system-x86_64").arg("--version").output().is_ok()
+        Command::new("qemu-system-x86_64")
+            .arg("--version")
+            .output()
+            .is_ok()
     }
 
     /// Create a temporary directory for test artifacts

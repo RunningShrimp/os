@@ -4,11 +4,16 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
-use alloc::string::{String, ToString};
-use alloc::collections::BTreeMap;
-use crate::subsystems::sync::Mutex;
-use crate::reliability::{EINVAL, ENOMEM};
+use alloc::{
+    collections::BTreeMap,
+    string::{String, ToString},
+    vec::Vec,
+};
+
+use crate::{
+    reliability::{EINVAL, ENOMEM},
+    subsystems::sync::Mutex,
+};
 
 /// IME state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,19 +54,19 @@ pub struct ImeComposition {
 pub trait ImeHandler: Send + Sync {
     /// Handle key input
     fn handle_key(&mut self, key: u32, modifiers: u32) -> Result<ImeResult, i32>;
-    
+
     /// Get current composition
     fn get_composition(&self) -> Option<ImeComposition>;
-    
+
     /// Get candidates
     fn get_candidates(&self) -> Vec<ImeCandidate>;
-    
+
     /// Select candidate
     fn select_candidate(&mut self, index: usize) -> Result<String, i32>;
-    
+
     /// Cancel composition
     fn cancel_composition(&mut self) -> Result<(), i32>;
-    
+
     /// Commit composition
     fn commit_composition(&mut self) -> Result<String, i32>;
 }
@@ -103,7 +108,7 @@ impl PinyinIme {
             pinyin_buffer: String::new(),
         }
     }
-    
+
     /// Convert pinyin to Chinese characters (simplified)
     fn pinyin_to_chinese(&self, pinyin: &str) -> Vec<ImeCandidate> {
         // Placeholder implementation
@@ -128,14 +133,14 @@ impl ImeHandler for PinyinIme {
             ImeState::Disabled | ImeState::Inactive => {
                 // Not in IME mode - return None
                 Ok(ImeResult::None)
-            }
+            },
             ImeState::Composing | ImeState::ShowingCandidates => {
                 // Handle pinyin input
                 if key >= b'a' as u32 && key <= b'z' as u32 {
                     // Add to pinyin buffer
                     self.pinyin_buffer.push(key as u8 as char);
                     self.state = ImeState::Composing;
-                    
+
                     // Update composition
                     self.composition = Some(ImeComposition {
                         text: self.pinyin_buffer.clone(),
@@ -143,7 +148,7 @@ impl ImeHandler for PinyinIme {
                         selection_start: 0,
                         selection_end: self.pinyin_buffer.len(),
                     });
-                    
+
                     // Get candidates
                     self.candidates = self.pinyin_to_chinese(&self.pinyin_buffer);
                     if !self.candidates.is_empty() {
@@ -152,7 +157,8 @@ impl ImeHandler for PinyinIme {
                     } else {
                         Ok(ImeResult::CompositionUpdated)
                     }
-                } else if key == 13 { // Enter
+                } else if key == 13 {
+                    // Enter
                     // Commit first candidate
                     if !self.candidates.is_empty() {
                         let result = self.candidates[0].text.clone();
@@ -164,39 +170,40 @@ impl ImeHandler for PinyinIme {
                     } else {
                         Ok(ImeResult::None)
                     }
-                } else if key == 27 { // Escape
+                } else if key == 27 {
+                    // Escape
                     // Cancel composition
                     self.cancel_composition()?;
                     Ok(ImeResult::None)
                 } else {
                     Ok(ImeResult::None)
                 }
-            }
+            },
         }
     }
-    
+
     fn get_composition(&self) -> Option<ImeComposition> {
         self.composition.clone()
     }
-    
+
     fn get_candidates(&self) -> Vec<ImeCandidate> {
         self.candidates.clone()
     }
-    
+
     fn select_candidate(&mut self, index: usize) -> Result<String, i32> {
         if index >= self.candidates.len() {
             return Err(EINVAL);
         }
-        
+
         let result = self.candidates[index].text.clone();
         self.pinyin_buffer.clear();
         self.composition = None;
         self.candidates.clear();
         self.state = ImeState::Inactive;
-        
+
         Ok(result)
     }
-    
+
     fn cancel_composition(&mut self) -> Result<(), i32> {
         self.pinyin_buffer.clear();
         self.composition = None;
@@ -204,7 +211,7 @@ impl ImeHandler for PinyinIme {
         self.state = ImeState::Inactive;
         Ok(())
     }
-    
+
     fn commit_composition(&mut self) -> Result<String, i32> {
         if !self.candidates.is_empty() {
             self.select_candidate(0)
@@ -229,15 +236,18 @@ impl ImeManager {
     /// Create a new IME manager
     pub fn new() -> Self {
         let mut imes = BTreeMap::new();
-        imes.insert("pinyin".to_string(), alloc::boxed::Box::new(PinyinIme::new()) as alloc::boxed::Box<dyn ImeHandler>);
-        
+        imes.insert(
+            "pinyin".to_string(),
+            alloc::boxed::Box::new(PinyinIme::new()) as alloc::boxed::Box<dyn ImeHandler>,
+        );
+
         Self {
             active_ime: Mutex::new(None),
             state: Mutex::new(ImeState::Disabled),
             imes: Mutex::new(imes),
         }
     }
-    
+
     /// Enable IME
     pub fn enable(&self, ime_name: &str) -> Result<(), i32> {
         let mut imes = self.imes.lock();
@@ -253,7 +263,7 @@ impl ImeManager {
             Err(EINVAL)
         }
     }
-    
+
     /// Disable IME
     pub fn disable(&self) {
         let mut active = self.active_ime.lock();
@@ -262,7 +272,7 @@ impl ImeManager {
         *state = ImeState::Disabled;
         crate::println!("[ime] Disabled IME");
     }
-    
+
     /// Process key input through IME
     pub fn process_key(&self, key: u32, modifiers: u32) -> Result<ImeResult, i32> {
         let state = self.state.lock();
@@ -270,7 +280,7 @@ impl ImeManager {
             return Ok(ImeResult::None);
         }
         drop(state);
-        
+
         let mut active = self.active_ime.lock();
         if let Some(ref mut ime) = *active {
             ime.handle_key(key, modifiers)
@@ -302,9 +312,6 @@ pub fn get_ime_manager() -> &'static ImeManager {
             *manager = Some(ImeManager::new());
         }
     });
-    
-    unsafe {
-        &*(IME_MANAGER.lock().as_ref().unwrap() as *const ImeManager)
-    }
-}
 
+    unsafe { &*(IME_MANAGER.lock().as_ref().unwrap() as *const ImeManager) }
+}

@@ -1,5 +1,5 @@
 //! NOS Bootloader Library - Modular Architecture
-//! 
+//!
 //! Comprehensive bootloader implementation organized into logical subsystems.
 //! Features both new hierarchical structure and legacy flat imports for backward compatibility.
 
@@ -75,11 +75,11 @@ pub mod platform;
 pub mod utils;
 
 // Core bootloader traits for dependency injection
+pub use bios::bios_realmode::{RealModeContext, RealModeExecutor};
+pub use kernel_if::kernel_handoff::{BootInformation, BootProtocol};
 pub use utils::boot_traits::{
-    MemoryManager, KernelLoader, BootValidator, 
-    BootInfoProvider, BootExecutor, DiagnosticReporter
+    BootExecutor, BootInfoProvider, BootValidator, DiagnosticReporter, KernelLoader, MemoryManager,
 };
-
 // ============================================================================
 // MODULE HIERARCHY NOTE
 // ============================================================================
@@ -99,10 +99,7 @@ pub use utils::boot_traits::{
 // Core bootloader types that are commonly used across the codebase.
 // These are carefully selected to provide essential functionality while
 // maintaining the hierarchical structure.
-
 pub use utils::error_recovery::ErrorRecoveryManager;
-pub use bios::bios_realmode::{RealModeContext, RealModeExecutor};
-pub use kernel_if::kernel_handoff::{BootInformation, BootProtocol};
 
 // ============================================================================
 // PANIC HANDLER

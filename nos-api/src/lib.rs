@@ -24,8 +24,7 @@
 //! # Usage
 //!
 //! ```rust
-//! use nos_api::core::traits::Service;
-//! use nos_api::error::Result;
+//! use nos_api::{core::traits::Service, error::Result};
 //!
 //! struct MyService;
 //!
@@ -50,30 +49,31 @@ extern crate std;
 
 extern crate alloc;
 
-pub use alloc::vec::Vec;
-pub use alloc::string::String;
-pub use alloc::boxed::Box;
-pub use alloc::collections::BTreeMap;
-pub use alloc::collections::BTreeSet;
+pub use alloc::{
+    boxed::Box,
+    collections::{BTreeMap, BTreeSet},
+    string::String,
+    vec::Vec,
+};
+
 pub use hashbrown::HashMap;
 
-
 // Core modules
+pub mod boot;
+pub mod collections;
+pub mod context;
 pub mod core;
+pub mod di;
 pub mod error;
-pub mod syscall;
-pub mod service;
+pub mod event;
+pub mod factory;
+pub mod fmt_utils;
+pub mod interfaces;
 pub mod memory;
 pub mod process;
-pub mod factory;
-pub mod event;
-pub mod di;
-pub mod interfaces;
-pub mod context;
+pub mod service;
 pub mod service_lifecycle;
-pub mod collections;
-pub mod fmt_utils;
-pub mod boot;
+pub mod syscall;
 
 pub use crate::fmt_utils::format;
 
@@ -81,12 +81,15 @@ pub use crate::fmt_utils::format;
 pub mod perf;
 
 // Re-export commonly used types
-pub use crate::core::types::*;
-pub use crate::error::{Error, Result};
-pub use crate::syscall::interface::{SyscallHandler, SyscallDispatcher};
-pub use crate::core::traits::Service;
-pub use crate::service::interface::ServiceRegistry;
-pub use crate::memory::interface::{MemoryManager, PageAllocator};
-pub use crate::process::interface::{ProcessManager, Scheduler};
-pub use crate::factory::{ServiceFactory, MemoryManagerFactory, ProcessManagerFactory, SyscallDispatcherFactory};
-pub use crate::interfaces::*;
+pub use crate::{
+    core::{traits::Service, types::*},
+    error::{Error, Result},
+    factory::{
+        MemoryManagerFactory, ProcessManagerFactory, ServiceFactory, SyscallDispatcherFactory,
+    },
+    interfaces::*,
+    memory::interface::{MemoryManager, PageAllocator},
+    process::interface::{ProcessManager, Scheduler},
+    service::interface::ServiceRegistry,
+    syscall::interface::{SyscallDispatcher, SyscallHandler},
+};

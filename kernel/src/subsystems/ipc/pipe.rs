@@ -4,12 +4,12 @@
 // for communication between processes.
 
 extern crate alloc;
-use alloc::sync::Arc;
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, sync::Arc};
 
-use crate::subsystems::mm::PAGE_SIZE;
-use crate::subsystems::sync::Sleeplock;
-use crate::fs::file::{FileType, FILE_TABLE};
+use crate::{
+    fs::file::{FILE_TABLE, FileType},
+    subsystems::{mm::PAGE_SIZE, sync::Sleeplock},
+};
 
 /// Pipe buffer size
 pub const PIPE_SIZE: usize = PAGE_SIZE;
@@ -38,23 +38,27 @@ impl Pipe {
             write_subs: BTreeMap::new(),
         }
     }
-    
+
     /// Close the read end of the pipe
     pub fn close_read(&mut self) {
         self.readopen = false;
-        for (&chan, _) in self.write_subs.iter() { crate::process::wakeup(chan); }
+        for (&chan, _) in self.write_subs.iter() {
+            crate::process::wakeup(chan);
+        }
     }
-    
+
     /// Close the write end of the pipe
     pub fn close_write(&mut self) {
         self.writeopen = false;
-        for (&chan, _) in self.read_subs.iter() { crate::process::wakeup(chan); }
+        for (&chan, _) in self.read_subs.iter() {
+            crate::process::wakeup(chan);
+        }
     }
-    
+
     /// Write to the pipe
     pub fn write(&mut self, data: &[u8]) -> Result<usize, ()> {
         let mut written = 0;
-        
+
         for &byte in data {
             // Wait for space in the buffer
             while self.nwrite == self.nread + PIPE_SIZE {
@@ -63,26 +67,26 @@ impl Pipe {
                 }
                 break;
             }
-            
+
             if self.nwrite >= self.nread + PIPE_SIZE {
                 break;
             }
-            
+
             self.data[self.nwrite % PIPE_SIZE] = byte;
             self.nwrite += 1;
             written += 1;
         }
-        
+
         // Wakeup readers handled at caller
         Ok(written)
     }
-    
+
     /// Read from the pipe
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, ()> {
         if self.nread == self.nwrite && self.writeopen {
             // Caller will handle blocking
         }
-        
+
         let mut nread = 0;
         for byte in buf.iter_mut() {
             if self.nread == self.nwrite {
@@ -92,33 +96,63 @@ impl Pipe {
             self.nread += 1;
             nread += 1;
         }
-        
+
         // Wakeup writers handled at caller
         Ok(nread)
     }
 
-    pub fn subscribe_read(&mut self, chan: usize) { let c = self.read_subs.get(&chan).cloned().unwrap_or(0); self.read_subs.insert(chan, c+1); }
+    pub fn subscribe_read(&mut self, chan: usize) {
+        let c = self.read_subs.get(&chan).cloned().unwrap_or(0);
+        self.read_subs.insert(chan, c + 1);
+    }
 
-    pub fn subscribe_write(&mut self, chan: usize) { let c = self.write_subs.get(&chan).cloned().unwrap_or(0); self.write_subs.insert(chan, c+1); }
+    pub fn subscribe_write(&mut self, chan: usize) {
+        let c = self.write_subs.get(&chan).cloned().unwrap_or(0);
+        self.write_subs.insert(chan, c + 1);
+    }
 
-    pub fn unsubscribe_read(&mut self, chan: usize) { if let Some(c) = self.read_subs.get_mut(&chan) { if *c>1 { *c-=1; } else { self.read_subs.remove(&chan); } } }
+    pub fn unsubscribe_read(&mut self, chan: usize) {
+        if let Some(c) = self.read_subs.get_mut(&chan) {
+            if *c > 1 {
+                *c -= 1;
+            } else {
+                self.read_subs.remove(&chan);
+            }
+        }
+    }
 
-    pub fn unsubscribe_write(&mut self, chan: usize) { if let Some(c) = self.write_subs.get_mut(&chan) { if *c>1 { *c-=1; } else { self.write_subs.remove(&chan); } } }
+    pub fn unsubscribe_write(&mut self, chan: usize) {
+        if let Some(c) = self.write_subs.get_mut(&chan) {
+            if *c > 1 {
+                *c -= 1;
+            } else {
+                self.write_subs.remove(&chan);
+            }
+        }
+    }
 
-    pub fn notify_read_ready(&self) { for (&chan, _) in self.read_subs.iter() { crate::process::wakeup(chan); } }
+    pub fn notify_read_ready(&self) {
+        for (&chan, _) in self.read_subs.iter() {
+            crate::process::wakeup(chan);
+        }
+    }
 
-    pub fn notify_write_ready(&self) { for (&chan, _) in self.write_subs.iter() { crate::process::wakeup(chan); } }
-    
+    pub fn notify_write_ready(&self) {
+        for (&chan, _) in self.write_subs.iter() {
+            crate::process::wakeup(chan);
+        }
+    }
+
     /// Check if pipe is readable
     pub fn is_readable(&self) -> bool {
         self.nread < self.nwrite || self.writeopen
     }
-    
+
     /// Check if pipe is writable  
     pub fn is_writable(&self) -> bool {
         self.nwrite < self.nread + PIPE_SIZE || self.readopen
     }
-    
+
     /// Get number of bytes available to read
     pub fn available(&self) -> usize {
         self.nwrite - self.nread
@@ -141,7 +175,7 @@ pub fn pipe_alloc() -> Option<(usize, usize)> {
         None => {
             table.close(r);
             return None;
-        }
+        },
     };
     if let Some(f) = table.get_mut(r) {
         f.ftype = FileType::Pipe;
@@ -173,7 +207,7 @@ pub fn pipe_write(fd: usize, buf: &[u8]) -> isize {
             } else {
                 -1
             }
-        }
+        },
         _ => -1,
     }
 }
@@ -191,7 +225,7 @@ pub fn pipe_read(fd: usize, buf: &mut [u8]) -> isize {
             } else {
                 -1
             }
-        }
+        },
         _ => -1,
     }
 }

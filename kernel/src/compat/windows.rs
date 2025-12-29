@@ -5,13 +5,11 @@ extern crate alloc;
 
 extern crate hashbrown;
 
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::vec::Vec;
-use alloc::boxed::Box;
+use alloc::{boxed::Box, string::String, vec::Vec};
+
 use hashbrown::HashMap;
-use crate::compat::*;
-use crate::compat::DefaultHasherBuilder;
+
+use crate::compat::{DefaultHasherBuilder, *};
 
 /// Windows compatibility module
 pub struct WindowsModule {
@@ -52,7 +50,6 @@ impl PlatformModule for WindowsModule {
     fn shutdown(&mut self) -> Result<(), &'static str> {
         Ok(())
     }
-
 }
 
 /// Windows API registry
@@ -155,38 +152,69 @@ impl WindowsRegistry {
         // Add basic registry entries
         self.registry.insert(
             "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion".to_string(),
-            RegistryValue::String("6.1".to_string()) // Windows 7
+            RegistryValue::String("6.1".to_string()), // Windows 7
         );
 
         self.registry.insert(
             "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion".to_string(),
-            RegistryValue::String("Windows 7".to_string())
+            RegistryValue::String("Windows 7".to_string()),
         );
 
         // Register system DLLs
-        self.register_dll("kernel32.dll", "6.1.7600.16385", vec![
-            "CreateFileA".to_string(), "ReadFile".to_string(), "WriteFile".to_string(), "CloseHandle".to_string(), "GetLastError".to_string()
-        ]);
+        self.register_dll(
+            "kernel32.dll",
+            "6.1.7600.16385",
+            vec![
+                "CreateFileA".to_string(),
+                "ReadFile".to_string(),
+                "WriteFile".to_string(),
+                "CloseHandle".to_string(),
+                "GetLastError".to_string(),
+            ],
+        );
 
-        self.register_dll("user32.dll", "6.1.7600.16385", vec![
-            "MessageBoxA".to_string(), "CreateWindowExA".to_string(), "DestroyWindow".to_string(), "ShowWindow".to_string()
-        ]);
+        self.register_dll(
+            "user32.dll",
+            "6.1.7600.16385",
+            vec![
+                "MessageBoxA".to_string(),
+                "CreateWindowExA".to_string(),
+                "DestroyWindow".to_string(),
+                "ShowWindow".to_string(),
+            ],
+        );
 
-        self.register_dll("gdi32.dll", "6.1.7600.16385", vec![
-            "CreateCompatibleDC".to_string(), "CreateCompatibleBitmap".to_string(), "BitBlt".to_string()
-        ]);
+        self.register_dll(
+            "gdi32.dll",
+            "6.1.7600.16385",
+            vec![
+                "CreateCompatibleDC".to_string(),
+                "CreateCompatibleBitmap".to_string(),
+                "BitBlt".to_string(),
+            ],
+        );
 
-        self.register_dll("ntdll.dll", "6.1.7600.16385", vec![
-            "NtCreateFile".to_string(), "NtReadFile".to_string(), "NtWriteFile".to_string(), "NtClose".to_string()
-        ]);
+        self.register_dll(
+            "ntdll.dll",
+            "6.1.7600.16385",
+            vec![
+                "NtCreateFile".to_string(),
+                "NtReadFile".to_string(),
+                "NtWriteFile".to_string(),
+                "NtClose".to_string(),
+            ],
+        );
     }
 
     fn register_dll(&mut self, name: &str, version: &str, functions: Vec<String>) {
-        self.dll_registry.insert(name.to_string(), DllInfo {
-            path: format!("C:\\Windows\\System32\\{}", name),
-            version: version.to_string(),
-            functions,
-        });
+        self.dll_registry.insert(
+            name.to_string(),
+            DllInfo {
+                path: format!("C:\\Windows\\System32\\{}", name),
+                version: version.to_string(),
+                functions,
+            },
+        );
     }
 
     pub fn is_dll_available(&self, name: &str) -> bool {
@@ -222,9 +250,7 @@ pub enum ServiceState {
 
 impl WindowsServiceManager {
     pub fn new() -> Self {
-        Self {
-            services: HashMap::with_hasher(DefaultHasherBuilder),
-        }
+        Self { services: HashMap::with_hasher(DefaultHasherBuilder) }
     }
 }
 

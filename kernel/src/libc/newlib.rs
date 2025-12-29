@@ -20,9 +20,7 @@ extern crate alloc;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering};
 use core::ffi::{c_char, c_int, c_void};
-use core::ptr;
 use spin::Mutex;
 
 /// Newlib配置
@@ -1233,7 +1231,6 @@ pub mod libc_funcs {
         fn random() -> c_long {
             use core::sync::atomic::{AtomicU64, Ordering};
             static RANDOM_SEED: AtomicU64 = AtomicU64::new(12345);
-
             let seed = RANDOM_SEED.fetch_add(1, Ordering::SeqCst);
             // 简单的伪随机数生成器
             ((seed * 1103515245 + 12345) & 0x7fffffff) as c_long

@@ -5,16 +5,21 @@
 
 extern crate alloc;
 
-use alloc::format;
-use crate::reliability::{EINVAL, ENOENT, ENOMEM, EIO, EPERM};
-use crate::subsystems::cloud_native::oci::{OciContainerSpec, OciProcess, OciRoot, OciUser};
-use alloc::collections::BTreeMap;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::sync::Arc;
-use spin::Mutex;
-use alloc::vec::Vec;
+use alloc::{
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+
+use spin::Mutex;
+
+use crate::{
+    reliability::{EINVAL, EIO, ENOENT, ENOMEM, EPERM},
+    subsystems::cloud_native::oci::{OciContainerSpec, OciProcess, OciRoot, OciUser},
+};
 
 /// 容器ID类型
 pub type ContainerId = u64;
@@ -80,12 +85,7 @@ pub struct ContainerUser {
 
 impl Default for ContainerUser {
     fn default() -> Self {
-        Self {
-            uid: 0,
-            gid: 0,
-            username: None,
-            additional_gids: Vec::new(),
-        }
+        Self { uid: 0, gid: 0, username: None, additional_gids: Vec::new() }
     }
 }
 
@@ -107,9 +107,9 @@ pub struct ContainerResources {
 impl Default for ContainerResources {
     fn default() -> Self {
         Self {
-            memory_limit: Some(512 * 1024 * 1024), // 512MB默认内存限制
-            cpu_limit: Some(1.0),                    // 1个CPU核心
-            cpu_shares: Some(1024),                  // 默认CPU份额
+            memory_limit: Some(512 * 1024 * 1024),     // 512MB默认内存限制
+            cpu_limit: Some(1.0),                      // 1个CPU核心
+            cpu_shares: Some(1024),                    // 默认CPU份额
             disk_limit: Some(10 * 1024 * 1024 * 1024), // 10GB默认磁盘限制
             network_bandwidth: None,
         }
@@ -373,12 +373,7 @@ impl Container {
                     rx_packets: 0,
                     tx_packets: 0,
                 },
-                disk_io: DiskIOStats {
-                    read_bytes: 0,
-                    write_bytes: 0,
-                    reads: 0,
-                    writes: 0,
-                },
+                disk_io: DiskIOStats { read_bytes: 0, write_bytes: 0, reads: 0, writes: 0 },
             })),
         }
     }
@@ -410,7 +405,12 @@ impl Container {
         // 设置网络
         self.setup_network()?;
 
-        crate::println!("[container] Started container '{}' (ID: {}, PID: {})", self.name, self.id, pid);
+        crate::println!(
+            "[container] Started container '{}' (ID: {}, PID: {})",
+            self.name,
+            self.id,
+            pid
+        );
 
         // 更新统计信息
         self.update_stats();
@@ -517,14 +517,17 @@ impl Container {
             readonly: self.config.security.read_only_rootfs,
         };
 
-        let oci_mounts = self.config.mounts.iter().map(|m| {
-            crate::subsystems::cloud_native::oci::OciMount {
+        let oci_mounts = self
+            .config
+            .mounts
+            .iter()
+            .map(|m| crate::subsystems::cloud_native::oci::OciMount {
                 destination: m.destination.clone(),
                 source: m.source.clone(),
                 options: m.options.clone(),
                 typ: m.fs_type.clone(),
-            }
-        }).collect();
+            })
+            .collect();
 
         let oci_resources = self.create_oci_resources()?;
 
@@ -542,7 +545,9 @@ impl Container {
     }
 
     /// 创建OCI资源配置
-    fn create_oci_resources(&self) -> Result<Option<crate::subsystems::cloud_native::oci::OciLinuxResources>, i32> {
+    fn create_oci_resources(
+        &self,
+    ) -> Result<Option<crate::subsystems::cloud_native::oci::OciLinuxResources>, i32> {
         let mut memory = None;
         let mut cpu = None;
 
@@ -561,7 +566,11 @@ impl Container {
         // CPU限制
         if self.config.resources.cpu_limit.is_some() || self.config.resources.cpu_shares.is_some() {
             cpu = Some(crate::subsystems::cloud_native::oci::OciLinuxCpu {
-                quota: self.config.resources.cpu_limit.map(|limit| (limit * 1000000.0) as i64),
+                quota: self
+                    .config
+                    .resources
+                    .cpu_limit
+                    .map(|limit| (limit * 1000000.0) as i64),
                 period: Some(1000000), // 1秒
                 cpus: None,
                 mems: None,
@@ -582,7 +591,9 @@ impl Container {
     }
 
     /// 创建OCI Linux配置
-    fn create_oci_linux_config(&self) -> Result<crate::subsystems::cloud_native::oci::OciLinux, i32> {
+    fn create_oci_linux_config(
+        &self,
+    ) -> Result<crate::subsystems::cloud_native::oci::OciLinux, i32> {
         let mut namespaces = Vec::new();
 
         // 添加标准命名空间
@@ -663,18 +674,18 @@ impl Container {
             NetworkMode::Bridge => {
                 // 设置桥接网络
                 self.setup_bridge_network()?;
-            }
+            },
             NetworkMode::Host => {
                 // 使用主机网络，无需额外设置
-            }
+            },
             NetworkMode::None => {
                 // 无网络模式
                 self.setup_none_network()?;
-            }
+            },
             NetworkMode::Container => {
                 // 容器网络模式
                 self.setup_container_network()?;
-            }
+            },
         }
 
         // 设置端口映射
@@ -717,17 +728,21 @@ impl Container {
         for port_mapping in &self.config.network.port_mappings {
             match port_mapping.protocol {
                 PortProtocol::TCP => {
-                    crate::println!("[container] Setting up TCP port mapping {}:{} -> {}",
+                    crate::println!(
+                        "[container] Setting up TCP port mapping {}:{} -> {}",
                         port_mapping.host_ip.as_deref().unwrap_or("0.0.0.0"),
                         port_mapping.host_port,
-                        port_mapping.container_port);
-                }
+                        port_mapping.container_port
+                    );
+                },
                 PortProtocol::UDP => {
-                    crate::println!("[container] Setting up UDP port mapping {}:{} -> {}",
+                    crate::println!(
+                        "[container] Setting up UDP port mapping {}:{} -> {}",
                         port_mapping.host_ip.as_deref().unwrap_or("0.0.0.0"),
                         port_mapping.host_port,
-                        port_mapping.container_port);
-                }
+                        port_mapping.container_port
+                    );
+                },
             }
             // 在实际实现中，这里会设置iptables规则或其他网络配置
         }
@@ -737,7 +752,10 @@ impl Container {
     /// 清理容器资源
     fn cleanup_resources(&self) -> Result<(), i32> {
         // 清理cgroups
-        crate::subsystems::cloud_native::cgroups::cleanup_container_cgroups(&format!("{}", self.id))?;
+        crate::subsystems::cloud_native::cgroups::cleanup_container_cgroups(&format!(
+            "{}",
+            self.id
+        ))?;
 
         // 清理网络配置
         self.cleanup_network()?;
@@ -798,23 +816,13 @@ impl Container {
     /// 获取网络I/O统计
     fn get_network_io_stats(&self, pid: u32) -> NetworkIOStats {
         // 在实际实现中，这里会获取容器的网络I/O统计
-        NetworkIOStats {
-            rx_bytes: 0,
-            tx_bytes: 0,
-            rx_packets: 0,
-            tx_packets: 0,
-        }
+        NetworkIOStats { rx_bytes: 0, tx_bytes: 0, rx_packets: 0, tx_packets: 0 }
     }
 
     /// 获取磁盘I/O统计
     fn get_disk_io_stats(&self, pid: u32) -> DiskIOStats {
         // 在实际实现中，这里会获取容器的磁盘I/O统计
-        DiskIOStats {
-            read_bytes: 0,
-            write_bytes: 0,
-            reads: 0,
-            writes: 0,
-        }
+        DiskIOStats { read_bytes: 0, write_bytes: 0, reads: 0, writes: 0 }
     }
 
     /// 获取统计信息
@@ -889,16 +897,16 @@ impl ContainerManager {
 
     /// 获取活跃容器数量
     pub fn get_active_container_count(&self) -> usize {
-        self.containers.values()
-            .filter(|container| {
-                container.lock().state == ContainerState::Running
-            })
+        self.containers
+            .values()
+            .filter(|container| container.lock().state == ContainerState::Running)
             .count()
     }
 
     /// 列出所有容器
     pub fn list_containers(&self) -> Vec<ContainerStats> {
-        self.containers.values()
+        self.containers
+            .values()
             .map(|container| {
                 let container = container.lock();
                 container.get_stats()
@@ -912,7 +920,11 @@ impl ContainerManager {
             let mut cont = container.lock();
             if cont.state == ContainerState::Running {
                 if let Err(e) = cont.stop(Some(5)) {
-                    crate::println!("[container] Warning: Failed to stop container {}: {}", cont.id, e);
+                    crate::println!(
+                        "[container] Warning: Failed to stop container {}: {}",
+                        cont.id,
+                        e
+                    );
                 }
             }
         }
@@ -928,7 +940,11 @@ impl ContainerManager {
         let container_ids: Vec<ContainerId> = self.containers.keys().copied().collect();
         for container_id in container_ids {
             if let Err(e) = self.remove_container(container_id) {
-                crate::println!("[container] Warning: Failed to remove container {}: {}", container_id, e);
+                crate::println!(
+                    "[container] Warning: Failed to remove container {}: {}",
+                    container_id,
+                    e
+                );
             }
         }
 
@@ -959,9 +975,7 @@ pub fn init_container_manager() -> Result<(), i32> {
 
 /// 获取容器管理器引用
 pub fn get_container_manager() -> Option<&'static mut ContainerManager> {
-    unsafe {
-        CONTAINER_MANAGER.as_mut()
-    }
+    unsafe { CONTAINER_MANAGER.as_mut() }
 }
 
 /// 创建容器（便捷函数）

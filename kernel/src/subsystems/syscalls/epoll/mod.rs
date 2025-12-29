@@ -8,12 +8,16 @@
 
 extern crate alloc;
 
-use crate::subsystems::syscalls::SyscallResult;
-use crate::subsystems::sync::Mutex;
-use crate::fs::epoll::{EpollManager, EpollEvent, EPOLLIN, EPOLLOUT, EPOLLERR, EPOLLHUP};
 use alloc::collections::BTreeMap;
-use core::ffi::{c_int, c_void};
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::{
+    ffi::{c_int, c_void},
+    sync::atomic::{AtomicUsize, Ordering},
+};
+
+use crate::{
+    fs::epoll::{EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLOUT, EpollEvent, EpollManager},
+    subsystems::{sync::Mutex, syscalls::SyscallResult},
+};
 
 /// GLib epoll error types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

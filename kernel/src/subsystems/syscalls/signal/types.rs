@@ -1,5 +1,5 @@
 //! 信号系统调用类型定义
-//! 
+//!
 //! 本模块定义了信号系统调用相关的数据类型，包括：
 //! - 信号编号和信号集
 //! - 信号处理程序定义
@@ -13,7 +13,7 @@ use core::fmt;
 pub type SignalNumber = i32;
 
 /// 信号集
-/// 
+///
 /// 表示一组信号，用于信号掩码和挂起信号集合
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SignalSet {
@@ -96,23 +96,17 @@ impl SignalSet {
 
     /// 信号集的按位与操作
     pub fn and(&self, other: &SignalSet) -> SignalSet {
-        SignalSet {
-            bits: self.bits & other.bits,
-        }
+        SignalSet { bits: self.bits & other.bits }
     }
 
     /// 信号集的按位或操作
     pub fn or(&self, other: &SignalSet) -> SignalSet {
-        SignalSet {
-            bits: self.bits | other.bits,
-        }
+        SignalSet { bits: self.bits | other.bits }
     }
 
     /// 信号集的按位异或操作
     pub fn xor(&self, other: &SignalSet) -> SignalSet {
-        SignalSet {
-            bits: self.bits ^ other.bits,
-        }
+        SignalSet { bits: self.bits ^ other.bits }
     }
 
     /// 信号集的按位取反操作
@@ -155,7 +149,7 @@ impl fmt::Display for SignalSet {
 }
 
 /// 信号处理程序
-/// 
+///
 /// 定义了进程接收到信号时的处理方式
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SignalAction {
@@ -200,11 +194,7 @@ impl SignalAction {
         mask: SignalSet,
         flags: SignalFlags,
     ) -> Self {
-        SignalAction::Handler {
-            handler,
-            mask,
-            flags,
-        }
+        SignalAction::Handler { handler, mask, flags }
     }
 
     /// 检查是否是默认处理程序
@@ -254,7 +244,7 @@ impl Default for SignalAction {
 }
 
 /// 信号处理程序标志
-/// 
+///
 /// 控制信号处理程序的行为
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SignalFlags {
@@ -326,7 +316,7 @@ pub enum SignalFlag {
 }
 
 /// 信号掩码操作类型
-/// 
+///
 /// 用于sigprocmask系统调用，指定如何修改信号掩码
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -340,7 +330,7 @@ pub enum SigmaskHow {
 }
 
 /// 信号上下文
-/// 
+///
 /// 保存信号处理时的进程上下文信息
 #[derive(Debug, Clone)]
 pub struct SignalContext {
@@ -363,7 +353,7 @@ pub struct SignalContext {
 }
 
 /// 信号寄存器状态
-/// 
+///
 /// 保存信号处理时的CPU寄存器状态
 #[derive(Debug, Clone)]
 pub struct SignalRegisters {
@@ -379,17 +369,12 @@ pub struct SignalRegisters {
 
 impl Default for SignalRegisters {
     fn default() -> Self {
-        Self {
-            general: [0; 16],
-            pc: 0,
-            sp: 0,
-            status: 0,
-        }
+        Self { general: [0; 16], pc: 0, sp: 0, status: 0 }
     }
 }
 
 /// 信号栈
-/// 
+///
 /// 用于信号处理的替代栈
 #[derive(Debug, Clone)]
 pub struct SignalStack {
@@ -547,25 +532,25 @@ mod tests {
     #[test]
     fn test_signal_set() {
         let mut set = SignalSet::empty();
-        
+
         // 测试添加和检查信号
         assert!(!set.contains(1));
         set.add(1);
         assert!(set.contains(1));
-        
+
         // 测试移除信号
         set.remove(1);
         assert!(!set.contains(1));
-        
+
         // 测试空和满
         assert!(set.is_empty());
         set.fill();
         assert!(set.is_full());
-        
+
         // 测试转换为向量
         let signals = set.to_vec();
         assert_eq!(signals.len(), 64);
-        
+
         // 测试从向量创建
         let set2 = SignalSet::from_vec(&[1, 2, 3]);
         assert!(set2.contains(1));
@@ -581,13 +566,13 @@ mod tests {
         assert!(action.is_default());
         assert!(!action.is_ignore());
         assert!(!action.is_handler());
-        
+
         // 测试忽略处理程序
         let action = SignalAction::ignore();
         assert!(action.is_ignore());
         assert!(!action.is_default());
         assert!(!action.is_handler());
-        
+
         // 测试自定义处理程序
         let action = SignalAction::handler(0x12345678);
         assert!(action.is_handler());
@@ -599,16 +584,16 @@ mod tests {
     #[test]
     fn test_signal_flags() {
         let mut flags = SignalFlags::empty();
-        
+
         // 测试添加和检查标志
         assert!(!flags.contains(SignalFlag::SA_RESTART));
         flags.add(SignalFlag::SA_RESTART);
         assert!(flags.contains(SignalFlag::SA_RESTART));
-        
+
         // 测试移除标志
         flags.remove(SignalFlag::SA_RESTART);
         assert!(!flags.contains(SignalFlag::SA_RESTART));
-        
+
         // 测试空
         assert!(flags.is_empty());
     }
@@ -616,12 +601,12 @@ mod tests {
     #[test]
     fn test_signal_stack_flags() {
         let mut flags = SignalStackFlags::empty();
-        
+
         // 测试添加和检查标志
         assert!(!flags.contains(SignalStackFlag::SS_DISABLE));
         flags.add(SignalStackFlag::SS_DISABLE);
         assert!(flags.contains(SignalStackFlag::SS_DISABLE));
-        
+
         // 测试移除标志
         flags.remove(SignalStackFlag::SS_DISABLE);
         assert!(!flags.contains(SignalStackFlag::SS_DISABLE));
@@ -630,17 +615,17 @@ mod tests {
     #[test]
     fn test_signals() {
         use signals::*;
-        
+
         // 测试信号名称
         assert_eq!(signal_name(SIGTERM), "SIGTERM");
         assert_eq!(signal_name(999), "UNKNOWN");
-        
+
         // 测试信号类型检查
         assert!(is_standard_signal(SIGINT));
         assert!(!is_standard_signal(32));
         assert!(is_realtime_signal(32));
         assert!(!is_realtime_signal(SIGINT));
-        
+
         // 测试可捕获性
         assert!(is_catchable(SIGINT));
         assert!(!is_catchable(SIGKILL));

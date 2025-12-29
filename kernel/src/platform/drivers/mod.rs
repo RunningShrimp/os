@@ -1,22 +1,20 @@
 // Device drivers for xv6-rust
 // Provides block device abstraction and implementations
 
-pub mod uart;
 pub mod console;
 pub mod device_manager;
-pub mod syscon;
 pub mod gic;
 pub mod gicv3;
-pub mod platform;
 pub mod nvme;
+pub mod platform;
+pub mod syscon;
+pub mod uart;
 pub mod usb;
 pub mod virtio_gpu;
 
-use crate::subsystems::sync::Mutex;
-use crate::posix;
-
 // Re-export driver manager functions
 pub use crate::services::driver::get_driver_manager;
+use crate::{posix, subsystems::sync::Mutex};
 
 // ============================================================================
 // Block Device Trait
@@ -26,18 +24,18 @@ pub use crate::services::driver::get_driver_manager;
 pub trait BlockDevice: Send + Sync {
     /// Read a block from the device
     fn read(&self, lba: usize, buf: &mut [u8]);
-    
+
     /// Write a block to the device
     fn write(&self, lba: usize, buf: &[u8]);
-    
+
     /// Get block size in bytes
     fn block_size(&self) -> usize {
         512
     }
-    
+
     /// Get total number of blocks
     fn num_blocks(&self) -> usize;
-    
+
     /// Flush any cached writes
     fn flush(&self) {}
 }
@@ -85,49 +83,6 @@ impl BlockDevice for RamDisk {
 }
 
 // ============================================================================
-// VirtIO Block Device (placeholder)
-// ============================================================================
-
-/// VirtIO block device configuration
-#[allow(dead_code)]
-pub struct VirtioBlk {
-    base: usize,
-    capacity: u64,
-}
-
-#[allow(dead_code)]
-impl VirtioBlk {
-    pub fn new(base: usize) -> Option<Self> {
-        // TODO: Initialize VirtIO device
-        Some(Self {
-            base,
-            capacity: 0,
-        })
-    }
-
-    /// Probe for VirtIO device
-    pub fn probe(base: usize) -> bool {
-        // Check magic number
-        let magic = crate::subsystems::mm::mmio_read32(base as *const u32);
-        magic == 0x74726976 // "virt"
-    }
-}
-
-impl BlockDevice for VirtioBlk {
-    fn read(&self, _lba: usize, _buf: &mut [u8]) {
-        // TODO: Implement VirtIO read
-    }
-
-    fn write(&self, _lba: usize, _buf: &[u8]) {
-        // TODO: Implement VirtIO write
-    }
-
-    fn num_blocks(&self) -> usize {
-        self.capacity as usize
-    }
-}
-
-// ============================================================================
 // Console Device
 // ============================================================================
 
@@ -143,11 +98,7 @@ pub struct Console {
 
 impl Console {
     pub const fn new() -> Self {
-        Self {
-            buf: [0; CONSOLE_BUF_SIZE],
-            read_idx: 0,
-            write_idx: 0,
-        }
+        Self { buf: [0; CONSOLE_BUF_SIZE], read_idx: 0, write_idx: 0 }
     }
 
     /// Add character to input buffer
@@ -191,21 +142,21 @@ static CONSOLE_SUBS: Mutex<Vec<usize>> = Mutex::new(Vec::new());
 /// Handle console interrupt (character received)
 pub fn console_intr(c: u8) {
     let mut console = CONSOLE.lock();
-    
+
     // Handle special characters
     match c {
         // Backspace
         0x7F | 0x08 => {
             // TODO: Handle backspace
-        }
+        },
         // Ctrl-C
         0x03 => {
             // TODO: Send SIGINT
-        }
+        },
         // Ctrl-D (EOF)
         0x04 => {
             console.push(c);
-        }
+        },
         // Regular character
         _ => {
             console.push(c);
@@ -214,19 +165,21 @@ pub fn console_intr(c: u8) {
             if c == b'\r' {
                 crate::drivers::uart::write_byte(b'\n');
             }
-        }
+        },
     }
-    
+
     // Wake up processes waiting for input
     crate::process::wakeup(&CONSOLE as *const _ as usize);
     let subs = CONSOLE_SUBS.lock();
-    for &chan in subs.iter() { crate::process::wakeup(chan); }
+    for &chan in subs.iter() {
+        crate::process::wakeup(chan);
+    }
 }
 
 /// Read from console
 pub fn console_read(buf: &mut [u8]) -> usize {
     let mut count = 0;
-    
+
     for byte in buf.iter_mut() {
         loop {
             let mut console = CONSOLE.lock();
@@ -236,12 +189,12 @@ pub fn console_read(buf: &mut [u8]) -> usize {
                 break;
             }
             drop(console);
-            
+
             // Sleep waiting for input
             crate::process::sleep(&CONSOLE as *const _ as usize);
         }
     }
-    
+
     count
 }
 
@@ -258,11 +211,15 @@ pub fn device_poll(major: i16, _minor: i16) -> i16 {
         1 => {
             let c = CONSOLE.lock();
             let mut ev: i16 = 0;
-            if !c.is_empty() { ev |= posix::POLLIN; }
+            if !c.is_empty() {
+                ev |= posix::POLLIN;
+            }
             ev |= posix::POLLOUT;
-            if !CONSOLE_SUBS.lock().is_empty() { ev |= posix::POLLPRI; }
+            if !CONSOLE_SUBS.lock().is_empty() {
+                ev |= posix::POLLPRI;
+            }
             ev
-        }
+        },
         _ => posix::POLLERR,
     }
 }
@@ -271,9 +228,11 @@ pub fn device_subscribe(major: i16, _minor: i16, _events: i16, chan: usize) {
     match major {
         1 => {
             let mut subs = CONSOLE_SUBS.lock();
-            if !subs.contains(&chan) { subs.push(chan); }
-        }
-        _ => {}
+            if !subs.contains(&chan) {
+                subs.push(chan);
+            }
+        },
+        _ => {},
     }
 }
 
@@ -281,9 +240,11 @@ pub fn device_unsubscribe(major: i16, _minor: i16, chan: usize) {
     match major {
         1 => {
             let mut subs = CONSOLE_SUBS.lock();
-            if let Some(pos) = subs.iter().position(|c| *c == chan) { subs.remove(pos); }
-        }
-        _ => {}
+            if let Some(pos) = subs.iter().position(|c| *c == chan) {
+                subs.remove(pos);
+            }
+        },
+        _ => {},
     }
 }
 
@@ -295,9 +256,9 @@ pub fn device_unsubscribe(major: i16, _minor: i16, chan: usize) {
 pub fn init() {
     // RAM disk is always available
     crate::println!("drivers: ramdisk {} blocks", RamDisk.num_blocks());
-    
+
     // TODO: Probe for other devices (VirtIO, etc.)
-    
+
     #[cfg(target_arch = "aarch64")]
     {
         if let Some((dist, redist)) = crate::drivers::platform::gicv3_bases() {
@@ -320,8 +281,11 @@ pub fn init_ap() {
     {
         if let Some((dist, _)) = crate::drivers::platform::gicv3_bases() {
             let mpidr: u64;
-            unsafe { core::arch::asm!("mrs {}, mpidr_el1", out(reg) mpidr); }
-            let redist = crate::drivers::platform::gicr_lookup(mpidr).or_else(|| crate::drivers::platform::gicr_default());
+            unsafe {
+                core::arch::asm!("mrs {}, mpidr_el1", out(reg) mpidr);
+            }
+            let redist = crate::drivers::platform::gicr_lookup(mpidr)
+                .or_else(|| crate::drivers::platform::gicr_default());
             if let Some(r) = redist {
                 let gic = crate::drivers::gicv3::GicV3::new(dist, r);
                 gic.cpu_enable();

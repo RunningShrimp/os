@@ -1,10 +1,10 @@
 //! Stack Canaries Implementation
-//! 
+//!
 //! Provides stack buffer overflow protection through canary values
 //! placed between local variables and the return address on the stack.
 
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+
 use spin::Mutex;
 
 /// Stack canary configuration
@@ -123,9 +123,9 @@ impl ThreadCanaryContext {
     }
 
     pub fn validate_frame(&self, stack_pointer: usize, expected_canary: u64) -> bool {
-        self.frame_canaries.iter().any(|(sp, canary)| {
-            *sp == stack_pointer && *canary == expected_canary
-        })
+        self.frame_canaries
+            .iter()
+            .any(|(sp, canary)| *sp == stack_pointer && *canary == expected_canary)
     }
 }
 
@@ -207,13 +207,13 @@ impl StackCanarySubsystem {
     fn get_cpu_entropy(&self) -> u64 {
         // Use CPU-specific information
         let mut entropy = 0u64;
-        
+
         // CPU frequency (simplified)
         entropy ^= 0x1234567890abcdef; // Placeholder for actual CPU frequency
-        
+
         // Core ID
         entropy ^= crate::arch::current_cpu_id() as u64;
-        
+
         entropy
     }
 
@@ -221,13 +221,13 @@ impl StackCanarySubsystem {
     fn get_memory_entropy(&self) -> u64 {
         // Use memory layout information
         let mut entropy = 0u64;
-        
+
         // Stack pointer
         entropy ^= self.get_stack_pointer() as u64;
-        
+
         // Heap start (simplified)
         entropy ^= 0xabcdef1234567890; // Placeholder for actual heap start
-        
+
         entropy
     }
 
@@ -247,13 +247,13 @@ impl StackCanarySubsystem {
     fn get_process_entropy(&self) -> u64 {
         // Use process-specific information
         let mut entropy = 0u64;
-        
+
         // Process ID
         entropy ^= crate::process::current_pid() as u64;
-        
+
         // Parent process ID
         entropy ^= crate::process::parent_pid() as u64;
-        
+
         entropy
     }
 
@@ -270,52 +270,52 @@ impl StackCanarySubsystem {
     pub fn generate_canary(&self, thread_id: u64) -> u64 {
         let generation = self.generation_counter.fetch_add(1, Ordering::SeqCst);
         let base_seed = self.global_seed.load(Ordering::SeqCst);
-        
+
         let mut canary = base_seed;
-        
+
         // Mix in thread ID
         canary ^= thread_id;
-        
+
         // Mix in generation counter
         canary ^= generation as u64;
-        
+
         // Mix in timestamp
         canary ^= self.get_timestamp_entropy();
-        
+
         // Add additional mixing based on configuration
         if self.config.high_entropy_canaries {
             canary ^= self.get_cpu_entropy();
             canary ^= self.get_memory_entropy();
-            
+
             // Rotate and mix
             canary = canary.rotate_left(13);
             canary ^= canary >> 7;
             canary = canary.rotate_left(17);
         }
-        
+
         // Ensure canary doesn't have common patterns
         canary &= 0xFFFFFFFFFFFFFF00u64; // Clear low byte to avoid null bytes
         canary |= 0xFF; // Set low byte to 0xFF for easy detection
-        
+
         self.stats.canary_generations.fetch_add(1, Ordering::SeqCst);
-        
+
         canary
     }
 
     /// Get or create thread canary context
     fn get_thread_context(&self, thread_id: u64) -> ThreadCanaryContext {
         let mut contexts = self.thread_contexts.lock();
-        
+
         // Find existing context
         if let Some(ctx) = contexts.iter().find(|ctx| ctx.thread_id == thread_id) {
             return ctx.clone();
         }
-        
+
         // Create new context
         let mut ctx = ThreadCanaryContext::new(thread_id);
         ctx.current_canary = self.generate_canary(thread_id);
         contexts.push(ctx.clone());
-        
+
         ctx
     }
 
@@ -332,30 +332,34 @@ impl StackCanarySubsystem {
     /// Insert canary at function entry
     pub fn insert_canary(&self, thread_id: u64) -> u64 {
         let mut context = self.get_thread_context(thread_id);
-        
+
         // Generate new canary if needed
         if context.generation_counter % self.config.randomization_interval == 0 {
             context.current_canary = self.generate_canary(thread_id);
         }
-        
+
         let stack_pointer = self.get_stack_pointer();
         let canary = context.current_canary;
-        
+
         context.push_frame(stack_pointer, canary);
         context.generation_counter += 1;
-        
+
         self.update_thread_context(thread_id, context);
-        
+
         canary
     }
 
     /// Validate canary at function exit
-    pub fn validate_canary(&self, thread_id: u64, expected_canary: u64) -> Result<(), CanaryCorruptionInfo> {
+    pub fn validate_canary(
+        &self,
+        thread_id: u64,
+        expected_canary: u64,
+    ) -> Result<(), CanaryCorruptionInfo> {
         let stack_pointer = self.get_stack_pointer();
         let context = self.get_thread_context(thread_id);
-        
+
         self.stats.total_validations.fetch_add(1, Ordering::SeqCst);
-        
+
         // Check if canary matches
         if !context.validate_frame(stack_pointer, expected_canary) {
             let corruption_info = CanaryCorruptionInfo {
@@ -366,22 +370,26 @@ impl StackCanarySubsystem {
                 stack_pointer,
                 timestamp: self.get_timestamp_entropy(),
             };
-            
-            self.stats.corruptions_detected.fetch_add(1, Ordering::SeqCst);
-            
+
+            self.stats
+                .corruptions_detected
+                .fetch_add(1, Ordering::SeqCst);
+
             // Handle corruption
             self.handle_canary_corruption(&corruption_info);
-            
+
             return Err(corruption_info);
         }
-        
-        self.stats.successful_validations.fetch_add(1, Ordering::SeqCst);
-        
+
+        self.stats
+            .successful_validations
+            .fetch_add(1, Ordering::SeqCst);
+
         // Pop frame from context
         let mut context = context;
         context.pop_frame();
         self.update_thread_context(thread_id, context);
-        
+
         Ok(())
     }
 
@@ -390,28 +398,31 @@ impl StackCanarySubsystem {
         match self.config.corruption_action {
             CanaryCorruptionAction::Terminate => {
                 crate::process::terminate_process(corruption_info.thread_id);
-            }
+            },
             CanaryCorruptionAction::RaiseException => {
                 crate::arch::raise_security_exception("Stack canary corruption detected");
-            }
+            },
             CanaryCorruptionAction::LogAndContinue => {
                 log::error!("Stack canary corruption detected: {:?}", corruption_info);
-            }
+            },
             CanaryCorruptionAction::CustomHandler(handler) => {
                 handler(corruption_info);
-            }
+            },
         }
     }
 
     /// Validate all canaries for a thread (used on context switch)
-    pub fn validate_thread_canaries(&self, thread_id: u64) -> Result<(), Vec<CanaryCorruptionInfo>> {
+    pub fn validate_thread_canaries(
+        &self,
+        thread_id: u64,
+    ) -> Result<(), Vec<CanaryCorruptionInfo>> {
         if !self.config.validate_on_context_switch {
             return Ok(());
         }
-        
+
         let context = self.get_thread_context(thread_id);
         let mut corruptions = Vec::new();
-        
+
         // Validate all frame canaries
         for (stack_pointer, expected_canary) in &context.frame_canaries {
             // In a real implementation, we would read the actual canary from the stack
@@ -428,7 +439,7 @@ impl StackCanarySubsystem {
                 corruptions.push(corruption_info);
             }
         }
-        
+
         if !corruptions.is_empty() {
             for corruption in &corruptions {
                 self.handle_canary_corruption(corruption);
@@ -475,9 +486,7 @@ pub fn init_stack_canaries(config: CanaryConfig) -> Result<(), &'static str> {
 
 /// Get the global stack canary subsystem
 pub fn get_stack_canary_subsystem() -> Option<&'static StackCanarySubsystem> {
-    unsafe {
-        STACK_CANARY_SUBSYSTEM.as_ref()
-    }
+    unsafe { STACK_CANARY_SUBSYSTEM.as_ref() }
 }
 
 /// Insert a stack canary (called at function entry)
@@ -487,7 +496,7 @@ macro_rules! stack_canary_enter {
         if let Some(subsystem) = $crate::security::stack_canaries::get_stack_canary_subsystem() {
             let thread_id = $crate::process::current_thread_id();
             let canary = subsystem.insert_canary(thread_id);
-            
+
             // Store canary on stack
             #[cfg(target_arch = "x86_64")]
             unsafe {
@@ -506,7 +515,7 @@ macro_rules! stack_canary_exit {
     () => {
         if let Some(subsystem) = $crate::security::stack_canaries::get_stack_canary_subsystem() {
             let thread_id = $crate::process::current_thread_id();
-            
+
             // Read canary from stack
             #[cfg(target_arch = "x86_64")]
             let canary: u64 = unsafe {
@@ -517,10 +526,10 @@ macro_rules! stack_canary_exit {
                 );
                 canary_val
             };
-            
+
             #[cfg(not(target_arch = "x86_64"))]
             let canary = 0u64; // Placeholder for other architectures
-            
+
             if let Err(corruption) = subsystem.validate_canary(thread_id, canary) {
                 // Handle corruption (already done by subsystem)
                 log::error!("Stack canary corruption detected: {:?}", corruption);
@@ -554,7 +563,7 @@ impl StackCanaryGuard {
         } else {
             0
         };
-        
+
         Self { thread_id, canary }
     }
 }

@@ -87,10 +87,7 @@ pub struct ElfLoader {
 
 impl ElfLoader {
     pub fn new(base: u64, size: u64) -> Self {
-        Self {
-            image_base: base,
-            image_size: size,
-        }
+        Self { image_base: base, image_size: size }
     }
 
     pub fn validate_header(&self, header: &ElfHeader64) -> Result<(), &'static str> {
@@ -137,8 +134,7 @@ impl ElfLoader {
                 return Err("Program header out of bounds");
             }
 
-            let ph_ptr =
-                &image_data[offset] as *const u8 as *const ProgramHeader64;
+            let ph_ptr = &image_data[offset] as *const u8 as *const ProgramHeader64;
             let ph = unsafe { &*ph_ptr };
 
             // Only load PT_LOAD segments
@@ -161,11 +157,7 @@ impl ElfLoader {
                 // Zero out BSS (memory size > file size)
                 if ph.p_memsz > ph.p_filesz {
                     let bss_size = (ph.p_memsz - ph.p_filesz) as usize;
-                    core::ptr::write_bytes(
-                        dst.add(ph.p_filesz as usize),
-                        0,
-                        bss_size,
-                    );
+                    core::ptr::write_bytes(dst.add(ph.p_filesz as usize), 0, bss_size);
                 }
             }
 
@@ -206,8 +198,7 @@ impl ElfLoader {
                 return Err("Section header out of bounds");
             }
 
-            let sh_ptr =
-                &image_data[offset] as *const u8 as *const SectionHeader64;
+            let sh_ptr = &image_data[offset] as *const u8 as *const SectionHeader64;
             let sh = unsafe { &*sh_ptr };
 
             // Process relocation sections
@@ -242,8 +233,7 @@ impl ElfLoader {
                 return Err("Relocation entry out of bounds");
             }
 
-            let rel_ptr =
-                &image_data[offset] as *const u8 as *const RelocationEntry64;
+            let rel_ptr = &image_data[offset] as *const u8 as *const RelocationEntry64;
             let rel = unsafe { &*rel_ptr };
 
             // Apply relocation (simplified - actual implementation depends on
@@ -258,9 +248,7 @@ impl ElfLoader {
     }
 }
 
-pub fn load_elf_kernel(
-    kernel_data: &[u8],
-) -> Result<(u64, u64), &'static str> {
+pub fn load_elf_kernel(kernel_data: &[u8]) -> Result<(u64, u64), &'static str> {
     if kernel_data.len() < mem::size_of::<ElfHeader64>() {
         return Err("Kernel data too small");
     }

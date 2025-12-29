@@ -14,12 +14,13 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::format;
-use alloc::string::String;
-use alloc::string::ToString;
+use alloc::{
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use spin::Mutex;
@@ -511,7 +512,7 @@ pub struct NvmeIoRequest {
     /// 请求类型
     pub request_type: NvmeIoRequestType,
     /// 完成回调
-    pub completion_callback: Option<alloc::sync::Arc<dyn Fn(Result<(), NvmeError>) + Send + Sync>>, 
+    pub completion_callback: Option<alloc::sync::Arc<dyn Fn(Result<(), NvmeError>) + Send + Sync>>,
 }
 
 /// NVMe I/O请求类型
@@ -577,11 +578,7 @@ impl NvmeController {
             config,
             state: Arc::new(Mutex::new(NvmeControllerState::Uninitialized)),
             namespaces: Arc::new(Mutex::new(BTreeMap::new())),
-            admin_queue: Arc::new(Mutex::new(NvmeQueue::new(
-                0,
-                NvmeQueueType::Admin,
-                64,
-            ))),
+            admin_queue: Arc::new(Mutex::new(NvmeQueue::new(0, NvmeQueueType::Admin, 64))),
             io_queues: Arc::new(Mutex::new(Vec::new())),
             pending_commands: Arc::new(Mutex::new(BTreeMap::new())),
             statistics: NvmeStatistics::default(),
@@ -652,7 +649,11 @@ impl NvmeController {
                 return Err(NvmeError::TimeoutError);
             }
 
-            timeout = Duration::from_millis(self.config.timeout_ms.saturating_sub(elapsed.min(u32::MAX as u64) as u32) as u64);
+            timeout = Duration::from_millis(
+                self.config
+                    .timeout_ms
+                    .saturating_sub(elapsed.min(u32::MAX as u64) as u32) as u64,
+            );
             crate::arch::wfi(); // 等待中断
         }
 
@@ -686,7 +687,11 @@ impl NvmeController {
                 return Err(NvmeError::TimeoutError);
             }
 
-            timeout = Duration::from_millis(self.config.timeout_ms.saturating_sub(elapsed.min(u32::MAX as u64) as u32) as u64);
+            timeout = Duration::from_millis(
+                self.config
+                    .timeout_ms
+                    .saturating_sub(elapsed.min(u32::MAX as u64) as u32) as u64,
+            );
             crate::arch::wfi();
         }
 
@@ -781,8 +786,12 @@ impl NvmeController {
         pending.insert(command_id, nvme_command_for_tracking);
 
         // 更新统计
-        self.statistics.current_queue_depth.fetch_add(1, Ordering::SeqCst);
-        self.statistics.total_commands.fetch_add(1, Ordering::SeqCst);
+        self.statistics
+            .current_queue_depth
+            .fetch_add(1, Ordering::SeqCst);
+        self.statistics
+            .total_commands
+            .fetch_add(1, Ordering::SeqCst);
 
         Ok(request_id)
     }
@@ -790,7 +799,8 @@ impl NvmeController {
     /// 获取命名空间
     pub fn get_namespace(&self, namespace_id: u32) -> Result<NvmeNamespace, NvmeError> {
         let namespaces = self.namespaces.lock();
-        namespaces.get(&namespace_id)
+        namespaces
+            .get(&namespace_id)
             .cloned()
             .ok_or(NvmeError::NamespaceError(format!("命名空间 {} 不存在", namespace_id)))
     }
@@ -805,16 +815,26 @@ impl NvmeController {
     pub fn get_statistics(&self) -> NvmeStatistics {
         NvmeStatistics {
             total_commands: AtomicU64::new(self.statistics.total_commands.load(Ordering::SeqCst)),
-            successful_commands: AtomicU64::new(self.statistics.successful_commands.load(Ordering::SeqCst)),
+            successful_commands: AtomicU64::new(
+                self.statistics.successful_commands.load(Ordering::SeqCst),
+            ),
             failed_commands: AtomicU64::new(self.statistics.failed_commands.load(Ordering::SeqCst)),
             bytes_read: AtomicU64::new(self.statistics.bytes_read.load(Ordering::SeqCst)),
             bytes_written: AtomicU64::new(self.statistics.bytes_written.load(Ordering::SeqCst)),
             read_operations: AtomicU64::new(self.statistics.read_operations.load(Ordering::SeqCst)),
-            write_operations: AtomicU64::new(self.statistics.write_operations.load(Ordering::SeqCst)),
-            average_latency_us: AtomicU64::new(self.statistics.average_latency_us.load(Ordering::SeqCst)),
+            write_operations: AtomicU64::new(
+                self.statistics.write_operations.load(Ordering::SeqCst),
+            ),
+            average_latency_us: AtomicU64::new(
+                self.statistics.average_latency_us.load(Ordering::SeqCst),
+            ),
             error_retries: AtomicU64::new(self.statistics.error_retries.load(Ordering::SeqCst)),
-            current_queue_depth: AtomicUsize::new(self.statistics.current_queue_depth.load(Ordering::SeqCst)),
-            max_queue_depth: AtomicUsize::new(self.statistics.max_queue_depth.load(Ordering::SeqCst)),
+            current_queue_depth: AtomicUsize::new(
+                self.statistics.current_queue_depth.load(Ordering::SeqCst),
+            ),
+            max_queue_depth: AtomicUsize::new(
+                self.statistics.max_queue_depth.load(Ordering::SeqCst),
+            ),
         }
     }
 
@@ -986,7 +1006,11 @@ impl NvmeController {
         Ok(())
     }
 
-    fn io_request_to_command(&self, request: &NvmeIoRequest, command_id: u16) -> Result<NvmeCommand, NvmeError> {
+    fn io_request_to_command(
+        &self,
+        request: &NvmeIoRequest,
+        command_id: u16,
+    ) -> Result<NvmeCommand, NvmeError> {
         let opcode = match request.request_type {
             NvmeIoRequestType::Read => NvmeOpcode::Nvm(NvmOpcode::Read),
             NvmeIoRequestType::Write => NvmeOpcode::Nvm(NvmOpcode::Write),
@@ -1001,7 +1025,9 @@ impl NvmeController {
             flags: 0,
             namespace_id: request.namespace_id,
             reserved: [0; 2],
-            metadata_ptr: request.metadata_buffer.as_ref()
+            metadata_ptr: request
+                .metadata_buffer
+                .as_ref()
                 .map_or(0, |buf| buf.as_ptr() as u64),
             data_ptr: request.data_buffer.as_ptr() as u64,
             data_length: request.data_buffer.len() as u32,
@@ -1014,7 +1040,11 @@ impl NvmeController {
         })
     }
 
-    fn submit_command_to_queue(&self, queue: &mut NvmeQueue, command: NvmeCommand) -> Result<u16, NvmeError> {
+    fn submit_command_to_queue(
+        &self,
+        queue: &mut NvmeQueue,
+        command: NvmeCommand,
+    ) -> Result<u16, NvmeError> {
         queue.submit_command(command)
     }
 
@@ -1027,7 +1057,10 @@ impl NvmeController {
 
         // 设置完成队列地址（假设与提交队列相邻）
         let completion_queue_addr = admin_queue_addr + 4096; // 简化假设
-        self.write_register(NvmeRegister::AdminCompletionQueueAddr, (completion_queue_addr >> 2) as u32);
+        self.write_register(
+            NvmeRegister::AdminCompletionQueueAddr,
+            (completion_queue_addr >> 2) as u32,
+        );
 
         Ok(())
     }
@@ -1043,9 +1076,7 @@ impl NvmeController {
     fn read_register(&self, register: NvmeRegister) -> u32 {
         // 简化实现，实际需要从硬件寄存器读取
         let address = self.register_base + register as usize;
-        unsafe {
-            *(address as *const u32)
-        }
+        unsafe { *(address as *const u32) }
     }
 }
 
@@ -1096,19 +1127,22 @@ impl NvmeQueue {
 
         let mut completions = self.completion_queue.lock();
         completions.clear();
-        completions.resize(self.size as usize, NvmeCompletion {
-            command_id: 0,
-            status: NvmeStatus {
-                status_code: 0,
-                status_type: NvmeStatusType::Generic,
-                more: false,
-                reserved: 0,
+        completions.resize(
+            self.size as usize,
+            NvmeCompletion {
+                command_id: 0,
+                status: NvmeStatus {
+                    status_code: 0,
+                    status_type: NvmeStatusType::Generic,
+                    more: false,
+                    reserved: 0,
+                },
+                sq_head: 0,
+                sq_id: 0,
+                phase: false,
+                error_info: None,
             },
-            sq_head: 0,
-            sq_id: 0,
-            phase: false,
-            error_info: None,
-        });
+        );
 
         self.state = NvmeQueueState::Ready;
         Ok(())

@@ -9,19 +9,14 @@ extern crate alloc;
 // - Shared memory regions
 // - Memory mapping for foreign binaries
 
-use core::ffi::c_void;
 use core::ptr;
-use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
-use spin::Mutex;
 
 use crate::compat::*;
 use crate::subsystems::mm::vm;
 use crate::mm;
-
 /// Memory layout manager for cross-platform processes
-pub struct MemoryLayoutManager {
     /// Platform-specific memory layouts
     memory_layouts: BTreeMap<TargetPlatform, PlatformMemoryLayout>,
     /// Allocated memory regions

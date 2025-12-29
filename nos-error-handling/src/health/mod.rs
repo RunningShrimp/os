@@ -1,19 +1,21 @@
 //! System health monitoring
-//! 
+//!
 //! This module provides system health monitoring functionality.
-//! 
+//!
 //! DEPRECATED: Implementation should be in kernel/src/error, not here
 
-use crate::Error;
-use crate::Result;
 use spin::Mutex;
+
+use crate::{Error, Result};
 extern crate alloc;
 
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
+
 use nos_api::collections::BTreeMap;
-use alloc::string::ToString;
-use alloc::string::String;
-use alloc::vec::Vec;
-use alloc::format;
 
 /// Health monitor
 #[derive(Default)]
@@ -41,27 +43,30 @@ impl HealthMonitor {
 
     /// Add a health threshold
     pub fn add_threshold(&mut self, threshold: HealthThreshold) {
-        self.thresholds.insert(threshold.metric_name.clone(), threshold);
+        self.thresholds
+            .insert(threshold.metric_name.clone(), threshold);
     }
 
     /// Update a metric value
     pub fn update_metric(&mut self, name: &str, value: f64) -> Result<()> {
-        let metric = self.metrics.get_mut(name)
+        let metric = self
+            .metrics
+            .get_mut(name)
             .ok_or_else(|| Error::NotFound(format!("Metric {} not found", name)))?;
-        
+
         metric.current_value = value;
         metric.last_updated = crate::common::get_timestamp();
-        
+
         // Check thresholds
         self.check_thresholds(name, value)?;
-        
+
         // Update health status
         self.update_health_status();
-        
+
         // Update statistics
         let mut stats = self.stats.lock();
         stats.total_updates += 1;
-        
+
         Ok(())
     }
 
@@ -83,7 +88,7 @@ impl HealthMonitor {
     /// Check thresholds
     fn check_thresholds(&self, name: &str, value: f64) -> Result<()> {
         let threshold = self.thresholds.get(name);
-        
+
         if let Some(threshold) = threshold {
             if value < threshold.min_value || value > threshold.max_value {
                 // Threshold violation
@@ -95,30 +100,38 @@ impl HealthMonitor {
                     metric_name: name.to_string(),
                     threshold_name: threshold.name.clone(),
                     current_value: value,
-                    threshold_value: if value < threshold.min_value { threshold.min_value } else { threshold.max_value },
+                    threshold_value: if value < threshold.min_value {
+                        threshold.min_value
+                    } else {
+                        threshold.max_value
+                    },
                     severity: threshold.severity,
                     timestamp: crate::common::get_timestamp(),
-                    message: format!("Metric {} value {} is outside threshold range [{}, {}]", 
-                                   name, value, threshold.min_value, threshold.max_value),
+                    message: format!(
+                        "Metric {} value {} is outside threshold range [{}, {}]",
+                        name, value, threshold.min_value, threshold.max_value
+                    ),
                 });
             }
         }
-        
+
         Ok(())
     }
 
     /// Update health status
     fn update_health_status(&self) {
         let mut status = self.status.lock();
-        
+
         // Calculate overall health based on metrics
         let mut _healthy_count = 0;
         let mut degraded_count = 0;
         let mut critical_count = 0;
-        
+
         for (name, metric) in self.metrics.iter() {
             if let Some(threshold) = self.thresholds.get(name) {
-                if metric.current_value < threshold.min_value || metric.current_value > threshold.max_value {
+                if metric.current_value < threshold.min_value
+                    || metric.current_value > threshold.max_value
+                {
                     if threshold.severity == HealthSeverity::Critical {
                         critical_count += 1;
                     } else {
@@ -131,7 +144,7 @@ impl HealthMonitor {
                 _healthy_count += 1;
             }
         }
-        
+
         // Update overall health
         status.overall_health = if critical_count > 0 {
             HealthLevel::Critical
@@ -140,13 +153,15 @@ impl HealthMonitor {
         } else {
             HealthLevel::Healthy
         };
-        
+
         // Update component health
         // Note: clear() not available in no-alloc BTreeMap, so we'll rebuild it
         // For now, we'll just iterate through metrics and set values
         for (name, metric) in self.metrics.iter() {
             let health = if let Some(threshold) = self.thresholds.get(name) {
-                if metric.current_value < threshold.min_value || metric.current_value > threshold.max_value {
+                if metric.current_value < threshold.min_value
+                    || metric.current_value > threshold.max_value
+                {
                     if threshold.severity == HealthSeverity::Critical {
                         HealthLevel::Critical
                     } else {
@@ -158,10 +173,10 @@ impl HealthMonitor {
             } else {
                 HealthLevel::Healthy
             };
-            
+
             status.component_health.insert(name.clone(), health);
         }
-        
+
         status.last_updated = crate::common::get_timestamp();
     }
 
@@ -191,7 +206,7 @@ impl HealthMonitor {
             max_value: 100.0,
             last_updated: crate::common::get_timestamp(),
         });
-        
+
         // Memory usage metric
         self.add_metric(HealthMetric {
             name: "memory_usage".to_string(),
@@ -202,7 +217,7 @@ impl HealthMonitor {
             max_value: 100.0,
             last_updated: crate::common::get_timestamp(),
         });
-        
+
         // Disk usage metric
         self.add_metric(HealthMetric {
             name: "disk_usage".to_string(),
@@ -213,7 +228,7 @@ impl HealthMonitor {
             max_value: 100.0,
             last_updated: crate::common::get_timestamp(),
         });
-        
+
         // Network latency metric
         self.add_metric(HealthMetric {
             name: "network_latency".to_string(),
@@ -236,7 +251,7 @@ impl HealthMonitor {
             max_value: 80.0,
             severity: HealthSeverity::Warning,
         });
-        
+
         // Memory usage threshold
         self.add_threshold(HealthThreshold {
             name: "memory_usage_threshold".to_string(),
@@ -245,7 +260,7 @@ impl HealthMonitor {
             max_value: 90.0,
             severity: HealthSeverity::Warning,
         });
-        
+
         // Disk usage threshold
         self.add_threshold(HealthThreshold {
             name: "disk_usage_threshold".to_string(),
@@ -254,7 +269,7 @@ impl HealthMonitor {
             max_value: 85.0,
             severity: HealthSeverity::Warning,
         });
-        
+
         // Network latency threshold
         self.add_threshold(HealthThreshold {
             name: "network_latency_threshold".to_string(),
@@ -325,8 +340,7 @@ impl Default for HealthStatus {
 }
 
 /// Health level
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum HealthLevel {
     /// Healthy
     #[default]
@@ -389,17 +403,17 @@ static GLOBAL_MONITOR: spin::Once<Mutex<HealthMonitor>> = spin::Once::new();
 
 /// Initialize global health monitor
 pub fn init_monitor() -> Result<()> {
-    GLOBAL_MONITOR.call_once(|| {
-        Mutex::new(HealthMonitor::new())
-    });
-    
+    GLOBAL_MONITOR.call_once(|| Mutex::new(HealthMonitor::new()));
+
     // Initialize monitor
     GLOBAL_MONITOR.get().unwrap().lock().init()
 }
 
 /// Get the global health monitor
 pub fn get_monitor() -> &'static Mutex<HealthMonitor> {
-    GLOBAL_MONITOR.get().expect("Health monitor not initialized")
+    GLOBAL_MONITOR
+        .get()
+        .expect("Health monitor not initialized")
 }
 
 /// Internal function to get the global health monitor
@@ -432,13 +446,14 @@ pub fn health_get_stats() -> HealthStats {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use alloc::string::ToString;
+
+    use super::*;
 
     #[test]
     fn test_health_monitor() {
         let mut monitor = HealthMonitor::new();
-        
+
         // Add a test metric
         let metric = HealthMetric {
             name: "test_metric".to_string(),
@@ -450,7 +465,7 @@ mod tests {
             last_updated: crate::common::get_timestamp(),
         };
         monitor.add_metric(metric);
-        
+
         // Add a test threshold
         let threshold = HealthThreshold {
             name: "test_threshold".to_string(),
@@ -460,10 +475,10 @@ mod tests {
             severity: HealthSeverity::Warning,
         };
         monitor.add_threshold(threshold);
-        
+
         // Update metric
         assert!(monitor.update_metric("test_metric", 50.0).is_ok());
-        
+
         // Check health status
         let status = monitor.get_current_status();
         assert_eq!(status.overall_health, HealthLevel::Healthy);
@@ -474,7 +489,7 @@ mod tests {
         assert!(HealthLevel::Healthy < HealthLevel::Degraded);
         assert!(HealthLevel::Degraded < HealthLevel::Critical);
         assert!(HealthLevel::Critical < HealthLevel::Unknown);
-        
+
         assert_eq!(HealthLevel::default(), HealthLevel::Healthy);
     }
 

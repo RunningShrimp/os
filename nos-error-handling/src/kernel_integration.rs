@@ -1,21 +1,22 @@
 //! Kernel error handling integration
-//! 
+//!
 //! This module provides integration between kernel error handling and the nos-error-handling crate.
 //! It includes kernel-specific error types and handling logic.
-//! 
+//!
 //! DEPRECATED: Implementation should be in kernel/src/error, not here
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::vec;
-use alloc::string::String;
-use alloc::string::ToString;
-use core::sync::atomic::{AtomicU64, AtomicBool, Ordering};
-use spin::Mutex;
-use spin::Once;
+use alloc::{
+    collections::BTreeMap,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
+use spin::{Mutex, Once};
 
 /// Error severity levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -322,12 +323,7 @@ impl Default for SystemStateSnapshot {
                 active_connections: 0,
                 listening_ports: 0,
                 interfaces: Vec::new(),
-                packet_stats: PacketStats {
-                    total_rx: 0,
-                    total_tx: 0,
-                    dropped: 0,
-                    errors: 0,
-                },
+                packet_stats: PacketStats { total_rx: 0, total_tx: 0, dropped: 0, errors: 0 },
             },
             filesystem_state: FileSystemState {
                 mount_points: Vec::new(),
@@ -636,10 +632,7 @@ impl Default for ErrorHandlingConfig {
             max_retries: 3,
             retry_interval_ms: 1000,
             escalation_threshold: 5,
-            auto_recovery_strategies: vec![
-                RecoveryStrategy::Retry,
-                RecoveryStrategy::Degrade,
-            ],
+            auto_recovery_strategies: vec![RecoveryStrategy::Retry, RecoveryStrategy::Degrade],
             retention_period_seconds: 86400 * 7, // 7 days
             max_error_records: 10000,
             enable_error_aggregation: true,
@@ -715,47 +708,52 @@ impl ErrorHandlingEngine {
         }
 
         let error_id = self.error_counter.fetch_add(1, Ordering::SeqCst);
-        
+
         // Update error record with ID
         let mut error_record = error_record;
         error_record.id = error_id;
-        
+
         // Add to records list
         self.error_records.push(error_record.clone());
-        
+
         // Limit record count
         if self.error_records.len() > self.config.max_error_records {
             self.error_records.remove(0);
         }
-        
+
         // Update statistics
         self.update_statistics(&error_record);
-        
+
         Ok(error_id)
     }
 
     /// Get error records
-    pub fn get_error_records(&self, limit: Option<usize>, category: Option<ErrorCategory>, severity: Option<ErrorSeverity>) -> Vec<ErrorRecord> {
+    pub fn get_error_records(
+        &self,
+        limit: Option<usize>,
+        category: Option<ErrorCategory>,
+        severity: Option<ErrorSeverity>,
+    ) -> Vec<ErrorRecord> {
         let mut records = self.error_records.clone();
-        
+
         // Filter by category
         if let Some(cat) = category {
             records.retain(|r| r.category == cat);
         }
-        
+
         // Filter by severity
         if let Some(sev) = severity {
             records.retain(|r| r.severity == sev);
         }
-        
+
         // Sort by timestamp (newest first)
         records.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-        
+
         // Limit count
         if let Some(limit) = limit {
             records.truncate(limit);
         }
-        
+
         records
     }
 
@@ -780,12 +778,18 @@ impl ErrorHandlingEngine {
     /// Update statistics
     fn update_statistics(&self, error_record: &ErrorRecord) {
         let mut stats = self.stats.lock();
-        
+
         stats.total_errors += 1;
-        
-        *stats.errors_by_category.entry(error_record.category).or_insert(0) += 1;
-        *stats.errors_by_severity.entry(error_record.severity).or_insert(0) += 1;
-        
+
+        *stats
+            .errors_by_category
+            .entry(error_record.category)
+            .or_insert(0) += 1;
+        *stats
+            .errors_by_severity
+            .entry(error_record.severity)
+            .or_insert(0) += 1;
+
         if error_record.resolved {
             stats.recovered_errors += 1;
         }
@@ -797,16 +801,14 @@ pub static ERROR_HANDLING_ENGINE: Once<spin::Mutex<ErrorHandlingEngine>> = Once:
 
 /// Initialize global error handling
 pub fn init_global_error_handling() {
-    ERROR_HANDLING_ENGINE.call_once(||
-        spin::Mutex::new(ErrorHandlingEngine::new(ErrorHandlingConfig::default()))
-    );
+    ERROR_HANDLING_ENGINE
+        .call_once(|| spin::Mutex::new(ErrorHandlingEngine::new(ErrorHandlingConfig::default())));
 }
 
 /// Get the global error handling engine instance
 pub fn get_error_handling_engine() -> &'static spin::Mutex<ErrorHandlingEngine> {
-    ERROR_HANDLING_ENGINE.call_once(||
-        spin::Mutex::new(ErrorHandlingEngine::new(ErrorHandlingConfig::default()))
-    );
+    ERROR_HANDLING_ENGINE
+        .call_once(|| spin::Mutex::new(ErrorHandlingEngine::new(ErrorHandlingConfig::default())));
     ERROR_HANDLING_ENGINE.get().unwrap()
 }
 
@@ -819,7 +821,14 @@ pub fn init_error_handling() -> nos_api::Result<()> {
 }
 
 /// Record an error
-pub fn record_error(error_code: u32, error_type: ErrorType, category: ErrorCategory, severity: ErrorSeverity, message: &str, source: &ErrorSource) -> nos_api::Result<u64> {
+pub fn record_error(
+    error_code: u32,
+    error_type: ErrorType,
+    category: ErrorCategory,
+    severity: ErrorSeverity,
+    message: &str,
+    source: &ErrorSource,
+) -> nos_api::Result<u64> {
     let error_record = ErrorRecord {
         id: 0, // Will be assigned in record_error
         code: error_code,
@@ -864,12 +873,7 @@ pub fn record_error(error_code: u32, error_type: ErrorType, category: ErrorCateg
                 active_connections: 0,
                 listening_ports: 0,
                 interfaces: Vec::new(),
-                packet_stats: PacketStats {
-                    total_rx: 0,
-                    total_tx: 0,
-                    dropped: 0,
-                    errors: 0,
-                },
+                packet_stats: PacketStats { total_rx: 0, total_tx: 0, dropped: 0, errors: 0 },
             },
             filesystem_state: FileSystemState {
                 mount_points: Vec::new(),
@@ -901,7 +905,9 @@ pub fn record_error(error_code: u32, error_type: ErrorType, category: ErrorCateg
         metadata: BTreeMap::new(),
     };
 
-    get_error_handling_engine().lock().record_error(error_record)
+    get_error_handling_engine()
+        .lock()
+        .record_error(error_record)
 }
 
 /// Get error statistics

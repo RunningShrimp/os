@@ -8,10 +8,15 @@
 //!
 //! This ensures consistent error reporting across all layers of the kernel.
 
-use crate::error::unified::UnifiedError;
-use crate::subsystems::syscalls::api::syscall_result::SyscallError as ApiSyscallError;
-use crate::subsystems::syscalls::interface::SyscallError as InterfaceSyscallError;
 use nos_error_handling::kernel_integration::ErrorType as NosErrorType;
+
+use crate::{
+    error::unified::UnifiedError,
+    subsystems::syscalls::{
+        api::syscall_result::SyscallError as ApiSyscallError,
+        interface::SyscallError as InterfaceSyscallError,
+    },
+};
 
 /// POSIX errno values
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -217,7 +222,7 @@ impl UnifiedErrorMapper {
             api_syscall_to_errno: alloc::collections::BTreeMap::new(),
             nos_error_to_errno: alloc::collections::BTreeMap::new(),
         };
-        
+
         mapper.init_default_mappings();
         mapper
     }
@@ -225,68 +230,121 @@ impl UnifiedErrorMapper {
     /// Initialize default error mappings
     fn init_default_mappings(&mut self) {
         // Map UnifiedError to Errno
-        self.unified_to_errno.insert(UnifiedError::InvalidArgument, Errno::EINVAL);
-        self.unified_to_errno.insert(UnifiedError::InvalidAddress, Errno::EFAULT);
-        self.unified_to_errno.insert(UnifiedError::PermissionDenied, Errno::EACCES);
-        self.unified_to_errno.insert(UnifiedError::NotFound, Errno::ENOENT);
-        self.unified_to_errno.insert(UnifiedError::AlreadyExists, Errno::EEXIST);
-        self.unified_to_errno.insert(UnifiedError::ResourceBusy, Errno::EBUSY);
-        self.unified_to_errno.insert(UnifiedError::ResourceUnavailable, Errno::EAGAIN);
-        self.unified_to_errno.insert(UnifiedError::OutOfMemory, Errno::ENOMEM);
-        
+        self.unified_to_errno
+            .insert(UnifiedError::InvalidArgument, Errno::EINVAL);
+        self.unified_to_errno
+            .insert(UnifiedError::InvalidAddress, Errno::EFAULT);
+        self.unified_to_errno
+            .insert(UnifiedError::PermissionDenied, Errno::EACCES);
+        self.unified_to_errno
+            .insert(UnifiedError::NotFound, Errno::ENOENT);
+        self.unified_to_errno
+            .insert(UnifiedError::AlreadyExists, Errno::EEXIST);
+        self.unified_to_errno
+            .insert(UnifiedError::ResourceBusy, Errno::EBUSY);
+        self.unified_to_errno
+            .insert(UnifiedError::ResourceUnavailable, Errno::EAGAIN);
+        self.unified_to_errno
+            .insert(UnifiedError::OutOfMemory, Errno::ENOMEM);
+
         // Map ApiSyscallError to Errno
-        self.api_syscall_to_errno.insert(ApiSyscallError::EPERM, Errno::EPERM);
-        self.api_syscall_to_errno.insert(ApiSyscallError::ENOENT, Errno::ENOENT);
-        self.api_syscall_to_errno.insert(ApiSyscallError::ESRCH, Errno::ESRCH);
-        self.api_syscall_to_errno.insert(ApiSyscallError::EINTR, Errno::EINTR);
-        self.api_syscall_to_errno.insert(ApiSyscallError::EIO, Errno::EIO);
-        self.api_syscall_to_errno.insert(ApiSyscallError::ENXIO, Errno::ENXIO);
-        self.api_syscall_to_errno.insert(ApiSyscallError::E2BIG, Errno::E2BIG);
-        self.api_syscall_to_errno.insert(ApiSyscallError::ENOEXEC, Errno::ENOEXEC);
-        self.api_syscall_to_errno.insert(ApiSyscallError::EBADF, Errno::EBADF);
-        self.api_syscall_to_errno.insert(ApiSyscallError::ECHILD, Errno::ECHILD);
-        self.api_syscall_to_errno.insert(ApiSyscallError::EAGAIN, Errno::EAGAIN);
-        self.api_syscall_to_errno.insert(ApiSyscallError::ENOMEM, Errno::ENOMEM);
-        self.api_syscall_to_errno.insert(ApiSyscallError::EACCES, Errno::EACCES);
-        self.api_syscall_to_errno.insert(ApiSyscallError::EFAULT, Errno::EFAULT);
-        self.api_syscall_to_errno.insert(ApiSyscallError::ENOTBLK, Errno::ENOTBLK);
-        self.api_syscall_to_errno.insert(ApiSyscallError::EBUSY, Errno::EBUSY);
-        self.api_syscall_to_errno.insert(ApiSyscallError::EEXIST, Errno::EEXIST);
-        self.api_syscall_to_errno.insert(ApiSyscallError::EXDEV, Errno::EXDEV);
-        self.api_syscall_to_errno.insert(ApiSyscallError::ENODEV, Errno::ENODEV);
-        self.api_syscall_to_errno.insert(ApiSyscallError::ENOTDIR, Errno::ENOTDIR);
-        self.api_syscall_to_errno.insert(ApiSyscallError::EISDIR, Errno::EISDIR);
-        self.api_syscall_to_errno.insert(ApiSyscallError::EINVAL, Errno::EINVAL);
-        self.api_syscall_to_errno.insert(ApiSyscallError::ENFILE, Errno::ENFILE);
-        self.api_syscall_to_errno.insert(ApiSyscallError::EMFILE, Errno::EMFILE);
-        self.api_syscall_to_errno.insert(ApiSyscallError::ENOTTY, Errno::ENOTTY);
-        self.api_syscall_to_errno.insert(ApiSyscallError::ETXTBSY, Errno::ETXTBSY);
-        self.api_syscall_to_errno.insert(ApiSyscallError::EFBIG, Errno::EFBIG);
-        self.api_syscall_to_errno.insert(ApiSyscallError::ENOSPC, Errno::ENOSPC);
-        self.api_syscall_to_errno.insert(ApiSyscallError::ESPIPE, Errno::ESPIPE);
-        self.api_syscall_to_errno.insert(ApiSyscallError::EROFS, Errno::EROFS);
-        self.api_syscall_to_errno.insert(ApiSyscallError::EMLINK, Errno::EMLINK);
-        self.api_syscall_to_errno.insert(ApiSyscallError::EPIPE, Errno::EPIPE);
-        
-        // Note: InterfaceSyscallError::InvalidSyscall has data, so we handle it specially in map_interface_syscall_error
-        
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::EPERM, Errno::EPERM);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::ENOENT, Errno::ENOENT);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::ESRCH, Errno::ESRCH);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::EINTR, Errno::EINTR);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::EIO, Errno::EIO);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::ENXIO, Errno::ENXIO);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::E2BIG, Errno::E2BIG);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::ENOEXEC, Errno::ENOEXEC);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::EBADF, Errno::EBADF);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::ECHILD, Errno::ECHILD);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::EAGAIN, Errno::EAGAIN);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::ENOMEM, Errno::ENOMEM);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::EACCES, Errno::EACCES);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::EFAULT, Errno::EFAULT);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::ENOTBLK, Errno::ENOTBLK);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::EBUSY, Errno::EBUSY);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::EEXIST, Errno::EEXIST);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::EXDEV, Errno::EXDEV);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::ENODEV, Errno::ENODEV);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::ENOTDIR, Errno::ENOTDIR);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::EISDIR, Errno::EISDIR);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::EINVAL, Errno::EINVAL);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::ENFILE, Errno::ENFILE);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::EMFILE, Errno::EMFILE);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::ENOTTY, Errno::ENOTTY);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::ETXTBSY, Errno::ETXTBSY);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::EFBIG, Errno::EFBIG);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::ENOSPC, Errno::ENOSPC);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::ESPIPE, Errno::ESPIPE);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::EROFS, Errno::EROFS);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::EMLINK, Errno::EMLINK);
+        self.api_syscall_to_errno
+            .insert(ApiSyscallError::EPIPE, Errno::EPIPE);
+
+        // Note: InterfaceSyscallError::InvalidSyscall has data, so we handle it specially in
+        // map_interface_syscall_error
+
         // Map NosErrorType to Errno
-        self.nos_error_to_errno.insert(NosErrorType::RuntimeError, Errno::EIO);
-        self.nos_error_to_errno.insert(NosErrorType::LogicError, Errno::EINVAL);
-        self.nos_error_to_errno.insert(NosErrorType::ResourceError, Errno::ENOMEM);
-        self.nos_error_to_errno.insert(NosErrorType::PermissionError, Errno::EACCES);
-        self.nos_error_to_errno.insert(NosErrorType::NetworkError, Errno::ECONNREFUSED);
-        self.nos_error_to_errno.insert(NosErrorType::IOError, Errno::EIO);
-        self.nos_error_to_errno.insert(NosErrorType::MemoryError, Errno::ENOMEM);
-        self.nos_error_to_errno.insert(NosErrorType::SystemCallError, Errno::ENOSYS);
-        self.nos_error_to_errno.insert(NosErrorType::ValidationError, Errno::EINVAL);
-        self.nos_error_to_errno.insert(NosErrorType::TimeoutError, Errno::ETIMEDOUT);
-        self.nos_error_to_errno.insert(NosErrorType::CancellationError, Errno::ECANCELED);
-        self.nos_error_to_errno.insert(NosErrorType::SystemError, Errno::EIO);
+        self.nos_error_to_errno
+            .insert(NosErrorType::RuntimeError, Errno::EIO);
+        self.nos_error_to_errno
+            .insert(NosErrorType::LogicError, Errno::EINVAL);
+        self.nos_error_to_errno
+            .insert(NosErrorType::ResourceError, Errno::ENOMEM);
+        self.nos_error_to_errno
+            .insert(NosErrorType::PermissionError, Errno::EACCES);
+        self.nos_error_to_errno
+            .insert(NosErrorType::NetworkError, Errno::ECONNREFUSED);
+        self.nos_error_to_errno
+            .insert(NosErrorType::IOError, Errno::EIO);
+        self.nos_error_to_errno
+            .insert(NosErrorType::MemoryError, Errno::ENOMEM);
+        self.nos_error_to_errno
+            .insert(NosErrorType::SystemCallError, Errno::ENOSYS);
+        self.nos_error_to_errno
+            .insert(NosErrorType::ValidationError, Errno::EINVAL);
+        self.nos_error_to_errno
+            .insert(NosErrorType::TimeoutError, Errno::ETIMEDOUT);
+        self.nos_error_to_errno
+            .insert(NosErrorType::CancellationError, Errno::ECANCELED);
+        self.nos_error_to_errno
+            .insert(NosErrorType::SystemError, Errno::EIO);
     }
 
     /// Map UnifiedError to Errno
-    /// 
+    ///
     /// This function uses static match for common errors (fast path)
     /// and falls back to BTreeMap lookup for less common errors.
     pub fn map_unified_error(&self, error: &UnifiedError) -> Errno {
@@ -316,7 +374,9 @@ impl UnifiedErrorMapper {
             UnifiedError::DriverError(_) => Errno::ENODEV,
             UnifiedError::SecurityError(_) => Errno::EACCES,
             // Fallback to BTreeMap for less common errors
-            _ => self.unified_to_errno.get(error)
+            _ => self
+                .unified_to_errno
+                .get(error)
                 .copied()
                 .unwrap_or_else(|| {
                     // Final fallback based on error category
@@ -330,13 +390,14 @@ impl UnifiedErrorMapper {
                         UnifiedError::SecurityError(_) => Errno::EACCES,
                         _ => Errno::EIO,
                     }
-                })
+                }),
         }
     }
 
     /// Map ApiSyscallError to Errno
     pub fn map_api_syscall_error(&self, error: &ApiSyscallError) -> Errno {
-        self.api_syscall_to_errno.get(error)
+        self.api_syscall_to_errno
+            .get(error)
             .copied()
             .unwrap_or(Errno::ENOSYS)
     }
@@ -371,7 +432,8 @@ impl UnifiedErrorMapper {
 
     /// Map NosErrorType to Errno
     pub fn map_nos_error_type(&self, error: &NosErrorType) -> Errno {
-        self.nos_error_to_errno.get(error)
+        self.nos_error_to_errno
+            .get(error)
             .copied()
             .unwrap_or(Errno::EIO)
     }
@@ -385,14 +447,15 @@ impl UnifiedErrorMapper {
         if let Some(unified_err) = (error as &dyn core::any::Any).downcast_ref::<UnifiedError>() {
             return self.map_unified_error(unified_err);
         }
-        
+
         // Default fallback
         Errno::EIO
     }
 }
 
 /// Global error mapper instance
-static GLOBAL_ERROR_MAPPER: crate::subsystems::sync::Mutex<Option<UnifiedErrorMapper>> = crate::subsystems::sync::Mutex::new(None);
+static GLOBAL_ERROR_MAPPER: crate::subsystems::sync::Mutex<Option<UnifiedErrorMapper>> =
+    crate::subsystems::sync::Mutex::new(None);
 
 /// Initialize the global error mapper
 pub fn init_error_mapper() {
@@ -401,12 +464,13 @@ pub fn init_error_mapper() {
 }
 
 /// Get the global error mapper
-pub fn get_error_mapper() -> Option<&'static crate::subsystems::sync::Mutex<Option<UnifiedErrorMapper>>> {
+pub fn get_error_mapper()
+-> Option<&'static crate::subsystems::sync::Mutex<Option<UnifiedErrorMapper>>> {
     Some(&GLOBAL_ERROR_MAPPER)
 }
 
 /// Fast path: Convert common UnifiedError to Errno without mapper lookup
-/// 
+///
 /// This function is optimized for hot path (syscall error returns).
 /// It uses static match for the most common errors, avoiding any
 /// synchronization or lookup overhead.
@@ -434,7 +498,7 @@ pub fn fast_unified_error_to_errno(error: &UnifiedError) -> Errno {
 }
 
 /// Convert UnifiedError to Errno
-/// 
+///
 /// This function uses the error mapper if available, otherwise uses
 /// fast path fallback. For hot path syscall errors, use fast_unified_error_to_errno instead.
 pub fn unified_error_to_errno(error: &UnifiedError) -> Errno {
@@ -507,14 +571,13 @@ mod tests {
     #[test]
     fn test_error_mapping() {
         init_error_mapper();
-        
+
         let unified_err = UnifiedError::InvalidArgument;
         let errno = unified_error_to_errno(&unified_err);
         assert_eq!(errno, Errno::EINVAL);
-        
+
         let unified_err = UnifiedError::OutOfMemory;
         let errno = unified_error_to_errno(&unified_err);
         assert_eq!(errno, Errno::ENOMEM);
     }
 }
-

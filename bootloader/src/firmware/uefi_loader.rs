@@ -11,10 +11,7 @@ pub struct UefiBootInfo {
 
 impl UefiBootInfo {
     pub fn new(image_handle: u64, system_table: u64) -> Self {
-        Self {
-            image_handle,
-            system_table,
-        }
+        Self { image_handle, system_table }
     }
 
     pub fn system_table_ptr(&self) -> *const UefiSystemTable {
@@ -68,12 +65,10 @@ pub fn uefi_load_kernel() -> Result<u64, &'static str> {
         Some(boot_info) => {
             initialize_uefi_loader(&boot_info)?;
             Ok(0x100000)
-        }
+        },
         None => {
-            crate::drivers::console::write_str(
-                "UEFI not detected, falling back to multiboot2\n",
-            );
+            crate::drivers::console::write_str("UEFI not detected, falling back to multiboot2\n");
             Err("No UEFI boot info")
-        }
+        },
     }
 }

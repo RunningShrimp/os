@@ -6,13 +6,15 @@
 //! This module provides a complete event-driven architecture for the bootloader,
 //! including event publishing, subscription, persistence, and replay capabilities.
 
-use alloc::vec;
-use alloc::boxed::Box;
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use alloc::{format, string::{String, ToString}};
-use core::fmt;
-use core::any::Any;
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
+use core::{any::Any, fmt};
 
 /// Domain Event trait - All domain events implement this
 pub trait DomainEvent: Send + Sync + fmt::Debug + Any {
@@ -39,10 +41,10 @@ pub trait DomainEvent: Send + Sync + fmt::Debug + Any {
     fn metadata(&self) -> Vec<(&'static str, String)> {
         Vec::new()
     }
-    
+
     /// Convert to Any for downcasting
     fn as_any(&self) -> &dyn Any;
-    
+
     /// Clone the event into a new Box<dyn DomainEvent>
     fn clone_box(&self) -> Box<dyn DomainEvent>;
 }
@@ -79,11 +81,11 @@ impl DomainEvent for Box<dyn DomainEvent> {
     fn metadata(&self) -> Vec<(&'static str, String)> {
         (**self).metadata()
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         (**self).as_any()
     }
-    
+
     fn clone_box(&self) -> Box<dyn DomainEvent> {
         (**self).clone_box()
     }
@@ -189,7 +191,11 @@ pub trait DomainEventPublisher: Send + Sync {
     ///
     /// # Returns
     /// Ok(()) if subscribed successfully, Err with error message if failed
-    fn subscribe(&mut self, event_type: Option<&'static str>, subscriber: Box<dyn DomainEventSubscriber>) -> Result<(), &'static str>;
+    fn subscribe(
+        &mut self,
+        event_type: Option<&'static str>,
+        subscriber: Box<dyn DomainEventSubscriber>,
+    ) -> Result<(), &'static str>;
 
     /// Unsubscribe from events
     ///
@@ -228,7 +234,11 @@ pub trait EventHandler: Send + Sync {
     ///
     /// # Returns
     /// Event handling result
-    fn handle_with_context(&self, event: &dyn DomainEvent, context: &EventContext) -> EventHandlingResult;
+    fn handle_with_context(
+        &self,
+        event: &dyn DomainEvent,
+        context: &EventContext,
+    ) -> EventHandlingResult;
 
     /// Get handler name
     fn handler_name(&self) -> &'static str;
@@ -327,7 +337,7 @@ impl HandlerCapabilities {
 /// Boot phase completed event
 #[derive(Debug, Clone)]
 pub struct BootPhaseCompletedEvent {
-    pub phase_name: &'static str,  // Use static string instead of BootPhase enum
+    pub phase_name: &'static str, // Use static string instead of BootPhase enum
     pub timestamp: u64,
     pub success: bool,
     pub duration_ms: u64,
@@ -391,11 +401,11 @@ impl DomainEvent for BootPhaseCompletedEvent {
         }
         metadata
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
-    
+
     fn clone_box(&self) -> Box<dyn DomainEvent> {
         Box::new(self.clone())
     }
@@ -457,11 +467,11 @@ impl DomainEvent for GraphicsInitializedEvent {
             ("backend_type", self.backend_type.to_string()),
         ]
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
-    
+
     fn clone_box(&self) -> Box<dyn DomainEvent> {
         Box::new(self.clone())
     }
@@ -536,11 +546,11 @@ impl DomainEvent for KernelLoadedEvent {
             ("signature_verified", self.signature_verified.to_string()),
         ]
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
-    
+
     fn clone_box(&self) -> Box<dyn DomainEvent> {
         Box::new(self.clone())
     }
@@ -555,10 +565,7 @@ pub struct BootPhaseStartedEvent {
 
 impl BootPhaseStartedEvent {
     pub fn new(phase_name: &'static str, timestamp: u64) -> Self {
-        Self {
-            phase_name,
-            timestamp,
-        }
+        Self { phase_name, timestamp }
     }
 }
 
@@ -574,11 +581,11 @@ impl DomainEvent for BootPhaseStartedEvent {
     fn as_string(&self) -> &'static str {
         "Boot phase started"
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
-    
+
     fn clone_box(&self) -> Box<dyn DomainEvent> {
         Box::new(self.clone())
     }
@@ -611,9 +618,7 @@ impl DomainEventSubscriber for LoggingSubscriber {
     }
 
     fn clone_box(&self) -> Box<dyn DomainEventSubscriber> {
-        Box::new(Self {
-            name: self.name,
-        })
+        Box::new(Self { name: self.name })
     }
 }
 
@@ -633,11 +638,7 @@ pub struct ValidationFailedEvent {
 
 impl ValidationFailedEvent {
     pub fn new(validation_type: &'static str, error_message: String, timestamp: u64) -> Self {
-        Self {
-            validation_type,
-            error_message,
-            timestamp,
-        }
+        Self { validation_type, error_message, timestamp }
     }
 }
 
@@ -653,11 +654,11 @@ impl DomainEvent for ValidationFailedEvent {
     fn as_string(&self) -> &'static str {
         "Validation failed"
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
-    
+
     fn clone_box(&self) -> Box<dyn DomainEvent> {
         Box::new(self.clone())
     }
@@ -740,11 +741,11 @@ impl DomainEvent for DeviceDetectedEvent {
         }
         metadata
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
-    
+
     fn clone_box(&self) -> Box<dyn DomainEvent> {
         Box::new(self.clone())
     }
@@ -795,11 +796,11 @@ impl DomainEvent for MemoryInitializedEvent {
             ("memory_map_entries", self.memory_map_entries.to_string()),
         ]
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
-    
+
     fn clone_box(&self) -> Box<dyn DomainEvent> {
         Box::new(self.clone())
     }
@@ -816,7 +817,12 @@ pub struct SystemErrorEvent {
 }
 
 impl SystemErrorEvent {
-    pub fn new(error_code: u32, error_message: String, component: &'static str, timestamp: u64) -> Self {
+    pub fn new(
+        error_code: u32,
+        error_message: String,
+        component: &'static str,
+        timestamp: u64,
+    ) -> Self {
         Self {
             error_code,
             error_message,
@@ -861,11 +867,11 @@ impl DomainEvent for SystemErrorEvent {
             ("recovery_possible", self.recovery_possible.to_string()),
         ]
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
-    
+
     fn clone_box(&self) -> Box<dyn DomainEvent> {
         Box::new(self.clone())
     }
@@ -882,7 +888,12 @@ pub struct PerformanceMetricsEvent {
 }
 
 impl PerformanceMetricsEvent {
-    pub fn new(metric_name: &'static str, metric_value: f64, metric_unit: &'static str, timestamp: u64) -> Self {
+    pub fn new(
+        metric_name: &'static str,
+        metric_value: f64,
+        metric_unit: &'static str,
+        timestamp: u64,
+    ) -> Self {
         Self {
             metric_name,
             metric_value,
@@ -927,11 +938,11 @@ impl DomainEvent for PerformanceMetricsEvent {
             ("threshold_exceeded", self.threshold_exceeded.to_string()),
         ]
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
-    
+
     fn clone_box(&self) -> Box<dyn DomainEvent> {
         Box::new(self.clone())
     }
@@ -952,11 +963,11 @@ impl SimpleEventFilter {
     pub fn new(allowed_types: Vec<&'static str>) -> Self {
         Self { allowed_types }
     }
-    
+
     pub fn allow_all() -> Self {
         Self { allowed_types: Vec::new() }
     }
-    
+
     pub fn allow_none() -> Self {
         Self { allowed_types: Vec::new() }
     }
@@ -985,12 +996,12 @@ impl ImprovedEventPublisher {
             filters: Vec::new(),
         }
     }
-    
+
     pub fn with_history_size(mut self, size: usize) -> Self {
         self.max_history_size = size;
         self
     }
-    
+
     pub fn with_filter(mut self, filter: Box<dyn EventFilter>) -> Self {
         self.filters.push(filter);
         self
@@ -1007,15 +1018,15 @@ impl DomainEventPublisher for ImprovedEventPublisher {
     fn publish(&mut self, event: Box<dyn DomainEvent>) -> Result<(), &'static str> {
         // Get event type before moving
         let event_type = event.event_type();
-        
+
         // Add to history
         self.event_history.push(event);
-        
+
         // Maintain history size limit
         if self.event_history.len() > self.max_history_size {
             self.event_history.remove(0);
         }
-        
+
         // Get the event from history for processing
         if let Some(event_ref) = self.event_history.last() {
             // Check filters
@@ -1024,18 +1035,22 @@ impl DomainEventPublisher for ImprovedEventPublisher {
                     return Ok(());
                 }
             }
-            
+
             // Notify subscribers
             if let Some(subscribers) = self.subscribers.get(event_type) {
                 for subscriber in subscribers {
                     if let Err(e) = subscriber.handle(event_ref.as_ref()) {
                         // Log error but continue with other subscribers
-                        log::error!("Event subscriber '{}' failed: {}", subscriber.subscriber_name(), e);
+                        log::error!(
+                            "Event subscriber '{}' failed: {}",
+                            subscriber.subscriber_name(),
+                            e
+                        );
                     }
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -1058,11 +1073,11 @@ impl DomainEventPublisher for ImprovedEventPublisher {
         }
         Ok(())
     }
-    
+
     fn get_event_history(&self) -> &[Box<dyn DomainEvent>] {
         &self.event_history
     }
-    
+
     fn clear_history(&mut self) {
         self.event_history.clear();
     }
@@ -1115,11 +1130,11 @@ impl DomainEventPublisher for SimpleEventPublisher {
     fn unsubscribe(&mut self, _subscriber_name: &'static str) -> Result<(), &'static str> {
         Ok(())
     }
-    
+
     fn get_event_history(&self) -> &[Box<dyn DomainEvent>] {
         &[]
     }
-    
+
     fn clear_history(&mut self) {
         // No-op for simple Publisher
     }
@@ -1133,7 +1148,6 @@ impl DomainEventPublisher for SimpleEventPublisher {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1143,23 +1157,24 @@ mod tests {
         let gfx_event = GraphicsInitializedEvent::new(1024, 768, 0x1000, 1234);
         assert_eq!(gfx_event.event_type(), "GraphicsInitialized");
         assert_eq!(gfx_event.timestamp(), 1234);
-        
+
         let kernel_event = KernelLoadedEvent::new(0x100000, 0x500000, 1234);
         assert_eq!(kernel_event.event_type(), "KernelLoaded");
         assert_eq!(kernel_event.timestamp(), 1234);
-        
+
         let phase_event = BootPhaseStartedEvent::new("initialization", 1234);
         assert_eq!(phase_event.event_type(), "BootPhaseStarted");
         assert_eq!(phase_event.timestamp(), 1234);
-        
+
         let mem_event = MemoryInitializedEvent::new(0x1000000, 0x8000000, 1234);
         assert_eq!(mem_event.event_type(), "MemoryInitialized");
         assert_eq!(mem_event.timestamp(), 1234);
-        
-        let validation_event = ValidationFailedEvent::new("kernel", "Invalid format".to_string(), 1234);
+
+        let validation_event =
+            ValidationFailedEvent::new("kernel", "Invalid format".to_string(), 1234);
         assert_eq!(validation_event.event_type(), "ValidationFailed");
         assert_eq!(validation_event.timestamp(), 1234);
-        
+
         let device_event = DeviceDetectedEvent::new("graphics", "vga".to_string(), 1234);
         assert_eq!(device_event.event_type(), "DeviceDetected");
         assert_eq!(device_event.timestamp(), 1234);
@@ -1171,55 +1186,59 @@ mod tests {
         let event = Box::new(GraphicsInitializedEvent::new(1024, 768, 0x1000, 0));
         assert!(publisher.publish(event).is_ok());
     }
-    
+
     #[test]
     fn test_improved_publisher() {
         let mut publisher = ImprovedEventPublisher::new();
-        
+
         // Test event history
         assert_eq!(publisher.get_event_history().len(), 0);
-        
+
         // Test subscription
         let subscriber = LoggingSubscriber::new("test_sub");
-        assert!(publisher.subscribe("GraphicsInitialized", Box::new(subscriber)).is_ok());
-        
+        assert!(
+            publisher
+                .subscribe("GraphicsInitialized", Box::new(subscriber))
+                .is_ok()
+        );
+
         // Test publishing
         let event = Box::new(GraphicsInitializedEvent::new(1024, 768, 0x1000, 1234));
         assert!(publisher.publish(event).is_ok());
         assert_eq!(publisher.get_event_history().len(), 1);
-        
+
         // Test filtering
         let filter = SimpleEventFilter::new(vec!["GraphicsInitialized"]);
         publisher = publisher.with_filter(Box::new(filter));
-        
+
         let filtered_event = Box::new(KernelLoadedEvent::new(0x100000, 0x500000, 1234));
         assert!(publisher.publish(filtered_event).is_ok()); // Should be filtered out
         assert_eq!(publisher.get_event_history().len(), 1); // Still only first event
     }
-    
+
     #[test]
     fn test_event_filter() {
         let filter = SimpleEventFilter::new(vec!["GraphicsInitialized", "KernelLoaded"]);
-        
+
         let gfx_event = GraphicsInitializedEvent::new(1024, 768, 0x1000, 1234);
         let kernel_event = KernelLoadedEvent::new(0x100000, 0x500000, 1234);
-        
+
         assert!(filter.should_process(gfx_event.as_ref()));
         assert!(filter.should_process(kernel_event.as_ref()));
-        
+
         let filter_all = SimpleEventFilter::allow_all();
         assert!(filter_all.should_process(gfx_event.as_ref()));
         assert!(filter_all.should_process(kernel_event.as_ref()));
-        
+
         let filter_none = SimpleEventFilter::allow_none();
         assert!(!filter_none.should_process(gfx_event.as_ref()));
         assert!(!filter_none.should_process(kernel_event.as_ref()));
     }
-    
+
     #[test]
     fn test_logging_subscriber() {
         let subscriber = LoggingSubscriber::new("test_logger");
-        
+
         let event = Box::new(GraphicsInitializedEvent::new(1024, 768, 0x1000, 1234));
         assert!(subscriber.handle(event.as_ref()).is_ok());
         assert_eq!(subscriber.name(), "test_logger");

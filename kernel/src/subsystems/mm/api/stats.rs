@@ -1,11 +1,11 @@
 //! mm模块内存统计公共接口
-//! 
+//!
 //! 提供内存使用统计和监控功能
 
-use super::{MemoryStats, AllocatorStats, PhysicalMemoryStats};
+use super::{AllocatorStats, MemoryStats, PhysicalMemoryStats};
 
 /// Get memory usage statistics
-/// 
+///
 /// # Return
 /// * `MemoryStats` - Memory statistics information
 pub fn get_memory_stats() -> MemoryStats {
@@ -14,7 +14,7 @@ pub fn get_memory_stats() -> MemoryStats {
 }
 
 /// Get allocator statistics
-/// 
+///
 /// # Return
 /// * `AllocatorStats` - Allocator statistics information
 pub fn get_allocator_stats() -> AllocatorStats {

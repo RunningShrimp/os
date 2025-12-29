@@ -5,10 +5,10 @@
 
 extern crate alloc;
 
+use alloc::{collections::BTreeMap, vec::Vec};
 use core::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use crate::reliability::{EINVAL, EDEADLK};
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
+
+use crate::reliability::{EDEADLK, EINVAL};
 
 /// Real-time mutex with priority inheritance
 pub struct RtMutex {
@@ -44,7 +44,11 @@ impl RtMutex {
     /// Lock the mutex with priority inheritance
     pub fn lock(&self, tid: u8, priority: u8) -> Result<(), i32> {
         // Try to acquire lock immediately
-        if self.locked.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_ok() {
+        if self
+            .locked
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_ok()
+        {
             self.owner.store(tid, Ordering::Release);
             return Ok(());
         }
@@ -61,11 +65,12 @@ impl RtMutex {
             waiters.push(Waiter { tid, priority });
             // Sort by priority (higher priority first)
             waiters.sort_by(|a, b| b.priority.cmp(&a.priority));
-            
+
             // Update inherited priority
             if let Some(highest) = waiters.first() {
-                self.inherited_prio.store(highest.priority, Ordering::Release);
-                
+                self.inherited_prio
+                    .store(highest.priority, Ordering::Release);
+
                 // Boost owner's priority if needed
                 if current_owner != 0 {
                     self.boost_owner_priority(current_owner, highest.priority);
@@ -80,22 +85,27 @@ impl RtMutex {
         }
 
         // Acquire lock
-        if self.locked.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_ok() {
+        if self
+            .locked
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_ok()
+        {
             self.owner.store(tid, Ordering::Release);
-            
+
             // Remove from waiters
             {
                 let mut waiters = self.waiters.lock();
                 waiters.retain(|w| w.tid != tid);
-                
+
                 // Update inherited priority
                 if let Some(highest) = waiters.first() {
-                    self.inherited_prio.store(highest.priority, Ordering::Release);
+                    self.inherited_prio
+                        .store(highest.priority, Ordering::Release);
                 } else {
                     self.inherited_prio.store(0, Ordering::Release);
                 }
             }
-            
+
             Ok(())
         } else {
             Err(EINVAL)
@@ -132,7 +142,11 @@ impl RtMutex {
 
     /// Try to lock without blocking
     pub fn try_lock(&self, tid: u8) -> Result<bool, i32> {
-        if self.locked.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_ok() {
+        if self
+            .locked
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_ok()
+        {
             self.owner.store(tid, Ordering::Release);
             Ok(true)
         } else {
@@ -183,7 +197,11 @@ impl RtSpinLock {
     /// Lock with priority inheritance
     pub fn lock(&self, tid: u8, priority: u8) {
         // Spin until lock is acquired
-        while self.locked.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_err() {
+        while self
+            .locked
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
             // Check if we should boost owner's priority
             let current_owner = self.owner.load(Ordering::Acquire);
             if current_owner != 0 && current_owner != tid {
@@ -193,10 +211,10 @@ impl RtSpinLock {
                     self.boost_owner_priority(current_owner, priority);
                 }
             }
-            
+
             core::hint::spin_loop();
         }
-        
+
         self.owner.store(tid, Ordering::Release);
     }
 
@@ -209,7 +227,7 @@ impl RtSpinLock {
                 self.restore_owner_priority(tid);
                 self.inherited_prio.store(0, Ordering::Release);
             }
-            
+
             self.owner.store(0, Ordering::Release);
             self.locked.store(false, Ordering::Release);
         }
@@ -231,4 +249,3 @@ impl Default for RtSpinLock {
         Self::new()
     }
 }
-

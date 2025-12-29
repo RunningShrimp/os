@@ -4,51 +4,51 @@
 
 /// File system error type.
 ///
-///统一的文件系统错误处理
+/// 统一的文件系统错误处理
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FsError {
-    ///路径不存在
+    /// 路径不存在
     PathNotFound,
-    ///文件不存在
+    /// 文件不存在
     FileNotFound,
-    ///权限被拒绝
+    /// 权限被拒绝
     PermissionDenied,
-    ///文件已存在
+    /// 文件已存在
     FileExists,
-    ///不是目录
+    /// 不是目录
     NotADirectory,
-    ///是目录
+    /// 是目录
     IsADirectory,
-    ///目录非空
+    /// 目录非空
     DirectoryNotEmpty,
-    ///无效路径
+    /// 无效路径
     InvalidPath,
-    ///路径过长
+    /// 路径过长
     PathTooLong,
-    ///文件系统已满
+    /// 文件系统已满
     FileSystemFull,
-    ///输入/输出错误
+    /// 输入/输出错误
     IoError,
-    ///文件系统只读
+    /// 文件系统只读
     ReadOnlyFileSystem,
-    ///文件系统不支持操作
+    /// 文件系统不支持操作
     OperationNotSupported,
-    ///资源忙
+    /// 资源忙
     ResourceBusy,
-    ///文件名过长
+    /// 文件名过长
     FileNameTooLong,
-    ///符号链接循环
+    /// 符号链接循环
     SymbolicLinkLoop,
-    ///配额超限
+    /// 配额超限
     QuotaExceeded,
-    ///存储空间不足
+    /// 存储空间不足
     NoSpaceLeft,
-    ///坏文件系统
+    /// 坏文件系统
     CorruptedFileSystem,
 }
 
 impl FsError {
-    ///转换为POSIX错误码
+    /// 转换为POSIX错误码
     pub fn to_errno(&self) -> i32 {
         match self {
             FsError::PathNotFound => crate::reliability::errno::ENOENT,
@@ -65,8 +65,8 @@ impl FsError {
             _ => crate::reliability::errno::EINVAL,
         }
     }
-    
-    ///获取错误描述
+
+    /// 获取错误描述
     pub fn description(&self) -> &'static str {
         match self {
             FsError::PathNotFound => "Path not found",

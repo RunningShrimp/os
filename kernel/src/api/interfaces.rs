@@ -3,9 +3,7 @@
 //! This document defines the interface specification for all kernel modules.
 //! It provides guidelines for implementing clear, consistent module boundaries.
 
-use alloc::boxed::Box;
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{boxed::Box, string::String, vec::Vec};
 
 /// Module interface trait
 ///
@@ -403,7 +401,12 @@ pub trait DriverInterface {
     ///
     /// # Returns
     /// * `Result<usize, DriverError>` - Number of bytes read or error
-    fn read_device(&mut self, handle: DeviceHandle, buffer: &mut [u8], count: usize) -> Result<usize, DriverError>;
+    fn read_device(
+        &mut self,
+        handle: DeviceHandle,
+        buffer: &mut [u8],
+        count: usize,
+    ) -> Result<usize, DriverError>;
 
     /// Write to a device
     ///
@@ -414,7 +417,12 @@ pub trait DriverInterface {
     ///
     /// # Returns
     /// * `Result<usize, DriverError>` - Number of bytes written or error
-    fn write_device(&mut self, handle: DeviceHandle, buffer: &[u8], count: usize) -> Result<usize, DriverError>;
+    fn write_device(
+        &mut self,
+        handle: DeviceHandle,
+        buffer: &[u8],
+        count: usize,
+    ) -> Result<usize, DriverError>;
 
     /// Control a device
     ///
@@ -425,7 +433,12 @@ pub trait DriverInterface {
     ///
     /// # Returns
     /// * `Result<u64, DriverError>` - Control result or error
-    fn control_device(&mut self, handle: DeviceHandle, command: u32, arg: u64) -> Result<u64, DriverError>;
+    fn control_device(
+        &mut self,
+        handle: DeviceHandle,
+        command: u32,
+        arg: u64,
+    ) -> Result<u64, DriverError>;
 
     /// Get the driver statistics
     ///
@@ -528,10 +541,7 @@ impl ModuleRegistry {
     /// # Returns
     /// * `ModuleRegistry` - New registry
     pub fn new() -> Self {
-        Self {
-            modules: Vec::new(),
-            init_order: Vec::new(),
-        }
+        Self { modules: Vec::new(), init_order: Vec::new() }
     }
 
     /// Register a module
@@ -543,22 +553,22 @@ impl ModuleRegistry {
     /// * `Result<(), ModuleError>` - Success or error
     pub fn register(&mut self, module: Box<dyn ModuleInterface>) -> Result<(), ModuleError> {
         let name = module.get_name();
-        
+
         // Check if module is already registered
         if self.modules.iter().any(|m| m.get_name() == name) {
             return Err(ModuleError::InitializationFailed);
         }
-        
+
         // Check dependencies
         for dep in module.get_dependencies() {
             if !self.modules.iter().any(|m| m.get_name() == dep) {
                 return Err(ModuleError::DependencyNotMet);
             }
         }
-        
+
         self.modules.push(module);
         self.init_order.push(name.to_string());
-        
+
         Ok(())
     }
 
@@ -569,12 +579,11 @@ impl ModuleRegistry {
     pub fn initialize_all(&mut self) -> Result<(), ModuleError> {
         // Initialize modules in dependency order
         for name in &self.init_order.clone() {
-            if let Some(module) = self.modules.iter_mut()
-                .find(|m| m.get_name() == name) {
+            if let Some(module) = self.modules.iter_mut().find(|m| m.get_name() == name) {
                 module.initialize()?;
             }
         }
-        
+
         Ok(())
     }
 
@@ -585,12 +594,11 @@ impl ModuleRegistry {
     pub fn shutdown_all(&mut self) -> Result<(), ModuleError> {
         // Shutdown modules in reverse dependency order
         for name in self.init_order.iter().rev() {
-            if let Some(module) = self.modules.iter_mut()
-                .find(|m| m.get_name() == name) {
+            if let Some(module) = self.modules.iter_mut().find(|m| m.get_name() == name) {
                 module.shutdown()?;
             }
         }
-        
+
         Ok(())
     }
 
@@ -602,7 +610,8 @@ impl ModuleRegistry {
     /// # Returns
     /// * `Option<&dyn ModuleInterface>` - Module if found
     pub fn get_module(&self, name: &str) -> Option<&dyn ModuleInterface> {
-        self.modules.iter()
+        self.modules
+            .iter()
             .find(|m| m.get_name() == name)
             .map(|m| m.as_ref())
     }
@@ -612,9 +621,7 @@ impl ModuleRegistry {
     /// # Returns
     /// * `Vec<&dyn ModuleInterface>` - All modules
     pub fn get_all_modules(&self) -> Vec<&dyn ModuleInterface> {
-        self.modules.iter()
-            .map(|m| m.as_ref())
-            .collect()
+        self.modules.iter().map(|m| m.as_ref()).collect()
     }
 
     /// Get module statistics
@@ -622,7 +629,8 @@ impl ModuleRegistry {
     /// # Returns
     /// * `Vec<(&str, ModuleStats)>` - Module statistics
     pub fn get_all_stats(&self) -> Vec<(&str, ModuleStats)> {
-        self.modules.iter()
+        self.modules
+            .iter()
             .map(|m| (m.get_name(), m.get_stats()))
             .collect()
     }

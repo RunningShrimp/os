@@ -2,8 +2,6 @@
 //!
 //! 主机入侵检测系统共享类型定义
 
-
-
 /// 主机入侵检测统计
 #[derive(Debug, Clone, Default)]
 pub struct HostIdsStats {
@@ -34,4 +32,3 @@ pub struct HostIdsStats {
     /// 内存使用量
     pub memory_usage_bytes: usize,
 }
-

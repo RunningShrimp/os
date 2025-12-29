@@ -5,14 +5,13 @@
 pub mod core;
 pub mod monitoring;
 
-use nos_api::Result;
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use spin::Mutex;
-
+use alloc::{collections::BTreeMap, sync::Arc};
 // Re-export commonly used types
-pub use core::{UnifiedSyscallStats, SyscallStatsSnapshot};
+pub use core::{SyscallStatsSnapshot, UnifiedSyscallStats};
+
 pub use monitoring::get_perf_stats;
+use nos_api::Result;
+use spin::Mutex;
 
 /// 性能监控器
 pub struct PerformanceMonitor {
@@ -28,31 +27,31 @@ impl PerformanceMonitor {
             collectors: Mutex::new(Vec::new()),
         }
     }
-    
+
     /// 添加性能收集器
     pub fn add_collector(&self, collector: Arc<dyn PerformanceCollector>) {
         let mut collectors = self.collectors.lock();
         collectors.push(collector);
     }
-    
+
     /// 移除性能收集器
     pub fn remove_collector(&self, collector_name: &str) {
         let mut collectors = self.collectors.lock();
         collectors.retain(|c| c.name() != collector_name);
     }
-    
+
     /// 收集性能指标
     pub fn collect_metrics(&self) -> Result<BTreeMap<String, PerformanceMetric>> {
         let collectors = self.collectors.lock();
         let mut all_metrics = BTreeMap::new();
-        
+
         for collector in collectors.iter() {
             let metrics = collector.collect()?;
             for (name, metric) in metrics {
                 all_metrics.insert(name, metric);
             }
         }
-        
+
         // 更新内部指标
         {
             let mut internal_metrics = self.metrics.lock();
@@ -60,22 +59,22 @@ impl PerformanceMonitor {
                 internal_metrics.insert(name.clone(), metric.clone());
             }
         }
-        
+
         Ok(all_metrics)
     }
-    
+
     /// 获取特定指标
     pub fn get_metric(&self, name: &str) -> Option<PerformanceMetric> {
         let metrics = self.metrics.lock();
         metrics.get(name).cloned()
     }
-    
+
     /// 获取所有指标
     pub fn get_all_metrics(&self) -> BTreeMap<String, PerformanceMetric> {
         let metrics = self.metrics.lock();
         metrics.clone()
     }
-    
+
     /// 清除所有指标
     pub fn clear_metrics(&self) {
         let mut metrics = self.metrics.lock();
@@ -132,10 +131,10 @@ pub enum MetricValue {
 pub trait PerformanceCollector: Send + Sync {
     /// 收集性能指标
     fn collect(&self) -> Result<BTreeMap<String, PerformanceMetric>>;
-    
+
     /// 获取收集器名称
     fn name(&self) -> &str;
-    
+
     /// 获取收集器描述
     fn description(&self) -> &str {
         "Performance collector"
@@ -150,43 +149,47 @@ pub struct CpuPerformanceCollector {
 impl CpuPerformanceCollector {
     /// 创建新的CPU性能收集器
     pub fn new() -> Self {
-        Self {
-            name: "cpu".to_string(),
-        }
+        Self { name: "cpu".to_string() }
     }
 }
 
 impl PerformanceCollector for CpuPerformanceCollector {
     fn collect(&self) -> Result<BTreeMap<String, PerformanceMetric>> {
         let mut metrics = BTreeMap::new();
-        
+
         // 占位符实现：收集CPU使用率
-        metrics.insert("cpu_usage".to_string(), PerformanceMetric {
-            name: "cpu_usage".to_string(),
-            metric_type: MetricType::Gauge,
-            value: MetricValue::Float(0.0),
-            unit: "percent".to_string(),
-            timestamp: nos_api::event::get_time_ns(),
-            tags: BTreeMap::new(),
-        });
-        
+        metrics.insert(
+            "cpu_usage".to_string(),
+            PerformanceMetric {
+                name: "cpu_usage".to_string(),
+                metric_type: MetricType::Gauge,
+                value: MetricValue::Float(0.0),
+                unit: "percent".to_string(),
+                timestamp: nos_api::event::get_time_ns(),
+                tags: BTreeMap::new(),
+            },
+        );
+
         // 占位符实现：收集CPU温度
-        metrics.insert("cpu_temperature".to_string(), PerformanceMetric {
-            name: "cpu_temperature".to_string(),
-            metric_type: MetricType::Gauge,
-            value: MetricValue::Float(0.0),
-            unit: "celsius".to_string(),
-            timestamp: nos_api::event::get_time_ns(),
-            tags: BTreeMap::new(),
-        });
-        
+        metrics.insert(
+            "cpu_temperature".to_string(),
+            PerformanceMetric {
+                name: "cpu_temperature".to_string(),
+                metric_type: MetricType::Gauge,
+                value: MetricValue::Float(0.0),
+                unit: "celsius".to_string(),
+                timestamp: nos_api::event::get_time_ns(),
+                tags: BTreeMap::new(),
+            },
+        );
+
         Ok(metrics)
     }
-    
+
     fn name(&self) -> &str {
         &self.name
     }
-    
+
     fn description(&self) -> &str {
         "CPU performance collector"
     }
@@ -200,43 +203,47 @@ pub struct MemoryPerformanceCollector {
 impl MemoryPerformanceCollector {
     /// 创建新的内存性能收集器
     pub fn new() -> Self {
-        Self {
-            name: "memory".to_string(),
-        }
+        Self { name: "memory".to_string() }
     }
 }
 
 impl PerformanceCollector for MemoryPerformanceCollector {
     fn collect(&self) -> Result<BTreeMap<String, PerformanceMetric>> {
         let mut metrics = BTreeMap::new();
-        
+
         // 占位符实现：收集内存使用量
-        metrics.insert("memory_usage".to_string(), PerformanceMetric {
-            name: "memory_usage".to_string(),
-            metric_type: MetricType::Gauge,
-            value: MetricValue::Integer(0),
-            unit: "bytes".to_string(),
-            timestamp: nos_api::event::get_time_ns(),
-            tags: BTreeMap::new(),
-        });
-        
+        metrics.insert(
+            "memory_usage".to_string(),
+            PerformanceMetric {
+                name: "memory_usage".to_string(),
+                metric_type: MetricType::Gauge,
+                value: MetricValue::Integer(0),
+                unit: "bytes".to_string(),
+                timestamp: nos_api::event::get_time_ns(),
+                tags: BTreeMap::new(),
+            },
+        );
+
         // 占位符实现：收集内存使用率
-        metrics.insert("memory_usage_percent".to_string(), PerformanceMetric {
-            name: "memory_usage_percent".to_string(),
-            metric_type: MetricType::Gauge,
-            value: MetricValue::Float(0.0),
-            unit: "percent".to_string(),
-            timestamp: nos_api::event::get_time_ns(),
-            tags: BTreeMap::new(),
-        });
-        
+        metrics.insert(
+            "memory_usage_percent".to_string(),
+            PerformanceMetric {
+                name: "memory_usage_percent".to_string(),
+                metric_type: MetricType::Gauge,
+                value: MetricValue::Float(0.0),
+                unit: "percent".to_string(),
+                timestamp: nos_api::event::get_time_ns(),
+                tags: BTreeMap::new(),
+            },
+        );
+
         Ok(metrics)
     }
-    
+
     fn name(&self) -> &str {
         &self.name
     }
-    
+
     fn description(&self) -> &str {
         "Memory performance collector"
     }
@@ -250,43 +257,47 @@ pub struct SyscallPerformanceCollector {
 impl SyscallPerformanceCollector {
     /// 创建新的系统调用性能收集器
     pub fn new() -> Self {
-        Self {
-            name: "syscall".to_string(),
-        }
+        Self { name: "syscall".to_string() }
     }
 }
 
 impl PerformanceCollector for SyscallPerformanceCollector {
     fn collect(&self) -> Result<BTreeMap<String, PerformanceMetric>> {
         let mut metrics = BTreeMap::new();
-        
+
         // 占位符实现：收集系统调用总数
-        metrics.insert("syscall_total".to_string(), PerformanceMetric {
-            name: "syscall_total".to_string(),
-            metric_type: MetricType::Counter,
-            value: MetricValue::Integer(0),
-            unit: "count".to_string(),
-            timestamp: nos_api::event::get_time_ns(),
-            tags: BTreeMap::new(),
-        });
-        
+        metrics.insert(
+            "syscall_total".to_string(),
+            PerformanceMetric {
+                name: "syscall_total".to_string(),
+                metric_type: MetricType::Counter,
+                value: MetricValue::Integer(0),
+                unit: "count".to_string(),
+                timestamp: nos_api::event::get_time_ns(),
+                tags: BTreeMap::new(),
+            },
+        );
+
         // 占位符实现：收集系统调用错误数
-        metrics.insert("syscall_errors".to_string(), PerformanceMetric {
-            name: "syscall_errors".to_string(),
-            metric_type: MetricType::Counter,
-            value: MetricValue::Integer(0),
-            unit: "count".to_string(),
-            timestamp: nos_api::event::get_time_ns(),
-            tags: BTreeMap::new(),
-        });
-        
+        metrics.insert(
+            "syscall_errors".to_string(),
+            PerformanceMetric {
+                name: "syscall_errors".to_string(),
+                metric_type: MetricType::Counter,
+                value: MetricValue::Integer(0),
+                unit: "count".to_string(),
+                timestamp: nos_api::event::get_time_ns(),
+                tags: BTreeMap::new(),
+            },
+        );
+
         Ok(metrics)
     }
-    
+
     fn name(&self) -> &str {
         &self.name
     }
-    
+
     fn description(&self) -> &str {
         "System call performance collector"
     }
@@ -302,14 +313,14 @@ pub fn init_performance_monitor() -> Result<()> {
     if *is_init {
         return Ok(());
     }
-    
+
     let monitor = Arc::new(PerformanceMonitor::new());
-    
+
     // 添加默认收集器
     monitor.add_collector(Arc::new(CpuPerformanceCollector::new()));
     monitor.add_collector(Arc::new(MemoryPerformanceCollector::new()));
     monitor.add_collector(Arc::new(SyscallPerformanceCollector::new()));
-    
+
     unsafe {
         GLOBAL_PERFORMANCE_MONITOR = Some(monitor);
     }

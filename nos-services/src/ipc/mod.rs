@@ -4,11 +4,14 @@
 
 extern crate alloc;
 
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+};
+
 use nos_api::Result;
+
 use crate::core::{Service, ServiceStatus};
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::boxed::Box;
 
 /// IPC service
 pub struct IpcService {
@@ -19,10 +22,7 @@ pub struct IpcService {
 impl IpcService {
     /// Create a new IPC service
     pub fn new(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            status: ServiceStatus::Stopped,
-        }
+        Self { name: name.to_string(), status: ServiceStatus::Stopped }
     }
 }
 
@@ -55,19 +55,19 @@ pub fn register_ipc_services() -> Result<()> {
     use crate::registry;
 
     let mut registry = registry::get_registry()?.lock();
-    
+
     // Register message queue service
     let mq_service = IpcService::new("message_queue");
     registry.register("message_queue", Box::new(mq_service))?;
-    
+
     // Register semaphore service
     let semaphore_service = IpcService::new("semaphore");
     registry.register("semaphore", Box::new(semaphore_service))?;
-    
+
     // Register shared memory service
     let shm_service = IpcService::new("shared_memory");
     registry.register("shared_memory", Box::new(shm_service))?;
-    
+
     Ok(())
 }
 
@@ -78,7 +78,7 @@ mod tests {
     #[test]
     fn test_ipc_service() {
         let service = IpcService::new("test_ipc");
-        
+
         assert_eq!(service.name(), "test_ipc");
         assert_eq!(service.service_type(), crate::types::service_type::IPC);
         assert_eq!(service.status(), ServiceStatus::Stopped);

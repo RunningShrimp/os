@@ -6,7 +6,7 @@ mod graphics_integration_tests {
     // Test module - actual tests would depend on public test APIs
     // This tests the integration of graphics rendering with VBE caching
     // and UEFI GOP mode selection
-    
+
     #[test]
     fn test_graphics_cache_integration() {
         // Verifies that graphics rendering uses caches effectively

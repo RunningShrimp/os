@@ -15,13 +15,13 @@
 //! - Single Responsibility: Focused solely on hardware detection operations
 //! - Dependency Inversion: Depends on abstractions, not concretions
 
-use super::boot_services::{HardwareInfo, GraphicsCapabilities};
+use super::boot_services::{GraphicsCapabilities, HardwareInfo};
 
 /// Hardware Detection Service - Domain Interface
 ///
 /// Defines the contract for hardware detection operations.
 /// Implementations are provided by the infrastructure layer.
-/// 
+///
 /// This interface enables the application layer to perform hardware detection
 /// without depending on specific implementation details like BIOS calls,
 /// UEFI services, or platform-specific code.
@@ -151,37 +151,37 @@ pub trait HardwareDetectionService: Send + Sync {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CpuInfo {
     /// CPU vendor string (e.g., "GenuineIntel", "AuthenticAMD")
-    /// 
+    ///
     /// This is a 12-byte array containing the ASCII vendor string
     /// as returned by CPUID instruction with EAX=0
     pub vendor: [u8; 12],
-    
+
     /// CPU family as defined by the manufacturer
-    /// 
+    ///
     /// Combined with model and stepping to identify a specific CPU
     pub family: u8,
-    
+
     /// CPU model as defined by the manufacturer
-    /// 
+    ///
     /// Combined with family and stepping to identify a specific CPU
     pub model: u8,
-    
+
     /// CPU stepping as defined by the manufacturer
-    /// 
+    ///
     /// Represents the revision of a specific CPU model
     pub stepping: u8,
-    
+
     /// CPU feature flags indicating supported instructions and capabilities
     pub features: CpuFeatures,
-    
+
     /// Maximum supported physical address bits
-    /// 
+    ///
     /// Indicates the maximum physical address width the CPU can handle
     /// Typical values: 32 (32-bit), 36 (PAE), 48 (x86-64)
     pub physical_address_bits: u8,
-    
+
     /// Maximum supported linear (virtual) address bits
-    /// 
+    ///
     /// Indicates the maximum virtual address width the CPU can handle
     /// Typical values: 32 (32-bit), 48 (x86-64)
     pub linear_address_bits: u8,
@@ -216,7 +216,7 @@ impl CpuInfo {
         // Basic validation - in a real implementation, might be more strict
         let physical_bits = physical_address_bits.max(32).min(52);
         let linear_bits = linear_address_bits.max(32).min(52);
-        
+
         Self {
             vendor,
             family,
@@ -303,103 +303,103 @@ impl CpuInfo {
 pub struct CpuFeatures {
     /// FPU (Floating Point Unit) - x87 FPU present
     pub fpu: bool,
-    
+
     /// VME (Virtual Mode Extensions) - Virtual 8086 mode enhancements
     pub vme: bool,
-    
+
     /// DE (Debugging Extensions) - I/O breakpoints
     pub de: bool,
-    
+
     /// PSE (Page Size Extension) - 4MB pages support
     pub pse: bool,
-    
+
     /// TSC (Time Stamp Counter) - RDTSC instruction support
     pub tsc: bool,
-    
+
     /// MSR (Model Specific Registers) - RDMSR/WRMSR instructions
     pub msr: bool,
-    
+
     /// PAE (Physical Address Extension) - 36-bit physical addressing
     pub pae: bool,
-    
+
     /// MCE (Machine Check Exception) - Machine check exception support
     pub mce: bool,
-    
+
     /// CX8 (CMPXCHG8B instruction) - 8-byte compare and swap
     pub cx8: bool,
-    
+
     /// APIC (Advanced Programmable Interrupt Controller) - On-chip APIC
     pub apic: bool,
-    
+
     /// SEP (SYSENTER/SYSEXIT instructions) - Fast system calls
     pub sep: bool,
-    
+
     /// MTRR (Memory Type Range Registers) - Memory type control
     pub mtrr: bool,
-    
+
     /// PGE (Page Global Enable) - Global page flag support
     pub pge: bool,
-    
+
     /// MCA (Machine Check Architecture) - Machine check architecture
     pub mca: bool,
-    
+
     /// CMOV (Conditional Move Instruction) - CMOV instruction support
     pub cmov: bool,
-    
+
     /// PAT (Page Attribute Table) - Page attribute table
     pub pat: bool,
-    
+
     /// PSE36 (36-bit Page Size Extension) - 4GB+ addressing with PSE
     pub pse36: bool,
-    
+
     /// PSN (Processor Serial Number) - CPU serial number (usually disabled)
     pub psn: bool,
-    
+
     /// CLFLUSH (Cache Line Flush) - CLFLUSH instruction support
     pub clflush: bool,
-    
+
     /// DS (Debug Store) - Debug store area
     pub ds: bool,
-    
+
     /// TM (Thermal Monitor) - Thermal monitoring and control
     pub tm: bool,
-    
+
     /// HTT (Hyper-Threading Technology) - Multiple logical processors
     pub htt: bool,
-    
+
     /// TM2 (Thermal Monitor 2) - Enhanced thermal monitoring
     pub tm2: bool,
-    
+
     /// IA-64 Architecture - Itanium architecture support
     pub ia64: bool,
-    
+
     /// PBE (Pending Break Enable) - Pending break enable
     pub pbe: bool,
-    
+
     /// SSE (Streaming SIMD Extensions) - SSE instruction support
     pub sse: bool,
-    
+
     /// SSE2 (Streaming SIMD Extensions 2) - SSE2 instruction support
     pub sse2: bool,
-    
+
     /// SS (Self-Snoop) - Cache snoop control
     pub ss: bool,
-    
+
     /// LM (Long Mode) - x86-64 architecture support
     pub lm: bool,
-    
+
     /// 3DNow! instructions - AMD 3DNow! instruction support
     pub now: bool,
-    
+
     /// 3DNow! extensions - AMD 3DNow! extensions
     pub nowext: bool,
-    
+
     /// VMX (Intel Virtualization Technology) - Intel VT-x support
     pub vmx: bool,
-    
+
     /// SVM (AMD Virtualization Technology) - AMD-V support
     pub svm: bool,
-    
+
     /// NX (No-execute bit) - Execute disable support
     pub nx: bool,
 }
@@ -458,32 +458,32 @@ impl Default for CpuFeatures {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DetectionCapabilities {
     /// CPU detection is available
-    /// 
+    ///
     /// Indicates if CPUID-based CPU detection is supported
     pub cpu_detection: bool,
-    
+
     /// Memory detection is available
-    /// 
+    ///
     /// Indicates if memory map detection is supported
     pub memory_detection: bool,
-    
+
     /// Graphics detection is available
-    /// 
+    ///
     /// Indicates if graphics capabilities detection is supported
     pub graphics_detection: bool,
-    
+
     /// ACPI detection is available
-    /// 
+    ///
     /// Indicates if ACPI table parsing is supported
     pub acpi_detection: bool,
-    
+
     /// PCI device enumeration is available
-    /// 
+    ///
     /// Indicates if PCI bus enumeration is supported
     pub pci_enumeration: bool,
-    
+
     /// USB device enumeration is available
-    /// 
+    ///
     /// Indicates if USB device enumeration is supported
     pub usb_enumeration: bool,
 }
@@ -591,7 +591,7 @@ mod tests {
         let vendor = b"GenuineIntel";
         let mut vendor_array = [0u8; 12];
         vendor_array[..vendor.len()].copy_from_slice(vendor);
-        
+
         let features = CpuFeatures {
             fpu: true,
             pae: true,
@@ -600,16 +600,8 @@ mod tests {
             vmx: true,
             ..Default::default()
         };
-        
-        let cpu_info = CpuInfo::new(
-            vendor_array,
-            6,
-            15,
-            1,
-            features,
-            48,
-            48,
-        );
+
+        let cpu_info = CpuInfo::new(vendor_array, 6, 15, 1, features, 48, 48);
 
         assert_eq!(cpu_info.family, 6);
         assert_eq!(cpu_info.model, 15);
@@ -626,9 +618,9 @@ mod tests {
         let vendor = b"AuthenticAMD";
         let mut vendor_array = [0u8; 12];
         vendor_array[..vendor.len()].copy_from_slice(vendor);
-        
+
         let features = CpuFeatures::default();
-        
+
         // Test with invalid address bits (too small)
         let cpu_info = CpuInfo::new(
             vendor_array,
@@ -640,7 +632,7 @@ mod tests {
             48,
         );
         assert_eq!(cpu_info.physical_address_bits, 32);
-        
+
         // Test with invalid address bits (too large)
         let cpu_info = CpuInfo::new(
             vendor_array,
@@ -685,16 +677,8 @@ mod tests {
         let vendor = b"GenuineIntel";
         let mut vendor_array = [0u8; 12];
         vendor_array[..vendor.len()].copy_from_slice(vendor);
-        
-        let cpu_info = CpuInfo::new(
-            vendor_array,
-            6,
-            15,
-            1,
-            features,
-            48,
-            48,
-        );
+
+        let cpu_info = CpuInfo::new(vendor_array, 6, 15, 1, features, 48, 48);
 
         assert!(cpu_info.supports_64bit());
         assert!(cpu_info.supports_nx());
@@ -707,10 +691,10 @@ mod tests {
         let vendor = b"AuthenticAMD";
         let mut vendor_array = [0u8; 12];
         vendor_array[..vendor.len()].copy_from_slice(vendor);
-        
+
         let features = CpuFeatures::default();
         let cpu_info = CpuInfo::new(vendor_array, 23, 1, 0, features, 48, 48);
-        
+
         let id_string = cpu_info.identification_string();
         assert!(id_string.contains("AuthenticAMD"));
         assert!(id_string.contains("Family 23"));

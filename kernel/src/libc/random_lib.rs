@@ -8,7 +8,6 @@
 //! - 安全随机数生成
 
 extern crate alloc;
-use core::ffi::{c_int, c_uint, c_double};
 use alloc::vec::Vec;
 
 /// 随机数生成器类型
@@ -147,11 +146,17 @@ impl EnhancedRandomGenerator {
         };
 
         // 初始化不同类型的生成器
-        self.xorshift_state.store(seed, core::sync::atomic::Ordering::SeqCst);
-        self.lcg_state.store(seed.wrapping_mul(1103515245).wrapping_add(12345), core::sync::atomic::Ordering::SeqCst);
-        self.mt_state.store(seed, core::sync::atomic::Ordering::SeqCst);
+        self.xorshift_state
+            .store(seed, core::sync::atomic::Ordering::SeqCst);
+        self.lcg_state.store(
+            seed.wrapping_mul(1103515245).wrapping_add(12345),
+            core::sync::atomic::Ordering::SeqCst,
+        );
+        self.mt_state
+            .store(seed, core::sync::atomic::Ordering::SeqCst);
 
-        self.initialized.store(true, core::sync::atomic::Ordering::SeqCst);
+        self.initialized
+            .store(true, core::sync::atomic::Ordering::SeqCst);
         crate::println!("[random_lib] 随机数生成器初始化，种子: 0x{:x}", seed);
     }
 
@@ -161,11 +166,18 @@ impl EnhancedRandomGenerator {
 
         // 更新所有生成器的种子
         let seed_value = seed as u64;
-        self.xorshift_state.store(seed_value, core::sync::atomic::Ordering::SeqCst);
-        self.lcg_state.store(seed_value.wrapping_mul(1103515245).wrapping_add(12345), core::sync::atomic::Ordering::SeqCst);
-        self.mt_state.store(seed_value, core::sync::atomic::Ordering::SeqCst);
+        self.xorshift_state
+            .store(seed_value, core::sync::atomic::Ordering::SeqCst);
+        self.lcg_state.store(
+            seed_value.wrapping_mul(1103515245).wrapping_add(12345),
+            core::sync::atomic::Ordering::SeqCst,
+        );
+        self.mt_state
+            .store(seed_value, core::sync::atomic::Ordering::SeqCst);
 
-        self.stats.seed_set_count.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+        self.stats
+            .seed_set_count
+            .fetch_add(1, core::sync::atomic::Ordering::SeqCst);
     }
 
     /// 生成随机整数（0到RAND_MAX）
@@ -181,7 +193,9 @@ impl EnhancedRandomGenerator {
             RandomGeneratorType::SystemEntropy => self.entropy_rand(),
         };
 
-        self.stats.total_generated.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+        self.stats
+            .total_generated
+            .fetch_add(1, core::sync::atomic::Ordering::SeqCst);
         (result & 0x7fffffff) as c_int // 确保在RAND_MAX范围内
     }
 
@@ -334,10 +348,22 @@ impl EnhancedRandomGenerator {
     pub fn print_stats_report(&self) {
         crate::println!("\n=== 随机数生成器统计报告 ===");
 
-        let total = self.stats.total_generated.load(core::sync::atomic::Ordering::SeqCst);
-        let seed_count = self.stats.seed_set_count.load(core::sync::atomic::Ordering::SeqCst);
-        let entropy_used = self.stats.entropy_used.load(core::sync::atomic::Ordering::SeqCst);
-        let reset_count = self.stats.reset_count.load(core::sync::atomic::Ordering::SeqCst);
+        let total = self
+            .stats
+            .total_generated
+            .load(core::sync::atomic::Ordering::SeqCst);
+        let seed_count = self
+            .stats
+            .seed_set_count
+            .load(core::sync::atomic::Ordering::SeqCst);
+        let entropy_used = self
+            .stats
+            .entropy_used
+            .load(core::sync::atomic::Ordering::SeqCst);
+        let reset_count = self
+            .stats
+            .reset_count
+            .load(core::sync::atomic::Ordering::SeqCst);
 
         crate::println!("生成器类型: {:?}", self.config.generator_type);
         crate::println!("总生成数: {}", total);
@@ -355,17 +381,21 @@ impl EnhancedRandomGenerator {
     fn lcg_rand(&self) -> u64 {
         let current = self.lcg_state.load(core::sync::atomic::Ordering::SeqCst);
         let next = current.wrapping_mul(1103515245).wrapping_add(12345);
-        self.lcg_state.store(next, core::sync::atomic::Ordering::SeqCst);
+        self.lcg_state
+            .store(next, core::sync::atomic::Ordering::SeqCst);
         next
     }
 
     /// Xorshift生成器
     fn xorshift_rand(&self) -> u64 {
-        let mut x = self.xorshift_state.load(core::sync::atomic::Ordering::SeqCst);
+        let mut x = self
+            .xorshift_state
+            .load(core::sync::atomic::Ordering::SeqCst);
         x ^= x << 13;
         x ^= x >> 7;
         x ^= x << 17;
-        self.xorshift_state.store(x, core::sync::atomic::Ordering::SeqCst);
+        self.xorshift_state
+            .store(x, core::sync::atomic::Ordering::SeqCst);
         x
     }
 
@@ -373,14 +403,17 @@ impl EnhancedRandomGenerator {
     fn mt_rand(&self) -> u64 {
         let state = self.mt_state.load(core::sync::atomic::Ordering::SeqCst);
         let next = state ^ (state >> 11);
-        self.mt_state.store(next, core::sync::atomic::Ordering::SeqCst);
+        self.mt_state
+            .store(next, core::sync::atomic::Ordering::SeqCst);
         next
     }
 
     /// 系统熵随机数
     fn entropy_rand(&self) -> u64 {
         let entropy = SystemEntropy.get_entropy();
-        self.stats.entropy_used.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+        self.stats
+            .entropy_used
+            .fetch_add(1, core::sync::atomic::Ordering::SeqCst);
         entropy
     }
 }
@@ -507,8 +540,12 @@ pub mod random_tests {
             max_bucket = max_bucket.max(count);
         }
 
-        crate::println!("  📊 分布测试: 最少={}, 最多={}, 偏差={}",
-            min_bucket, max_bucket, max_bucket - min_bucket);
+        crate::println!(
+            "  📊 分布测试: 最少={}, 最多={}, 偏差={}",
+            min_bucket,
+            max_bucket,
+            max_bucket - min_bucket
+        );
     }
 
     fn test_float_random(generator: &EnhancedRandomGenerator) {
@@ -563,12 +600,15 @@ pub mod random_tests {
         crate::println!("\n🎲 测试分布随机数生成...");
 
         // 测试正态分布
-        let normal_samples: Vec<c_double> = (0..100).map(|_| generator.rand_normal(0.0, 1.0)).collect();
-        let normal_mean = normal_samples.iter().sum::<c_double>() / normal_samples.len() as c_double;
+        let normal_samples: Vec<c_double> =
+            (0..100).map(|_| generator.rand_normal(0.0, 1.0)).collect();
+        let normal_mean =
+            normal_samples.iter().sum::<c_double>() / normal_samples.len() as c_double;
         crate::println!("  📊 正态分布: 期望=0.0, 实际均值={:.4}", normal_mean);
 
         // 测试指数分布
-        let exp_samples: Vec<c_double> = (0..100).map(|_| generator.rand_exponential(1.0)).collect();
+        let exp_samples: Vec<c_double> =
+            (0..100).map(|_| generator.rand_exponential(1.0)).collect();
         let exp_mean = exp_samples.iter().sum::<c_double>() / exp_samples.len() as c_double;
         crate::println!("  📊 指数分布(λ=1): 期望=1.0, 实际均值={:.4}", exp_mean);
     }

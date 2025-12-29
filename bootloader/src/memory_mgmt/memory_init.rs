@@ -4,10 +4,10 @@
 pub fn init_memory() {
     #[cfg(target_arch = "x86_64")]
     init_memory_x86_64();
-    
+
     #[cfg(target_arch = "aarch64")]
     init_memory_aarch64();
-    
+
     #[cfg(target_arch = "riscv64")]
     init_memory_riscv64();
 }

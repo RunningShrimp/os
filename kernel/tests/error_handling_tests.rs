@@ -11,14 +11,17 @@
 //! - Unified error handling norms compliance
 
 extern crate alloc;
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 
-use crate::tests::common::{TestUtils, TestFixture, IntegrationTestResult};
-use crate::tests::common::{integration_test_assert, integration_test_assert_eq};
-use crate::syscalls::common::{SyscallError, syscall_error_to_errno};
-use crate::syscalls;
-use crate::reliability::errno::*;
+use crate::{
+    reliability::errno::*,
+    syscalls,
+    syscalls::common::{SyscallError, syscall_error_to_errno},
+    tests::common::{
+        IntegrationTestResult, TestFixture, TestUtils, integration_test_assert,
+        integration_test_assert_eq,
+    },
+};
 
 /// Test POSIX error code conversion for all SyscallError variants
 #[test]
@@ -60,15 +63,27 @@ fn test_syscall_dispatch_error_propagation() -> IntegrationTestResult {
         // Test that all syscall ranges properly handle invalid calls
         // Process syscalls (0x1000-0x1FFF) - most return ENOTSUP
         let result = syscalls::dispatch(0x1000, &args); // getpid - not implemented
-        integration_test_assert_eq!(result, -ENOSYS as isize, "Unimplemented process syscall should return ENOTSUP");
+        integration_test_assert_eq!(
+            result,
+            -ENOSYS as isize,
+            "Unimplemented process syscall should return ENOTSUP"
+        );
 
         // File I/O syscalls (0x2000-0x2FFF)
         let result = syscalls::dispatch(0x2000, &args); // open - not implemented
-        integration_test_assert_eq!(result, -ENOSYS as isize, "Unimplemented file syscall should return ENOTSUP");
+        integration_test_assert_eq!(
+            result,
+            -ENOSYS as isize,
+            "Unimplemented file syscall should return ENOTSUP"
+        );
 
         // Network syscalls (0x4000-0x4FFF)
         let result = syscalls::dispatch(0x4000, &args); // socket - not implemented
-        integration_test_assert_eq!(result, -ENOSYS as isize, "Unimplemented network syscall should return ENOTSUP");
+        integration_test_assert_eq!(
+            result,
+            -ENOSYS as isize,
+            "Unimplemented network syscall should return ENOTSUP"
+        );
 
         Ok(())
     })
@@ -111,11 +126,19 @@ fn test_error_context_preservation() -> IntegrationTestResult {
 
         // Test invalid syscall - should preserve InvalidSyscall error
         let result = syscalls::dispatch(0xFFFF, &args);
-        integration_test_assert_eq!(result, -1, "Invalid syscall should return -1 (InvalidSyscall -> errno conversion)");
+        integration_test_assert_eq!(
+            result,
+            -1,
+            "Invalid syscall should return -1 (InvalidSyscall -> errno conversion)"
+        );
 
         // Test unimplemented syscall - should preserve NotSupported error
         let result = syscalls::dispatch(0x4000, &args); // socket
-        integration_test_assert_eq!(result, -(EOPNOTSUPP as isize), "NotSupported should map to EOPNOTSUPP");
+        integration_test_assert_eq!(
+            result,
+            -(EOPNOTSUPP as isize),
+            "NotSupported should map to EOPNOTSUPP"
+        );
 
         Ok(())
     })
@@ -185,11 +208,17 @@ fn test_unified_error_handling_norms() -> IntegrationTestResult {
 
         for (syscall_num, name) in &test_syscalls {
             let result = syscalls::dispatch(*syscall_num, &args);
-            integration_test_assert!(result <= 0, alloc::format!("{} syscall should return error (<= 0)", name));
+            integration_test_assert!(
+                result <= 0,
+                alloc::format!("{} syscall should return error (<= 0)", name)
+            );
             if result < 0 {
                 // Verify it's a valid negative errno value
                 let errno = (-result) as i32;
-                integration_test_assert!(errno > 0 && errno <= 133, alloc::format!("{} should return valid errno", name));
+                integration_test_assert!(
+                    errno > 0 && errno <= 133,
+                    alloc::format!("{} should return valid errno", name)
+                );
             }
         }
 
@@ -212,26 +241,38 @@ fn test_syscall_module_error_consistency() -> IntegrationTestResult {
         // Process module (0x1000-0x1FFF)
         for syscall_num in (0x1000..=0x1005).step_by(1) {
             let result = syscalls::dispatch(syscall_num, &args);
-            integration_test_assert!(result <= 0, alloc::format!("Process syscall {} should handle errors consistently", syscall_num));
+            integration_test_assert!(
+                result <= 0,
+                alloc::format!("Process syscall {} should handle errors consistently", syscall_num)
+            );
         }
 
         // File I/O module (0x2000-0x2FFF)
         for syscall_num in (0x2000..=0x2005).step_by(1) {
             let result = syscalls::dispatch(syscall_num, &args);
-            integration_test_assert!(result <= 0, alloc::format!("File syscall {} should handle errors consistently", syscall_num));
+            integration_test_assert!(
+                result <= 0,
+                alloc::format!("File syscall {} should handle errors consistently", syscall_num)
+            );
         }
 
         // Memory module (0x3000-0x3FFF) - some are implemented
         for syscall_num in (0x3000..=0x3005).step_by(1) {
             let result = syscalls::dispatch(syscall_num, &args);
             // Memory syscalls may succeed or fail, but should not panic
-            integration_test_assert!(true, alloc::format!("Memory syscall {} should not panic", syscall_num));
+            integration_test_assert!(
+                true,
+                alloc::format!("Memory syscall {} should not panic", syscall_num)
+            );
         }
 
         // Network module (0x4000-0x4FFF)
         for syscall_num in (0x4000..=0x4005).step_by(1) {
             let result = syscalls::dispatch(syscall_num, &args);
-            integration_test_assert!(result <= 0, alloc::format!("Network syscall {} should handle errors consistently", syscall_num));
+            integration_test_assert!(
+                result <= 0,
+                alloc::format!("Network syscall {} should handle errors consistently", syscall_num)
+            );
         }
 
         Ok(())
@@ -254,13 +295,21 @@ fn test_error_recovery_consistency() -> IntegrationTestResult {
         // Make several invalid calls
         for _ in 0..10 {
             let result = syscalls::dispatch(0xFFFF, &args);
-            integration_test_assert_eq!(result, -1, "Invalid syscall should consistently return -1");
+            integration_test_assert_eq!(
+                result,
+                -1,
+                "Invalid syscall should consistently return -1"
+            );
         }
 
         // Make several calls to unimplemented syscalls
         for _ in 0..10 {
             let result = syscalls::dispatch(0x4000, &args);
-            integration_test_assert_eq!(result, -(EOPNOTSUPP as isize), "Unimplemented syscall should consistently return EOPNOTSUPP");
+            integration_test_assert_eq!(
+                result,
+                -(EOPNOTSUPP as isize),
+                "Unimplemented syscall should consistently return EOPNOTSUPP"
+            );
         }
 
         // Verify that valid calls still work after errors
@@ -298,8 +347,11 @@ fn test_error_message_consistency() -> IntegrationTestResult {
 
         for (error, expected_errno) in &test_cases {
             let actual_errno = syscall_error_to_errno(*error);
-            integration_test_assert_eq!(actual_errno, *expected_errno,
-                alloc::format!("{:?} should map to errno {}", error, expected_errno));
+            integration_test_assert_eq!(
+                actual_errno,
+                *expected_errno,
+                alloc::format!("{:?} should map to errno {}", error, expected_errno)
+            );
         }
 
         Ok(())
@@ -323,19 +375,30 @@ fn test_concurrent_error_handling() -> IntegrationTestResult {
         // Rapid succession of error conditions
         for i in 0..100 {
             let result = syscalls::dispatch(0xFFFF, &args);
-            integration_test_assert_eq!(result, -1, alloc::format!("Concurrent error call {} should work", i));
+            integration_test_assert_eq!(
+                result,
+                -1,
+                alloc::format!("Concurrent error call {} should work", i)
+            );
         }
 
         // Mix of valid and invalid calls
         for i in 0..50 {
             // Invalid call
             let result = syscalls::dispatch(0xFFFF, &args);
-            integration_test_assert_eq!(result, -1, alloc::format!("Mixed invalid call {} should work", i));
+            integration_test_assert_eq!(
+                result,
+                -1,
+                alloc::format!("Mixed invalid call {} should work", i)
+            );
 
             // Valid call (mmap)
             let result = syscalls::dispatch(0x3000, &args);
             // Should not panic
-            integration_test_assert!(true, alloc::format!("Mixed valid call {} should not panic", i));
+            integration_test_assert!(
+                true,
+                alloc::format!("Mixed valid call {} should not panic", i)
+            );
         }
 
         Ok(())
@@ -364,8 +427,14 @@ fn test_error_handling_performance() -> IntegrationTestResult {
         let duration = end_time - start_time;
 
         // Error handling should be fast (< 1000 ticks for 1000 calls)
-        integration_test_assert!(duration < 1000,
-            alloc::format!("Error handling took too long: {} ticks for {} calls", duration, iterations));
+        integration_test_assert!(
+            duration < 1000,
+            alloc::format!(
+                "Error handling took too long: {} ticks for {} calls",
+                duration,
+                iterations
+            )
+        );
 
         Ok(())
     })

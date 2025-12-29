@@ -1,22 +1,19 @@
 /// Response Engine Module for IDS
-
 extern crate alloc;
-///
-/// This module implements automated response capabilities for
-/// detected security threats and intrusions.
-
-use crate::subsystems::sync::{SpinLock, Mutex};
-use crate::collections::HashMap;
-use crate::compat::DefaultHasherBuilder;
-use crate::subsystems::time::{SystemTime, UNIX_EPOCH};
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::string::String;
-use core::sync::atomic::{AtomicU64, AtomicBool, Ordering};
+use alloc::{string::String, sync::Arc, vec::Vec};
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 // Use the parent IDS ResponseAction enum so calls from the IDS core share the
 // same type and don't require conversions.
 use crate::ids::ResponseAction;
+/// This module implements automated response capabilities for
+/// detected security threats and intrusions.
+use crate::subsystems::sync::{Mutex, SpinLock};
+use crate::{
+    collections::HashMap,
+    compat::DefaultHasherBuilder,
+    subsystems::time::{SystemTime, UNIX_EPOCH},
+};
 
 /// Response priority
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -199,7 +196,11 @@ impl ResponseEngine {
 
     /// Execute a specific action immediately
     /// Execute an action for a given IntrusionDetection event.
-    pub fn execute_action(&mut self, action: ResponseAction, detection: &crate::ids::IntrusionDetection) -> Result<ResponseExecution, &'static str> {
+    pub fn execute_action(
+        &mut self,
+        action: ResponseAction,
+        detection: &crate::ids::IntrusionDetection,
+    ) -> Result<ResponseExecution, &'static str> {
         let _lock = self.engine_lock.lock();
 
         let execution_id = self.execution_counter.fetch_add(1, Ordering::Relaxed);
@@ -230,17 +231,23 @@ impl ResponseEngine {
         };
 
         // Prepare minimal execution context from the detection
-        let mut ctx: HashMap<String, String> = HashMap::with_hasher(crate::compat::DefaultHasherBuilder);
+        let mut ctx: HashMap<String, String> =
+            HashMap::with_hasher(crate::compat::DefaultHasherBuilder);
         ctx.insert(String::from("detection_id"), format!("{}", detection.id));
         if let Some(pid) = detection.evidence.iter().find_map(|e| {
             // look for a pid in evidence content (very naive)
-            if e.content.contains("pid=") { Some(e.content.clone()) } else { None }
+            if e.content.contains("pid=") {
+                Some(e.content.clone())
+            } else {
+                None
+            }
         }) {
             ctx.insert(String::from("pid"), pid);
         }
 
         // Execute the action
-        let (success, result_message, error_message) = self.perform_action(action, &execution.target, &ctx);
+        let (success, result_message, error_message) =
+            self.perform_action(action, &execution.target, &ctx);
 
         let end_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -284,7 +291,8 @@ impl ResponseEngine {
 
     /// Get recent executions
     pub fn get_recent_executions(&self, count: usize) -> Vec<ResponseExecution> {
-        self.execution_history.iter()
+        self.execution_history
+            .iter()
             .rev()
             .take(count)
             .cloned()
@@ -321,9 +329,8 @@ impl ResponseEngine {
             .unwrap_or_default()
             .as_secs();
 
-        self.execution_history.retain(|execution| {
-            current_time - execution.timestamp <= max_age_seconds
-        });
+        self.execution_history
+            .retain(|execution| current_time - execution.timestamp <= max_age_seconds);
     }
 
     /// Check if a rule should be triggered
@@ -345,7 +352,9 @@ impl ResponseEngine {
 
         // Check rate limiting
         if let Some(rate_limit) = rule.rate_limit {
-            let recent_executions = self.executions.iter()
+            let recent_executions = self
+                .executions
+                .iter()
                 .filter(|e| e.rule_id == rule.id && current_time - e.timestamp < 60)
                 .count() as u32;
 
@@ -393,7 +402,11 @@ impl ResponseEngine {
     }
 
     /// Execute a response rule
-    fn execute_rule(&mut self, rule: &ResponseRule, context: &ResponseContext) -> Vec<ResponseExecution> {
+    fn execute_rule(
+        &mut self,
+        rule: &ResponseRule,
+        context: &ResponseContext,
+    ) -> Vec<ResponseExecution> {
         let mut executions = Vec::new();
 
         // Update rule statistics
@@ -462,52 +475,57 @@ impl ResponseEngine {
     }
 
     /// Perform the actual action
-    fn perform_action(&self, action: ResponseAction, target: &str, context: &HashMap<String, String>) -> (bool, String, Option<String>) {
+    fn perform_action(
+        &self,
+        action: ResponseAction,
+        target: &str,
+        context: &HashMap<String, String>,
+    ) -> (bool, String, Option<String>) {
         match action {
-            ResponseAction::Log => {
-                (true, format!("Logged event for target: {}", target), None)
-            }
+            ResponseAction::Log => (true, format!("Logged event for target: {}", target), None),
             ResponseAction::Alert => {
                 // Log the event (simplified)
                 (true, format!("Alert sent for target: {}", target), None)
-            }
+            },
             ResponseAction::BlockConnection => {
                 // Block network traffic (simplified)
                 (true, format!("Blocked network traffic for: {}", target), None)
-            }
+            },
             ResponseAction::TerminateProcess => {
                 // Terminate process (simplified)
                 if let Some(pid_str) = context.get("pid") {
                     (true, format!("Process {} terminated", pid_str), None)
                 } else {
-                    (false, String::from("Process ID not specified"), Some(String::from("Missing PID")))
+                    (
+                        false,
+                        String::from("Process ID not specified"),
+                        Some(String::from("Missing PID")),
+                    )
                 }
-            }
+            },
             ResponseAction::IsolateSystem => {
                 // Quarantine file (simplified)
                 (true, format!("System isolation initiated for: {}", target), None)
-            }
+            },
             ResponseAction::BlockUser => {
                 // Disable user account (simplified)
                 (true, format!("Account {} disabled", target), None)
-            }
+            },
             ResponseAction::UpdateFirewall => {
                 // Schedule system reboot (simplified)
                 (true, format!("Firewall updated for {}", target), None)
-            }
+            },
             ResponseAction::ExecuteScript(ref s) => {
                 (true, format!("Executed script '{}' for {}", s, target), None)
-            }
+            },
             ResponseAction::SendEmail(ref addr) => {
                 (true, format!("Sent email to '{}' regarding {}", addr, target), None)
-            }
+            },
             ResponseAction::CallWebhook(ref url) => {
                 (true, format!("Called webhook '{}' for {}", url, target), None)
-            }
+            },
             // Fallback (for any unhandled parent variant)
-            _ => {
-                (true, format!("Custom action executed for: {}", target), None)
-            }
+            _ => (true, format!("Custom action executed for: {}", target), None),
         }
     }
 
@@ -528,7 +546,11 @@ impl ResponseEngine {
             description: String::from("Response for critical security threats"),
             conditions: vec![String::from("severity:critical")],
             min_severity: 200,
-            actions: vec![ResponseAction::Alert, ResponseAction::BlockConnection, ResponseAction::Log],
+            actions: vec![
+                ResponseAction::Alert,
+                ResponseAction::BlockConnection,
+                ResponseAction::Log,
+            ],
             priority: ResponsePriority::Critical,
             active: true,
             rate_limit: Some(10),
@@ -560,7 +582,11 @@ impl ResponseEngine {
             description: String::from("Response for network-based intrusions"),
             conditions: vec![String::from("type:network"), String::from("severity:high")],
             min_severity: 100,
-            actions: vec![ResponseAction::BlockConnection, ResponseAction::Alert, ResponseAction::Log],
+            actions: vec![
+                ResponseAction::BlockConnection,
+                ResponseAction::Alert,
+                ResponseAction::Log,
+            ],
             priority: ResponsePriority::High,
             active: true,
             rate_limit: Some(15),
@@ -576,7 +602,11 @@ impl ResponseEngine {
             description: String::from("Response for malware detection"),
             conditions: vec![String::from("type:malware")],
             min_severity: 100,
-            actions: vec![ResponseAction::ExecuteScript(String::from("quarantine")), ResponseAction::Alert, ResponseAction::Log],
+            actions: vec![
+                ResponseAction::ExecuteScript(String::from("quarantine")),
+                ResponseAction::Alert,
+                ResponseAction::Log,
+            ],
             priority: ResponsePriority::High,
             active: true,
             rate_limit: Some(5),

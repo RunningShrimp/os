@@ -13,7 +13,7 @@
 //! # Usage
 //!
 //! ```rust
-//! use nos_error_handling::{ErrorHandler, ErrorAction, ErrorSeverity};
+//! use nos_error_handling::{ErrorAction, ErrorHandler, ErrorSeverity};
 //!
 //! // Implement the ErrorHandler trait in kernel code
 //! struct MyErrorHandler;
@@ -35,18 +35,18 @@ pub use nos_api::error::{Error, Result};
 pub mod core {
     // Core traits for error handling
     pub mod traits;
-    
+
     // Engine functions - these are implemented in kernel/src/error
     pub fn init_engine() -> nos_api::Result<()> {
         // Implementation in kernel/src/error
         Ok(())
     }
-    
+
     pub fn shutdown_engine() -> nos_api::Result<()> {
         // Implementation in kernel/src/error
         Ok(())
     }
-    
+
     pub fn get_stats() -> crate::types::ErrorHandlingStats {
         // Implementation in kernel/src/error
         crate::types::ErrorHandlingStats::default()
@@ -54,8 +54,8 @@ pub mod core {
 }
 
 // Type definitions
-pub mod types;
 pub mod common;
+pub mod types;
 
 // Kernel integration types (deprecated - use kernel/src/error instead)
 #[deprecated(note = "Implementation should be in kernel/src/error, not here")]
@@ -90,40 +90,39 @@ pub mod health;
 
 // Re-export trait definitions
 pub use core::traits::{
-    ErrorHandler, ErrorAction, ErrorContext,
-    RecoveryStrategy, RecoveryResult,
-    ErrorClassifier, HealthMonitor, HealthStatus
+    ErrorAction, ErrorClassifier, ErrorContext, ErrorHandler, HealthMonitor, HealthStatus,
+    RecoveryResult, RecoveryStrategy,
 };
-
-// Re-export type definitions
-pub use types::*;
-pub use common::{get_timestamp, validate_error_record, format_error_message};
-
-// Deprecated: Implementation exports (should use kernel/src/error instead)
-// Suppress deprecation warnings during migration period
-#[allow(deprecated)]
-#[deprecated(note = "Use kernel/src/error implementations instead")]
-pub use registry::{ErrorRegistry, init_registry, get_registry, shutdown_registry};
 
 #[allow(deprecated)]
 #[deprecated(note = "Use kernel/src/error implementations instead")]
 pub use classifier::{ErrorClassifier as ImplErrorClassifier, get_classifier};
-
+pub use common::{format_error_message, get_timestamp, validate_error_record};
+#[allow(deprecated)]
+#[deprecated(note = "Use kernel/src/error implementations instead")]
+pub use diagnostics::{DiagnosticAnalyzer, analyze_error, diagnostics_get_stats, get_analyzer};
+#[allow(deprecated)]
+#[deprecated(note = "Use kernel/src/error implementations instead")]
+pub use health::{
+    HealthLevel, HealthMetric, HealthMonitor as ImplHealthMonitor, HealthSeverity, HealthStats,
+    HealthThreshold, get_current_status, get_monitor, health_get_stats,
+};
 #[allow(deprecated)]
 #[deprecated(note = "Use kernel/src/error implementations instead")]
 pub use recovery::{RecoveryManager, apply_recovery_strategy, get_manager, recovery_get_stats};
-
+// Deprecated: Implementation exports (should use kernel/src/error instead)
+// Suppress deprecation warnings during migration period
 #[allow(deprecated)]
 #[deprecated(note = "Use kernel/src/error implementations instead")]
-pub use diagnostics::{DiagnosticAnalyzer, analyze_error, get_analyzer, diagnostics_get_stats};
-
+pub use registry::{ErrorRegistry, get_registry, init_registry, shutdown_registry};
 #[allow(deprecated)]
 #[deprecated(note = "Use kernel/src/error implementations instead")]
-pub use reporting::{ErrorReporter, ReportDestination, ReportLevel, ReportingStats, report_error, generate_report, get_reporter, reporting_get_stats};
-
-#[allow(deprecated)]
-#[deprecated(note = "Use kernel/src/error implementations instead")]
-pub use health::{HealthMonitor as ImplHealthMonitor, HealthMetric, HealthThreshold, HealthLevel, HealthSeverity, HealthStats, get_current_status, get_monitor, health_get_stats};
+pub use reporting::{
+    ErrorReporter, ReportDestination, ReportLevel, ReportingStats, generate_report, get_reporter,
+    report_error, reporting_get_stats,
+};
+// Re-export type definitions
+pub use types::*;
 
 /// Initialize error handling subsystem
 ///
@@ -171,8 +170,6 @@ pub fn get_error_stats() -> types::ErrorHandlingStats {
         health_score: 100.0,
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {

@@ -8,12 +8,13 @@
 
 extern crate alloc;
 
-use alloc::string::String;
-use alloc::format;
-use alloc::vec::Vec;
+use alloc::{format, string::String, vec::Vec};
 use core::panic::PanicInfo;
-use crate::error::{UnifiedError, ErrorContext, ErrorSeverity, handle_error};
-use crate::log_error; use crate::log_info;
+
+use crate::{
+    error::{ErrorContext, ErrorSeverity, UnifiedError, handle_error},
+    log_error, log_info,
+};
 
 /// Structured crash information
 #[derive(Debug, Clone)]
@@ -229,30 +230,104 @@ impl RegisterDump {
         #[cfg(target_arch = "x86_64")]
         {
             Self {
-                rax: 0, rbx: 0, rcx: 0, rdx: 0, rsi: 0, rdi: 0,
-                rbp: 0, rsp: 0, r8: 0, r9: 0, r10: 0, r11: 0,
-                r12: 0, r13: 0, r14: 0, r15: 0, rip: 0, rflags: 0,
-                cs: 0, ss: 0,
+                rax: 0,
+                rbx: 0,
+                rcx: 0,
+                rdx: 0,
+                rsi: 0,
+                rdi: 0,
+                rbp: 0,
+                rsp: 0,
+                r8: 0,
+                r9: 0,
+                r10: 0,
+                r11: 0,
+                r12: 0,
+                r13: 0,
+                r14: 0,
+                r15: 0,
+                rip: 0,
+                rflags: 0,
+                cs: 0,
+                ss: 0,
             }
         }
         #[cfg(target_arch = "aarch64")]
         {
             Self {
-                x0: 0, x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0,
-                x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0,
-                x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0,
-                x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0,
-                sp: 0, pc: 0, pstate: 0,
+                x0: 0,
+                x1: 0,
+                x2: 0,
+                x3: 0,
+                x4: 0,
+                x5: 0,
+                x6: 0,
+                x7: 0,
+                x8: 0,
+                x9: 0,
+                x10: 0,
+                x11: 0,
+                x12: 0,
+                x13: 0,
+                x14: 0,
+                x15: 0,
+                x16: 0,
+                x17: 0,
+                x18: 0,
+                x19: 0,
+                x20: 0,
+                x21: 0,
+                x22: 0,
+                x23: 0,
+                x24: 0,
+                x25: 0,
+                x26: 0,
+                x27: 0,
+                x28: 0,
+                x29: 0,
+                x30: 0,
+                sp: 0,
+                pc: 0,
+                pstate: 0,
             }
         }
         #[cfg(target_arch = "riscv64")]
         {
             Self {
-                x0: 0, x1: 0, x2: 0, x3: 0, x4: 0, x5: 0, x6: 0, x7: 0,
-                x8: 0, x9: 0, x10: 0, x11: 0, x12: 0, x13: 0, x14: 0, x15: 0,
-                x16: 0, x17: 0, x18: 0, x19: 0, x20: 0, x21: 0, x22: 0, x23: 0,
-                x24: 0, x25: 0, x26: 0, x27: 0, x28: 0, x29: 0, x30: 0, x31: 0,
-                pc: 0, sp: 0,
+                x0: 0,
+                x1: 0,
+                x2: 0,
+                x3: 0,
+                x4: 0,
+                x5: 0,
+                x6: 0,
+                x7: 0,
+                x8: 0,
+                x9: 0,
+                x10: 0,
+                x11: 0,
+                x12: 0,
+                x13: 0,
+                x14: 0,
+                x15: 0,
+                x16: 0,
+                x17: 0,
+                x18: 0,
+                x19: 0,
+                x20: 0,
+                x21: 0,
+                x22: 0,
+                x23: 0,
+                x24: 0,
+                x25: 0,
+                x26: 0,
+                x27: 0,
+                x28: 0,
+                x29: 0,
+                x30: 0,
+                x31: 0,
+                pc: 0,
+                sp: 0,
             }
         }
     }
@@ -278,7 +353,8 @@ impl SystemState {
     pub fn collect() -> Self {
         let proc_table = crate::subsystems::process::manager::PROC_TABLE.lock();
         let total_processes = proc_table.iter().count();
-        let running_processes = proc_table.iter()
+        let running_processes = proc_table
+            .iter()
             .filter(|p| p.state == crate::subsystems::process::manager::ProcState::Running)
             .count();
         drop(proc_table);
@@ -341,9 +417,9 @@ pub fn collect_crash_info(info: &PanicInfo) -> CrashInfo {
 /// Format crash info as structured text
 pub fn format_crash_report(crash_info: &CrashInfo) -> String {
     let mut report = String::new();
-    
+
     report.push_str("=== KERNEL PANIC REPORT ===\n\n");
-    
+
     // Basic information
     report.push_str("PANIC INFORMATION:\n");
     report.push_str(&format!("  Message: {}\n", crash_info.message));
@@ -368,44 +444,83 @@ pub fn format_crash_report(crash_info: &CrashInfo) -> String {
     report.push_str("REGISTERS:\n");
     #[cfg(target_arch = "x86_64")]
     {
-        report.push_str(&format!("  RAX: {:#018x}  RBX: {:#018x}  RCX: {:#018x}  RDX: {:#018x}\n",
-            crash_info.registers.rax, crash_info.registers.rbx,
-            crash_info.registers.rcx, crash_info.registers.rdx));
-        report.push_str(&format!("  RSI: {:#018x}  RDI: {:#018x}  RBP: {:#018x}  RSP: {:#018x}\n",
-            crash_info.registers.rsi, crash_info.registers.rdi,
-            crash_info.registers.rbp, crash_info.registers.rsp));
-        report.push_str(&format!("  R8:  {:#018x}  R9:  {:#018x}  R10: {:#018x}  R11: {:#018x}\n",
-            crash_info.registers.r8, crash_info.registers.r9,
-            crash_info.registers.r10, crash_info.registers.r11));
-        report.push_str(&format!("  R12: {:#018x}  R13: {:#018x}  R14: {:#018x}  R15: {:#018x}\n",
-            crash_info.registers.r12, crash_info.registers.r13,
-            crash_info.registers.r14, crash_info.registers.r15));
-        report.push_str(&format!("  RIP: {:#018x}  RFLAGS: {:#018x}\n",
-            crash_info.registers.rip, crash_info.registers.rflags));
-        report.push_str(&format!("  CS:  {:#018x}  SS:  {:#018x}\n",
-            crash_info.registers.cs, crash_info.registers.ss));
+        report.push_str(&format!(
+            "  RAX: {:#018x}  RBX: {:#018x}  RCX: {:#018x}  RDX: {:#018x}\n",
+            crash_info.registers.rax,
+            crash_info.registers.rbx,
+            crash_info.registers.rcx,
+            crash_info.registers.rdx
+        ));
+        report.push_str(&format!(
+            "  RSI: {:#018x}  RDI: {:#018x}  RBP: {:#018x}  RSP: {:#018x}\n",
+            crash_info.registers.rsi,
+            crash_info.registers.rdi,
+            crash_info.registers.rbp,
+            crash_info.registers.rsp
+        ));
+        report.push_str(&format!(
+            "  R8:  {:#018x}  R9:  {:#018x}  R10: {:#018x}  R11: {:#018x}\n",
+            crash_info.registers.r8,
+            crash_info.registers.r9,
+            crash_info.registers.r10,
+            crash_info.registers.r11
+        ));
+        report.push_str(&format!(
+            "  R12: {:#018x}  R13: {:#018x}  R14: {:#018x}  R15: {:#018x}\n",
+            crash_info.registers.r12,
+            crash_info.registers.r13,
+            crash_info.registers.r14,
+            crash_info.registers.r15
+        ));
+        report.push_str(&format!(
+            "  RIP: {:#018x}  RFLAGS: {:#018x}\n",
+            crash_info.registers.rip, crash_info.registers.rflags
+        ));
+        report.push_str(&format!(
+            "  CS:  {:#018x}  SS:  {:#018x}\n",
+            crash_info.registers.cs, crash_info.registers.ss
+        ));
     }
     #[cfg(target_arch = "aarch64")]
     {
-        report.push_str(&format!("  PC: {:#018x}  SP: {:#018x}  PSTATE: {:#018x}\n",
-            crash_info.registers.pc, crash_info.registers.sp, crash_info.registers.pstate));
-        report.push_str(&format!("  X0-X7: {:#018x} {:#018x} {:#018x} {:#018x} {:#018x} {:#018x} {:#018x} {:#018x}\n",
-            crash_info.registers.x0, crash_info.registers.x1, crash_info.registers.x2, crash_info.registers.x3,
-            crash_info.registers.x4, crash_info.registers.x5, crash_info.registers.x6, crash_info.registers.x7));
+        report.push_str(&format!(
+            "  PC: {:#018x}  SP: {:#018x}  PSTATE: {:#018x}\n",
+            crash_info.registers.pc, crash_info.registers.sp, crash_info.registers.pstate
+        ));
+        report.push_str(&format!(
+            "  X0-X7: {:#018x} {:#018x} {:#018x} {:#018x} {:#018x} {:#018x} {:#018x} {:#018x}\n",
+            crash_info.registers.x0,
+            crash_info.registers.x1,
+            crash_info.registers.x2,
+            crash_info.registers.x3,
+            crash_info.registers.x4,
+            crash_info.registers.x5,
+            crash_info.registers.x6,
+            crash_info.registers.x7
+        ));
     }
     #[cfg(target_arch = "riscv64")]
     {
-        report.push_str(&format!("  PC: {:#018x}  SP: {:#018x}\n",
-            crash_info.registers.pc, crash_info.registers.sp));
+        report.push_str(&format!(
+            "  PC: {:#018x}  SP: {:#018x}\n",
+            crash_info.registers.pc, crash_info.registers.sp
+        ));
     }
     report.push_str("\n");
 
     // System state
     report.push_str("SYSTEM STATE:\n");
     report.push_str(&format!("  Total processes: {}\n", crash_info.system_state.process_count));
-    report.push_str(&format!("  Running processes: {}\n", crash_info.system_state.running_processes));
-    report.push_str(&format!("  Total errors: {}\n", crash_info.system_state.error_stats.total_errors));
-    report.push_str(&format!("  Critical errors: {}\n", crash_info.system_state.error_stats.critical_errors));
+    report
+        .push_str(&format!("  Running processes: {}\n", crash_info.system_state.running_processes));
+    report.push_str(&format!(
+        "  Total errors: {}\n",
+        crash_info.system_state.error_stats.total_errors
+    ));
+    report.push_str(&format!(
+        "  Critical errors: {}\n",
+        crash_info.system_state.error_stats.critical_errors
+    ));
     report.push_str("\n");
 
     // Stack trace
@@ -418,7 +533,7 @@ pub fn format_crash_report(crash_info: &CrashInfo) -> String {
     }
 
     report.push_str("=== END OF PANIC REPORT ===\n");
-    
+
     report
 }
 
@@ -426,14 +541,18 @@ pub fn format_crash_report(crash_info: &CrashInfo) -> String {
 pub fn report_crash(crash_info: &CrashInfo) {
     // Create unified error from crash info
     let error = UnifiedError::Other(format!("Kernel panic: {}", crash_info.message));
-    
+
     // Create error context
-    let location = crash_info.file.clone().unwrap_or_else(|| "unknown".to_string());
-    let context = format!("{}:{} on CPU {}", location, crash_info.line.unwrap_or(0), crash_info.cpu_id);
-    
+    let location = crash_info
+        .file
+        .clone()
+        .unwrap_or_else(|| "unknown".to_string());
+    let context =
+        format!("{}:{} on CPU {}", location, crash_info.line.unwrap_or(0), crash_info.cpu_id);
+
     // Handle the error using kernel's internal error handling
     let action = handle_error(error, &context);
-    
+
     // Log the result
     match action {
         crate::error::ErrorAction::Log => log_info!("[panic] Crash logged successfully"),
@@ -461,7 +580,7 @@ pub fn enhanced_panic_handler(info: &PanicInfo) -> ! {
     if let Ok(_) = crate::monitoring::health_integration::trigger_degradation_from_error_handling(
         "kernel",
         "critical",
-        &format!("Kernel panic: {}", crash_info.message)
+        &format!("Kernel panic: {}", crash_info.message),
     ) {
         crate::println!("[panic] Triggered health monitoring degradation");
     }
@@ -473,4 +592,3 @@ pub fn enhanced_panic_handler(info: &PanicInfo) -> ! {
         crate::platform::arch::wfi();
     }
 }
-

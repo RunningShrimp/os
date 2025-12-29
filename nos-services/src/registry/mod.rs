@@ -4,16 +4,19 @@
 
 extern crate alloc;
 
-use crate::core::Service;
-use alloc::collections::BTreeMap;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::boxed::Box;
-use alloc::sync::Arc;
-use alloc::format;
-use alloc::vec::Vec;
-use spin::Mutex;
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
+
 use nos_api::Result;
+use spin::Mutex;
+
+use crate::core::Service;
 
 /// Service registry
 #[allow(clippy::should_implement_trait)]
@@ -63,11 +66,13 @@ impl ServiceRegistry {
 
     /// Unregister a service
     pub fn unregister(&mut self, id: u32) -> Result<()> {
-        let info = self.services.remove(&id)
+        let info = self
+            .services
+            .remove(&id)
             .ok_or_else(|| nos_api::Error::NotFound(format!("Service {} not found", id)))?;
-        
+
         self.services_by_name.remove(&info.name);
-        
+
         Ok(())
     }
 
@@ -78,7 +83,8 @@ impl ServiceRegistry {
 
     /// Get a service by name
     pub fn get_by_name(&self, name: &str) -> Option<&ServiceInfo> {
-        self.services_by_name.get(name)
+        self.services_by_name
+            .get(name)
             .and_then(|id| self.services.get(id))
     }
 
@@ -89,33 +95,37 @@ impl ServiceRegistry {
 
     /// Start a service
     pub fn start(&mut self, id: u32) -> Result<()> {
-        let info = self.services.get_mut(&id)
+        let info = self
+            .services
+            .get_mut(&id)
             .ok_or_else(|| nos_api::Error::NotFound(format!("Service {} not found", id)))?;
-        
+
         if info.status != ServiceStatus::Registered {
             return Err(nos_api::Error::InvalidState(format!("Service {} is not registered", id)));
         }
-        
+
         // Start the service
         info.service.start()?;
         info.status = ServiceStatus::Running;
-        
+
         Ok(())
     }
 
     /// Stop a service
     pub fn stop(&mut self, id: u32) -> Result<()> {
-        let info = self.services.get_mut(&id)
+        let info = self
+            .services
+            .get_mut(&id)
             .ok_or_else(|| nos_api::Error::NotFound(format!("Service {} not found", id)))?;
-        
+
         if info.status != ServiceStatus::Running {
             return Err(nos_api::Error::InvalidState(format!("Service {} is not running", id)));
         }
-        
+
         // Stop the service
         info.service.stop()?;
         info.status = ServiceStatus::Stopped;
-        
+
         Ok(())
     }
 }
@@ -159,7 +169,9 @@ pub fn init_registry() -> Result<()> {
 /// Get global service registry
 pub fn get_registry() -> Result<&'static Mutex<ServiceRegistry>> {
     GLOBAL_REGISTRY.get().ok_or_else(|| {
-        nos_api::Error::InvalidState("Registry not initialized. Call init_registry() first.".to_string())
+        nos_api::Error::InvalidState(
+            "Registry not initialized. Call init_registry() first.".to_string(),
+        )
     })
 }
 
@@ -181,7 +193,8 @@ pub fn register_service(name: &str, service: Box<dyn Service>) -> Result<u32> {
 pub fn get_service_by_name(name: &str) -> Result<Arc<dyn Service>> {
     let registry = get_registry()?;
     let registry = registry.lock();
-    let service_info = registry.get_by_name(name)
+    let service_info = registry
+        .get_by_name(name)
         .ok_or_else(|| nos_api::Error::NotFound(format!("Service {} not found", name)))?;
 
     Ok(Arc::clone(&service_info.service))
@@ -239,15 +252,15 @@ mod tests {
         fn start(&self) -> Result<()> {
             Ok(())
         }
-        
+
         fn stop(&self) -> Result<()> {
             Ok(())
         }
-        
+
         fn name(&self) -> &str {
             self.name
         }
-        
+
         fn service_type(&self) -> u32 {
             1
         }
@@ -256,17 +269,17 @@ mod tests {
     #[test]
     fn test_registry() {
         let mut registry = ServiceRegistry::new();
-        
+
         // Register a test service
-        let service = TestService {
-            name: "test_service",
-        };
-        let id = registry.register("test_service", Box::new(service)).unwrap();
-        
+        let service = TestService { name: "test_service" };
+        let id = registry
+            .register("test_service", Box::new(service))
+            .unwrap();
+
         // Get service
         let info = registry.get(id).unwrap();
         assert_eq!(info.name, "test_service");
-        
+
         // Get by name
         let info = registry.get_by_name("test_service").unwrap();
         assert_eq!(info.id, id);

@@ -1,10 +1,9 @@
 // SMP (Symmetric Multi-Processing) Support
 // Per-CPU data structures and multi-core management
 
-use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::cell::UnsafeCell;
-use crate::process::{Context, Pid};
 
+use crate::process::{Context, Pid};
 /// Maximum number of CPUs supported
 pub const NCPU: usize = 8;
 
@@ -37,25 +36,25 @@ impl CpuLoadStats {
 pub struct CpuInfo {
     /// CPU ID (hart ID for RISC-V, core ID for others)
     pub id: usize,
-    
+
     /// Is this CPU started?
     pub started: AtomicBool,
-    
+
     /// Current running process PID (None if idle)
     pub proc: Option<Pid>,
-    
+
     /// Scheduler context for this CPU
     pub context: Context,
-    
+
     /// Interrupt disable nesting depth
     pub noff: i32,
-    
+
     /// Were interrupts enabled before push_off?
     pub intena: bool,
-    
+
     /// Load statistics for this CPU
     pub load_stats: CpuLoadStats,
-    
+
     /// Is CPU in deep sleep mode?
     pub deep_sleep: AtomicBool,
 }
@@ -73,21 +72,21 @@ impl CpuInfo {
             deep_sleep: AtomicBool::new(false),
         }
     }
-    
+
     /// Update load statistics
     pub fn update_load_stats(&mut self, is_idle: bool) {
         let current_tick = crate::subsystems::time::get_ticks();
         let elapsed = current_tick.saturating_sub(self.load_stats.last_update);
-        
+
         if is_idle {
             self.load_stats.idle_time += elapsed;
         } else {
             self.load_stats.run_time += elapsed;
         }
-        
+
         self.load_stats.last_update = current_tick;
     }
-    
+
     /// Get CPU utilization percentage (0-100)
     pub fn utilization(&self) -> u32 {
         let total = self.load_stats.run_time + self.load_stats.idle_time;
@@ -96,7 +95,7 @@ impl CpuInfo {
         }
         ((self.load_stats.run_time * 100) / total) as u32
     }
-    
+
     /// Check if CPU should enter deep sleep
     pub fn should_deep_sleep(&self) -> bool {
         // Enter deep sleep if utilization is very low (< 5%) and CPU has been idle
@@ -146,7 +145,7 @@ pub fn cpuid() -> usize {
         }
         hartid
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     {
         let mpidr: u64;
@@ -155,7 +154,7 @@ pub fn cpuid() -> usize {
         }
         (mpidr & 0xff) as usize
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     {
         // Read APIC ID from CPUID
@@ -217,7 +216,7 @@ pub unsafe fn cpu_mut(id: usize) -> &'static mut CpuInfo {
 pub fn push_off() {
     let old = intr_get();
     intr_off();
-    
+
     let cpu = mycpu();
     if cpu.noff == 0 {
         cpu.intena = old;
@@ -228,10 +227,10 @@ pub fn push_off() {
 /// Re-enable interrupts if we've popped all push_off calls
 pub fn pop_off() {
     let cpu = mycpu();
-    
+
     debug_assert!(!intr_get(), "pop_off: interrupts enabled");
     debug_assert!(cpu.noff >= 1, "pop_off: noff < 1");
-    
+
     cpu.noff -= 1;
     if cpu.noff == 0 && cpu.intena {
         intr_on();
@@ -248,12 +247,12 @@ fn intr_off() {
     unsafe {
         core::arch::asm!("csrc sstatus, {}", in(reg) 1usize << 1);
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     unsafe {
         core::arch::asm!("msr daifset, #0xf");
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     unsafe {
         core::arch::asm!("cli");
@@ -266,12 +265,12 @@ fn intr_on() {
     unsafe {
         core::arch::asm!("csrs sstatus, {}", in(reg) 1usize << 1);
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     unsafe {
         core::arch::asm!("msr daifclr, #0xf");
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     unsafe {
         core::arch::asm!("sti");
@@ -288,7 +287,7 @@ fn intr_get() -> bool {
         }
         (sstatus & (1 << 1)) != 0
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     {
         let daif: u64;
@@ -297,7 +296,7 @@ fn intr_get() -> bool {
         }
         (daif & 0x3c0) == 0
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     {
         let flags: u64;
@@ -315,15 +314,15 @@ fn intr_get() -> bool {
 /// Initialize the boot CPU
 pub fn init_boot_cpu() {
     let id = cpuid();
-    
+
     let cpu = unsafe { cpu_mut(id) };
     cpu.id = id;
     cpu.started.store(true, Ordering::SeqCst);
     cpu.noff = 0;
     cpu.intena = false;
-    
+
     NCPUS_STARTED.fetch_add(1, Ordering::SeqCst);
-    
+
     crate::println!("cpu: boot CPU {} initialized", id);
 }
 
@@ -344,15 +343,15 @@ pub fn init_ap() {
     while !is_boot_complete() {
         core::hint::spin_loop();
     }
-    
+
     let id = cpuid();
-    
+
     let cpu = unsafe { cpu_mut(id) };
     cpu.id = id;
     cpu.started.store(true, Ordering::SeqCst);
     cpu.noff = 0;
     cpu.intena = false;
-    
+
     let n = NCPUS_STARTED.fetch_add(1, Ordering::SeqCst);
     crate::println!("cpu: AP {} started (total: {})", id, n + 1);
 }
@@ -367,7 +366,6 @@ pub fn ncpus() -> usize {
 // ============================================================================
 
 /// Send IPI to a specific CPU
-#[allow(unused)]
 pub fn send_ipi(target_cpu: usize) {
     #[cfg(target_arch = "riscv64")]
     {
@@ -389,14 +387,14 @@ pub fn send_ipi(target_cpu: usize) {
             );
         }
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     {
         // Use GIC SGI (Software Generated Interrupt)
         // This is simplified; real implementation needs GIC driver
         let _ = target_cpu;
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     {
         // Use APIC to send IPI
@@ -406,7 +404,6 @@ pub fn send_ipi(target_cpu: usize) {
 }
 
 /// Broadcast IPI to all other CPUs
-#[allow(unused)]
 pub fn broadcast_ipi() {
     let my_id = cpuid();
     for i in 0..NCPU {
@@ -426,7 +423,7 @@ pub fn start_aps() {
     // On RISC-V with OpenSBI, other harts are typically started by
     // the bootloader. We just need to wait for them.
     crate::println!("cpu: waiting for other harts to start...");
-    
+
     // In QEMU virt machine, all harts start running
     // They spin waiting for BOOT_COMPLETE
 }
@@ -436,7 +433,7 @@ pub fn start_aps() {
     // On AArch64, we need to use PSCI to bring up secondary cores
     // This is simplified
     crate::println!("cpu: starting secondary cores via PSCI...");
-    
+
     // PSCI CPU_ON call would go here
 }
 
@@ -447,6 +444,6 @@ pub fn start_aps() {
     // 2. Send INIT IPI
     // 3. Send STARTUP IPI
     crate::println!("cpu: starting APs via INIT/SIPI...");
-    
+
     // APIC initialization would go here
 }

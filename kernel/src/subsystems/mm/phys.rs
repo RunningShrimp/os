@@ -1,19 +1,18 @@
 //! Physical memory management for xv6-rust
 //! Provides page frame allocation using a free list (like xv6) and bitmap allocator
 
-use crate::subsystems::sync::Mutex;
-use crate::println;
 use core::ptr;
-use crate::subsystems::mm::buddy::OptimizedBuddyAllocator;
 
 // Re-export types from nos-mm
 pub use nos_mm::physical::{
-    PAGE_SIZE, PAGE_SHIFT,
-    page_round_down, page_round_up,
-    addr_to_pfn, pfn_to_addr,
-    PhysAddr
+    PAGE_SHIFT, PAGE_SIZE, PhysAddr, addr_to_pfn, page_round_down, page_round_up, pfn_to_addr,
 };
 pub use nos_mm::virtual_mem::VirtAddr;
+
+use crate::{
+    println,
+    subsystems::{mm::buddy::OptimizedBuddyAllocator, sync::Mutex},
+};
 
 static BUDDY: Mutex<OptimizedBuddyAllocator> = Mutex::new(OptimizedBuddyAllocator::new());
 use core::sync::atomic::{AtomicUsize, Ordering};
@@ -45,7 +44,9 @@ static PHYS_END_OVERRIDE: AtomicUsize = AtomicUsize::new(0);
 
 pub fn phys_end() -> usize {
     #[cfg(feature = "link_phys_end")]
-    unsafe { &_phys_end as *const u8 as usize }
+    unsafe {
+        &_phys_end as *const u8 as usize
+    }
     #[cfg(not(feature = "link_phys_end"))]
     {
         let v = PHYS_END_OVERRIDE.load(Ordering::SeqCst);
@@ -105,7 +106,9 @@ struct FreeListAllocator {
     free_list: *mut FreeNode,
     free_count: usize,
     total_pages: usize,
-    compressed_pages: alloc::collections::BTreeMap<usize, CompressedPage>, // Map from original address to compressed data
+    compressed_pages: alloc::collections::BTreeMap<usize, CompressedPage>, /* Map from original
+                                                                            * address to
+                                                                            * compressed data */
 }
 
 // Safety: Protected by mutex
@@ -125,7 +128,7 @@ impl FreeListAllocator {
     unsafe fn init(&mut self, start: usize, end: usize) {
         let start = page_round_up(start);
         let end = page_round_down(end);
-        
+
         self.free_list = ptr::null_mut();
         self.free_count = 0;
         self.total_pages = (end - start) / PAGE_SIZE;
@@ -156,45 +159,51 @@ impl FreeListAllocator {
         unsafe {
             ptr::write_bytes(page, 0, PAGE_SIZE);
         }
-        
+
         // Memory pressure handling: enable compression when free pages < 10%
         if self.free_count < self.total_pages / 10 {
             // TODO: Implement slab_shrink in optimized_slab module
             // let freed = crate::subsystems::mm::optimized_slab::slab_shrink();
             crate::println!("[mm] pressure: free={} total={}", self.free_count, self.total_pages);
-            
+
             // Trigger memory compression for inactive pages
             // This compresses pages that haven't been accessed recently to free up more memory
             if crate::subsystems::mm::compress::is_compression_enabled() {
                 let compressed_count = self.compress_inactive_pages();
                 if compressed_count > 0 {
-                    crate::println!("[mm] compression: compressed {} pages, freed {} pages", compressed_count, compressed_count);
+                    crate::println!(
+                        "[mm] compression: compressed {} pages, freed {} pages",
+                        compressed_count,
+                        compressed_count
+                    );
                 }
             }
         }
-        
+
         // Try to reuse a compressed page if available
         if let Some((addr, compressed)) = self.compressed_pages.iter().next() {
             let addr = *addr;
             let compressed_data = compressed.compressed_data.clone();
-            
+
             // Decompress the page
-            if let Some(decompressed) = unsafe { crate::subsystems::mm::compress::decompress_page(&compressed_data) } {
+            if let Some(decompressed) =
+                unsafe { crate::subsystems::mm::compress::decompress_page(&compressed_data) }
+            {
                 if decompressed.len() == PAGE_SIZE {
                     // Remove from compressed pages
                     self.compressed_pages.remove(&addr);
-                    
+
                     // Write decompressed data to page
                     let page_ptr = addr as *mut u8;
                     unsafe {
                         ptr::copy_nonoverlapping(decompressed.as_ptr(), page_ptr, PAGE_SIZE);
                     }
-                    
+
                     return page_ptr;
                 }
             }
         }
-        
+
         page
     }
 
@@ -220,36 +229,38 @@ impl FreeListAllocator {
         if !crate::subsystems::mm::compress::is_compression_enabled() {
             return 0;
         }
-        
+
         // For demonstration, we'll compress a few pages from the free list
         // In a real implementation, this would track page access and compress inactive pages
         let target_compress = (self.free_count / 10).min(10); // Compress up to 10% of free pages or 10 pages max
         let mut compressed_count = 0;
-        
+
         // Take some pages from free list and compress them
         for _ in 0..target_compress {
             let node = self.free_list;
             if node.is_null() {
                 break;
             }
-            
+
             unsafe {
                 self.free_list = (*node).next;
             }
             self.free_count -= 1;
-            
+
             let page_ptr = node as *mut u8;
             let page_addr = page_ptr as usize;
-            
+
             // Compress the page
-            if let Some(compressed_data) = unsafe { crate::subsystems::mm::compress::compress_page(page_ptr, PAGE_SIZE) } {
+            if let Some(compressed_data) =
+                unsafe { crate::subsystems::mm::compress::compress_page(page_ptr, PAGE_SIZE) }
+            {
                 // Check if compression actually saved space
                 if compressed_data.len() < PAGE_SIZE {
                     // Store compressed page
-                    self.compressed_pages.insert(page_addr, CompressedPage {
-                        compressed_data,
-                        original_addr: page_addr,
-                    });
+                    self.compressed_pages.insert(
+                        page_addr,
+                        CompressedPage { compressed_data, original_addr: page_addr },
+                    );
                     compressed_count += 1;
                 } else {
                     // Compression didn't help, put page back
@@ -264,10 +275,10 @@ impl FreeListAllocator {
                 }
             }
         }
-        
+
         compressed_count
     }
-    
+
     /// Get number of free pages
     fn free_pages(&self) -> usize {
         self.free_count
@@ -289,18 +300,24 @@ static PAGE_ALLOCATOR: Mutex<FreeListAllocator> = Mutex::new(FreeListAllocator::
 pub fn init() {
     let start = heap_start();
     let end = heap_end();
-    
+
     unsafe {
         PAGE_ALLOCATOR.lock().init(start, end);
     }
-    
+
     // Initialize the kernel heap allocator
     // Split heap into slab region (first 25%) and buddy region (remaining 75%)
     let total_size = end - start;
     let slab_size = total_size / 4;
     let buddy_size = total_size - slab_size;
     unsafe {
-        crate::subsystems::mm::allocator::init(start, slab_size, start + slab_size, buddy_size, PAGE_SIZE);
+        crate::subsystems::mm::allocator::init(
+            start,
+            slab_size,
+            start + slab_size,
+            buddy_size,
+            PAGE_SIZE,
+        );
         // Initialize buddy allocator for multi-page allocations
         BUDDY.lock().init(start + slab_size, end, PAGE_SIZE);
     }
@@ -315,13 +332,18 @@ pub fn init() {
 
     // Buddy allocator statistics
     let stats = BUDDY.lock().stats();
-    crate::println!("[mm] buddy: allocated={}, freed={}, frag={}", stats.allocated, stats.freed, stats.fragmentation);
+    crate::println!(
+        "[mm] buddy: allocated={}, freed={}, frag={}",
+        stats.allocated,
+        stats.freed,
+        stats.fragmentation
+    );
     // TODO: Implement slab_stats and slab_shrink in optimized_slab module
     // let slab = crate::subsystems::mm::optimized_slab::slab_stats();
     // crate::println!("[mm] slab: used={} allocated={}", slab.used, slab.allocated);
     // let freed = crate::subsystems::mm::optimized_slab::slab_shrink();
     // crate::println!("[mm] slab: shrink freed {} empty slabs", freed);
-    
+
     // Huge page allocator statistics
     let hugepage = crate::subsystems::mm::allocator::get_global_allocator();
     let hugepage_sizes = hugepage.get_hugepage_sizes();
@@ -351,7 +373,7 @@ pub unsafe fn kfree(page: *mut u8) {
     if page.is_null() {
         return;
     }
-    
+
     // Validate alignment
     let addr = page as usize;
     if addr % PAGE_SIZE != 0 {
@@ -366,13 +388,19 @@ pub unsafe fn kfree(page: *mut u8) {
 /// Allocate multiple contiguous pages
 /// Returns null pointer on failure
 pub fn kalloc_pages(count: usize) -> *mut u8 {
-    if count == 0 { return ptr::null_mut(); }
-    if count == 1 { return kalloc(); }
+    if count == 0 {
+        return ptr::null_mut();
+    }
+    if count == 1 {
+        return kalloc();
+    }
     use core::alloc::Layout;
     let layout = Layout::from_size_align(count * PAGE_SIZE, PAGE_SIZE).unwrap();
     let addr = BUDDY.lock().alloc(layout);
     if !addr.is_null() {
-        unsafe { ptr::write_bytes(addr as *mut u8, 0, count * PAGE_SIZE); }
+        unsafe {
+            ptr::write_bytes(addr as *mut u8, 0, count * PAGE_SIZE);
+        }
         return addr as *mut u8;
     }
     ptr::null_mut()
@@ -391,11 +419,11 @@ pub fn mmio_regions() -> Vec<(usize, usize)> {
         regions.push((0x0900_0000, 0x0002_0000)); // PL011 UART
         regions.push((0x0800_0000, 0x0020_0000)); // GIC (approx)
     }
-    
+
     // Add dynamic regions
     let dynamic = DYNAMIC_MMIO.lock();
     regions.extend_from_slice(&dynamic);
-    
+
     regions
 }
 
@@ -418,21 +446,71 @@ pub fn mmio_regions_wc() -> Vec<(usize, usize)> {
 }
 
 #[derive(Clone, Copy)]
-struct MmioStat { base: usize, size: usize, priority: u8, hits: u64, ewma_q16: u64, cooldown_until: u64, last_tick: u64, sample_acc: u64 }
+struct MmioStat {
+    base: usize,
+    size: usize,
+    priority: u8,
+    hits: u64,
+    ewma_q16: u64,
+    cooldown_until: u64,
+    last_tick: u64,
+    sample_acc: u64,
+}
 
 #[derive(Clone, Copy)]
-struct Usage { used: usize, total: usize, covered: u64, left: u64 }
+struct Usage {
+    used: usize,
+    total: usize,
+    covered: u64,
+    left: u64,
+}
 
 #[derive(Clone, Copy)]
-struct MmioCfg { decay_interval_ticks: u64, decay_num: u64, decay_den: u64, threshold_q16: u64, cooldown_ticks: u64, sample_div: u64 }
-static MMIO_CFG: Mutex<MmioCfg> = Mutex::new(MmioCfg { decay_interval_ticks: 100, decay_num: 7, decay_den: 8, threshold_q16: 200u64 << 16, cooldown_ticks: 1000, sample_div: 1 });
+struct MmioCfg {
+    decay_interval_ticks: u64,
+    decay_num: u64,
+    decay_den: u64,
+    threshold_q16: u64,
+    cooldown_ticks: u64,
+    sample_div: u64,
+}
+static MMIO_CFG: Mutex<MmioCfg> = Mutex::new(MmioCfg {
+    decay_interval_ticks: 100,
+    decay_num: 7,
+    decay_den: 8,
+    threshold_q16: 200u64 << 16,
+    cooldown_ticks: 1000,
+    sample_div: 1,
+});
 
 pub fn mmio_stats_init() {
     let mut v = MMIO_STATS.lock();
     v.clear();
     let now = crate::subsystems::time::get_ticks();
-    for (b, s) in mmio_regions_strong() { v.push(MmioStat { base: b, size: s, priority: 1, hits: 0, ewma_q16: 0, cooldown_until: 0, last_tick: now, sample_acc: 0 }); }
-    for (b, s) in mmio_regions() { v.push(MmioStat { base: b, size: s, priority: 0, hits: 0, ewma_q16: 0, cooldown_until: 0, last_tick: now, sample_acc: 0 }); }
+    for (b, s) in mmio_regions_strong() {
+        v.push(MmioStat {
+            base: b,
+            size: s,
+            priority: 1,
+            hits: 0,
+            ewma_q16: 0,
+            cooldown_until: 0,
+            last_tick: now,
+            sample_acc: 0,
+        });
+    }
+    for (b, s) in mmio_regions() {
+        v.push(MmioStat {
+            base: b,
+            size: s,
+            priority: 0,
+            hits: 0,
+            ewma_q16: 0,
+            cooldown_until: 0,
+            last_tick: now,
+            sample_acc: 0,
+        });
+    }
 }
 
 pub fn mmio_hit(addr: usize) {
@@ -441,8 +519,14 @@ pub fn mmio_hit(addr: usize) {
     for e in v.iter_mut() {
         if addr >= e.base && addr < e.base.saturating_add(e.size) {
             e.sample_acc = e.sample_acc.saturating_add(1);
-            let div = if cfg.sample_div == 0 { 1 } else { cfg.sample_div };
-            if e.sample_acc % div == 0 { e.hits = e.hits.saturating_add(1); }
+            let div = if cfg.sample_div == 0 {
+                1
+            } else {
+                cfg.sample_div
+            };
+            if e.sample_acc % div == 0 {
+                e.hits = e.hits.saturating_add(1);
+            }
             break;
         }
     }
@@ -450,25 +534,35 @@ pub fn mmio_hit(addr: usize) {
 
 pub fn mmio_stats_take() -> Vec<(usize, usize, u8, u64)> {
     let v = MMIO_STATS.lock();
-    v.iter().map(|e| (e.base, e.size, e.priority, e.ewma_q16)).collect()
+    v.iter()
+        .map(|e| (e.base, e.size, e.priority, e.ewma_q16))
+        .collect()
 }
 
 pub fn mmio_stats_periodic(current_tick: u64) {
     let cfg = MMIO_CFG.lock().clone();
     let mut v = MMIO_STATS.lock();
-    if cfg.decay_interval_ticks == 0 { return; }
-    if current_tick % cfg.decay_interval_ticks != 0 { return; }
+    if cfg.decay_interval_ticks == 0 {
+        return;
+    }
+    if current_tick % cfg.decay_interval_ticks != 0 {
+        return;
+    }
     let mut max_q16 = 0u64;
     let mut max_idx = None::<usize>;
     for (i, e) in v.iter_mut().enumerate() {
         let ticks = current_tick.saturating_sub(e.last_tick);
         if ticks >= cfg.decay_interval_ticks {
-            e.ewma_q16 = (e.ewma_q16.saturating_mul(cfg.decay_num) / cfg.decay_den).saturating_add(e.hits << 16);
+            e.ewma_q16 = (e.ewma_q16.saturating_mul(cfg.decay_num) / cfg.decay_den)
+                .saturating_add(e.hits << 16);
             e.hits = 0;
             e.last_tick = current_tick;
         }
         if current_tick >= e.cooldown_until {
-            if e.ewma_q16 > max_q16 { max_q16 = e.ewma_q16; max_idx = Some(i); }
+            if e.ewma_q16 > max_q16 {
+                max_q16 = e.ewma_q16;
+                max_idx = Some(i);
+            }
         }
     }
     if let Some(_i) = max_idx {
@@ -479,7 +573,9 @@ pub fn mmio_stats_periodic(current_tick: u64) {
                 crate::subsystems::mm::vm::refresh_mtrr_hot();
                 let mut v2 = MMIO_STATS.lock();
                 let now = current_tick;
-                for e in v2.iter_mut() { e.cooldown_until = now.saturating_add(cfg.cooldown_ticks); }
+                for e in v2.iter_mut() {
+                    e.cooldown_until = now.saturating_add(cfg.cooldown_ticks);
+                }
             }
         }
     }
@@ -488,7 +584,9 @@ pub fn mmio_stats_periodic(current_tick: u64) {
 pub fn mmio_cooldown_all(current_tick: u64) {
     let cfg = MMIO_CFG.lock().clone();
     let mut v = MMIO_STATS.lock();
-    for e in v.iter_mut() { e.cooldown_until = current_tick.saturating_add(cfg.cooldown_ticks); }
+    for e in v.iter_mut() {
+        e.cooldown_until = current_tick.saturating_add(cfg.cooldown_ticks);
+    }
 }
 
 pub fn mmio_record_mtrr_usage(used: usize, total: usize, covered: u64, left: u64) {
@@ -501,7 +599,14 @@ pub fn mmio_last_usage() -> (usize, usize, u64, u64) {
     (u.used, u.total, u.covered, u.left)
 }
 
-pub fn mmio_cfg_set(decay_interval_ticks: u64, decay_num: u64, decay_den: u64, threshold_hits: u64, cooldown_ticks: u64, sample_div: u64) {
+pub fn mmio_cfg_set(
+    decay_interval_ticks: u64,
+    decay_num: u64,
+    decay_den: u64,
+    threshold_hits: u64,
+    cooldown_ticks: u64,
+    sample_div: u64,
+) {
     let mut cfg = MMIO_CFG.lock();
     cfg.decay_interval_ticks = decay_interval_ticks;
     cfg.decay_num = if decay_num == 0 { 1 } else { decay_num };
@@ -511,14 +616,33 @@ pub fn mmio_cfg_set(decay_interval_ticks: u64, decay_num: u64, decay_den: u64, t
     cfg.sample_div = if sample_div == 0 { 1 } else { sample_div };
 }
 
-pub fn mmio_cfg_update(decay_interval_ticks: Option<u64>, decay_num: Option<u64>, decay_den: Option<u64>, threshold_hits: Option<u64>, cooldown_ticks: Option<u64>, sample_div: Option<u64>) {
+pub fn mmio_cfg_update(
+    decay_interval_ticks: Option<u64>,
+    decay_num: Option<u64>,
+    decay_den: Option<u64>,
+    threshold_hits: Option<u64>,
+    cooldown_ticks: Option<u64>,
+    sample_div: Option<u64>,
+) {
     let mut cfg = MMIO_CFG.lock();
-    if let Some(v) = decay_interval_ticks { cfg.decay_interval_ticks = v; }
-    if let Some(v) = decay_num { cfg.decay_num = if v == 0 { 1 } else { v }; }
-    if let Some(v) = decay_den { cfg.decay_den = if v == 0 { 1 } else { v }; }
-    if let Some(v) = threshold_hits { cfg.threshold_q16 = v << 16; }
-    if let Some(v) = cooldown_ticks { cfg.cooldown_ticks = v; }
-    if let Some(v) = sample_div { cfg.sample_div = if v == 0 { 1 } else { v }; }
+    if let Some(v) = decay_interval_ticks {
+        cfg.decay_interval_ticks = v;
+    }
+    if let Some(v) = decay_num {
+        cfg.decay_num = if v == 0 { 1 } else { v };
+    }
+    if let Some(v) = decay_den {
+        cfg.decay_den = if v == 0 { 1 } else { v };
+    }
+    if let Some(v) = threshold_hits {
+        cfg.threshold_q16 = v << 16;
+    }
+    if let Some(v) = cooldown_ticks {
+        cfg.cooldown_ticks = v;
+    }
+    if let Some(v) = sample_div {
+        cfg.sample_div = if v == 0 { 1 } else { v };
+    }
 }
 
 #[inline]

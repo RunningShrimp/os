@@ -4,11 +4,16 @@
 //! It implements dependency injection to replace global state and break circular dependencies.
 
 use alloc::sync::Arc;
-use crate::subsystems::sync::Mutex;
-use crate::api::syscall::{SyscallDispatcher, SyscallContext};
-use crate::api::process::{ProcessManager, ThreadManager};
-use crate::api::memory::{MemoryManager, ProcessMemoryManager};
-use crate::api::error::KernelError;
+
+use crate::{
+    api::{
+        error::KernelError,
+        memory::{MemoryManager, ProcessMemoryManager},
+        process::{ProcessManager, ThreadManager},
+        syscall::{SyscallContext, SyscallDispatcher},
+    },
+    subsystems::sync::Mutex,
+};
 
 /// Kernel context
 ///
@@ -126,15 +131,15 @@ static KERNEL_CONTEXT_INIT: Mutex<bool> = Mutex::new(false);
 /// * `Err(KernelError)` - Initialization error
 pub fn init_kernel_context(context: KernelContext) -> Result<(), KernelError> {
     let mut init_guard = KERNEL_CONTEXT_INIT.lock();
-    
+
     if *init_guard {
         return Err(KernelError::AlreadyExists);
     }
-    
+
     unsafe {
         KERNEL_CONTEXT = Some(context);
     }
-    
+
     *init_guard = true;
     Ok(())
 }
@@ -319,18 +324,16 @@ impl KernelContextBuilder {
     /// # Returns
     /// * `Result<KernelContext, KernelError>` - Kernel context or error
     pub fn build(self) -> Result<KernelContext, KernelError> {
-        let syscall_dispatcher = self.syscall_dispatcher
+        let syscall_dispatcher = self
+            .syscall_dispatcher
             .ok_or(KernelError::InvalidArgument)?;
-        let process_manager = self.process_manager
+        let process_manager = self.process_manager.ok_or(KernelError::InvalidArgument)?;
+        let thread_manager = self.thread_manager.ok_or(KernelError::InvalidArgument)?;
+        let memory_manager = self.memory_manager.ok_or(KernelError::InvalidArgument)?;
+        let process_memory_manager = self
+            .process_memory_manager
             .ok_or(KernelError::InvalidArgument)?;
-        let thread_manager = self.thread_manager
-            .ok_or(KernelError::InvalidArgument)?;
-        let memory_manager = self.memory_manager
-            .ok_or(KernelError::InvalidArgument)?;
-        let process_memory_manager = self.process_memory_manager
-            .ok_or(KernelError::InvalidArgument)?;
-        let syscall_context = self.syscall_context
-            .ok_or(KernelError::InvalidArgument)?;
+        let syscall_context = self.syscall_context.ok_or(KernelError::InvalidArgument)?;
 
         Ok(KernelContext::new(
             syscall_dispatcher,

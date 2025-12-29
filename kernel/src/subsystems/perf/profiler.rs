@@ -1,7 +1,6 @@
-use alloc::collections::BTreeMap;
-use alloc::string::String;
-use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU64, AtomicU8, Ordering};
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use core::sync::atomic::{AtomicU8, AtomicU64, Ordering};
+
 use spin::Mutex;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -13,37 +12,12 @@ pub enum ProfilingMode {
 
 #[derive(Debug, Clone)]
 pub enum ProfilingEvent {
-    FunctionEnter {
-        function_id: u64,
-        timestamp: u64,
-        cpu_id: u64,
-    },
-    FunctionExit {
-        function_id: u64,
-        timestamp: u64,
-        cpu_id: u64,
-    },
-    Interrupt {
-        interrupt_id: u64,
-        timestamp: u64,
-        cpu_id: u64,
-    },
-    ContextSwitch {
-        from_task: u64,
-        to_task: u64,
-        timestamp: u64,
-        cpu_id: u64,
-    },
-    PageFault {
-        address: u64,
-        timestamp: u64,
-        task_id: u64,
-    },
-    CacheMiss {
-        level: u8,
-        address: u64,
-        timestamp: u64,
-    },
+    FunctionEnter { function_id: u64, timestamp: u64, cpu_id: u64 },
+    FunctionExit { function_id: u64, timestamp: u64, cpu_id: u64 },
+    Interrupt { interrupt_id: u64, timestamp: u64, cpu_id: u64 },
+    ContextSwitch { from_task: u64, to_task: u64, timestamp: u64, cpu_id: u64 },
+    PageFault { address: u64, timestamp: u64, task_id: u64 },
+    CacheMiss { level: u8, address: u64, timestamp: u64 },
 }
 
 #[derive(Debug, Clone)]
@@ -187,22 +161,22 @@ impl Profiler {
             next_function_id: AtomicU64::new(1),
         }
     }
-    
+
     pub fn start_session(&self, mode: ProfilingMode, config: Option<ProfilingConfig>) -> u64 {
         let session_id = self.session_id.fetch_add(1, Ordering::SeqCst);
-        
+
         if let Some(cfg) = config {
             *self.config.lock() = cfg;
         }
-        
+
         self.mode.store(mode as u8, Ordering::Release);
         self.samples.lock().clear();
         self.events.lock().clear();
         self.call_stack.lock().clear();
-        
+
         let statistics = ProfilingStatistics::default();
         *self.statistics.lock() = statistics;
-        
+
         let session = ProfilingSession {
             id: session_id,
             start_time: self.get_timestamp(),
@@ -213,24 +187,24 @@ impl Profiler {
             statistics,
             config: self.config.lock().clone(),
         };
-        
+
         *self.active_session.lock() = Some(session);
-        
+
         session_id
     }
-    
+
     pub fn stop_session(&self) -> Option<ProfilingSession> {
         let mode = self.mode.swap(ProfilingMode::Off as u8, Ordering::AcqRel);
         if mode == ProfilingMode::Off as u8 {
             return None;
         }
-        
+
         let end_time = self.get_timestamp();
         let samples = self.samples.lock().clone();
         let events = self.events.lock().clone();
         let statistics = self.statistics.lock().clone();
         let config = self.config.lock().clone();
-        
+
         let mut session = self.active_session.lock();
         if let Some(mut s) = session.take() {
             s.end_time = Some(end_time);
@@ -240,10 +214,10 @@ impl Profiler {
             s.config = config;
             return Some(s);
         }
-        
+
         None
     }
-    
+
     pub fn get_mode(&self) -> ProfilingMode {
         match self.mode.load(Ordering::Acquire) {
             0 => ProfilingMode::Off,
@@ -252,95 +226,95 @@ impl Profiler {
             _ => ProfilingMode::Off,
         }
     }
-    
+
     pub fn is_active(&self) -> bool {
         self.mode.load(Ordering::Acquire) != ProfilingMode::Off as u8
     }
-    
+
     pub fn record_sample(&self, sample: ProfilingSample) {
         if !self.is_active() {
             return;
         }
-        
+
         let config = self.config.lock();
         if self.samples.lock().len() >= config.max_samples {
             return;
         }
         drop(config);
-        
+
         self.samples.lock().push(sample);
-        
+
         let mut stats = self.statistics.lock();
         stats.total_samples += 1;
         stats.max_stack_depth = stats.max_stack_depth.max(sample.stack_frames.len());
     }
-    
+
     pub fn record_event(&self, event: ProfilingEvent) {
         if !self.is_active() {
             return;
         }
-        
+
         self.events.lock().push(event);
-        
+
         let mut stats = self.statistics.lock();
         stats.total_events += 1;
-        
+
         match &event {
             ProfilingEvent::FunctionEnter { .. } | ProfilingEvent::FunctionExit { .. } => {
                 stats.function_calls += 1;
-            }
+            },
             ProfilingEvent::Interrupt { .. } => {
                 stats.interrupt_count += 1;
-            }
+            },
             ProfilingEvent::ContextSwitch { .. } => {
                 stats.context_switch_count += 1;
-            }
+            },
             ProfilingEvent::PageFault { .. } => {
                 stats.page_fault_count += 1;
-            }
-            _ => {}
+            },
+            _ => {},
         }
     }
-    
+
     pub fn register_function(&self, info: FunctionInfo) -> u64 {
         let key = format!("{}::{}", info.module, info.name);
-        
+
         let mut name_to_id = self.name_to_id.lock();
         if let Some(&id) = name_to_id.get(&key) {
             return id;
         }
-        
+
         let id = self.next_function_id.fetch_add(1, Ordering::SeqCst);
-        
+
         name_to_id.insert(key.clone(), id);
         self.function_map.lock().insert(id, info);
-        
+
         id
     }
-    
+
     pub fn get_function_info(&self, id: u64) -> Option<FunctionInfo> {
         self.function_map.lock().get(&id).cloned()
     }
-    
+
     pub fn trace_function_enter(&self, function_id: u64) {
         if self.get_mode() != ProfilingMode::Tracing {
             return;
         }
-        
+
         self.call_stack.lock().push(function_id);
-        
+
         self.record_event(ProfilingEvent::FunctionEnter {
             function_id,
             timestamp: self.get_timestamp(),
             cpu_id: self.get_cpu_id(),
         });
     }
-    
+
     pub fn trace_function_exit(&self, function_id: u64) {
         if self.get_mode() != ProfilingMode::Tracing {
             return;
         }
-        
+
         let mut stack = self.call_stack.lock();
         if let Some(&top) = stack.last() {
             if top == function_id {
@@ -348,43 +322,43 @@ impl Profiler {
             }
         }
         drop(stack);
-        
+
         self.record_event(ProfilingEvent::FunctionExit {
             function_id,
             timestamp: self.get_timestamp(),
             cpu_id: self.get_cpu_id(),
         });
     }
-    
+
     pub fn trace_interrupt(&self, interrupt_id: u64) {
         if !self.is_active() {
             return;
         }
-        
+
         let config = self.config.lock();
         if !config.trace_interrupts {
             return;
         }
         drop(config);
-        
+
         self.record_event(ProfilingEvent::Interrupt {
             interrupt_id,
             timestamp: self.get_timestamp(),
             cpu_id: self.get_cpu_id(),
         });
     }
-    
+
     pub fn trace_context_switch(&self, from_task: u64, to_task: u64) {
         if !self.is_active() {
             return;
         }
-        
+
         let config = self.config.lock();
         if !config.trace_context_switches {
             return;
         }
         drop(config);
-        
+
         self.record_event(ProfilingEvent::ContextSwitch {
             from_task,
             to_task,
@@ -392,33 +366,33 @@ impl Profiler {
             cpu_id: self.get_cpu_id(),
         });
     }
-    
+
     pub fn trace_page_fault(&self, address: u64, task_id: u64) {
         if !self.is_active() {
             return;
         }
-        
+
         let config = self.config.lock();
         if !config.trace_page_faultes {
             return;
         }
         drop(config);
-        
+
         self.record_event(ProfilingEvent::PageFault {
             address,
             timestamp: self.get_timestamp(),
             task_id,
         });
     }
-    
+
     pub fn take_sample(&self) {
         if self.get_mode() != ProfilingMode::Sampling {
             return;
         }
-        
+
         let config = self.config.lock().clone();
         drop(config);
-        
+
         let stack = self.capture_stack_trace();
         let sample = ProfilingSample {
             timestamp: self.get_timestamp(),
@@ -427,22 +401,22 @@ impl Profiler {
             stack_frames: stack,
             event_type: SampleEventType::TimerInterrupt,
         };
-        
+
         self.record_sample(sample);
     }
-    
+
     pub fn build_call_graph(&self, session: &ProfilingSession) -> CallGraph {
         let mut call_tree: BTreeMap<String, (u64, u64)> = BTreeMap::new();
-        
+
         for event in &session.events {
             if let ProfilingEvent::FunctionEnter { function_id, .. } = event {
                 let key = self.get_function_key(*function_id);
                 call_tree.entry(key).or_insert((0, 0)).0 += 1;
             }
         }
-        
+
         let total_time_ns = session.end_time.unwrap_or(self.get_timestamp()) - session.start_time;
-        
+
         CallGraph {
             root: FunctionInfo {
                 id: 0,
@@ -457,26 +431,26 @@ impl Profiler {
             call_count: session.statistics.function_calls,
         }
     }
-    
+
     pub fn get_hot_functions(&self, session: &ProfilingSession, top_n: usize) -> Vec<(u64, u64)> {
         let mut counts: BTreeMap<u64, u64> = BTreeMap::new();
-        
+
         for event in &session.events {
             if let ProfilingEvent::FunctionEnter { function_id, .. } = event {
                 *counts.entry(*function_id).or_insert(0) += 1;
             }
         }
-        
+
         let mut vec: Vec<(u64, u64)> = counts.into_iter().collect();
         vec.sort_by(|a, b| b.1.cmp(&a.1));
         vec.truncate(top_n);
-        
+
         vec
     }
-    
+
     pub fn get_flamegraph_data(&self, session: &ProfilingSession) -> String {
         let mut lines = Vec::new();
-        
+
         for event in &session.events {
             if let ProfilingEvent::FunctionEnter { function_id, .. } = event {
                 if let Some(info) = self.get_function_info(*function_id) {
@@ -484,18 +458,22 @@ impl Profiler {
                 }
             }
         }
-        
+
         lines.join("\n")
     }
-    
-    pub fn export_session(&self, session: &ProfilingSession, format: ExportFormat) -> Result<String, String> {
+
+    pub fn export_session(
+        &self,
+        session: &ProfilingSession,
+        format: ExportFormat,
+    ) -> Result<String, String> {
         match format {
             ExportFormat::Json => self.export_json(session),
             ExportFormat::Flamegraph => Ok(self.get_flamegraph_data(session)),
             ExportFormat::Csv => self.export_csv(session),
         }
     }
-    
+
     fn export_json(&self, session: &ProfilingSession) -> Result<String, String> {
         Ok(format!(
             r#"{{"id":{},"start_time":{},"end_time":{:?},"samples":{},"events":{}}}"#,
@@ -506,11 +484,11 @@ impl Profiler {
             session.events.len()
         ))
     }
-    
+
     fn export_csv(&self, session: &ProfilingSession) -> Result<String, String> {
         let mut output = String::new();
         output.push_str("timestamp,event_type,cpu_id\n");
-        
+
         for event in &session.events {
             let event_type = match event {
                 ProfilingEvent::FunctionEnter { .. } => "function_enter",
@@ -520,7 +498,7 @@ impl Profiler {
                 ProfilingEvent::PageFault { .. } => "page_fault",
                 ProfilingEvent::CacheMiss { .. } => "cache_miss",
             };
-            
+
             let cpu_id = match event {
                 ProfilingEvent::FunctionEnter { cpu_id, .. } => *cpu_id,
                 ProfilingEvent::FunctionExit { cpu_id, .. } => *cpu_id,
@@ -529,7 +507,7 @@ impl Profiler {
                 ProfilingEvent::PageFault { .. } => 0,
                 ProfilingEvent::CacheMiss { .. } => 0,
             };
-            
+
             let timestamp = match event {
                 ProfilingEvent::FunctionEnter { timestamp, .. } => *timestamp,
                 ProfilingEvent::FunctionExit { timestamp, .. } => *timestamp,
@@ -538,17 +516,17 @@ impl Profiler {
                 ProfilingEvent::PageFault { timestamp, .. } => *timestamp,
                 ProfilingEvent::CacheMiss { timestamp, .. } => *timestamp,
             };
-            
+
             output.push_str(&format!("{},{},{}\n", timestamp, event_type, cpu_id));
         }
-        
+
         Ok(output)
     }
-    
+
     fn capture_stack_trace(&self) -> Vec<Frame> {
         Vec::new()
     }
-    
+
     fn get_function_key(&self, id: u64) -> String {
         if let Some(info) = self.get_function_info(id) {
             format!("{}::{}", info.module, info.name)
@@ -556,15 +534,15 @@ impl Profiler {
             format!("unknown_{}", id)
         }
     }
-    
+
     fn get_timestamp(&self) -> u64 {
         0
     }
-    
+
     fn get_cpu_id(&self) -> u64 {
         0
     }
-    
+
     fn get_current_task_id(&self) -> Option<u64> {
         None
     }
@@ -605,10 +583,10 @@ impl ProfilerGuard {
             file: file!().to_string(),
             line: line!(),
         };
-        
+
         let function_id = PROFILER.register_function(info);
         PROFILER.trace_function_enter(function_id);
-        
+
         Self { function_id }
     }
 }

@@ -5,11 +5,13 @@
 //! and memory protection.
 
 extern crate alloc;
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
-use crate::subsystems::sync::Mutex;
-use crate::reliability::{ENOMEM, EINVAL, EFAULT};
+use alloc::{collections::BTreeMap, vec::Vec};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+use crate::{
+    reliability::{EFAULT, EINVAL, ENOMEM},
+    subsystems::sync::Mutex,
+};
 // use crate::subsystems::mm::vm::{Page, VirtAddr, PhysAddr}; // TODO: Implement vm module
 
 pub type VirtAddr = usize;
@@ -95,10 +97,18 @@ impl MemoryProtection {
 
     pub fn as_flags(&self) -> u64 {
         let mut flags = 0u64;
-        if self.readable { flags |= 0x1; }
-        if self.writable { flags |= 0x2; }
-        if self.executable { flags |= 0x4; }
-        if self.user_accessible { flags |= 0x8; }
+        if self.readable {
+            flags |= 0x1;
+        }
+        if self.writable {
+            flags |= 0x2;
+        }
+        if self.executable {
+            flags |= 0x4;
+        }
+        if self.user_accessible {
+            flags |= 0x8;
+        }
         flags
     }
 }
@@ -108,7 +118,7 @@ impl MemoryProtection {
 pub struct PhysicalPage {
     pub paddr: PhysAddr,
     pub allocated: bool,
-    pub order: u8,      // Allocation order (for buddy system)
+    pub order: u8, // Allocation order (for buddy system)
     pub ref_count: AtomicUsize,
 }
 
@@ -147,13 +157,7 @@ pub struct MemoryRegion {
 
 impl MemoryRegion {
     pub fn new(start: VirtAddr, size: usize, protection: MemoryProtection) -> Self {
-        Self {
-            start,
-            size,
-            protection,
-            backing_paddr: None,
-            flags: 0,
-        }
+        Self { start, size, protection, backing_paddr: None, flags: 0 }
     }
 
     pub fn contains(&self, addr: VirtAddr) -> bool {
@@ -239,13 +243,15 @@ pub struct PageTableManager {
 impl PageTableManager {
     pub fn new() -> Self {
         // In a real implementation, this would allocate a new page table
-        Self {
-            root_paddr: 0,
-            asid: None,
-        }
+        Self { root_paddr: 0, asid: None }
     }
 
-    pub fn map_page(&mut self, vaddr: VirtAddr, paddr: PhysAddr, protection: MemoryProtection) -> Result<(), i32> {
+    pub fn map_page(
+        &mut self,
+        vaddr: VirtAddr,
+        paddr: PhysAddr,
+        protection: MemoryProtection,
+    ) -> Result<(), i32> {
         // In a real implementation, this would update the page table
         // For now, just validate parameters
         if vaddr == 0 || paddr == 0 {
@@ -319,7 +325,9 @@ impl PhysicalMemoryManager {
                 self.allocated_pages.fetch_add(1, Ordering::SeqCst);
 
                 // Update statistics
-                super::MICROKERNEL_STATS.memory_allocations.fetch_add(1, Ordering::SeqCst);
+                super::MICROKERNEL_STATS
+                    .memory_allocations
+                    .fetch_add(1, Ordering::SeqCst);
 
                 return Ok(*paddr);
             }
@@ -340,7 +348,7 @@ impl PhysicalMemoryManager {
                         let _ = self.free_page(paddr);
                     }
                     return Err(e);
-                }
+                },
             }
         }
 
@@ -412,7 +420,8 @@ impl AddressSpaceManager {
             for (_, region) in space.regions {
                 if let Some(paddr) = region.backing_paddr {
                     // Free the physical page
-                    // Note: In a real implementation, we'd need a reference to the physical memory manager
+                    // Note: In a real implementation, we'd need a reference to the physical memory
+                    // manager
                 }
             }
             Ok(())
@@ -426,7 +435,13 @@ impl AddressSpaceManager {
         spaces.get(&asid).cloned()
     }
 
-    pub fn map_memory(&self, asid: u32, vaddr: VirtAddr, size: usize, protection: MemoryProtection) -> Result<(), i32> {
+    pub fn map_memory(
+        &self,
+        asid: u32,
+        vaddr: VirtAddr,
+        size: usize,
+        protection: MemoryProtection,
+    ) -> Result<(), i32> {
         let mut spaces = self.address_spaces.lock();
 
         let space = spaces.get_mut(&asid).ok_or(EINVAL)?;
@@ -499,7 +514,7 @@ impl MicroMemoryManager {
             self.kernel_asid,
             kernel_code_start,
             kernel_code_size,
-            MemoryProtection::kernel_code()
+            MemoryProtection::kernel_code(),
         )?;
 
         // Map kernel data region
@@ -510,7 +525,7 @@ impl MicroMemoryManager {
             self.kernel_asid,
             kernel_data_start,
             kernel_data_size,
-            MemoryProtection::kernel_read_write()
+            MemoryProtection::kernel_read_write(),
         )?;
 
         Ok(())
@@ -528,16 +543,19 @@ impl MicroMemoryManager {
         self.address_space_manager.create_address_space()
     }
 
-    pub fn map_user_memory(&self, asid: u32, vaddr: VirtAddr, size: usize,
-                          readable: bool, writable: bool, executable: bool) -> Result<(), i32> {
-        let protection = MemoryProtection {
-            readable,
-            writable,
-            executable,
-            user_accessible: true,
-        };
+    pub fn map_user_memory(
+        &self,
+        asid: u32,
+        vaddr: VirtAddr,
+        size: usize,
+        readable: bool,
+        writable: bool,
+        executable: bool,
+    ) -> Result<(), i32> {
+        let protection = MemoryProtection { readable, writable, executable, user_accessible: true };
 
-        self.address_space_manager.map_memory(asid, vaddr, size, protection)
+        self.address_space_manager
+            .map_memory(asid, vaddr, size, protection)
     }
 }
 
@@ -570,16 +588,12 @@ pub fn init() -> Result<(), i32> {
 
 /// Get global memory manager
 pub fn get_memory_manager() -> Option<&'static MicroMemoryManager> {
-    unsafe {
-        GLOBAL_MEMORY_MANAGER.as_ref()
-    }
+    unsafe { GLOBAL_MEMORY_MANAGER.as_ref() }
 }
 
 /// Get mutable global memory manager
 pub fn get_memory_manager_mut() -> Option<&'static mut MicroMemoryManager> {
-    unsafe {
-        GLOBAL_MEMORY_MANAGER.as_mut()
-    }
+    unsafe { GLOBAL_MEMORY_MANAGER.as_mut() }
 }
 
 #[cfg(test)]

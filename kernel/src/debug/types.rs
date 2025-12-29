@@ -5,9 +5,8 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
+
 use crate::debug::session::DebugLevel;
 
 /// 调试符号管理器

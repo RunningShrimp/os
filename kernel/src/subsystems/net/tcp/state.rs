@@ -4,13 +4,10 @@
 //! proper state transitions, timer management, and connection lifecycle.
 
 extern crate alloc;
-use alloc::collections::VecDeque;
-use alloc::vec::Vec;
-
+use alloc::{collections::VecDeque, vec::Vec};
 use core::sync::atomic::{AtomicU64, Ordering};
 
-use super::{TcpPacket, TcpState};
-use super::tcp_flags;
+use super::{TcpPacket, TcpState, tcp_flags};
 use crate::net::ipv4::Ipv4Addr;
 
 /// TCP connection state machine
@@ -312,7 +309,8 @@ impl TcpStateMachine {
         self.local_ack = packet.seq_num() + packet.payload.len() as u32;
 
         // Update congestion control
-        self.congestion.on_data_received(packet.seq_num() + packet.payload.len() as u32);
+        self.congestion
+            .on_data_received(packet.seq_num() + packet.payload.len() as u32);
 
         // Return data to application
         TcpAction::DataReceived(packet.payload.clone())
@@ -466,7 +464,10 @@ impl TcpStateMachine {
             return TcpAction::None;
         }
 
-        let max_send = self.flow_control.get_send_window().min(self.congestion.get_send_window());
+        let max_send = self
+            .flow_control
+            .get_send_window()
+            .min(self.congestion.get_send_window());
         if max_send == 0 || data.len() as u32 > max_send {
             return TcpAction::None; // Window is full
         }
@@ -496,15 +497,15 @@ impl TcpStateMachine {
             TcpState::Established => {
                 self.state = TcpState::FinWait1;
                 TcpAction::SendFin
-            }
+            },
             TcpState::CloseWait => {
                 self.state = TcpState::LastAck;
                 TcpAction::SendFin
-            }
+            },
             TcpState::Listen => {
                 self.state = TcpState::Closed;
                 TcpAction::ConnectionClosed
-            }
+            },
             _ => TcpAction::Error,
         }
     }
@@ -526,9 +527,9 @@ impl TcpStateMachine {
 
     /// Check if we can send data
     pub fn can_send(&self) -> bool {
-        self.state == TcpState::Established &&
-        self.flow_control.can_send() &&
-        self.congestion.can_send()
+        self.state == TcpState::Established
+            && self.flow_control.can_send()
+            && self.congestion.can_send()
     }
 
     /// Get retransmission timeout check
@@ -549,7 +550,8 @@ impl TcpStateMachine {
 
         // Check TIME_WAIT timeout
         if self.state == TcpState::TimeWait {
-            if now - self.timestamps.connection_time >= 120 { // 2 minutes TIME_WAIT
+            if now - self.timestamps.connection_time >= 120 {
+                // 2 minutes TIME_WAIT
                 self.state = TcpState::Closed;
                 actions.push(TcpAction::ConnectionClosed);
             }
@@ -619,17 +621,17 @@ impl TcpCongestionControl {
                     if self.cwnd >= self.ssthresh {
                         self.state = CongestionState::CongestionAvoidance;
                     }
-                }
+                },
                 CongestionState::CongestionAvoidance => {
                     self.cwnd += (acknowledged * 1460) / self.cwnd; // AIMD
-                }
+                },
                 CongestionState::FastRecovery => {
                     self.cwnd += acknowledged;
                     self.state = CongestionState::CongestionAvoidance;
-                }
+                },
                 CongestionState::FastRetransmit => {
                     self.state = CongestionState::FastRecovery;
-                }
+                },
             }
         } else if ack == self.last_ack {
             // Duplicate ACK
@@ -671,9 +673,9 @@ impl RttEstimator {
     /// Create new RTT estimator
     pub fn new() -> Self {
         Self {
-            srtt: 1000,      // 1 second initial
-            rttvar: 500,      // 0.5 second initial variance
-            rto: 3000,        // 3 second initial timeout
+            srtt: 1000,  // 1 second initial
+            rttvar: 500, // 0.5 second initial variance
+            rto: 3000,   // 3 second initial timeout
             min_rtt: u32::MAX,
         }
     }
@@ -734,7 +736,8 @@ impl TcpFlowControl {
 
     /// Update effective window
     fn update_effective_window(&mut self) {
-        self.effective_window = (self.advertised_window as u32).saturating_sub(self.outstanding_bytes);
+        self.effective_window =
+            (self.advertised_window as u32).saturating_sub(self.outstanding_bytes);
     }
 
     /// Check if we can send

@@ -2,33 +2,23 @@
 //!
 //! This module provides time-related system calls.
 
-use alloc::string::ToString;
-use alloc::boxed::Box;
+use alloc::{boxed::Box, string::ToString};
 
 use nos_api::Result;
-use crate::SyscallHandler;
-use crate::SyscallDispatcher;
+
+use crate::{SyscallDispatcher, SyscallHandler};
 
 /// Register time system call handlers
 pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     // Register clock_gettime system call
-    dispatcher.register_handler(
-        crate::types::SYS_CLOCK_GETTIME,
-        Box::new(ClockGettimeHandler)
-    );
-    
+    dispatcher.register_handler(crate::types::SYS_CLOCK_GETTIME, Box::new(ClockGettimeHandler));
+
     // Register gettimeofday system call
-    dispatcher.register_handler(
-        crate::types::SYS_GETTIMEOFDAY,
-        Box::new(GettimeofdayHandler)
-    );
-    
+    dispatcher.register_handler(crate::types::SYS_GETTIMEOFDAY, Box::new(GettimeofdayHandler));
+
     // Register nanosleep system call
-    dispatcher.register_handler(
-        crate::types::SYS_NANOSLEEP,
-        Box::new(NanosleepHandler)
-    );
-    
+    dispatcher.register_handler(crate::types::SYS_NANOSLEEP, Box::new(NanosleepHandler));
+
     Ok(())
 }
 
@@ -39,23 +29,27 @@ impl SyscallHandler for ClockGettimeHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_CLOCK_GETTIME
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 2 {
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
         }
-        
+
         let clock_id = args[0] as i32;
         let timespec = args[1] as *mut Timespec;
-        
+
         // TODO: Implement actual clock_gettime logic using parameters:
         // clock_id: Clock type (CLOCK_REALTIME, CLOCK_MONOTONIC, etc.)
         // timespec: Pointer to timespec structure to fill with current time
-        sys_trace_with_args!("clock_gettime called with: clock_id={}, timespec={:?}", clock_id, timespec);
-        
+        sys_trace_with_args!(
+            "clock_gettime called with: clock_id={}, timespec={:?}",
+            clock_id,
+            timespec
+        );
+
         Ok(0)
     }
-    
+
     fn name(&self) -> &str {
         "clock_gettime"
     }
@@ -68,23 +62,23 @@ impl SyscallHandler for GettimeofdayHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_GETTIMEOFDAY
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 2 {
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
         }
-        
+
         let tv = args[0] as *mut Timeval;
         let tz = args[1] as *mut Timezone;
-        
+
         // TODO: Implement actual gettimeofday logic using parameters:
         // tv: Pointer to timeval structure to fill with current time
         // tz: Pointer to timezone structure (unused in modern systems)
         sys_trace_with_args!("gettimeofday called with: tv={:?}, tz={:?}", tv, tz);
-        
+
         Ok(0)
     }
-    
+
     fn name(&self) -> &str {
         "gettimeofday"
     }
@@ -97,12 +91,12 @@ impl SyscallHandler for NanosleepHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_NANOSLEEP
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 2 {
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
         }
-        
+
         let req = args[0] as *const Timespec;
         let rem = args[1] as *mut Timespec;
 
@@ -113,7 +107,7 @@ impl SyscallHandler for NanosleepHandler {
 
         Ok(0)
     }
-    
+
     fn name(&self) -> &str {
         "nanosleep"
     }

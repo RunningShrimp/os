@@ -13,16 +13,12 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use spin::Mutex;
-
-use crate::types::stubs::{VirtAddr, RNG_INSTANCE, get_timestamp};
-use nos_api::Error;
+use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
 use core::result::Result;
 
+use spin::Mutex;
+
+use crate::types::stubs::{RNG_INSTANCE, VirtAddr, get_timestamp};
 /// ASLR entropy bits for different memory regions
 #[derive(Debug, Clone, Copy)]
 pub struct AslrEntropy {
@@ -273,7 +269,9 @@ impl AslrSubsystem {
 
         // 先检查进程状态，释放借用后再调用其他方法
         let enabled = {
-            let process_state = self.process_states.get_mut(&pid)
+            let process_state = self
+                .process_states
+                .get_mut(&pid)
                 .ok_or("Process not found")?;
             process_state.enabled
         };
@@ -296,10 +294,14 @@ impl AslrSubsystem {
         };
 
         // 重新获取process_state的可变引用
-        let process_state = self.process_states.get_mut(&pid)
+        let process_state = self
+            .process_states
+            .get_mut(&pid)
             .ok_or("Process not found")?;
         process_state.regions.push(region);
-        process_state.original_addresses.insert(randomized_base, base);
+        process_state
+            .original_addresses
+            .insert(randomized_base, base);
 
         // Update statistics
         {
@@ -389,7 +391,9 @@ impl AslrSubsystem {
         // 先生成种子，避免借用冲突
         let new_seed = self.generate_seed();
 
-        let process_state = self.process_states.get_mut(&pid)
+        let process_state = self
+            .process_states
+            .get_mut(&pid)
             .ok_or("Process not found")?;
 
         process_state.seed = new_seed;
@@ -410,7 +414,10 @@ impl AslrSubsystem {
     /// Get the original (non-randomized) address for a randomized address
     pub fn get_original_address(&self, pid: u64, randomized_addr: VirtAddr) -> Option<VirtAddr> {
         let process_state = self.process_states.get(&pid)?;
-        process_state.original_addresses.get(&randomized_addr).copied()
+        process_state
+            .original_addresses
+            .get(&randomized_addr)
+            .copied()
     }
 
     /// Check if an address is in a randomized region
@@ -421,7 +428,8 @@ impl AslrSubsystem {
         };
 
         process_state.regions.iter().any(|region| {
-            addr.as_usize() >= region.base.as_usize() && addr.as_usize() < (region.base.as_usize() + region.size)
+            addr.as_usize() >= region.base.as_usize()
+                && addr.as_usize() < (region.base.as_usize() + region.size)
         })
     }
 
@@ -433,8 +441,7 @@ impl AslrSubsystem {
 
     /// Validate address randomization
     pub fn validate_randomization(&self, pid: u64) -> Result<bool, &'static str> {
-        let process_state = self.process_states.get(&pid)
-            .ok_or("Process not found")?;
+        let process_state = self.process_states.get(&pid).ok_or("Process not found")?;
 
         if !process_state.enabled {
             return Ok(false);
@@ -469,17 +476,17 @@ impl AslrSubsystem {
     pub fn reset_stats(&self) {
         *self.stats.lock() = AslrStats::default();
     }
-    
+
     /// Enable/disable bypass detection
     pub fn set_bypass_detection(&mut self, enabled: bool) {
         self.bypass_detection_enabled = enabled;
     }
-    
+
     /// Check if bypass detection is enabled
     pub fn is_bypass_detection_enabled(&self) -> bool {
         self.bypass_detection_enabled
     }
-    
+
     /// Detect ASLR bypass attempt
     pub fn detect_bypass_attempt(
         &mut self,
@@ -492,7 +499,7 @@ impl AslrSubsystem {
         if !self.bypass_detection_enabled {
             return;
         }
-        
+
         let event = AslrBypassEvent {
             pid,
             bypass_type,
@@ -501,59 +508,60 @@ impl AslrSubsystem {
             target_addr,
             details,
         };
-        
+
         self.bypass_events.push(event);
-        
+
         // Update statistics
         {
             let mut stats = self.stats.lock();
             stats.bypass_attempts += 1;
-            
+
             // Consider it a successful bypass if it's not just an attempt
             match bypass_type {
-                AslrBypassType::None => {}
+                AslrBypassType::None => {},
                 _ => stats.successful_bypasses += 1,
             }
-            
+
             stats.mitigations_applied += 1;
         }
     }
-    
+
     /// Get bypass events
     pub fn get_bypass_events(&self) -> &[AslrBypassEvent] {
         &self.bypass_events
     }
-    
+
     /// Clear bypass events
     pub fn clear_bypass_events(&mut self) {
         self.bypass_events.clear();
     }
-    
+
     /// Set re-randomization interval
     pub fn set_rerandomization_interval(&self, interval_seconds: usize) {
-        self.rerandomization_interval.store(interval_seconds, Ordering::Relaxed);
+        self.rerandomization_interval
+            .store(interval_seconds, Ordering::Relaxed);
     }
-    
+
     /// Get re-randomization interval
     pub fn get_rerandomization_interval(&self) -> usize {
         self.rerandomization_interval.load(Ordering::Relaxed)
     }
-    
+
     /// Check if re-randomization is needed
     pub fn should_rerandomize(&self) -> bool {
         let interval = self.rerandomization_interval.load(Ordering::Relaxed);
         let last_time = self.last_rerandomization.load(Ordering::Relaxed);
         let current_time = crate::subsystems::time::get_ticks();
-        
+
         if interval == 0 {
             return false;
         }
-        
+
         // Convert interval from seconds to ticks
         let interval_ticks = interval as u64 * crate::subsystems::time::TICK_HZ;
         current_time.saturating_sub(last_time) >= interval_ticks
     }
-    
+
     /// Update process entropy statistics
     pub fn update_entropy_stats(&self, pid: u64, entropy_bits: u8) {
         if entropy_bits > 24 {
@@ -561,7 +569,7 @@ impl AslrSubsystem {
         } else if entropy_bits < 16 {
             self.low_entropy_processes.fetch_add(1, Ordering::Relaxed);
         }
-        
+
         // Update average entropy per region
         {
             let mut stats = self.stats.lock();
@@ -573,28 +581,28 @@ impl AslrSubsystem {
             }
         }
     }
-    
+
     /// Get entropy statistics
     pub fn get_entropy_stats(&self) -> (usize, usize, f32) {
         let high_entropy = self.high_entropy_processes.load(Ordering::Relaxed);
         let low_entropy = self.low_entropy_processes.load(Ordering::Relaxed);
         let avg_entropy = self.stats.lock().avg_entropy_per_region;
-        
+
         (high_entropy, low_entropy, avg_entropy)
     }
-    
+
     /// Apply ASLR mitigations
     pub fn apply_mitigations(&mut self, pid: u64, addr: VirtAddr) -> Result<(), &'static str> {
         if !self.bypass_detection_enabled {
             return Ok(());
         }
-        
+
         // Check if address is in a randomized region
         if let Some(process_state) = self.process_states.get(&pid) {
             for region in &process_state.regions {
-                if addr.as_usize() >= region.base.as_usize() && 
-                   addr.as_usize() < (region.base.as_usize() + region.size) {
-                    
+                if addr.as_usize() >= region.base.as_usize()
+                    && addr.as_usize() < (region.base.as_usize() + region.size)
+                {
                     // Apply mitigations based on region type
                     match region.region_type {
                         MemoryRegionType::Executable => {
@@ -606,7 +614,7 @@ impl AslrSubsystem {
                                 region.base,
                                 format!("Executable region access at {:x}", addr.as_usize()),
                             );
-                        }
+                        },
                         MemoryRegionType::Stack => {
                             // Apply stack-specific mitigations
                             self.detect_bypass_attempt(
@@ -616,7 +624,7 @@ impl AslrSubsystem {
                                 region.base,
                                 format!("Stack region access at {:x}", addr.as_usize()),
                             );
-                        }
+                        },
                         _ => {
                             // Generic bypass attempt
                             self.detect_bypass_attempt(
@@ -626,46 +634,47 @@ impl AslrSubsystem {
                                 region.base,
                                 format!("Memory region access at {:x}", addr.as_usize()),
                             );
-                        }
+                        },
                     }
-                    
+
                     return Ok(());
                 }
             }
         }
-        
+
         Err("Process not found")
     }
-    
+
     /// Perform periodic re-randomization
     pub fn perform_periodic_rerandomization(&mut self) -> Result<usize, &'static str> {
         let mut rerandomized_count = 0;
-        
+
         // Collect all process IDs
         let pids: Vec<u64> = self.process_states.keys().copied().collect();
-        
+
         for &pid in &pids {
             if self.should_rerandomize() {
                 match self.rerandomize_process(pid) {
                     Ok(()) => {
                         rerandomized_count += 1;
-                        self.last_rerandomization.store(crate::subsystems::time::get_ticks(), Ordering::Relaxed);
-                    }
+                        self.last_rerandomization
+                            .store(crate::subsystems::time::get_ticks(), Ordering::Relaxed);
+                    },
                     Err(_) => {
                         // Log error but continue with other processes
-                    }
+                    },
                 }
             }
         }
-        
+
         Ok(rerandomized_count)
     }
-    
+
     /// Get ASLR health metrics
     pub fn get_health_metrics(&self) -> AslrHealthMetrics {
         let stats = self.stats.lock();
         let (high_entropy, low_entropy, avg_entropy) = self.get_entropy_stats();
-        
+
         AslrHealthMetrics {
             total_processes: self.process_states.len(),
             aslr_enabled_processes: stats.aslr_processes,
@@ -678,7 +687,8 @@ impl AslrSubsystem {
             high_entropy_processes,
             low_entropy_processes,
             mitigation_effectiveness: if stats.mitigations_applied > 0 {
-                (stats.mitigations_applied - stats.successful_bypasses) as f32 / stats.mitigations_applied as f32
+                (stats.mitigations_applied - stats.successful_bypasses) as f32
+                    / stats.mitigations_applied as f32
             } else {
                 1.0
             },
@@ -742,7 +752,10 @@ pub fn is_aslr_enabled() -> bool {
 /// Get ASLR configuration
 pub fn get_aslr_config() -> AslrConfig {
     let guard = crate::security::ASLR.lock();
-    guard.as_ref().map(|s| s.config().clone()).unwrap_or_else(AslrConfig::default)
+    guard
+        .as_ref()
+        .map(|s| s.config().clone())
+        .unwrap_or_else(AslrConfig::default)
 }
 
 /// Update ASLR configuration
@@ -770,7 +783,10 @@ pub fn validate_process_aslr(pid: u64) -> Result<bool, &'static str> {
 /// Check if address is randomized
 pub fn is_address_randomized(pid: u64, addr: VirtAddr) -> bool {
     let guard = crate::security::ASLR.lock();
-    guard.as_ref().map(|s| s.is_randomized_address(pid, addr)).unwrap_or(false)
+    guard
+        .as_ref()
+        .map(|s| s.is_randomized_address(pid, addr))
+        .unwrap_or(false)
 }
 
 /// Re-randomize process
@@ -808,7 +824,10 @@ pub fn set_aslr_bypass_detection(enabled: bool) -> Result<(), &'static str> {
 /// Check if bypass detection is enabled
 pub fn is_aslr_bypass_detection_enabled() -> bool {
     let guard = crate::security::ASLR.lock();
-    guard.as_ref().map(|s| s.is_bypass_detection_enabled()).unwrap_or(false)
+    guard
+        .as_ref()
+        .map(|s| s.is_bypass_detection_enabled())
+        .unwrap_or(false)
 }
 
 /// Detect ASLR bypass attempt
@@ -831,7 +850,8 @@ pub fn detect_aslr_bypass(
 /// Get ASLR bypass events
 pub fn get_aslr_bypass_events() -> Vec<AslrBypassEvent> {
     let guard = crate::security::ASLR.lock();
-    guard.as_ref()
+    guard
+        .as_ref()
         .map(|s| s.get_bypass_events().to_vec())
         .unwrap_or_default()
 }
@@ -861,7 +881,10 @@ pub fn set_aslr_rerandomization_interval(interval_seconds: usize) -> Result<(), 
 /// Get re-randomization interval
 pub fn get_aslr_rerandomization_interval() -> usize {
     let guard = crate::security::ASLR.lock();
-    guard.as_ref().map(|s| s.get_rerandomization_interval()).unwrap_or(0)
+    guard
+        .as_ref()
+        .map(|s| s.get_rerandomization_interval())
+        .unwrap_or(0)
 }
 
 /// Perform periodic re-randomization
@@ -910,27 +933,27 @@ pub fn validate_aslr_config(config: &AslrConfig) -> Result<(), String> {
     if config.entropy.stack_bits < 8 || config.entropy.stack_bits > 32 {
         return Err("Stack entropy bits must be between 8 and 32".to_string());
     }
-    
+
     if config.entropy.mmap_bits < 8 || config.entropy.mmap_bits > 32 {
         return Err("Mmap entropy bits must be between 8 and 32".to_string());
     }
-    
+
     if config.entropy.heap_bits < 8 || config.entropy.heap_bits > 32 {
         return Err("Heap entropy bits must be between 8 and 32".to_string());
     }
-    
+
     if config.entropy.exec_bits < 8 || config.entropy.exec_bits > 32 {
         return Err("Exec entropy bits must be between 8 and 32".to_string());
     }
-    
+
     if config.entropy.pie_bits < 8 || config.entropy.pie_bits > 32 {
         return Err("PIE entropy bits must be between 8 and 32".to_string());
     }
-    
+
     if config.entropy.library_bits < 8 || config.entropy.library_bits > 32 {
         return Err("Library entropy bits must be between 8 and 32".to_string());
     }
-    
+
     Ok(())
 }
 
@@ -1004,24 +1027,24 @@ pub fn benchmark_aslr_performance(iterations: usize) -> Result<(u64, u64), &'sta
     let guard = crate::security::ASLR.lock();
     if let Some(ref aslr) = *guard {
         let start_time = crate::subsystems::time::get_ticks();
-        
+
         // Benchmark randomization
         for _ in 0..iterations {
             let base = VirtAddr::new(0x10000000);
             let _ = aslr.randomize_region(1234, base, 4096, 4096, MemoryRegionType::Stack);
         }
-        
+
         let randomization_time = crate::subsystems::time::get_ticks() - start_time;
-        
+
         // Benchmark validation
         let start_time = crate::subsystems::time::get_ticks();
-        
+
         for _ in 0..iterations {
             let _ = aslr.validate_randomization(1234);
         }
-        
+
         let validation_time = crate::subsystems::time::get_ticks() - start_time;
-        
+
         Ok((randomization_time, validation_time))
     } else {
         Err("ASLR subsystem not initialized")

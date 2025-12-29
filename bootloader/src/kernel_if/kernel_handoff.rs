@@ -2,11 +2,10 @@
 ///
 /// Manages boot information structure and jumps to kernel entry point.
 /// Passes all necessary boot parameters to the kernel.
-
 use core::mem;
 
 // Import VGA writer for error output
-use crate::drivers::vga::{VGAWriter, Color};
+use crate::drivers::vga::{Color, VGAWriter};
 
 /// Halt the system with an error message
 fn halt_with_error(msg: &str) -> ! {
@@ -46,7 +45,7 @@ pub struct LoadedModule {
 }
 
 /// Complete boot information structure
-/// 
+///
 /// This is passed to the kernel at entry point
 #[repr(C)]
 pub struct BootInformation {
@@ -97,17 +96,9 @@ impl BootInformation {
             magic: 0x12345678,
             protocol: 0,
             kernel_entry: entry,
-            memory_map: [MemoryMapEntry {
-                base: 0,
-                length: 0,
-                region_type: 0,
-            }; 32],
+            memory_map: [MemoryMapEntry { base: 0, length: 0, region_type: 0 }; 32],
             memory_map_count: 0,
-            modules: [LoadedModule {
-                start: 0,
-                end: 0,
-                command_line: 0,
-            }; 16],
+            modules: [LoadedModule { start: 0, end: 0, command_line: 0 }; 16],
             module_count: 0,
             bootloader_name: [0u8; 64],
             command_line: [0u8; 256],
@@ -213,9 +204,7 @@ pub struct KernelHandoff {
 impl KernelHandoff {
     /// Create new kernel handoff
     pub fn new(entry: u64) -> Self {
-        Self {
-            boot_info: BootInformation::new(entry),
-        }
+        Self { boot_info: BootInformation::new(entry) }
     }
 
     /// Prepare for kernel handoff
@@ -276,22 +265,32 @@ impl KernelHandoff {
         // For RISC-V: kernel space starts at 0xFFFFFFC000000000 (SV39) or 0xFFFFFFE000000000 (SV48)
         #[cfg(target_arch = "x86_64")]
         {
-            if kernel_entry < 0x100000 || (kernel_entry > 0x7FFFFFFFFFFF && kernel_entry < 0xFFFF800000000000) {
+            if kernel_entry < 0x100000
+                || (kernel_entry > 0x7FFFFFFFFFFF && kernel_entry < 0xFFFF800000000000)
+            {
                 halt_with_error("Invalid kernel entry point address");
             }
         }
 
         #[cfg(target_arch = "aarch64")]
         {
-            if kernel_entry < 0x100000 || (kernel_entry > 0xFFFFFFFFFFFF && kernel_entry < 0xFFFF000000000000) {
+            if kernel_entry < 0x100000
+                || (kernel_entry > 0xFFFFFFFFFFFF && kernel_entry < 0xFFFF000000000000)
+            {
                 halt_with_error("Invalid kernel entry point address");
             }
         }
 
         #[cfg(target_arch = "riscv64")]
         {
-            if kernel_entry < 0x100000 || (kernel_entry > 0x3FFFFFFFFF && kernel_entry < 0xFFFFFFC000000000) {
-                crate::panic!("Invalid kernel entry point address {:#x} (must be in valid kernel address space)", kernel_entry);
+            if kernel_entry < 0x100000
+                || (kernel_entry > 0x3FFFFFFFFF && kernel_entry < 0xFFFFFFC000000000)
+            {
+                crate::panic!(
+                    "Invalid kernel entry point address {:#x} (must be in valid kernel address \
+                     space)",
+                    kernel_entry
+                );
             }
         }
 
@@ -382,11 +381,7 @@ mod tests {
     #[test]
     fn test_add_memory_entry() {
         let mut bi = BootInformation::new(0x200000);
-        let entry = MemoryMapEntry {
-            base: 0x0,
-            length: 0x100000,
-            region_type: 1,
-        };
+        let entry = MemoryMapEntry { base: 0x0, length: 0x100000, region_type: 1 };
 
         assert!(bi.add_memory_entry(entry).is_ok());
         assert_eq!(bi.memory_map_count, 1);
@@ -395,11 +390,7 @@ mod tests {
     #[test]
     fn test_memory_map_full() {
         let mut bi = BootInformation::new(0x200000);
-        let entry = MemoryMapEntry {
-            base: 0x0,
-            length: 0x100000,
-            region_type: 1,
-        };
+        let entry = MemoryMapEntry { base: 0x0, length: 0x100000, region_type: 1 };
 
         for _ in 0..32 {
             let _ = bi.add_memory_entry(entry);
@@ -424,11 +415,7 @@ mod tests {
         let mut bi = BootInformation::new(0x200000);
 
         // Add memory entry for validation
-        let entry = MemoryMapEntry {
-            base: 0x0,
-            length: 0x1000000,
-            region_type: 1,
-        };
+        let entry = MemoryMapEntry { base: 0x0, length: 0x1000000, region_type: 1 };
         let _ = bi.add_memory_entry(entry);
 
         assert!(bi.validate().is_ok());

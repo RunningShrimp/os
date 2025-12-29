@@ -11,24 +11,19 @@
 extern crate alloc;
 extern crate hashbrown;
 
-use core::ffi::{c_void, c_char, c_int, c_uint};
 use core::hash::{Hash, Hasher};
-use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 use alloc::{format, vec};
 use alloc::boxed::Box;
-use alloc::string::String;
 use alloc::string::ToString;
 use hashbrown::HashMap;
 pub type SyscallHashMap<K, V> = HashMap<K, V, CustomHasher>;
-use spin::Mutex;
 use crate::compat::abi::AbiConverter;
 use crate::compat::DefaultHasherBuilder;
 
 #[derive(Default)]
 struct CustomHasher;
-
 impl core::hash::Hasher for CustomHasher {
     fn finish(&self) -> u64 {
         0 // Placeholder implementation
@@ -494,7 +489,6 @@ impl SyscallTranslator {
         TIMESTAMP.fetch_add(1, Ordering::SeqCst)
     }
 
-    /// Create Linux translation table
     /// Maps Linux x86_64 system call numbers to NOS system call numbers
     /// Covers 95%+ of commonly used system calls for Musl Libc/Glibc compatibility
     fn create_linux_translation_table(&self) -> Result<TranslationTable> {

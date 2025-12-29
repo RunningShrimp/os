@@ -2,7 +2,6 @@
 ///
 /// Provides disk read/write operations via BIOS interrupt 0x13.
 /// Used for loading the kernel from disk during boot.
-
 use crate::bios::bios_realmode::{self, RealModeExecutor};
 
 /// Result type for disk operations
@@ -103,11 +102,7 @@ impl CylinderHeadSector {
             return Err(DiskError::InvalidParams);
         }
 
-        Ok(CylinderHeadSector {
-            cylinder,
-            head,
-            sector,
-        })
+        Ok(CylinderHeadSector { cylinder, head, sector })
     }
 
     /// Check if CHS values are valid
@@ -124,9 +119,7 @@ pub struct DiskController {
 impl DiskController {
     /// Create new disk controller with executor
     pub fn new(executor: &RealModeExecutor) -> Self {
-        Self {
-            executor: executor as *const _,
-        }
+        Self { executor: executor as *const _ }
     }
 
     /// Get drive information via INT 0x13/AH=0x08
@@ -194,9 +187,7 @@ pub struct BootSectorLoader {
 impl BootSectorLoader {
     /// Create new boot sector loader
     pub fn new(executor: &RealModeExecutor) -> Self {
-        Self {
-            controller: DiskController::new(executor),
-        }
+        Self { controller: DiskController::new(executor) }
     }
 
     /// Load kernel sectors from disk
@@ -264,12 +255,7 @@ mod tests {
 
     #[test]
     fn test_drive_info_creation() {
-        let drive = DriveInfo {
-            drive: 0x80,
-            cylinders: 1024,
-            heads: 16,
-            sectors: 63,
-        };
+        let drive = DriveInfo { drive: 0x80, cylinders: 1024, heads: 16, sectors: 63 };
 
         assert_eq!(drive.drive, 0x80);
         assert!(drive.exists());
@@ -277,23 +263,14 @@ mod tests {
 
     #[test]
     fn test_drive_info_total_sectors() {
-        let drive = DriveInfo {
-            drive: 0x80,
-            cylinders: 100,
-            heads: 10,
-            sectors: 5,
-        };
+        let drive = DriveInfo { drive: 0x80, cylinders: 100, heads: 10, sectors: 5 };
 
         assert_eq!(drive.total_sectors(), 5000); // 100 * 10 * 5
     }
 
     #[test]
     fn test_chs_validity() {
-        let valid = CylinderHeadSector {
-            cylinder: 500,
-            head: 5,
-            sector: 10,
-        };
+        let valid = CylinderHeadSector { cylinder: 500, head: 5, sector: 10 };
         assert!(valid.is_valid());
 
         let invalid_cyl = CylinderHeadSector {
@@ -313,12 +290,7 @@ mod tests {
 
     #[test]
     fn test_lba_to_chs_conversion() {
-        let drive = DriveInfo {
-            drive: 0x80,
-            cylinders: 1024,
-            heads: 16,
-            sectors: 63,
-        };
+        let drive = DriveInfo { drive: 0x80, cylinders: 1024, heads: 16, sectors: 63 };
 
         // LBA 0 = CHS (0, 0, 1)
         let chs = CylinderHeadSector::from_lba(0, &drive).unwrap();
@@ -335,12 +307,7 @@ mod tests {
 
     #[test]
     fn test_lba_to_chs_invalid() {
-        let drive = DriveInfo {
-            drive: 0x80,
-            cylinders: 100,
-            heads: 5,
-            sectors: 10,
-        };
+        let drive = DriveInfo { drive: 0x80, cylinders: 100, heads: 5, sectors: 10 };
 
         // LBA that would require > 1023 cylinders should fail
         let huge_lba = 2000000u32; // Way beyond drive capacity

@@ -1,22 +1,23 @@
 // Reporting Module for Security Audit
 
 extern crate alloc;
-//
 // 报告模块，负责生成各种格式的安全审计报告
 
-use alloc::format;
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec;
-use alloc::vec::Vec;
-use alloc::boxed::Box;
-use alloc::string::String;
-use alloc::string::ToString;
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
 use core::sync::atomic::{AtomicU64, Ordering};
+
 use spin::Mutex;
 
+use super::{ReportFormat, ReportFrequency, ReportType, ReportingConfig};
 use crate::security::audit::{AuditEvent, AuditEventType, AuditSeverity};
-use super::{ReportType, ReportFrequency, ReportFormat, ReportingConfig};
 
 /// 报告生成器
 pub struct ReportGenerator {
@@ -678,7 +679,10 @@ impl ReportGenerator {
             let mut stats = self.stats.lock();
             stats.total_reports_generated += 1;
             *stats.reports_by_type.entry(report_type).or_insert(0) += 1;
-            *stats.reports_by_format.entry(*self.config.formats.first().unwrap()).or_insert(0) += 1;
+            *stats
+                .reports_by_format
+                .entry(*self.config.formats.first().unwrap())
+                .or_insert(0) += 1;
             stats.successful_generations += 1;
 
             let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
@@ -721,20 +725,24 @@ impl ReportGenerator {
     fn get_time_range_for_report_type(&self, report_type: ReportType) -> (u64, u64) {
         let now = crate::subsystems::time::get_timestamp();
         let start_time = match report_type {
-            ReportType::RealTime => now - 3600,      // 1 hour
+            ReportType::RealTime => now - 3600,     // 1 hour
             ReportType::Daily => now - 86400,       // 1 day
             ReportType::Weekly => now - 604800,     // 1 week
             ReportType::Monthly => now - 2592000,   // 30 days
             ReportType::Quarterly => now - 7776000, // 90 days
             ReportType::Annual => now - 31536000,   // 365 days
-            _ => now - 86400, // Default to 1 day
+            _ => now - 86400,                       // Default to 1 day
         };
 
         (start_time * 1000000000, now * 1000000000) // Convert to nanoseconds
     }
 
     /// 从数据生成内容
-    fn generate_content_from_data(&self, data: &CollectedData, report_type: ReportType) -> Result<ReportContent, &'static str> {
+    fn generate_content_from_data(
+        &self,
+        data: &CollectedData,
+        report_type: ReportType,
+    ) -> Result<ReportContent, &'static str> {
         let content = ReportContent {
             executive_summary: format!("Executive summary for {:?} report", report_type),
             key_findings: self.generate_findings_from_data(data)?,
@@ -747,7 +755,10 @@ impl ReportGenerator {
     }
 
     /// 生成发现
-    fn generate_findings_from_data(&self, data: &CollectedData) -> Result<Vec<Finding>, &'static str> {
+    fn generate_findings_from_data(
+        &self,
+        data: &CollectedData,
+    ) -> Result<Vec<Finding>, &'static str> {
         // Use data for validation/logging
         let _event_count = data.events.len(); // Use data to get event count for validation
         let mut findings = Vec::new();
@@ -767,7 +778,10 @@ impl ReportGenerator {
     }
 
     /// 生成分析部分
-    fn generate_analysis_sections(&self, data: &CollectedData) -> Result<Vec<AnalysisSection>, &'static str> {
+    fn generate_analysis_sections(
+        &self,
+        data: &CollectedData,
+    ) -> Result<Vec<AnalysisSection>, &'static str> {
         // Use data for validation/logging
         let _event_count = data.events.len(); // Use data to get event count for validation
         let mut sections = Vec::new();
@@ -794,7 +808,10 @@ impl ReportGenerator {
     }
 
     /// 生成建议
-    fn generate_recommendations_from_data(&self, data: &CollectedData) -> Result<Vec<Recommendation>, &'static str> {
+    fn generate_recommendations_from_data(
+        &self,
+        data: &CollectedData,
+    ) -> Result<Vec<Recommendation>, &'static str> {
         // Use data for validation/logging
         let _event_count = data.events.len(); // Use data to get event count for validation
         let mut recommendations = Vec::new();
@@ -818,7 +835,10 @@ impl ReportGenerator {
     }
 
     /// 生成统计信息
-    fn generate_statistics_from_data(&self, data: &CollectedData) -> Result<ReportStatistics, &'static str> {
+    fn generate_statistics_from_data(
+        &self,
+        data: &CollectedData,
+    ) -> Result<ReportStatistics, &'static str> {
         let stats = ReportStatistics {
             total_events: 1000, // Simplified
             events_by_type: BTreeMap::new(),
@@ -831,12 +851,16 @@ impl ReportGenerator {
     }
 
     /// 生成格式化报告
-    fn generate_formatted_report(&mut self, data: &ReportData, format: ReportFormat) -> Result<String, &'static str> {
+    fn generate_formatted_report(
+        &mut self,
+        data: &ReportData,
+        format: ReportFormat,
+    ) -> Result<String, &'static str> {
         match self.formatters.get_mut(&format) {
             Some(formatter) => {
                 let formatted_bytes = formatter.format_report(data)?;
                 Ok(String::from_utf8_lossy(&formatted_bytes).to_string())
-            }
+            },
             None => Err("Formatter not found"),
         }
     }
@@ -855,31 +879,34 @@ impl ReportGenerator {
 impl TemplateEngine {
     /// 创建新的模板引擎
     pub fn new() -> Self {
-        Self {
-            templates: BTreeMap::new(),
-            variables: BTreeMap::new(),
-        }
+        Self { templates: BTreeMap::new(), variables: BTreeMap::new() }
     }
 
     /// 加载默认模板
     pub fn load_default_templates(&mut self) -> Result<(), &'static str> {
         // HTML模板
-        self.templates.insert("html_report".to_string(), ReportTemplate {
-            id: 1,
-            name: "HTML Report Template".to_string(),
-            content: include_str!("templates/html_report.html").to_string(),
-            template_type: TemplateType::Html,
-            parameters: vec![],
-        });
+        self.templates.insert(
+            "html_report".to_string(),
+            ReportTemplate {
+                id: 1,
+                name: "HTML Report Template".to_string(),
+                content: include_str!("templates/html_report.html").to_string(),
+                template_type: TemplateType::Html,
+                parameters: vec![],
+            },
+        );
 
         // 文本模板
-        self.templates.insert("text_report".to_string(), ReportTemplate {
-            id: 2,
-            name: "Text Report Template".to_string(),
-            content: "Security Audit Report\n====================\n\n{{content}}".to_string(),
-            template_type: TemplateType::Text,
-            parameters: vec![],
-        });
+        self.templates.insert(
+            "text_report".to_string(),
+            ReportTemplate {
+                id: 2,
+                name: "Text Report Template".to_string(),
+                content: "Security Audit Report\n====================\n\n{{content}}".to_string(),
+                template_type: TemplateType::Text,
+                parameters: vec![],
+            },
+        );
 
         Ok(())
     }
@@ -903,7 +930,8 @@ impl DataCollector {
             name: "Audit Database".to_string(),
             source_type: DataSourceType::AuditDatabase,
             connection_string: "audit.db".to_string(),
-            query_template: "SELECT * FROM audit_events WHERE timestamp BETWEEN ? AND ?".to_string(),
+            query_template: "SELECT * FROM audit_events WHERE timestamp BETWEEN ? AND ?"
+                .to_string(),
         });
 
         // 系统指标数据源
@@ -951,14 +979,19 @@ impl DataCollector {
             self.stats.successful_collections += 1;
 
             let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
-            self.stats.avg_collection_time_us = (self.stats.avg_collection_time_us + elapsed / 1000) / 2;
+            self.stats.avg_collection_time_us =
+                (self.stats.avg_collection_time_us + elapsed / 1000) / 2;
         }
 
         Ok(collected_data)
     }
 
     /// 从单个数据源收集数据
-    fn collect_from_source(&mut self, source: &DataSource, time_range: (u64, u64)) -> Result<CollectedData, &'static str> {
+    fn collect_from_source(
+        &mut self,
+        source: &DataSource,
+        time_range: (u64, u64),
+    ) -> Result<CollectedData, &'static str> {
         // 简化的数据收集逻辑
         let mut content = BTreeMap::new();
 
@@ -968,14 +1001,14 @@ impl DataCollector {
                 content.insert("total_events".to_string(), VariableValue::Number(1000.0));
                 content.insert("security_violations".to_string(), VariableValue::Number(25.0));
                 content.insert("auth_failures".to_string(), VariableValue::Number(15.0));
-            }
+            },
             DataSourceType::SystemMetrics => {
                 // 模拟系统指标数据
                 content.insert("cpu_usage".to_string(), VariableValue::Number(45.2));
                 content.insert("memory_usage".to_string(), VariableValue::Number(67.8));
                 content.insert("disk_usage".to_string(), VariableValue::Number(32.1));
-            }
-            _ => {}
+            },
+            _ => {},
         }
 
         Ok(CollectedData {
@@ -983,7 +1016,7 @@ impl DataCollector {
             name: source.name.clone(),
             content,
             collected_at: crate::subsystems::time::get_timestamp_nanos(),
-            expires_at: crate::subsystems::time::get_timestamp_nanos() + 1800000000000, // 30 minutes
+            expires_at: crate::subsystems::time::get_timestamp_nanos() + 1_800_000_000_000, /* 30 minutes */
         })
     }
 }
@@ -1069,7 +1102,8 @@ impl ReportFormatter for HtmlFormatter {
 
 impl HtmlFormatter {
     fn format_findings(&self, findings: &[Finding]) -> String {
-        findings.iter()
+        findings
+            .iter()
             .map(|f| {
                 let class = match f.severity {
                     FindingSeverity::Critical => "critical",
@@ -1095,7 +1129,8 @@ impl HtmlFormatter {
     }
 
     fn format_recommendations(&self, recommendations: &[Recommendation]) -> String {
-        recommendations.iter()
+        recommendations
+            .iter()
             .map(|r| {
                 format!(
                     r#"<div class="finding">
@@ -1133,7 +1168,8 @@ impl PdfFormatter {
 impl ReportFormatter for PdfFormatter {
     fn format_report(&mut self, _data: &ReportData) -> Result<Vec<u8>, &'static str> {
         // 简化的PDF生成
-        let pdf_content = "%PDF-1.4\n1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\n...\n%%EOF";
+        let pdf_content =
+            "%PDF-1.4\n1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\n...\n%%EOF";
         Ok(pdf_content.as_bytes().to_vec())
     }
 

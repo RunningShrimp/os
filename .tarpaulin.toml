@@ -1,0 +1,31 @@
+# Tarpaulin Configuration File
+# See https://github.com/xd009642/tarpaulin for more options
+
+[coverage]
+# Output formats
+out = ["Html", "Xml"]
+
+# Coverage thresholds
+line-coverage = 80
+branch-coverage = 70
+
+[coverage.output]
+# Directory for coverage reports
+directory = "./coverage"
+
+[coverage.run]
+# Types of coverage to track
+types = ["Lines", "Branches", "Functions", "Regions"]
+
+[coverage.report]
+# Show missing lines in output
+show-missing-lines = 100
+
+[coverage.files]
+# Exclude specific files or directories if needed
+# exclude = ["*/tests/*", "*/benches/*"]
+
+[coverage.ignore]
+# Ignore specific modules or paths
+# modules = []
+# paths = []

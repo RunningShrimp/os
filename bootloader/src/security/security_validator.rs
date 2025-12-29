@@ -1,6 +1,5 @@
 // Security validation framework for bootloader
 
-
 /// Security level for boot process
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -19,11 +18,11 @@ pub enum SecurityLevel {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct KernelSignature {
-    pub magic: u32,      // 0x4B53494E = "KSIN"
+    pub magic: u32, // 0x4B53494E = "KSIN"
     pub version: u32,
-    pub signature: [u8; 256], // RSA-2048 signature
+    pub signature: [u8; 256],      // RSA-2048 signature
     pub public_key_hash: [u8; 32], // SHA-256 of public key
-    pub kernel_hash: [u8; 32], // SHA-256 of kernel
+    pub kernel_hash: [u8; 32],     // SHA-256 of kernel
 }
 
 impl KernelSignature {
@@ -124,10 +123,7 @@ impl SecurityValidator {
     }
 
     /// Validate kernel entry point
-    pub fn validate_kernel_entry_point(
-        &mut self,
-        entry_point: u64,
-    ) -> Result<(), &'static str> {
+    pub fn validate_kernel_entry_point(&mut self, entry_point: u64) -> Result<(), &'static str> {
         crate::drivers::console::write_str("Validating kernel entry point\n");
 
         // Entry point must be in valid memory range
@@ -153,7 +149,7 @@ impl SecurityValidator {
             SecurityLevel::None => {
                 crate::drivers::console::write_str("Skipping signature validation\n");
                 Ok(())
-            }
+            },
             SecurityLevel::Basic => {
                 // Just validate magic
                 if !signature.is_valid() {
@@ -162,7 +158,7 @@ impl SecurityValidator {
                 self.kernel_signature = Some(*signature);
                 self.validation_results[1].passed = true;
                 Ok(())
-            }
+            },
             SecurityLevel::Full | SecurityLevel::Secure => {
                 if !signature.is_valid() {
                     return Err("Invalid kernel signature magic");
@@ -175,15 +171,12 @@ impl SecurityValidator {
                 self.kernel_signature = Some(*signature);
                 self.validation_results[1].passed = true;
                 Ok(())
-            }
+            },
         }
     }
 
     /// Setup memory protection region
-    pub fn add_protected_region(
-        &mut self,
-        region: MemoryProtection,
-    ) -> Result<(), &'static str> {
+    pub fn add_protected_region(&mut self, region: MemoryProtection) -> Result<(), &'static str> {
         if self.region_count >= self.memory_regions.len() {
             return Err("Memory protection table full");
         }
@@ -219,16 +212,14 @@ impl SecurityValidator {
     }
 
     /// Verify bootloader integrity
-    pub fn verify_bootloader_integrity(
-        &mut self,
-    ) -> Result<(), &'static str> {
+    pub fn verify_bootloader_integrity(&mut self) -> Result<(), &'static str> {
         crate::drivers::console::write_str("Verifying bootloader integrity\n");
 
         match self.security_level {
             SecurityLevel::None | SecurityLevel::Basic => {
                 self.validation_results[3].passed = true;
                 Ok(())
-            }
+            },
             SecurityLevel::Full | SecurityLevel::Secure => {
                 // In real implementation:
                 // 1. Calculate SHA-256 of bootloader code
@@ -238,7 +229,7 @@ impl SecurityValidator {
                 crate::drivers::console::write_str("Bootloader integrity check passed\n");
                 self.validation_results[3].passed = true;
                 Ok(())
-            }
+            },
         }
     }
 
@@ -250,7 +241,7 @@ impl SecurityValidator {
             SecurityLevel::None => {
                 self.validation_results[4].passed = true;
                 Ok(())
-            }
+            },
             SecurityLevel::Basic | SecurityLevel::Full => {
                 // Check for NX bit (no-execute)
                 #[cfg(target_arch = "x86_64")]
@@ -260,7 +251,7 @@ impl SecurityValidator {
                 }
 
                 Ok(())
-            }
+            },
             SecurityLevel::Secure => {
                 // Check for:
                 // - NX/XD bit
@@ -271,7 +262,7 @@ impl SecurityValidator {
                 crate::drivers::console::write_str("CPU security features validated\n");
                 self.validation_results[4].passed = true;
                 Ok(())
-            }
+            },
         }
     }
 
@@ -326,26 +317,24 @@ impl SecurityValidator {
 }
 
 /// Create default security context
-pub fn create_security_context(
-    level: SecurityLevel,
-) -> Result<SecurityValidator, &'static str> {
+pub fn create_security_context(level: SecurityLevel) -> Result<SecurityValidator, &'static str> {
     let mut validator = SecurityValidator::new(level);
 
     // Setup basic kernel protection
     let kernel_region = MemoryProtection::new(
-        0x100000,     // 1MB start
-        0x1000000,    // up to 16MB
-        false,        // not writable after load
-        true,         // executable
+        0x100000,  // 1MB start
+        0x1000000, // up to 16MB
+        false,     // not writable after load
+        true,      // executable
     );
     validator.add_protected_region(kernel_region)?;
 
     // Setup bootloader protection
     let bootloader_region = MemoryProtection::new(
-        0x7C00,       // Real mode entry
-        0x100000,     // 1MB boundary
-        false,        // not writable
-        true,         // executable
+        0x7C00,   // Real mode entry
+        0x100000, // 1MB boundary
+        false,    // not writable
+        true,     // executable
     );
     validator.add_protected_region(bootloader_region)?;
 

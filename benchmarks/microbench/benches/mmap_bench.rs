@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 
 // Mock mmap/munmap implementation for benchmarking
 // In a real scenario, this would call the actual syscalls
@@ -73,10 +73,7 @@ struct MockProcessTable {
 
 impl MockProcessTable {
     fn new() -> Self {
-        Self {
-            processes: BTreeMap::new(),
-            pid_counter: 1,
-        }
+        Self { processes: BTreeMap::new(), pid_counter: 1 }
     }
 
     fn add_process(&mut self, name: &'static str) -> usize {

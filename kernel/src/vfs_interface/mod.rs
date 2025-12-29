@@ -5,9 +5,7 @@
 
 extern crate alloc;
 
-use alloc::sync::Arc;
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{string::String, sync::Arc, vec::Vec};
 
 // ============================================================================
 // VFS Core Types
@@ -18,9 +16,15 @@ use alloc::vec::Vec;
 pub struct FileMode(pub u32);
 
 impl FileMode {
-    pub const fn empty() -> Self { FileMode(0) }
-    pub const fn from_bits(bits: u32) -> Self { FileMode(bits) }
-    pub const fn bits(&self) -> u32 { self.0 }
+    pub const fn empty() -> Self {
+        FileMode(0)
+    }
+    pub const fn from_bits(bits: u32) -> Self {
+        FileMode(bits)
+    }
+    pub const fn bits(&self) -> u32 {
+        self.0
+    }
 }
 
 /// File type enumeration
@@ -77,7 +81,7 @@ use crate::subsystems::syscalls::fs::service::FilesystemStats;
 pub trait FileSystemType: Send + Sync {
     /// 获取文件系统名称
     fn name(&self) -> &str;
-    
+
     /// 挂载文件系统
     fn mount(&self, device: Option<&str>, flags: u32) -> Result<Arc<dyn SuperBlock>, VfsError>;
 }
@@ -86,10 +90,10 @@ pub trait FileSystemType: Send + Sync {
 pub trait SuperBlock: Send + Sync {
     /// 获取根 inode
     fn root(&self) -> Arc<dyn Inode>;
-    
+
     /// 卸载文件系统
     fn unmount(&self) -> Result<(), VfsError>;
-    
+
     /// 获取文件系统统计信息
     fn statfs(&self) -> Result<FilesystemStats, VfsError>;
 }
@@ -98,40 +102,45 @@ pub trait SuperBlock: Send + Sync {
 pub trait Inode: Send + Sync {
     /// 获取文件属性
     fn getattr(&self) -> Result<FileAttr, VfsError>;
-    
+
     /// 读取数据
     fn read(&self, offset: u64, buf: &mut [u8]) -> Result<usize, VfsError>;
-    
+
     /// 写入数据
     fn write(&self, offset: u64, buf: &[u8]) -> Result<usize, VfsError>;
-    
+
     /// 获取目录项
     fn readdir(&self) -> Result<Vec<DirEntry>, VfsError>;
-    
+
     /// 查找子节点
     fn lookup(&self, name: &str) -> Result<Arc<dyn Inode>, VfsError>;
-    
+
     /// 创建子节点
-    fn create(&self, name: &str, mode: FileMode, file_type: FileType) -> Result<Arc<dyn Inode>, VfsError>;
-    
+    fn create(
+        &self,
+        name: &str,
+        mode: FileMode,
+        file_type: FileType,
+    ) -> Result<Arc<dyn Inode>, VfsError>;
+
     /// 删除节点
     fn unlink(&self, name: &str) -> Result<(), VfsError>;
-    
+
     /// 创建目录
     fn mkdir(&self, name: &str, mode: FileMode) -> Result<Arc<dyn Inode>, VfsError>;
-    
+
     /// 删除目录
     fn rmdir(&self, name: &str) -> Result<(), VfsError>;
-    
+
     /// 获取文件类型
     fn file_type(&self) -> FileType;
-    
+
     /// 获取文件名
     fn name(&self) -> String;
-    
+
     /// 获取父目录
     fn parent(&self) -> Option<Arc<dyn Inode>>;
-    
+
     /// 软链接目标
     fn symlink_target(&self) -> Option<String>;
 }
@@ -140,13 +149,13 @@ pub trait Inode: Send + Sync {
 pub trait Mount: Send + Sync {
     /// 获取挂载点路径
     fn mount_point(&self) -> &str;
-    
+
     /// 获取文件系统类型
     fn filesystem_type(&self) -> &dyn FileSystemType;
-    
+
     /// 获取超级块
     fn superblock(&self) -> Arc<dyn SuperBlock>;
-    
+
     /// 检查是否为根挂载
     fn is_root(&self) -> bool;
 }

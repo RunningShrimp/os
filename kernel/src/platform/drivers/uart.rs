@@ -20,7 +20,7 @@ mod imp {
 
     // Line Status Register bits
     const LSR_RX_READY: u8 = 1 << 0; // Data ready
-    const LSR_TX_IDLE: u8 = 1 << 5;  // THR empty
+    const LSR_TX_IDLE: u8 = 1 << 5; // THR empty
 
     #[inline]
     fn reg(offset: usize) -> *mut u8 {
@@ -116,13 +116,13 @@ mod imp {
     const UART_BASE: usize = 0x09000000;
 
     // Register offsets (32-bit aligned)
-    const DR: usize = 0x00;    // Data Register
-    const FR: usize = 0x18;    // Flag Register
-    const IBRD: usize = 0x24;  // Integer Baud Rate
-    const FBRD: usize = 0x28;  // Fractional Baud Rate
+    const DR: usize = 0x00; // Data Register
+    const FR: usize = 0x18; // Flag Register
+    const IBRD: usize = 0x24; // Integer Baud Rate
+    const FBRD: usize = 0x28; // Fractional Baud Rate
     const LCR_H: usize = 0x2C; // Line Control Register
-    const CR: usize = 0x30;    // Control Register
-    const IMSC: usize = 0x38;  // Interrupt Mask Set/Clear
+    const CR: usize = 0x30; // Control Register
+    const IMSC: usize = 0x38; // Interrupt Mask Set/Clear
 
     // Flag Register bits
     const FR_RXFE: u32 = 1 << 4; // Receive FIFO empty

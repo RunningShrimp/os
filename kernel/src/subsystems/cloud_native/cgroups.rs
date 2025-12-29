@@ -5,15 +5,18 @@
 
 extern crate alloc;
 
-use alloc::format;
-use crate::reliability::{EINVAL, ENOENT, ENOMEM, EIO, EACCES};
-use alloc::collections::BTreeMap;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::sync::Arc;
+use alloc::{
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
+
 use spin::Mutex;
-use alloc::vec;
-use alloc::vec::Vec;
+
+use crate::reliability::{EACCES, EINVAL, EIO, ENOENT, ENOMEM};
 
 /// cgroup版本
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -242,53 +245,68 @@ impl Cgroup {
 
         // 初始化子系统统计
         if config.cpu.is_some() {
-            subsystem_stats.insert(CgroupSubsystem::Cpu, CgroupSubsystemStats {
-                name: "cpu".to_string(),
-                enabled: true,
-                current_value: None,
-                max_value: None,
-                usage_percent: None,
-            });
+            subsystem_stats.insert(
+                CgroupSubsystem::Cpu,
+                CgroupSubsystemStats {
+                    name: "cpu".to_string(),
+                    enabled: true,
+                    current_value: None,
+                    max_value: None,
+                    usage_percent: None,
+                },
+            );
         }
 
         if config.memory.is_some() {
-            subsystem_stats.insert(CgroupSubsystem::Memory, CgroupSubsystemStats {
-                name: "memory".to_string(),
-                enabled: true,
-                current_value: None,
-                max_value: None,
-                usage_percent: None,
-            });
+            subsystem_stats.insert(
+                CgroupSubsystem::Memory,
+                CgroupSubsystemStats {
+                    name: "memory".to_string(),
+                    enabled: true,
+                    current_value: None,
+                    max_value: None,
+                    usage_percent: None,
+                },
+            );
         }
 
         if config.io.is_some() {
-            subsystem_stats.insert(CgroupSubsystem::Io, CgroupSubsystemStats {
-                name: "io".to_string(),
-                enabled: true,
-                current_value: None,
-                max_value: None,
-                usage_percent: None,
-            });
+            subsystem_stats.insert(
+                CgroupSubsystem::Io,
+                CgroupSubsystemStats {
+                    name: "io".to_string(),
+                    enabled: true,
+                    current_value: None,
+                    max_value: None,
+                    usage_percent: None,
+                },
+            );
         }
 
         if config.blkio.is_some() {
-            subsystem_stats.insert(CgroupSubsystem::Blkio, CgroupSubsystemStats {
-                name: "blkio".to_string(),
-                enabled: true,
-                current_value: None,
-                max_value: None,
-                usage_percent: None,
-            });
+            subsystem_stats.insert(
+                CgroupSubsystem::Blkio,
+                CgroupSubsystemStats {
+                    name: "blkio".to_string(),
+                    enabled: true,
+                    current_value: None,
+                    max_value: None,
+                    usage_percent: None,
+                },
+            );
         }
 
         if config.pids.is_some() {
-            subsystem_stats.insert(CgroupSubsystem::Pids, CgroupSubsystemStats {
-                name: "pids".to_string(),
-                enabled: true,
-                current_value: None,
-                max_value: None,
-                usage_percent: None,
-            });
+            subsystem_stats.insert(
+                CgroupSubsystem::Pids,
+                CgroupSubsystemStats {
+                    name: "pids".to_string(),
+                    enabled: true,
+                    current_value: None,
+                    max_value: None,
+                    usage_percent: None,
+                },
+            );
         }
 
         Self {
@@ -296,10 +314,7 @@ impl Cgroup {
             version,
             config,
             processes: Arc::new(Mutex::new(Vec::new())),
-            stats: Arc::new(Mutex::new(CgroupStats {
-                path: String::new(),
-                subsystem_stats,
-            })),
+            stats: Arc::new(Mutex::new(CgroupStats { path: String::new(), subsystem_stats })),
             active: false,
         }
     }
@@ -394,11 +409,11 @@ impl Cgroup {
             CgroupVersion::V1 => {
                 // 创建v1 cgroup目录
                 self.create_v1_cgroup_directory()
-            }
+            },
             CgroupVersion::V2 => {
                 // 创建v2 cgroup目录
                 self.create_v2_cgroup_directory()
-            }
+            },
         }
     }
 
@@ -487,16 +502,20 @@ impl Cgroup {
                 if let Some(ref cpus) = config.cpus {
                     self.write_cgroup_file("cpuset", "cpuset.cpus", cpus)?;
                 }
-            }
+            },
             CgroupVersion::V2 => {
                 // 配置v2 CPU子系统
                 if let Some(quota) = config.quota {
-                    self.write_cgroup_file("", "cpu.max", &format!("{} {}", quota, config.period.unwrap_or(1000000)))?;
+                    self.write_cgroup_file(
+                        "",
+                        "cpu.max",
+                        &format!("{} {}", quota, config.period.unwrap_or(1000000)),
+                    )?;
                 }
                 if let Some(shares) = config.shares {
                     self.write_cgroup_file("", "cpu.weight", &shares.to_string())?;
                 }
-            }
+            },
         }
         Ok(())
     }
@@ -509,12 +528,16 @@ impl Cgroup {
                     self.write_cgroup_file("memory", "memory.limit_in_bytes", &limit.to_string())?;
                 }
                 if let Some(swap_limit) = config.swap_limit {
-                    self.write_cgroup_file("memory", "memory.memsw.limit_in_bytes", &swap_limit.to_string())?;
+                    self.write_cgroup_file(
+                        "memory",
+                        "memory.memsw.limit_in_bytes",
+                        &swap_limit.to_string(),
+                    )?;
                 }
                 if config.oom_control.oom_kill_disable {
                     self.write_cgroup_file("memory", "memory.oom_control", "1")?;
                 }
-            }
+            },
             CgroupVersion::V2 => {
                 if let Some(limit) = config.limit {
                     self.write_cgroup_file("", "memory.max", &limit.to_string())?;
@@ -522,7 +545,7 @@ impl Cgroup {
                 if config.oom_control.oom_kill_disable {
                     self.write_cgroup_file("", "memory.oom.group", "1")?;
                 }
-            }
+            },
         }
         Ok(())
     }
@@ -537,32 +560,42 @@ impl Cgroup {
                 }
                 if let Some(ref max_config) = config.max {
                     for io_max in max_config {
-                        let config_str = format!("{}:{} {} {} {} {}",
-                            io_max.major, io_max.minor,
+                        let config_str = format!(
+                            "{}:{} {} {} {} {}",
+                            io_max.major,
+                            io_max.minor,
                             io_max.read_bps.unwrap_or(0),
                             io_max.write_bps.unwrap_or(0),
                             io_max.read_iops.unwrap_or(0),
-                            io_max.write_iops.unwrap_or(0));
-                        self.write_cgroup_file("blkio", "blkio.throttle.read_bps_device", &config_str)?;
+                            io_max.write_iops.unwrap_or(0)
+                        );
+                        self.write_cgroup_file(
+                            "blkio",
+                            "blkio.throttle.read_bps_device",
+                            &config_str,
+                        )?;
                     }
                 }
-            }
+            },
             CgroupVersion::V2 => {
                 if let Some(weight) = config.weight {
                     self.write_cgroup_file("", "io.weight", &format!("default {}", weight))?;
                 }
                 if let Some(ref max_config) = config.max {
                     for io_max in max_config {
-                        let config_str = format!("{}:{} rbps={} wbps={} riops={} wiops={}",
-                            io_max.major, io_max.minor,
+                        let config_str = format!(
+                            "{}:{} rbps={} wbps={} riops={} wiops={}",
+                            io_max.major,
+                            io_max.minor,
                             io_max.read_bps.unwrap_or(0),
                             io_max.write_bps.unwrap_or(0),
                             io_max.read_iops.unwrap_or(0),
-                            io_max.write_iops.unwrap_or(0));
+                            io_max.write_iops.unwrap_or(0)
+                        );
                         self.write_cgroup_file("", "io.max", &config_str)?;
                     }
                 }
-            }
+            },
         }
         Ok(())
     }
@@ -574,16 +607,22 @@ impl Cgroup {
         }
         if let Some(ref weight_devices) = config.weight_device {
             for weight_device in weight_devices {
-                let config_str = format!("{}:{} {}", weight_device.major, weight_device.minor, weight_device.weight);
+                let config_str = format!(
+                    "{}:{} {}",
+                    weight_device.major, weight_device.minor, weight_device.weight
+                );
                 self.write_cgroup_file("blkio", "blkio.weight_device", &config_str)?;
             }
         }
         if let Some(ref throttle) = config.throttle {
             for throttle_config in throttle {
-                let config_str = format!("{}:{} {} {}",
-                    throttle_config.major, throttle_config.minor,
+                let config_str = format!(
+                    "{}:{} {} {}",
+                    throttle_config.major,
+                    throttle_config.minor,
                     throttle_config.read_bps.unwrap_or(0),
-                    throttle_config.write_bps.unwrap_or(0));
+                    throttle_config.write_bps.unwrap_or(0)
+                );
                 self.write_cgroup_file("blkio", "blkio.throttle.read_bps_device", &config_str)?;
             }
         }
@@ -630,11 +669,11 @@ impl Cgroup {
                 if self.config.pids.is_some() {
                     self.write_cgroup_file("pids", "tasks", &pid.to_string())?;
                 }
-            }
+            },
             CgroupVersion::V2 => {
                 // v2：统一进程文件
                 self.write_cgroup_file("", "cgroup.procs", &pid.to_string())?;
-            }
+            },
         }
         Ok(())
     }
@@ -649,11 +688,11 @@ impl Cgroup {
                 self.write_cgroup_file("memory", "tasks", &pid.to_string())?;
                 self.write_cgroup_file("blkio", "tasks", &pid.to_string())?;
                 self.write_cgroup_file("pids", "tasks", &pid.to_string())?;
-            }
+            },
             CgroupVersion::V2 => {
                 // v2：移除进程到父cgroup
                 self.write_cgroup_file("", "cgroup.procs", &pid.to_string())?;
-            }
+            },
         }
         Ok(())
     }
@@ -682,11 +721,11 @@ impl Cgroup {
                 if self.config.pids.is_some() {
                     self.remove_subsystem_directory("pids")?;
                 }
-            }
+            },
             CgroupVersion::V2 => {
                 // 删除v2统一目录
                 crate::println!("[cgroups] Removing unified cgroup directory: {}", self.path);
-            }
+            },
         }
         Ok(())
     }
@@ -707,11 +746,18 @@ impl Cgroup {
     }
 
     /// 更新子系统统计信息
-    fn update_subsystem_stats(&self, subsystem_stats: &mut BTreeMap<CgroupSubsystem, CgroupSubsystemStats>) {
+    fn update_subsystem_stats(
+        &self,
+        subsystem_stats: &mut BTreeMap<CgroupSubsystem, CgroupSubsystemStats>,
+    ) {
         // 更新CPU统计
         if let Some(stats) = subsystem_stats.get_mut(&CgroupSubsystem::Cpu) {
             stats.current_value = Some(self.get_cpu_usage());
-            stats.max_value = self.config.cpu.as_ref().and_then(|c| c.quota.map(|q| q as u64));
+            stats.max_value = self
+                .config
+                .cpu
+                .as_ref()
+                .and_then(|c| c.quota.map(|q| q as u64));
             if let (Some(current), Some(max)) = (stats.current_value, stats.max_value) {
                 stats.usage_percent = Some((current as f64 / max as f64) * 100.0);
             }
@@ -730,7 +776,11 @@ impl Cgroup {
         if let Some(stats) = subsystem_stats.get_mut(&CgroupSubsystem::Pids) {
             let current_process_count = self.processes.lock().len() as u64;
             stats.current_value = Some(current_process_count);
-            stats.max_value = self.config.pids.as_ref().and_then(|c| c.max.map(|m| m as u64));
+            stats.max_value = self
+                .config
+                .pids
+                .as_ref()
+                .and_then(|c| c.max.map(|m| m as u64));
             if let (Some(current), Some(max)) = (stats.current_value, stats.max_value) {
                 stats.usage_percent = Some((current as f64 / max as f64) * 100.0);
             }
@@ -768,15 +818,15 @@ impl CgroupManager {
             CgroupVersion::V2 => "/sys/fs/cgroup/unified".to_string(),
         };
 
-        Self {
-            cgroups: BTreeMap::new(),
-            version,
-            root_path,
-        }
+        Self { cgroups: BTreeMap::new(), version, root_path }
     }
 
     /// 创建cgroup
-    pub fn create_cgroup(&mut self, name: &str, config: CgroupResourceConfig) -> Result<Arc<Mutex<Cgroup>>, i32> {
+    pub fn create_cgroup(
+        &mut self,
+        name: &str,
+        config: CgroupResourceConfig,
+    ) -> Result<Arc<Mutex<Cgroup>>, i32> {
         let path = format!("{}/{}", self.root_path, name);
         let mut cgroup = Cgroup::new(path.clone(), self.version, config);
 
@@ -813,7 +863,8 @@ impl CgroupManager {
 
     /// 获取所有cgroup统计信息
     pub fn get_all_stats(&self) -> Vec<CgroupStats> {
-        self.cgroups.values()
+        self.cgroups
+            .values()
             .map(|cgroup| {
                 let cg = cgroup.lock();
                 cg.get_stats()
@@ -849,30 +900,22 @@ pub fn initialize_cgroups() -> Result<(), i32> {
 
 /// 获取v1 cgroup管理器
 pub fn get_v1_cgroup_manager() -> Option<&'static CgroupManager> {
-    unsafe {
-        CGROUP_MANAGER_V1.as_ref()
-    }
+    unsafe { CGROUP_MANAGER_V1.as_ref() }
 }
 
 /// 获取v1 cgroup管理器（可变）
 pub fn get_v1_cgroup_manager_mut() -> Option<&'static mut CgroupManager> {
-    unsafe {
-        CGROUP_MANAGER_V1.as_mut()
-    }
+    unsafe { CGROUP_MANAGER_V1.as_mut() }
 }
 
 /// 获取v2 cgroup管理器
 pub fn get_v2_cgroup_manager() -> Option<&'static CgroupManager> {
-    unsafe {
-        CGROUP_MANAGER_V2.as_ref()
-    }
+    unsafe { CGROUP_MANAGER_V2.as_ref() }
 }
 
 /// 获取v2 cgroup管理器（可变）
 pub fn get_v2_cgroup_manager_mut() -> Option<&'static mut CgroupManager> {
-    unsafe {
-        CGROUP_MANAGER_V2.as_mut()
-    }
+    unsafe { CGROUP_MANAGER_V2.as_mut() }
 }
 
 /// 设置内存限制
@@ -1039,7 +1082,7 @@ pub fn get_process_cpu_limits(pid: u32) -> Option<(i64, u64)> {
     let cg = cgroup.lock();
     if let Some(ref cpu_config) = cg.config.cpu {
         Some((
-            cpu_config.quota.unwrap_or(-1), // -1 means unlimited
+            cpu_config.quota.unwrap_or(-1),      // -1 means unlimited
             cpu_config.period.unwrap_or(100000), // Default 100ms
         ))
     } else {
@@ -1081,16 +1124,14 @@ pub fn set_disk_limit_for_process(pid: u32, limit: u64) -> Result<(), i32> {
         memory: None,
         io: Some(IoConfig {
             weight: None,
-            max: Some(vec![
-                IoMax {
-                    major: 8, // 假设是sda设备
-                    minor: 0,
-                    read_bps: Some(limit),
-                    write_bps: Some(limit),
-                    read_iops: None,
-                    write_iops: None,
-                }
-            ]),
+            max: Some(vec![IoMax {
+                major: 8, // 假设是sda设备
+                minor: 0,
+                read_bps: Some(limit),
+                write_bps: Some(limit),
+                read_iops: None,
+                write_iops: None,
+            }]),
         }),
         blkio: None,
         pids: None,

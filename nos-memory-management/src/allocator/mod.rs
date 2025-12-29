@@ -3,8 +3,8 @@
 //! This module contains various memory allocator implementations.
 
 pub mod buddy;
-pub mod slab;
 pub mod mempool;
+pub mod slab;
 pub mod tiered;
 
 use nos_api::Result;

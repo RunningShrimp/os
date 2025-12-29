@@ -8,25 +8,24 @@
 //! - 安全字符串操作：strlcpy, strlcat等
 //! - 高性能算法优化
 
-use core::ffi::{c_char, c_int, c_void, c_double};
-
 pub type SizeT = usize;
 
 #[allow(non_camel_case_types)]
 pub type size_t = SizeT;
-use crate::libc::error::set_errno;
-use crate::libc::error::errno::EINVAL;
-use crate::reliability::ERANGE;
+use crate::{
+    libc::error::{errno::EINVAL, set_errno},
+    reliability::ERANGE,
+};
 
 /// 字符分类常量
 pub mod char_class {
-    pub const _ISupper: u16 = 1;   /* Uppercase */
-    pub const _ISlower: u16 = 2;   /* Lowercase */
-    pub const _ISalpha: u16 = 4;   /* Alphabetic */
-    pub const _ISdigit: u16 = 8;   /* Numeric */
-    pub const _ISxdigit: u16 = 16;  /* Hexadecimal numeric */
-    pub const _ISspace: u16 = 32;  /* Whitespace */
-    pub const _ISprint: u16 = 64;  /* Printable */
+    pub const _ISupper: u16 = 1; /* Uppercase */
+    pub const _ISlower: u16 = 2; /* Lowercase */
+    pub const _ISalpha: u16 = 4; /* Alphabetic */
+    pub const _ISdigit: u16 = 8; /* Numeric */
+    pub const _ISxdigit: u16 = 16; /* Hexadecimal numeric */
+    pub const _ISspace: u16 = 32; /* Whitespace */
+    pub const _ISprint: u16 = 64; /* Printable */
     pub const _ISgraph: u16 = 128; /* Graphical */
     pub const _ISblank: u16 = 256; /* Blank (space or tab) */
     pub const _IScntrl: u16 = 512; /* Control character */
@@ -225,7 +224,12 @@ impl EnhancedStringLib {
     }
 
     /// 线程安全的字符串分割函数
-    pub fn strtok_r(&self, s: *mut c_char, delim: *const c_char, saveptr: &mut *mut c_char) -> *mut c_char {
+    pub fn strtok_r(
+        &self,
+        s: *mut c_char,
+        delim: *const c_char,
+        saveptr: &mut *mut c_char,
+    ) -> *mut c_char {
         if delim.is_null() || saveptr.is_null() {
             return core::ptr::null_mut();
         }
@@ -240,7 +244,10 @@ impl EnhancedStringLib {
         };
 
         // 跳过开头的分隔符
-        while !str.is_null() && unsafe { *str != 0 } && !self.strchr(delim, unsafe { *str } as c_int).is_null() {
+        while !str.is_null()
+            && unsafe { *str != 0 }
+            && !self.strchr(delim, unsafe { *str } as c_int).is_null()
+        {
             str = unsafe { str.add(1) };
         }
 
@@ -251,7 +258,10 @@ impl EnhancedStringLib {
 
         // 找到下一个分隔符
         let token = str;
-        while !str.is_null() && unsafe { *str != 0 } && self.strchr(delim, unsafe { *str } as c_int).is_null() {
+        while !str.is_null()
+            && unsafe { *str != 0 }
+            && self.strchr(delim, unsafe { *str } as c_int).is_null()
+        {
             str = unsafe { str.add(1) };
         }
 
@@ -501,11 +511,7 @@ impl EnhancedStringLib {
     /// 检查字符是否为数字
     pub fn isdigit(&self, c: c_int) -> c_int {
         let ch = c as u8;
-        if ch >= b'0' && ch <= b'9' {
-            1
-        } else {
-            0
-        }
+        if ch >= b'0' && ch <= b'9' { 1 } else { 0 }
     }
 
     /// 检查字符是否为字母或数字
@@ -516,9 +522,7 @@ impl EnhancedStringLib {
     /// 检查字符是否为十六进制数字
     pub fn isxdigit(&self, c: c_int) -> c_int {
         let ch = c as u8;
-        if (ch >= b'0' && ch <= b'9') ||
-           (ch >= b'A' && ch <= b'F') ||
-           (ch >= b'a' && ch <= b'f') {
+        if (ch >= b'0' && ch <= b'9') || (ch >= b'A' && ch <= b'F') || (ch >= b'a' && ch <= b'f') {
             1
         } else {
             0
@@ -528,7 +532,8 @@ impl EnhancedStringLib {
     /// 检查字符是否为空白字符
     pub fn isspace(&self, c: c_int) -> c_int {
         let ch = c as u8;
-        if ch == b' ' || ch == b'\t' || ch == b'\n' || ch == b'\r' || ch == b'\x0B' || ch == b'\x0C' {
+        if ch == b' ' || ch == b'\t' || ch == b'\n' || ch == b'\r' || ch == b'\x0B' || ch == b'\x0C'
+        {
             1
         } else {
             0
@@ -538,59 +543,35 @@ impl EnhancedStringLib {
     /// 检查字符是否为可打印字符
     pub fn isprint(&self, c: c_int) -> c_int {
         let ch = c as u8;
-        if ch >= 32 && ch <= 126 {
-            1
-        } else {
-            0
-        }
+        if ch >= 32 && ch <= 126 { 1 } else { 0 }
     }
 
     /// 检查字符是否为控制字符
     pub fn iscntrl(&self, c: c_int) -> c_int {
         let ch = c as u8;
-        if ch < 32 || ch == 127 {
-            1
-        } else {
-            0
-        }
+        if ch < 32 || ch == 127 { 1 } else { 0 }
     }
 
     /// 检查字符是否为小写字母
     pub fn islower(&self, c: c_int) -> c_int {
         let ch = c as u8;
-        if ch >= b'a' && ch <= b'z' {
-            1
-        } else {
-            0
-        }
+        if ch >= b'a' && ch <= b'z' { 1 } else { 0 }
     }
 
     /// 检查字符是否为大写字母
     pub fn isupper(&self, c: c_int) -> c_int {
         let ch = c as u8;
-        if ch >= b'A' && ch <= b'Z' {
-            1
-        } else {
-            0
-        }
+        if ch >= b'A' && ch <= b'Z' { 1 } else { 0 }
     }
 
     /// 转换为小写字母
     pub fn tolower(&self, c: c_int) -> c_int {
-        if self.isupper(c) != 0 {
-            c + 32
-        } else {
-            c
-        }
+        if self.isupper(c) != 0 { c + 32 } else { c }
     }
 
     /// 转换为大写字母
     pub fn toupper(&self, c: c_int) -> c_int {
-        if self.islower(c) != 0 {
-            c - 32
-        } else {
-            c
-        }
+        if self.islower(c) != 0 { c - 32 } else { c }
     }
 
     // === 内存操作函数 ===
@@ -649,8 +630,16 @@ impl EnhancedStringLib {
             for i in 0..n {
                 let b1 = *ptr1.add(i);
                 let b2 = *ptr2.add(i);
-                let c1 = if b'A' <= b1 && b1 <= b'Z' { b1 + 32 } else { b1 };
-                let c2 = if b'A' <= b2 && b2 <= b'Z' { b2 + 32 } else { b2 };
+                let c1 = if b'A' <= b1 && b1 <= b'Z' {
+                    b1 + 32
+                } else {
+                    b1
+                };
+                let c2 = if b'A' <= b2 && b2 <= b'Z' {
+                    b2 + 32
+                } else {
+                    b2
+                };
                 if c1 != c2 {
                     return (c1 as c_int) - (c2 as c_int);
                 }
@@ -699,7 +688,7 @@ impl EnhancedStringLib {
                 core::ptr::copy_nonoverlapping(
                     src as *const u8,
                     dst.add(dst_len) as *mut u8,
-                    copy_len
+                    copy_len,
                 );
                 *dst.add(dst_len + copy_len) = 0;
             }
@@ -789,27 +778,49 @@ pub fn strtod(nptr: *const c_char, endptr: *mut *mut c_char) -> c_double {
     STRING_LIB.strtod(nptr, endptr)
 }
 #[inline]
-pub fn isalpha(c: c_int) -> c_int { STRING_LIB.isalpha(c) }
+pub fn isalpha(c: c_int) -> c_int {
+    STRING_LIB.isalpha(c)
+}
 #[inline]
-pub fn isdigit(c: c_int) -> c_int { STRING_LIB.isdigit(c) }
+pub fn isdigit(c: c_int) -> c_int {
+    STRING_LIB.isdigit(c)
+}
 #[inline]
-pub fn isalnum(c: c_int) -> c_int { STRING_LIB.isalnum(c) }
+pub fn isalnum(c: c_int) -> c_int {
+    STRING_LIB.isalnum(c)
+}
 #[inline]
-pub fn isxdigit(c: c_int) -> c_int { STRING_LIB.isxdigit(c) }
+pub fn isxdigit(c: c_int) -> c_int {
+    STRING_LIB.isxdigit(c)
+}
 #[inline]
-pub fn isspace(c: c_int) -> c_int { STRING_LIB.isspace(c) }
+pub fn isspace(c: c_int) -> c_int {
+    STRING_LIB.isspace(c)
+}
 #[inline]
-pub fn isprint(c: c_int) -> c_int { STRING_LIB.isprint(c) }
+pub fn isprint(c: c_int) -> c_int {
+    STRING_LIB.isprint(c)
+}
 #[inline]
-pub fn iscntrl(c: c_int) -> c_int { STRING_LIB.iscntrl(c) }
+pub fn iscntrl(c: c_int) -> c_int {
+    STRING_LIB.iscntrl(c)
+}
 #[inline]
-pub fn islower(c: c_int) -> c_int { STRING_LIB.islower(c) }
+pub fn islower(c: c_int) -> c_int {
+    STRING_LIB.islower(c)
+}
 #[inline]
-pub fn isupper(c: c_int) -> c_int { STRING_LIB.isupper(c) }
+pub fn isupper(c: c_int) -> c_int {
+    STRING_LIB.isupper(c)
+}
 #[inline]
-pub fn tolower(c: c_int) -> c_int { STRING_LIB.tolower(c) }
+pub fn tolower(c: c_int) -> c_int {
+    STRING_LIB.tolower(c)
+}
 #[inline]
-pub fn toupper(c: c_int) -> c_int { STRING_LIB.toupper(c) }
+pub fn toupper(c: c_int) -> c_int {
+    STRING_LIB.toupper(c)
+}
 #[inline]
 pub fn memchr(s: *const c_void, c: c_int, n: size_t) -> *const c_void {
     STRING_LIB.memchr(s, c, n)

@@ -2,7 +2,9 @@
 //!
 //! Tests for chdir, getcwd, link, stat, lstat system calls
 
-use kernel::tests::common::{IntegrationTestResult, integration_test_assert, integration_test_assert_eq};
+use kernel::tests::common::{
+    IntegrationTestResult, integration_test_assert, integration_test_assert_eq,
+};
 
 /// Test chdir system call
 pub fn test_chdir() -> IntegrationTestResult {
@@ -12,14 +14,20 @@ pub fn test_chdir() -> IntegrationTestResult {
     let path = alloc::format!("/tmp/{}", dir_name);
 
     // Ensure /tmp exists (best-effort)
-    let _ = crate::vfs::vfs().mkdir("/tmp", crate::vfs::FileMode::new(crate::vfs::FileMode::S_IFDIR | crate::vfs::FileMode::S_IRWXU));
+    let _ = crate::vfs::vfs().mkdir(
+        "/tmp",
+        crate::vfs::FileMode::new(crate::vfs::FileMode::S_IFDIR | crate::vfs::FileMode::S_IRWXU),
+    );
 
-    crate::vfs::vfs().mkdir(&path, crate::vfs::FileMode::new(crate::vfs::FileMode::S_IFDIR | crate::vfs::FileMode::S_IRWXU))?;
+    crate::vfs::vfs().mkdir(
+        &path,
+        crate::vfs::FileMode::new(crate::vfs::FileMode::S_IFDIR | crate::vfs::FileMode::S_IRWXU),
+    )?;
 
     // Verify the created directory is visible and is a directory
     let attr = crate::vfs::vfs().stat(&path)?;
     integration_test_assert!(attr.mode.is_dir(), "created path should be a directory");
-    
+
     Ok(())
 }
 
@@ -32,11 +40,15 @@ pub fn test_getcwd() -> IntegrationTestResult {
 
     let path = alloc::format!("/tmp/{}", fname);
     let stat = crate::vfs::vfs().stat(&path)?;
-    integration_test_assert_eq!(stat.size as usize, content.len(), "file size should match written content");
+    integration_test_assert_eq!(
+        stat.size as usize,
+        content.len(),
+        "file size should match written content"
+    );
 
     // Cleanup
     TestUtils::remove_temp_file(fname)?;
-    
+
     Ok(())
 }
 
@@ -60,7 +72,7 @@ pub fn test_link() -> IntegrationTestResult {
     // Cleanup
     TestUtils::remove_temp_file("link_src.txt")?;
     let _ = crate::vfs::vfs().unlink(linkname);
-    
+
     Ok(())
 }
 
@@ -76,7 +88,7 @@ pub fn test_stat() -> IntegrationTestResult {
     integration_test_assert_eq!(st.size as usize, content.len());
 
     TestUtils::remove_temp_file(fname)?;
-    
+
     Ok(())
 }
 
@@ -96,7 +108,6 @@ pub fn test_lstat() -> IntegrationTestResult {
 
     TestUtils::remove_temp_file(fname)?;
     let _ = crate::vfs::vfs().unlink(link);
-    
+
     Ok(())
 }
-

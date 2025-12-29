@@ -28,17 +28,6 @@ formal_verification = []
 security_audit = []
 advanced_syscalls = []
 
-# Feature flags for conditional compilation
-minimal = []
-embedded = []
-server = ["log", "advanced_syscalls"]
-desktop = ["log", "advanced_syscalls"]
-
-# Additional feature combinations
-full = ["log", "advanced_syscalls", "debug_subsystems"]
-debug = ["log", "debug_subsystems"]
-release = []
-
 [lib]
 name = "nos_syscalls"
 path = "src/lib.rs"

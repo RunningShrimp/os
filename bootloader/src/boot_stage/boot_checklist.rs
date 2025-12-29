@@ -46,10 +46,7 @@ impl BootCheckList {
     }
 
     pub fn all_critical_ok(&self) -> bool {
-        self.console_ok
-            && self.arch_ok
-            && self.memory_ok
-            && self.kernel_loaded_ok
+        self.console_ok && self.arch_ok && self.memory_ok && self.kernel_loaded_ok
     }
 
     pub fn print_checklist(&self) {
@@ -59,11 +56,7 @@ impl BootCheckList {
         crate::drivers::console::write_str("  Architecture: ");
         crate::drivers::console::write_str(if self.arch_ok { "✓\n" } else { "✗\n" });
         crate::drivers::console::write_str("  Interrupts: ");
-        crate::drivers::console::write_str(if self.interrupts_ok {
-            "✓\n"
-        } else {
-            "✗\n"
-        });
+        crate::drivers::console::write_str(if self.interrupts_ok { "✓\n" } else { "✗\n" });
         crate::drivers::console::write_str("  Memory: ");
         crate::drivers::console::write_str(if self.memory_ok { "✓\n" } else { "✗\n" });
         crate::drivers::console::write_str("  Kernel: ");

@@ -6,11 +6,8 @@
 //! - Recovery action execution
 //! - Event logging and history
 
+use alloc::{format, string::String, vec::Vec};
 use core::fmt;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::format;
-
 
 /// Boot recovery error codes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -131,13 +128,7 @@ impl BootEvent {
 
 impl fmt::Display for BootEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "[{}] {}: {}",
-            self.severity_name(),
-            self.event_type,
-            self.message
-        )
+        write!(f, "[{}] {}: {}", self.severity_name(), self.event_type, self.message)
     }
 }
 
@@ -232,10 +223,10 @@ impl BootRecovery {
     pub fn report_error(&mut self, error: RecoveryErrorCode, component: &str) -> bool {
         let mut context = RecoveryContext::new(error);
         context.set_component(component);
-        
+
         let message = format!("Error in {}: {}", component, error);
         self.log_event(BootEvent::error(&message));
-        
+
         self.last_error = error;
         self.contexts.push(context);
         true
@@ -257,23 +248,23 @@ impl BootRecovery {
                 self.safe_mode_enabled = true;
                 self.log_diagnostic("RECOVERY", "Entering safe mode");
                 true
-            }
+            },
             RecoveryAction::Retry => {
                 self.log_diagnostic("RECOVERY", "Retrying failed operation");
                 true
-            }
+            },
             RecoveryAction::UseDefaults => {
                 self.log_diagnostic("RECOVERY", "Using default configuration");
                 true
-            }
+            },
             RecoveryAction::SkipComponent => {
                 self.log_diagnostic("RECOVERY", "Skipping failed component");
                 true
-            }
+            },
             _ => {
                 self.log_diagnostic("RECOVERY", &format!("Executing: {}", action));
                 true
-            }
+            },
         }
     }
 
@@ -323,7 +314,8 @@ impl BootRecovery {
     /// Get detailed diagnostic report
     pub fn diagnostic_report(&self) -> String {
         format!(
-            "BootRecovery {{ last_error: {}, recovery_count: {}, events: {}, errors: {}, safe_mode: {} }}",
+            "BootRecovery {{ last_error: {}, recovery_count: {}, events: {}, errors: {}, \
+             safe_mode: {} }}",
             self.last_error,
             self.recovery_count,
             self.event_count(),
@@ -483,7 +475,7 @@ mod tests {
     fn test_boot_recovery_recommendation() {
         let mut recovery = BootRecovery::new();
         recovery.last_error = RecoveryErrorCode::KernelLoadFailed;
-        
+
         let recommendation = recovery.get_recovery_recommendation();
         assert_eq!(recommendation, Some(RecoveryAction::Retry));
     }
@@ -492,7 +484,7 @@ mod tests {
     fn test_boot_recovery_max_attempts() {
         let mut recovery = BootRecovery::new();
         recovery.set_max_attempts(2);
-        
+
         assert!(recovery.attempt_recovery(RecoveryAction::Retry));
         assert!(recovery.attempt_recovery(RecoveryAction::Retry));
         assert!(!recovery.attempt_recovery(RecoveryAction::Retry));
@@ -504,7 +496,7 @@ mod tests {
         recovery.log_event(BootEvent::info("info"));
         recovery.log_event(BootEvent::error("error"));
         recovery.log_event(BootEvent::critical("critical"));
-        
+
         assert_eq!(recovery.error_count(), 2);
     }
 
@@ -513,7 +505,7 @@ mod tests {
         let mut recovery = BootRecovery::new();
         recovery.log_event(BootEvent::info("event1"));
         recovery.attempt_recovery(RecoveryAction::Retry);
-        
+
         let (recovery_count, event_count, _error_count) = recovery.get_stats();
         assert_eq!(recovery_count, 1);
         assert_eq!(event_count, 1);
@@ -524,7 +516,7 @@ mod tests {
         let mut recovery = BootRecovery::new();
         recovery.log_event(BootEvent::info("test"));
         recovery.attempt_recovery(RecoveryAction::Retry);
-        
+
         assert!(recovery.event_count() > 0);
         recovery.clear_history();
         assert_eq!(recovery.event_count(), 0);
@@ -535,7 +527,7 @@ mod tests {
     fn test_boot_recovery_event_log_export() {
         let mut recovery = BootRecovery::new();
         recovery.log_event(BootEvent::info("Boot started"));
-        
+
         let log = recovery.export_event_log();
         assert!(log.contains("Boot Event Log"));
         assert!(log.contains("Boot started"));

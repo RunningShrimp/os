@@ -6,16 +6,18 @@
 //! to improve I/O performance and reduce disk access.
 
 extern crate alloc;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::collections::{BTreeMap, VecDeque};
-use crate::collections::HashMap;
+use alloc::{
+    collections::{BTreeMap, VecDeque},
+    string::String,
+    vec::Vec,
+};
+
 // use alloc::sync::Arc;
 // use core::sync::atomic::{AtomicU64, AtomicU32, AtomicBool, AtomicU8, Ordering};
 // use crate::subsystems::sync::{Sleeplock, Mutex};
 // use crate::subsystems::fs::fs_impl::{Buf, BufFlags, BufCache, CacheKey};
 use crate::platform::drivers::BlockDevice;
-use crate::error::UnifiedError;
+use crate::{collections::HashMap, error::UnifiedError};
 
 // ============================================================================
 // File System Cache Constants and Types
@@ -373,11 +375,13 @@ impl FsCache {
             stats.total_entries = self.config.max_entries;
         }
 
-        crate::println!("fs_cache: initialized with size {}MB, block size {}B, max entries {}",
-                      self.config.cache_size / (1024 * 1024),
-                      self.config.block_size,
-                      self.config.max_entries);
-        
+        crate::println!(
+            "fs_cache: initialized with size {}MB, block size {}B, max entries {}",
+            self.config.cache_size / (1024 * 1024),
+            self.config.block_size,
+            self.config.max_entries
+        );
+
         Ok(())
     }
 
@@ -416,7 +420,7 @@ impl FsCache {
         stats.max_access_time = 0;
         stats.min_access_time = u64::MAX;
         stats.hit_ratio = 0.0;
-        
+
         self.total_access_time.store(0, Ordering::SeqCst);
         self.min_access_time.store(u64::MAX, Ordering::SeqCst);
         self.max_access_time.store(0, Ordering::SeqCst);
@@ -439,7 +443,7 @@ impl FsCache {
         }
 
         let start_time = self.get_current_time();
-        
+
         let entry = {
             let entries = self.entries.lock();
             entries.get(key).cloned()
@@ -449,25 +453,25 @@ impl FsCache {
             // Update access statistics
             entry.last_access_time = self.get_current_time();
             entry.access_count += 1;
-            
+
             // Update LRU list
             self.update_lru(key);
-            
+
             // Update LFU map
             self.update_lfu(key, entry.access_count);
-            
+
             // Update statistics
             self.update_hit_stats(&entry);
-            
+
             // Update access time statistics
             let access_time = self.get_current_time() - start_time;
             self.update_access_time_stats(access_time);
-            
+
             Some(entry)
         } else {
             // Update miss statistics
             self.update_miss_stats(key);
-            
+
             None
         }
     }
@@ -489,20 +493,21 @@ impl FsCache {
 
         // Update LRU list
         self.add_to_lru(&key);
-        
+
         // Update LFU map
         self.add_to_lfu(&key, 1);
-        
+
         // Update FIFO queue
         self.add_to_fifo(&key);
-        
+
         // Update used size and entries
-        self.used_size.fetch_add(entry.size as u64, Ordering::SeqCst);
+        self.used_size
+            .fetch_add(entry.size as u64, Ordering::SeqCst);
         self.used_entries.fetch_add(1, Ordering::SeqCst);
-        
+
         // Update statistics
         self.update_put_stats(&entry);
-        
+
         Ok(())
     }
 
@@ -519,21 +524,22 @@ impl FsCache {
 
         if let Some(entry) = entry {
             // Update used size and entries
-            self.used_size.fetch_sub(entry.size as u64, Ordering::SeqCst);
+            self.used_size
+                .fetch_sub(entry.size as u64, Ordering::SeqCst);
             self.used_entries.fetch_sub(1, Ordering::SeqCst);
-            
+
             // Remove from LRU list
             self.remove_from_lru(key);
-            
+
             // Remove from LFU map
             self.remove_from_lfu(key);
-            
+
             // Remove from FIFO queue
             self.remove_from_fifo(key);
-            
+
             // Update statistics
             self.update_remove_stats(&entry);
-            
+
             Some(entry)
         } else {
             None
@@ -547,7 +553,7 @@ impl FsCache {
         }
 
         let mut dirty_entries = Vec::new();
-        
+
         // Collect dirty entries
         {
             let entries = self.entries.lock();
@@ -564,7 +570,7 @@ impl FsCache {
                 crate::println!("fs_cache: failed to write entry to disk: {:?}", e);
                 continue;
             }
-            
+
             // Mark entry as clean
             {
                 let mut entries = self.entries.lock();
@@ -573,7 +579,7 @@ impl FsCache {
                     entry.status = CacheEntryStatus::Valid;
                 }
             }
-            
+
             // Update statistics
             {
                 let mut stats = self.stats.lock();
@@ -592,7 +598,7 @@ impl FsCache {
 
         let mut freed_size = 0u64;
         let mut evicted_count = 0u32;
-        
+
         // Evict entries based on policy
         match self.config.eviction_policy {
             CacheEvictionPolicy::LRU => {
@@ -606,7 +612,7 @@ impl FsCache {
                         break;
                     }
                 }
-            }
+            },
             CacheEvictionPolicy::LFU => {
                 while freed_size < required_size {
                     if let Some(key) = self.get_lfu_key() {
@@ -618,7 +624,7 @@ impl FsCache {
                         break;
                     }
                 }
-            }
+            },
             CacheEvictionPolicy::FIFO => {
                 while freed_size < required_size {
                     if let Some(key) = self.get_fifo_key() {
@@ -630,7 +636,7 @@ impl FsCache {
                         break;
                     }
                 }
-            }
+            },
             CacheEvictionPolicy::Clock => {
                 while freed_size < required_size {
                     if let Some(key) = self.get_clock_key() {
@@ -642,13 +648,13 @@ impl FsCache {
                         break;
                     }
                 }
-            }
+            },
             CacheEvictionPolicy::ARC => {
                 self.arc_evict(required_size, &mut freed_size, &mut evicted_count);
-            }
+            },
             CacheEvictionPolicy::TwoQueue => {
                 self.twoq_evict(required_size, &mut freed_size, &mut evicted_count);
-            }
+            },
             CacheEvictionPolicy::Random => {
                 while freed_size < required_size {
                     if let Some(key) = self.get_random_key() {
@@ -660,7 +666,7 @@ impl FsCache {
                         break;
                     }
                 }
-            }
+            },
         }
 
         // Update statistics
@@ -716,11 +722,11 @@ impl FsCache {
     fn ensure_space(&self, required_size: u64) -> Result<(), KernelError> {
         let current_size = self.used_size.load(Ordering::SeqCst);
         let max_size = self.config.cache_size;
-        
+
         if current_size + required_size <= max_size {
             return Ok(());
         }
-        
+
         // Need to evict entries
         let needed = current_size + required_size - max_size;
         self.evict_entries(needed)
@@ -729,10 +735,10 @@ impl FsCache {
     /// Update LRU list
     fn update_lru(&self, key: &CacheKey) {
         let mut lru_list = self.lru_list.lock();
-        
+
         // Remove key from current position
         lru_list.retain(|k| k != key);
-        
+
         // Add key to the end (most recently used)
         lru_list.push_back(key.clone());
     }
@@ -776,7 +782,7 @@ impl FsCache {
     /// Get LFU key
     fn get_lfu_key(&self) -> Option<CacheKey> {
         let mut lfu_map = self.lfu_map.lock();
-        
+
         if let Some((key, _)) = lfu_map.iter().min_by_key(|(_, &count)| count) {
             Some(key.clone())
         } else {
@@ -806,13 +812,13 @@ impl FsCache {
     fn get_clock_key(&self) -> Option<CacheKey> {
         let entries = self.entries.lock();
         let entry_count = entries.len();
-        
+
         if entry_count == 0 {
             return None;
         }
-        
+
         let hand = self.clock_hand.fetch_add(1, Ordering::SeqCst) as usize % entry_count;
-        
+
         if let Some((key, _)) = entries.iter().nth(hand) {
             Some(key.clone())
         } else {
@@ -824,14 +830,14 @@ impl FsCache {
     fn get_random_key(&self) -> Option<CacheKey> {
         let entries = self.entries.lock();
         let entry_count = entries.len();
-        
+
         if entry_count == 0 {
             return None;
         }
-        
+
         // Simple pseudo-random selection
         let index = (self.get_current_time() as usize) % entry_count;
-        
+
         if let Some((key, _)) = entries.iter().nth(index) {
             Some(key.clone())
         } else {
@@ -843,7 +849,7 @@ impl FsCache {
     fn arc_evict(&self, required_size: u64, freed_size: &mut u64, evicted_count: &mut u32) {
         // Simplified ARC implementation
         // In a real implementation, this would implement the full ARC algorithm
-        
+
         // First try to evict from T1 (recently evicted once)
         while *freed_size < required_size {
             let mut t1 = self.arc_t1.lock();
@@ -851,7 +857,7 @@ impl FsCache {
                 let key = key.clone();
                 let entry = entry.clone();
                 drop(t1);
-                
+
                 self.arc_t1.lock().remove(&key);
                 *freed_size += entry.size as u64;
                 *evicted_count += 1;
@@ -859,7 +865,7 @@ impl FsCache {
                 break;
             }
         }
-        
+
         // Then try to evict from T2 (frequently used)
         while *freed_size < required_size {
             let mut t2 = self.arc_t2.lock();
@@ -867,7 +873,7 @@ impl FsCache {
                 let key = key.clone();
                 let entry = entry.clone();
                 drop(t2);
-                
+
                 self.arc_t2.lock().remove(&key);
                 *freed_size += entry.size as u64;
                 *evicted_count += 1;
@@ -881,7 +887,7 @@ impl FsCache {
     fn twoq_evict(&self, required_size: u64, freed_size: &mut u64, evicted_count: &mut u32) {
         // Simplified 2Q implementation
         // In a real implementation, this would implement the full 2Q algorithm
-        
+
         // First try to evict from A1out (demoted entries)
         while *freed_size < required_size {
             let mut a1out = self.twoq_a1out.lock();
@@ -889,7 +895,7 @@ impl FsCache {
                 let key = key.clone();
                 let entry = entry.clone();
                 drop(a1out);
-                
+
                 self.twoq_a1out.lock().remove(&key);
                 *freed_size += entry.size as u64;
                 *evicted_count += 1;
@@ -897,7 +903,7 @@ impl FsCache {
                 break;
             }
         }
-        
+
         // Then try to evict from A1in (new entries)
         while *freed_size < required_size {
             let mut a1in = self.twoq_a1in.lock();
@@ -905,7 +911,7 @@ impl FsCache {
                 let key = key.clone();
                 let entry = entry.clone();
                 drop(a1in);
-                
+
                 self.twoq_a1in.lock().remove(&key);
                 *freed_size += entry.size as u64;
                 *evicted_count += 1;
@@ -920,7 +926,7 @@ impl FsCache {
         if let Some(ref block_device) = self.block_device {
             let block_size = block_device.block_size();
             let block_num = entry.block_num as usize;
-            
+
             // Ensure data size matches block size
             let mut data = entry.data.clone();
             if data.len() < block_size {
@@ -928,7 +934,7 @@ impl FsCache {
             } else if data.len() > block_size {
                 data.truncate(block_size);
             }
-            
+
             block_device.write(block_num, &data);
             Ok(())
         } else {
@@ -939,29 +945,30 @@ impl FsCache {
     /// Update hit statistics
     fn update_hit_stats(&self, entry: &CacheEntry) {
         let mut stats = self.stats.lock();
-        
+
         stats.total_hits += 1;
-        
+
         match entry.entry_type {
             CacheEntryType::DataBlock => stats.data_hits += 1,
             CacheEntryType::MetadataBlock => stats.metadata_hits += 1,
             CacheEntryType::DirectoryEntry => stats.directory_hits += 1,
             CacheEntryType::Inode => stats.inode_hits += 1,
-            _ => {}
+            _ => {},
         }
-        
+
         // Update hit ratio
         if stats.total_hits + stats.total_misses > 0 {
-            stats.hit_ratio = stats.total_hits as f32 / (stats.total_hits + stats.total_misses) as f32;
+            stats.hit_ratio =
+                stats.total_hits as f32 / (stats.total_hits + stats.total_misses) as f32;
         }
     }
 
     /// Update miss statistics
     fn update_miss_stats(&self, key: &CacheKey) {
         let mut stats = self.stats.lock();
-        
+
         stats.total_misses += 1;
-        
+
         // Determine entry type from key
         // This is a simplified approach; in a real implementation,
         // we would have more sophisticated type detection
@@ -972,20 +979,21 @@ impl FsCache {
         } else {
             stats.data_misses += 1;
         }
-        
+
         // Update hit ratio
         if stats.total_hits + stats.total_misses > 0 {
-            stats.hit_ratio = stats.total_hits as f32 / (stats.total_hits + stats.total_misses) as f32;
+            stats.hit_ratio =
+                stats.total_hits as f32 / (stats.total_hits + stats.total_misses) as f32;
         }
     }
 
     /// Update put statistics
     fn update_put_stats(&self, entry: &CacheEntry) {
         let mut stats = self.stats.lock();
-        
+
         stats.used_entries = self.used_entries.load(Ordering::SeqCst);
         stats.used_size = self.used_size.load(Ordering::SeqCst);
-        
+
         // Update utilization
         if stats.total_size > 0 {
             stats.utilization = stats.used_size as f32 / stats.total_size as f32;
@@ -995,10 +1003,10 @@ impl FsCache {
     /// Update remove statistics
     fn update_remove_stats(&self, entry: &CacheEntry) {
         let mut stats = self.stats.lock();
-        
+
         stats.used_entries = self.used_entries.load(Ordering::SeqCst);
         stats.used_size = self.used_size.load(Ordering::SeqCst);
-        
+
         // Update utilization
         if stats.total_size > 0 {
             stats.utilization = stats.used_size as f32 / stats.total_size as f32;
@@ -1007,20 +1015,21 @@ impl FsCache {
 
     /// Update access time statistics
     fn update_access_time_stats(&self, access_time: u64) {
-        self.total_access_time.fetch_add(access_time, Ordering::SeqCst);
-        
+        self.total_access_time
+            .fetch_add(access_time, Ordering::SeqCst);
+
         // Update min access time
         let current_min = self.min_access_time.load(Ordering::SeqCst);
         if access_time < current_min {
             self.min_access_time.store(access_time, Ordering::SeqCst);
         }
-        
+
         // Update max access time
         let current_max = self.max_access_time.load(Ordering::SeqCst);
         if access_time > current_max {
             self.max_access_time.store(access_time, Ordering::SeqCst);
         }
-        
+
         // Update average access time
         let total_time = self.total_access_time.load(Ordering::SeqCst);
         let total_hits = self.stats.lock().total_hits;
@@ -1037,32 +1046,33 @@ impl FsCache {
         if !self.config.enable_stats {
             return;
         }
-        
+
         let current_time = self.get_current_time();
         let last_update = self.last_stats_update.load(Ordering::SeqCst);
-        
+
         if current_time - last_update < self.config.stats_update_interval as u64 {
             return;
         }
-        
+
         self.last_stats_update.store(current_time, Ordering::SeqCst);
-        
+
         let mut stats = self.stats.lock();
-        
+
         // Update current usage
         stats.used_entries = self.used_entries.load(Ordering::SeqCst);
         stats.used_size = self.used_size.load(Ordering::SeqCst);
-        
+
         // Update utilization
         if stats.total_size > 0 {
             stats.utilization = stats.used_size as f32 / stats.total_size as f32;
         }
-        
+
         // Update hit ratio
         if stats.total_hits + stats.total_misses > 0 {
-            stats.hit_ratio = stats.total_hits as f32 / (stats.total_hits + stats.total_misses) as f32;
+            stats.hit_ratio =
+                stats.total_hits as f32 / (stats.total_hits + stats.total_misses) as f32;
         }
-        
+
         // Update access time statistics
         let total_time = self.total_access_time.load(Ordering::SeqCst);
         let total_hits = stats.total_hits;
@@ -1106,9 +1116,9 @@ impl Default for CacheConfig {
 /// Initialize file system cache
 pub fn init() {
     crate::println!("fs_cache: initializing file system cache");
-    
+
     // In a real implementation, this would initialize the file system cache
     // with appropriate configuration based on system resources
-    
+
     crate::println!("fs_cache: file system cache initialized");
 }

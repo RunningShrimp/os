@@ -1,10 +1,13 @@
 /// Complete Boot Execution Coordinator
 ///
 /// Integrates all boot components and manages the complete boot-to-kernel transition.
-
 use crate::boot_stage::boot_loader::BootLoader;
-use crate::boot_stage::boot_diagnostics::{BootDiagnostics, BootVerification, BootStatusReport, BootEvent};
-use crate::bios::e820_detection::E820MemoryMap;
+use crate::{
+    bios::e820_detection::E820MemoryMap,
+    boot_stage::boot_diagnostics::{
+        BootDiagnostics, BootEvent, BootStatusReport, BootVerification,
+    },
+};
 
 /// Boot execution phase
 #[derive(Debug, Clone, Copy)]
@@ -122,7 +125,8 @@ impl BootExecutor {
         self.phase = ExecutionPhase::KernelValidation;
 
         self.bootloader.validate_kernel()?;
-        self.diagnostics.log_event(BootEvent::KernelSignatureValid)?;
+        self.diagnostics
+            .log_event(BootEvent::KernelSignatureValid)?;
         self.diagnostics.log_event(BootEvent::ChecksumValid)?;
 
         self.verification.check_kernel_valid();

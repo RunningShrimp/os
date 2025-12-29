@@ -1,5 +1,5 @@
 /// Complete BIOS Support Implementation
-/// 
+///
 /// Provides:
 /// - E820 memory detection
 /// - INT 0x13 disk reading
@@ -61,10 +61,7 @@ pub struct BiosMemoryDetector {
 impl BiosMemoryDetector {
     /// Create new BIOS memory detector
     pub fn new() -> Self {
-        Self {
-            entries: [None; 32],
-            entry_count: 0,
-        }
+        Self { entries: [None; 32], entry_count: 0 }
     }
 }
 
@@ -75,7 +72,6 @@ impl Default for BiosMemoryDetector {
 }
 
 impl BiosMemoryDetector {
-
     /// Add E820 entry from bootloader
     pub fn add_entry(&mut self, entry: E820Entry) -> Result<(), &'static str> {
         if self.entry_count >= 32 {
@@ -103,7 +99,7 @@ impl BiosMemoryDetector {
     /// Get largest contiguous usable region
     pub fn get_largest_usable_region(&self) -> Option<E820Entry> {
         let mut largest: Option<E820Entry> = None;
-        
+
         for i in 0..self.entry_count {
             if let Some(entry) = self.entries[i] {
                 if entry.region_type.is_usable() {
@@ -117,7 +113,7 @@ impl BiosMemoryDetector {
                 }
             }
         }
-        
+
         largest
     }
 
@@ -138,13 +134,13 @@ impl BiosMemoryDetector {
     /// Convert to memory region tuples
     pub fn to_memory_regions(&self) -> [Option<(u64, u64)>; 32] {
         let mut regions = [None; 32];
-        
+
         for i in 0..self.entry_count {
             if let Some(entry) = self.entries[i] {
                 regions[i] = Some((entry.base, entry.length));
             }
         }
-        
+
         regions
     }
 }
@@ -158,14 +154,11 @@ pub struct BiosDiskIo {
 impl BiosDiskIo {
     /// Create BIOS disk I/O interface
     pub fn new(drive_number: u8) -> Self {
-        Self {
-            drive_number,
-            sectors_read: 0,
-        }
+        Self { drive_number, sectors_read: 0 }
     }
 
     /// Read sectors from disk via INT 0x13
-    /// 
+    ///
     /// This is a framework - actual implementation requires real mode code
     pub fn read_sectors(
         &mut self,
@@ -255,10 +248,8 @@ impl VgaTextMode {
             let offset = self.cursor_y as usize * self.width as usize + self.cursor_x as usize;
             let attr = (color as u16) << 8;
             let cell = attr | (ch as u16);
-            
-            self.buffer_base
-                .add(offset)
-                .write_volatile(cell);
+
+            self.buffer_base.add(offset).write_volatile(cell);
         }
 
         // Move cursor
@@ -282,7 +273,7 @@ impl VgaTextMode {
                 b'\n' => {
                     self.cursor_x = 0;
                     self.cursor_y = (self.cursor_y + 1) % self.height;
-                }
+                },
                 _ => self.write_char(ch, 0x0F), // White text on black background
             }
         }

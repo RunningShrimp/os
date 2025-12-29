@@ -2,18 +2,16 @@
 ///
 /// Orchestrates the complete boot process including environment detection,
 /// kernel loading validation, and boot parameter preparation.
-
 use crate::core::boot_sequence::BootMemoryLayout;
-use crate::bios::e820_detection::E820MemoryMap;
-use crate::kernel_if::kernel_handoff::BootInformation;
+use crate::{bios::e820_detection::E820MemoryMap, kernel_if::kernel_handoff::BootInformation};
 
 /// Boot environment detection result
 #[derive(Debug, Clone, Copy)]
 pub enum BootEnvironment {
-    BIOS,           // Legacy BIOS boot
-    UEFI,           // UEFI firmware
-    Multiboot2,     // Multiboot2 compliant bootloader
-    Unknown,        // Unknown boot environment
+    BIOS,       // Legacy BIOS boot
+    UEFI,       // UEFI firmware
+    Multiboot2, // Multiboot2 compliant bootloader
+    Unknown,    // Unknown boot environment
 }
 
 impl BootEnvironment {
@@ -38,12 +36,7 @@ pub struct KernelSignature {
 
 impl KernelSignature {
     pub fn new() -> Self {
-        Self {
-            magic: 0,
-            version: 0,
-            flags: 0,
-            checksum: 0,
-        }
+        Self { magic: 0, version: 0, flags: 0, checksum: 0 }
     }
 
     /// Validate Multiboot2 kernel signature
@@ -201,19 +194,20 @@ impl BootLoader {
 
     /// Prepare boot information structure
     pub fn prepare_boot_info(&mut self) -> Result<(), &'static str> {
-        let memory_map = self.memory_map.as_ref()
-            .ok_or("Memory map not available")?;
+        let memory_map = self.memory_map.as_ref().ok_or("Memory map not available")?;
 
         let mut boot_info = BootInformation::new(self.kernel.entry_point);
-        
+
         // Add memory entries
         for entry in &memory_map.entries {
             if let Some(mem_entry) = entry {
-                if let Err(e) = boot_info.add_memory_entry(crate::kernel_if::kernel_handoff::MemoryMapEntry {
-                    base: mem_entry.base_address,
-                    length: mem_entry.length,
-                    region_type: mem_entry.entry_type,
-                }) {
+                if let Err(e) =
+                    boot_info.add_memory_entry(crate::kernel_if::kernel_handoff::MemoryMapEntry {
+                        base: mem_entry.base_address,
+                        length: mem_entry.length,
+                        region_type: mem_entry.entry_type,
+                    })
+                {
                     log::warn!("Failed to add memory entry: {}", e);
                 }
             }
@@ -237,9 +231,7 @@ impl BootLoader {
 
     /// Check if ready to execute kernel
     pub fn is_ready(&self) -> bool {
-        self.kernel.is_valid()
-            && self.memory_map.is_some()
-            && self.boot_info.is_some()
+        self.kernel.is_valid() && self.memory_map.is_some() && self.boot_info.is_some()
     }
 
     /// Mark as ready for execution

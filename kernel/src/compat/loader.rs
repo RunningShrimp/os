@@ -10,10 +10,8 @@
 extern crate alloc;
 extern crate hashbrown;
 
-use core::ffi::{c_void, c_char};
 use core::ptr;
 use core::hash::{Hash, Hasher};
-
 // Dynamic linker data structures
 
 /// Procedure Linkage Table entry
@@ -174,11 +172,9 @@ impl DynamicLinker {
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::sync::Arc;
-use alloc::vec::Vec;
 use alloc::{format, vec};
 use alloc::boxed::Box;
 use hashbrown::HashMap;
-use crate::compat::DefaultHasherBuilder;
 
 use crate::compat::*;
 use crate::vfs;

@@ -1,14 +1,16 @@
 //! Health Monitoring
-//! 
+//!
 //! This module provides health monitoring functionality for the kernel.
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloc::string::String;
-use alloc::string::ToString;
-use spin::Mutex;
+use alloc::{
+    collections::BTreeMap,
+    string::{String, ToString},
+};
 use core::sync::atomic::{AtomicU64, Ordering};
+
+use spin::Mutex;
 
 /// Health level
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -123,12 +125,13 @@ impl HealthMonitor {
 
     /// Update a metric value
     pub fn update_metric(&mut self, name: &str, value: f64) -> crate::error::UnifiedResult<()> {
-        let metric = self.metrics.get_mut(name)
-            .ok_or_else(|| crate::error::create_error(
+        let metric = self.metrics.get_mut(name).ok_or_else(|| {
+            crate::error::create_error(
                 crate::error::ErrorSeverity::Error,
                 crate::error::ProcessError::NotFound,
                 "Metric not found".to_string(),
-            ))?;
+            )
+        })?;
         metric.current_value = value;
         metric.last_updated = crate::common::get_timestamp();
         Ok(())
@@ -157,5 +160,7 @@ pub fn init_health_monitor() -> crate::error::UnifiedResult<()> {
 
 /// Get health monitor
 pub fn get_health_monitor() -> &'static HealthMonitor {
-    HEALTH_MONITOR.get().expect("Health monitor not initialized")
+    HEALTH_MONITOR
+        .get()
+        .expect("Health monitor not initialized")
 }

@@ -4,11 +4,11 @@
 //! of received fragments.
 
 extern crate alloc;
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use alloc::vec;
-use core::time::Duration;
-use core::sync::atomic::{AtomicU64, Ordering};
+use alloc::{collections::BTreeMap, vec, vec::Vec};
+use core::{
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
 
 use super::ipv4::{Ipv4Addr, Ipv4Header, Ipv4Packet};
 
@@ -34,12 +34,7 @@ pub struct FragmentId {
 impl FragmentId {
     /// Create a new fragment ID
     pub fn new(src_ip: Ipv4Addr, dst_ip: Ipv4Addr, protocol: u8, identification: u16) -> Self {
-        Self {
-            src_ip,
-            dst_ip,
-            protocol,
-            identification,
-        }
+        Self { src_ip, dst_ip, protocol, identification }
     }
 }
 
@@ -210,7 +205,8 @@ impl ReassemblyEntry {
 
     /// Reassemble the complete datagram
     pub fn reassemble(&self) -> Result<Vec<u8>, FragmentError> {
-        let total_length = self.calculate_total_length()
+        let total_length = self
+            .calculate_total_length()
             .ok_or(FragmentError::IncompleteDatagram)?;
 
         let mut datagram = vec![0u8; total_length];
@@ -306,11 +302,7 @@ impl FragmentReassembler {
 
         // Create fragment object
         let offset = (header.fragment_offset() as usize) * 8; // Convert to bytes
-        let fragment = Fragment::new(
-            payload.to_vec(),
-            offset,
-            header.more_fragments(),
-        );
+        let fragment = Fragment::new(payload.to_vec(), offset, header.more_fragments());
 
         // Get or create reassembly entry
         let entry = self.entries.entry(fragment_id).or_insert_with(|| {
@@ -330,11 +322,11 @@ impl FragmentReassembler {
                     // Remove completed entry
                     self.entries.remove(&fragment_id);
                     Ok(Some(datum))
-                }
+                },
                 Err(e) => {
                     self.stats.failed_reassemblies += 1;
                     Err(e)
-                }
+                },
             }
         } else {
             Ok(None)
@@ -514,10 +506,7 @@ impl Fragmenter {
             fragment_header.set_checksum();
 
             // Create fragment packet
-            let fragment = Ipv4Packet {
-                header: fragment_header,
-                payload: fragment_payload,
-            };
+            let fragment = Ipv4Packet { header: fragment_header, payload: fragment_payload };
 
             fragments.push(fragment);
             offset += fragment_payload_len;

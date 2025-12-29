@@ -145,33 +145,33 @@ pub struct Dynamic {
 pub mod constants {
     /// ELF magic number
     pub const ELF_MAGIC: [u8; 4] = [0x7F, b'E', b'L', b'F'];
-    
+
     /// ELF classes
     pub const ELFCLASS32: u8 = 1;
     pub const ELFCLASS64: u8 = 2;
-    
+
     /// ELF data encodings
     pub const ELFDATA2LSB: u8 = 1; // Little endian
     pub const ELFDATA2MSB: u8 = 2; // Big endian
-    
+
     /// ELF versions
     pub const EV_NONE: u8 = 0;
     pub const EV_CURRENT: u8 = 1;
-    
+
     /// ELF file types
     pub const ET_NONE: u16 = 0; // No file type
     pub const ET_REL: u16 = 1; // Relocatable file
     pub const ET_EXEC: u16 = 2; // Executable file
     pub const ET_DYN: u16 = 3; // Shared object file
     pub const ET_CORE: u16 = 4; // Core file
-    
+
     /// ELF machine types
     pub const EM_NONE: u16 = 0; // No machine
     pub const EM_386: u16 = 3; // Intel 80386
     pub const EM_X86_64: u16 = 62; // AMD x86-64 architecture
     pub const EM_AARCH64: u16 = 183; // ARM AARCH64
     pub const EM_RISCV: u16 = 243; // RISC-V
-    
+
     /// Program header types
     pub const PT_NULL: u32 = 0; // Unused entry
     pub const PT_LOAD: u32 = 1; // Loadable segment
@@ -184,12 +184,12 @@ pub mod constants {
     pub const PT_GNU_EH_FRAME: u32 = 0x6474e550; // GCC .eh_frame_hdr segment
     pub const PT_GNU_STACK: u32 = 0x6474e551; // Indicates stack executability
     pub const PT_GNU_RELRO: u32 = 0x6474e552; // Read-only after relocation
-    
+
     /// Program header flags
     pub const PF_X: u32 = 0x1; // Executable
     pub const PF_W: u32 = 0x2; // Writable
     pub const PF_R: u32 = 0x4; // Readable
-    
+
     /// Section header types
     pub const SHT_NULL: u32 = 0; // Inactive section
     pub const SHT_PROGBITS: u32 = 1; // Program data
@@ -209,7 +209,7 @@ pub mod constants {
     pub const SHT_GNU_VERDEF: u32 = 0x6ffffffd; // Version definition section
     pub const SHT_GNU_VERNEED: u32 = 0x6ffffffe; // Version needs section
     pub const SHT_GNU_VERSYM: u32 = 0x6fffffff; // Version symbol table
-    
+
     /// Section header flags
     pub const SHF_WRITE: u64 = 0x1; // Writable
     pub const SHF_ALLOC: u64 = 0x2; // Occupies memory during execution
@@ -222,7 +222,7 @@ pub mod constants {
     pub const SHF_GROUP: u64 = 0x200; // Section is member of a group
     pub const SHF_TLS: u64 = 0x400; // Section hold thread-local data
     pub const SHF_COMPRESSED: u64 = 0x800; // Section with compressed data
-    
+
     /// Symbol types
     pub const STT_NOTYPE: u8 = 0; // Symbol type is unspecified
     pub const STT_OBJECT: u8 = 1; // Symbol is a data object
@@ -232,19 +232,19 @@ pub mod constants {
     pub const STT_COMMON: u8 = 5; // Symbol is a common data object
     pub const STT_TLS: u8 = 6; // Symbol is thread-local data object
     pub const STT_GNU_IFUNC: u8 = 10; // Symbol is indirect code object
-    
+
     /// Symbol bindings
     pub const STB_LOCAL: u8 = 0; // Local symbol
     pub const STB_GLOBAL: u8 = 1; // Global symbol
     pub const STB_WEAK: u8 = 2; // Weak symbol
     pub const STB_GNU_UNIQUE: u8 = 10; // Unique symbol
-    
+
     /// Symbol visibility
     pub const STV_DEFAULT: u8 = 0; // Default symbol visibility rules
     pub const STV_INTERNAL: u8 = 1; // Processor specific hidden class
     pub const STV_HIDDEN: u8 = 2; // Sym unavailable in other modules
     pub const STV_PROTECTED: u8 = 3; // Not preemptible, not exported
-    
+
     /// Dynamic tags
     pub const DT_NULL: u64 = 0; // Marks end of dynamic section
     pub const DT_NEEDED: u64 = 1; // Name of needed library

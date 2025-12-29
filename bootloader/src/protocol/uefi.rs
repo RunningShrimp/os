@@ -1,15 +1,17 @@
 //! UEFI Boot Protocol
-//! 
+//!
 //! This module provides the UEFI protocol implementation for the bootloader.
 
 use spin::Mutex;
-use crate::utils::error::{BootError, Result};
-use crate::protocol::BootInfo;
-
 #[cfg(feature = "uefi_support")]
-use uefi::{Handle};
+use uefi::Handle;
 #[cfg(feature = "uefi_support")]
 use uefi_raw::table::system::SystemTable;
+
+use crate::{
+    protocol::BootInfo,
+    utils::error::{BootError, Result},
+};
 
 /// Active UEFI protocol instance (global singleton)
 #[cfg(feature = "uefi_support")]
@@ -30,18 +32,11 @@ unsafe impl Send for UefiProtocol {}
 impl UefiProtocol {
     /// Create a new UEFI protocol instance
     pub fn new() -> Self {
-        Self {
-            system_table: None,
-            image_handle: None,
-            boot_info: None,
-        }
+        Self { system_table: None, image_handle: None, boot_info: None }
     }
 
     /// Initialize the protocol with the UEFI system table
-    pub fn initialize_with_system_table(
-        &mut self, 
-        system_table: *const SystemTable
-    ) -> Result<()> {
+    pub fn initialize_with_system_table(&mut self, system_table: *const SystemTable) -> Result<()> {
         if system_table.is_null() {
             return Err(BootError::UefiNullSystemTable);
         }
@@ -90,11 +85,7 @@ pub fn set_active_protocol(protocol: UefiProtocol) {
 #[cfg(feature = "uefi_support")]
 pub fn get_active_protocol() -> Option<spin::MutexGuard<'static, Option<UefiProtocol>>> {
     let guard = ACTIVE_PROTOCOL.lock();
-    if guard.is_some() {
-        Some(guard)
-    } else {
-        None
-    }
+    if guard.is_some() { Some(guard) } else { None }
 }
 
 /// Initialize UEFI panic handler

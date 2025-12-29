@@ -39,12 +39,7 @@ pub struct TimingMeasurement {
 impl TimingMeasurement {
     /// Create timing measurement
     pub fn new(phase: BootPhase, start: u64) -> Self {
-        TimingMeasurement {
-            phase,
-            start_time: start,
-            end_time: start,
-            valid: false,
-        }
+        TimingMeasurement { phase, start_time: start, end_time: start, valid: false }
     }
 
     /// Complete measurement
@@ -302,7 +297,7 @@ mod tests {
         analyzer.complete_phase(BootPhase::Firmware, 100);
         analyzer.record_phase_start(BootPhase::Memory, 100);
         analyzer.complete_phase(BootPhase::Memory, 300);
-        
+
         let slowest = analyzer.get_slowest_phase();
         assert!(slowest.is_some());
         assert_eq!(slowest.unwrap().0, BootPhase::Memory);
@@ -315,7 +310,7 @@ mod tests {
         analyzer.record_phase_start(BootPhase::Firmware, 0);
         analyzer.complete_phase(BootPhase::Firmware, 100);
         analyzer.calculate_total_boot_time();
-        
+
         let pct = analyzer.get_phase_percentage(BootPhase::Firmware);
         assert!(pct > 0.0);
     }
@@ -330,7 +325,7 @@ mod tests {
         analyzer.complete_phase(BootPhase::Memory, 250);
         analyzer.record_phase_start(BootPhase::Cpu, 250);
         analyzer.complete_phase(BootPhase::Cpu, 350);
-        
+
         assert_eq!(analyzer.get_measurement_count(), 3);
     }
 
@@ -341,7 +336,7 @@ mod tests {
         analyzer.record_phase_start(BootPhase::Firmware, 0);
         analyzer.complete_phase(BootPhase::Firmware, 100);
         analyzer.calculate_total_boot_time();
-        
+
         let avg = analyzer.get_average_phase_duration();
         assert!(avg > 0);
     }
@@ -383,7 +378,7 @@ mod tests {
     fn test_boot_timing_all_phases() {
         let mut analyzer = BootTimingAnalyzer::new();
         analyzer.set_boot_start_time(0);
-        
+
         let mut time = 0;
         let phases = vec![
             BootPhase::Firmware,
@@ -419,9 +414,9 @@ mod tests {
         analyzer.record_phase_start(BootPhase::Memory, 50);
         analyzer.complete_phase(BootPhase::Memory, 150);
         analyzer.calculate_total_boot_time();
-        
-        let total_pct = analyzer.get_phase_percentage(BootPhase::Firmware) 
-                      + analyzer.get_phase_percentage(BootPhase::Memory);
+
+        let total_pct = analyzer.get_phase_percentage(BootPhase::Firmware)
+            + analyzer.get_phase_percentage(BootPhase::Memory);
         assert!(total_pct <= 100.0);
     }
 }

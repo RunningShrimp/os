@@ -1,7 +1,6 @@
 // GLib对象系统支持系统调用
 
 extern crate alloc;
-//
 // 为GLib的GObject系统提供内核级支持，包括：
 // - 对象类型注册和管理
 // - 信号连接和发射
@@ -9,11 +8,13 @@ extern crate alloc;
 // - 继承和接口管理
 // - 引用计数管理
 
-use crate::subsystems::syscalls::SyscallResult;
-use crate::subsystems::sync::Mutex;
 use alloc::collections::BTreeMap;
-use core::ffi::{c_int, c_void};
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::{
+    ffi::{c_int, c_void},
+    sync::atomic::{AtomicUsize, Ordering},
+};
+
+use crate::subsystems::{sync::Mutex, syscalls::SyscallResult};
 
 /// 对象类型信息
 #[derive(Debug, Clone)]
@@ -73,16 +74,13 @@ pub struct GObjectInstanceInfo {
 }
 
 /// 全局对象类型注册表
-static OBJECT_TYPES: Mutex<BTreeMap<u64, GObjectTypeInfo>> =
-    Mutex::new(BTreeMap::new());
+static OBJECT_TYPES: Mutex<BTreeMap<u64, GObjectTypeInfo>> = Mutex::new(BTreeMap::new());
 
 /// 全局信号注册表
-static OBJECT_SIGNALS: Mutex<BTreeMap<u64, Vec<GObjectSignalInfo>>> =
-    Mutex::new(BTreeMap::new());
+static OBJECT_SIGNALS: Mutex<BTreeMap<u64, Vec<GObjectSignalInfo>>> = Mutex::new(BTreeMap::new());
 
 /// 全局对象实例注册表
-static OBJECT_INSTANCES: Mutex<BTreeMap<u64, GObjectInstanceInfo>> =
-    Mutex::new(BTreeMap::new());
+static OBJECT_INSTANCES: Mutex<BTreeMap<u64, GObjectInstanceInfo>> = Mutex::new(BTreeMap::new());
 
 /// 下一个可用的类型ID
 static NEXT_TYPE_ID: AtomicUsize = AtomicUsize::new(1);
@@ -101,8 +99,8 @@ pub fn get_glib_object_manager() -> &'static dyn super::manager::GObjectManager 
     unsafe { &GLIB_OBJECT_MANAGER }
 }
 
-pub mod type_;
 pub mod instance;
-pub mod signal;
-pub mod property;
 pub mod manager;
+pub mod property;
+pub mod signal;
+pub mod type_;

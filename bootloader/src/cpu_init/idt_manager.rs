@@ -1,5 +1,5 @@
 //! IDT Manager - Interrupt Descriptor Table initialization and management
-//! 
+//!
 //! Provides:
 //! - IDT descriptor table setup
 //! - Gate descriptor types (interrupt, trap, task)
@@ -44,11 +44,7 @@ pub struct GateFlags {
 impl GateFlags {
     /// Create gate flags
     pub fn new(present: bool, dpl: PrivilegeLevel) -> Self {
-        GateFlags {
-            present,
-            dpl,
-            storage_segment: false,
-        }
+        GateFlags { present, dpl, storage_segment: false }
     }
 
     /// Encode flags into descriptor byte
@@ -84,12 +80,7 @@ pub struct GateDescriptor {
 
 impl GateDescriptor {
     /// Create new gate descriptor
-    pub fn new(
-        handler: u64,
-        selector: u16,
-        gate_type: GateType,
-        flags: GateFlags,
-    ) -> Self {
+    pub fn new(handler: u64, selector: u16, gate_type: GateType, flags: GateFlags) -> Self {
         GateDescriptor {
             offset_lo: (handler & 0xFFFF) as u16,
             selector,
@@ -104,9 +95,7 @@ impl GateDescriptor {
 
     /// Get full handler address
     pub fn handler_address(&self) -> u64 {
-        ((self.offset_hi as u64) << 32)
-            | ((self.offset_mid as u64) << 16)
-            | (self.offset_lo as u64)
+        ((self.offset_hi as u64) << 32) | ((self.offset_mid as u64) << 16) | (self.offset_lo as u64)
     }
 
     /// Set interrupt stack table index (0-7)
@@ -176,32 +165,17 @@ impl IdtManager {
 
     /// Register interrupt gate (normal interrupt)
     pub fn register_interrupt(&mut self, vector: u8, handler: u64) -> bool {
-        self.register_handler(
-            vector,
-            handler,
-            GateType::InterruptGate,
-            PrivilegeLevel::Kernel,
-        )
+        self.register_handler(vector, handler, GateType::InterruptGate, PrivilegeLevel::Kernel)
     }
 
     /// Register trap gate (exception/syscall)
     pub fn register_trap(&mut self, vector: u8, handler: u64) -> bool {
-        self.register_handler(
-            vector,
-            handler,
-            GateType::TrapGate,
-            PrivilegeLevel::Kernel,
-        )
+        self.register_handler(vector, handler, GateType::TrapGate, PrivilegeLevel::Kernel)
     }
 
     /// Register user-accessible trap gate
     pub fn register_user_trap(&mut self, vector: u8, handler: u64) -> bool {
-        self.register_handler(
-            vector,
-            handler,
-            GateType::TrapGate,
-            PrivilegeLevel::User,
-        )
+        self.register_handler(vector, handler, GateType::TrapGate, PrivilegeLevel::User)
     }
 
     /// Get IDT entry
@@ -227,14 +201,14 @@ impl IdtManager {
     /// Load IDT into CPU (LIDT instruction)
     pub fn load(&mut self) -> bool {
         self.update_register();
-        
+
         // Execute LIDT instruction with IDT register
         #[cfg(target_arch = "x86_64")]
         unsafe {
             use core::arch::asm;
             asm!("lidt [{}]", in(reg) &self.idt_register, options(nostack));
         }
-        
+
         #[cfg(not(target_arch = "x86_64"))]
         {
             // Non-x86 architectures configure interrupt handlers differently
@@ -360,7 +334,7 @@ mod tests {
     fn test_register_trap_handler() {
         let mut manager = IdtManager::new(0x08);
         assert!(manager.register_trap(1, 0x2000));
-        
+
         let desc = manager.get_descriptor(1).unwrap();
         assert_eq!(desc.gate_type, GateType::TrapGate);
         assert_eq!(desc.flags.present, true);
@@ -399,7 +373,7 @@ mod tests {
     fn test_idt_base_and_size() {
         let mut manager = IdtManager::new(0x08);
         manager.register_interrupt(0, 0x1000);
-        
+
         assert!(manager.idt_base() > 0);
         assert_eq!(manager.idt_size(), 16); // 1 entry * 16 bytes
     }
@@ -408,7 +382,7 @@ mod tests {
     fn test_idt_register_update() {
         let mut manager = IdtManager::new(0x08);
         manager.register_interrupt(0, 0x1000);
-        
+
         assert_eq!(unsafe { core::ptr::read_unaligned(&manager.idt_register.limit) }, 15); // (1 * 16) - 1
     }
 
@@ -445,9 +419,9 @@ mod tests {
         for i in 0..20 {
             assert!(manager.register_interrupt(i, 0x1000 + i as u64 * 0x10));
         }
-        
+
         assert_eq!(manager.registered_count(), 20);
-        
+
         for i in 0..20 {
             let desc = manager.get_descriptor(i).unwrap();
             assert_eq!(desc.handler_address(), 0x1000 + i as u64 * 0x10);
@@ -471,7 +445,7 @@ mod tests {
     fn test_different_gate_types() {
         let mut manager = IdtManager::new(0x08);
         manager.register_interrupt(0, 0x1000); // InterruptGate
-        manager.register_trap(1, 0x2000);     // TrapGate
+        manager.register_trap(1, 0x2000); // TrapGate
 
         let int_desc = manager.get_descriptor(0).unwrap();
         let trap_desc = manager.get_descriptor(1).unwrap();

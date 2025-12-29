@@ -4,10 +4,12 @@
 
 #[cfg(feature = "kernel_tests")]
 pub mod pipe_tests {
-    use crate::{test_assert_eq, test_assert};
-    use crate::tests::{skip_test, TestResult};
-    use crate::ipc::pipe;
-    use crate::fs::file;
+    use crate::{
+        fs::file,
+        ipc::pipe,
+        test_assert, test_assert_eq,
+        tests::{TestResult, skip_test},
+    };
 
     /// Test basic pipe operations
     pub fn test_pipe_basic() -> TestResult {
@@ -33,7 +35,7 @@ pub mod pipe_tests {
     /// Test pipe with non-blocking mode
     pub fn test_pipe_nonblock() -> TestResult {
         use crate::posix::O_NONBLOCK;
-        
+
         if let Some((rfd_idx, wfd_idx)) = pipe::pipe_alloc() {
             {
                 let mut table = file::FILE_TABLE.lock();
@@ -43,7 +45,10 @@ pub mod pipe_tests {
             }
             let mut buf = [0u8; 4];
             let ret = file::file_read(rfd_idx, &mut buf);
-            test_assert_eq!(ret, crate::reliability::errno::errno_neg(crate::reliability::errno::EAGAIN));
+            test_assert_eq!(
+                ret,
+                crate::reliability::errno::errno_neg(crate::reliability::errno::EAGAIN)
+            );
             file::file_close(rfd_idx);
             file::file_close(wfd_idx);
             Ok(())
@@ -58,7 +63,10 @@ pub mod pipe_tests {
             file::file_close(rfd_idx);
             let buf = [0xBBu8; 16];
             let n = file::file_write(wfd_idx, &buf);
-            test_assert_eq!(n, crate::reliability::errno::errno_neg(crate::reliability::errno::EPIPE));
+            test_assert_eq!(
+                n,
+                crate::reliability::errno::errno_neg(crate::reliability::errno::EPIPE)
+            );
             file::file_close(wfd_idx);
             Ok(())
         } else {

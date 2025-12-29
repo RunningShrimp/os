@@ -8,14 +8,10 @@
 //! - 进程信息：getpid, getppid, getsid
 //! - 用户信息：getuid, getgid, geteuid, getegid
 
-use core::ffi::{c_char, c_int, c_long, c_uint, c_double, c_ushort};
 use core::str::FromStr;
-use heapless::{String, Vec};
-use crate::libc::error::set_errno;
-use crate::libc::error::errno::{EINVAL, ENAMETOOLONG, EPERM};
-use crate::libc::interface::c_ulong;
 
-/// 系统名称结构体（对应struct utsname）
+use crate::libc::{error::set_errno, interface::c_ulong};
+
 #[repr(C)]
 #[derive(Debug, Clone)]
 pub struct UtsName {
@@ -220,13 +216,17 @@ impl EnhancedSystemInfo {
             return -1;
         }
 
-        self.stats.total_queries.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+        self.stats
+            .total_queries
+            .fetch_add(1, core::sync::atomic::Ordering::SeqCst);
 
         let utsname = if self.config.enable_caching && self.is_cache_valid() {
             // 使用缓存数据
             if let Some(cached) = self.cached_utsname.try_lock() {
                 if cached.is_some() {
-                    self.stats.cache_hits.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+                    self.stats
+                        .cache_hits
+                        .fetch_add(1, core::sync::atomic::Ordering::SeqCst);
                     cached.clone().unwrap()
                 } else {
                     drop(cached);
@@ -256,7 +256,7 @@ impl EnhancedSystemInfo {
                 *cached = Some(utsname_clone);
                 self.cache_timestamp.store(
                     crate::subsystems::time::get_timestamp() as u64,
-                    core::sync::atomic::Ordering::SeqCst
+                    core::sync::atomic::Ordering::SeqCst,
                 );
             }
         }
@@ -271,13 +271,17 @@ impl EnhancedSystemInfo {
             return -1;
         }
 
-        self.stats.total_queries.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+        self.stats
+            .total_queries
+            .fetch_add(1, core::sync::atomic::Ordering::SeqCst);
 
         let sysinfo = if self.config.enable_caching && self.is_cache_valid() {
             // 使用缓存数据
             if let Some(cached) = self.cached_sysinfo.try_lock() {
                 if cached.is_some() {
-                    self.stats.cache_hits.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+                    self.stats
+                        .cache_hits
+                        .fetch_add(1, core::sync::atomic::Ordering::SeqCst);
                     cached.clone().unwrap()
                 } else {
                     drop(cached);
@@ -307,7 +311,7 @@ impl EnhancedSystemInfo {
                 *cached = Some(sysinfo_clone);
                 self.cache_timestamp.store(
                     crate::subsystems::time::get_timestamp() as u64,
-                    core::sync::atomic::Ordering::SeqCst
+                    core::sync::atomic::Ordering::SeqCst,
                 );
             }
         }
@@ -350,7 +354,9 @@ impl EnhancedSystemInfo {
 
         if !self.config.allow_unprivileged_access {
             set_errno(EPERM);
-            self.stats.permission_errors.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+            self.stats
+                .permission_errors
+                .fetch_add(1, core::sync::atomic::Ordering::SeqCst);
             return -1;
         }
 
@@ -424,7 +430,8 @@ impl EnhancedSystemInfo {
         if let Some(mut sysinfo) = self.cached_sysinfo.try_lock() {
             *sysinfo = None;
         }
-        self.cache_timestamp.store(0, core::sync::atomic::Ordering::SeqCst);
+        self.cache_timestamp
+            .store(0, core::sync::atomic::Ordering::SeqCst);
     }
 
     /// 打印系统信息报告
@@ -453,10 +460,15 @@ impl EnhancedSystemInfo {
         crate::println!("内存使用率: {:.1}%", mem_info.memory_usage_percent);
 
         let stats = self.get_stats();
-        crate::println!("查询统计: 总数={}, 缓存命中={}, 权限错误={}",
-            stats.total_queries.load(core::sync::atomic::Ordering::SeqCst),
+        crate::println!(
+            "查询统计: 总数={}, 缓存命中={}, 权限错误={}",
+            stats
+                .total_queries
+                .load(core::sync::atomic::Ordering::SeqCst),
             stats.cache_hits.load(core::sync::atomic::Ordering::SeqCst),
-            stats.permission_errors.load(core::sync::atomic::Ordering::SeqCst)
+            stats
+                .permission_errors
+                .load(core::sync::atomic::Ordering::SeqCst)
         );
 
         crate::println!("==================");
@@ -467,7 +479,9 @@ impl EnhancedSystemInfo {
     /// 检查缓存是否有效
     fn is_cache_valid(&self) -> bool {
         let current_time = crate::subsystems::time::get_timestamp() as u64;
-        let cache_time = self.cache_timestamp.load(core::sync::atomic::Ordering::SeqCst);
+        let cache_time = self
+            .cache_timestamp
+            .load(core::sync::atomic::Ordering::SeqCst);
 
         cache_time > 0 && (current_time - cache_time) < self.config.cache_timeout as u64
     }
@@ -478,7 +492,8 @@ impl EnhancedSystemInfo {
             sysname: heapless::String::from_str("NOS").unwrap_or_default(),
             nodename: heapless::String::from_str("localhost").unwrap_or_default(),
             release: heapless::String::from_str("1.0.0").unwrap_or_default(),
-            version: heapless::String::from_str("NOS Kernel v1.0.0 (Build 2024)").unwrap_or_default(),
+            version: heapless::String::from_str("NOS Kernel v1.0.0 (Build 2024)")
+                .unwrap_or_default(),
             machine: heapless::String::from_str("x86_64").unwrap_or_default(),
             domainname: heapless::String::from_str("localdomain").unwrap_or_default(),
         }
@@ -491,13 +506,13 @@ impl EnhancedSystemInfo {
 
         SysInfo {
             uptime,
-            loads: [65536, 32768, 16384], // 模拟负载：1.0, 0.5, 0.25
+            loads: [65536, 32768, 16384],     // 模拟负载：1.0, 0.5, 0.25
             totalram: 8 * 1024 * 1024 * 1024, // 8GB
-            freeram: 4 * 1024 * 1024 * 1024, // 4GB
-            sharedram: 512 * 1024 * 1024,    // 512MB
-            bufferram: 256 * 1024 * 1024,    // 256MB
+            freeram: 4 * 1024 * 1024 * 1024,  // 4GB
+            sharedram: 512 * 1024 * 1024,     // 512MB
+            bufferram: 256 * 1024 * 1024,     // 256MB
             totalswap: 2 * 1024 * 1024 * 1024, // 2GB
-            freeswap: 2 * 1024 * 1024 * 1024,  // 2GB
+            freeswap: 2 * 1024 * 1024 * 1024, // 2GB
             procs: 42,
             totalhigh: 0,
             freehigh: 0,
@@ -517,10 +532,18 @@ impl EnhancedSystemInfo {
             virtualization: true,
             features: {
                 let mut features = heapless::Vec::new();
-                features.push(heapless::String::from_str("mmx").unwrap_or_default()).ok();
-                features.push(heapless::String::from_str("sse").unwrap_or_default()).ok();
-                features.push(heapless::String::from_str("sse2").unwrap_or_default()).ok();
-                features.push(heapless::String::from_str("avx").unwrap_or_default()).ok();
+                features
+                    .push(heapless::String::from_str("mmx").unwrap_or_default())
+                    .ok();
+                features
+                    .push(heapless::String::from_str("sse").unwrap_or_default())
+                    .ok();
+                features
+                    .push(heapless::String::from_str("sse2").unwrap_or_default())
+                    .ok();
+                features
+                    .push(heapless::String::from_str("avx").unwrap_or_default())
+                    .ok();
                 features
             },
         }
@@ -551,27 +574,31 @@ impl EnhancedSystemInfo {
         let mut interfaces = heapless::Vec::new();
 
         // 模拟网络接口
-        interfaces.push(NetworkInterface {
-            name: heapless::String::from_str("lo").unwrap_or_default(),
-            mac_address: heapless::String::from_str("00:00:00:00:00:00").unwrap_or_default(),
-            ip_address: heapless::String::from_str("127.0.0.1").unwrap_or_default(),
-            is_up: true,
-            rx_bytes: 1048576,
-            tx_bytes: 1048576,
-            rx_packets: 1024,
-            tx_packets: 1024,
-        }).ok();
+        interfaces
+            .push(NetworkInterface {
+                name: heapless::String::from_str("lo").unwrap_or_default(),
+                mac_address: heapless::String::from_str("00:00:00:00:00:00").unwrap_or_default(),
+                ip_address: heapless::String::from_str("127.0.0.1").unwrap_or_default(),
+                is_up: true,
+                rx_bytes: 1048576,
+                tx_bytes: 1048576,
+                rx_packets: 1024,
+                tx_packets: 1024,
+            })
+            .ok();
 
-        interfaces.push(NetworkInterface {
-            name: heapless::String::from_str("eth0").unwrap_or_default(),
-            mac_address: heapless::String::from_str("52:54:00:12:34:56").unwrap_or_default(),
-            ip_address: heapless::String::from_str("192.168.1.100").unwrap_or_default(),
-            is_up: true,
-            rx_bytes: 1073741824,
-            tx_bytes: 536870912,
-            rx_packets: 1000000,
-            tx_packets: 500000,
-        }).ok();
+        interfaces
+            .push(NetworkInterface {
+                name: heapless::String::from_str("eth0").unwrap_or_default(),
+                mac_address: heapless::String::from_str("52:54:00:12:34:56").unwrap_or_default(),
+                ip_address: heapless::String::from_str("192.168.1.100").unwrap_or_default(),
+                is_up: true,
+                rx_bytes: 1073741824,
+                tx_bytes: 536870912,
+                rx_packets: 1000000,
+                tx_packets: 500000,
+            })
+            .ok();
 
         interfaces
     }
@@ -704,7 +731,8 @@ pub mod sysinfo_tests {
         let sysinfo = EnhancedSystemInfo::new(SystemInfoConfig::default());
         let mut hostname_buffer = [0u8; 256];
 
-        let result = sysinfo.gethostname(hostname_buffer.as_mut_ptr() as *mut c_char, hostname_buffer.len());
+        let result =
+            sysinfo.gethostname(hostname_buffer.as_mut_ptr() as *mut c_char, hostname_buffer.len());
         if result == 0 {
             let hostname_str = unsafe {
                 core::ffi::CStr::from_ptr(hostname_buffer.as_ptr() as *const c_char)
@@ -776,7 +804,8 @@ pub mod sysinfo_tests {
         crate::println!("    网络接口数量: {}", interfaces.len());
 
         for interface in interfaces.iter() {
-            crate::println!("    {}: 状态={}, IP={}, RX={}MB, TX={}MB",
+            crate::println!(
+                "    {}: 状态={}, IP={}, RX={}MB, TX={}MB",
                 interface.name,
                 if interface.is_up { "UP" } else { "DOWN" },
                 interface.ip_address,

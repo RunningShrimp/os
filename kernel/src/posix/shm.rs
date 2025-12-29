@@ -4,12 +4,12 @@
 
 extern crate alloc;
 
-use alloc::sync::Arc;
-use alloc::collections::BTreeMap;
-use crate::subsystems::sync::Mutex;
-use crate::reliability::{EOK, EINVAL, ENOENT};
-use crate::posix::{ShmidDs, IpcPerm, Mode, Pid, Size};
-use crate::subsystems::mm::vm;
+use alloc::{collections::BTreeMap, sync::Arc};
+
+use crate::{
+    posix::{IpcPerm, Mode, Pid, ShmidDs, Size},
+    subsystems::sync::Mutex,
+};
 
 /// Shared memory segment
 #[derive(Debug)]
@@ -117,11 +117,9 @@ pub unsafe extern "C" fn shmget(key: i32, size: Size, shmflg: i32) -> i32 {
         let mut pages = alloc::vec::Vec::with_capacity(num_pages);
         for _ in 0..num_pages {
             match vm::alloc_page() {
-                Some(page_addr) => pages.push(vm::Page {
-                    addr: page_addr,
-                    size: page_size,
-                    flags: 0,
-                }),
+                Some(page_addr) => {
+                    pages.push(vm::Page { addr: page_addr, size: page_size, flags: 0 })
+                },
                 None => return -1,
             }
         }
@@ -178,7 +176,8 @@ pub unsafe extern "C" fn shmat(shmid: i32, shmaddr: *mut u8, shmflg: i32) -> *mu
     let segments = SHM_SEGMENTS.lock();
 
     // Find segment by ID (linear search - could be optimized)
-    let segment = segments.iter()
+    let segment = segments
+        .iter()
         .find(|(_, seg)| seg.lock().id == shmid)
         .map(|(_, seg)| seg.clone());
 
@@ -224,7 +223,7 @@ pub unsafe extern "C" fn shmat(shmid: i32, shmaddr: *mut u8, shmflg: i32) -> *mu
                 Some(proc) => (pid, proc.pagetable),
                 None => return core::ptr::null_mut(),
             }
-        }
+        },
         None => return core::ptr::null_mut(),
     };
 
@@ -292,7 +291,7 @@ pub unsafe extern "C" fn shmdt(shmaddr: *mut u8) -> i32 {
                 Some(proc) => (pid, proc.pagetable),
                 None => return EINVAL,
             }
-        }
+        },
         None => return EINVAL,
     };
 
@@ -314,7 +313,9 @@ pub unsafe extern "C" fn shmdt(shmaddr: *mut u8) -> i32 {
             // Try to find a mapping for this address
             let table = crate::process::manager::PROC_TABLE.lock();
             if let Some(proc) = table.find_ref(current_pid) {
-                if vm::get_page_mapping(proc as *const crate::process::manager::Proc, vaddr).is_some() {
+                if vm::get_page_mapping(proc as *const crate::process::manager::Proc, vaddr)
+                    .is_some()
+                {
                     found_segment = Some(segment.clone());
                     break;
                 }
@@ -376,7 +377,8 @@ pub unsafe extern "C" fn shmctl(shmid: i32, cmd: i32, buf: *mut ShmidDs) -> i32 
     let segments = SHM_SEGMENTS.lock();
 
     // Find segment by ID
-    let segment = segments.iter()
+    let segment = segments
+        .iter()
         .find(|(_, seg)| seg.lock().id == shmid)
         .map(|(_, seg)| seg.clone());
 
@@ -405,7 +407,7 @@ pub unsafe extern "C" fn shmctl(shmid: i32, cmd: i32, buf: *mut ShmidDs) -> i32 
                 shm_nattch: seg_guard.nattch,
             };
             EOK
-        }
+        },
 
         crate::posix::IPC_SET => {
             if buf.is_null() {
@@ -421,7 +423,7 @@ pub unsafe extern "C" fn shmctl(shmid: i32, cmd: i32, buf: *mut ShmidDs) -> i32 
             seg_guard.perm.mode = new_buf.shm_perm.mode & 0o777;
 
             EOK
-        }
+        },
 
         crate::posix::IPC_RMID => {
             let mut seg_guard = segment.lock();
@@ -436,7 +438,7 @@ pub unsafe extern "C" fn shmctl(shmid: i32, cmd: i32, buf: *mut ShmidDs) -> i32 
             }
 
             EOK
-        }
+        },
 
         _ => EINVAL,
     }

@@ -11,10 +11,10 @@ extern crate alloc;
 extern crate hashbrown;
 
 use alloc::string::String;
-use alloc::string::ToString;
-use hashbrown::HashMap;
-use crate::compat::{*, DefaultHasherBuilder};
 
+use hashbrown::HashMap;
+
+use crate::compat::{DefaultHasherBuilder, *};
 /// macOS compatibility module
 pub struct MacOSModule {
     framework_registry: MacOSFrameworkRegistry,
@@ -54,7 +54,6 @@ impl PlatformModule for MacOSModule {
     fn shutdown(&mut self) -> Result<(), &'static str> {
         Ok(())
     }
-
 }
 
 /// macOS Framework Registry
@@ -92,7 +91,9 @@ impl MacOSFrameworkRegistry {
 
         cf_framework.symbols.insert("CFAllocate".to_string(), 1);
         cf_framework.symbols.insert("CFRelease".to_string(), 2);
-        cf_framework.symbols.insert("CFStringCreateWithCString".to_string(), 3);
+        cf_framework
+            .symbols
+            .insert("CFStringCreateWithCString".to_string(), 3);
 
         // Foundation
         let mut foundation_framework = MacOSFramework {
@@ -102,8 +103,12 @@ impl MacOSFrameworkRegistry {
             symbols: HashMap::with_hasher(DefaultHasherBuilder),
         };
 
-        foundation_framework.symbols.insert("NSString stringWithUTF8String".to_string(), 100);
-        foundation_framework.symbols.insert("NSArray array".to_string(), 101);
+        foundation_framework
+            .symbols
+            .insert("NSString stringWithUTF8String".to_string(), 100);
+        foundation_framework
+            .symbols
+            .insert("NSArray array".to_string(), 101);
 
         // AppKit
         let mut appkit_framework = MacOSFramework {
@@ -113,12 +118,19 @@ impl MacOSFrameworkRegistry {
             symbols: HashMap::with_hasher(DefaultHasherBuilder),
         };
 
-        appkit_framework.symbols.insert("NSApplication sharedApplication".to_string(), 200);
-        appkit_framework.symbols.insert("NSWindow init".to_string(), 201);
+        appkit_framework
+            .symbols
+            .insert("NSApplication sharedApplication".to_string(), 200);
+        appkit_framework
+            .symbols
+            .insert("NSWindow init".to_string(), 201);
 
-        self.loaded_frameworks.insert("CoreFoundation.framework".to_string(), cf_framework);
-        self.loaded_frameworks.insert("Foundation.framework".to_string(), foundation_framework);
-        self.loaded_frameworks.insert("AppKit.framework".to_string(), appkit_framework);
+        self.loaded_frameworks
+            .insert("CoreFoundation.framework".to_string(), cf_framework);
+        self.loaded_frameworks
+            .insert("Foundation.framework".to_string(), foundation_framework);
+        self.loaded_frameworks
+            .insert("AppKit.framework".to_string(), appkit_framework);
     }
 }
 
@@ -165,19 +177,25 @@ impl ObjectiveCRuntime {
             ivars: HashMap::with_hasher(DefaultHasherBuilder),
         };
 
-        nsobject.methods.insert("init".to_string(), ObjCMethod {
-            name: "init".to_string(),
-            selector: "init".to_string(),
-            implementation: 0,
-            types: "v@:".to_string(),
-        });
+        nsobject.methods.insert(
+            "init".to_string(),
+            ObjCMethod {
+                name: "init".to_string(),
+                selector: "init".to_string(),
+                implementation: 0,
+                types: "v@:".to_string(),
+            },
+        );
 
-        nsobject.methods.insert("dealloc".to_string(), ObjCMethod {
-            name: "dealloc".to_string(),
-            selector: "dealloc".to_string(),
-            implementation: 1,
-            types: "v@:".to_string(),
-        });
+        nsobject.methods.insert(
+            "dealloc".to_string(),
+            ObjCMethod {
+                name: "dealloc".to_string(),
+                selector: "dealloc".to_string(),
+                implementation: 1,
+                types: "v@:".to_string(),
+            },
+        );
 
         self.class_registry.insert("NSObject".to_string(), nsobject);
     }

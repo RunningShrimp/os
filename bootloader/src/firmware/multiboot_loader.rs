@@ -1,7 +1,6 @@
 // Multiboot2 bootloader information handler
 
-use crate::protocol::BootInfo;
-use crate::protocol::multiboot2_tags;
+use crate::protocol::{BootInfo, multiboot2_tags};
 
 pub struct MultibootLoader {
     magic: u32,
@@ -15,8 +14,7 @@ impl MultibootLoader {
 
     /// Check if valid Multiboot2 info
     pub fn is_valid(&self) -> bool {
-        self.magic == multiboot2_tags::MULTIBOOT2_BOOTLOADER_MAGIC
-            && self.info_addr != 0
+        self.magic == multiboot2_tags::MULTIBOOT2_BOOTLOADER_MAGIC && self.info_addr != 0
     }
 
     /// Parse Multiboot2 tags and build BootInfo
@@ -25,13 +23,10 @@ impl MultibootLoader {
             return None;
         }
 
-        let mut boot_info =
-            BootInfo::new(crate::protocol::BootProtocolType::Multiboot2);
+        let mut boot_info = BootInfo::new(crate::protocol::BootProtocolType::Multiboot2);
 
         // Parse tags
-        if let Some(mut iter) =
-            multiboot2_tags::parse_tags(self.info_addr)
-        {
+        if let Some(mut iter) = multiboot2_tags::parse_tags(self.info_addr) {
             while let Some(tag) = iter.next() {
                 unsafe {
                     self.parse_tag(tag, &mut boot_info);
@@ -52,8 +47,7 @@ impl MultibootLoader {
         match tag_type {
             multiboot2_tags::MULTIBOOT_TAG_TYPE_CMDLINE => {
                 // Command line tag at offset 8 bytes
-                let cmdline_ptr =
-                    (tag as usize + 8) as *const u8;
+                let cmdline_ptr = (tag as usize + 8) as *const u8;
                 crate::drivers::console::write_str("Kernel command: ");
                 let mut i = 0;
                 while i < 128 {
@@ -65,7 +59,7 @@ impl MultibootLoader {
                     i += 1;
                 }
                 crate::drivers::console::write_str("\n");
-            }
+            },
 
             multiboot2_tags::MULTIBOOT_TAG_TYPE_BOOTLOADER_NAME => {
                 let name_ptr = (tag as usize + 8) as *const u8;
@@ -80,41 +74,34 @@ impl MultibootLoader {
                     i += 1;
                 }
                 crate::drivers::console::write_str("\n");
-            }
+            },
 
             multiboot2_tags::MULTIBOOT_TAG_TYPE_BASIC_MEMINFO => {
-                let meminfo_ptr =
-                    tag as *const multiboot2_tags::MultibootTag;
+                let meminfo_ptr = tag as *const multiboot2_tags::MultibootTag;
                 // Memory info at offset +8 (lower mem in KB)
-                let mem_lower =
-                    *(meminfo_ptr as usize as *const u32).add(2);
+                let mem_lower = *(meminfo_ptr as usize as *const u32).add(2);
                 crate::drivers::console::write_str("Memory: ");
-                crate::drivers::console::write_str(
-                    if mem_lower > 0 { "OK" } else { "?" },
-                );
+                crate::drivers::console::write_str(if mem_lower > 0 { "OK" } else { "?" });
                 crate::drivers::console::write_str("\n");
-            }
+            },
 
             multiboot2_tags::MULTIBOOT_TAG_TYPE_FRAMEBUFFER => {
                 crate::drivers::console::write_str("Framebuffer: detected\n");
-            }
+            },
 
             multiboot2_tags::MULTIBOOT_TAG_TYPE_MMAP => {
                 crate::drivers::console::write_str("Memory map: present\n");
-            }
+            },
 
             _ => {
                 // Unknown tag, skip
-            }
+            },
         }
     }
 }
 
 /// Parse Multiboot2 boot information
-pub fn load_from_multiboot2(
-    magic: u32,
-    info_addr: usize,
-) -> Option<BootInfo> {
+pub fn load_from_multiboot2(magic: u32, info_addr: usize) -> Option<BootInfo> {
     let loader = MultibootLoader::new(magic, info_addr);
     loader.parse()
 }

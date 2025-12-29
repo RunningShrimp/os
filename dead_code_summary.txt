@@ -1,0 +1,26 @@
+Dead Code Summary
+=================
+
+Quick Stats:
+- Files: 3
+- Structs: 9
+- Enums: 9  
+- Functions: 0
+- Total Items: 18
+
+Location Breakdown:
+1. kernel/src/lib.rs: 16 items (network stubs for conditional compilation)
+2. kernel/src/platform/drivers/mod.rs: 2 items (VirtIO placeholder)
+3. kernel/src/subsystems/process/elf.rs: 1 item (AuxType enum)
+
+Special Note: get_time_us
+- Status: NOT DEAD CODE
+- Found in 6 locations across nos-syscalls
+- All instances are actively used
+
+Recommendations:
+- Keep network stubs (needed for feature flags)
+- Implement or remove VirtIO placeholder  
+- Review AuxType enum usage in ELF loading
+
+Full report: dead_code_report.txt

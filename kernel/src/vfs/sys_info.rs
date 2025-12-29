@@ -3,9 +3,7 @@
 //! Provides system-wide information files like /proc/meminfo, /proc/stat, etc.
 
 extern crate alloc;
-use alloc::{boxed::Box, string::String, sync::Arc};
 use crate::subsystems::sync::Mutex;
-use crate::vfs::{
     error::*,
     types::*,
     fs::InodeOps,

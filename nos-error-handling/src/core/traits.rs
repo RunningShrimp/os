@@ -1,20 +1,21 @@
 //! Core error handling traits
-//! 
+//!
 //! This module defines the core traits for error handling in NOS.
 //! Implementations of these traits are in kernel/src/error.
 
 extern crate alloc;
 
-use crate::types::{ErrorRecord, ErrorSeverity, ErrorCategory};
 use alloc::string::String;
 
+use crate::types::{ErrorCategory, ErrorRecord, ErrorSeverity};
+
 /// Error handler trait
-/// 
+///
 /// Implementations of this trait handle errors and decide on actions.
 pub trait ErrorHandler: Send + Sync {
     /// Handle an error and return the action to take
     fn handle_error(&self, error: &ErrorContext) -> ErrorAction;
-    
+
     /// Check if this handler can handle the given error
     fn can_handle(&self, error: &ErrorRecord) -> bool;
 }
@@ -62,12 +63,12 @@ impl ErrorContext {
             function: None,
         }
     }
-    
+
     /// Get error severity
     pub fn severity(&self) -> ErrorSeverity {
         self.error.severity
     }
-    
+
     /// Get error description
     pub fn description(&self) -> &str {
         &self.error.message
@@ -78,7 +79,7 @@ impl ErrorContext {
 pub trait RecoveryStrategy: Send + Sync {
     /// Attempt to recover from an error
     fn recover(&self, error: &ErrorContext) -> RecoveryResult;
-    
+
     /// Get the recovery strategy name
     fn name(&self) -> &str;
 }
@@ -100,7 +101,7 @@ pub enum RecoveryResult {
 pub trait ErrorClassifier: Send + Sync {
     /// Classify an error
     fn classify(&self, error: &ErrorRecord) -> ErrorCategory;
-    
+
     /// Get classifier name
     fn name(&self) -> &str;
 }
@@ -109,7 +110,7 @@ pub trait ErrorClassifier: Send + Sync {
 pub trait HealthMonitor: Send + Sync {
     /// Check system health
     fn check_health(&self) -> HealthStatus;
-    
+
     /// Get health monitor name
     fn name(&self) -> &str;
 }
@@ -126,4 +127,3 @@ pub enum HealthStatus {
     /// System is critical
     Critical,
 }
-

@@ -4,17 +4,17 @@
 //! for reducing overhead and improving performance in NOS operating system.
 
 use alloc::{
-    collections::BTreeMap,
-    string::{String, ToString},
     boxed::Box,
+    collections::BTreeMap,
     format,
+    string::{String, ToString},
 };
-use nos_api::Result;
-use crate::{SyscallHandler, SyscallDispatcher};
-use crate::logging::output_report;
 use core::sync::atomic::{AtomicU64, Ordering};
+
+use nos_api::Result;
 use spin::Mutex;
 
+use crate::{SyscallDispatcher, SyscallHandler, logging::output_report};
 
 /// System call statistics for optimization
 #[derive(Debug, Clone)]
@@ -43,20 +43,20 @@ impl OptimizedSyscallStats {
             slow_path_count: 0,
         }
     }
-    
+
     /// Record a syscall execution
     pub fn record_execution(&mut self, time_us: u64, fast_path: bool) {
         self.call_count += 1;
         self.total_time_us += time_us;
         self.avg_time_us = self.total_time_us / self.call_count;
-        
+
         if fast_path {
             self.fast_path_count += 1;
         } else {
             self.slow_path_count += 1;
         }
     }
-    
+
     /// Get fast path percentage
     pub fn fast_path_percentage(&self) -> f32 {
         if self.call_count == 0 {
@@ -90,43 +90,44 @@ impl OptimizedSyscallDispatcher {
             total_calls: AtomicU64::new(0),
         }
     }
-    
+
     /// Register a syscall handler with optimization
     pub fn register_handler(&mut self, id: u32, handler: Box<dyn SyscallHandler>) -> Result<()> {
         // Register with base dispatcher
         self.base_dispatcher.register_handler(id, handler);
-        
+
         // Add to fast path cache for common syscalls
         if Self::is_fast_path_candidate(id) {
             self.fast_path_cache.insert(id, id);
         }
-        
+
         // Initialize stats
         self.stats.insert(id, OptimizedSyscallStats::new());
-        
+
         Ok(())
     }
-    
+
     /// Check if syscall is a fast path candidate
     fn is_fast_path_candidate(id: u32) -> bool {
         // Common syscalls that benefit from fast path
-        matches!(id, 
-            crate::types::SYS_READ | 
-            crate::types::SYS_WRITE | 
-            crate::types::SYS_OPEN | 
-            crate::types::SYS_CLOSE |
-            crate::types::SYS_MMAP |
-            crate::types::SYS_MUNMAP |
-            crate::types::SYS_ZERO_COPY_SEND |
-            crate::types::SYS_ZERO_COPY_RECV
+        matches!(
+            id,
+            crate::types::SYS_READ
+                | crate::types::SYS_WRITE
+                | crate::types::SYS_OPEN
+                | crate::types::SYS_CLOSE
+                | crate::types::SYS_MMAP
+                | crate::types::SYS_MUNMAP
+                | crate::types::SYS_ZERO_COPY_SEND
+                | crate::types::SYS_ZERO_COPY_RECV
         )
     }
-    
+
     /// Dispatch syscall with optimized path
     pub fn dispatch(&mut self, id: u32, args: &[usize]) -> Result<isize> {
         let start_time = self.get_time_us();
         self.total_calls.fetch_add(1, Ordering::SeqCst);
-        
+
         // Try fast path first
         let (result, fast_path) = if self.fast_path_cache.contains_key(&id) {
             // Fast path: minimal validation, direct execution
@@ -135,36 +136,34 @@ impl OptimizedSyscallDispatcher {
             // Slow path: full validation and execution
             (self.execute_slow_path(id, args), false)
         };
-        
+
         let end_time = self.get_time_us();
         let execution_time = end_time - start_time;
-        
+
         // Update statistics
         if let Some(stats) = self.stats.get_mut(&id) {
             stats.record_execution(execution_time, fast_path);
         }
-        
+
         result
     }
-    
 
-    
     /// Execute syscall on slow path
     fn execute_slow_path(&self, id: u32, args: &[usize]) -> Result<isize> {
         // Slow path: full validation and execution
         // Get handler from base dispatcher
-        let handler = self.base_dispatcher.get_handler(id)
-            .ok_or_else(|| nos_api::Error::NotFound(
-                format!("Syscall {} not found", id)
-            ))?;
-        
+        let handler = self
+            .base_dispatcher
+            .get_handler(id)
+            .ok_or_else(|| nos_api::Error::NotFound(format!("Syscall {} not found", id)))?;
+
         // Full argument validation
         self.validate_arguments(id, args)?;
-        
+
         // Execute with full context
         handler.execute(args)
     }
-    
+
     /// Validate syscall arguments
     fn validate_arguments(&self, id: u32, args: &[usize]) -> Result<()> {
         // Basic validation based on syscall type
@@ -172,21 +171,21 @@ impl OptimizedSyscallDispatcher {
             crate::types::SYS_READ => {
                 if args.len() < 3 {
                     return Err(nos_api::Error::InvalidArgument(
-                        "Read requires 3 arguments".to_string()
+                        "Read requires 3 arguments".to_string(),
                     ));
                 }
             },
             crate::types::SYS_WRITE => {
                 if args.len() < 3 {
                     return Err(nos_api::Error::InvalidArgument(
-                        "Write requires 3 arguments".to_string()
+                        "Write requires 3 arguments".to_string(),
                     ));
                 }
             },
             crate::types::SYS_OPEN => {
                 if args.len() < 2 {
                     return Err(nos_api::Error::InvalidArgument(
-                        "Open requires 2 arguments".to_string()
+                        "Open requires 2 arguments".to_string(),
                     ));
                 }
             },
@@ -194,14 +193,14 @@ impl OptimizedSyscallDispatcher {
                 // Default validation for other syscalls
                 if args.is_empty() {
                     return Err(nos_api::Error::InvalidArgument(
-                        "Syscall requires arguments".to_string()
+                        "Syscall requires arguments".to_string(),
                     ));
                 }
-            }
+            },
         }
         Ok(())
     }
-    
+
     /// Get current time in microseconds
     fn get_time_us(&self) -> u64 {
         // In a real implementation, this would use a high-precision timer
@@ -209,23 +208,23 @@ impl OptimizedSyscallDispatcher {
         static TIME_COUNTER: AtomicU64 = AtomicU64::new(0);
         TIME_COUNTER.fetch_add(1, Ordering::SeqCst)
     }
-    
+
     /// Get syscall statistics
     pub fn get_stats(&self) -> &BTreeMap<u32, OptimizedSyscallStats> {
         &self.stats
     }
-    
+
     /// Get total syscall count
     pub fn get_total_calls(&self) -> u64 {
         self.total_calls.load(Ordering::SeqCst)
     }
-    
+
     /// Get optimization report
     pub fn get_optimization_report(&self) -> String {
         let mut report = String::from("=== System Call Optimization Report ===\n");
         report.push_str(&format!("Total syscalls: {}\n", self.get_total_calls()));
         report.push_str(&format!("Fast path cache size: {}\n", self.fast_path_cache.len()));
-        
+
         for (id, stats) in &self.stats {
             let syscall_name = self.get_syscall_name(*id);
             report.push_str(&format!(
@@ -236,10 +235,10 @@ impl OptimizedSyscallDispatcher {
                 stats.fast_path_percentage()
             ));
         }
-        
+
         report
     }
-    
+
     /// Get syscall name by ID
     fn get_syscall_name(&self, id: u32) -> &str {
         match id {
@@ -272,7 +271,7 @@ impl OptimizedSyscallHandler {
             stats: Mutex::new(OptimizedSyscallStats::new()),
         }
     }
-    
+
     /// Get handler statistics
     pub fn get_stats(&self) -> OptimizedSyscallStats {
         self.stats.lock().clone()
@@ -283,31 +282,30 @@ impl SyscallHandler for OptimizedSyscallHandler {
     fn id(&self) -> u32 {
         self.base_handler.id()
     }
-    
+
     fn name(&self) -> &str {
         self.base_handler.name()
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         let start_time = self.get_time_us();
-        
+
         // Execute the base handler
         let result = self.base_handler.execute(args);
-        
+
         let end_time = self.get_time_us();
         let execution_time = end_time - start_time;
-        
+
         // Update statistics
         let mut stats = self.stats.lock();
         let fast_path = args.len() <= 4 && stats.call_count > 10;
         stats.record_execution(execution_time, fast_path);
-        
+
         result
     }
 }
 
 impl OptimizedSyscallHandler {
-    
     /// Get current time in microseconds
     fn get_time_us(&self) -> u64 {
         // In a real implementation, this would use a high-precision timer
@@ -320,30 +318,36 @@ impl OptimizedSyscallHandler {
 pub fn register_handlers(_dispatcher: &mut SyscallDispatcher) -> Result<()> {
     // Create optimized dispatcher
     let mut optimized_dispatcher = OptimizedSyscallDispatcher::new();
-    
+
     // Register common syscalls with optimization
     let read_handler = OptimizedSyscallHandler::new(Box::new(crate::fs::ReadHandler::new()));
     let _ = optimized_dispatcher.register_handler(crate::types::SYS_READ, Box::new(read_handler));
-    
+
     let write_handler = OptimizedSyscallHandler::new(Box::new(crate::fs::WriteHandler::new()));
     let _ = optimized_dispatcher.register_handler(crate::types::SYS_WRITE, Box::new(write_handler));
-    
+
     let open_handler = OptimizedSyscallHandler::new(Box::new(crate::fs::OpenHandler::new()));
     let _ = optimized_dispatcher.register_handler(crate::types::SYS_OPEN, Box::new(open_handler));
-    
+
     let close_handler = OptimizedSyscallHandler::new(Box::new(crate::fs::CloseHandler::new()));
     let _ = optimized_dispatcher.register_handler(crate::types::SYS_CLOSE, Box::new(close_handler));
-    
+
     // Register zero-copy network handlers with optimization
-    let zero_copy_send_handler = OptimizedSyscallHandler::new(Box::new(crate::zero_copy_network_impl::ZeroCopySendHandler::new()));
-    let _ = optimized_dispatcher.register_handler(crate::types::SYS_ZERO_COPY_SEND, Box::new(zero_copy_send_handler));
-    
-    let zero_copy_recv_handler = OptimizedSyscallHandler::new(Box::new(crate::zero_copy_network_impl::ZeroCopyRecvHandler::new()));
-    let _ = optimized_dispatcher.register_handler(crate::types::SYS_ZERO_COPY_RECV, Box::new(zero_copy_recv_handler));
-    
+    let zero_copy_send_handler = OptimizedSyscallHandler::new(Box::new(
+        crate::zero_copy_network_impl::ZeroCopySendHandler::new(),
+    ));
+    let _ = optimized_dispatcher
+        .register_handler(crate::types::SYS_ZERO_COPY_SEND, Box::new(zero_copy_send_handler));
+
+    let zero_copy_recv_handler = OptimizedSyscallHandler::new(Box::new(
+        crate::zero_copy_network_impl::ZeroCopyRecvHandler::new(),
+    ));
+    let _ = optimized_dispatcher
+        .register_handler(crate::types::SYS_ZERO_COPY_RECV, Box::new(zero_copy_recv_handler));
+
     // Print optimization report
     let report = optimized_dispatcher.get_optimization_report();
     output_report(&report);
-    
+
     Ok(())
 }

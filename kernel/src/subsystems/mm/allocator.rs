@@ -4,13 +4,12 @@
 
 extern crate alloc;
 
-use core::alloc::{GlobalAlloc, Layout};
-use core::ptr::null_mut;
-use core::sync::atomic::{AtomicUsize, Ordering};
-use crate::perf::monitoring::{get_perf_stats};
-use crate::perf::core::{UnifiedSyscallStats, SyscallStatsSnapshot};
 use alloc::vec::Vec;
-use crate::subsystems::sync::Mutex;
+use core::{
+    alloc::{GlobalAlloc, Layout},
+    ptr::null_mut,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 // ============================================================================
 // Re-export the allocator modules
@@ -19,17 +18,24 @@ use crate::subsystems::sync::Mutex;
 // pub mod buddy;
 // pub mod slab;
 // pub mod compress;
-
-
 use crate::subsystems::mm::buddy;
-use crate::subsystems::mm::slab;
-use crate::subsystems::mm::buddy::AllocatorStats as BuddyStats;
-use crate::subsystems::mm::slab::AllocatorStats as SlabStats;
-use crate::subsystems::mm::hugepage;
-use crate::subsystems::mm::buddy::OptimizedBuddyAllocator;
-use crate::subsystems::mm::slab::OptimizedSlabAllocator;
-use crate::subsystems::mm::hugepage::HugePageAllocator;
-use crate::subsystems::mm::traits::{UnifiedAllocator, AllocatorWithStats, AllocatorStats};
+use crate::{
+    perf::{
+        core::{SyscallStatsSnapshot, UnifiedSyscallStats},
+        monitoring::get_perf_stats,
+    },
+    subsystems::{
+        mm::{
+            buddy::{AllocatorStats as BuddyStats, OptimizedBuddyAllocator},
+            hugepage,
+            hugepage::HugePageAllocator,
+            slab,
+            slab::{AllocatorStats as SlabStats, OptimizedSlabAllocator},
+            traits::{AllocatorStats, AllocatorWithStats, UnifiedAllocator},
+        },
+        sync::Mutex,
+    },
+};
 
 // ============================================================================
 // Hybrid Allocator
@@ -60,19 +66,23 @@ impl HybridAllocator {
             failed_allocations: AtomicUsize::new(0),
         }
     }
-pub unsafe fn init(&self, slab_start: usize, slab_size: usize,
-                   buddy_start: usize, buddy_size: usize,
-                   page_size: usize) {
-    // 使用 SpinLock 替代 Mutex 初始化分配器
-    let mut slab = self.slab.lock();
-    slab.init(slab_start as *mut u8, slab_size);
-    drop(slab);
+    pub unsafe fn init(
+        &self,
+        slab_start: usize,
+        slab_size: usize,
+        buddy_start: usize,
+        buddy_size: usize,
+        page_size: usize,
+    ) {
+        // 使用 SpinLock 替代 Mutex 初始化分配器
+        let mut slab = self.slab.lock();
+        slab.init(slab_start as *mut u8, slab_size);
+        drop(slab);
 
-    let mut buddy = self.buddy.lock();
-    buddy.init(buddy_start, buddy_start + buddy_size, page_size);
-    drop(buddy);
-    
-        
+        let mut buddy = self.buddy.lock();
+        buddy.init(buddy_start, buddy_start + buddy_size, page_size);
+        drop(buddy);
+
         // Initialize huge page allocator with a portion of the buddy region
         // Reserve 10% of buddy region for huge pages
         let hugepage_start = buddy_start + (buddy_size * 9 / 10);
@@ -83,7 +93,7 @@ pub unsafe fn init(&self, slab_start: usize, slab_size: usize,
 
     fn alloc(&self, layout: Layout) -> *mut u8 {
         let size = layout.size();
-        
+
         // Check if this is a huge page allocation (>= 2MB)
         if size >= hugepage::HPAGE_2MB {
             let mut hugepage = self.hugepage.lock();
@@ -95,9 +105,10 @@ pub unsafe fn init(&self, slab_start: usize, slab_size: usize,
             }
             // Fallback to buddy if hugepage allocation fails
         }
-        
+
         // Try slab allocator first for small objects
-        if size <= 2048 { // Matches SLAB_SIZES defined in slab.rs
+        if size <= 2048 {
+            // Matches SLAB_SIZES defined in slab.rs
             let mut slab = self.slab.lock(); // SpinLock for faster access
             let ptr = slab.alloc(layout);
             if !ptr.is_null() {
@@ -118,18 +129,23 @@ pub unsafe fn init(&self, slab_start: usize, slab_size: usize,
         }
         ptr
     }
-    
-   fn track_allocation(&self, size: usize) {
-       let current = self.current_allocated_bytes.fetch_add(size, Ordering::Relaxed) + size;
-       // Update peak if necessary (use simple compare-and-swap loop)
+
+    fn track_allocation(&self, size: usize) {
+        let current = self
+            .current_allocated_bytes
+            .fetch_add(size, Ordering::Relaxed)
+            + size;
+        // Update peak if necessary (use simple compare-and-swap loop)
         loop {
             let peak = self.peak_allocated_bytes.load(Ordering::Relaxed);
             if current <= peak {
                 break;
             }
-            if self.peak_allocated_bytes.compare_exchange_weak(
-                peak, current, Ordering::Relaxed, Ordering::Relaxed
-            ).is_ok() {
+            if self
+                .peak_allocated_bytes
+                .compare_exchange_weak(peak, current, Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok()
+            {
                 break;
             }
         }
@@ -141,11 +157,12 @@ pub unsafe fn init(&self, slab_start: usize, slab_size: usize,
         }
 
         let size = layout.size();
-        
+
         // Track deallocation
         self.deallocation_count.fetch_add(1, Ordering::Relaxed);
-        self.current_allocated_bytes.fetch_sub(size, Ordering::Relaxed);
-        
+        self.current_allocated_bytes
+            .fetch_sub(size, Ordering::Relaxed);
+
         // Check if this is a huge page deallocation
         if size >= hugepage::HPAGE_2MB {
             let mut hugepage = self.hugepage.lock();
@@ -153,11 +170,14 @@ pub unsafe fn init(&self, slab_start: usize, slab_size: usize,
             self.allocation_count.fetch_sub(1, Ordering::Relaxed);
             return;
         }
-        
+
         // Try slab allocator first for small objects
-        if size <= 2048 { // Matches SLAB_SIZES defined in slab.rs
+        if size <= 2048 {
+            // Matches SLAB_SIZES defined in slab.rs
             let mut slab = self.slab.lock(); // SpinLock for faster access
-            unsafe { slab.dealloc(ptr, layout); }
+            unsafe {
+                slab.dealloc(ptr, layout);
+            }
             self.allocation_count.fetch_sub(1, Ordering::Relaxed);
             return;
         }
@@ -173,7 +193,7 @@ pub unsafe fn init(&self, slab_start: usize, slab_size: usize,
         let slab_stats = self.slab.lock().stats();
         (buddy.stats(), slab_stats)
     }
-    
+
     /// Get supported huge page sizes
     pub fn get_hugepage_sizes(&self) -> Vec<usize> {
         let hugepage = self.hugepage.lock();
@@ -199,12 +219,7 @@ unsafe impl UnifiedAllocator for HybridAllocator {
         ptr
     }
 
-    unsafe fn reallocate(
-        &self,
-        ptr: *mut u8,
-        old_layout: Layout,
-        new_size: usize,
-    ) -> *mut u8 {
+    unsafe fn reallocate(&self, ptr: *mut u8, old_layout: Layout, new_size: usize) -> *mut u8 {
         let new_layout = match Layout::from_size_align(new_size, old_layout.align()) {
             Ok(l) => l,
             Err(_) => return null_mut(),
@@ -231,7 +246,7 @@ impl AllocatorWithStats for HybridAllocator {
         let current_allocated_bytes = self.current_allocated_bytes.load(Ordering::Relaxed);
         let peak_allocated_bytes = self.peak_allocated_bytes.load(Ordering::Relaxed);
         let failed_allocations = self.failed_allocations.load(Ordering::Relaxed);
-        
+
         crate::subsystems::mm::traits::AllocatorStats {
             total_allocations,
             total_deallocations,
@@ -294,14 +309,14 @@ fn get_total_memory() -> usize {
         // In a real implementation, this would query the hardware
         512 * 1024 * 1024 // 512 MB default for x86_64
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     {
         // For aarch64, we could read from device tree
         // In a real implementation, this would query the device tree
         512 * 1024 * 1024 // 512 MB default for aarch64
     }
-    
+
     #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
     {
         // Default fallback for other architectures
@@ -313,12 +328,12 @@ fn get_total_memory() -> usize {
 pub fn calculate_memory_pressure() -> u64 {
     let current = ALLOCATOR.current_allocated_bytes.load(Ordering::Relaxed);
     let total = get_total_memory();
-    
+
     // If total memory is 0, return maximum pressure
     if total == 0 {
         return 10000; // Maximum pressure
     }
-    
+
     (current * 10000) / total
 }
 
@@ -327,7 +342,7 @@ pub fn get_memory_metrics() -> (usize, usize, usize) {
     let current = ALLOCATOR.current_allocated_bytes.load(Ordering::Relaxed);
     let peak = ALLOCATOR.peak_allocated_bytes.load(Ordering::Relaxed);
     let failed = ALLOCATOR.failed_allocations.load(Ordering::Relaxed);
-    
+
     (current, peak, failed)
 }
 
@@ -339,9 +354,13 @@ pub fn get_global_allocator() -> &'static HybridAllocator {
 /// Initialize the kernel heap allocator
 /// # Safety
 /// Must be called exactly once with valid heap bounds
-pub unsafe fn init(slab_start: usize, slab_size: usize,
-                   buddy_start: usize, buddy_size: usize,
-                   page_size: usize) {
+pub unsafe fn init(
+    slab_start: usize,
+    slab_size: usize,
+    buddy_start: usize,
+    buddy_size: usize,
+    page_size: usize,
+) {
     ALLOCATOR.init(slab_start, slab_size, buddy_start, buddy_size, page_size);
 }
 

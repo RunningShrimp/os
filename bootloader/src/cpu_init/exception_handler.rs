@@ -6,7 +6,6 @@
 //! - Stack frame management for exceptions
 //! - Recovery and fallback mechanisms
 
-
 /// CPU exception categories (Intel x86-64)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExceptionType {
@@ -75,11 +74,7 @@ pub struct ExceptionFlags {
 impl ExceptionFlags {
     /// Create exception flags
     pub fn new(has_error_code: bool, is_nmi: bool, is_user_mode: bool) -> Self {
-        ExceptionFlags {
-            has_error_code,
-            is_nmi,
-            is_user_mode,
-        }
+        ExceptionFlags { has_error_code, is_nmi, is_user_mode }
     }
 }
 
@@ -103,14 +98,7 @@ pub struct ExceptionContext {
 impl ExceptionContext {
     /// Create exception context
     pub fn new(rip: u64, rcs: u16, rflags: u64, rsp: u64, rss: u16) -> Self {
-        ExceptionContext {
-            rip,
-            rcs,
-            rflags,
-            rsp,
-            rss,
-            error_code: None,
-        }
+        ExceptionContext { rip, rcs, rflags, rsp, rss, error_code: None }
     }
 
     /// Set error code
@@ -152,10 +140,7 @@ pub struct ExceptionInfo {
 
 impl ExceptionInfo {
     /// Create exception info
-    pub fn new(
-        exception_type: ExceptionType,
-        context: ExceptionContext,
-    ) -> Self {
+    pub fn new(exception_type: ExceptionType, context: ExceptionContext) -> Self {
         let severity = Self::classify_severity(exception_type);
         let recovery_strategy = Self::classify_recovery(exception_type);
 
@@ -175,10 +160,10 @@ impl ExceptionInfo {
             ExceptionType::Overflow | ExceptionType::BoundRange => ExceptionSeverity::Recoverable,
             ExceptionType::InvalidOpcode | ExceptionType::DeviceNotAvailable => {
                 ExceptionSeverity::Severe
-            }
+            },
             ExceptionType::PageFault | ExceptionType::GeneralProtection => {
                 ExceptionSeverity::Severe
-            }
+            },
             ExceptionType::DoubleFault | ExceptionType::MachineCheck => ExceptionSeverity::Fatal,
             _ => ExceptionSeverity::Severe,
         }
@@ -209,11 +194,7 @@ pub struct ExceptionHandler {
 impl ExceptionHandler {
     /// Create new exception handler manager
     pub fn new() -> Self {
-        ExceptionHandler {
-            handlers: [None; 32],
-            total_handled: 0,
-            fatal_count: 0,
-        }
+        ExceptionHandler { handlers: [None; 32], total_handled: 0, fatal_count: 0 }
     }
 
     /// Register exception handler
@@ -264,11 +245,7 @@ impl ExceptionHandler {
     /// Get exception handler
     pub fn get_handler(&self, exc_type: ExceptionType) -> Option<ExceptionHandlerFn> {
         let idx = exc_type as usize;
-        if idx < 32 {
-            self.handlers[idx]
-        } else {
-            None
-        }
+        if idx < 32 { self.handlers[idx] } else { None }
     }
 
     /// Get total handled exceptions
@@ -461,7 +438,7 @@ mod tests {
         for _ in 0..5 {
             handler.handle_exception(ExceptionType::Breakpoint, ctx);
         }
-        
+
         // 1 fatal exception
         handler.handle_exception(ExceptionType::DoubleFault, ctx);
 
@@ -497,7 +474,7 @@ mod tests {
     #[test]
     fn test_handler_with_multiple_types() {
         let mut handler = ExceptionHandler::new();
-        
+
         assert!(handler.register(ExceptionType::PageFault, dummy_handler));
         assert!(handler.register(ExceptionType::GeneralProtection, dummy_handler));
         assert!(handler.register(ExceptionType::InvalidOpcode, dummy_handler));

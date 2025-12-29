@@ -2,11 +2,10 @@
 //!
 //! This module provides error classification and analysis functionality.
 
-use crate::Result;
-
 use nos_api::collections::BTreeMap;
-
 use spin::Mutex;
+
+use crate::Result;
 
 /// Error classifier
 pub struct ErrorClassifier {
@@ -40,29 +39,35 @@ impl ErrorClassifier {
     pub fn classify_error(&self, error_record: &mut crate::types::ErrorRecord) -> Result<()> {
         // Get the rule for this error code
         let rule = self.rules.get(&error_record.code);
-        
+
         if let Some(rule) = rule {
             // Apply the rule
             error_record.category = rule.category;
             error_record.severity = rule.severity;
             error_record.error_type = rule.error_type;
-            
+
             // Update statistics
             let mut stats = self.stats.lock();
             stats.total_classified += 1;
-            *stats.classifications_by_category.entry(rule.category).or_insert(0) += 1;
-            *stats.classifications_by_severity.entry(rule.severity).or_insert(0) += 1;
+            *stats
+                .classifications_by_category
+                .entry(rule.category)
+                .or_insert(0) += 1;
+            *stats
+                .classifications_by_severity
+                .entry(rule.severity)
+                .or_insert(0) += 1;
         } else {
             // Default classification
             error_record.category = crate::types::ErrorCategory::System;
             error_record.severity = crate::types::ErrorSeverity::Error;
             error_record.error_type = crate::types::ErrorType::RuntimeError;
-            
+
             // Update statistics
             let mut stats = self.stats.lock();
             stats.total_unclassified += 1;
         }
-        
+
         Ok(())
     }
 
@@ -93,7 +98,7 @@ impl ErrorClassifier {
             severity: crate::types::ErrorSeverity::High,
             error_type: crate::types::ErrorType::MemoryError,
         });
-        
+
         // File system errors
         self.add_rule(ClassificationRule {
             error_code: 2, // ENOENT
@@ -101,7 +106,7 @@ impl ErrorClassifier {
             severity: crate::types::ErrorSeverity::Medium,
             error_type: crate::types::ErrorType::IOError,
         });
-        
+
         // Network errors
         self.add_rule(ClassificationRule {
             error_code: 101, // ENETUNREACH
@@ -109,7 +114,7 @@ impl ErrorClassifier {
             severity: crate::types::ErrorSeverity::Medium,
             error_type: crate::types::ErrorType::NetworkError,
         });
-        
+
         // Permission errors
         self.add_rule(ClassificationRule {
             error_code: 13, // EACCES
@@ -151,20 +156,18 @@ static GLOBAL_CLASSIFIER: spin::Once<Mutex<ErrorClassifier>> = spin::Once::new()
 
 /// Initialize the global error classifier
 pub fn init_classifier() -> Result<()> {
-    GLOBAL_CLASSIFIER.call_once(|| {
-        Mutex::new(ErrorClassifier::new())
-    });
-    
+    GLOBAL_CLASSIFIER.call_once(|| Mutex::new(ErrorClassifier::new()));
+
     // Initialize the classifier
     GLOBAL_CLASSIFIER.get().unwrap().lock().init()
 }
 
 /// Get the global error classifier
 pub fn get_classifier() -> &'static Mutex<ErrorClassifier> {
-    GLOBAL_CLASSIFIER.get().expect("Error classifier not initialized")
+    GLOBAL_CLASSIFIER
+        .get()
+        .expect("Error classifier not initialized")
 }
-
-
 
 /// Shutdown the global error classifier
 pub fn shutdown_classifier() -> Result<()> {
@@ -180,7 +183,7 @@ mod tests {
     #[test]
     fn test_error_classifier() {
         let mut classifier = ErrorClassifier::new();
-        
+
         // Add a test rule
         let rule = ClassificationRule {
             error_code: 100,
@@ -189,13 +192,10 @@ mod tests {
             error_type: crate::types::ErrorType::RuntimeError,
         };
         classifier.add_rule(rule);
-        
+
         // Classify an error
-        let mut error_record = crate::types::ErrorRecord {
-            code: 100,
-            ..Default::default()
-        };
-        
+        let mut error_record = crate::types::ErrorRecord { code: 100, ..Default::default() };
+
         assert!(classifier.classify_error(&mut error_record).is_ok());
         assert_eq!(error_record.category, crate::types::ErrorCategory::System);
         assert_eq!(error_record.severity, crate::types::ErrorSeverity::Error);

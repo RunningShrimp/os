@@ -2,7 +2,6 @@
 ///
 /// Implements Multiboot2 protocol for kernel boot information passing.
 /// Handles boot info structure, tags, and kernel parameters.
-
 use alloc::vec::Vec;
 
 /// Multiboot2 magic
@@ -97,10 +96,7 @@ pub struct BootInfoHeader {
 
 impl BootInfoHeader {
     pub fn new(total_size: u32) -> Self {
-        Self {
-            total_size,
-            reserved: 0,
-        }
+        Self { total_size, reserved: 0 }
     }
 }
 
@@ -113,10 +109,7 @@ pub struct Multiboot2BootInfo {
 impl Multiboot2BootInfo {
     /// Create new Multiboot2 boot info
     pub fn new(total_size: u32) -> Self {
-        Self {
-            header: BootInfoHeader::new(total_size),
-            tags: Vec::new(),
-        }
+        Self { header: BootInfoHeader::new(total_size), tags: Vec::new() }
     }
 
     /// Add command line tag
@@ -192,8 +185,7 @@ impl Multiboot2BootInfo {
 
     /// Validate boot info
     pub fn is_valid(&self) -> bool {
-        self.header.total_size > 0
-            && !self.tags.is_empty()
+        self.header.total_size > 0 && !self.tags.is_empty()
     }
 }
 
@@ -207,11 +199,7 @@ pub struct Multiboot2Executor {
 impl Multiboot2Executor {
     /// Create new Multiboot2 executor
     pub fn new() -> Self {
-        Self {
-            boot_info: None,
-            magic: MULTIBOOT2_MAGIC,
-            validated: false,
-        }
+        Self { boot_info: None, magic: MULTIBOOT2_MAGIC, validated: false }
     }
 
     /// Set boot info

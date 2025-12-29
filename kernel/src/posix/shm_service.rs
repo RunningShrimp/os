@@ -14,7 +14,6 @@ use alloc::boxed::Box;
 use core::sync::atomic;
 use alloc::collections::BTreeMap;
 use core::sync::atomic;
-use nos_api::di::{ServiceFactory, ServiceMetadata, ServiceScope};
 use core::sync::atomic;
 
 /// Shared Memory Service

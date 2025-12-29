@@ -613,7 +613,6 @@ pub fn unified_batch_dispatch(calls: &[(u32, &[u64])]) -> Option<SyscallBatchRes
     })
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

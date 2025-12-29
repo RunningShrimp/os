@@ -1,18 +1,16 @@
 /// Signature Detection Module for IDS
-
 extern crate alloc;
-///
+use alloc::{string::String, sync::Arc, vec::Vec};
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
 /// This module implements signature-based intrusion detection using
 /// pattern matching and rule-based detection.
-
-use crate::subsystems::sync::{SpinLock, Mutex};
-use crate::collections::HashMap;
-use crate::compat::DefaultHasherBuilder;
-use crate::subsystems::time::{SystemTime, UNIX_EPOCH};
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::string::String;
-use core::sync::atomic::{AtomicU64, AtomicBool, Ordering};
+use crate::subsystems::sync::{Mutex, SpinLock};
+use crate::{
+    collections::HashMap,
+    compat::DefaultHasherBuilder,
+    subsystems::time::{SystemTime, UNIX_EPOCH},
+};
 
 /// Detection severity level
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -205,7 +203,10 @@ impl SignatureEngine {
     }
 
     /// Initialize signature engine with config
-    pub fn init(&mut self, config: &crate::ids::SignatureDetectionConfig) -> Result<(), &'static str> {
+    pub fn init(
+        &mut self,
+        config: &crate::ids::SignatureDetectionConfig,
+    ) -> Result<(), &'static str> {
         if !config.enabled {
             self.stop();
             return Ok(());
@@ -246,7 +247,8 @@ impl SignatureEngine {
         self.signatures.insert(signature.id, signature.clone());
 
         // Update type index
-        let type_signatures = self.signatures_by_type
+        let type_signatures = self
+            .signatures_by_type
             .entry(signature.signature_type)
             .or_insert_with(Vec::new);
 
@@ -263,7 +265,9 @@ impl SignatureEngine {
 
         if let Some(signature) = self.signatures.remove(&signature_id) {
             // Update type index
-            if let Some(type_signatures) = self.signatures_by_type.get_mut(&signature.signature_type) {
+            if let Some(type_signatures) =
+                self.signatures_by_type.get_mut(&signature.signature_type)
+            {
                 type_signatures.retain(|&id| id != signature_id);
             }
 
@@ -275,7 +279,12 @@ impl SignatureEngine {
     }
 
     /// Scan data for signature matches
-    pub fn scan_data(&mut self, data: &[u8], signature_type: SignatureType, context: &HashMap<String, String>) -> Vec<DetectionEvent> {
+    pub fn scan_data(
+        &mut self,
+        data: &[u8],
+        signature_type: SignatureType,
+        context: &HashMap<String, String>,
+    ) -> Vec<DetectionEvent> {
         let _lock = self.engine_lock.lock();
 
         if !self.running.load(Ordering::Relaxed) {
@@ -284,7 +293,9 @@ impl SignatureEngine {
 
         let mut events = Vec::new();
 
-        let signature_ids_to_check: Vec<_> = self.signatures_by_type.get(&signature_type)
+        let signature_ids_to_check: Vec<_> = self
+            .signatures_by_type
+            .get(&signature_type)
             .map(|ids| ids.iter().copied().collect::<Vec<_>>())
             .unwrap_or_default();
 
@@ -331,11 +342,7 @@ impl SignatureEngine {
 
     /// Get recent detection events
     pub fn get_recent_events(&self, count: usize) -> Vec<DetectionEvent> {
-        self.events.iter()
-            .rev()
-            .take(count)
-            .cloned()
-            .collect()
+        self.events.iter().rev().take(count).cloned().collect()
     }
 
     /// Get signature by ID
@@ -346,7 +353,8 @@ impl SignatureEngine {
     /// Get all signatures of a specific type
     pub fn get_signatures_by_type(&self, signature_type: SignatureType) -> Vec<&Signature> {
         if let Some(signature_ids) = self.signatures_by_type.get(&signature_type) {
-            signature_ids.iter()
+            signature_ids
+                .iter()
                 .filter_map(|&id| self.signatures.get(&id))
                 .collect()
         } else {
@@ -378,33 +386,34 @@ impl SignatureEngine {
             .unwrap_or_default()
             .as_secs();
 
-        self.events.retain(|event| {
-            current_time - event.timestamp <= max_age_seconds
-        });
+        self.events
+            .retain(|event| current_time - event.timestamp <= max_age_seconds);
     }
 
     /// Check if data matches a signature
-    fn matches_signature(&self, data: &[u8], signature: &Signature, _context: &HashMap<String, String>) -> bool {
+    fn matches_signature(
+        &self,
+        data: &[u8],
+        signature: &Signature,
+        _context: &HashMap<String, String>,
+    ) -> bool {
         match signature.pattern_type {
             PatternType::Exact => {
                 let pattern_bytes = signature.pattern.as_bytes();
-                data.windows(pattern_bytes.len()).any(|window| window == pattern_bytes)
-            }
-            PatternType::Bytes => {
-                self.match_bytes_pattern(data, &signature.pattern)
-            }
-            PatternType::Wildcard => {
-                self.match_wildcard_pattern(data, &signature.pattern)
-            }
-            PatternType::Set => {
-                self.match_set_pattern(data, &signature.pattern)
-            }
+                data.windows(pattern_bytes.len())
+                    .any(|window| window == pattern_bytes)
+            },
+            PatternType::Bytes => self.match_bytes_pattern(data, &signature.pattern),
+            PatternType::Wildcard => self.match_wildcard_pattern(data, &signature.pattern),
+            PatternType::Set => self.match_set_pattern(data, &signature.pattern),
             _ => {
                 // For other pattern types, fallback to subsequence search using windows
                 let pat = signature.pattern.as_bytes();
-                if pat.is_empty() { return false; }
+                if pat.is_empty() {
+                    return false;
+                }
                 data.windows(pat.len()).any(|w| w == pat)
-            }
+            },
         }
     }
 
@@ -426,12 +435,15 @@ impl SignatureEngine {
         }
 
         data.windows(pattern_bytes.len()).any(|window| {
-            window.iter().zip(pattern_bytes.iter()).all(|(&data_byte, &pattern_byte)| {
-                match pattern_byte {
-                    Some(expected) => data_byte == expected,
-                    None => true, // Wildcard matches any byte
-                }
-            })
+            window
+                .iter()
+                .zip(pattern_bytes.iter())
+                .all(|(&data_byte, &pattern_byte)| {
+                    match pattern_byte {
+                        Some(expected) => data_byte == expected,
+                        None => true, // Wildcard matches any byte
+                    }
+                })
         })
     }
 
@@ -454,12 +466,12 @@ impl SignatureEngine {
                     while data_idx < data.len() && data[data_idx] != pattern_bytes[pattern_idx] {
                         data_idx += 1;
                     }
-                }
+                },
                 b'?' => {
                     // Match any single character
                     data_idx += 1;
                     pattern_idx += 1;
-                }
+                },
                 pattern_char => {
                     if data[data_idx] == pattern_char {
                         data_idx += 1;
@@ -467,7 +479,7 @@ impl SignatureEngine {
                     } else {
                         return false;
                     }
-                }
+                },
             }
         }
 
@@ -477,14 +489,13 @@ impl SignatureEngine {
     /// Match set pattern
     fn match_set_pattern(&self, data: &[u8], pattern: &str) -> bool {
         // Parse comma-separated values and check if data contains any
-        let values: Vec<String> = pattern
-            .split(',')
-            .map(|s| String::from(s.trim()))
-            .collect();
+        let values: Vec<String> = pattern.split(',').map(|s| String::from(s.trim())).collect();
 
         for value in values {
             let pat = value.as_bytes();
-            if pat.is_empty() { continue; }
+            if pat.is_empty() {
+                continue;
+            }
             if data.windows(pat.len()).any(|w| w == pat) {
                 return true;
             }
@@ -493,7 +504,12 @@ impl SignatureEngine {
     }
 
     /// Create a detection event
-    fn create_detection_event(&self, signature_id: u64, matched_content: &[u8], context: &HashMap<String, String>) -> DetectionEvent {
+    fn create_detection_event(
+        &self,
+        signature_id: u64,
+        matched_content: &[u8],
+        context: &HashMap<String, String>,
+    ) -> DetectionEvent {
         let id = self.event_counter.fetch_add(1, Ordering::Relaxed);
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -534,8 +550,14 @@ impl SignatureEngine {
             severity: Severity::Medium,
             category: String::from("Reconnaissance"),
             confidence: 0.7,
-            created_at: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
-            updated_at: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
+            created_at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            updated_at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
             active: true,
             references: vec![String::from("CVE-2023-XXXX")],
             context: HashMap::with_hasher(DefaultHasherBuilder),
@@ -547,13 +569,21 @@ impl SignatureEngine {
             name: String::from("EICAR Test File"),
             description: String::from("Standard antivirus test file signature"),
             signature_type: SignatureType::Malware,
-            pattern: String::from("X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"),
+            pattern: String::from(
+                "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*",
+            ),
             pattern_type: PatternType::Exact,
             severity: Severity::Info,
             category: String::from("Test"),
             confidence: 1.0,
-            created_at: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
-            updated_at: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
+            created_at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            updated_at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
             active: true,
             references: Vec::new(),
             context: HashMap::with_hasher(DefaultHasherBuilder),
@@ -570,8 +600,14 @@ impl SignatureEngine {
             severity: Severity::High,
             category: String::from("Injection"),
             confidence: 0.9,
-            created_at: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
-            updated_at: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
+            created_at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            updated_at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
             active: true,
             references: vec![String::from("OWASP Top 10")],
             context: HashMap::with_hasher(DefaultHasherBuilder),
@@ -625,7 +661,8 @@ pub fn export_signatures(signatures: &[Signature]) -> String {
 
     for signature in signatures {
         output.push_str(&format!(
-            "ID: {}\nName: {}\nType: {:?}\nSeverity: {:?}\nPattern: {}\nDescription: {}\nActive: {}\n\n",
+            "ID: {}\nName: {}\nType: {:?}\nSeverity: {:?}\nPattern: {}\nDescription: {}\nActive: \
+             {}\n\n",
             signature.id,
             signature.name,
             signature.signature_type,

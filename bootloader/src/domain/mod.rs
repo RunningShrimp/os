@@ -7,7 +7,8 @@
 //! Key concepts:
 //! - **Entities**: Mutable objects with identity (BootProcess, BootInfo)
 //! - **Value Objects**: Immutable objects representing domain values (BootConfig, GraphicsMode)
-//! - **Aggregate Roots**: Entry points for consistency (BootInfo aggregates memory map, kernel, framebuffer)
+//! - **Aggregate Roots**: Entry points for consistency (BootInfo aggregates memory map, kernel,
+//!   framebuffer)
 //! - **Domain Services**: Business logic spanning multiple entities
 //! - **Domain Events**: Significant changes published to subscribers
 
@@ -15,63 +16,61 @@ pub mod aggregate_root;
 pub mod boot_config;
 pub mod boot_info;
 pub mod boot_services;
-pub mod events;
+pub mod enhanced_event_publisher;
+pub mod event_driven_state;
 pub mod event_persistence;
+pub mod events;
+pub mod hardware_detection;
 pub mod repositories;
 pub mod serialization;
 pub mod transactions;
-pub mod hardware_detection;
-pub mod enhanced_event_publisher;
-pub mod event_driven_state;
 
 pub use aggregate_root::{
-    AggregateRoot, VersionedAggregateRoot, AuditableAggregateRoot,
-    SoftDeletableAggregateRoot, AggregateRootBuilder, AggregateRootFactory,
-    AggregateRootValidator, EventSourcedAggregateRoot
+    AggregateRoot, AggregateRootBuilder, AggregateRootFactory, AggregateRootValidator,
+    AuditableAggregateRoot, EventSourcedAggregateRoot, SoftDeletableAggregateRoot,
+    VersionedAggregateRoot,
 };
 pub use boot_config::{
-    BootConfig, GraphicsMode, LogLevel, MemoryRegion, MemoryRegionType,
-    KernelInfo, GraphicsInfo, BootPhase
+    BootConfig, BootPhase, GraphicsInfo, GraphicsMode, KernelInfo, LogLevel, MemoryRegion,
+    MemoryRegionType,
 };
 pub use boot_info::BootInfo;
 pub use boot_services::{
-    BootValidator, GraphicsModeSelector, HardwareInfo, GraphicsCapabilities,
-    MemoryManager, KernelLoader
-};
-pub use events::{
-    BootPhaseCompletedEvent, DomainEvent, DomainEventPublisher, GraphicsInitializedEvent,
-    KernelLoadedEvent, BootPhaseStartedEvent, MemoryInitializedEvent, ValidationFailedEvent,
-    DeviceDetectedEvent, EventFilter, SimpleEventFilter, ImprovedEventPublisher,
-    SimpleEventPublisher, NamedDomainEventSubscriber, LoggingSubscriber
-};
-pub use event_persistence::{
-    PersistentEventStore, DiagnosticEventReplayer,
-    MemoryUsageStats, ReplayStats, ReplayFilter
+    BootValidator, GraphicsCapabilities, GraphicsModeSelector, HardwareInfo, KernelLoader,
+    MemoryManager,
 };
 pub use enhanced_event_publisher::{
-    EnhancedEventPublisher, PublisherConfig, PublisherStats, DiagnosticReport
+    DiagnosticReport, EnhancedEventPublisher, PublisherConfig, PublisherStats,
 };
 pub use event_driven_state::{
-    EventDrivenStateManager, BootState, StateTransitionContext, StateTransitionStats
+    BootState, EventDrivenStateManager, StateTransitionContext, StateTransitionStats,
 };
-pub use repositories::{
-    BootConfigRepository, KernelImageRepository, DefaultBootConfigRepository,
-    Repository, EntityId, TransactionId, RepositoryError, Page, IdGenerator,
-    DefaultIdGenerator, SerializationService, SimpleSerializationService,
-    BootInfoRepository, MemoryRegionRepository, KernelInfoRepository, GraphicsInfoRepository
+pub use event_persistence::{
+    DiagnosticEventReplayer, MemoryUsageStats, PersistentEventStore, ReplayFilter, ReplayStats,
 };
-pub use serialization::{
-    SerializationFormat, SerializationContext, SerializationResult, DeserializationResult,
-    Serializer, BinarySerializer, JsonSerializer, SerializerRegistry
-};
-pub use transactions::{
-    TransactionOperation, TransactionStatus, TransactionError, Transaction,
-    TransactionManager, TransactionStats, TransactionLog, TransactionLogEntry,
-    TransactionLogType, TransactionLogStats
-};
-pub use hardware_detection::{
-    HardwareDetectionService, CpuInfo, CpuFeatures, DetectionCapabilities
-};
-
 // Re-export all domain types for convenience
 pub use events::*;
+pub use events::{
+    BootPhaseCompletedEvent, BootPhaseStartedEvent, DeviceDetectedEvent, DomainEvent,
+    DomainEventPublisher, EventFilter, GraphicsInitializedEvent, ImprovedEventPublisher,
+    KernelLoadedEvent, LoggingSubscriber, MemoryInitializedEvent, NamedDomainEventSubscriber,
+    SimpleEventFilter, SimpleEventPublisher, ValidationFailedEvent,
+};
+pub use hardware_detection::{
+    CpuFeatures, CpuInfo, DetectionCapabilities, HardwareDetectionService,
+};
+pub use repositories::{
+    BootConfigRepository, BootInfoRepository, DefaultBootConfigRepository, DefaultIdGenerator,
+    EntityId, GraphicsInfoRepository, IdGenerator, KernelImageRepository, KernelInfoRepository,
+    MemoryRegionRepository, Page, Repository, RepositoryError, SerializationService,
+    SimpleSerializationService, TransactionId,
+};
+pub use serialization::{
+    BinarySerializer, DeserializationResult, JsonSerializer, SerializationContext,
+    SerializationFormat, SerializationResult, Serializer, SerializerRegistry,
+};
+pub use transactions::{
+    Transaction, TransactionError, TransactionLog, TransactionLogEntry, TransactionLogStats,
+    TransactionLogType, TransactionManager, TransactionOperation, TransactionStats,
+    TransactionStatus,
+};

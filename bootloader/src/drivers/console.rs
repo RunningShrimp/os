@@ -9,12 +9,12 @@ pub fn write_byte(_byte: u8) {
             core::arch::asm!("out dx, al", in("al") _byte, in("dx") 0x3F8u16);
         }
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     {
         // AArch64: Would write to UART (stub for now)
     }
-    
+
     #[cfg(target_arch = "riscv64")]
     {
         // RISC-V: Would write to SBI console (stub for now)

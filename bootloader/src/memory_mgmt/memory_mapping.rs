@@ -1,7 +1,6 @@
 // Real memory mapping for bootloader
 // Maps physical to virtual addresses and sets up page tables
 
-
 pub const PAGE_SIZE: usize = 0x1000; // 4KB
 pub const LARGE_PAGE_SIZE: usize = 0x200000; // 2MB
 
@@ -19,10 +18,7 @@ pub struct MemoryMap {
 
 impl MemoryMap {
     pub fn new() -> Self {
-        Self {
-            total_pages: 0,
-            identity_map_end: 0,
-        }
+        Self { total_pages: 0, identity_map_end: 0 }
     }
 
     /// Map physical address range to virtual address range
@@ -49,12 +45,7 @@ impl MemoryMap {
     }
 
     /// Map single page
-    pub fn map_page(
-        &mut self,
-        phys: u64,
-        _virt: u64,
-        _flags: u32,
-    ) -> Result<(), &'static str> {
+    pub fn map_page(&mut self, phys: u64, _virt: u64, _flags: u32) -> Result<(), &'static str> {
         if phys > _virt {
             self.identity_map_end = phys;
         }
@@ -62,11 +53,7 @@ impl MemoryMap {
     }
 
     /// Identity map physical memory range
-    pub fn identity_map(
-        &mut self,
-        start: u64,
-        size: u64,
-    ) -> Result<(), &'static str> {
+    pub fn identity_map(&mut self, start: u64, size: u64) -> Result<(), &'static str> {
         self.map_range(start, start, size, PageTableFlags::PRESENT)
     }
 
@@ -80,9 +67,9 @@ impl MemoryMap {
 
         // Map kernel space at higher half (0xFFFF800000000000)
         self.map_range(
-            0x100000,     // Physical kernel location
+            0x100000,           // Physical kernel location
             0xFFFF800000100000, // Virtual kernel location (higher half)
-            0x10000000,   // 256MB
+            0x10000000,         // 256MB
             PageTableFlags::PRESENT,
         )?;
 
@@ -125,10 +112,7 @@ pub fn init_virtual_memory() -> Result<(), &'static str> {
 }
 
 /// Validate memory range for loading
-pub fn validate_memory_range(
-    start: u64,
-    size: u64,
-) -> Result<(), &'static str> {
+pub fn validate_memory_range(start: u64, size: u64) -> Result<(), &'static str> {
     if start == 0 {
         return Err("Cannot map address 0");
     }
@@ -148,9 +132,9 @@ pub fn validate_memory_range(
 /// Get memory information from boot protocol
 pub fn get_memory_info() -> MemoryInfo {
     MemoryInfo {
-        total_memory: 0x10000000, // 256MB default
+        total_memory: 0x10000000,    // 256MB default
         available_memory: 0x8000000, // 128MB available
-        reserved_memory: 0x8000000, // 128MB reserved
+        reserved_memory: 0x8000000,  // 128MB reserved
     }
 }
 

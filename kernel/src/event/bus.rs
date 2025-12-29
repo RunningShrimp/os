@@ -102,7 +102,6 @@ impl DefaultEventBus {
         }
     }
 
-
     /// Create a new DefaultEventBus with custom configuration
     pub fn with_config(config: EventBusConfig) -> Self {
         Self {
@@ -226,7 +225,6 @@ impl EventBus for DefaultEventBus {
 
         Ok(())
     }
-
 
     fn subscribe(&mut self, topic: &str, handler: Arc<dyn EventHandler>) -> Result<()> {
         let subscribers = self.get_or_create_topic(topic)?;
@@ -359,8 +357,6 @@ impl EventBus for BatchEventBus {
         // For batch event bus, we add to batch instead of publishing immediately
         self.add_to_batch(event)
     }
-
-
 
     fn subscribe(&mut self, topic: &str, handler: Arc<dyn EventHandler>) -> Result<()> {
         self.base.subscribe(topic, handler)

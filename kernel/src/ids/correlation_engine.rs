@@ -1,18 +1,16 @@
 /// Correlation Engine Module for IDS
-
 extern crate alloc;
-///
+use alloc::{string::String, sync::Arc, vec::Vec};
+use core::sync::atomic::{AtomicU64, Ordering};
+
 /// This module implements advanced correlation analysis to connect
 /// related security events and identify attack patterns.
-
-use crate::subsystems::sync::{SpinLock, Mutex};
-use crate::collections::{HashMap, HashSet};
-use crate::compat::DefaultHasherBuilder;
-use crate::subsystems::time::{SystemTime, UNIX_EPOCH};
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::string::String;
-use core::sync::atomic::{AtomicU64, Ordering};
+use crate::subsystems::sync::{Mutex, SpinLock};
+use crate::{
+    collections::{HashMap, HashSet},
+    compat::DefaultHasherBuilder,
+    subsystems::time::{SystemTime, UNIX_EPOCH},
+};
 
 /// Correlation confidence level
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -200,7 +198,10 @@ impl CorrelationEngine {
     }
 
     /// Analyze a set of detections and produce correlation results
-    pub fn analyze_correlations(&mut self, _detections: &alloc::vec::Vec<crate::ids::IntrusionDetection>) -> Result<alloc::vec::Vec<crate::ids::CorrelationResult>, &'static str> {
+    pub fn analyze_correlations(
+        &mut self,
+        _detections: &alloc::vec::Vec<crate::ids::IntrusionDetection>,
+    ) -> Result<alloc::vec::Vec<crate::ids::CorrelationResult>, &'static str> {
         // Simple stub: no correlation logic yet
         Ok(Vec::new())
     }
@@ -245,7 +246,8 @@ impl CorrelationEngine {
 
     /// Get recent correlations
     pub fn get_recent_correlations(&self, count: usize) -> Vec<EventCorrelation> {
-        self.correlations.iter()
+        self.correlations
+            .iter()
             .rev()
             .take(count)
             .cloned()
@@ -277,30 +279,47 @@ impl CorrelationEngine {
     pub fn get_mitre_mapping(&self) -> HashMap<AttackPattern, Vec<String>> {
         let mut mapping = HashMap::with_hasher(DefaultHasherBuilder);
 
-        mapping.insert(AttackPattern::PortScanning, vec![
-            String::from("T1595.002: Active Scanning: Scanning for Open Ports"),
-            String::from("T1046: Network Service Scanning"),
-        ]);
+        mapping.insert(
+            AttackPattern::PortScanning,
+            vec![
+                String::from("T1595.002: Active Scanning: Scanning for Open Ports"),
+                String::from("T1046: Network Service Scanning"),
+            ],
+        );
 
-        mapping.insert(AttackPattern::BruteForce, vec![
-            String::from("T1110.001: Brute Force: Password Guessing"),
-            String::from("T1110.002: Brute Force: Password Cracking"),
-        ]);
+        mapping.insert(
+            AttackPattern::BruteForce,
+            vec![
+                String::from("T1110.001: Brute Force: Password Guessing"),
+                String::from("T1110.002: Brute Force: Password Cracking"),
+            ],
+        );
 
-        mapping.insert(AttackPattern::PrivilegeEscalation, vec![
-            String::from("T1068: Exploitation for Privilege Escalation"),
-            String::from("T1548.003: Abuse Elevation Control Mechanism: Sudo and Sudo Caching"),
-        ]);
+        mapping.insert(
+            AttackPattern::PrivilegeEscalation,
+            vec![
+                String::from("T1068: Exploitation for Privilege Escalation"),
+                String::from("T1548.003: Abuse Elevation Control Mechanism: Sudo and Sudo Caching"),
+            ],
+        );
 
-        mapping.insert(AttackPattern::DataExfiltration, vec![
-            String::from("T1041: Exfiltration Over C2 Channel"),
-            String::from("T1567.001: Exfiltration Over Web Service: Exfiltration to Cloud Storage"),
-        ]);
+        mapping.insert(
+            AttackPattern::DataExfiltration,
+            vec![
+                String::from("T1041: Exfiltration Over C2 Channel"),
+                String::from(
+                    "T1567.001: Exfiltration Over Web Service: Exfiltration to Cloud Storage",
+                ),
+            ],
+        );
 
-        mapping.insert(AttackPattern::LateralMovement, vec![
-            String::from("T1021.002: Remote Services: SMB/Windows Admin Shares"),
-            String::from("T1021.004: Remote Services: SSH"),
-        ]);
+        mapping.insert(
+            AttackPattern::LateralMovement,
+            vec![
+                String::from("T1021.002: Remote Services: SMB/Windows Admin Shares"),
+                String::from("T1021.004: Remote Services: SSH"),
+            ],
+        );
 
         mapping
     }
@@ -319,19 +338,16 @@ impl CorrelationEngine {
             .as_secs();
 
         // Clear old events
-        self.event_buffer.retain(|event| {
-            current_time - event.timestamp <= max_age_seconds
-        });
+        self.event_buffer
+            .retain(|event| current_time - event.timestamp <= max_age_seconds);
 
         // Clear old correlations
-        self.correlations.retain(|correlation| {
-            current_time - correlation.timestamp <= max_age_seconds
-        });
+        self.correlations
+            .retain(|correlation| current_time - correlation.timestamp <= max_age_seconds);
 
         // Clear old clusters
-        self.clusters.retain(|cluster| {
-            current_time - cluster.timestamp <= max_age_seconds
-        });
+        self.clusters
+            .retain(|cluster| current_time - cluster.timestamp <= max_age_seconds);
     }
 
     /// Perform correlation analysis
@@ -366,10 +382,10 @@ impl CorrelationEngine {
             .as_secs();
 
         // Find events within time window
-        let recent_events: Vec<&TimelineEvent> = self.event_buffer.iter()
-            .filter(|event| {
-                current_time - event.timestamp <= rule.time_window
-            })
+        let recent_events: Vec<&TimelineEvent> = self
+            .event_buffer
+            .iter()
+            .filter(|event| current_time - event.timestamp <= rule.time_window)
             .collect();
 
         if recent_events.len() < rule.min_events {
@@ -377,10 +393,9 @@ impl CorrelationEngine {
         }
 
         // Check for rule conditions
-        let matching_events: Vec<&TimelineEvent> = recent_events.iter()
-            .filter(|event| {
-                self.matches_rule_conditions(event, rule)
-            })
+        let matching_events: Vec<&TimelineEvent> = recent_events
+            .iter()
+            .filter(|event| self.matches_rule_conditions(event, rule))
             .cloned()
             .collect();
 
@@ -401,17 +416,20 @@ impl CorrelationEngine {
         // Create correlation
         let correlation_id = self.correlation_counter.fetch_add(1, Ordering::Relaxed);
         let event_ids: Vec<u64> = matching_events.iter().map(|e| e.id).collect();
-        let sources: Vec<String> = matching_events.iter()
+        let sources: Vec<String> = matching_events
+            .iter()
             .map(|e| e.source.clone())
             .collect::<HashSet<_>>()
             .into_iter()
             .collect();
-        let targets: Vec<String> = matching_events.iter()
+        let targets: Vec<String> = matching_events
+            .iter()
             .map(|e| e.target.clone())
             .collect::<HashSet<_>>()
             .into_iter()
             .collect();
-        let timeline: Vec<(u64, String)> = matching_events.iter()
+        let timeline: Vec<(u64, String)> = matching_events
+            .iter()
             .map(|e| (e.timestamp, e.event_type.clone()))
             .collect();
 
@@ -436,14 +454,17 @@ impl CorrelationEngine {
     /// Check if event matches rule conditions
     fn matches_rule_conditions(&self, event: &TimelineEvent, rule: &CorrelationRule) -> bool {
         // Check required event types
-        if !rule.required_event_types.is_empty() &&
-           !rule.required_event_types.contains(&event.event_type) {
+        if !rule.required_event_types.is_empty()
+            && !rule.required_event_types.contains(&event.event_type)
+        {
             return false;
         }
 
         // Check source patterns
         if !rule.source_patterns.is_empty() {
-            let source_matches = rule.source_patterns.iter()
+            let source_matches = rule
+                .source_patterns
+                .iter()
                 .any(|pattern| event.source.contains(pattern));
             if !source_matches {
                 return false;
@@ -452,7 +473,9 @@ impl CorrelationEngine {
 
         // Check target patterns
         if !rule.target_patterns.is_empty() {
-            let target_matches = rule.target_patterns.iter()
+            let target_matches = rule
+                .target_patterns
+                .iter()
                 .any(|pattern| event.target.contains(pattern));
             if !target_matches {
                 return false;
@@ -499,16 +522,19 @@ impl CorrelationEngine {
 
         for (index, event) in self.event_buffer.iter().enumerate() {
             let cluster_key = format!("{}:{}", event.source, event.event_type);
-            clusters.entry(cluster_key)
+            clusters
+                .entry(cluster_key)
                 .or_insert_with(Vec::new)
                 .push(index);
         }
 
         // Create cluster objects
         for (cluster_key, event_indices) in clusters {
-            if event_indices.len() >= 3 { // Minimum cluster size
+            if event_indices.len() >= 3 {
+                // Minimum cluster size
                 let cluster_id = self.cluster_counter.fetch_add(1, Ordering::Relaxed);
-                let event_ids: Vec<u64> = event_indices.iter()
+                let event_ids: Vec<u64> = event_indices
+                    .iter()
                     .map(|&index| self.event_buffer[index].id)
                     .collect();
 
@@ -557,7 +583,8 @@ impl CorrelationEngine {
     /// Detect port scanning patterns
     fn detect_port_scanning(&mut self, current_time: u64) {
         let time_window = 300; // 5 minutes
-        let mut source_ports: HashMap<String, Vec<u16>> = HashMap::with_hasher(DefaultHasherBuilder);
+        let mut source_ports: HashMap<String, Vec<u16>> =
+            HashMap::with_hasher(DefaultHasherBuilder);
 
         for event in &self.event_buffer {
             if current_time - event.timestamp > time_window {
@@ -567,7 +594,8 @@ impl CorrelationEngine {
             if event.event_type.contains("network") || event.event_type.contains("port") {
                 if let Some(port_str) = event.details.get("dst_port") {
                     if let Ok(port) = port_str.parse::<u16>() {
-                        source_ports.entry(event.source.clone())
+                        source_ports
+                            .entry(event.source.clone())
                             .or_insert_with(Vec::new)
                             .push(port);
                     }
@@ -577,7 +605,8 @@ impl CorrelationEngine {
 
         for (source, ports) in source_ports {
             let unique_ports: HashSet<_> = ports.iter().collect();
-            if unique_ports.len() >= 10 { // Threshold for port scanning
+            if unique_ports.len() >= 10 {
+                // Threshold for port scanning
                 let correlation_id = self.correlation_counter.fetch_add(1, Ordering::Relaxed);
 
                 let correlation = EventCorrelation {
@@ -592,7 +621,8 @@ impl CorrelationEngine {
                     timeline: Vec::new(),
                     stage: String::from("Reconnaissance"),
                     description: String::from("Port scanning activity detected"),
-                    mitre_techniques: self.get_mitre_techniques_for_pattern(AttackPattern::PortScanning),
+                    mitre_techniques: self
+                        .get_mitre_techniques_for_pattern(AttackPattern::PortScanning),
                     indicators: vec![format!("Source IP: {}", source)],
                     recommended_actions: vec![
                         String::from("Block source IP"),
@@ -608,7 +638,8 @@ impl CorrelationEngine {
     /// Detect brute force attack patterns
     fn detect_brute_force(&mut self, current_time: u64) {
         let time_window = 600; // 10 minutes
-        let mut failed_attempts: HashMap<String, usize> = HashMap::with_hasher(DefaultHasherBuilder);
+        let mut failed_attempts: HashMap<String, usize> =
+            HashMap::with_hasher(DefaultHasherBuilder);
 
         for event in &self.event_buffer {
             if current_time - event.timestamp > time_window {
@@ -626,7 +657,8 @@ impl CorrelationEngine {
         }
 
         for (target, count) in failed_attempts {
-            if count >= 5 { // Threshold for brute force
+            if count >= 5 {
+                // Threshold for brute force
                 let correlation_id = self.correlation_counter.fetch_add(1, Ordering::Relaxed);
 
                 let correlation = EventCorrelation {
@@ -641,7 +673,8 @@ impl CorrelationEngine {
                     timeline: Vec::new(),
                     stage: String::from("Credential Access"),
                     description: String::from("Brute force attack detected"),
-                    mitre_techniques: self.get_mitre_techniques_for_pattern(AttackPattern::BruteForce),
+                    mitre_techniques: self
+                        .get_mitre_techniques_for_pattern(AttackPattern::BruteForce),
                     indicators: vec![format!("Target account: {}", target)],
                     recommended_actions: vec![
                         String::from("Lock account temporarily"),
@@ -671,7 +704,8 @@ impl CorrelationEngine {
         }
 
         for (target, count) in request_count {
-            if count >= 1000 { // Threshold for DDoS
+            if count >= 1000 {
+                // Threshold for DDoS
                 let correlation_id = self.correlation_counter.fetch_add(1, Ordering::Relaxed);
 
                 let correlation = EventCorrelation {
@@ -728,12 +762,8 @@ impl CorrelationEngine {
     fn extract_indicators(&self, events: &[&TimelineEvent]) -> Vec<String> {
         let mut indicators = Vec::new();
 
-        let sources: HashSet<_> = events.iter()
-            .map(|e| e.source.clone())
-            .collect();
-        let targets: HashSet<_> = events.iter()
-            .map(|e| e.target.clone())
-            .collect();
+        let sources: HashSet<_> = events.iter().map(|e| e.source.clone()).collect();
+        let targets: HashSet<_> = events.iter().map(|e| e.target.clone()).collect();
 
         for source in sources {
             indicators.push(format!("Source: {}", source));
@@ -816,7 +846,10 @@ pub fn create_correlation_engine() -> Arc<Mutex<CorrelationEngine>> {
 }
 
 /// Export correlation analysis report
-pub fn export_correlation_report(correlations: &[EventCorrelation], patterns: &HashMap<AttackPattern, usize>) -> String {
+pub fn export_correlation_report(
+    correlations: &[EventCorrelation],
+    patterns: &HashMap<AttackPattern, usize>,
+) -> String {
     let mut output = String::from("Correlation Analysis Report\n");
     output.push_str("==========================\n\n");
 
@@ -833,7 +866,8 @@ pub fn export_correlation_report(correlations: &[EventCorrelation], patterns: &H
     output.push_str("---------------------\n");
     for correlation in correlations.iter().take(10) {
         output.push_str(&format!(
-            "ID: {} | Pattern: {:?} | Confidence: {:?} | Severity: {} | Sources: {} | Targets: {}\n",
+            "ID: {} | Pattern: {:?} | Confidence: {:?} | Severity: {} | Sources: {} | Targets: \
+             {}\n",
             correlation.id,
             correlation.pattern,
             correlation.confidence,

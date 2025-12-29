@@ -5,11 +5,11 @@
 //! These implementations bypass normal validation and dispatch mechanisms
 //! for maximum performance.
 
-use crate::error::SyscallError;
-use nos_api::syscall::SyscallResult;
-use crate::process;
-use crate::process::manager::PROC_TABLE;
 use core::sync::atomic::{AtomicU64, Ordering};
+
+use nos_api::syscall::SyscallResult;
+
+use crate::{error::SyscallError, process, process::manager::PROC_TABLE};
 
 /// System call numbers for fast-path syscalls
 pub mod syscall_numbers {
@@ -101,50 +101,50 @@ impl FastPathRegistry {
     pub const fn new() -> Self {
         const NONE_HANDLER: Option<FastPathHandler> = None;
         const ZERO_COUNTER: AtomicU64 = AtomicU64::new(0);
-        
+
         Self {
             handlers: [NONE_HANDLER; 256],
             call_counters: [ZERO_COUNTER; 256],
         }
     }
-    
+
     /// Register a fast-path handler for a syscall
     pub fn register(&mut self, syscall_num: u32, handler: FastPathHandler) {
         let index = (syscall_num % 256) as usize;
         self.handlers[index] = Some(handler);
     }
-    
+
     /// Check if a syscall has a fast-path handler
     pub fn has_handler(&self, syscall_num: u32) -> bool {
         let index = (syscall_num % 256) as usize;
         self.handlers[index].is_some()
     }
-    
+
     /// Dispatch a syscall through fast-path
     pub fn dispatch(&self, syscall_num: u32, args: &[u64]) -> Option<SyscallResult> {
         let index = (syscall_num % 256) as usize;
-        
+
         if let Some(handler) = self.handlers[index] {
             // Increment call counter
             self.call_counters[index].fetch_add(1, Ordering::Relaxed);
-            
+
             // Call fast-path handler
             Some(handler(args))
         } else {
             None
         }
     }
-    
+
     /// Get call count for a syscall
     pub fn get_call_count(&self, syscall_num: u32) -> u64 {
         let index = (syscall_num % 256) as usize;
         self.call_counters[index].load(Ordering::Relaxed)
     }
-    
+
     /// Initialize default fast-path handlers
     pub fn init_default_handlers(&mut self) {
         use syscall_numbers::*;
-        
+
         // Register hot syscalls for fast-path
         self.register(SYS_GETPID, fast_getpid);
         self.register(SYS_GETPPID, fast_getppid);
@@ -162,12 +162,15 @@ static FAST_PATH_INIT: core::sync::atomic::AtomicBool = core::sync::atomic::Atom
 
 /// Initialize fast-path registry
 pub fn init_fast_path_registry() {
-    if FAST_PATH_INIT.compare_exchange(
-        false,
-        true,
-        core::sync::atomic::Ordering::Acquire,
-        core::sync::atomic::Ordering::Relaxed,
-    ).is_ok() {
+    if FAST_PATH_INIT
+        .compare_exchange(
+            false,
+            true,
+            core::sync::atomic::Ordering::Acquire,
+            core::sync::atomic::Ordering::Relaxed,
+        )
+        .is_ok()
+    {
         unsafe {
             let mut registry = FastPathRegistry::new();
             registry.init_default_handlers();
@@ -212,33 +215,32 @@ pub fn get_fast_path_call_count(syscall_num: u32) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_fast_path_registry() {
         init_fast_path_registry();
-        
+
         assert!(can_use_fast_path(syscall_numbers::SYS_GETPID));
         assert!(can_use_fast_path(syscall_numbers::SYS_GETUID));
         assert!(!can_use_fast_path(0x9999)); // Non-existent syscall
     }
-    
+
     #[test]
     fn test_fast_getpid() {
         init_fast_path_registry();
-        
+
         let result = dispatch_fast_path(syscall_numbers::SYS_GETPID, &[]);
         assert!(result.is_some());
         assert!(result.unwrap().is_ok());
     }
-    
+
     #[test]
     fn test_fast_getuid() {
         init_fast_path_registry();
-        
+
         let result = dispatch_fast_path(syscall_numbers::SYS_GETUID, &[]);
         assert!(result.is_some());
         let uid_result = result.unwrap();
         assert!(uid_result.is_ok());
     }
 }
-

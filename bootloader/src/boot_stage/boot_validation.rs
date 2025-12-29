@@ -2,7 +2,6 @@
 ///
 /// Comprehensive validation of all boot components before kernel execution.
 /// Ensures memory, disk, kernel, and boot parameters are all correct.
-
 use crate::utils::error_handling::BootErrorCode;
 
 /// Validation check result
@@ -41,11 +40,7 @@ pub struct ValidationCheck {
 
 impl ValidationCheck {
     pub fn new(name: &'static str, result: CheckResult) -> Self {
-        Self {
-            name,
-            result,
-            message: None,
-        }
+        Self { name, result, message: None }
     }
 
     pub fn with_message(mut self, msg: &'static str) -> Self {
@@ -74,9 +69,7 @@ pub struct BootValidation {
 impl BootValidation {
     /// Create new validation suite
     pub fn new() -> Self {
-        Self {
-            checks: alloc::vec::Vec::new(),
-        }
+        Self { checks: alloc::vec::Vec::new() }
     }
 
     /// Add validation check
@@ -225,10 +218,7 @@ impl FinalSystemCheck {
 
     /// Check overall system readiness
     pub fn is_system_ready(&self) -> bool {
-        self.validation.all_pass()
-            && self.power_status
-            && self.stack_valid
-            && self.heap_valid
+        self.validation.all_pass() && self.power_status && self.stack_valid && self.heap_valid
     }
 
     /// Get validation
@@ -332,7 +322,6 @@ mod tests {
         assert!(!check.is_system_ready());
     }
 }
-
 
 // Boot verification stages (merged from boot_verification.rs)
 

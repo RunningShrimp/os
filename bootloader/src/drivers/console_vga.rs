@@ -105,10 +105,10 @@ impl VgaWriter {
                 if self.row >= VGA_HEIGHT {
                     self.scroll();
                 }
-            }
+            },
             b'\r' => {
                 self.col = 0;
-            }
+            },
             _ => {
                 self.write_char_at(byte, self.row, self.col);
                 self.col += 1;
@@ -119,7 +119,7 @@ impl VgaWriter {
                         self.scroll();
                     }
                 }
-            }
+            },
         }
     }
 

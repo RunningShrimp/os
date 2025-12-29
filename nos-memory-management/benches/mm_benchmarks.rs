@@ -1,7 +1,8 @@
 //! Memory management benchmarks
 
-use criterion::{criterion_group, criterion_main, Criterion};
 use core::hint::black_box;
+
+use criterion::{Criterion, criterion_group, criterion_main};
 
 fn bench_memory_allocation(c: &mut Criterion) {
     // TODO: Implement memory allocation benchmark

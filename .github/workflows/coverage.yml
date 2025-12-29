@@ -1,0 +1,18 @@
+name: Coverage
+
+on: [push, pull_request]
+
+jobs:
+  tarpaulin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install tarpaulin
+        run: cargo install cargo-tarpaulin
+      - name: Generate coverage
+        run: cargo tarpaulin --workspace --out Xml -- Html
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v3

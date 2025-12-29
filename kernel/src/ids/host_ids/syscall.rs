@@ -5,13 +5,11 @@
 
 extern crate alloc;
 
-use crate::security::audit::AuditEvent;
-
 // 重新导出类型（临时，后续会移动到这里）
 #[allow(unused_imports)]
 pub use super::host_ids::{
-    SyscallMonitor, SyscallStats, SyscallAnomalyDetector, SyscallAnomalyModel,
-    ArgPattern, ArgPatternType, SyscallThresholds, CallTracer, CallFrame,
-    SyscallArg, SyscallArgType, CallChain, CallChainType,
+    ArgPattern, ArgPatternType, CallChain, CallChainType, CallFrame, CallTracer,
+    SyscallAnomalyDetector, SyscallAnomalyModel, SyscallArg, SyscallArgType, SyscallMonitor,
+    SyscallStats, SyscallThresholds,
 };
-
+use crate::security::audit::AuditEvent;

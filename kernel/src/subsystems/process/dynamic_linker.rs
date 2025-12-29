@@ -6,11 +6,10 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use core::mem::size_of;
-use crate::process::elf::{ElfLoader, ElfError};
+
+use crate::process::elf::{ElfError, ElfLoader};
 
 // ============================================================================
 // Dynamic Linking Constants
@@ -208,20 +207,20 @@ impl DynamicLinker {
             global_symbols: BTreeMap::new(),
             search_paths: Vec::new(),
         };
-        
+
         // Add default search paths
         linker.search_paths.push("/lib".to_string());
         linker.search_paths.push("/usr/lib".to_string());
         linker.search_paths.push("/usr/local/lib".to_string());
-        
+
         linker
     }
-    
+
     /// Add a library search path
     pub fn add_search_path(&mut self, path: String) {
         self.search_paths.push(path);
     }
-    
+
     /// Load a shared library
     ///
     /// # Arguments
@@ -245,10 +244,10 @@ impl DynamicLinker {
     {
         // Read library file
         let data = self.read_library_file(path)?;
-        
+
         // Parse ELF
         let loader = ElfLoader::new(&data)?;
-        
+
         // Determine base address (use provided base or calculate)
         let actual_base = if base == 0 {
             // ASLR: choose a random base address (simplified - use fixed address for now)
@@ -256,34 +255,35 @@ impl DynamicLinker {
         } else {
             base
         };
-        
+
         // Create a mutable closure for map_page that adjusts addresses
         let mut map_page_fn = map_page;
         let base_offset = actual_base;
-        
+
         // Load ELF segments with base address adjustment
         let elf_info = loader.load(|vaddr, readable, writable, executable| {
             map_page_fn(base_offset + vaddr, readable, writable, executable)
         })?;
-        
+
         // Parse dynamic section
-        let dynamic_phdr = loader.program_headers()
+        let dynamic_phdr = loader
+            .program_headers()
             .find(|ph| ph.p_type == crate::process::elf::PT_DYNAMIC);
-        
+
         if dynamic_phdr.is_none() {
             return Err(ElfError::InvalidMagic); // Not a dynamic library
         }
-        
+
         let dynamic_phdr = dynamic_phdr.unwrap();
         let dynamic_addr = actual_base + dynamic_phdr.p_vaddr as usize;
-        
+
         // Parse dynamic entries
         let (symtab, strtab, strtab_size, hash, rela, rela_size, jmprel, jmprel_size, needed) =
             self.parse_dynamic_section(&data, dynamic_addr, actual_base)?;
-        
+
         // Extract library name from path
         let name = path.split('/').last().unwrap_or(path).to_string();
-        
+
         let library = LoadedLibrary {
             base: actual_base,
             dynamic: dynamic_addr,
@@ -299,19 +299,19 @@ impl DynamicLinker {
             needed,
             entry: elf_info.entry,
         };
-        
+
         // Add to loaded libraries
         self.libraries.insert(name.clone(), library.clone());
-        
+
         // Process relocations
         self.process_relocations(&library, &data)?;
-        
+
         // Add symbols to global symbol table
         self.add_symbols(&library, &data)?;
-        
+
         Ok(library)
     }
-    
+
     /// Resolve a symbol
     ///
     /// Searches for a symbol in loaded libraries and returns its address.
@@ -332,46 +332,38 @@ impl DynamicLinker {
         }
         None
     }
-    
+
     /// Process relocations for a library
-    fn process_relocations(
-        &self,
-        library: &LoadedLibrary,
-        data: &[u8],
-    ) -> Result<(), ElfError> {
+    fn process_relocations(&self, library: &LoadedLibrary, data: &[u8]) -> Result<(), ElfError> {
         // Process RELA relocations
         if let Some(rela_addr) = library.rela {
             let rela_size = library.rela_size;
             let rela_count = rela_size / size_of::<Rela>();
-            
+
             for i in 0..rela_count {
                 let offset = rela_addr + i * size_of::<Rela>();
-                let rela = unsafe {
-                    &*(data.as_ptr().add(offset - library.base) as *const Rela)
-                };
-                
+                let rela = unsafe { &*(data.as_ptr().add(offset - library.base) as *const Rela) };
+
                 self.apply_relocation(library, rela, data)?;
             }
         }
-        
+
         // Process PLT relocations (JUMP_SLOT)
         if let Some(jmprel_addr) = library.jmprel {
             let jmprel_size = library.jmprel_size;
             let jmprel_count = jmprel_size / size_of::<Rela>();
-            
+
             for i in 0..jmprel_count {
                 let offset = jmprel_addr + i * size_of::<Rela>();
-                let rela = unsafe {
-                    &*(data.as_ptr().add(offset - library.base) as *const Rela)
-                };
-                
+                let rela = unsafe { &*(data.as_ptr().add(offset - library.base) as *const Rela) };
+
                 self.apply_relocation(library, rela, data)?;
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Apply a single relocation
     fn apply_relocation(
         &self,
@@ -381,9 +373,9 @@ impl DynamicLinker {
     ) -> Result<(), ElfError> {
         let r_type = (rela.r_info & 0xffffffff) as u32;
         let r_sym = (rela.r_info >> 32) as u32;
-        
+
         let target_addr = library.base + rela.r_offset as usize;
-        
+
         #[cfg(target_arch = "x86_64")]
         {
             use reloc_types::*;
@@ -394,7 +386,7 @@ impl DynamicLinker {
                     unsafe {
                         *(target_addr as *mut u64) = value;
                     }
-                }
+                },
                 R_X86_64_GLOB_DAT | R_X86_64_JUMP_SLOT => {
                     // Global data or PLT: resolve symbol
                     if let Some(sym_addr) = self.resolve_symbol_by_index(library, r_sym, data) {
@@ -402,7 +394,7 @@ impl DynamicLinker {
                             *(target_addr as *mut u64) = sym_addr as u64;
                         }
                     }
-                }
+                },
                 R_X86_64_64 => {
                     // 64-bit absolute: resolve symbol and add addend
                     if let Some(sym_addr) = self.resolve_symbol_by_index(library, r_sym, data) {
@@ -411,7 +403,7 @@ impl DynamicLinker {
                             *(target_addr as *mut u64) = value;
                         }
                     }
-                }
+                },
                 R_X86_64_PC32 => {
                     // 32-bit PC-relative: resolve symbol and calculate offset
                     if let Some(sym_addr) = self.resolve_symbol_by_index(library, r_sym, data) {
@@ -420,13 +412,13 @@ impl DynamicLinker {
                             *(target_addr as *mut i32) = value as i32;
                         }
                     }
-                }
+                },
                 _ => {
                     // Other relocation types not yet implemented
-                }
+                },
             }
         }
-        
+
         #[cfg(target_arch = "aarch64")]
         {
             use reloc_types::*;
@@ -436,14 +428,14 @@ impl DynamicLinker {
                     unsafe {
                         *(target_addr as *mut u64) = value;
                     }
-                }
+                },
                 R_AARCH64_GLOB_DAT | R_AARCH64_JUMP_SLOT => {
                     if let Some(sym_addr) = self.resolve_symbol_by_index(library, r_sym, data) {
                         unsafe {
                             *(target_addr as *mut u64) = sym_addr as u64;
                         }
                     }
-                }
+                },
                 R_AARCH64_ABS64 => {
                     if let Some(sym_addr) = self.resolve_symbol_by_index(library, r_sym, data) {
                         let value = sym_addr as u64 + rela.r_addend as u64;
@@ -451,11 +443,11 @@ impl DynamicLinker {
                             *(target_addr as *mut u64) = value;
                         }
                     }
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
-        
+
         #[cfg(target_arch = "riscv64")]
         {
             use reloc_types::*;
@@ -465,14 +457,14 @@ impl DynamicLinker {
                     unsafe {
                         *(target_addr as *mut u64) = value;
                     }
-                }
+                },
                 R_RISCV_JUMP_SLOT => {
                     if let Some(sym_addr) = self.resolve_symbol_by_index(library, r_sym, data) {
                         unsafe {
                             *(target_addr as *mut u64) = sym_addr as u64;
                         }
                     }
-                }
+                },
                 R_RISCV_64 => {
                     if let Some(sym_addr) = self.resolve_symbol_by_index(library, r_sym, data) {
                         let value = sym_addr as u64 + rela.r_addend as u64;
@@ -480,14 +472,14 @@ impl DynamicLinker {
                             *(target_addr as *mut u64) = value;
                         }
                     }
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Resolve symbol by index
     fn resolve_symbol_by_index(
         &self,
@@ -496,16 +488,14 @@ impl DynamicLinker {
         data: &[u8],
     ) -> Option<usize> {
         let sym_offset = library.symtab + (sym_index as usize * size_of::<Sym>());
-        let sym = unsafe {
-            &*(data.as_ptr().add(sym_offset - library.base) as *const Sym)
-        };
-        
+        let sym = unsafe { &*(data.as_ptr().add(sym_offset - library.base) as *const Sym) };
+
         // Get symbol name from string table
         let name_offset = library.strtab + sym.st_name as usize;
         if name_offset >= library.strtab + library.strtab_size {
             return None;
         }
-        
+
         let name = unsafe {
             let mut len = 0;
             let mut ptr = data.as_ptr().add(name_offset - library.base);
@@ -516,20 +506,34 @@ impl DynamicLinker {
             core::str::from_utf8(core::slice::from_raw_parts(
                 data.as_ptr().add(name_offset - library.base),
                 len,
-            )).ok()?
+            ))
+            .ok()?
         };
-        
+
         // Resolve symbol
         self.resolve_symbol(name)
     }
-    
+
     /// Parse dynamic section
     fn parse_dynamic_section(
         &self,
         data: &[u8],
         dynamic_addr: usize,
         base: usize,
-    ) -> Result<(usize, usize, usize, Option<usize>, Option<usize>, usize, Option<usize>, usize, Vec<String>), ElfError> {
+    ) -> Result<
+        (
+            usize,
+            usize,
+            usize,
+            Option<usize>,
+            Option<usize>,
+            usize,
+            Option<usize>,
+            usize,
+            Vec<String>,
+        ),
+        ElfError,
+    > {
         let mut symtab = 0;
         let mut strtab = 0;
         let mut strtab_size = 0;
@@ -539,17 +543,15 @@ impl DynamicLinker {
         let mut jmprel = None;
         let mut jmprel_size = 0;
         let mut needed = Vec::new();
-        
+
         let mut offset = dynamic_addr - base;
         loop {
             if offset + size_of::<Dyn>() > data.len() {
                 break;
             }
-            
-            let dyn_entry = unsafe {
-                &*(data.as_ptr().add(offset) as *const Dyn)
-            };
-            
+
+            let dyn_entry = unsafe { &*(data.as_ptr().add(offset) as *const Dyn) };
+
             match dyn_entry.d_tag {
                 DT_NULL => break,
                 DT_SYMTAB => symtab = base + dyn_entry.d_val as usize,
@@ -573,39 +575,34 @@ impl DynamicLinker {
                             core::str::from_utf8(core::slice::from_raw_parts(
                                 data.as_ptr().add(name_offset - base),
                                 len,
-                            )).ok()
+                            ))
+                            .ok()
                         };
                         if let Some(name) = name {
                             needed.push(name.to_string());
                         }
                     }
-                }
-                _ => {}
+                },
+                _ => {},
             }
-            
+
             offset += size_of::<Dyn>();
         }
-        
+
         Ok((symtab, strtab, strtab_size, hash, rela, rela_size, jmprel, jmprel_size, needed))
     }
-    
+
     /// Add symbols from library to global symbol table
-    fn add_symbols(
-        &mut self,
-        library: &LoadedLibrary,
-        data: &[u8],
-    ) -> Result<(), ElfError> {
+    fn add_symbols(&mut self, library: &LoadedLibrary, data: &[u8]) -> Result<(), ElfError> {
         // Iterate through symbol table
         let mut offset = library.symtab - library.base;
         loop {
             if offset + size_of::<Sym>() > data.len() {
                 break;
             }
-            
-            let sym = unsafe {
-                &*(data.as_ptr().add(offset) as *const Sym)
-            };
-            
+
+            let sym = unsafe { &*(data.as_ptr().add(offset) as *const Sym) };
+
             // Get symbol name
             let name_offset = library.strtab + sym.st_name as usize;
             if name_offset < library.base + library.strtab + library.strtab_size {
@@ -619,29 +616,32 @@ impl DynamicLinker {
                     core::str::from_utf8(core::slice::from_raw_parts(
                         data.as_ptr().add(name_offset - library.base),
                         len,
-                    )).ok()
+                    ))
+                    .ok()
                 };
-                
+
                 if let Some(name) = name {
                     // Only add exported symbols (not local)
                     let bind = (sym.st_info >> 4) & 0xf;
-                    if bind == 1 || bind == 2 { // STB_GLOBAL or STB_WEAK
-                        self.global_symbols.insert(name.to_string(), (library.name.clone(), *sym));
+                    if bind == 1 || bind == 2 {
+                        // STB_GLOBAL or STB_WEAK
+                        self.global_symbols
+                            .insert(name.to_string(), (library.name.clone(), *sym));
                     }
                 }
             }
-            
+
             offset += size_of::<Sym>();
-            
+
             // Stop if we've processed all symbols (heuristic: stop after empty name)
             if sym.st_name == 0 && offset > library.symtab - library.base + size_of::<Sym>() * 10 {
                 break;
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Read library file from filesystem
     fn read_library_file(&self, path: &str) -> Result<Vec<u8>, ElfError> {
         // Try direct path first
@@ -657,11 +657,12 @@ impl DynamicLinker {
             }
             return Ok(data);
         }
-        
+
         // Try search paths
         for search_path in &self.search_paths {
             let full_path = format!("{}/{}", search_path, path);
-            if let Ok(mut file) = crate::vfs::vfs().open(&full_path, crate::posix::O_RDONLY as u32) {
+            if let Ok(mut file) = crate::vfs::vfs().open(&full_path, crate::posix::O_RDONLY as u32)
+            {
                 let mut data = Vec::new();
                 let mut buffer = [0u8; 4096];
                 loop {
@@ -674,7 +675,7 @@ impl DynamicLinker {
                 return Ok(data);
             }
         }
-        
+
         Err(ElfError::InvalidMagic) // File not found
     }
 }

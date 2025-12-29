@@ -155,7 +155,7 @@ impl MemoryHotplugManager {
     pub fn get_dimm_mut(&mut self, slot_id: u32) -> Option<&mut DimmInfo> {
         let dimm_count = self.dimm_count;
         let dimms_ptr = self.dimms.as_mut_ptr();
-        
+
         for i in 0..dimm_count {
             unsafe {
                 if let Some(d) = (*dimms_ptr.add(i)).as_mut() {

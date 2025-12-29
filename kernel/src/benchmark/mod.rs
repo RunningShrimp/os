@@ -2,9 +2,8 @@
 //!
 //! Provides performance benchmarks and monitoring capabilities for production validation.
 
-pub mod syscall;
+pub mod io;
 pub mod memory;
 pub mod network;
-pub mod io;
 pub mod scheduler;
-
+pub mod syscall;

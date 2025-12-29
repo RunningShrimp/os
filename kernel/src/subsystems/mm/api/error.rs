@@ -2,7 +2,7 @@
 // These error types follow the MM_MODULE_API_BOUNDARIES_DESIGN.md
 
 /// Memory allocation error
-/// 
+///
 /// Memory allocation process中可能出现的错误
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AllocError {
@@ -19,7 +19,7 @@ pub enum AllocError {
 }
 
 /// Virtual memory error
-/// 
+///
 /// Virtual memory操作过程中可能出现的错误
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VmError {
@@ -42,7 +42,7 @@ pub enum VmError {
 }
 
 /// Physical memory error
-/// 
+///
 /// Physical memory操作过程中可能出现的错误
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PhysicalError {

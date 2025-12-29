@@ -9,10 +9,8 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use alloc::string::String;
-use alloc::string::ToString;
 use alloc::format;
 use core::sync::atomic::{AtomicU64, Ordering};
-use spin::Mutex;
 
 /// SELinux security context
 #[derive(Debug, Clone, PartialEq, Eq)]

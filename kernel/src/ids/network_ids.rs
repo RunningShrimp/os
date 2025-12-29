@@ -1,26 +1,19 @@
 /// Network Intrusion Detection System (NIDS)
-
 extern crate alloc;
 
 /// 网络入侵检测系统模块
 /// 负责检测网络流量中的恶意活动和攻击模式
-
 use alloc::collections::BTreeMap;
-use alloc::string::String;
-use alloc::sync::Arc;
-use alloc::vec;
-use alloc::vec::Vec;
-use alloc::boxed::Box;
-use alloc::format;
+use alloc::{boxed::Box, format, string::String, sync::Arc, vec, vec::Vec};
 use core::sync::atomic::{AtomicU64, Ordering};
+
 use spin::Mutex;
 
-use crate::net::Packet as NetworkPacket;
-use crate::security::audit::AuditSeverity;
 use super::{
-    IntrusionDetection, DetectionType, ThreatLevel, DetectionSource, TargetInfo,
-    AttackInfo, Evidence, ResponseAction, NetworkIdsConfig
+    AttackInfo, DetectionSource, DetectionType, Evidence, IntrusionDetection, NetworkIdsConfig,
+    ResponseAction, TargetInfo, ThreatLevel,
 };
+use crate::{net::Packet as NetworkPacket, security::audit::AuditSeverity};
 
 /// 网络入侵检测系统
 pub struct NetworkIds {
@@ -484,7 +477,10 @@ pub struct Timeouts {
 // Box<dyn ProtocolAnalyzer> is Send/Sync when stored inside `NetworkIds`.
 pub trait ProtocolAnalyzer: Send + Sync {
     /// 分析包
-    fn analyze_packet(&mut self, packet: &NetworkPacket) -> Result<Vec<ProtocolEvent>, &'static str>;
+    fn analyze_packet(
+        &mut self,
+        packet: &NetworkPacket,
+    ) -> Result<Vec<ProtocolEvent>, &'static str>;
     /// 获取协议信息
     fn get_protocol_info(&self) -> ProtocolInfo;
 }
@@ -593,7 +589,10 @@ impl NetworkIds {
     }
 
     /// 分析网络包
-    pub fn analyze_packet(&mut self, packet: &NetworkPacket) -> Result<Vec<IntrusionDetection>, &'static str> {
+    pub fn analyze_packet(
+        &mut self,
+        packet: &NetworkPacket,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         // 更新流量统计
@@ -609,12 +608,15 @@ impl NetworkIds {
                 Ok(events) => protocol_events = events,
                 Err(e) => {
                     crate::println!("[NetworkIds] Protocol analysis failed: {}", e);
-                }
+                },
             }
         }
 
         // 检测引擎分析
-        let detections = self.detection_engine.lock().analyze_packet(packet, &protocol_events)?;
+        let detections = self
+            .detection_engine
+            .lock()
+            .analyze_packet(packet, &protocol_events)?;
 
         // 流量异常检测
         let mut anomaly_detections = Vec::new();
@@ -646,7 +648,10 @@ impl NetworkIds {
     }
 
     /// 创建异常检测结果
-    fn create_anomaly_detection(&self, packet: &NetworkPacket) -> Result<IntrusionDetection, &'static str> {
+    fn create_anomaly_detection(
+        &self,
+        packet: &NetworkPacket,
+    ) -> Result<IntrusionDetection, &'static str> {
         let detection = IntrusionDetection {
             id: 0, // Will be assigned by parent
             detection_type: DetectionType::AnomalyBehavior,
@@ -675,20 +680,15 @@ impl NetworkIds {
                 technique: String::from("Anomalous network behavior"),
                 mitre_id: None,
             },
-            evidence: vec![
-                Evidence {
-                    id: 1,
-                    evidence_type: super::EvidenceType::PacketCapture,
-                    content: format!("Anomalous packet: {}", packet.protocol),
-                    collected_at: crate::subsystems::time::get_timestamp_nanos(),
-                    reliability: 0.8,
-                    source: String::from("NetworkIds"),
-                }
-            ],
-            recommended_response: vec![
-                ResponseAction::Log,
-                ResponseAction::Alert,
-            ],
+            evidence: vec![Evidence {
+                id: 1,
+                evidence_type: super::EvidenceType::PacketCapture,
+                content: format!("Anomalous packet: {}", packet.protocol),
+                collected_at: crate::subsystems::time::get_timestamp_nanos(),
+                reliability: 0.8,
+                source: String::from("NetworkIds"),
+            }],
+            recommended_response: vec![ResponseAction::Log, ResponseAction::Alert],
         };
 
         Ok(detection)
@@ -771,12 +771,10 @@ impl DetectionEngine {
             description: String::from("Detects port scanning activities"),
             rule_type: RuleType::Behavior,
             category: String::from("Scanning"),
-            conditions: vec![
-                MatchCondition::And(vec![
-                    MatchCondition::Protocol(ProtocolType::TCP),
-                    MatchCondition::Flags(vec![PacketFlag::SYN]),
-                ])
-            ],
+            conditions: vec![MatchCondition::And(vec![
+                MatchCondition::Protocol(ProtocolType::TCP),
+                MatchCondition::Flags(vec![PacketFlag::SYN]),
+            ])],
             actions: vec![
                 RuleAction::Alert(String::from("Port scan detected")),
                 RuleAction::Log(String::from("Potential reconnaissance activity")),
@@ -799,7 +797,10 @@ impl DetectionEngine {
         // 更新规则索引
         for condition in &rule.conditions {
             let key = self.get_condition_key(condition);
-            self.rule_index.entry(key).or_insert_with(Vec::new).push(self.enabled_rules.len() - 1);
+            self.rule_index
+                .entry(key)
+                .or_insert_with(Vec::new)
+                .push(self.enabled_rules.len() - 1);
         }
 
         // 初始化规则统计
@@ -810,7 +811,10 @@ impl DetectionEngine {
 
     /// 移除规则
     pub fn remove_rule(&mut self, rule_id: u64) -> Result<(), &'static str> {
-        let index = self.enabled_rules.iter().position(|r| r.id == rule_id)
+        let index = self
+            .enabled_rules
+            .iter()
+            .position(|r| r.id == rule_id)
             .ok_or("Rule not found")?;
 
         self.enabled_rules.remove(index);
@@ -847,7 +851,11 @@ impl DetectionEngine {
     }
 
     /// 分析包
-    pub fn analyze_packet(&mut self, packet: &NetworkPacket, protocol_events: &[ProtocolEvent]) -> Result<Vec<IntrusionDetection>, &'static str> {
+    pub fn analyze_packet(
+        &mut self,
+        packet: &NetworkPacket,
+        protocol_events: &[ProtocolEvent],
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         let mut detections = Vec::new();
         let start_time = crate::subsystems::time::get_timestamp_nanos();
 
@@ -866,7 +874,8 @@ impl DetectionEngine {
                     stats.last_match = crate::subsystems::time::get_timestamp_nanos();
 
                     let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
-                    stats.avg_processing_time_us = (stats.avg_processing_time_us + elapsed / 1000) / 2;
+                    stats.avg_processing_time_us =
+                        (stats.avg_processing_time_us + elapsed / 1000) / 2;
                 }
             }
         }
@@ -875,7 +884,12 @@ impl DetectionEngine {
     }
 
     /// 评估规则
-    fn evaluate_rule(&self, rule: &DetectionRule, packet: &NetworkPacket, protocol_events: &[ProtocolEvent]) -> Result<bool, &'static str> {
+    fn evaluate_rule(
+        &self,
+        rule: &DetectionRule,
+        packet: &NetworkPacket,
+        protocol_events: &[ProtocolEvent],
+    ) -> Result<bool, &'static str> {
         for condition in &rule.conditions {
             if !self.evaluate_condition(condition, packet, protocol_events)? {
                 return Ok(false);
@@ -885,14 +899,19 @@ impl DetectionEngine {
     }
 
     /// 评估条件
-    fn evaluate_condition(&self, condition: &MatchCondition, packet: &NetworkPacket, _protocol_events: &[ProtocolEvent]) -> Result<bool, &'static str> {
+    fn evaluate_condition(
+        &self,
+        condition: &MatchCondition,
+        packet: &NetworkPacket,
+        _protocol_events: &[ProtocolEvent],
+    ) -> Result<bool, &'static str> {
         match condition {
             MatchCondition::Protocol(protocol) => Ok(packet.protocol == format!("{:?}", protocol)),
             MatchCondition::Port(port) => Ok(packet.dst_port == *port || packet.src_port == *port),
             MatchCondition::Flags(flags) => {
                 let packet_flags = self.extract_packet_flags(packet);
                 Ok(flags.iter().all(|&flag| packet_flags.contains(&flag)))
-            }
+            },
             MatchCondition::And(conditions) => {
                 for cond in conditions {
                     if !self.evaluate_condition(cond, packet, _protocol_events)? {
@@ -900,7 +919,7 @@ impl DetectionEngine {
                     }
                 }
                 Ok(true)
-            }
+            },
             _ => Ok(false),
         }
     }
@@ -927,7 +946,11 @@ impl DetectionEngine {
     }
 
     /// 从规则创建检测结果
-    fn create_detection_from_rule(&self, rule: &DetectionRule, packet: &NetworkPacket) -> Result<IntrusionDetection, &'static str> {
+    fn create_detection_from_rule(
+        &self,
+        rule: &DetectionRule,
+        packet: &NetworkPacket,
+    ) -> Result<IntrusionDetection, &'static str> {
         let detection = IntrusionDetection {
             id: rule.id,
             detection_type: DetectionType::NetworkIntrusion,
@@ -956,20 +979,15 @@ impl DetectionEngine {
                 technique: rule.name.clone(),
                 mitre_id: None,
             },
-            evidence: vec![
-                Evidence {
-                    id: 1,
-                    evidence_type: super::EvidenceType::PacketCapture,
-                    content: format!("Rule '{}' triggered by packet", rule.name),
-                    collected_at: crate::subsystems::time::get_timestamp_nanos(),
-                    reliability: 0.9,
-                    source: String::from("NetworkIds"),
-                }
-            ],
-            recommended_response: vec![
-                ResponseAction::Alert,
-                ResponseAction::Log,
-            ],
+            evidence: vec![Evidence {
+                id: 1,
+                evidence_type: super::EvidenceType::PacketCapture,
+                content: format!("Rule '{}' triggered by packet", rule.name),
+                collected_at: crate::subsystems::time::get_timestamp_nanos(),
+                reliability: 0.9,
+                source: String::from("NetworkIds"),
+            }],
+            recommended_response: vec![ResponseAction::Alert, ResponseAction::Log],
         };
 
         Ok(detection)
@@ -1005,7 +1023,10 @@ impl RuleManager {
     /// 添加规则
     pub fn add_rule(&mut self, rule: DetectionRule) -> Result<(), &'static str> {
         // 添加到分类
-        self.rule_categories.entry(rule.category.clone()).or_insert_with(Vec::new).push(rule.id);
+        self.rule_categories
+            .entry(rule.category.clone())
+            .or_insert_with(Vec::new)
+            .push(rule.id);
 
         // 添加到规则列表
         self.rules.push(rule);
@@ -1022,7 +1043,10 @@ impl RuleManager {
 
     /// 移除规则
     pub fn remove_rule(&mut self, rule_id: u64) -> Result<(), &'static str> {
-        let index = self.rules.iter().position(|r| r.id == rule_id)
+        let index = self
+            .rules
+            .iter()
+            .position(|r| r.id == rule_id)
             .ok_or("Rule not found")?;
 
         let rule = &self.rules[index];
@@ -1061,7 +1085,8 @@ impl RuleManager {
 
     /// 按分类获取规则
     pub fn get_rules_by_category(&self, category: &str) -> Vec<&DetectionRule> {
-        self.rules.iter()
+        self.rules
+            .iter()
             .filter(|r| r.category == category)
             .collect()
     }
@@ -1133,10 +1158,10 @@ impl StateTracker {
             connections: BTreeMap::new(),
             sessions: BTreeMap::new(),
             timeouts: Timeouts {
-                tcp_connection_timeout: 300,      // 5 minutes
+                tcp_connection_timeout: 300,     // 5 minutes
                 udp_session_timeout: 60,         // 1 minute
                 idle_connection_timeout: 600,    // 10 minutes
-                fragment_reassembly_timeout: 60,  // 60 milliseconds
+                fragment_reassembly_timeout: 60, // 60 milliseconds
             },
         }
     }
@@ -1158,14 +1183,17 @@ impl StateTracker {
 
         let now = crate::subsystems::time::get_timestamp();
 
-        let state = self.connections.entry(key).or_insert_with(|| ConnectionState {
-            state: ConnectionStateType::New,
-            created_at: now,
-            last_activity: now,
-            packet_count: 0,
-            byte_count: 0,
-            flags: 0,
-        });
+        let state = self
+            .connections
+            .entry(key)
+            .or_insert_with(|| ConnectionState {
+                state: ConnectionStateType::New,
+                created_at: now,
+                last_activity: now,
+                packet_count: 0,
+                byte_count: 0,
+                flags: 0,
+            });
 
         state.last_activity = now;
         state.packet_count += 1;
@@ -1195,9 +1223,8 @@ impl StateTracker {
         let now = crate::subsystems::time::get_timestamp();
         let timeout = self.timeouts.tcp_connection_timeout;
 
-        self.connections.retain(|_, state| {
-            now - state.last_activity < timeout
-        });
+        self.connections
+            .retain(|_, state| now - state.last_activity < timeout);
     }
 }
 
@@ -1220,7 +1247,10 @@ impl HttpAnalyzer {
 }
 
 impl ProtocolAnalyzer for HttpAnalyzer {
-    fn analyze_packet(&mut self, _packet: &NetworkPacket) -> Result<Vec<ProtocolEvent>, &'static str> {
+    fn analyze_packet(
+        &mut self,
+        _packet: &NetworkPacket,
+    ) -> Result<Vec<ProtocolEvent>, &'static str> {
         // 简化的HTTP包分析
         Ok(vec![])
     }
@@ -1249,7 +1279,10 @@ impl DnsAnalyzer {
 }
 
 impl ProtocolAnalyzer for DnsAnalyzer {
-    fn analyze_packet(&mut self, _packet: &NetworkPacket) -> Result<Vec<ProtocolEvent>, &'static str> {
+    fn analyze_packet(
+        &mut self,
+        _packet: &NetworkPacket,
+    ) -> Result<Vec<ProtocolEvent>, &'static str> {
         // 简化的DNS包分析
         Ok(vec![])
     }
@@ -1278,7 +1311,10 @@ impl SmtpAnalyzer {
 }
 
 impl ProtocolAnalyzer for SmtpAnalyzer {
-    fn analyze_packet(&mut self, _packet: &NetworkPacket) -> Result<Vec<ProtocolEvent>, &'static str> {
+    fn analyze_packet(
+        &mut self,
+        _packet: &NetworkPacket,
+    ) -> Result<Vec<ProtocolEvent>, &'static str> {
         // 简化的SMTP包分析
         Ok(vec![])
     }

@@ -2,7 +2,6 @@
 ///
 /// Provides GDT/IDT configuration and boot-time memory layout setup
 /// necessary for real mode operations and long mode transitions.
-
 use core::mem;
 
 /// Global Descriptor Table (GDT) entry
@@ -35,8 +34,8 @@ impl GDTEntry {
             limit_low: 0xFFFF,
             base_low: 0,
             base_mid: 0,
-            access: 0x9A,  // P=1, DPL=0, S=1, Type=A (execute/read)
-            limit_high_flags: 0xA0,  // L=1 (64-bit), D=0, G=1 (4KB granularity)
+            access: 0x9A,           // P=1, DPL=0, S=1, Type=A (execute/read)
+            limit_high_flags: 0xA0, // L=1 (64-bit), D=0, G=1 (4KB granularity)
             base_high: 0,
         }
     }
@@ -47,8 +46,8 @@ impl GDTEntry {
             limit_low: 0xFFFF,
             base_low: 0,
             base_mid: 0,
-            access: 0x92,  // P=1, DPL=0, S=1, Type=2 (read/write)
-            limit_high_flags: 0xC0,  // L=0, D=1, G=1 (4KB granularity)
+            access: 0x92,           // P=1, DPL=0, S=1, Type=2 (read/write)
+            limit_high_flags: 0xC0, // L=0, D=1, G=1 (4KB granularity)
             base_high: 0,
         }
     }
@@ -59,8 +58,8 @@ impl GDTEntry {
             limit_low: 0xFFFF,
             base_low: 0,
             base_mid: 0,
-            access: 0x9E,  // Present, Ring 0, Code, Execute/Read
-            limit_high_flags: 0x00,  // 64KB limit, byte granularity
+            access: 0x9E,           // Present, Ring 0, Code, Execute/Read
+            limit_high_flags: 0x00, // 64KB limit, byte granularity
             base_high: 0,
         }
     }
@@ -76,9 +75,9 @@ impl GlobalDescriptorTable {
     pub fn new() -> Self {
         Self {
             entries: [
-                GDTEntry::null(),      // Index 0: Null descriptor
-                GDTEntry::code64(),    // Index 1: 64-bit code (0x08)
-                GDTEntry::data64(),    // Index 2: 64-bit data (0x10)
+                GDTEntry::null(),   // Index 0: Null descriptor
+                GDTEntry::code64(), // Index 1: 64-bit code (0x08)
+                GDTEntry::data64(), // Index 2: 64-bit data (0x10)
             ],
         }
     }
@@ -138,7 +137,7 @@ impl IDTEntry {
             offset_low: (handler & 0xFFFF) as u16,
             selector,
             ist: 0,
-            flags: 0x8E,  // Present=1, DPL=0, Type=14 (Interrupt Gate)
+            flags: 0x8E, // Present=1, DPL=0, Type=14 (Interrupt Gate)
             offset_mid: ((handler >> 16) & 0xFFFF) as u16,
             offset_high: ((handler >> 32) & 0xFFFFFFFF) as u32,
             reserved: 0,
@@ -151,7 +150,7 @@ impl IDTEntry {
             offset_low: (handler & 0xFFFF) as u16,
             selector,
             ist: 0,
-            flags: 0x8F,  // Present=1, DPL=0, Type=15 (Trap Gate)
+            flags: 0x8F, // Present=1, DPL=0, Type=15 (Trap Gate)
             offset_mid: ((handler >> 16) & 0xFFFF) as u16,
             offset_high: ((handler >> 32) & 0xFFFFFFFF) as u32,
             reserved: 0,
@@ -161,15 +160,13 @@ impl IDTEntry {
 
 /// Interrupt Descriptor Table
 pub struct InterruptDescriptorTable {
-    entries: [IDTEntry; 32],  // Support first 32 interrupts (for exception handling)
+    entries: [IDTEntry; 32], // Support first 32 interrupts (for exception handling)
 }
 
 impl InterruptDescriptorTable {
     /// Create new IDT
     pub fn new() -> Self {
-        Self {
-            entries: [IDTEntry::null(); 32],
-        }
+        Self { entries: [IDTEntry::null(); 32] }
     }
 
     /// Set IDT entry
@@ -195,19 +192,19 @@ pub struct BootMemoryLayout {
     /// Bootloader code segment
     pub bootloader_base: u64,
     pub bootloader_size: u64,
-    
+
     /// Stack area
     pub stack_base: u64,
     pub stack_size: u64,
-    
+
     /// Heap area
     pub heap_base: u64,
     pub heap_size: u64,
-    
+
     /// Real mode buffer (for BIOS calls)
     pub realmode_buffer: u64,
     pub realmode_buffer_size: u64,
-    
+
     /// Kernel load area
     pub kernel_base: u64,
     pub kernel_max_size: u64,
@@ -217,20 +214,20 @@ impl BootMemoryLayout {
     /// Create default boot memory layout
     pub fn new() -> Self {
         Self {
-            bootloader_base: 0x7C00,      // Traditional bootloader address
-            bootloader_size: 0x200,       // 512 bytes
-            
-            stack_base: 0x7FFF0000,       // Stack grows downward
-            stack_size: 64 * 1024,        // 64 KB
-            
-            heap_base: 0x7FFE0000,        // Heap grows upward
-            heap_size: 256 * 1024,        // 256 KB
-            
-            realmode_buffer: 0x10000,     // 64 KB area for real mode operations
+            bootloader_base: 0x7C00, // Traditional bootloader address
+            bootloader_size: 0x200,  // 512 bytes
+
+            stack_base: 0x7FFF0000, // Stack grows downward
+            stack_size: 64 * 1024,  // 64 KB
+
+            heap_base: 0x7FFE0000, // Heap grows upward
+            heap_size: 256 * 1024, // 256 KB
+
+            realmode_buffer: 0x10000, // 64 KB area for real mode operations
             realmode_buffer_size: 64 * 1024,
-            
-            kernel_base: 0x100000,        // 1 MB (traditional kernel load address)
-            kernel_max_size: 16 * 1024 * 1024,  // 16 MB max kernel size
+
+            kernel_base: 0x100000, // 1 MB (traditional kernel load address)
+            kernel_max_size: 16 * 1024 * 1024, // 16 MB max kernel size
         }
     }
 
@@ -240,11 +237,11 @@ impl BootMemoryLayout {
         if self.stack_base < self.stack_size {
             return Err("Stack would overflow low memory");
         }
-        
+
         if self.heap_base + self.heap_size > self.stack_base - self.stack_size {
             return Err("Heap and stack would overlap");
         }
-        
+
         if self.kernel_base < self.realmode_buffer + self.realmode_buffer_size {
             return Err("Kernel load area overlaps with real mode buffer");
         }

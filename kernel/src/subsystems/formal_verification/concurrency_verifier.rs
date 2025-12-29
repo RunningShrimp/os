@@ -1,20 +1,17 @@
 // Concurrency Verification Module
 
 extern crate alloc;
-//
 // 并发验证模块
 // 验证多线程和并发程序的安全性属性
 
-use hashbrown::{HashMap, HashSet};
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::{format, vec};
+use alloc::{collections::BTreeMap, format, sync::Arc, vec, vec::Vec};
 use core::sync::atomic::Ordering;
+
+use hashbrown::{HashMap, HashSet};
 use spin::Mutex;
-use crate::compat::DefaultHasherBuilder;
 
 use super::*;
+use crate::compat::DefaultHasherBuilder;
 
 /// 并发验证器
 pub struct ConcurrencyVerifier {
@@ -65,7 +62,10 @@ impl ConcurrencyVerifier {
     }
 
     /// 验证并发安全性
-    pub fn verify_concurrency(&mut self, targets: &[VerificationTarget]) -> Result<Vec<VerificationResult>, &'static str> {
+    pub fn verify_concurrency(
+        &mut self,
+        targets: &[VerificationTarget],
+    ) -> Result<Vec<VerificationResult>, &'static str> {
         if !self.running.load(Ordering::SeqCst) {
             return Err("Concurrency verifier is not running");
         }

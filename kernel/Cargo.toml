@@ -31,10 +31,10 @@ spin = { workspace = true }
 log = { workspace = true }
 
 # Heapless data structures for no_std environment
-heapless = { version = "0.7", default-features = false }
+heapless = { version = "0.8.0", default-features = false }
 
 # Math library for no_std environment
-libm = "0.2.8"
+libm = "0.2.11"
 
 # Test dependencies
 [dev-dependencies]
@@ -44,42 +44,25 @@ mockall = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 bincode = { workspace = true }
+tarpaulin = "0.27"
 
 [features]
-default = ["posix_layer", "net_stack", "syscalls", "services", "error_handling"]
+default = ["networking", "syscalls", "services", "error_handling", "huge_pages"]
 baremetal = []
-kernel_tests = []
-link_phys_end = []
-fast_syscall = []
-zero_copy = []
-batch_syscalls = []
-net_opt = []
-sched_opt = []
-lazy_init = []
-security_audit = []
-formal_verification = []
-observability = []
-debug_subsystems = []
-cloud_native = []
-net_stack = []
-graphics_subsystem = []
-web_engine = []
-posix_layer = []
-
-hpage_2mb = []
-hpage_1gb = []
-debug = []
-
-# Additional infrastructure features
-alloc = []
-strict_boot = []
-journaling_fs = []
-
-# New modular features
+std = []
+kernel_tests = ["std"]
 syscalls = ["nos-syscalls"]
 services = ["nos-services"]
 error_handling = ["nos-error-handling"]
-advanced_syscalls = ["nos-syscalls/advanced_syscalls"]
+networking = ["services", "error_handling"]
+graphics = ["networking"]
+debug = ["std"]
+security = []
+performance = []
+cloud_native = []
+experimental = []
+huge_pages = []
+advanced_syscalls = ["syscalls"]
 realtime = []
 log = []
 

@@ -3,82 +3,86 @@
 //! This module provides VESA graphics interface support for BIOS bootloader,
 //! enabling high-resolution graphics modes and framebuffer access.
 
-use crate::utils::error::{BootError, Result};
-use crate::protocol::FramebufferInfo;
-use crate::infrastructure::graphics_backend::PixelFormat;
 use alloc::vec::Vec;
+
 #[cfg(feature = "uefi_support")]
 use uefi::println;
+
+use crate::{
+    infrastructure::graphics_backend::PixelFormat,
+    protocol::FramebufferInfo,
+    utils::error::{BootError, Result},
+};
 
 /// VBE Controller Info structure
 #[derive(Debug, Clone, Copy)]
 #[repr(C, packed)]
 pub struct VbeControllerInfo {
-    pub signature: [u8; 4],      // Should be "VESA"
-    pub version: u16,             // VBE version
-    pub oem_string: u32,          // OEM string pointer
-    pub capabilities: u32,        // Capabilities flags
-    pub video_modes: u32,         // Video mode list pointer
-    pub total_memory: u16,        // Total memory in 64KB blocks
-    pub oem_software_rev: u16,    // OEM software revision
-    pub oem_vendor: u32,          // OEM vendor string pointer
-    pub oem_product: u32,         // OEM product name string pointer
-    pub oem_revision: u32,        // OEM product revision string pointer
-    pub reserved: [u8; 222],      // Reserved for VBE implementation
-    pub oem_data: [u8; 256],      // OEM data area
+    pub signature: [u8; 4],    // Should be "VESA"
+    pub version: u16,          // VBE version
+    pub oem_string: u32,       // OEM string pointer
+    pub capabilities: u32,     // Capabilities flags
+    pub video_modes: u32,      // Video mode list pointer
+    pub total_memory: u16,     // Total memory in 64KB blocks
+    pub oem_software_rev: u16, // OEM software revision
+    pub oem_vendor: u32,       // OEM vendor string pointer
+    pub oem_product: u32,      // OEM product name string pointer
+    pub oem_revision: u32,     // OEM product revision string pointer
+    pub reserved: [u8; 222],   // Reserved for VBE implementation
+    pub oem_data: [u8; 256],   // OEM data area
 }
 
 /// VBE Mode Info structure
 #[derive(Debug, Clone, Copy)]
 #[repr(C, packed)]
 pub struct VbeModeInfo {
-    pub mode_attributes: u16,             // Mode attributes
-    pub win_a_attributes: u8,             // Window A attributes
-    pub win_b_attributes: u8,             // Window B attributes
-    pub win_granularity: u16,             // Window granularity
-    pub win_size: u16,                    // Window size
-    pub win_a_segment: u16,               // Window A segment
-    pub win_b_segment: u16,               // Window B segment
-    pub win_func_ptr: u32,                // Window function pointer
-    pub bytes_per_scanline: u16,          // Bytes per scanline
-    pub x_resolution: u16,                // Horizontal resolution
-    pub y_resolution: u16,                // Vertical resolution
-    pub x_char_size: u8,                  // Character cell width
-    pub y_char_size: u8,                  // Character cell height
-    pub number_of_planes: u8,             // Number of memory planes
-    pub bits_per_pixel: u8,               // Bits per pixel
-    pub number_of_banks: u8,              // Number of banks
-    pub memory_model: u8,                 // Memory model type
-    pub bank_size: u8,                    // Bank size in KB
-    pub number_of_image_pages: u8,        // Number of image pages
-    pub reserved1: u8,                    // Reserved
-    pub red_mask_size: u8,                // Red mask size
-    pub red_field_position: u8,           // Red field position
-    pub green_mask_size: u8,              // Green mask size
-    pub green_field_position: u8,         // Green field position
-    pub blue_mask_size: u8,               // Blue mask size
-    pub blue_field_position: u8,          // Blue field position
-    pub rsvd_mask_size: u8,               // Reserved mask size
-    pub rsvd_field_position: u8,          // Reserved field position
-    pub direct_color_mode_info: u8,       // Direct color mode info
-    pub phys_base_ptr: u32,               // Physical address for flat frame buffer
-    pub reserved2: [u8; 6],               // Reserved
-    pub reserved3: u16,                   // Reserved
-    pub linear_bytes_per_scanline: u16,   // Bytes per scanline for linear modes
-    pub number_of_image_pages_lin: u8,    // Number of image pages for linear modes
-    pub depth_of_color: u8,               // Depth of color
-    pub number_of_banks_lin: u8,          // Number of banks for linear modes
-    pub number_of_images_lin: u8,         // Number of images for linear modes
-    pub linear_red_mask_size: u8,         // Red mask size for linear modes
-    pub linear_red_field_position: u8,    // Red field position for linear modes
-    pub linear_green_mask_size: u8,       // Green mask size for linear modes
-    pub linear_green_field_position: u8,  // Green field position for linear modes
-    pub linear_blue_mask_size: u8,        // Blue mask size for linear modes
-    pub linear_blue_field_position: u8,   // Blue field position for linear modes
-    pub linear_rsvd_mask_size: u8,        // Reserved mask size for linear modes
-    pub linear_rsvd_field_position: u8,   // Reserved field position for linear modes
-    pub max_pixel_clock: u32,             // Maximum pixel clock
-    pub reserved4: [u8; 190],             // Reserved for VBE implementation
+    pub mode_attributes: u16,            // Mode attributes
+    pub win_a_attributes: u8,            // Window A attributes
+    pub win_b_attributes: u8,            // Window B attributes
+    pub win_granularity: u16,            // Window granularity
+    pub win_size: u16,                   // Window size
+    pub win_a_segment: u16,              // Window A segment
+    pub win_b_segment: u16,              // Window B segment
+    pub win_func_ptr: u32,               // Window function pointer
+    pub bytes_per_scanline: u16,         // Bytes per scanline
+    pub x_resolution: u16,               // Horizontal resolution
+    pub y_resolution: u16,               // Vertical resolution
+    pub x_char_size: u8,                 // Character cell width
+    pub y_char_size: u8,                 // Character cell height
+    pub number_of_planes: u8,            // Number of memory planes
+    pub bits_per_pixel: u8,              // Bits per pixel
+    pub number_of_banks: u8,             // Number of banks
+    pub memory_model: u8,                // Memory model type
+    pub bank_size: u8,                   // Bank size in KB
+    pub number_of_image_pages: u8,       // Number of image pages
+    pub reserved1: u8,                   // Reserved
+    pub red_mask_size: u8,               // Red mask size
+    pub red_field_position: u8,          // Red field position
+    pub green_mask_size: u8,             // Green mask size
+    pub green_field_position: u8,        // Green field position
+    pub blue_mask_size: u8,              // Blue mask size
+    pub blue_field_position: u8,         // Blue field position
+    pub rsvd_mask_size: u8,              // Reserved mask size
+    pub rsvd_field_position: u8,         // Reserved field position
+    pub direct_color_mode_info: u8,      // Direct color mode info
+    pub phys_base_ptr: u32,              // Physical address for flat frame buffer
+    pub reserved2: [u8; 6],              // Reserved
+    pub reserved3: u16,                  // Reserved
+    pub linear_bytes_per_scanline: u16,  // Bytes per scanline for linear modes
+    pub number_of_image_pages_lin: u8,   // Number of image pages for linear modes
+    pub depth_of_color: u8,              // Depth of color
+    pub number_of_banks_lin: u8,         // Number of banks for linear modes
+    pub number_of_images_lin: u8,        // Number of images for linear modes
+    pub linear_red_mask_size: u8,        // Red mask size for linear modes
+    pub linear_red_field_position: u8,   // Red field position for linear modes
+    pub linear_green_mask_size: u8,      // Green mask size for linear modes
+    pub linear_green_field_position: u8, // Green field position for linear modes
+    pub linear_blue_mask_size: u8,       // Blue mask size for linear modes
+    pub linear_blue_field_position: u8,  // Blue field position for linear modes
+    pub linear_rsvd_mask_size: u8,       // Reserved mask size for linear modes
+    pub linear_rsvd_field_position: u8,  // Reserved field position for linear modes
+    pub max_pixel_clock: u32,            // Maximum pixel clock
+    pub reserved4: [u8; 190],            // Reserved for VBE implementation
 }
 
 /// VBE Mode Types
@@ -143,7 +147,8 @@ impl VbeController {
 
     /// Get cached mode info or None if not cached
     pub fn get_cached_mode(&self, mode_id: u16) -> Option<CachedModeInfo> {
-        self.mode_cache.iter()
+        self.mode_cache
+            .iter()
             .find(|cached| cached.mode_id == mode_id && cached.valid)
             .cloned()
     }
@@ -151,7 +156,11 @@ impl VbeController {
     /// Cache mode info to avoid repeated hardware queries
     pub fn cache_mode(&mut self, info: CachedModeInfo) -> Result<()> {
         // Check if the mode is already cached
-        if let Some(index) = self.mode_cache.iter().position(|cached| cached.mode_id == info.mode_id) {
+        if let Some(index) = self
+            .mode_cache
+            .iter()
+            .position(|cached| cached.mode_id == info.mode_id)
+        {
             // Update existing cache entry
             self.mode_cache[index] = info;
         } else {
@@ -202,18 +211,19 @@ impl VbeController {
 
         println!("[vbe] VBE Controller Info:");
         println!("[vbe]   Signature: {}", signature_str);
-        println!("[vbe]   Version: {}.{}",
-                 (controller_info.version >> 8) & 0xFF,
-                 controller_info.version & 0xFF);
-        println!("[vbe]   Total Memory: {} KB",
-                 controller_info.total_memory as u32 * 64);
+        println!(
+            "[vbe]   Version: {}.{}",
+            (controller_info.version >> 8) & 0xFF,
+            controller_info.version & 0xFF
+        );
+        println!("[vbe]   Total Memory: {} KB", controller_info.total_memory as u32 * 64);
 
         self.controller_info = Some(controller_info);
         self.initialized = true;
 
         // Enumerate supported modes
         self.enumerate_modes()?;
-        
+
         // Preload common VBE modes to improve performance later
         self.preload_common_modes()?;
 
@@ -380,9 +390,10 @@ impl VbeController {
     pub fn find_best_mode(&self, width: u16, height: u16, bpp: u8) -> Option<u16> {
         for &mode in &self.supported_modes {
             if let Ok(mode_info) = self.get_mode_info_details(mode) {
-                if mode_info.x_resolution == width &&
-                   mode_info.y_resolution == height &&
-                   mode_info.bits_per_pixel == bpp {
+                if mode_info.x_resolution == width
+                    && mode_info.y_resolution == height
+                    && mode_info.bits_per_pixel == bpp
+                {
                     return Some(mode);
                 }
             }
@@ -391,9 +402,10 @@ impl VbeController {
         // Fallback: find mode with same or higher resolution
         for &mode in &self.supported_modes {
             if let Ok(mode_info) = self.get_mode_info_details(mode) {
-                if mode_info.x_resolution >= width &&
-                   mode_info.y_resolution >= height &&
-                   mode_info.bits_per_pixel >= bpp {
+                if mode_info.x_resolution >= width
+                    && mode_info.y_resolution >= height
+                    && mode_info.bits_per_pixel >= bpp
+                {
                     return Some(mode);
                 }
             }
@@ -435,7 +447,7 @@ impl VbeController {
             VBE_MODE_1280X1024X24,
             VBE_MODE_1280X1024X32,
         ];
-        
+
         // Try to preload each common mode
         for &mode in &common_modes {
             // Check if the mode is in the supported modes list to avoid unnecessary hardware calls
@@ -451,16 +463,16 @@ impl VbeController {
                             info: mode_info,
                             valid: true,
                         };
-                        
+
                         self.cache_mode(cached)?;
-                    }
+                    },
                     Err(_) => {
                         // Ignore modes that can't be preloaded
-                    }
+                    },
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -471,7 +483,8 @@ impl VbeController {
         }
 
         // Find best mode
-        let mode = self.find_best_mode(width, height, bpp)
+        let mode = self
+            .find_best_mode(width, height, bpp)
             .ok_or(BootError::HardwareError("No suitable VBE mode found"))?;
 
         // Get mode info before setting
@@ -489,7 +502,7 @@ impl VbeController {
         let y_res = mode_info.y_resolution;
         let bpp_val = mode_info.bits_per_pixel;
         let fb_addr = mode_info.phys_base_ptr;
-        
+
         println!("[vbe] Set VBE mode: 0x{:04X}", mode_val);
         println!("[vbe] Resolution: {}x{}", x_res, y_res);
         println!("[vbe] BPP: {}", bpp_val);
@@ -536,7 +549,7 @@ impl VbeController {
         log::debug!("Executing VBE interrupt call");
         // Real BIOS interrupt implementation for VBE
         // We use inline assembly with constraints to set and get registers
-        
+
         let result = VbeRegisters {
             ax: regs.ax,
             bx: regs.bx,
@@ -546,7 +559,7 @@ impl VbeController {
             di: regs.di,
             es: regs.es,
         };
-        
+
         // Execute BIOS interrupt 0x10 for VBE calls
         #[cfg(target_arch = "x86")]
         asm!(
@@ -560,10 +573,10 @@ impl VbeController {
             inout("es") result.es,
             options(nostack),
         );
-        
+
         #[cfg(not(target_arch = "x86"))]
         {}
-        
+
         result
     }
 }
@@ -649,7 +662,12 @@ impl VbeGraphicsManager {
 
         for &mode in self.controller.get_supported_modes() {
             if let Ok(mode_info) = self.controller.get_mode_info_details(mode) {
-                modes.push((mode, mode_info.x_resolution, mode_info.y_resolution, mode_info.bits_per_pixel));
+                modes.push((
+                    mode,
+                    mode_info.x_resolution,
+                    mode_info.y_resolution,
+                    mode_info.bits_per_pixel,
+                ));
             }
         }
 

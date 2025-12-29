@@ -6,9 +6,13 @@
 extern crate alloc;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering};
-use crate::subsystems::sync::Mutex;
-use crate::reliability::{EINVAL, ENOMEM, EIO};
-// Note: Graphics types are used conceptually, actual implementation would integrate with graphics subsystem
+
+use crate::{
+    reliability::{EINVAL, EIO, ENOMEM},
+    subsystems::sync::Mutex,
+};
+// Note: Graphics types are used conceptually, actual implementation would integrate with graphics
+// subsystem
 
 /// VirtIO GPU device ID
 pub const VIRTIO_GPU_DEVICE_ID: u16 = 16;
@@ -118,7 +122,7 @@ impl VirtioGpuDevice {
             acceleration_3d: AtomicU32::new(0),
         })
     }
-    
+
     /// Initialize GPU device
     pub fn initialize(&mut self) -> Result<(), i32> {
         // Initialize VirtIO device
@@ -127,15 +131,20 @@ impl VirtioGpuDevice {
         // 2. Negotiate features
         // 3. Setup queues
         // 4. Enable device
-        
+
         crate::println!("[virtio-gpu] GPU device initialized at 0x{:x}", self.base_addr);
         Ok(())
     }
-    
+
     /// Create a 2D resource
-    pub fn create_resource_2d(&self, width: u32, height: u32, format: u32) -> Result<ResourceId, i32> {
+    pub fn create_resource_2d(
+        &self,
+        width: u32,
+        height: u32,
+        format: u32,
+    ) -> Result<ResourceId, i32> {
         let resource_id = self.next_resource_id.fetch_add(1, Ordering::SeqCst);
-        
+
         let resource = GpuResource {
             resource_id,
             width,
@@ -144,19 +153,25 @@ impl VirtioGpuDevice {
             backing_pages: Vec::new(),
             scanout_id: None,
         };
-        
+
         {
             let mut resources = self.resources.lock();
             resources.insert(resource_id, resource);
         }
-        
+
         // Send command to GPU
         // In real implementation, this would send VIRTIO_GPU_CMD_RESOURCE_CREATE_2D
-        
-        crate::println!("[virtio-gpu] Created 2D resource {} ({}x{}, format: {})", resource_id, width, height, format);
+
+        crate::println!(
+            "[virtio-gpu] Created 2D resource {} ({}x{}, format: {})",
+            resource_id,
+            width,
+            height,
+            format
+        );
         Ok(resource_id)
     }
-    
+
     /// Attach backing pages to resource
     pub fn attach_backing(&self, resource_id: ResourceId, pages: Vec<usize>) -> Result<(), i32> {
         let mut resources = self.resources.lock();
@@ -169,48 +184,81 @@ impl VirtioGpuDevice {
             Err(EINVAL)
         }
     }
-    
+
     /// Transfer data to host (GPU)
-    pub fn transfer_to_host_2d(&self, resource_id: ResourceId, x: u32, y: u32, width: u32, height: u32) -> Result<(), i32> {
+    pub fn transfer_to_host_2d(
+        &self,
+        resource_id: ResourceId,
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+    ) -> Result<(), i32> {
         // Send transfer command to GPU
         // In real implementation, this would send VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D
-        crate::println!("[virtio-gpu] Transfer to host: resource {}, rect ({},{}) {}x{}", resource_id, x, y, width, height);
+        crate::println!(
+            "[virtio-gpu] Transfer to host: resource {}, rect ({},{}) {}x{}",
+            resource_id,
+            x,
+            y,
+            width,
+            height
+        );
         Ok(())
     }
-    
+
     /// Flush resource
-    pub fn flush_resource(&self, resource_id: ResourceId, x: u32, y: u32, width: u32, height: u32) -> Result<(), i32> {
+    pub fn flush_resource(
+        &self,
+        resource_id: ResourceId,
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+    ) -> Result<(), i32> {
         // Send flush command to GPU
         // In real implementation, this would send VIRTIO_GPU_CMD_RESOURCE_FLUSH
-        crate::println!("[virtio-gpu] Flush resource: resource {}, rect ({},{}) {}x{}", resource_id, x, y, width, height);
+        crate::println!(
+            "[virtio-gpu] Flush resource: resource {}, rect ({},{}) {}x{}",
+            resource_id,
+            x,
+            y,
+            width,
+            height
+        );
         Ok(())
     }
-    
+
     /// Set scanout (display resource)
-    pub fn set_scanout(&self, scanout_id: u32, resource_id: Option<ResourceId>, x: u32, y: u32, width: u32, height: u32) -> Result<(), i32> {
+    pub fn set_scanout(
+        &self,
+        scanout_id: u32,
+        resource_id: Option<ResourceId>,
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+    ) -> Result<(), i32> {
         // Update scanout
         {
             let mut scanouts = self.scanouts.lock();
             if scanout_id as usize >= scanouts.len() {
-                scanouts.resize(scanout_id as usize + 1, GpuScanout {
-                    scanout_id: 0,
-                    resource_id: None,
-                    x: 0,
-                    y: 0,
-                    width: 0,
-                    height: 0,
-                });
+                scanouts.resize(
+                    scanout_id as usize + 1,
+                    GpuScanout {
+                        scanout_id: 0,
+                        resource_id: None,
+                        x: 0,
+                        y: 0,
+                        width: 0,
+                        height: 0,
+                    },
+                );
             }
-            scanouts[scanout_id as usize] = GpuScanout {
-                scanout_id,
-                resource_id,
-                x,
-                y,
-                width,
-                height,
-            };
+            scanouts[scanout_id as usize] =
+                GpuScanout { scanout_id, resource_id, x, y, width, height };
         }
-        
+
         // Update resource scanout reference
         if let Some(res_id) = resource_id {
             let mut resources = self.resources.lock();
@@ -218,31 +266,31 @@ impl VirtioGpuDevice {
                 resource.scanout_id = Some(scanout_id);
             }
         }
-        
+
         // Send command to GPU
         // In real implementation, this would send VIRTIO_GPU_CMD_SET_SCANOUT
-        
+
         crate::println!("[virtio-gpu] Set scanout {} to resource {:?}", scanout_id, resource_id);
         Ok(())
     }
-    
+
     /// Create 3D context
     pub fn create_context_3d(&self) -> Result<ContextId, i32> {
         let context_id = self.next_context_id.fetch_add(1, Ordering::SeqCst);
-        
+
         // Send command to GPU
         // In real implementation, this would send VIRTIO_GPU_CMD_CTX_CREATE
-        
+
         self.acceleration_3d.store(1, Ordering::Release);
         crate::println!("[virtio-gpu] Created 3D context {}", context_id);
         Ok(context_id)
     }
-    
+
     /// Check if 3D acceleration is supported
     pub fn supports_3d(&self) -> bool {
         self.acceleration_3d.load(Ordering::Acquire) != 0
     }
-    
+
     /// Get resource by ID
     pub fn get_resource(&self, resource_id: ResourceId) -> Option<GpuResource> {
         let resources = self.resources.lock();
@@ -277,11 +325,8 @@ pub fn get_virtio_gpu() -> Option<&'static VirtioGpuDevice> {
     match &*device {
         Some(dev) => {
             // 延长生命周期，避免返回局部变量的引用
-            Some(unsafe {
-                core::mem::transmute::<&VirtioGpuDevice, &'static VirtioGpuDevice>(dev)
-            })
+            Some(unsafe { core::mem::transmute::<&VirtioGpuDevice, &'static VirtioGpuDevice>(dev) })
         },
         None => None,
     }
 }
-

@@ -1,6 +1,5 @@
 // Memory management and paging setup for bootloader
 
-
 /// PML4 (Page Map Level 4) entry for x86_64
 #[repr(transparent)]
 #[derive(Clone, Copy)]
@@ -114,11 +113,7 @@ impl PagingManager {
     }
 
     /// Setup identity mapping (physical = virtual)
-    pub fn identity_map_region(
-        &mut self,
-        start: u64,
-        size: u64,
-    ) -> Result<(), &'static str> {
+    pub fn identity_map_region(&mut self, start: u64, size: u64) -> Result<(), &'static str> {
         let mut current = (start / PAGE_SIZE) * PAGE_SIZE;
         let end = ((start + size + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE;
 
@@ -146,15 +141,13 @@ impl PagingManager {
                 pdpt_addr | Pml4Entry::PRESENT | Pml4Entry::WRITABLE;
         }
 
-        let pdpt_addr =
-            self.pml4.entries[pml4_idx as usize] & 0x000FFFFFFFFFF000;
+        let pdpt_addr = self.pml4.entries[pml4_idx as usize] & 0x000FFFFFFFFFF000;
         let pdpt = unsafe { &mut *(pdpt_addr as *mut PageTable) };
 
         // PDPT
         if pdpt.entries[pdpt_idx as usize] == 0 {
             let pd_addr = self.allocate_table();
-            pdpt.entries[pdpt_idx as usize] =
-                pd_addr | PdptEntry::PRESENT | PdptEntry::WRITABLE;
+            pdpt.entries[pdpt_idx as usize] = pd_addr | PdptEntry::PRESENT | PdptEntry::WRITABLE;
         }
 
         let pd_addr = pdpt.entries[pdpt_idx as usize] & 0x000FFFFFFFFFF000;
@@ -163,8 +156,7 @@ impl PagingManager {
         // PD
         if pd.entries[pd_idx as usize] == 0 {
             let pt_addr = self.allocate_table();
-            pd.entries[pd_idx as usize] =
-                pt_addr | PdEntry::PRESENT | PdEntry::WRITABLE;
+            pd.entries[pd_idx as usize] = pt_addr | PdEntry::PRESENT | PdEntry::WRITABLE;
         }
 
         let pt_addr = pd.entries[pd_idx as usize] & 0x000FFFFFFFFFF000;

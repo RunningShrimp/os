@@ -6,25 +6,22 @@
 
 extern crate alloc;
 
-pub mod model_checker;
-pub mod theorem_prover;
-pub mod static_analyzer;
-pub mod type_checker;
-pub mod memory_safety;
 pub mod concurrency_verifier;
-pub mod security_prover;
-pub mod verification_pipeline;
+pub mod memory_safety;
+pub mod model_checker;
 pub mod proof_assistant;
+pub mod security_prover;
 pub mod spec_language;
+pub mod static_analyzer;
+pub mod theorem_prover;
+pub mod type_checker;
+pub mod verification_pipeline;
 
 // Re-export all public types and functions
 
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::{format, vec};
-use alloc::string::String;
-use core::sync::atomic::{AtomicU64, AtomicBool, Ordering};
+use alloc::{collections::BTreeMap, format, string::String, sync::Arc, vec, vec::Vec};
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
 use spin::Mutex;
 
 /// 验证结果状态
@@ -767,7 +764,9 @@ impl FormalVerificationEngine {
             static_analyzer: Arc::new(Mutex::new(static_analyzer::StaticAnalyzer::new())),
             type_checker: Arc::new(Mutex::new(type_checker::TypeChecker::new())),
             memory_verifier: Arc::new(Mutex::new(memory_safety::MemorySafetyVerifier::new())),
-            concurrency_verifier: Arc::new(Mutex::new(concurrency_verifier::ConcurrencyVerifier::new())),
+            concurrency_verifier: Arc::new(Mutex::new(
+                concurrency_verifier::ConcurrencyVerifier::new(),
+            )),
             security_prover: Arc::new(Mutex::new(security_prover::SecurityProver::new())),
             pipeline: Arc::new(Mutex::new(verification_pipeline::VerificationPipeline::new())),
             stats: Arc::new(Mutex::new(VerificationStatistics::default())),
@@ -817,7 +816,10 @@ impl FormalVerificationEngine {
         let mut all_results = Vec::new();
 
         // 使用验证管道执行验证
-        let pipeline_results = self.pipeline.lock().execute_verification(&self.targets, &self.properties)?;
+        let pipeline_results = self
+            .pipeline
+            .lock()
+            .execute_verification(&self.targets, &self.properties)?;
         all_results.extend(pipeline_results);
 
         // 存储结果
@@ -830,35 +832,54 @@ impl FormalVerificationEngine {
     }
 
     /// 执行特定类型的验证
-    pub fn verify_by_type(&mut self, verification_type: VerificationType) -> Result<Vec<VerificationResult>, &'static str> {
+    pub fn verify_by_type(
+        &mut self,
+        verification_type: VerificationType,
+    ) -> Result<Vec<VerificationResult>, &'static str> {
         let mut results = Vec::new();
 
         match verification_type {
             VerificationType::ModelChecking => {
                 results.extend(self.model_checker.lock().check_models(&self.targets)?);
-            }
+            },
             VerificationType::TheoremProving => {
-                results.extend(self.theorem_prover.lock().prove_theorems(&self.properties)?);
-            }
+                results.extend(
+                    self.theorem_prover
+                        .lock()
+                        .prove_theorems(&self.properties)?,
+                );
+            },
             VerificationType::StaticAnalysis => {
                 results.extend(self.static_analyzer.lock().analyze(&self.targets)?);
-            }
+            },
             VerificationType::TypeChecking => {
                 results.extend(self.type_checker.lock().check_types(&self.targets)?);
-            }
+            },
             VerificationType::MemorySafety => {
-                results.extend(self.memory_verifier.lock().verify_memory_safety(&self.targets)?);
-            }
+                results.extend(
+                    self.memory_verifier
+                        .lock()
+                        .verify_memory_safety(&self.targets)?,
+                );
+            },
             VerificationType::ConcurrencyVerification => {
-                results.extend(self.concurrency_verifier.lock().verify_concurrency(&self.targets)?);
-            }
+                results.extend(
+                    self.concurrency_verifier
+                        .lock()
+                        .verify_concurrency(&self.targets)?,
+                );
+            },
             VerificationType::SecurityVerification => {
-                results.extend(self.security_prover.lock().verify_security(&self.properties)?);
-            }
+                results.extend(
+                    self.security_prover
+                        .lock()
+                        .verify_security(&self.properties)?,
+                );
+            },
             VerificationType::SpecificationVerification => {
                 // 综合验证
                 results.extend(self.verify()?);
-            }
+            },
         }
 
         self.results.extend(results.clone());
@@ -904,7 +925,9 @@ impl FormalVerificationEngine {
     fn update_statistics(&self) {
         let mut stats = self.stats.lock();
         stats.properties_verified = self.properties.len() as u64;
-        stats.bugs_found = self.results.iter()
+        stats.bugs_found = self
+            .results
+            .iter()
             .filter(|r| r.status == VerificationStatus::Failed)
             .count() as u64;
     }
@@ -935,7 +958,9 @@ pub fn verify() -> Result<Vec<VerificationResult>, &'static str> {
 }
 
 /// 执行特定类型的验证
-pub fn verify_by_type(verification_type: VerificationType) -> Result<Vec<VerificationResult>, &'static str> {
+pub fn verify_by_type(
+    verification_type: VerificationType,
+) -> Result<Vec<VerificationResult>, &'static str> {
     let mut guard = FORMAL_VERIFICATION_ENGINE.lock();
     if let Some(ref mut e) = *guard {
         e.verify_by_type(verification_type)
@@ -953,7 +978,10 @@ pub fn get_verification_results() -> Vec<VerificationResult> {
 /// 获取验证统计信息
 pub fn get_verification_statistics() -> VerificationStatistics {
     let guard = FORMAL_VERIFICATION_ENGINE.lock();
-    guard.as_ref().map(|e| e.get_statistics()).unwrap_or_default()
+    guard
+        .as_ref()
+        .map(|e| e.get_statistics())
+        .unwrap_or_default()
 }
 
 /// 停止形式化验证引擎

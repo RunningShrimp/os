@@ -1,7 +1,6 @@
 // 系统监控模块
 
 extern crate alloc;
-//
 // 提供全面的系统监控功能，包括资源监控、性能监控、
 // 事件监控和健康状态监控。
 //
@@ -14,22 +13,25 @@ extern crate alloc;
 // - 监控数据存储和查询
 // - 可视化支持
 
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::format;
-use alloc::boxed::Box;
-use alloc::string::String;
-use alloc::string::ToString;
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use core::time::Duration;
-use spin::Mutex;
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
+use core::{
+    sync::atomic::{AtomicU64, AtomicUsize, Ordering},
+    time::Duration,
+};
 
-use crate::time;
+use spin::Mutex;
 
 // Import println macro
 #[allow(unused_imports)]
 use crate::println;
+use crate::time;
 
 /// 监控指标类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -243,7 +245,7 @@ impl Default for MonitorConfig {
     fn default() -> Self {
         Self {
             retention_period: Duration::from_secs(24 * 60 * 60), // 24小时
-            sample_interval: Duration::from_millis(1000),       // 1秒
+            sample_interval: Duration::from_millis(1000),        // 1秒
             max_metrics: 100000,
             max_events: 10000,
             auto_cleanup: true,
@@ -377,11 +379,12 @@ impl MonitorEngine {
         }
 
         // 更新统计
-        self.statistics.total_metrics_collected.fetch_add(1, Ordering::SeqCst);
-        self.statistics.active_metrics.store(
-            metrics.values().map(|v| v.len()).sum(),
-            Ordering::SeqCst
-        );
+        self.statistics
+            .total_metrics_collected
+            .fetch_add(1, Ordering::SeqCst);
+        self.statistics
+            .active_metrics
+            .store(metrics.values().map(|v| v.len()).sum(), Ordering::SeqCst);
 
         // 评估相关规则
         self.evaluate_rules_for_metric(&metric)?;
@@ -402,8 +405,12 @@ impl MonitorEngine {
         }
 
         // 更新统计
-        self.statistics.total_events_generated.fetch_add(1, Ordering::SeqCst);
-        self.statistics.event_queue_size.store(events.len(), Ordering::SeqCst);
+        self.statistics
+            .total_events_generated
+            .fetch_add(1, Ordering::SeqCst);
+        self.statistics
+            .event_queue_size
+            .store(events.len(), Ordering::SeqCst);
 
         // 通知事件监听器
         self.notify_event_listeners(&event)?;
@@ -416,7 +423,9 @@ impl MonitorEngine {
         let mut rules = self.rules.lock();
         rules.insert(rule.id.clone(), rule.clone());
 
-        self.statistics.active_rules.store(rules.len(), Ordering::SeqCst);
+        self.statistics
+            .active_rules
+            .store(rules.len(), Ordering::SeqCst);
 
         crate::println!("[monitor] 添加监控规则: {}", rule.name);
 
@@ -427,7 +436,9 @@ impl MonitorEngine {
     pub fn remove_rule(&self, rule_id: &str) -> Result<(), MonitorError> {
         let mut rules = self.rules.lock();
         if rules.remove(rule_id).is_some() {
-            self.statistics.active_rules.store(rules.len(), Ordering::SeqCst);
+            self.statistics
+                .active_rules
+                .store(rules.len(), Ordering::SeqCst);
             crate::println!("[monitor] 移除监控规则: {}", rule_id);
         }
 
@@ -450,7 +461,12 @@ impl MonitorEngine {
     }
 
     /// 查询监控指标
-    pub fn query_metrics(&self, metric_name: &str, start_time: u64, end_time: u64) -> Result<Vec<Metric>, MonitorError> {
+    pub fn query_metrics(
+        &self,
+        metric_name: &str,
+        start_time: u64,
+        end_time: u64,
+    ) -> Result<Vec<Metric>, MonitorError> {
         let metrics = self.metrics.lock();
 
         if let Some(metric_list) = metrics.get(metric_name) {
@@ -467,7 +483,11 @@ impl MonitorEngine {
     }
 
     /// 查询监控事件
-    pub fn query_events(&self, start_time: u64, end_time: u64) -> Result<Vec<MonitorEvent>, MonitorError> {
+    pub fn query_events(
+        &self,
+        start_time: u64,
+        end_time: u64,
+    ) -> Result<Vec<MonitorEvent>, MonitorError> {
         let events = self.events.lock();
 
         let filtered_events: Vec<MonitorEvent> = events
@@ -483,28 +503,32 @@ impl MonitorEngine {
     pub fn get_statistics(&self) -> MonitorStatistics {
         MonitorStatistics {
             total_metrics_collected: AtomicU64::new(
-                self.statistics.total_metrics_collected.load(Ordering::SeqCst)
+                self.statistics
+                    .total_metrics_collected
+                    .load(Ordering::SeqCst),
             ),
             total_events_generated: AtomicU64::new(
-                self.statistics.total_events_generated.load(Ordering::SeqCst)
+                self.statistics
+                    .total_events_generated
+                    .load(Ordering::SeqCst),
             ),
             total_rule_evaluations: AtomicU64::new(
-                self.statistics.total_rule_evaluations.load(Ordering::SeqCst)
+                self.statistics
+                    .total_rule_evaluations
+                    .load(Ordering::SeqCst),
             ),
             total_alerts_triggered: AtomicU64::new(
-                self.statistics.total_alerts_triggered.load(Ordering::SeqCst)
+                self.statistics
+                    .total_alerts_triggered
+                    .load(Ordering::SeqCst),
             ),
-            active_metrics: AtomicUsize::new(
-                self.statistics.active_metrics.load(Ordering::SeqCst)
-            ),
-            active_rules: AtomicUsize::new(
-                self.statistics.active_rules.load(Ordering::SeqCst)
-            ),
+            active_metrics: AtomicUsize::new(self.statistics.active_metrics.load(Ordering::SeqCst)),
+            active_rules: AtomicUsize::new(self.statistics.active_rules.load(Ordering::SeqCst)),
             event_queue_size: AtomicUsize::new(
-                self.statistics.event_queue_size.load(Ordering::SeqCst)
+                self.statistics.event_queue_size.load(Ordering::SeqCst),
             ),
             monitor_data_size: AtomicU64::new(
-                self.statistics.monitor_data_size.load(Ordering::SeqCst)
+                self.statistics.monitor_data_size.load(Ordering::SeqCst),
             ),
         }
     }
@@ -551,7 +575,9 @@ impl MonitorEngine {
             // 这里需要更新规则，但由于是不可变引用，实际实现需要用其他方式
         }
 
-        self.statistics.total_rule_evaluations.fetch_add(1, Ordering::SeqCst);
+        self.statistics
+            .total_rule_evaluations
+            .fetch_add(1, Ordering::SeqCst);
 
         Ok(())
     }
@@ -565,7 +591,8 @@ impl MonitorEngine {
             title: format!("监控告警: {}", rule.name),
             description: format!(
                 "指标 {} 值 {} {} 阈值 {}",
-                metric.name, metric.value,
+                metric.name,
+                metric.value,
                 self.operator_to_string(rule.operator),
                 rule.threshold
             ),
@@ -583,7 +610,9 @@ impl MonitorEngine {
         };
 
         self.emit_event(event)?;
-        self.statistics.total_alerts_triggered.fetch_add(1, Ordering::SeqCst);
+        self.statistics
+            .total_alerts_triggered
+            .fetch_add(1, Ordering::SeqCst);
 
         Ok(())
     }
@@ -652,7 +681,8 @@ impl MonitorEngine {
 
     /// 清理过期数据
     pub fn cleanup_expired_data(&self) -> Result<(), MonitorError> {
-        let cutoff_time = time::timestamp_millis() - self.config.retention_period.as_millis() as u64;
+        let cutoff_time =
+            time::timestamp_millis() - self.config.retention_period.as_millis() as u64;
 
         // 清理过期指标
         let mut metrics = self.metrics.lock();
@@ -665,11 +695,12 @@ impl MonitorEngine {
         events.retain(|e| e.timestamp >= cutoff_time);
 
         // 更新统计
-        self.statistics.active_metrics.store(
-            metrics.values().map(|v| v.len()).sum(),
-            Ordering::SeqCst
-        );
-        self.statistics.event_queue_size.store(events.len(), Ordering::SeqCst);
+        self.statistics
+            .active_metrics
+            .store(metrics.values().map(|v| v.len()).sum(), Ordering::SeqCst);
+        self.statistics
+            .event_queue_size
+            .store(events.len(), Ordering::SeqCst);
 
         Ok(())
     }
@@ -678,11 +709,7 @@ impl MonitorEngine {
 impl SystemResourceMonitor {
     /// 创建新的系统资源监控器
     pub fn new(max_history: usize) -> Self {
-        Self {
-            history: Vec::new(),
-            max_history,
-            last_update: 0,
-        }
+        Self { history: Vec::new(), max_history, last_update: 0 }
     }
 
     /// 更新资源使用情况
@@ -691,12 +718,12 @@ impl SystemResourceMonitor {
 
         // 简单的实现，实际应该从系统获取真实数据
         let usage = SystemResourceUsage {
-            cpu_usage: 0.1, // 10%
-            memory_usage: 0.3, // 30%
-            memory_used: 300 * 1024 * 1024, // 300MB
-            memory_total: 1024 * 1024 * 1024, // 1GB
-            disk_usage: 0.2, // 20%
-            disk_used: 2 * 1024 * 1024 * 1024, // 2GB
+            cpu_usage: 0.1,                      // 10%
+            memory_usage: 0.3,                   // 30%
+            memory_used: 300 * 1024 * 1024,      // 300MB
+            memory_total: 1024 * 1024 * 1024,    // 1GB
+            disk_usage: 0.2,                     // 20%
+            disk_used: 2 * 1024 * 1024 * 1024,   // 2GB
             disk_total: 10 * 1024 * 1024 * 1024, // 10GB
             network_io: NetworkIO {
                 rx_bytes: 1024 * 1024,
@@ -719,22 +746,20 @@ impl SystemResourceMonitor {
 
     /// 获取当前资源使用情况
     pub fn current_usage(&self) -> SystemResourceUsage {
-        self.history.last().cloned().unwrap_or_else(|| SystemResourceUsage {
-            cpu_usage: 0.0,
-            memory_usage: 0.0,
-            memory_used: 0,
-            memory_total: 0,
-            disk_usage: 0.0,
-            disk_used: 0,
-            disk_total: 0,
-            network_io: NetworkIO {
-                rx_bytes: 0,
-                tx_bytes: 0,
-                rx_packets: 0,
-                tx_packets: 0,
-            },
-            timestamp: time::timestamp_millis(),
-        })
+        self.history
+            .last()
+            .cloned()
+            .unwrap_or_else(|| SystemResourceUsage {
+                cpu_usage: 0.0,
+                memory_usage: 0.0,
+                memory_used: 0,
+                memory_total: 0,
+                disk_usage: 0.0,
+                disk_used: 0,
+                disk_total: 0,
+                network_io: NetworkIO { rx_bytes: 0, tx_bytes: 0, rx_packets: 0, tx_packets: 0 },
+                timestamp: time::timestamp_millis(),
+            })
     }
 
     /// 获取历史资源使用情况

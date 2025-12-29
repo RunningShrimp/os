@@ -1,17 +1,20 @@
 //! System call handler interface
 
-use crate::error::Result;
-use crate::syscall::types::{SyscallNumber, SyscallArgs, SyscallResult};
 use alloc::boxed::Box;
+
+use crate::{
+    error::Result,
+    syscall::types::{SyscallArgs, SyscallNumber, SyscallResult},
+};
 
 /// Trait for handling system calls
 pub trait SyscallHandler {
     /// Handles a system call
     fn handle(&mut self, number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult>;
-    
+
     /// Returns the name of the handler
     fn name(&self) -> &str;
-    
+
     /// Checks if the handler supports a specific system call
     fn supports(&self, number: SyscallNumber) -> bool;
 }
@@ -20,13 +23,13 @@ pub trait SyscallHandler {
 pub trait SyscallDispatcher {
     /// Registers a system call handler
     fn register_handler(&mut self, number: SyscallNumber, handler: Box<dyn SyscallHandler>);
-    
+
     /// Unregisters a system call handler
     fn unregister_handler(&mut self, number: SyscallNumber);
-    
+
     /// Dispatches a system call to the appropriate handler
     fn dispatch(&mut self, number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult>;
-    
+
     /// Returns the number of registered handlers
     fn handler_count(&self) -> usize;
 }
@@ -35,7 +38,7 @@ pub trait SyscallDispatcher {
 pub trait SyscallValidator {
     /// Validates system call arguments
     fn validate(&self, number: SyscallNumber, args: &SyscallArgs) -> Result<()>;
-    
+
     /// Returns the name of the validator
     fn name(&self) -> &str;
 }
@@ -44,7 +47,7 @@ pub trait SyscallValidator {
 pub trait SyscallLogger {
     /// Logs a system call
     fn log(&mut self, number: SyscallNumber, args: &SyscallArgs, result: &Result<SyscallResult>);
-    
+
     /// Returns the name of the logger
     fn name(&self) -> &str;
 }
@@ -53,10 +56,15 @@ pub trait SyscallLogger {
 pub trait SyscallMonitor {
     /// Called before a system call is executed
     fn before_syscall(&mut self, number: SyscallNumber, args: &SyscallArgs);
-    
+
     /// Called after a system call is executed
-    fn after_syscall(&mut self, number: SyscallNumber, args: &SyscallArgs, result: &Result<SyscallResult>);
-    
+    fn after_syscall(
+        &mut self,
+        number: SyscallNumber,
+        args: &SyscallArgs,
+        result: &Result<SyscallResult>,
+    );
+
     /// Returns the name of the monitor
     fn name(&self) -> &str;
 }
@@ -65,7 +73,7 @@ pub trait SyscallMonitor {
 pub trait SyscallFilter {
     /// Checks if a system call should be allowed
     fn allow(&mut self, number: SyscallNumber, args: &SyscallArgs) -> bool;
-    
+
     /// Returns the name of the filter
     fn name(&self) -> &str;
 }

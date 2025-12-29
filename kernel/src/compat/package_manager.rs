@@ -12,18 +12,14 @@ extern crate alloc;
 
 extern crate hashbrown;
 
-use core::ffi::c_void;
 use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::string::ToString;
-use alloc::sync::Arc;
 use alloc::{format, vec};
 use alloc::boxed::Box;
-use hashbrown::HashMap;
 use crate::compat::{*, DefaultHasherBuilder};
 use spin::Mutex;
 use crate::vfs;
-
 /// Universal package manager
 pub struct PackageManager {
     /// Format-specific package installers
@@ -694,7 +690,6 @@ impl PackageManager {
         static TIMESTAMP_MS: AtomicU64 = AtomicU64::new(0);
         TIMESTAMP_MS.fetch_add(1, Ordering::SeqCst)
     }
-
     /// Get package manager statistics
     pub fn get_stats(&self) -> PackageManagerStats {
         self.stats.lock().clone()

@@ -1,12 +1,12 @@
-use crate::core::traits::Service;
-use crate::service::interface::ServiceMetadata;
 use alloc::{
     string::{String, ToString},
-    vec::Vec,
     sync::Arc,
+    vec::Vec,
 };
 
 use hashbrown::HashMap;
+
+use crate::{core::traits::Service, service::interface::ServiceMetadata};
 
 /// Service discovery trait
 pub trait ServiceDiscovery {
@@ -43,9 +43,7 @@ struct ServiceEntry {
 impl DefaultServiceDiscovery {
     /// Creates a new service discovery
     pub fn new() -> Self {
-        Self {
-            services: HashMap::new()
-        }
+        Self { services: HashMap::new() }
     }
 
     /// Adds a service to discovery (alloc mode)
@@ -54,10 +52,7 @@ impl DefaultServiceDiscovery {
         let version = service.version().to_string();
         let metadata = ServiceMetadata::new(&name, &version);
 
-        let entry = ServiceEntry {
-            service,
-            metadata,
-        };
+        let entry = ServiceEntry { service, metadata };
 
         self.services.insert(name, entry);
     }
@@ -110,9 +105,7 @@ impl ServiceDiscovery for DefaultServiceDiscovery {
     fn discover_by_interface(&self, interface: &str) -> Vec<Arc<dyn Service>> {
         self.services
             .iter()
-            .filter(|(_, entry)| {
-                entry.metadata.interfaces.iter().any(|i| i == interface)
-            })
+            .filter(|(_, entry)| entry.metadata.interfaces.iter().any(|i| i == interface))
             .map(|(_, entry)| entry.service.clone())
             .collect()
     }
@@ -120,9 +113,7 @@ impl ServiceDiscovery for DefaultServiceDiscovery {
     fn discover_by_capability(&self, capability: &str) -> Vec<Arc<dyn Service>> {
         self.services
             .iter()
-            .filter(|(_, entry)| {
-                entry.metadata.capabilities.iter().any(|c| c == capability)
-            })
+            .filter(|(_, entry)| entry.metadata.capabilities.iter().any(|c| c == capability))
             .map(|(_, entry)| entry.service.clone())
             .collect()
     }
@@ -147,9 +138,7 @@ pub struct ServiceDiscoveryBuilder {
 impl ServiceDiscoveryBuilder {
     /// Creates a new service discovery builder
     pub fn new() -> Self {
-        Self {
-            discovery: DefaultServiceDiscovery::new(),
-        }
+        Self { discovery: DefaultServiceDiscovery::new() }
     }
 
     /// Adds a service to discovery

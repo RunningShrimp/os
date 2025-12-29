@@ -1,5 +1,5 @@
 //! 系统调用安全验证模块
-//! 
+//!
 //! 本模块提供系统调用的安全验证功能，包括：
 //! - 权限检查
 //! - 参数验证
@@ -7,12 +7,18 @@
 //! - 安全策略执行
 //! - 审计日志记录
 
-use crate::error::UnifiedError;
-use crate::api::syscall::{SyscallCategory, get_syscall_category};
-use alloc::collections::BTreeMap;
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
+use alloc::{
+    collections::BTreeMap,
+    string::{String, ToString},
+    vec::Vec,
+};
+
 use spin::Mutex;
+
+use crate::{
+    api::syscall::{SyscallCategory, get_syscall_category},
+    error::UnifiedError,
+};
 
 /// 安全验证结果
 #[derive(Debug, Clone, PartialEq)]
@@ -219,18 +225,18 @@ impl SyscallSecurityValidator {
             audit_log: Arc::new(Mutex::new(Vec::new())),
             config,
         };
-        
+
         // 初始化默认安全策略
         validator.init_default_policies();
-        
+
         validator
     }
-    
+
     /// 使用默认配置创建验证器
     pub fn with_default_config() -> Self {
         Self::new(ValidatorConfig::default())
     }
-    
+
     /// 初始化默认安全策略
     fn init_default_policies(&mut self) {
         // 内存管理系统调用策略
@@ -254,7 +260,7 @@ impl SyscallSecurityValidator {
             resource_requirements: vec![],
             audit_required: true,
         });
-        
+
         // 文件I/O系统调用策略
         self.add_policy(SyscallSecurityPolicy {
             syscall_number: 0x2000, // SYS_READ
@@ -273,21 +279,19 @@ impl SyscallSecurityValidator {
                     validation_params: vec![],
                 },
             ],
-            resource_requirements: vec![
-                ResourceRequirement {
-                    resource_type: ResourceType::File,
-                    resource_identifier: 0,
-                    required_access: ResourceAccess {
-                        readable: true,
-                        writable: false,
-                        executable: false,
-                        deletable: false,
-                    },
+            resource_requirements: vec![ResourceRequirement {
+                resource_type: ResourceType::File,
+                resource_identifier: 0,
+                required_access: ResourceAccess {
+                    readable: true,
+                    writable: false,
+                    executable: false,
+                    deletable: false,
                 },
-            ],
+            }],
             audit_required: false,
         });
-        
+
         // 进程管理系统调用策略
         self.add_policy(SyscallSecurityPolicy {
             syscall_number: 0x1001, // SYS_FORK
@@ -298,7 +302,7 @@ impl SyscallSecurityValidator {
             resource_requirements: vec![],
             audit_required: true,
         });
-        
+
         // 网络系统调用策略
         self.add_policy(SyscallSecurityPolicy {
             syscall_number: 0x4000, // SYS_SOCKET
@@ -309,12 +313,14 @@ impl SyscallSecurityValidator {
                 ArgumentValidationRule {
                     index: 0,
                     validation_type: ArgumentValidationType::NumericRange,
-                    validation_params: vec!["0".to_string(), "10".to_string()], // Valid socket domains
+                    validation_params: vec!["0".to_string(), "10".to_string()], /* Valid socket
+                                                                                 * domains */
                 },
                 ArgumentValidationRule {
                     index: 1,
                     validation_type: ArgumentValidationType::NumericRange,
-                    validation_params: vec!["0".to_string(), "10".to_string()], // Valid socket types
+                    validation_params: vec!["0".to_string(), "10".to_string()], /* Valid socket
+                                                                                 * types */
                 },
                 ArgumentValidationRule {
                     index: 2,
@@ -326,12 +332,12 @@ impl SyscallSecurityValidator {
             audit_required: true,
         });
     }
-    
+
     /// 添加安全策略
     pub fn add_policy(&mut self, policy: SyscallSecurityPolicy) {
         self.policies.insert(policy.syscall_number, policy);
     }
-    
+
     /// 验证系统调用
     pub fn validate_syscall(
         &self,
@@ -345,36 +351,38 @@ impl SyscallSecurityValidator {
             None => {
                 // 如果没有找到策略，根据严格模式决定
                 if self.config.strict_mode {
-                    return SecurityValidationResult::DeniedPolicyViolation(
-                        format!("No security policy defined for syscall {}", syscall_number)
-                    );
+                    return SecurityValidationResult::DeniedPolicyViolation(format!(
+                        "No security policy defined for syscall {}",
+                        syscall_number
+                    ));
                 } else {
                     // 在非严格模式下，允许未定义策略的系统调用
                     return SecurityValidationResult::Allowed;
                 }
-            }
+            },
         };
-        
+
         // 1. 检查安全级别
         if security_context.security_level > policy.min_security_level {
-            return SecurityValidationResult::DeniedPermission(
-                format!("Security level {:?} insufficient, required {:?}", 
-                       security_context.security_level, policy.min_security_level)
-            );
+            return SecurityValidationResult::DeniedPermission(format!(
+                "Security level {:?} insufficient, required {:?}",
+                security_context.security_level, policy.min_security_level
+            ));
         }
-        
+
         // 2. 检查所需权限
         for permission in &policy.required_permissions {
             match security_context.permissions.get(permission) {
                 Some(true) => {}, // 权限存在且为true
                 _ => {
-                    return SecurityValidationResult::DeniedPermission(
-                        format!("Missing required permission: {}", permission)
-                    );
-                }
+                    return SecurityValidationResult::DeniedPermission(format!(
+                        "Missing required permission: {}",
+                        permission
+                    ));
+                },
             }
         }
-        
+
         // 3. 验证参数
         if self.config.enable_argument_validation {
             for rule in &policy.argument_validation {
@@ -383,24 +391,31 @@ impl SyscallSecurityValidator {
                 }
             }
         }
-        
+
         // 4. 检查资源访问权限
         if self.config.enable_resource_access_check {
             for requirement in &policy.resource_requirements {
-                if let Err(result) = self.validate_resource_access(requirement, args, security_context) {
+                if let Err(result) =
+                    self.validate_resource_access(requirement, args, security_context)
+                {
                     return result;
                 }
             }
         }
-        
+
         // 记录审计日志
         if self.config.enable_audit_log && policy.audit_required {
-            self.log_audit_entry(syscall_number, args, security_context, &SecurityValidationResult::Allowed);
+            self.log_audit_entry(
+                syscall_number,
+                args,
+                security_context,
+                &SecurityValidationResult::Allowed,
+            );
         }
-        
+
         SecurityValidationResult::Allowed
     }
-    
+
     /// 验证参数
     fn validate_argument(
         &self,
@@ -409,48 +424,52 @@ impl SyscallSecurityValidator {
         _security_context: &SecurityContext,
     ) -> Result<(), SecurityValidationResult> {
         if rule.index >= args.len() {
-            return Err(SecurityValidationResult::DeniedInvalidArgument(
-                format!("Argument {} not provided", rule.index)
-            ));
+            return Err(SecurityValidationResult::DeniedInvalidArgument(format!(
+                "Argument {} not provided",
+                rule.index
+            )));
         }
-        
+
         let arg_value = args[rule.index];
-        
+
         match &rule.validation_type {
             ArgumentValidationType::NonNullPointer => {
                 if arg_value == 0 {
-                    return Err(SecurityValidationResult::DeniedInvalidArgument(
-                        format!("Argument {} is null pointer", rule.index)
-                    ));
+                    return Err(SecurityValidationResult::DeniedInvalidArgument(format!(
+                        "Argument {} is null pointer",
+                        rule.index
+                    )));
                 }
             },
             ArgumentValidationType::UserSpacePointer => {
                 // 检查指针是否在用户空间范围内
                 if arg_value >= 0x8000000000000000 || arg_value == 0 {
-                    return Err(SecurityValidationResult::DeniedInvalidArgument(
-                        format!("Argument {} is not a valid user space pointer", rule.index)
-                    ));
+                    return Err(SecurityValidationResult::DeniedInvalidArgument(format!(
+                        "Argument {} is not a valid user space pointer",
+                        rule.index
+                    )));
                 }
             },
             ArgumentValidationType::ValidFileDescriptor => {
                 // 这里应该检查文件描述符是否有效
                 // 简化实现，假设fd < 1024是有效的
                 if arg_value >= 1024 {
-                    return Err(SecurityValidationResult::DeniedInvalidArgument(
-                        format!("Argument {} is not a valid file descriptor", rule.index)
-                    ));
+                    return Err(SecurityValidationResult::DeniedInvalidArgument(format!(
+                        "Argument {} is not a valid file descriptor",
+                        rule.index
+                    )));
                 }
             },
             ArgumentValidationType::NumericRange => {
                 if rule.validation_params.len() >= 2 {
                     let min_val: u64 = rule.validation_params[0].parse().unwrap_or(0);
                     let max_val: u64 = rule.validation_params[1].parse().unwrap_or(u64::MAX);
-                    
+
                     if arg_value < min_val || arg_value > max_val {
-                        return Err(SecurityValidationResult::DeniedInvalidArgument(
-                            format!("Argument {} value {} out of range [{}, {}]", 
-                                   rule.index, arg_value, min_val, max_val)
-                        ));
+                        return Err(SecurityValidationResult::DeniedInvalidArgument(format!(
+                            "Argument {} value {} out of range [{}, {}]",
+                            rule.index, arg_value, min_val, max_val
+                        )));
                     }
                 }
             },
@@ -466,12 +485,12 @@ impl SyscallSecurityValidator {
                 if rule.validation_params.len() >= 2 {
                     let size: u64 = rule.validation_params[0].parse().unwrap_or(0);
                     let max_size: u64 = rule.validation_params[1].parse().unwrap_or(1073741824); // 1GB
-                    
+
                     if size > max_size {
-                        return Err(SecurityValidationResult::DeniedInvalidArgument(
-                            format!("Argument {} memory size {} exceeds maximum {}", 
-                                   rule.index, size, max_size)
-                        ));
+                        return Err(SecurityValidationResult::DeniedInvalidArgument(format!(
+                            "Argument {} memory size {} exceeds maximum {}",
+                            rule.index, size, max_size
+                        )));
                     }
                 }
             },
@@ -480,10 +499,10 @@ impl SyscallSecurityValidator {
                 // 这里应该调用具体的验证函数
             },
         }
-        
+
         Ok(())
     }
-    
+
     /// 验证资源访问权限
     fn validate_resource_access(
         &self,
@@ -492,48 +511,52 @@ impl SyscallSecurityValidator {
         _security_context: &SecurityContext,
     ) -> Result<(), SecurityValidationResult> {
         if requirement.resource_identifier >= args.len() {
-            return Err(SecurityValidationResult::DeniedInvalidArgument(
-                format!("Resource identifier {} not provided", requirement.resource_identifier)
-            ));
+            return Err(SecurityValidationResult::DeniedInvalidArgument(format!(
+                "Resource identifier {} not provided",
+                requirement.resource_identifier
+            )));
         }
-        
+
         let resource_id = args[requirement.resource_identifier];
-        
+
         // 这里应该实际检查资源访问权限
         // 简化实现，假设所有资源访问都是有效的
         match requirement.resource_type {
             ResourceType::File => {
                 // 检查文件访问权限
                 if resource_id >= 1024 {
-                    return Err(SecurityValidationResult::DeniedResourceAccess(
-                        format!("File descriptor {} is invalid", resource_id)
-                    ));
+                    return Err(SecurityValidationResult::DeniedResourceAccess(format!(
+                        "File descriptor {} is invalid",
+                        resource_id
+                    )));
                 }
             },
             ResourceType::Memory => {
                 // 检查内存访问权限
                 if resource_id == 0 || resource_id >= 0x8000000000000000 {
-                    return Err(SecurityValidationResult::DeniedResourceAccess(
-                        format!("Memory address {} is invalid", resource_id)
-                    ));
+                    return Err(SecurityValidationResult::DeniedResourceAccess(format!(
+                        "Memory address {} is invalid",
+                        resource_id
+                    )));
                 }
             },
             ResourceType::NetworkSocket => {
                 // 检查网络套接字访问权限
                 if resource_id >= 1024 {
-                    return Err(SecurityValidationResult::DeniedResourceAccess(
-                        format!("Socket descriptor {} is invalid", resource_id)
-                    ));
+                    return Err(SecurityValidationResult::DeniedResourceAccess(format!(
+                        "Socket descriptor {} is invalid",
+                        resource_id
+                    )));
                 }
             },
             _ => {
                 // 其他资源类型的检查
             },
         }
-        
+
         Ok(())
     }
-    
+
     /// 记录审计日志
     fn log_audit_entry(
         &self,
@@ -552,16 +575,16 @@ impl SyscallSecurityValidator {
             arguments: args.to_vec(),
             security_context: security_context.clone(),
         };
-        
+
         let mut log = self.audit_log.lock();
         log.push(entry);
-        
+
         // 如果日志条目超过最大限制，移除最旧的条目
         if log.len() > self.config.max_audit_entries {
             log.remove(0);
         }
     }
-    
+
     /// 获取系统调用名称
     fn get_syscall_name(&self, syscall_number: u32) -> String {
         match syscall_number {
@@ -585,29 +608,29 @@ impl SyscallSecurityValidator {
             _ => format!("unknown_{}", syscall_number),
         }
     }
-    
+
     /// 获取当前时间
     fn get_current_time(&self) -> u64 {
         // 这里应该实现真实的时间获取
         // 暂时返回固定值
         0
     }
-    
+
     /// 获取审计日志
     pub fn get_audit_log(&self) -> Vec<AuditLogEntry> {
         self.audit_log.lock().clone()
     }
-    
+
     /// 清空审计日志
     pub fn clear_audit_log(&self) {
         self.audit_log.lock().clear();
     }
-    
+
     /// 获取安全策略
     pub fn get_policy(&self, syscall_number: u32) -> Option<&SyscallSecurityPolicy> {
         self.policies.get(&syscall_number)
     }
-    
+
     /// 获取所有安全策略
     pub fn get_all_policies(&self) -> &BTreeMap<u32, SyscallSecurityPolicy> {
         &self.policies

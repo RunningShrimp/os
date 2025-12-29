@@ -1,30 +1,30 @@
 // Security Audit Module
 
 extern crate alloc;
-//
 // 安全审计模块
 // 提供全面的安全审计功能，包括事件记录、日志分析、合规检查等
 
-pub mod events;
-pub mod logging;
-pub mod compliance;
-pub mod forensics;
 pub mod analysis;
-pub mod reporting;
+pub mod compliance;
+pub mod events;
+pub mod forensics;
+pub mod logging;
 pub mod monitoring;
+pub mod reporting;
 
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::{format, vec};
-use alloc::string::String;
-use alloc::string::ToString;
-use core::sync::atomic::{AtomicU64, AtomicBool, Ordering};
+use alloc::{
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
 use spin::Mutex;
 
-use crate::security::audit::{
-    AuditEvent, AuditEventType, AuditSeverity, AuditFilter, AuditStats
-};
+use crate::security::audit::{AuditEvent, AuditEventType, AuditFilter, AuditSeverity, AuditStats};
 
 /// 审计子系统状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -266,7 +266,11 @@ impl Default for AlertConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            alert_levels: vec![AuditSeverity::Warning, AuditSeverity::Error, AuditSeverity::Critical],
+            alert_levels: vec![
+                AuditSeverity::Warning,
+                AuditSeverity::Error,
+                AuditSeverity::Critical,
+            ],
             alert_channels: vec![AlertChannel::Log, AlertChannel::Console],
             alert_rules: Vec::new(),
             rate_limit: AlertRateLimit::default(),
@@ -353,7 +357,7 @@ impl Default for StorageConfig {
             storage_type: StorageType::FileSystem,
             storage_path: "/var/log/security_audit".to_string(),
             max_file_size: 100 * 1024 * 1024, // 100MB
-            retain_files: 30, // 30 days
+            retain_files: 30,                 // 30 days
             compression: CompressionConfig::default(),
             encryption: EncryptionConfig::default(),
             backup: BackupConfig::default(),
@@ -456,7 +460,7 @@ impl Default for BackupConfig {
         Self {
             enabled: false,
             backup_path: "/var/log/security_audit/backup".to_string(),
-            interval: 24, // 24 hours
+            interval: 24,      // 24 hours
             retain_backups: 7, // 7 days
         }
     }
@@ -481,7 +485,10 @@ impl Default for AnalysisConfig {
     fn default() -> Self {
         Self {
             real_time: true,
-            analysis_types: vec![AnalysisType::AnomalyDetection, AnalysisType::BehaviorAnalysis],
+            analysis_types: vec![
+                AnalysisType::AnomalyDetection,
+                AnalysisType::BehaviorAnalysis,
+            ],
             anomaly_detection: AnomalyDetectionConfig::default(),
             behavior_analysis: BehaviorAnalysisConfig::default(),
             trend_analysis: TrendAnalysisConfig::default(),
@@ -768,10 +775,16 @@ impl SecurityAuditSubsystem {
         // 初始化各个组件
         self.event_processor.lock().init(&self.config)?;
         self.log_manager.lock().init(&self.config.storage_config)?;
-        self.compliance_checker.lock().init(&self.config.compliance_standards)?;
+        self.compliance_checker
+            .lock()
+            .init(&self.config.compliance_standards)?;
         self.forensic_analyzer.lock().init()?;
-        self.event_analyzer.lock().init(&self.config.analysis_config)?;
-        self.report_generator.lock().init(&self.config.reporting_config)?;
+        self.event_analyzer
+            .lock()
+            .init(&self.config.analysis_config)?;
+        self.report_generator
+            .lock()
+            .init(&self.config.reporting_config)?;
         self.monitor.lock().init()?;
 
         self.status = SecurityAuditStatus::Running;
@@ -847,7 +860,11 @@ impl SecurityAuditSubsystem {
     }
 
     /// 评估过滤器条件
-    fn evaluate_filter_conditions(&self, conditions: &[AuditCondition], event: &AuditEvent) -> bool {
+    fn evaluate_filter_conditions(
+        &self,
+        conditions: &[AuditCondition],
+        event: &AuditEvent,
+    ) -> bool {
         for condition in conditions {
             if !self.evaluate_condition(condition, event) {
                 return false;
@@ -872,7 +889,7 @@ impl SecurityAuditSubsystem {
             AuditOperator::Regex => {
                 // Simple regex matching (would use proper regex crate in real implementation)
                 field_value.contains(&condition.value)
-            }
+            },
         }
     }
 
@@ -890,7 +907,7 @@ impl SecurityAuditSubsystem {
             _ => {
                 // Check data fields
                 event.data.get(field).cloned().unwrap_or_default()
-            }
+            },
         }
     }
 
@@ -934,7 +951,10 @@ impl SecurityAuditSubsystem {
     }
 
     /// 执行取证分析
-    pub fn run_forensic_analysis(&mut self, time_range: (u64, u64)) -> Result<ForensicReport, &'static str> {
+    pub fn run_forensic_analysis(
+        &mut self,
+        time_range: (u64, u64),
+    ) -> Result<ForensicReport, &'static str> {
         if !self.initialized.load(Ordering::SeqCst) {
             return Err("Security audit subsystem not initialized");
         }
@@ -954,9 +974,15 @@ impl SecurityAuditSubsystem {
         // 重新初始化相关组件
         if self.initialized.load(Ordering::SeqCst) {
             self.log_manager.lock().init(&self.config.storage_config)?;
-            self.compliance_checker.lock().init(&self.config.compliance_standards)?;
-            self.event_analyzer.lock().init(&self.config.analysis_config)?;
-            self.report_generator.lock().init(&self.config.reporting_config)?;
+            self.compliance_checker
+                .lock()
+                .init(&self.config.compliance_standards)?;
+            self.event_analyzer
+                .lock()
+                .init(&self.config.analysis_config)?;
+            self.report_generator
+                .lock()
+                .init(&self.config.reporting_config)?;
         }
 
         Ok(())
@@ -1097,8 +1123,7 @@ pub struct ForensicEvent {
 }
 
 /// 全局安全审计实例
-pub static SECURITY_AUDIT: spin::Mutex<Option<SecurityAuditSubsystem>> =
-    spin::Mutex::new(None);
+pub static SECURITY_AUDIT: spin::Mutex<Option<SecurityAuditSubsystem>> = spin::Mutex::new(None);
 
 /// 初始化安全审计子系统
 pub fn init_security_audit() -> Result<(), &'static str> {

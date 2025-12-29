@@ -2,11 +2,14 @@
 //!
 //! This module provides system call registry functionality.
 
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    string::{String, ToString},
+    vec::Vec,
+};
+
 use nos_api::Result;
-use alloc::collections::BTreeMap;
-use alloc::string::{String, ToString};
-use alloc::boxed::Box;
-use alloc::vec::Vec;
 use spin::{Mutex, Once};
 
 /// System call registry
@@ -31,13 +34,9 @@ impl SyscallRegistry {
     pub fn register(&mut self, name: &str, handler: Box<dyn SyscallHandler>) -> Result<u32> {
         let id = self.next_id;
         self.next_id += 1;
-        
-        let info = SyscallInfo {
-            id,
-            name: name.to_string(),
-            handler,
-        };
-        
+
+        let info = SyscallInfo { id, name: name.to_string(), handler };
+
         self.syscalls.insert(id, info);
         Ok(id)
     }
@@ -72,7 +71,7 @@ pub struct SyscallInfo {
 pub trait SyscallHandler: Send + Sync {
     /// Execute the system call
     fn execute(&self, args: &[usize]) -> Result<isize>;
-    
+
     /// Get the system call name
     fn name(&self) -> &str;
 }
@@ -110,7 +109,7 @@ mod tests {
         fn execute(&self, _args: &[usize]) -> Result<isize> {
             Ok(self.result)
         }
-        
+
         fn name(&self) -> &str {
             self.name
         }
@@ -119,18 +118,17 @@ mod tests {
     #[test]
     fn test_registry() {
         let mut registry = SyscallRegistry::new();
-        
+
         // Register a test system call
-        let handler = TestHandler {
-            name: "test_syscall",
-            result: 42,
-        };
-        let id = registry.register("test_syscall", Box::new(handler)).unwrap();
-        
+        let handler = TestHandler { name: "test_syscall", result: 42 };
+        let id = registry
+            .register("test_syscall", Box::new(handler))
+            .unwrap();
+
         // Get the system call
         let info = registry.get(id).unwrap();
         assert_eq!(info.name, "test_syscall");
-        
+
         // Get by name
         let info = registry.get_by_name("test_syscall").unwrap();
         assert_eq!(info.id, id);

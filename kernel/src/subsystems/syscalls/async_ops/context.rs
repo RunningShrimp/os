@@ -1,7 +1,8 @@
 //! Async I/O context management functions
 
-use super::*;
 use core::ffi::c_char;
+
+use super::*;
 
 /// 创建异步I/O上下文
 ///
@@ -101,8 +102,12 @@ pub extern "C" fn sys_glib_async_context_stats(
     crate::println!("[glib_async] 获取上下文统计: {}", context_id);
 
     // 验证参数
-    if context_id == 0 || total_ops.is_null() || active_ops.is_null()
-        || successful_ops.is_null() || failed_ops.is_null() {
+    if context_id == 0
+        || total_ops.is_null()
+        || active_ops.is_null()
+        || successful_ops.is_null()
+        || failed_ops.is_null()
+    {
         crate::println!("[glib_async] 无效参数");
         return -22; // EINVAL
     }
@@ -115,7 +120,7 @@ pub extern "C" fn sys_glib_async_context_stats(
             None => {
                 crate::println!("[glib_async] 异步上下文不存在: {}", context_id);
                 return -2; // ENOENT
-            }
+            },
         }
     };
 
@@ -127,12 +132,14 @@ pub extern "C" fn sys_glib_async_context_stats(
         *failed_ops = context_info.failed_operations.load(Ordering::SeqCst);
     }
 
-    crate::println!("[glib_async] 上下文统计: ID={}, total={}, active={}, success={}, failed={}",
+    crate::println!(
+        "[glib_async] 上下文统计: ID={}, total={}, active={}, success={}, failed={}",
         context_id,
         context_info.total_operations.load(Ordering::SeqCst),
         context_info.active_operations.load(Ordering::SeqCst),
         context_info.successful_operations.load(Ordering::SeqCst),
-        context_info.failed_operations.load(Ordering::SeqCst));
+        context_info.failed_operations.load(Ordering::SeqCst)
+    );
     0
 }
 
@@ -169,15 +176,21 @@ pub extern "C" fn sys_glib_async_context_destroy(context_id: u64) -> SyscallResu
                     context_info.failed_operations.load(Ordering::SeqCst),
                     active,
                 )
-            }
+            },
             None => {
                 crate::println!("[glib_async] 异步上下文不存在: {}", context_id);
                 return -2; // ENOENT
-            }
+            },
         }
     };
 
-    crate::println!("[glib_async] 上下文销毁完成: ID={}, total={}, success={}, failed={}, active={}",
-        context_id, total_ops, successful_ops, failed_ops, active_ops);
+    crate::println!(
+        "[glib_async] 上下文销毁完成: ID={}, total={}, success={}, failed={}, active={}",
+        context_id,
+        total_ops,
+        successful_ops,
+        failed_ops,
+        active_ops
+    );
     0
 }

@@ -1,7 +1,5 @@
 //! POSIX Stat and Time Structures
 
-use super::types::{Mode, Dev, Ino, Nlink, Off, Blksize, Blkcnt, Time};
-
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Stat {

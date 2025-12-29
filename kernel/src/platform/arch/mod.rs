@@ -39,7 +39,7 @@ pub fn intr_off() -> bool {
         }
         (sstatus & 0x2) != 0
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     {
         let daif: u64;
@@ -49,7 +49,7 @@ pub fn intr_off() -> bool {
         }
         (daif & 0x3c0) == 0
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     {
         let flags: u64;
@@ -67,12 +67,12 @@ pub fn intr_on() {
     unsafe {
         asm!("csrsi sstatus, 0x2");
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     unsafe {
         asm!("msr daifclr, #0xf");
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     unsafe {
         asm!("sti");
@@ -90,7 +90,7 @@ pub fn intr_get() -> bool {
         }
         (sstatus & 0x2) != 0
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     {
         let daif: u64;
@@ -99,7 +99,7 @@ pub fn intr_get() -> bool {
         }
         (daif & 0x3c0) == 0
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     {
         let flags: u64;
@@ -117,12 +117,12 @@ pub fn wfi() {
     unsafe {
         asm!("wfi");
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     unsafe {
         asm!("wfi");
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     unsafe {
         asm!("hlt");
@@ -140,7 +140,7 @@ pub fn cpuid() -> usize {
         }
         hartid
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     {
         let mpidr: u64;
@@ -149,7 +149,7 @@ pub fn cpuid() -> usize {
         }
         (mpidr & 0xff) as usize
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     {
         // For simplicity, assume single CPU
@@ -167,7 +167,7 @@ pub fn current_cpu_id() -> usize {
 pub fn raise_security_exception(message: &str) {
     // Log the security exception
     crate::println!("Security Exception: {}", message);
-    
+
     // For now, we'll just panic, but in a real system this would trigger
     // appropriate security response mechanisms
     panic!("Security exception raised: {}", message);
@@ -180,12 +180,12 @@ pub fn fence() {
     unsafe {
         asm!("fence");
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     unsafe {
         asm!("dsb sy");
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     unsafe {
         asm!("mfence");
@@ -219,10 +219,7 @@ pub fn ifence() {
 #[inline]
 #[cfg(target_arch = "x86_64")]
 pub unsafe fn retpoline_barrier() {
-    asm!(
-        "lfence",
-        options(nostack, preserves_flags)
-    );
+    asm!("lfence", options(nostack, preserves_flags));
 }
 
 /// Retpoline thunk for indirect calls (x86_64)
@@ -270,31 +267,21 @@ pub unsafe fn retpoline_jump_thunk(target: *const u8) -> ! {
 #[inline]
 #[cfg(target_arch = "x86_64")]
 pub unsafe fn speculation_barrier() {
-    asm!(
-        "lfence",
-        options(nostack, preserves_flags)
-    );
+    asm!("lfence", options(nostack, preserves_flags));
 }
 
 /// Speculation barrier using DSB/ISB (AArch64)
 #[inline]
 #[cfg(target_arch = "aarch64")]
 pub unsafe fn speculation_barrier() {
-    asm!(
-        "dsb sy",
-        "isb",
-        options(nostack)
-    );
+    asm!("dsb sy", "isb", options(nostack));
 }
 
 /// Speculation barrier using FENCE (RISC-V)
 #[inline]
 #[cfg(target_arch = "riscv64")]
 pub unsafe fn speculation_barrier() {
-    asm!(
-        "fence",
-        options(nostack)
-    );
+    asm!("fence", options(nostack));
 }
 
 /// Flush Return Stack Buffer (RSB) on context switch
@@ -303,14 +290,7 @@ pub unsafe fn speculation_barrier() {
 pub unsafe fn flush_rsb() {
     const RSB_DEPTH: usize = 16;
     for _ in 0..RSB_DEPTH {
-        asm!(
-            "call 1f",
-            "1:",
-            "pause",
-            "lfence",
-            "ret",
-            options(nostack)
-        );
+        asm!("call 1f", "1:", "pause", "lfence", "ret", options(nostack));
     }
 }
 

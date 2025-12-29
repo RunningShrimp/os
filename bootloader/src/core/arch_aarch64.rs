@@ -1,5 +1,5 @@
 /// ARM64 (aarch64) Architecture Optimization Module
-/// 
+///
 /// Provides:
 /// - CPU feature detection (MIDR, ID_AA64*)
 /// - ARM-specific optimization flags
@@ -11,21 +11,21 @@
 /// ARM64 CPU Features from ID registers
 #[derive(Debug, Clone, Copy)]
 pub struct Arm64Features {
-    pub has_sve: bool,              // Scalable Vector Extension
-    pub has_neon: bool,             // NEON media engine
-    pub has_fp: bool,               // Floating Point
-    pub has_asid: bool,             // Address Space Identifier
-    pub has_mmu: bool,              // Memory Management Unit
-    pub has_virt: bool,             // Virtualization Extension
-    pub has_pmu: bool,              // Performance Monitoring
-    pub has_debug: bool,            // Debug Support
-    pub has_ras: bool,              // Reliability, Availability, Serviceability
-    pub has_sve2: bool,             // Scalable Vector Extension 2
-    pub has_bf16: bool,             // Brain Float 16-bit
-    pub has_int8_matmul: bool,      // INT8 Matrix Multiplication
-    pub has_mte: bool,              // Memory Tagging Extension
-    pub has_dcpodp: bool,           // DCPoDP (Data Consistency Point)
-    pub has_wfxt: bool,             // Wait for External Events (WFxT)
+    pub has_sve: bool,         // Scalable Vector Extension
+    pub has_neon: bool,        // NEON media engine
+    pub has_fp: bool,          // Floating Point
+    pub has_asid: bool,        // Address Space Identifier
+    pub has_mmu: bool,         // Memory Management Unit
+    pub has_virt: bool,        // Virtualization Extension
+    pub has_pmu: bool,         // Performance Monitoring
+    pub has_debug: bool,       // Debug Support
+    pub has_ras: bool,         // Reliability, Availability, Serviceability
+    pub has_sve2: bool,        // Scalable Vector Extension 2
+    pub has_bf16: bool,        // Brain Float 16-bit
+    pub has_int8_matmul: bool, // INT8 Matrix Multiplication
+    pub has_mte: bool,         // Memory Tagging Extension
+    pub has_dcpodp: bool,      // DCPoDP (Data Consistency Point)
+    pub has_wfxt: bool,        // Wait for External Events (WFxT)
 }
 
 impl Arm64Features {
@@ -53,21 +53,51 @@ impl Arm64Features {
     /// Count available features
     pub fn feature_count(&self) -> usize {
         let mut count = 0;
-        if self.has_sve { count += 1; }
-        if self.has_neon { count += 1; }
-        if self.has_fp { count += 1; }
-        if self.has_asid { count += 1; }
-        if self.has_mmu { count += 1; }
-        if self.has_virt { count += 1; }
-        if self.has_pmu { count += 1; }
-        if self.has_debug { count += 1; }
-        if self.has_ras { count += 1; }
-        if self.has_sve2 { count += 1; }
-        if self.has_bf16 { count += 1; }
-        if self.has_int8_matmul { count += 1; }
-        if self.has_mte { count += 1; }
-        if self.has_dcpodp { count += 1; }
-        if self.has_wfxt { count += 1; }
+        if self.has_sve {
+            count += 1;
+        }
+        if self.has_neon {
+            count += 1;
+        }
+        if self.has_fp {
+            count += 1;
+        }
+        if self.has_asid {
+            count += 1;
+        }
+        if self.has_mmu {
+            count += 1;
+        }
+        if self.has_virt {
+            count += 1;
+        }
+        if self.has_pmu {
+            count += 1;
+        }
+        if self.has_debug {
+            count += 1;
+        }
+        if self.has_ras {
+            count += 1;
+        }
+        if self.has_sve2 {
+            count += 1;
+        }
+        if self.has_bf16 {
+            count += 1;
+        }
+        if self.has_int8_matmul {
+            count += 1;
+        }
+        if self.has_mte {
+            count += 1;
+        }
+        if self.has_dcpodp {
+            count += 1;
+        }
+        if self.has_wfxt {
+            count += 1;
+        }
         count
     }
 
@@ -80,10 +110,10 @@ impl Arm64Features {
 /// ARM64 Exception Levels
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ExceptionLevel {
-    EL0,    // User/Application level
-    EL1,    // Kernel level
-    EL2,    // Hypervisor level
-    EL3,    // Secure Monitor level
+    EL0, // User/Application level
+    EL1, // Kernel level
+    EL2, // Hypervisor level
+    EL3, // Secure Monitor level
 }
 
 impl ExceptionLevel {
@@ -114,10 +144,7 @@ pub struct DeviceTreeParser {
 impl DeviceTreeParser {
     /// Create new device tree parser
     pub fn new(base_address: u64) -> Self {
-        Self {
-            base_address,
-            parsed: false,
-        }
+        Self { base_address, parsed: false }
     }
 
     /// Parse device tree magic number
@@ -179,7 +206,7 @@ impl PsciInterface {
     /// Create new PSCI interface
     pub fn new() -> Self {
         Self {
-            version: 0x00010000,  // PSCI 1.0
+            version: 0x00010000, // PSCI 1.0
             available: false,
         }
     }
@@ -230,11 +257,11 @@ impl PsciInterface {
 /// ARM64 Cache Configuration
 #[derive(Debug, Clone, Copy)]
 pub struct Arm64CacheConfig {
-    pub enable_dcache: bool,        // Data cache
-    pub enable_icache: bool,        // Instruction cache
-    pub cache_coherency: bool,      // Cache coherency
-    pub enable_prefetch: bool,      // Hardware prefetching
-    pub write_back_mode: bool,      // Write-back vs write-through
+    pub enable_dcache: bool,   // Data cache
+    pub enable_icache: bool,   // Instruction cache
+    pub cache_coherency: bool, // Cache coherency
+    pub enable_prefetch: bool, // Hardware prefetching
+    pub write_back_mode: bool, // Write-back vs write-through
 }
 
 impl Arm64CacheConfig {
@@ -255,7 +282,7 @@ impl Arm64CacheConfig {
             enable_dcache: true,
             enable_icache: true,
             cache_coherency: true,
-            enable_prefetch: false,  // Disable during boot
+            enable_prefetch: false, // Disable during boot
             write_back_mode: true,
         }
     }
@@ -282,17 +309,17 @@ pub struct Arm64BootConfig {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Arm64BootMode {
-    EfiBootServices,    // UEFI firmware boot
-    Devicetree,         // Device tree boot
-    Acpi,              // ACPI boot
-    Direct,            // Direct kernel boot
+    EfiBootServices, // UEFI firmware boot
+    Devicetree,      // Device tree boot
+    Acpi,            // ACPI boot
+    Direct,          // Direct kernel boot
 }
 
 impl Arm64BootConfig {
     /// Initialize ARM64 boot configuration
     pub fn initialize() -> Self {
         let features = Arm64Features::detect();
-        
+
         Self {
             features,
             exception_level: ExceptionLevel::current(),
@@ -314,10 +341,10 @@ impl Arm64BootConfig {
     /// Setup boot mode
     pub fn setup(&mut self, mode: Arm64BootMode) -> Result<(), &'static str> {
         self.boot_mode = mode;
-        
+
         // Apply default cache configuration
         self.cache_config.apply()?;
-        
+
         // Detect PSCI
         if self.psci.detect() {
             // PSCI available for CPU management

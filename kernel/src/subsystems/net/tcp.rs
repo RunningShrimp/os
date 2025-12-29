@@ -7,8 +7,8 @@ use alloc::vec::Vec;
 
 use super::ipv4::Ipv4Addr;
 
-pub mod state;
 pub mod manager;
+pub mod state;
 
 /// TCP header
 #[derive(Debug, Clone, Copy)]
@@ -152,12 +152,7 @@ impl TcpHeader {
     }
 
     /// Set checksum
-    pub fn set_checksum(
-        &mut self,
-        source_addr: Ipv4Addr,
-        dest_addr: Ipv4Addr,
-        data: &[u8],
-    ) {
+    pub fn set_checksum(&mut self, source_addr: Ipv4Addr, dest_addr: Ipv4Addr, data: &[u8]) {
         self.checksum = 0;
         self.checksum = self.calculate_checksum(source_addr, dest_addr, data);
     }
@@ -327,21 +322,15 @@ impl TcpPacket {
 
         let payload = bytes[options_end..].to_vec();
 
-        Ok(Self {
-            header,
-            options,
-            payload,
-        })
+        Ok(Self { header, options, payload })
     }
 
     /// Verify checksum
-    pub fn verify_checksum(
-        &self,
-        source_addr: Ipv4Addr,
-        dest_addr: Ipv4Addr,
-    ) -> bool {
+    pub fn verify_checksum(&self, source_addr: Ipv4Addr, dest_addr: Ipv4Addr) -> bool {
         let total_data = [&self.options[..], &self.payload[..]].concat();
-        self.header.calculate_checksum(source_addr, dest_addr, &total_data) == 0
+        self.header
+            .calculate_checksum(source_addr, dest_addr, &total_data)
+            == 0
     }
 }
 
@@ -354,7 +343,8 @@ pub enum TcpState {
     Listen,
     /// SYN-SENT - Waiting for a matching connection request after having sent a connection request
     SynSent,
-    /// SYN-RECEIVED - Waiting for a confirming connection request acknowledgment after having both received and sent a connection request
+    /// SYN-RECEIVED - Waiting for a confirming connection request acknowledgment after having both
+    /// received and sent a connection request
     SynReceived,
     /// ESTABLISHED - Connection is established and data can be exchanged
     Established,
@@ -368,7 +358,8 @@ pub enum TcpState {
     Closing,
     /// LAST-ACK - Waiting for an acknowledgment of the connection termination request
     LastAck,
-    /// TIME-WAIT - Waiting for enough time to pass to be sure the remote TCP received the acknowledgment
+    /// TIME-WAIT - Waiting for enough time to pass to be sure the remote TCP received the
+    /// acknowledgment
     TimeWait,
 }
 
@@ -430,18 +421,12 @@ impl TcpSocket {
 
     /// Check if socket can send data
     pub fn can_send(&self) -> bool {
-        matches!(
-            self.state,
-            TcpState::Established | TcpState::CloseWait
-        )
+        matches!(self.state, TcpState::Established | TcpState::CloseWait)
     }
 
     /// Check if socket can receive data
     pub fn can_receive(&self) -> bool {
-        matches!(
-            self.state,
-            TcpState::Established | TcpState::FinWait1 | TcpState::FinWait2
-        )
+        matches!(self.state, TcpState::Established | TcpState::FinWait1 | TcpState::FinWait2)
     }
 }
 
@@ -682,8 +667,18 @@ impl TimestampOption {
             return Err(TcpError::InvalidOption);
         }
 
-        let timestamp = u32::from_be_bytes([option.data[0], option.data[1], option.data[2], option.data[3]]);
-        let echo = u32::from_be_bytes([option.data[4], option.data[5], option.data[6], option.data[7]]);
+        let timestamp = u32::from_be_bytes([
+            option.data[0],
+            option.data[1],
+            option.data[2],
+            option.data[3],
+        ]);
+        let echo = u32::from_be_bytes([
+            option.data[4],
+            option.data[5],
+            option.data[6],
+            option.data[7],
+        ]);
 
         Ok(Self { timestamp, echo })
     }

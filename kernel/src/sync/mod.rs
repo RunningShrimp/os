@@ -1,11 +1,117 @@
+//! # 同步原语
+//!
+//! 提供 SMP 安全的同步原语，包括自旋锁、互斥锁、读写锁等。
+//!
+//! ## 概述
+//!
+//! 同步原语模块提供内核中使用的各种同步机制：
+//! - **自旋锁（SpinLock）**: 短期锁定，禁用中断
+//! - **互斥锁（Mutex）**: 可能睡眠的锁
+//! - **睡眠锁（Sleeplock）**: 允许睡眠的读写锁
+//! - **读写锁（RwLock）**: 支持并发读
+//! - **Once**: 单次初始化
+//! - **RCU**: 读-复制-更新机制
+//!
+//! ## 主要组件
+//!
+//! - [`SpinLock`]: 自旋锁，用于短期临界区
+//! - [`Mutex`]: 互斥锁，可能阻塞
+//! - [`SleepLock`]: 睡眠锁
+//! - [`RwLock`]: 读写锁
+//! - [`Once`]: 单次初始化
+//! - [`SeqLock`]: 序号锁，无锁读取
+//!
+//! ## 使用示例
+//!
+//! ### 自旋锁
+//!
+//! ```
+//! use kernel::sync::SpinLock;
+//!
+//! let lock = SpinLock::new(42);
+//!
+//! {
+//!     let mut data = lock.lock();
+//!     *data += 1;
+//! } // 锁在这里释放
+//! ```
+//!
+//! ### 互斥锁
+//!
+//! ```
+//! use kernel::sync::Mutex;
+//!
+//! let mutex = Mutex::new(Vec::new());
+//!
+//! {
+//!     let mut data = mutex.lock();
+//!     data.push(1);
+//! } // 锁在这里释放
+//! ```
+//!
+//! ### 读写锁
+//!
+//! ```
+//! use kernel::sync::RwLock;
+//!
+//! let rwlock = RwLock::new(42);
+//!
+//! // 读锁（多个读者可以同时持有）
+//! {
+//!     let r1 = rwlock.read();
+//!     let r2 = rwlock.read();
+//!     println!("Read: {}", *r1);
+//! }
+//!
+//! // 写锁（独占访问）
+//! {
+//!     let mut w = rwlock.write();
+//!     *w += 1;
+//! }
+//! ```
+//!
+//! ## 设计决策
+//!
+//! ### 中断控制
+//!
+//! 自旋锁在持有期间禁用中断：
+//! - 防止死锁（中断处理程序可能尝试获取同一锁）
+//! - 使用 `push_off`/`pop_off` 管理
+//!
+//! ### 内存屏障
+//!
+//! 所有同步原语都包含适当的内存屏障：
+//! - 编译器屏障：防止编译器重排序
+//! - CPU 屏障：确保内存操作的顺序
+//!
+//! ## 性能考虑
+//!
+//! - **自旋锁**: 适用于短期锁定（< 1μs）
+//! - **互斥锁**: 适用于可能睡眠的场景
+//! - **读写锁**: 适用于读多写少的场景
+//!
+//! ## SMP 安全
+//!
+//! 所有同步原语都是 SMP 安全的：
+//! - 使用原子操作
+//! - 适当的内存屏障
+//! - 正确的中断处理
+//!
+//! ## 相关模块
+//!
+//! - [`crate::subsystems::sync`): 更多的同步原语实现
+//! - [`futex`]: 用户空间同步原语
+
 // Synchronization primitives for xv6-rust kernel
 // Provides SpinLock, Mutex, Sleeplock, Once, and related types
 //
 // SMP-safe implementation with proper memory barriers and interrupt handling.
 
-use core::cell::UnsafeCell;
-use core::ops::{Deref, DerefMut};
-use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use core::{
+    cell::UnsafeCell,
+    ops::{Deref, DerefMut},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+};
 
 // ============================================================================
 // Interrupt control for SMP safety
@@ -36,14 +142,14 @@ fn interrupts_enabled() -> bool {
         core::arch::asm!("csrr {}, sstatus", out(reg) sstatus);
         (sstatus & 0x2) != 0 // SIE bit
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     unsafe {
         let daif: u64;
         core::arch::asm!("mrs {}, daif", out(reg) daif);
         (daif & 0x80) == 0 // IRQ not masked
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     unsafe {
         let flags: u64;
@@ -59,12 +165,12 @@ fn disable_interrupts() {
     unsafe {
         core::arch::asm!("csrc sstatus, {}", in(reg) 0x2usize); // Clear SIE
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     unsafe {
         core::arch::asm!("msr daifset, #2"); // Mask IRQ
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     unsafe {
         core::arch::asm!("cli");
@@ -78,12 +184,12 @@ fn enable_interrupts() {
     unsafe {
         core::arch::asm!("csrs sstatus, {}", in(reg) 0x2usize); // Set SIE
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     unsafe {
         core::arch::asm!("msr daifclr, #2"); // Unmask IRQ
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     unsafe {
         core::arch::asm!("sti");
@@ -104,39 +210,36 @@ pub struct RawSpinLock {
 
 impl RawSpinLock {
     pub const fn new() -> Self {
-        Self {
-            locked: AtomicBool::new(false),
-            cpu_id: AtomicUsize::new(0),
-        }
+        Self { locked: AtomicBool::new(false), cpu_id: AtomicUsize::new(0) }
     }
-    
+
     pub fn lock(&self) {
         // Disable interrupts to prevent deadlock with ISR
         push_off();
-        
+
         // Spin until lock is acquired
         while self.locked.swap(true, Ordering::Acquire) {
             // Spin loop hint to CPU
             core::hint::spin_loop();
         }
-        
+
         // Record CPU holding the lock
         self.cpu_id.store(crate::cpu::cpuid(), Ordering::Relaxed);
     }
-    
+
     pub fn unlock(&self) {
         self.cpu_id.store(0, Ordering::Relaxed);
-        
+
         // Release lock
         self.locked.store(false, Ordering::Release);
-        
+
         // Restore interrupt state
         pop_off(false); // Argument ignored by pop_off implementation above? 
-                        // Wait, pop_off takes `was_enabled`. 
-                        // The implementation in sync.rs uses a thread-local (CPU-local) stack 
-                        // to track interrupt state.
+        // Wait, pop_off takes `was_enabled`.
+        // The implementation in sync.rs uses a thread-local (CPU-local) stack
+        // to track interrupt state.
     }
-    
+
     pub fn try_lock(&self) -> bool {
         if !self.locked.swap(true, Ordering::Acquire) {
             push_off();
@@ -145,12 +248,12 @@ impl RawSpinLock {
             false
         }
     }
-    
+
     /// Check if the lock is currently held
     pub fn is_locked(&self) -> bool {
         self.locked.load(Ordering::Acquire)
     }
-    
+
     /// Check if the current CPU is holding the lock
     pub fn holding(&self) -> bool {
         self.is_locked() && self.cpu_id.load(Ordering::Relaxed) == crate::cpu::cpuid()
@@ -170,7 +273,6 @@ pub mod tests;
 pub mod futex_tests;
 pub mod futex_validation;
 
-
 // Legacy compatibility alias
 pub type SpinLock = RawSpinLock;
 
@@ -186,42 +288,34 @@ pub struct SpinLockIrq {
 
 impl SpinLockIrq {
     pub const fn new() -> Self {
-        Self {
-            inner: RawSpinLock::new(),
-        }
+        Self { inner: RawSpinLock::new() }
     }
-    
+
     /// Acquire lock and disable interrupts
     /// Returns a guard that restores interrupt state on drop
     #[inline]
     pub fn lock(&self) -> SpinLockIrqGuard<'_> {
         let was_enabled = push_off();
         self.inner.lock();
-        SpinLockIrqGuard {
-            lock: self,
-            was_enabled,
-        }
+        SpinLockIrqGuard { lock: self, was_enabled }
     }
-    
+
     #[inline]
     pub fn try_lock(&self) -> Option<SpinLockIrqGuard<'_>> {
         let was_enabled = push_off();
         if self.inner.try_lock() {
-            Some(SpinLockIrqGuard {
-                lock: self,
-                was_enabled,
-            })
+            Some(SpinLockIrqGuard { lock: self, was_enabled })
         } else {
             pop_off(was_enabled);
             None
         }
     }
-    
+
     #[inline]
     pub fn is_locked(&self) -> bool {
         self.inner.is_locked()
     }
-    
+
     #[inline]
     pub fn holding(&self) -> bool {
         self.inner.holding()
@@ -258,10 +352,7 @@ unsafe impl<T: ?Sized + Send> Send for Mutex<T> {}
 impl<T> Mutex<T> {
     /// Creates a new mutex protecting the given data
     pub const fn new(data: T) -> Self {
-        Self {
-            lock: RawSpinLock::new(),
-            data: UnsafeCell::new(data),
-        }
+        Self { lock: RawSpinLock::new(), data: UnsafeCell::new(data) }
     }
 
     /// Consumes the mutex and returns the inner data
@@ -354,12 +445,9 @@ unsafe impl<T: ?Sized + Send> Send for MutexIrq<T> {}
 
 impl<T> MutexIrq<T> {
     pub const fn new(data: T) -> Self {
-        Self {
-            lock: SpinLockIrq::new(),
-            data: UnsafeCell::new(data),
-        }
+        Self { lock: SpinLockIrq::new(), data: UnsafeCell::new(data) }
     }
-    
+
     pub fn into_inner(self) -> T {
         self.data.into_inner()
     }
@@ -369,23 +457,19 @@ impl<T: ?Sized> MutexIrq<T> {
     /// Acquire the lock with interrupts disabled
     pub fn lock(&self) -> MutexIrqGuard<'_, T> {
         let guard = self.lock.lock();
-        MutexIrqGuard {
-            mutex: self,
-            _guard: guard,
-        }
+        MutexIrqGuard { mutex: self, _guard: guard }
     }
-    
+
     pub fn try_lock(&self) -> Option<MutexIrqGuard<'_, T>> {
-        self.lock.try_lock().map(|guard| MutexIrqGuard {
-            mutex: self,
-            _guard: guard,
-        })
+        self.lock
+            .try_lock()
+            .map(|guard| MutexIrqGuard { mutex: self, _guard: guard })
     }
-    
+
     pub fn get_mut(&mut self) -> &mut T {
         self.data.get_mut()
     }
-    
+
     pub fn is_locked(&self) -> bool {
         self.lock.is_locked()
     }
@@ -399,7 +483,7 @@ pub struct MutexIrqGuard<'a, T: ?Sized> {
 
 impl<T: ?Sized> Deref for MutexIrqGuard<'_, T> {
     type Target = T;
-    
+
     fn deref(&self) -> &T {
         unsafe { &*self.mutex.data.get() }
     }
@@ -426,9 +510,7 @@ pub struct Once {
 
 impl Once {
     pub const fn new() -> Self {
-        Self {
-            state: AtomicUsize::new(ONCE_INCOMPLETE),
-        }
+        Self { state: AtomicUsize::new(ONCE_INCOMPLETE) }
     }
 
     /// Returns true if `call_once` has completed successfully
@@ -458,14 +540,14 @@ impl Once {
                     f();
                     self.state.store(ONCE_COMPLETE, Ordering::Release);
                     return;
-                }
+                },
                 Err(ONCE_COMPLETE) => return,
                 Err(ONCE_RUNNING) => {
                     // Spin while another thread initializes
                     while self.state.load(Ordering::Acquire) == ONCE_RUNNING {
                         core::hint::spin_loop();
                     }
-                }
+                },
                 Err(_) => unreachable!(),
             }
         }
@@ -642,10 +724,7 @@ unsafe impl<T: ?Sized + Send + Sync> Sync for RwLock<T> {}
 
 impl<T> RwLock<T> {
     pub const fn new(data: T) -> Self {
-        Self {
-            state: AtomicUsize::new(0),
-            data: UnsafeCell::new(data),
-        }
+        Self { state: AtomicUsize::new(0), data: UnsafeCell::new(data) }
     }
 
     pub fn into_inner(self) -> T {
@@ -665,12 +744,7 @@ impl<T: ?Sized> RwLock<T> {
             // Try to increment reader count
             if self
                 .state
-                .compare_exchange_weak(
-                    state,
-                    state + 1,
-                    Ordering::Acquire,
-                    Ordering::Relaxed,
-                )
+                .compare_exchange_weak(state, state + 1, Ordering::Acquire, Ordering::Relaxed)
                 .is_ok()
             {
                 return RwLockReadGuard { lock: self };

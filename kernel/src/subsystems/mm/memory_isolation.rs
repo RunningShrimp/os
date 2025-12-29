@@ -11,12 +11,18 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
+use alloc::{collections::BTreeMap, vec::Vec};
 use core::sync::atomic::{AtomicUsize, Ordering};
+
 use spin::mutex::Mutex;
-use crate::subsystems::mm::{PAGE_SIZE, vm::{PageTable, VmPerm, VmArea, VmSpace}};
-use crate::subsystems::sync::Mutex as NosMutex;
+
+use crate::subsystems::{
+    mm::{
+        PAGE_SIZE,
+        vm::{PageTable, VmArea, VmPerm, VmSpace},
+    },
+    sync::Mutex as NosMutex,
+};
 
 /// Memory protection domain identifier
 pub type ProtectionDomainId = u32;
@@ -196,13 +202,13 @@ impl MemoryIsolationManager {
     pub fn init(&mut self) -> Result<(), MemoryIsolationError> {
         // Initialize ASLR
         self.aslr_state.init()?;
-        
+
         // Initialize protection keys
         self.protection_keys.init()?;
-        
+
         // Create kernel domain (ID 0)
         self.create_kernel_domain()?;
-        
+
         Ok(())
     }
 
@@ -214,15 +220,9 @@ impl MemoryIsolationManager {
         trusted: bool,
     ) -> Result<ProtectionDomainId, MemoryIsolationError> {
         let id = self.next_domain_id.fetch_add(1, Ordering::SeqCst) as ProtectionDomainId;
-        
-        let domain = ProtectionDomain {
-            id,
-            name,
-            regions: BTreeMap::new(),
-            permissions,
-            trusted,
-        };
-        
+
+        let domain = ProtectionDomain { id, name, regions: BTreeMap::new(), permissions, trusted };
+
         self.domains.insert(id, domain);
         Ok(id)
     }
@@ -236,12 +236,8 @@ impl MemoryIsolationManager {
             can_manage_domains: true,
             can_modify_protection_keys: true,
         };
-        
-        self.create_domain(
-            alloc::string::String::from("kernel"),
-            kernel_perms,
-            true,
-        )
+
+        self.create_domain(alloc::string::String::from("kernel"), kernel_perms, true)
     }
 
     /// Add a memory region to a protection domain
@@ -258,12 +254,12 @@ impl MemoryIsolationManager {
         if !self.domains.contains_key(&domain_id) {
             return Err(MemoryIsolationError::DomainNotFound);
         }
-        
+
         // Validate address range
         if start == 0 || size == 0 || (start + size) < start {
             return Err(MemoryIsolationError::InvalidAddressRange);
         }
-        
+
         // Check for overlap with existing regions
         let end = start + size;
         if let Some(domain) = self.domains.get(&domain_id) {
@@ -273,9 +269,9 @@ impl MemoryIsolationManager {
                 }
             }
         }
-        
+
         let id = self.next_region_id.fetch_add(1, Ordering::SeqCst);
-        
+
         let region = MemoryRegion {
             id,
             start,
@@ -286,24 +282,24 @@ impl MemoryIsolationManager {
             region_type,
             access_count: AtomicUsize::new(0),
         };
-        
+
         // Apply ASLR if enabled
         let randomized_start = if self.aslr_state.enabled {
             self.aslr_state.randomize_address(start, region_type)?
         } else {
             start
         };
-        
+
         // Update region with randomized start
         let mut randomized_region = region.clone();
         randomized_region.start = randomized_start;
         randomized_region.end = randomized_start + size;
-        
+
         // Add to domain
         if let Some(domain) = self.domains.get_mut(&domain_id) {
             domain.regions.insert(id, randomized_region);
         }
-        
+
         Ok(id)
     }
 
@@ -313,12 +309,16 @@ impl MemoryIsolationManager {
         domain_id: ProtectionDomainId,
         region_id: MemoryRegionId,
     ) -> Result<(), MemoryIsolationError> {
-        let domain = self.domains.get_mut(&domain_id)
+        let domain = self
+            .domains
+            .get_mut(&domain_id)
             .ok_or(MemoryIsolationError::DomainNotFound)?;
-        
-        domain.regions.remove(&region_id)
+
+        domain
+            .regions
+            .remove(&region_id)
             .ok_or(MemoryIsolationError::RegionNotFound)?;
-        
+
         Ok(())
     }
 
@@ -336,37 +336,40 @@ impl MemoryIsolationManager {
             Some(d) => d,
             None => return AccessValidationResult::DeniedDomain,
         };
-        
+
         // Find the region containing the address
         let end = addr + size;
-        let region = domain.regions.values().find(|r| addr >= r.start && end <= r.end);
-        
+        let region = domain
+            .regions
+            .values()
+            .find(|r| addr >= r.start && end <= r.end);
+
         let region = match region {
             Some(r) => r,
             None => return AccessValidationResult::DeniedNotFound,
         };
-        
+
         // Check secure region access
         if region.secure && !domain.trusted {
             return AccessValidationResult::DeniedSecure;
         }
-        
+
         // Check permissions
         if is_write && !region.permissions.write {
             return AccessValidationResult::DeniedPermission;
         }
-        
+
         if is_execute && !region.permissions.exec {
             return AccessValidationResult::DeniedPermission;
         }
-        
+
         if !region.permissions.read {
             return AccessValidationResult::DeniedPermission;
         }
-        
+
         // Update access count
         region.access_count.fetch_add(1, Ordering::Relaxed);
-        
+
         AccessValidationResult::Allowed
     }
 
@@ -382,39 +385,37 @@ impl MemoryIsolationManager {
         if from_domain_id == to_domain_id {
             return AccessValidationResult::Allowed;
         }
-        
+
         let from_domain = match self.domains.get(&from_domain_id) {
             Some(d) => d,
             None => return AccessValidationResult::DeniedDomain,
         };
-        
+
         // Check cross-domain permissions
         if is_write && !from_domain.permissions.can_write_others {
             return AccessValidationResult::DeniedPermission;
         }
-        
+
         if is_execute && !from_domain.permissions.can_execute_others {
             return AccessValidationResult::DeniedPermission;
         }
-        
+
         if !from_domain.permissions.can_read_others {
             return AccessValidationResult::DeniedPermission;
         }
-        
+
         AccessValidationResult::Allowed
     }
 
     /// Get memory isolation statistics
     pub fn get_stats(&self) -> MemoryIsolationStats {
-        let total_regions: u32 = self.domains.values()
-            .map(|d| d.regions.len() as u32)
-            .sum();
-        
+        let total_regions: u32 = self.domains.values().map(|d| d.regions.len() as u32).sum();
+
         MemoryIsolationStats {
             total_domains: self.domains.len() as u32,
             total_regions,
-            access_violations: 0, // TODO: Track violations
-            secure_access_attempts: 0, // TODO: Track secure access
+            access_violations: 0,            // TODO: Track violations
+            secure_access_attempts: 0,       // TODO: Track secure access
             cross_domain_access_attempts: 0, // TODO: Track cross-domain access
         }
     }
@@ -425,9 +426,11 @@ impl MemoryIsolationManager {
         pagetable: *mut PageTable,
         domain_id: ProtectionDomainId,
     ) -> Result<(), MemoryIsolationError> {
-        let domain = self.domains.get(&domain_id)
+        let domain = self
+            .domains
+            .get(&domain_id)
             .ok_or(MemoryIsolationError::DomainNotFound)?;
-        
+
         // Apply protection keys if available
         for region in domain.regions.values() {
             if let Some(key) = self.protection_keys.allocate_key(region.permissions)? {
@@ -435,7 +438,7 @@ impl MemoryIsolationManager {
                 self.apply_protection_key_to_region(pagetable, region, key)?;
             }
         }
-        
+
         Ok(())
     }
 
@@ -460,7 +463,7 @@ impl MemoryIsolationManager {
     ) -> Result<MemoryRegionId, MemoryIsolationError> {
         // Find a secure address range
         let start = self.find_secure_address_range(size)?;
-        
+
         // Create region with secure flag
         self.add_region(
             domain_id,
@@ -485,21 +488,25 @@ impl MemoryIsolationManager {
         domain_id: ProtectionDomainId,
         region_id: MemoryRegionId,
     ) -> Result<(), MemoryIsolationError> {
-        let domain = self.domains.get_mut(&domain_id)
+        let domain = self
+            .domains
+            .get_mut(&domain_id)
             .ok_or(MemoryIsolationError::DomainNotFound)?;
-        
-        let region = domain.regions.get_mut(&region_id)
+
+        let region = domain
+            .regions
+            .get_mut(&region_id)
             .ok_or(MemoryIsolationError::RegionNotFound)?;
-        
+
         if !region.secure {
             return Err(MemoryIsolationError::NotSecureRegion);
         }
-        
+
         // Zero out the memory region
         unsafe {
             core::ptr::write_bytes(region.start as *mut u8, 0, region.end - region.start);
         }
-        
+
         Ok(())
     }
 }
@@ -522,13 +529,13 @@ impl AslrState {
         // Enable ASLR with 32 bits of entropy
         self.enabled = true;
         self.entropy_bits = 32;
-        
+
         // Generate random offsets
         self.code_offset = self.generate_random_offset()?;
         self.data_offset = self.generate_random_offset()?;
         self.heap_offset = self.generate_random_offset()?;
         self.stack_offset = self.generate_random_offset()?;
-        
+
         Ok(())
     }
 
@@ -538,7 +545,7 @@ impl AslrState {
         // For now, use a simple pseudo-random generator
         static COUNTER: AtomicUsize = AtomicUsize::new(1);
         let value = COUNTER.fetch_add(1, Ordering::SeqCst);
-        
+
         // Apply entropy mask
         let mask = (1usize << self.entropy_bits) - 1;
         Ok(value & mask)
@@ -553,7 +560,7 @@ impl AslrState {
         if !self.enabled {
             return Ok(addr);
         }
-        
+
         let offset = match region_type {
             MemoryRegionType::Code => self.code_offset,
             MemoryRegionType::Data => self.data_offset,
@@ -561,7 +568,7 @@ impl AslrState {
             MemoryRegionType::Stack => self.stack_offset,
             _ => 0,
         };
-        
+
         Ok(addr.wrapping_add(offset))
     }
 }
@@ -583,7 +590,7 @@ impl ProtectionKeyManager {
         for i in 1..16 {
             self.available_keys.push(i);
         }
-        
+
         Ok(())
     }
 
@@ -592,10 +599,10 @@ impl ProtectionKeyManager {
         if self.available_keys.is_empty() {
             return Ok(None);
         }
-        
+
         let key_index = self.next_key.fetch_add(1, Ordering::SeqCst) % self.available_keys.len();
         let key = self.available_keys[key_index];
-        
+
         // Store key permissions
         // Note: This would need to be mutable in a real implementation
         // For now, we'll just return the key
@@ -625,7 +632,8 @@ pub enum MemoryIsolationError {
 }
 
 /// Global memory isolation manager instance
-static MEMORY_ISOLATION_MANAGER: NosMutex<MemoryIsolationManager> = NosMutex::new(MemoryIsolationManager::new());
+static MEMORY_ISOLATION_MANAGER: NosMutex<MemoryIsolationManager> =
+    NosMutex::new(MemoryIsolationManager::new());
 
 /// Initialize memory isolation system
 pub fn init_memory_isolation() -> Result<(), MemoryIsolationError> {
@@ -673,13 +681,11 @@ mod tests {
     fn test_domain_creation() {
         let mut manager = MemoryIsolationManager::new();
         manager.init().unwrap();
-        
-        let domain_id = manager.create_domain(
-            alloc::string::String::from("test"),
-            DomainPermissions::default(),
-            false,
-        ).unwrap();
-        
+
+        let domain_id = manager
+            .create_domain(alloc::string::String::from("test"), DomainPermissions::default(), false)
+            .unwrap();
+
         assert!(domain_id > 0);
     }
 
@@ -687,22 +693,15 @@ mod tests {
     fn test_region_addition() {
         let mut manager = MemoryIsolationManager::new();
         manager.init().unwrap();
-        
-        let domain_id = manager.create_domain(
-            alloc::string::String::from("test"),
-            DomainPermissions::default(),
-            false,
-        ).unwrap();
-        
-        let region_id = manager.add_region(
-            domain_id,
-            0x1000,
-            0x1000,
-            VmPerm::rw(),
-            MemoryRegionType::Data,
-            false,
-        ).unwrap();
-        
+
+        let domain_id = manager
+            .create_domain(alloc::string::String::from("test"), DomainPermissions::default(), false)
+            .unwrap();
+
+        let region_id = manager
+            .add_region(domain_id, 0x1000, 0x1000, VmPerm::rw(), MemoryRegionType::Data, false)
+            .unwrap();
+
         assert!(region_id > 0);
     }
 
@@ -710,25 +709,18 @@ mod tests {
     fn test_access_validation() {
         let mut manager = MemoryIsolationManager::new();
         manager.init().unwrap();
-        
-        let domain_id = manager.create_domain(
-            alloc::string::String::from("test"),
-            DomainPermissions::default(),
-            false,
-        ).unwrap();
-        
-        manager.add_region(
-            domain_id,
-            0x1000,
-            0x1000,
-            VmPerm::rw(),
-            MemoryRegionType::Data,
-            false,
-        ).unwrap();
-        
+
+        let domain_id = manager
+            .create_domain(alloc::string::String::from("test"), DomainPermissions::default(), false)
+            .unwrap();
+
+        manager
+            .add_region(domain_id, 0x1000, 0x1000, VmPerm::rw(), MemoryRegionType::Data, false)
+            .unwrap();
+
         let result = manager.validate_access(domain_id, 0x1000, 0x100, true, false);
         assert_eq!(result, AccessValidationResult::Allowed);
-        
+
         let result = manager.validate_access(domain_id, 0x1000, 0x100, false, true);
         assert_eq!(result, AccessValidationResult::DeniedPermission);
     }

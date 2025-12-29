@@ -11,15 +11,20 @@
 //! - Serialization and deserialization services
 //! - Repository factory pattern for dependency injection
 
-use super::aggregate_root::AggregateRoot;
-use super::boot_config::BootConfig;
-use super::boot_info::BootInfo;
-use super::transactions::TransactionError;
-use alloc::string::{String, ToString};
-use alloc::format;
-use alloc::vec::Vec;
-use core::fmt;
-use core::sync::atomic::{AtomicU64, Ordering};
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::{
+    fmt,
+    sync::atomic::{AtomicU64, Ordering},
+};
+
+use super::{
+    aggregate_root::AggregateRoot, boot_config::BootConfig, boot_info::BootInfo,
+    transactions::TransactionError,
+};
 
 /// Entity ID type for uniquely identifying entities
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -30,12 +35,12 @@ impl EntityId {
     pub fn new(id: u64) -> Self {
         Self(id)
     }
-    
+
     /// Get raw ID value
     pub fn value(&self) -> u64 {
         self.0
     }
-    
+
     /// Check if ID is valid (non-zero)
     pub fn is_valid(&self) -> bool {
         self.0 != 0
@@ -57,12 +62,12 @@ impl TransactionId {
     pub fn new(id: u64) -> Self {
         Self(id)
     }
-    
+
     /// Get raw ID value
     pub fn value(&self) -> u64 {
         self.0
     }
-    
+
     /// Check if ID is valid (non-zero)
     pub fn is_valid(&self) -> bool {
         self.0 != 0
@@ -137,37 +142,26 @@ pub struct Page<T> {
 
 impl<T> Page<T> {
     /// Create a new page
-    pub fn new(
-        items: Vec<T>,
-        page_number: usize,
-        page_size: usize,
-        total_items: usize,
-    ) -> Self {
+    pub fn new(items: Vec<T>, page_number: usize, page_size: usize, total_items: usize) -> Self {
         let total_pages = if page_size == 0 {
             0
         } else {
             (total_items + page_size - 1) / page_size
         };
-        
-        Self {
-            items,
-            page_number,
-            page_size,
-            total_items,
-            total_pages,
-        }
+
+        Self { items, page_number, page_size, total_items, total_pages }
     }
-    
+
     /// Check if there's a next page
     pub fn has_next(&self) -> bool {
         self.page_number + 1 < self.total_pages
     }
-    
+
     /// Check if there's a previous page
     pub fn has_previous(&self) -> bool {
         self.page_number > 0
     }
-    
+
     /// Get next page number
     pub fn next_page(&self) -> Option<usize> {
         if self.has_next() {
@@ -176,7 +170,7 @@ impl<T> Page<T> {
             None
         }
     }
-    
+
     /// Get previous page number
     pub fn previous_page(&self) -> Option<usize> {
         if self.has_previous() {
@@ -195,28 +189,28 @@ impl<T> Page<T> {
 pub trait Repository<T: AggregateRoot>: Send + Sync {
     /// Create a new entity
     fn create(&self, entity: T) -> Result<EntityId, RepositoryError>;
-    
+
     /// Find entity by ID
     fn find_by_id(&self, id: EntityId) -> Result<Option<T>, RepositoryError>;
-    
+
     /// Update an entity
     fn update(&self, entity: T) -> Result<(), RepositoryError>;
-    
+
     /// Delete an entity
     fn delete(&self, id: EntityId) -> Result<(), RepositoryError>;
-    
+
     /// Find all entities
     fn find_all(&self) -> Result<Vec<T>, RepositoryError>;
-    
+
     /// Get query interface for this repository
     fn query(&self) -> &dyn BasicRepositoryQuery<T>;
-    
+
     /// Count entities
     /// Default implementation delegates to the query interface
     fn count(&self) -> Result<usize, RepositoryError> {
         self.query().count()
     }
-    
+
     /// Check if entity exists
     /// Default implementation delegates to the query interface
     fn exists(&self, id: EntityId) -> Result<bool, RepositoryError> {
@@ -230,19 +224,19 @@ pub trait Repository<T: AggregateRoot>: Send + Sync {
 pub trait BasicRepositoryQuery<T: AggregateRoot>: Send + Sync {
     /// Count entities
     fn count(&self) -> Result<usize, RepositoryError>;
-    
+
     /// Check if entity exists
     fn exists(&self, id: EntityId) -> Result<bool, RepositoryError>;
-    
+
     /// Find entities with pagination
     fn find_with_pagination(&self, page: usize, size: usize) -> Result<Page<T>, RepositoryError>;
-    
+
     /// Create multiple entities (batch operation)
     fn create_batch(&self, entities: Vec<T>) -> Result<Vec<EntityId>, RepositoryError>;
-    
+
     /// Update multiple entities (batch operation)
     fn update_batch(&self, entities: Vec<T>) -> Result<(), RepositoryError>;
-    
+
     /// Delete multiple entities (batch operation)
     fn delete_batch(&self, ids: Vec<EntityId>) -> Result<(), RepositoryError>;
 }
@@ -261,7 +255,7 @@ pub trait RepositoryQuery<T: AggregateRoot>: BasicRepositoryQuery<T> {
 pub trait IdGenerator: Send + Sync {
     /// Generate a new entity ID
     fn generate_entity_id(&self) -> EntityId;
-    
+
     /// Generate a new transaction ID
     fn generate_transaction_id(&self) -> TransactionId;
 }
@@ -294,7 +288,7 @@ impl IdGenerator for DefaultIdGenerator {
     fn generate_entity_id(&self) -> EntityId {
         EntityId(self.entity_counter.fetch_add(1, Ordering::SeqCst))
     }
-    
+
     fn generate_transaction_id(&self) -> TransactionId {
         TransactionId(self.transaction_counter.fetch_add(1, Ordering::SeqCst))
     }
@@ -305,7 +299,7 @@ impl IdGenerator for DefaultIdGenerator {
 pub trait SerializationService: Send + Sync {
     /// Serialize an aggregate root
     fn serialize<T: AggregateRoot>(&self, entity: &T) -> Result<Vec<u8>, RepositoryError>;
-    
+
     /// Deserialize an aggregate root
     fn deserialize<T: AggregateRoot>(&self, data: &[u8]) -> Result<T, RepositoryError>;
 }
@@ -325,82 +319,102 @@ impl SimpleSerializationService {
 impl SerializationService for SimpleSerializationService {
     fn serialize<T: AggregateRoot>(&self, entity: &T) -> Result<Vec<u8>, RepositoryError> {
         // Simple implementation that serializes the entity type and basic data
-        log::debug!("Serializing entity of type: {} with id: {}", T::entity_type(), entity.id().value());
+        log::debug!(
+            "Serializing entity of type: {} with id: {}",
+            T::entity_type(),
+            entity.id().value()
+        );
         // Use the entity reference to extract type information
         let entity_type = T::entity_type();
         let type_bytes = entity_type.as_bytes();
-        
+
         // Format: [type_length: 4 bytes][type_data][entity_data]
         let mut result = Vec::new();
         result.extend_from_slice(&(type_bytes.len() as u32).to_le_bytes());
         result.extend_from_slice(type_bytes);
-        
+
         // Add entity-specific data (simplified)
         result.extend_from_slice(b"\x00\x00\x00\x00"); // Placeholder for actual entity data
-        
+
         Ok(result)
     }
-    
+
     fn deserialize<T: AggregateRoot>(&self, data: &[u8]) -> Result<T, RepositoryError> {
         // Simple implementation that validates the data structure
         log::debug!("Deserializing entity of type: {}", T::entity_type());
-        
+
         if data.len() < 4 {
             return Err(RepositoryError::SerializationError(
-                "Insufficient data for deserialization".to_string()
+                "Insufficient data for deserialization".to_string(),
             ));
         }
-        
+
         // Read type length
         let type_len = u32::from_le_bytes([data[0], data[1], data[2], data[3]]) as usize;
         log::trace!("Entity type length: {}", type_len);
-        
+
         if data.len() < 4 + type_len {
             return Err(RepositoryError::SerializationError(
-                "Insufficient data for entity type".to_string()
+                "Insufficient data for entity type".to_string(),
             ));
         }
-        
+
         // Verify entity type matches
-        let stored_type = core::str::from_utf8(&data[4..4 + type_len])
-            .map_err(|_| RepositoryError::SerializationError("Invalid entity type encoding".to_string()))?;
-        
+        let stored_type = core::str::from_utf8(&data[4..4 + type_len]).map_err(|_| {
+            RepositoryError::SerializationError("Invalid entity type encoding".to_string())
+        })?;
+
         if stored_type != T::entity_type() {
-            return Err(RepositoryError::SerializationError(
-                format!("Type mismatch: expected {}, got {}", T::entity_type(), stored_type)
-            ));
+            return Err(RepositoryError::SerializationError(format!(
+                "Type mismatch: expected {}, got {}",
+                T::entity_type(),
+                stored_type
+            )));
         }
-        
+
         // This should be replaced with proper deserialization logic
         panic!("SimpleSerializationService::deserialize not fully implemented")
     }
 }
 
-
-
 /// BootInfo仓储接口
 pub trait BootInfoRepository: Repository<BootInfo> {
     /// 根据协议类型查找
-    fn find_by_protocol_type(&self, protocol: crate::protocol::BootProtocolType) -> Result<Option<BootInfo>, RepositoryError>;
-    
+    fn find_by_protocol_type(
+        &self,
+        protocol: crate::protocol::BootProtocolType,
+    ) -> Result<Option<BootInfo>, RepositoryError>;
+
     /// 查找准备就绪的引导信息
     fn find_ready_for_kernel(&self) -> Result<Vec<BootInfo>, RepositoryError>;
-    
+
     /// 根据引导阶段查找
-    fn find_by_phase(&self, phase: super::boot_config::BootPhase) -> Result<Vec<BootInfo>, RepositoryError>;
+    fn find_by_phase(
+        &self,
+        phase: super::boot_config::BootPhase,
+    ) -> Result<Vec<BootInfo>, RepositoryError>;
 }
 
 /// MemoryRegion仓储接口
 pub trait MemoryRegionRepository: Repository<super::boot_config::MemoryRegion> {
     /// 查找可用内存区域
-    fn find_available_regions(&self) -> Result<Vec<super::boot_config::MemoryRegion>, RepositoryError>;
-    
+    fn find_available_regions(
+        &self,
+    ) -> Result<Vec<super::boot_config::MemoryRegion>, RepositoryError>;
+
     /// 查找指定范围内的内存区域
-    fn find_by_address_range(&self, start: u64, end: u64) -> Result<Vec<super::boot_config::MemoryRegion>, RepositoryError>;
-    
+    fn find_by_address_range(
+        &self,
+        start: u64,
+        end: u64,
+    ) -> Result<Vec<super::boot_config::MemoryRegion>, RepositoryError>;
+
     /// 根据类型查找内存区域
-    fn find_by_type(&self, region_type: super::boot_config::MemoryRegionType) -> Result<Vec<super::boot_config::MemoryRegion>, RepositoryError>;
-    
+    fn find_by_type(
+        &self,
+        region_type: super::boot_config::MemoryRegionType,
+    ) -> Result<Vec<super::boot_config::MemoryRegion>, RepositoryError>;
+
     /// 计算总可用内存
     fn calculate_total_available_memory(&self) -> Result<u64, RepositoryError>;
 }
@@ -408,25 +422,43 @@ pub trait MemoryRegionRepository: Repository<super::boot_config::MemoryRegion> {
 /// KernelInfo仓储接口
 pub trait KernelInfoRepository: Repository<super::boot_config::KernelInfo> {
     /// 根据地址查找内核信息
-    fn find_by_address(&self, address: u64) -> Result<Option<super::boot_config::KernelInfo>, RepositoryError>;
-    
+    fn find_by_address(
+        &self,
+        address: u64,
+    ) -> Result<Option<super::boot_config::KernelInfo>, RepositoryError>;
+
     /// 查找已验证签名的内核
-    fn find_verified_kernels(&self) -> Result<Vec<super::boot_config::KernelInfo>, RepositoryError>;
-    
+    fn find_verified_kernels(&self)
+    -> Result<Vec<super::boot_config::KernelInfo>, RepositoryError>;
+
     /// 根据大小范围查找内核
-    fn find_by_size_range(&self, min_size: u64, max_size: u64) -> Result<Vec<super::boot_config::KernelInfo>, RepositoryError>;
+    fn find_by_size_range(
+        &self,
+        min_size: u64,
+        max_size: u64,
+    ) -> Result<Vec<super::boot_config::KernelInfo>, RepositoryError>;
 }
 
 /// GraphicsInfo仓储接口
 pub trait GraphicsInfoRepository: Repository<super::boot_config::GraphicsInfo> {
     /// 根据图形模式查找
-    fn find_by_mode(&self, width: u16, height: u16, bpp: u8) -> Result<Option<super::boot_config::GraphicsInfo>, RepositoryError>;
-    
+    fn find_by_mode(
+        &self,
+        width: u16,
+        height: u16,
+        bpp: u8,
+    ) -> Result<Option<super::boot_config::GraphicsInfo>, RepositoryError>;
+
     /// 查找高分辨率图形信息
-    fn find_high_resolution(&self) -> Result<Vec<super::boot_config::GraphicsInfo>, RepositoryError>;
-    
+    fn find_high_resolution(
+        &self,
+    ) -> Result<Vec<super::boot_config::GraphicsInfo>, RepositoryError>;
+
     /// 根据帧缓冲区地址查找
-    fn find_by_framebuffer_address(&self, address: usize) -> Result<Option<super::boot_config::GraphicsInfo>, RepositoryError>;
+    fn find_by_framebuffer_address(
+        &self,
+        address: usize,
+    ) -> Result<Option<super::boot_config::GraphicsInfo>, RepositoryError>;
 }
 
 /// Kernel image information
@@ -483,13 +515,20 @@ pub trait KernelImageRepository: Send + Sync {
 /// Abstracts retrieval of graphics capabilities and preferences.
 pub trait GraphicsRepository: Send + Sync {
     /// Detect graphics capabilities from hardware
-    fn detect_capabilities(&self) -> Result<super::boot_services::GraphicsCapabilities, &'static str>;
+    fn detect_capabilities(
+        &self,
+    ) -> Result<super::boot_services::GraphicsCapabilities, &'static str>;
 
     /// Load graphics preference from configuration
-    fn load_user_preference(&self) -> Result<Option<super::boot_config::GraphicsMode>, &'static str>;
+    fn load_user_preference(
+        &self,
+    ) -> Result<Option<super::boot_config::GraphicsMode>, &'static str>;
 
     /// Save graphics mode for next boot
-    fn save_graphics_mode(&self, mode: &super::boot_config::GraphicsMode) -> Result<(), &'static str>;
+    fn save_graphics_mode(
+        &self,
+        mode: &super::boot_config::GraphicsMode,
+    ) -> Result<(), &'static str>;
 }
 
 /// Simple default boot config repository (for testing)

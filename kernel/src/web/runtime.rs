@@ -4,11 +4,9 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
+
 use crate::subsystems::sync::Mutex;
-use crate::reliability::{EINVAL, ENOMEM};
 
 /// PWA manifest
 #[derive(Debug, Clone)]
@@ -62,14 +60,14 @@ impl PwaApp {
             cache: Mutex::new(BTreeMap::new()),
         }
     }
-    
+
     /// Install PWA
     pub fn install(&mut self) -> Result<(), i32> {
         self.installed = true;
         crate::println!("[pwa] Installed PWA: {}", self.manifest.name);
         Ok(())
     }
-    
+
     /// Uninstall PWA
     pub fn uninstall(&mut self) -> Result<(), i32> {
         self.installed = false;
@@ -78,14 +76,14 @@ impl PwaApp {
         crate::println!("[pwa] Uninstalled PWA: {}", self.manifest.name);
         Ok(())
     }
-    
+
     /// Cache resource
     pub fn cache_resource(&self, url: &str, data: Vec<u8>) -> Result<(), i32> {
         let mut cache = self.cache.lock();
         cache.insert(url.to_string(), data);
         Ok(())
     }
-    
+
     /// Get cached resource
     pub fn get_cached_resource(&self, url: &str) -> Option<Vec<u8>> {
         let cache = self.cache.lock();
@@ -149,7 +147,7 @@ impl WasmMemory {
             pages: initial_pages,
         }
     }
-    
+
     /// Grow memory
     pub fn grow(&mut self, pages: u32) -> Result<(), i32> {
         let page_size = 64 * 1024;
@@ -176,7 +174,7 @@ impl WasmRuntime {
             memory: Mutex::new(WasmMemory::new(1)), // 1 page initial
         }
     }
-    
+
     /// Load WASM module
     pub fn load_module(&self, name: &str, bytes: Vec<u8>) -> Result<(), i32> {
         // In real implementation, this would:
@@ -184,23 +182,28 @@ impl WasmRuntime {
         // 2. Validate module
         // 3. Instantiate module
         // 4. Extract exports
-        
+
         let module = WasmModule {
             bytes,
             name: name.to_string(),
             exports: BTreeMap::new(),
             memory: Some(WasmMemory::new(1)),
         };
-        
+
         let mut modules = self.modules.lock();
         modules.insert(name.to_string(), module);
-        
+
         crate::println!("[wasm] Loaded module: {}", name);
         Ok(())
     }
-    
+
     /// Call WASM function
-    pub fn call_function(&self, module_name: &str, function_name: &str, args: &[u64]) -> Result<Vec<u64>, i32> {
+    pub fn call_function(
+        &self,
+        module_name: &str,
+        function_name: &str,
+        args: &[u64],
+    ) -> Result<Vec<u64>, i32> {
         let modules = self.modules.lock();
         if let Some(module) = modules.get(module_name) {
             if module.exports.contains_key(function_name) {
@@ -236,19 +239,19 @@ impl WebRuntimeManager {
             wasm_runtime: WasmRuntime::new(),
         }
     }
-    
+
     /// Install PWA
     pub fn install_pwa(&self, manifest: PwaManifest) -> Result<String, i32> {
         let app_id = manifest.short_name.clone();
         let mut pwas = self.pwas.lock();
-        
+
         let mut app = PwaApp::new(manifest);
         app.install()?;
         pwas.insert(app_id.clone(), app);
-        
+
         Ok(app_id)
     }
-    
+
     /// Get WASM runtime
     pub fn get_wasm_runtime(&self) -> &WasmRuntime {
         &self.wasm_runtime
@@ -277,9 +280,6 @@ pub fn get_web_runtime_manager() -> &'static WebRuntimeManager {
             *manager = Some(WebRuntimeManager::new());
         }
     });
-    
-    unsafe {
-        &*(WEB_RUNTIME_MANAGER.lock().as_ref().unwrap() as *const WebRuntimeManager)
-    }
-}
 
+    unsafe { &*(WEB_RUNTIME_MANAGER.lock().as_ref().unwrap() as *const WebRuntimeManager) }
+}

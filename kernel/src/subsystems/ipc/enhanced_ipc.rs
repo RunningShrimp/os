@@ -9,10 +9,9 @@
 //! - POSIX-compatible IPC primitives
 
 extern crate alloc;
-use alloc::vec::Vec;
-use alloc::collections::BTreeMap;
-use alloc::string::String;
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+
 use crate::subsystems::sync::Mutex;
 
 // ============================================================================
@@ -257,10 +256,10 @@ pub enum ConnectionState {
 /// Connection type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConnectionType {
-    Stream,     // Reliable, ordered delivery
-    Datagram,   // Unreliable, unordered delivery
-    Raw,        // Raw packet delivery
-    Reliable,   // Reliable but unordered delivery
+    Stream,   // Reliable, ordered delivery
+    Datagram, // Unreliable, unordered delivery
+    Raw,      // Raw packet delivery
+    Reliable, // Reliable but unordered delivery
 }
 
 /// Connection statistics
@@ -301,11 +300,11 @@ pub struct IpcEndpoint {
 /// Endpoint type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EndpointType {
-    Unicast,    // Point-to-point communication
-    Multicast,  // One-to-many communication
-    Broadcast,  // One-to-all communication
-    Request,    // Request-response pattern
-    Publish,    // Publish-subscribe pattern
+    Unicast,   // Point-to-point communication
+    Multicast, // One-to-many communication
+    Broadcast, // One-to-all communication
+    Request,   // Request-response pattern
+    Publish,   // Publish-subscribe pattern
 }
 
 // ============================================================================
@@ -405,13 +404,13 @@ pub fn create_message_queue(max_size: usize) -> Result<u32, IpcError> {
     if max_size == 0 || max_size > ENHANCED_IPC_MAX_QUEUE {
         return Err(IpcError::InvalidMessageSize);
     }
-    
+
     let queue_id = NEXT_QUEUE_ID.fetch_add(1, Ordering::SeqCst);
     let queue = EnhancedMessageQueue::new(queue_id, max_size);
-    
+
     let mut queues = MESSAGE_QUEUES.lock();
     queues.insert(queue_id, queue);
-    
+
     Ok(queue_id)
 }
 
@@ -423,26 +422,33 @@ pub fn send_message(queue_id: u32, msg: EnhancedIpcMessage) -> Result<(), IpcErr
 }
 
 /// Receive message from queue
-pub fn receive_message(queue_id: u32, timeout: Option<u32>) -> Result<EnhancedIpcMessage, IpcError> {
+pub fn receive_message(
+    queue_id: u32,
+    timeout: Option<u32>,
+) -> Result<EnhancedIpcMessage, IpcError> {
     let queues = MESSAGE_QUEUES.lock();
     let queue = queues.get(&queue_id).ok_or(IpcError::InvalidQueueId)?;
     queue.recv(timeout)
 }
 
 /// Create enhanced shared memory
-pub fn create_shared_memory(size: usize, owner_pid: u32, permissions: u32) -> Result<u32, IpcError> {
+pub fn create_shared_memory(
+    size: usize,
+    owner_pid: u32,
+    permissions: u32,
+) -> Result<u32, IpcError> {
     if size == 0 || size > ENHANCED_IPC_MAX_SHM_SIZE {
         return Err(IpcError::InvalidMessageSize);
     }
-    
+
     // Allocate memory for shared region
     let page_size = crate::subsystems::mm::PAGE_SIZE;
     let aligned_size = (size + page_size - 1) & !(page_size - 1);
-    
+
     // Allocate pages
     let pages_needed = aligned_size / page_size;
     let mut base_addr = 0usize;
-    
+
     for i in 0..pages_needed {
         let page = crate::subsystems::mm::kalloc();
         if page.is_null() {
@@ -455,21 +461,23 @@ pub fn create_shared_memory(size: usize, owner_pid: u32, permissions: u32) -> Re
             }
             return Err(IpcError::SystemError);
         }
-        
+
         // Zero page
-        unsafe { core::ptr::write_bytes(page, 0, page_size); }
-        
+        unsafe {
+            core::ptr::write_bytes(page, 0, page_size);
+        }
+
         if i == 0 {
             base_addr = page as usize;
         }
     }
-    
+
     let shm_id = NEXT_SHM_ID.fetch_add(1, Ordering::SeqCst);
     let shm = EnhancedSharedMemory::new(shm_id, base_addr, aligned_size, owner_pid, permissions);
-    
+
     let mut shms = SHARED_MEMORIES.lock();
     shms.insert(shm_id, shm);
-    
+
     Ok(shm_id)
 }
 
@@ -477,12 +485,12 @@ pub fn create_shared_memory(size: usize, owner_pid: u32, permissions: u32) -> Re
 pub fn attach_shared_memory(shm_id: u32, pid: u32) -> Result<usize, IpcError> {
     let mut shms = SHARED_MEMORIES.lock();
     let shm = shms.get_mut(&shm_id).ok_or(IpcError::InvalidShmId)?;
-    
+
     // Check permissions
     if !shm.has_access(pid, SHM_PERM_READ) {
         return Err(IpcError::PermissionDenied);
     }
-    
+
     shm.inc_ref();
     Ok(shm.base_addr)
 }
@@ -491,7 +499,7 @@ pub fn attach_shared_memory(shm_id: u32, pid: u32) -> Result<usize, IpcError> {
 pub fn detach_shared_memory(shm_id: u32, pid: u32) -> Result<(), IpcError> {
     let mut shms = SHARED_MEMORIES.lock();
     let shm = shms.get_mut(&shm_id).ok_or(IpcError::InvalidShmId)?;
-    
+
     shm.dec_ref();
     Ok(())
 }
@@ -500,17 +508,17 @@ pub fn detach_shared_memory(shm_id: u32, pid: u32) -> Result<(), IpcError> {
 pub fn delete_shared_memory(shm_id: u32, pid: u32) -> Result<(), IpcError> {
     let mut shms = SHARED_MEMORIES.lock();
     let shm = shms.get(&shm_id).ok_or(IpcError::InvalidShmId)?;
-    
+
     // Check if owner
     if shm.owner_pid != pid {
         return Err(IpcError::PermissionDenied);
     }
-    
+
     // Check if no processes are attached
     if shm.ref_count() > 1 {
         return Err(IpcError::SystemError);
     }
-    
+
     // Free memory
     let page_size = crate::subsystems::mm::PAGE_SIZE;
     let pages = shm.size / page_size;
@@ -520,10 +528,10 @@ pub fn delete_shared_memory(shm_id: u32, pid: u32) -> Result<(), IpcError> {
             crate::subsystems::mm::kfree(addr as *mut u8);
         }
     }
-    
+
     // Remove from list
     shms.remove(&shm_id);
-    
+
     Ok(())
 }
 
@@ -531,10 +539,10 @@ pub fn delete_shared_memory(shm_id: u32, pid: u32) -> Result<(), IpcError> {
 pub fn create_semaphore(initial_value: u32, max_value: u32) -> Result<u32, IpcError> {
     let sem_id = NEXT_SEM_ID.fetch_add(1, Ordering::SeqCst);
     let semaphore = IpcSemaphore::new(sem_id, initial_value, max_value);
-    
+
     let mut semaphores = SEMAPHORES.lock();
     semaphores.insert(sem_id, semaphore);
-    
+
     Ok(sem_id)
 }
 
@@ -556,10 +564,10 @@ pub fn semaphore_signal(sem_id: u32) -> Result<(), IpcError> {
 pub fn create_mutex() -> Result<u32, IpcError> {
     let mutex_id = NEXT_MUTEX_ID.fetch_add(1, Ordering::SeqCst);
     let mutex = IpcMutex::new(mutex_id);
-    
+
     let mut mutexes = MUTEXES.lock();
     mutexes.insert(mutex_id, mutex);
-    
+
     Ok(mutex_id)
 }
 
@@ -581,10 +589,10 @@ pub fn mutex_unlock(mutex_id: u32) -> Result<(), IpcError> {
 pub fn create_condition(mutex_id: Option<u32>) -> Result<u32, IpcError> {
     let cond_id = NEXT_COND_ID.fetch_add(1, Ordering::SeqCst);
     let condition = IpcCondition::new(cond_id, mutex_id);
-    
+
     let mut conditions = CONDITIONS.lock();
     conditions.insert(cond_id, condition);
-    
+
     Ok(cond_id)
 }
 
@@ -613,10 +621,10 @@ pub fn condition_broadcast(cond_id: u32) -> Result<(), IpcError> {
 pub fn create_event(event_type: u32, src_pid: u32, data: &[u8]) -> Result<u32, IpcError> {
     let event_id = NEXT_EVENT_ID.fetch_add(1, Ordering::SeqCst);
     let event = IpcEvent::new(event_id, event_type, src_pid, data);
-    
+
     let mut events = EVENTS.lock();
     events.insert(event_id, event);
-    
+
     Ok(event_id)
 }
 
@@ -638,37 +646,50 @@ pub fn event_trigger(event_id: u32) -> Result<(), IpcError> {
 pub fn create_rpc_endpoint(name: String, owner_pid: u32) -> Result<u32, IpcError> {
     let endpoint_id = NEXT_RPC_ENDPOINT_ID.fetch_add(1, Ordering::SeqCst);
     let endpoint = RpcEndpoint::new(endpoint_id, name, owner_pid);
-    
+
     let mut endpoints = RPC_ENDPOINTS.lock();
     endpoints.insert(endpoint_id, endpoint);
-    
+
     Ok(endpoint_id)
 }
 
 /// Register RPC procedure
 pub fn register_rpc_procedure(endpoint_id: u32, proc: RpcProcedure) -> Result<(), IpcError> {
     let endpoints = RPC_ENDPOINTS.lock();
-    let endpoint = endpoints.get(&endpoint_id).ok_or(IpcError::InvalidEndpointId)?;
+    let endpoint = endpoints
+        .get(&endpoint_id)
+        .ok_or(IpcError::InvalidEndpointId)?;
     endpoint.register_procedure(proc)
 }
 
 /// Make RPC call
-pub fn make_rpc_call(endpoint_id: u32, proc_name: &str, args: &[u8], timeout: Option<u32>) -> Result<u64, IpcError> {
+pub fn make_rpc_call(
+    endpoint_id: u32,
+    proc_name: &str,
+    args: &[u8],
+    timeout: Option<u32>,
+) -> Result<u64, IpcError> {
     let endpoints = RPC_ENDPOINTS.lock();
-    let endpoint = endpoints.get(&endpoint_id).ok_or(IpcError::InvalidEndpointId)?;
+    let endpoint = endpoints
+        .get(&endpoint_id)
+        .ok_or(IpcError::InvalidEndpointId)?;
     endpoint.call(proc_name, args, timeout)
 }
 
 /// Complete RPC call
 pub fn complete_rpc_call(endpoint_id: u32, call_id: u64, response: &[u8]) -> Result<(), IpcError> {
     let endpoints = RPC_ENDPOINTS.lock();
-    let endpoint = endpoints.get(&endpoint_id).ok_or(IpcError::InvalidEndpointId)?;
+    let endpoint = endpoints
+        .get(&endpoint_id)
+        .ok_or(IpcError::InvalidEndpointId)?;
     endpoint.complete_call(call_id, response)
 }
 
 /// Get RPC call result
 pub fn get_rpc_result(endpoint_id: u32, call_id: u64) -> Result<Vec<u8>, IpcError> {
     let endpoints = RPC_ENDPOINTS.lock();
-    let endpoint = endpoints.get(&endpoint_id).ok_or(IpcError::InvalidEndpointId)?;
+    let endpoint = endpoints
+        .get(&endpoint_id)
+        .ok_or(IpcError::InvalidEndpointId)?;
     endpoint.get_result(call_id)
 }

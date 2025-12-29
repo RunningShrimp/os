@@ -4,19 +4,21 @@
 
 extern crate alloc;
 
-use alloc::format;
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::vec;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::boxed::Box;
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
 use core::sync::atomic::{AtomicU64, Ordering};
+
 use spin::Mutex;
 
+use super::{BackupConfig, CompressionConfig, EncryptionConfig, StorageConfig, StorageType};
 use crate::security::audit::{AuditEvent, AuditEventType, AuditSeverity};
-use super::{StorageConfig, StorageType, CompressionConfig, EncryptionConfig, BackupConfig};
 
 /// 日志管理器
 pub struct LogManager {
@@ -149,19 +151,19 @@ impl LogManager {
             StorageType::FileSystem => {
                 let writer = FileSystemWriter::new(storage_config.clone());
                 self.writers.push(Box::new(writer));
-            }
+            },
             StorageType::Database => {
                 let writer = DatabaseWriter::new(storage_config.clone());
                 self.writers.push(Box::new(writer));
-            }
+            },
             StorageType::RemoteLog => {
                 let writer = RemoteLogWriter::new(storage_config.clone());
                 self.writers.push(Box::new(writer));
-            }
+            },
             StorageType::Memory => {
                 let writer = MemoryWriter::new(storage_config.clone());
                 self.writers.push(Box::new(writer));
-            }
+            },
         }
 
         self.running = true;
@@ -201,8 +203,10 @@ impl LogManager {
 
             // 如果需要，修改事件数据以包含加密/压缩信息
             if self.storage_config.compression.enabled || self.storage_config.encryption.enabled {
-                modified_event.data.insert("processed_data".to_string(),
-                    String::from_utf8_lossy(&encrypted_data).to_string());
+                modified_event.data.insert(
+                    "processed_data".to_string(),
+                    String::from_utf8_lossy(&encrypted_data).to_string(),
+                );
             }
 
             match writer.write_event(&modified_event) {
@@ -211,7 +215,7 @@ impl LogManager {
                     crate::println!("[LogManager] Writer failed: {}", e);
                     let mut stats = self.stats.lock();
                     stats.write_errors += 1;
-                }
+                },
             }
         }
 
@@ -441,7 +445,11 @@ impl LogWriter for FileSystemWriter {
         self.stats.bytes_written += bytes_written;
         self.stats.last_write_time = crate::subsystems::time::get_timestamp_nanos();
 
-        crate::println!("[FileSystemWriter] Wrote {} bytes to {}", bytes_written, self.current_file_path);
+        crate::println!(
+            "[FileSystemWriter] Wrote {} bytes to {}",
+            bytes_written,
+            self.current_file_path
+        );
         Ok(())
     }
 
@@ -616,7 +624,10 @@ impl LogWriter for MemoryWriter {
     }
 
     fn close(&mut self) -> Result<(), &'static str> {
-        crate::println!("[MemoryWriter] Memory writer closed, {} events in buffer", self.buffer.len());
+        crate::println!(
+            "[MemoryWriter] Memory writer closed, {} events in buffer",
+            self.buffer.len()
+        );
         Ok(())
     }
 

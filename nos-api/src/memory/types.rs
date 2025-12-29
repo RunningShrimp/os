@@ -2,7 +2,6 @@
 
 use crate::core::types::Size;
 
-
 /// Page size constants
 pub mod page_size {
     use super::Size;
@@ -61,35 +60,29 @@ pub struct MemoryRegion {
 impl MemoryRegion {
     /// Creates a new memory region
     pub fn new(start: usize, end: usize, size: Size, protection: u32, mapping_type: u32) -> Self {
-        Self {
-            start,
-            end,
-            size,
-            protection,
-            mapping_type,
-        }
+        Self { start, end, size, protection, mapping_type }
     }
-    
+
     /// Returns true if address is in region
     pub fn contains(&self, addr: usize) -> bool {
         addr >= self.start && addr < self.end
     }
-    
+
     /// Returns true if region overlaps with another region
     pub fn overlaps(&self, other: &MemoryRegion) -> bool {
         self.start < other.end && other.start < self.end
     }
-    
+
     /// Returns the intersection of two regions
     pub fn intersection(&self, other: &MemoryRegion) -> Option<MemoryRegion> {
         if !self.overlaps(other) {
             return None;
         }
-        
+
         let start = core::cmp::max(self.start, other.start);
         let end = core::cmp::min(self.end, other.end);
         let size = end - start;
-        
+
         Some(MemoryRegion::new(
             start,
             end,
@@ -116,49 +109,44 @@ pub struct PageTableEntry {
 impl PageTableEntry {
     /// Creates a new page table entry
     pub fn new(phys_addr: usize, protection: u32, mapping_flags: u32, access_flags: u32) -> Self {
-        Self {
-            phys_addr,
-            protection,
-            mapping_flags,
-            access_flags,
-        }
+        Self { phys_addr, protection, mapping_flags, access_flags }
     }
-    
+
     /// Returns true if entry is present
     pub fn is_present(&self) -> bool {
         (self.protection & 0x1) != 0
     }
-    
+
     /// Returns true if entry is writable
     pub fn is_writable(&self) -> bool {
         (self.protection & 0x2) != 0
     }
-    
+
     /// Returns true if entry is executable
     pub fn is_executable(&self) -> bool {
         (self.protection & 0x4) != 0
     }
-    
+
     /// Returns true if entry is user accessible
     pub fn is_user(&self) -> bool {
         (self.protection & 0x8) != 0
     }
-    
+
     /// Returns true if entry is write-through
     pub fn is_write_through(&self) -> bool {
         (self.mapping_flags & 0x1) != 0
     }
-    
+
     /// Returns true if entry is cache disabled
     pub fn is_cache_disabled(&self) -> bool {
         (self.mapping_flags & 0x2) != 0
     }
-    
+
     /// Returns true if entry is accessed
     pub fn is_accessed(&self) -> bool {
         (self.access_flags & 0x1) != 0
     }
-    
+
     /// Returns true if entry is dirty
     pub fn is_dirty(&self) -> bool {
         (self.access_flags & 0x2) != 0
@@ -308,7 +296,7 @@ impl MemoryStats {
             minor_page_faults: 0,
         }
     }
-    
+
     /// Updates allocation statistics
     pub fn allocate(&mut self, size: Size) {
         self.used += size;
@@ -323,14 +311,14 @@ impl MemoryStats {
             self.free -= size;
         }
     }
-    
+
     /// Updates deallocation statistics
     pub fn deallocate(&mut self, size: Size) {
         self.used -= size;
         self.deallocations += 1;
         self.free += size;
     }
-    
+
     /// Updates page fault statistics
     pub fn page_fault(&mut self, major: bool) {
         self.page_faults += 1;

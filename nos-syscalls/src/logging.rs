@@ -114,10 +114,10 @@ macro_rules! sys_error_with_args {
 pub fn output_report(report: &str) {
     #[cfg(feature = "log")]
     external_log::info!("{}", report);
-    
+
     #[cfg(all(feature = "std", not(feature = "log")))]
     println!("{}", report);
-    
+
     #[cfg(not(any(feature = "log", feature = "std")))]
     core::hint::black_box(report);
 }

@@ -13,38 +13,38 @@ mod syscall_error_handling_tests {
     #[test]
     fn test_error_to_errno_mapping() {
         // Test basic error mappings
-        assert_eq!(syscall_error_to_errno(SyscallError::InvalidSyscall), 38);  // ENOSYS
-        assert_eq!(syscall_error_to_errno(SyscallError::PermissionDenied), 1);  // EPERM
-        assert_eq!(syscall_error_to_errno(SyscallError::InvalidArgument), 22);  // EINVAL
-        assert_eq!(syscall_error_to_errno(SyscallError::NotFound), 2);          // ENOENT
-        assert_eq!(syscall_error_to_errno(SyscallError::OutOfMemory), 12);      // ENOMEM
-        assert_eq!(syscall_error_to_errno(SyscallError::Interrupted), 4);       // EINTR
-        assert_eq!(syscall_error_to_errno(SyscallError::IoError), 5);           // EIO
-        assert_eq!(syscall_error_to_errno(SyscallError::WouldBlock), 11);       // EAGAIN
-        assert_eq!(syscall_error_to_errno(SyscallError::NotSupported), 95);     // EOPNOTSUPP
+        assert_eq!(syscall_error_to_errno(SyscallError::InvalidSyscall), 38); // ENOSYS
+        assert_eq!(syscall_error_to_errno(SyscallError::PermissionDenied), 1); // EPERM
+        assert_eq!(syscall_error_to_errno(SyscallError::InvalidArgument), 22); // EINVAL
+        assert_eq!(syscall_error_to_errno(SyscallError::NotFound), 2); // ENOENT
+        assert_eq!(syscall_error_to_errno(SyscallError::OutOfMemory), 12); // ENOMEM
+        assert_eq!(syscall_error_to_errno(SyscallError::Interrupted), 4); // EINTR
+        assert_eq!(syscall_error_to_errno(SyscallError::IoError), 5); // EIO
+        assert_eq!(syscall_error_to_errno(SyscallError::WouldBlock), 11); // EAGAIN
+        assert_eq!(syscall_error_to_errno(SyscallError::NotSupported), 95); // EOPNOTSUPP
     }
 
     /// Test extended error mappings
     #[test]
     fn test_extended_error_mappings() {
-        assert_eq!(syscall_error_to_errno(SyscallError::BadFileDescriptor), 9);  // EBADF
-        assert_eq!(syscall_error_to_errno(SyscallError::TooManyOpenFiles), 24);  // EMFILE
-        assert_eq!(syscall_error_to_errno(SyscallError::NoBufferSpace), 105);    // ENOBUFS
-        assert_eq!(syscall_error_to_errno(SyscallError::NotADirectory), 20);     // ENOTDIR
-        assert_eq!(syscall_error_to_errno(SyscallError::IsADirectory), 21);      // EISDIR
+        assert_eq!(syscall_error_to_errno(SyscallError::BadFileDescriptor), 9); // EBADF
+        assert_eq!(syscall_error_to_errno(SyscallError::TooManyOpenFiles), 24); // EMFILE
+        assert_eq!(syscall_error_to_errno(SyscallError::NoBufferSpace), 105); // ENOBUFS
+        assert_eq!(syscall_error_to_errno(SyscallError::NotADirectory), 20); // ENOTDIR
+        assert_eq!(syscall_error_to_errno(SyscallError::IsADirectory), 21); // EISDIR
         assert_eq!(syscall_error_to_errno(SyscallError::DirectoryNotEmpty), 39); // ENOTEMPTY
-        assert_eq!(syscall_error_to_errno(SyscallError::FileExists), 17);        // EEXIST
-        assert_eq!(syscall_error_to_errno(SyscallError::CrossDeviceLink), 18);   // EXDEV
-        assert_eq!(syscall_error_to_errno(SyscallError::FileTooBig), 27);        // EFBIG
-        assert_eq!(syscall_error_to_errno(SyscallError::NoSpaceLeft), 28);       // ENOSPC
-        assert_eq!(syscall_error_to_errno(SyscallError::BadAddress), 14);        // EFAULT
-        assert_eq!(syscall_error_to_errno(SyscallError::DeadlockWouldOccur), 35);// EDEADLK
-        assert_eq!(syscall_error_to_errno(SyscallError::NameTooLong), 36);       // ENAMETOOLONG
-        assert_eq!(syscall_error_to_errno(SyscallError::TooManySymlinks), 40);   // ELOOP
-        assert_eq!(syscall_error_to_errno(SyscallError::ConnectionRefused), 111);// ECONNREFUSED
-        assert_eq!(syscall_error_to_errno(SyscallError::ConnectionReset), 104);  // ECONNRESET
-        assert_eq!(syscall_error_to_errno(SyscallError::BrokenPipe), 32);        // EPIPE
-        assert_eq!(syscall_error_to_errno(SyscallError::TimedOut), 110);         // ETIMEDOUT
+        assert_eq!(syscall_error_to_errno(SyscallError::FileExists), 17); // EEXIST
+        assert_eq!(syscall_error_to_errno(SyscallError::CrossDeviceLink), 18); // EXDEV
+        assert_eq!(syscall_error_to_errno(SyscallError::FileTooBig), 27); // EFBIG
+        assert_eq!(syscall_error_to_errno(SyscallError::NoSpaceLeft), 28); // ENOSPC
+        assert_eq!(syscall_error_to_errno(SyscallError::BadAddress), 14); // EFAULT
+        assert_eq!(syscall_error_to_errno(SyscallError::DeadlockWouldOccur), 35); // EDEADLK
+        assert_eq!(syscall_error_to_errno(SyscallError::NameTooLong), 36); // ENAMETOOLONG
+        assert_eq!(syscall_error_to_errno(SyscallError::TooManySymlinks), 40); // ELOOP
+        assert_eq!(syscall_error_to_errno(SyscallError::ConnectionRefused), 111); // ECONNREFUSED
+        assert_eq!(syscall_error_to_errno(SyscallError::ConnectionReset), 104); // ECONNRESET
+        assert_eq!(syscall_error_to_errno(SyscallError::BrokenPipe), 32); // EPIPE
+        assert_eq!(syscall_error_to_errno(SyscallError::TimedOut), 110); // ETIMEDOUT
     }
 
     /// Test that negative errno is returned for errors
@@ -75,8 +75,12 @@ mod syscall_error_handling_tests {
         for error in errors {
             let errno = syscall_error_to_errno(error);
             // Ensure no duplicates (except where explicitly aliased like EAGAIN/EWOULDBLOCK)
-            assert!(!errno_values.contains(&errno) || errno == 11, 
-                    "Duplicate errno {} for error {:?}", errno, error);
+            assert!(
+                !errno_values.contains(&errno) || errno == 11,
+                "Duplicate errno {} for error {:?}",
+                errno,
+                error
+            );
             errno_values.push(errno);
         }
     }
@@ -99,7 +103,7 @@ mod syscall_dispatch_tests {
     fn test_syscall_ranges() {
         // Verify that different syscall ranges are properly routed
         // This is a basic sanity check
-        
+
         // Process management syscalls should return an error (no process to manage in test)
         let result = kernel::syscalls::dispatch(0x1000, &[]);
         // Result could be -ENOSYS or -EINVAL depending on implementation
@@ -161,8 +165,7 @@ mod error_handling_consistency_tests {
         for error in errors {
             let errno = syscall_error_to_errno(error);
             // Check that errno is positive and within valid range
-            assert!(errno > 0 && errno <= 133, 
-                    "Invalid errno {} for error {:?}", errno, error);
+            assert!(errno > 0 && errno <= 133, "Invalid errno {} for error {:?}", errno, error);
             // Check that negation produces expected negative value
             let neg_errno = -(errno as isize);
             assert!(neg_errno < 0);
@@ -194,7 +197,7 @@ mod syscall_argument_tests {
         // Test that system call arguments are converted without heap allocation
         // Using fixed-size array instead of Vec
         let args = [1usize, 2, 3, 4, 5, 6];
-        
+
         // This should not allocate on the heap
         let result = kernel::syscalls::dispatch(0x1000, &args);
         // Should not panic and should return an error (no process context)
@@ -205,9 +208,9 @@ mod syscall_argument_tests {
     #[test]
     fn test_argument_extraction() {
         use kernel::syscalls::common::extract_args;
-        
+
         let args = [1u64, 2, 3, 4];
-        
+
         // Extract 2 arguments
         let result = extract_args(&args, 2);
         assert!(result.is_ok());
@@ -215,7 +218,7 @@ mod syscall_argument_tests {
         assert_eq!(extracted.len(), 2);
         assert_eq!(extracted[0], 1);
         assert_eq!(extracted[1], 2);
-        
+
         // Extract more than available should fail
         let result = extract_args(&args, 5);
         assert!(result.is_err());
@@ -225,15 +228,15 @@ mod syscall_argument_tests {
     #[test]
     fn test_argument_bounds() {
         let args = [1usize, 2, 3];
-        
+
         // Test with valid arguments
         let result = kernel::syscalls::dispatch(0x1000, &args);
         assert!(result <= 0); // Should return error (no process context)
-        
+
         // Test with empty arguments
         let result = kernel::syscalls::dispatch(0x1000, &[]);
         assert!(result <= 0);
-        
+
         // Test with maximum arguments
         let args = [1usize, 2, 3, 4, 5, 6, 7, 8];
         let result = kernel::syscalls::dispatch(0x1000, &args);

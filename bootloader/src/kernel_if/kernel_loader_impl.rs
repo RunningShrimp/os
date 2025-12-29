@@ -2,7 +2,6 @@
 ///
 /// Loads kernel from disk using actual BIOS INT 0x13 operations.
 /// Handles ELF64 parsing and relocation.
-
 use alloc::vec::Vec;
 
 /// Kernel loading error
@@ -224,9 +223,7 @@ pub struct KernelInfo {
 
 impl KernelInfo {
     pub fn is_valid(&self) -> bool {
-        self.entry_point != 0
-            && self.base_address != 0
-            && self.segments_loaded > 0
+        self.entry_point != 0 && self.base_address != 0 && self.segments_loaded > 0
     }
 }
 
@@ -236,12 +233,12 @@ mod tests {
 
     #[test]
     fn test_kernel_load_error_description() {
-        assert!(KernelLoadError::ReadFailed
-            .description()
-            .contains("read"));
-        assert!(KernelLoadError::InvalidFormat
-            .description()
-            .contains("Invalid"));
+        assert!(KernelLoadError::ReadFailed.description().contains("read"));
+        assert!(
+            KernelLoadError::InvalidFormat
+                .description()
+                .contains("Invalid")
+        );
     }
 
     #[test]
@@ -296,10 +293,7 @@ mod tests {
     #[test]
     fn test_kernel_loader_invalid_address() {
         let mut loader = KernelLoader::new();
-        assert_eq!(
-            loader.read_kernel_header(0),
-            Err(KernelLoadError::AddressOutOfRange)
-        );
+        assert_eq!(loader.read_kernel_header(0), Err(KernelLoadError::AddressOutOfRange));
     }
 
     #[test]
@@ -308,10 +302,7 @@ mod tests {
         loader.buffer.resize(64, 0);
 
         // Invalid header (no magic)
-        assert_eq!(
-            loader.validate_elf64_header(),
-            Err(KernelLoadError::InvalidFormat)
-        );
+        assert_eq!(loader.validate_elf64_header(), Err(KernelLoadError::InvalidFormat));
     }
 
     #[test]

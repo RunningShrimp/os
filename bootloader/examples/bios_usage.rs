@@ -8,11 +8,11 @@
 
 use nos_bootloader::{
     arch::x86_64::{X86_64CpuInfo, X86_64Utils},
-    memory::bios::{BiosMemoryManager, BiosMemoryScanner},
-    graphics::vbe::{VbeController, VbeGraphicsManager},
-    boot_menu::{create_default_config, BootMenuConfig, BootMenuEntry},
-    protocol::multiboot2::{Multiboot2Protocol, create_e820_entry},
+    boot_menu::{BootMenuConfig, BootMenuEntry, create_default_config},
     error::BootError,
+    graphics::vbe::{VbeController, VbeGraphicsManager},
+    memory::bios::{BiosMemoryManager, BiosMemoryScanner},
+    protocol::multiboot2::{Multiboot2Protocol, create_e820_entry},
     result::Result,
 };
 
@@ -33,7 +33,7 @@ pub extern "C" fn bios_main() -> ! {
         Err(e) => {
             println!("Memory management setup failed: {:?}", e);
             bootloader_halt();
-        }
+        },
     };
 
     // Step 3: Graphics initialization
@@ -45,7 +45,7 @@ pub extern "C" fn bios_main() -> ! {
         Err(e) => {
             println!("Boot menu failed: {:?}", e);
             bootloader_halt();
-        }
+        },
     };
 
     // Step 5: Load kernel
@@ -54,7 +54,7 @@ pub extern "C" fn bios_main() -> ! {
         Err(e) => {
             println!("Kernel loading failed: {:?}", e);
             bootloader_halt();
-        }
+        },
     };
 
     // Step 6: Prepare Multiboot2 information
@@ -124,12 +124,14 @@ fn setup_memory_management() -> Result<BiosMemoryManager> {
             _ => "Other",
         };
 
-        println!("  {}: {:#018X}-{:#018X} {} ({}) MB",
-                i,
-                entry.base,
-                entry.base + entry.size,
-                mem_type,
-                entry.size / (1024 * 1024));
+        println!(
+            "  {}: {:#018X}-{:#018X} {} ({}) MB",
+            i,
+            entry.base,
+            entry.base + entry.size,
+            mem_type,
+            entry.size / (1024 * 1024)
+        );
     }
 
     println!("Memory management setup complete");
@@ -149,28 +151,32 @@ fn setup_graphics() -> Option<nos_bootloader::protocol::FramebufferInfo> {
             // Try to set a common graphics mode
             match vbe_controller.set_graphics_mode(1024, 768, 32) {
                 Ok(fb_info) => {
-                    println!("Graphics mode set: {}x{}x{}",
-                            fb_info.width,
-                            fb_info.height,
-                            fb_info.bytes_per_pixel * 8);
+                    println!(
+                        "Graphics mode set: {}x{}x{}",
+                        fb_info.width,
+                        fb_info.height,
+                        fb_info.bytes_per_pixel * 8
+                    );
                     println!("Framebuffer address: {:#X}", fb_info.address);
                     return Some(fb_info);
-                }
+                },
                 Err(e) => {
                     println!("Failed to set graphics mode: {:?}, using text mode", e);
                     None
-                }
+                },
             }
-        }
+        },
         Err(e) => {
             println!("VBE initialization failed: {:?}, using text mode", e);
             None
-        }
+        },
     }
 }
 
 /// Display boot menu and get user selection
-fn display_boot_menu(framebuffer_info: Option<&nos_bootloader::protocol::FramebufferInfo>) -> Result<BootMenuEntry> {
+fn display_boot_menu(
+    framebuffer_info: Option<&nos_bootloader::protocol::FramebufferInfo>,
+) -> Result<BootMenuEntry> {
     println!("Displaying boot menu...");
 
     // Create custom boot menu configuration
@@ -180,17 +186,23 @@ fn display_boot_menu(framebuffer_info: Option<&nos_bootloader::protocol::Framebu
     config.graphical = framebuffer_info.is_some();
 
     // Add boot entries
-    config.add_entry(BootMenuEntry::default_entry(
-        "NOS OS - Normal Boot".to_string(),
-        "boot/kernel.bin".to_string(),
-        "root=/dev/sda1 quiet splash".to_string(),
-    ).with_timeout(10));
+    config.add_entry(
+        BootMenuEntry::default_entry(
+            "NOS OS - Normal Boot".to_string(),
+            "boot/kernel.bin".to_string(),
+            "root=/dev/sda1 quiet splash".to_string(),
+        )
+        .with_timeout(10),
+    );
 
-    config.add_entry(BootMenuEntry::new(
-        "NOS OS - Recovery Mode".to_string(),
-        "boot/kernel.bin".to_string(),
-        "root=/dev/sda1 single recovery".to_string(),
-    ).with_timeout(5));
+    config.add_entry(
+        BootMenuEntry::new(
+            "NOS OS - Recovery Mode".to_string(),
+            "boot/kernel.bin".to_string(),
+            "root=/dev/sda1 single recovery".to_string(),
+        )
+        .with_timeout(5),
+    );
 
     config.add_entry(BootMenuEntry::new(
         "NOS OS - Debug Mode".to_string(),
@@ -227,7 +239,10 @@ fn display_boot_menu(framebuffer_info: Option<&nos_bootloader::protocol::Framebu
 }
 
 /// Load kernel from specified path
-fn load_kernel(path: &str, memory_manager: &BiosMemoryManager) -> Result<nos_bootloader::protocol::KernelImage> {
+fn load_kernel(
+    path: &str,
+    memory_manager: &BiosMemoryManager,
+) -> Result<nos_bootloader::protocol::KernelImage> {
     println!("Loading kernel from: {}", path);
 
     // In a real implementation, this would load the kernel from disk
@@ -243,7 +258,7 @@ fn load_kernel(path: &str, memory_manager: &BiosMemoryManager) -> Result<nos_boo
     // Create kernel image structure
     let kernel_image = nos_bootloader::protocol::KernelImage::new(
         kernel_addr,
-        kernel_addr, // Entry point same as load address for simplicity
+        kernel_addr,            // Entry point same as load address for simplicity
         vec![0u8; kernel_size], // Placeholder kernel data
     );
 
@@ -255,10 +270,7 @@ fn load_kernel(path: &str, memory_manager: &BiosMemoryManager) -> Result<nos_boo
 }
 
 /// Prepare Multiboot2 information structure
-fn prepare_multiboot2_info(
-    boot_entry: &BootMenuEntry,
-    memory_manager: &BiosMemoryManager,
-) -> u64 {
+fn prepare_multiboot2_info(boot_entry: &BootMenuEntry, memory_manager: &BiosMemoryManager) -> u64 {
     println!("Preparing Multiboot2 information...");
 
     // Create Multiboot2 protocol instance
@@ -268,7 +280,8 @@ fn prepare_multiboot2_info(
 
     // Build E820 memory map entries
     let memory_map = memory_manager.get_memory_map()?;
-    let e820_entries: Vec<_> = memory_map.entries
+    let e820_entries: Vec<_> = memory_map
+        .entries
         .iter()
         .map(|entry| {
             let mem_type = match entry.mem_type {
@@ -286,10 +299,10 @@ fn prepare_multiboot2_info(
     // Build Multiboot2 info structure
     let info_size = multiboot2_protocol.build_info(
         Some(&boot_entry.cmdline),
-        640,   // Base memory in KB
+        640, // Base memory in KB
         memory_manager.get_scanner().get_extended_memory_kb() as u32,
         &e820_entries,
-        None,  // No framebuffer info for now
+        None, // No framebuffer info for now
         &[],
     )?;
 
@@ -301,7 +314,10 @@ fn prepare_multiboot2_info(
 
 /// Jump to kernel entry point
 unsafe fn jump_to_kernel(entry_point: usize, multiboot_info: u64) -> ! {
-    println!("Jumping to kernel at {:#X} with Multiboot2 info at {:#X}", entry_point, multiboot_info);
+    println!(
+        "Jumping to kernel at {:#X} with Multiboot2 info at {:#X}",
+        entry_point, multiboot_info
+    );
 
     // Set up for long mode kernel entry
     let kernel_fn: extern "C" fn(u64) -> ! = core::mem::transmute(entry_point);

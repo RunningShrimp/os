@@ -21,4 +21,3 @@ pub const MAP_NONBLOCK: i32 = 0x10000;
 pub const MAP_STACK: i32 = 0x20000;
 pub const MAP_HUGETLB: i32 = 0x40000;
 
-

@@ -8,7 +8,6 @@
 //! - 自定义格式化支持
 //! - 性能优化的格式化算法
 
-use core::ffi::{c_char, c_int, c_void};
 use crate::libc::io_manager::CFile;
 
 // 模拟 va_list 类型
@@ -58,35 +57,35 @@ impl Default for FormatFlags {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LengthModifier {
     None,
-    Char,      // hh
-    Short,     // h
-    Normal,    // 无修饰符
-    Long,      // l
-    LongLong,  // ll
-    IntMax,    // j
-    Size,      // z
-    PtrDiff,   // t
-    LongDouble,// L
+    Char,       // hh
+    Short,      // h
+    Normal,     // 无修饰符
+    Long,       // l
+    LongLong,   // ll
+    IntMax,     // j
+    Size,       // z
+    PtrDiff,    // t
+    LongDouble, // L
 }
 
 /// 格式说明符类型
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FormatSpecifier {
-    Percent,   // %%
-    SignedInt, // d, i
+    Percent,     // %%
+    SignedInt,   // d, i
     UnsignedInt, // u
-    Octal,     // o
-    HexLower,  // x
-    HexUpper,  // X
-    Float,     // f, F
-    Scientific, // e, E
-    Shortest,  // g, G
-    HexFloat,  // a, A
-    Char,      // c
-    String,    // s
-    Pointer,   // p
-    WriteCount,// n
-    GetChar,   // []
+    Octal,       // o
+    HexLower,    // x
+    HexUpper,    // X
+    Float,       // f, F
+    Scientific,  // e, E
+    Shortest,    // g, G
+    HexFloat,    // a, A
+    Char,        // c
+    String,      // s
+    Pointer,     // p
+    WriteCount,  // n
+    GetChar,     // []
 }
 
 /// 格式化上下文
@@ -179,7 +178,13 @@ impl EnhancedFormatter {
     }
 
     /// 格式化字符串到缓冲区
-    pub fn snprintf(&mut self, buffer: *mut c_char, size: usize, format: *const c_char, mut args: va_list) -> c_int {
+    pub fn snprintf(
+        &mut self,
+        buffer: *mut c_char,
+        size: usize,
+        format: *const c_char,
+        mut args: va_list,
+    ) -> c_int {
         if format.is_null() {
             self.set_error(crate::libc::error::errno::EINVAL);
             return -1;
@@ -229,7 +234,7 @@ impl EnhancedFormatter {
                 core::ptr::copy_nonoverlapping(
                     self.output_buffer.as_ptr(),
                     buffer as *mut u8,
-                    copy_len
+                    copy_len,
                 );
                 *buffer.add(copy_len) = 0; // null终止
             }
@@ -256,7 +261,11 @@ impl EnhancedFormatter {
     // 私有方法
 
     /// 解析格式说明符
-    fn parse_format_specifier(&mut self, format_ptr: &mut *const c_char, args: &mut va_list) -> FormatContext {
+    fn parse_format_specifier(
+        &mut self,
+        format_ptr: &mut *const c_char,
+        args: &mut va_list,
+    ) -> FormatContext {
         let mut flags = FormatFlags::default();
         let mut width: Option<c_int> = None;
         let mut precision: Option<c_int> = None;
@@ -269,19 +278,19 @@ impl EnhancedFormatter {
                 match **format_ptr as u8 {
                     b'-' => {
                         flags.left_align = true;
-                    }
+                    },
                     b'+' => {
                         flags.plus_sign = true;
-                    }
+                    },
                     b' ' => {
                         flags.space_sign = true;
-                    }
+                    },
                     b'#' => {
                         flags.alternate_form = true;
-                    }
+                    },
                     b'0' => {
                         flags.zero_pad = true;
-                    }
+                    },
                     _ => break,
                 }
                 *format_ptr = format_ptr.add(1);
@@ -338,7 +347,7 @@ impl EnhancedFormatter {
                     } else {
                         length = LengthModifier::Short;
                     }
-                }
+                },
                 b'l' => {
                     *format_ptr = format_ptr.add(1);
                     if **format_ptr as u8 == b'l' {
@@ -347,24 +356,24 @@ impl EnhancedFormatter {
                     } else {
                         length = LengthModifier::Long;
                     }
-                }
+                },
                 b'j' => {
                     length = LengthModifier::IntMax;
                     *format_ptr = format_ptr.add(1);
-                }
+                },
                 b'z' => {
                     length = LengthModifier::Size;
                     *format_ptr = format_ptr.add(1);
-                }
+                },
                 b't' => {
                     length = LengthModifier::PtrDiff;
                     *format_ptr = format_ptr.add(1);
-                }
+                },
                 b'L' => {
                     length = LengthModifier::LongDouble;
                     *format_ptr = format_ptr.add(1);
-                }
-                _ => {}
+                },
+                _ => {},
             }
 
             // 解析格式说明符
@@ -388,26 +397,14 @@ impl EnhancedFormatter {
                     self.write_char(b'%');
                     self.write_char(**format_ptr as u8);
                     *format_ptr = format_ptr.add(1);
-                    return FormatContext {
-                        flags,
-                        width,
-                        precision,
-                        length,
-                        specifier,
-                    };
-                }
+                    return FormatContext { flags, width, precision, length, specifier };
+                },
             };
 
             *format_ptr = format_ptr.add(1);
         }
 
-        FormatContext {
-            flags,
-            width,
-            precision,
-            length,
-            specifier,
-        }
+        FormatContext { flags, width, precision, length, specifier }
     }
 
     /// 格式化参数
@@ -466,7 +463,12 @@ impl EnhancedFormatter {
     }
 
     /// 格式化十六进制数
-    fn format_hex(&mut self, context: &FormatContext, _args: &mut va_list, uppercase: bool) -> isize {
+    fn format_hex(
+        &mut self,
+        context: &FormatContext,
+        _args: &mut va_list,
+        uppercase: bool,
+    ) -> isize {
         let value: u64 = 0;
         let mut written = 0;
         if context.flags.alternate_form && value != 0 {
@@ -479,7 +481,13 @@ impl EnhancedFormatter {
     }
 
     /// 格式化数字（内部函数）
-    fn format_number(&mut self, value: i64, context: &FormatContext, base: u32, uppercase: bool) -> isize {
+    fn format_number(
+        &mut self,
+        value: i64,
+        context: &FormatContext,
+        base: u32,
+        uppercase: bool,
+    ) -> isize {
         let mut buffer = heapless::String::<64>::new();
         let mut num = value;
 
@@ -527,11 +535,7 @@ impl EnhancedFormatter {
         let width = context.width.unwrap_or(0) as usize;
         let text_len = text.len().min(precision);
 
-        let total_len = if text_len < width {
-            width
-        } else {
-            text_len
-        };
+        let total_len = if text_len < width { width } else { text_len };
 
         let mut written = 0;
 
@@ -603,9 +607,7 @@ impl EnhancedFormatter {
             let c_str = core::ffi::CStr::from_ptr(str_ptr);
             match c_str.to_str() {
                 Ok(string) => self.apply_width_and_precision(string, context) as isize,
-                Err(_) => {
-                    self.apply_width_and_precision("(invalid)", context) as isize
-                }
+                Err(_) => self.apply_width_and_precision("(invalid)", context) as isize,
             }
         }
     }
@@ -648,21 +650,36 @@ impl EnhancedFormatter {
     }
 
     /// 格式化浮点数（简化实现）
-    fn format_float(&mut self, _context: &FormatContext, _args: &mut va_list, _uppercase: bool) -> isize {
+    fn format_float(
+        &mut self,
+        _context: &FormatContext,
+        _args: &mut va_list,
+        _uppercase: bool,
+    ) -> isize {
         // 简化实现：只输出0.0
         self.write_str("0.000000");
         8
     }
 
     /// 格式化科学计数法（简化实现）
-    fn format_scientific(&mut self, _context: &FormatContext, _args: &mut va_list, _uppercase: bool) -> isize {
+    fn format_scientific(
+        &mut self,
+        _context: &FormatContext,
+        _args: &mut va_list,
+        _uppercase: bool,
+    ) -> isize {
         // 简化实现
         self.write_str("0.000000e+00");
         12
     }
 
     /// 格式化最短表示（简化实现）
-    fn format_shortest(&mut self, context: &FormatContext, args: &mut va_list, uppercase: bool) -> isize {
+    fn format_shortest(
+        &mut self,
+        context: &FormatContext,
+        args: &mut va_list,
+        uppercase: bool,
+    ) -> isize {
         // 简化实现：使用浮点数格式
         self.format_float(context, args, uppercase)
     }
@@ -691,7 +708,12 @@ impl EnhancedFormatter {
         if !file.is_null() && !self.output_buffer.is_empty() {
             unsafe {
                 let written = crate::libc::io_manager::EnhancedIOManager::new(Default::default())
-                    .fwrite(self.output_buffer.as_ptr() as *const c_void, 1, self.output_buffer.len(), file);
+                    .fwrite(
+                        self.output_buffer.as_ptr() as *const c_void,
+                        1,
+                        self.output_buffer.len(),
+                        file,
+                    );
 
                 if written != self.output_buffer.len() {
                     self.set_error(crate::libc::error::errno::EIO);

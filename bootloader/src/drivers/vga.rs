@@ -52,9 +52,9 @@ impl VGAWriter {
         let color_attr = self.color_byte();
         unsafe {
             for i in 0..2000 {
-                VGA_BUFFER.add(i).write_volatile(
-                    (b' ' as u16) | ((color_attr as u16) << 8)
-                );
+                VGA_BUFFER
+                    .add(i)
+                    .write_volatile((b' ' as u16) | ((color_attr as u16) << 8));
             }
         }
         self.col = 0;
@@ -67,10 +67,10 @@ impl VGAWriter {
             b'\n' => {
                 self.row += 1;
                 self.col = 0;
-            }
+            },
             b'\r' => {
                 self.col = 0;
-            }
+            },
             _ => {
                 if self.row >= 25 {
                     self.scroll_up();
@@ -79,11 +79,11 @@ impl VGAWriter {
 
                 let idx = self.row * 80 + self.col;
                 let color_attr = self.color_byte();
-                
+
                 unsafe {
-                    VGA_BUFFER.add(idx).write_volatile(
-                        (ch as u16) | ((color_attr as u16) << 8)
-                    );
+                    VGA_BUFFER
+                        .add(idx)
+                        .write_volatile((ch as u16) | ((color_attr as u16) << 8));
                 }
 
                 self.col += 1;
@@ -91,7 +91,7 @@ impl VGAWriter {
                     self.col = 0;
                     self.row += 1;
                 }
-            }
+            },
         }
     }
 
@@ -117,17 +117,13 @@ impl VGAWriter {
         let color_attr = self.color_byte();
         unsafe {
             // Copy rows 1-24 to rows 0-23
-            core::ptr::copy(
-                VGA_BUFFER.add(80),
-                VGA_BUFFER,
-                80 * 24,
-            );
-            
+            core::ptr::copy(VGA_BUFFER.add(80), VGA_BUFFER, 80 * 24);
+
             // Clear last row
             for i in 0..80 {
-                VGA_BUFFER.add(24 * 80 + i).write_volatile(
-                    (b' ' as u16) | ((color_attr as u16) << 8)
-                );
+                VGA_BUFFER
+                    .add(24 * 80 + i)
+                    .write_volatile((b' ' as u16) | ((color_attr as u16) << 8));
             }
         }
     }

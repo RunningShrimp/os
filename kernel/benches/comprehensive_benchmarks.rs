@@ -9,7 +9,7 @@
 
 extern crate alloc;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use kernel::syscalls;
 
 // System call constants
@@ -36,7 +36,7 @@ fn bench_getpid_latency(c: &mut Criterion) {
 /// Benchmark read system call latency (fast path vs normal path)
 fn bench_read_latency(c: &mut Criterion) {
     let mut group = c.benchmark_group("syscall_read_latency");
-    
+
     // Fast path (small buffer <= 4KB)
     group.bench_function("fast_path_4kb", |b| {
         let args = [0u64, 0x1000u64, 4096u64];
@@ -45,7 +45,7 @@ fn bench_read_latency(c: &mut Criterion) {
             black_box(result);
         });
     });
-    
+
     // Normal path (large buffer > 4KB)
     group.bench_function("normal_path_64kb", |b| {
         let args = [0u64, 0x1000u64, 65536u64];
@@ -54,14 +54,14 @@ fn bench_read_latency(c: &mut Criterion) {
             black_box(result);
         });
     });
-    
+
     group.finish();
 }
 
 /// Benchmark write system call latency (fast path vs normal path)
 fn bench_write_latency(c: &mut Criterion) {
     let mut group = c.benchmark_group("syscall_write_latency");
-    
+
     // Fast path (small buffer <= 4KB)
     group.bench_function("fast_path_4kb", |b| {
         let args = [1u64, 0x1000u64, 4096u64]; // stdout
@@ -70,7 +70,7 @@ fn bench_write_latency(c: &mut Criterion) {
             black_box(result);
         });
     });
-    
+
     // Normal path (large buffer > 4KB)
     group.bench_function("normal_path_64kb", |b| {
         let args = [1u64, 0x1000u64, 65536u64]; // stdout
@@ -79,7 +79,7 @@ fn bench_write_latency(c: &mut Criterion) {
             black_box(result);
         });
     });
-    
+
     group.finish();
 }
 
@@ -97,7 +97,7 @@ fn bench_close_latency(c: &mut Criterion) {
 /// Benchmark system call throughput
 fn bench_syscall_throughput(c: &mut Criterion) {
     let mut group = c.benchmark_group("syscall_throughput");
-    
+
     // Test throughput for different iteration counts
     for iterations in [100, 1000, 10000].iter() {
         group.bench_with_input(
@@ -112,14 +112,14 @@ fn bench_syscall_throughput(c: &mut Criterion) {
             },
         );
     }
-    
+
     group.finish();
 }
 
 /// Benchmark epoll system calls
 fn bench_epoll_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("epoll_operations");
-    
+
     // epoll_create
     group.bench_function("epoll_create", |b| {
         let args = [128u64]; // size
@@ -128,7 +128,7 @@ fn bench_epoll_operations(c: &mut Criterion) {
             black_box(result);
         });
     });
-    
+
     // epoll_create1
     group.bench_function("epoll_create1", |b| {
         let args = [0u64]; // flags
@@ -137,7 +137,7 @@ fn bench_epoll_operations(c: &mut Criterion) {
             black_box(result);
         });
     });
-    
+
     group.finish();
 }
 
@@ -148,29 +148,25 @@ fn bench_epoll_operations(c: &mut Criterion) {
 /// Benchmark memory allocation with different sizes
 fn bench_memory_allocation_sizes(c: &mut Criterion) {
     let mut group = c.benchmark_group("memory_allocation_sizes");
-    
+
     let sizes = vec![64, 256, 1024, 4096, 16384, 65536, 262144];
-    
+
     for size in sizes {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            &size,
-            |b, &size| {
-                b.iter(|| {
-                    let _data = alloc::vec![0u8; size];
-                    black_box(_data);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
+            b.iter(|| {
+                let _data = alloc::vec![0u8; size];
+                black_box(_data);
+            });
+        });
     }
-    
+
     group.finish();
 }
 
 /// Benchmark memory allocation/deallocation cycle
 fn bench_memory_cycle(c: &mut Criterion) {
     let mut group = c.benchmark_group("memory_cycle");
-    
+
     // Small objects cycle
     group.bench_function("small_objects_100", |b| {
         b.iter(|| {
@@ -180,7 +176,7 @@ fn bench_memory_cycle(c: &mut Criterion) {
             }
         });
     });
-    
+
     // Medium objects cycle
     group.bench_function("medium_objects_50", |b| {
         b.iter(|| {
@@ -190,7 +186,7 @@ fn bench_memory_cycle(c: &mut Criterion) {
             }
         });
     });
-    
+
     // Large objects cycle
     group.bench_function("large_objects_10", |b| {
         b.iter(|| {
@@ -200,14 +196,14 @@ fn bench_memory_cycle(c: &mut Criterion) {
             }
         });
     });
-    
+
     group.finish();
 }
 
 /// Benchmark memory mapping operations simulation
 fn bench_memory_mapping(c: &mut Criterion) {
     let mut group = c.benchmark_group("memory_mapping");
-    
+
     // Small mapping (4KB)
     group.bench_function("mmap_4kb", |b| {
         b.iter(|| {
@@ -219,7 +215,7 @@ fn bench_memory_mapping(c: &mut Criterion) {
             black_box(overhead);
         });
     });
-    
+
     // Medium mapping (64KB)
     group.bench_function("mmap_64kb", |b| {
         b.iter(|| {
@@ -231,7 +227,7 @@ fn bench_memory_mapping(c: &mut Criterion) {
             black_box(overhead);
         });
     });
-    
+
     // Large mapping (1MB)
     group.bench_function("mmap_1mb", |b| {
         b.iter(|| {
@@ -243,7 +239,7 @@ fn bench_memory_mapping(c: &mut Criterion) {
             black_box(overhead);
         });
     });
-    
+
     group.finish();
 }
 
@@ -254,7 +250,7 @@ fn bench_memory_mapping(c: &mut Criterion) {
 /// Benchmark file I/O operations simulation
 fn bench_file_io_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("file_io_operations");
-    
+
     // Sequential write simulation
     group.bench_function("sequential_write_1mb", |b| {
         b.iter(|| {
@@ -266,7 +262,7 @@ fn bench_file_io_operations(c: &mut Criterion) {
             black_box(overhead);
         });
     });
-    
+
     // Sequential read simulation
     group.bench_function("sequential_read_1mb", |b| {
         b.iter(|| {
@@ -278,7 +274,7 @@ fn bench_file_io_operations(c: &mut Criterion) {
             black_box(overhead);
         });
     });
-    
+
     // Random read simulation
     group.bench_function("random_read_1mb", |b| {
         b.iter(|| {
@@ -290,14 +286,14 @@ fn bench_file_io_operations(c: &mut Criterion) {
             black_box(overhead);
         });
     });
-    
+
     group.finish();
 }
 
 /// Benchmark file operations (create, delete, stat)
 fn bench_file_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("file_operations");
-    
+
     // File create simulation
     group.bench_function("file_create", |b| {
         b.iter(|| {
@@ -309,7 +305,7 @@ fn bench_file_operations(c: &mut Criterion) {
             black_box(overhead);
         });
     });
-    
+
     // File delete simulation
     group.bench_function("file_delete", |b| {
         b.iter(|| {
@@ -321,7 +317,7 @@ fn bench_file_operations(c: &mut Criterion) {
             black_box(overhead);
         });
     });
-    
+
     // File stat simulation
     group.bench_function("file_stat", |b| {
         b.iter(|| {
@@ -333,7 +329,7 @@ fn bench_file_operations(c: &mut Criterion) {
             black_box(overhead);
         });
     });
-    
+
     group.finish();
 }
 
@@ -344,7 +340,7 @@ fn bench_file_operations(c: &mut Criterion) {
 /// Benchmark network operations simulation
 fn bench_network_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("network_operations");
-    
+
     // Socket creation simulation
     group.bench_function("socket_create", |b| {
         b.iter(|| {
@@ -356,7 +352,7 @@ fn bench_network_operations(c: &mut Criterion) {
             black_box(overhead);
         });
     });
-    
+
     // TCP connect simulation
     group.bench_function("tcp_connect", |b| {
         b.iter(|| {
@@ -368,7 +364,7 @@ fn bench_network_operations(c: &mut Criterion) {
             black_box(overhead);
         });
     });
-    
+
     // Network data transfer simulation
     group.bench_function("network_transfer_1mb", |b| {
         b.iter(|| {
@@ -380,7 +376,7 @@ fn bench_network_operations(c: &mut Criterion) {
             black_box(overhead);
         });
     });
-    
+
     group.finish();
 }
 
@@ -391,7 +387,7 @@ fn bench_network_operations(c: &mut Criterion) {
 /// Benchmark process creation/destruction simulation
 fn bench_process_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("process_operations");
-    
+
     // Process creation simulation
     group.bench_function("process_create", |b| {
         b.iter(|| {
@@ -410,7 +406,7 @@ fn bench_process_operations(c: &mut Criterion) {
             black_box(overhead);
         });
     });
-    
+
     // Process destruction simulation
     group.bench_function("process_destroy", |b| {
         b.iter(|| {
@@ -423,7 +419,7 @@ fn bench_process_operations(c: &mut Criterion) {
             black_box(overhead);
         });
     });
-    
+
     // Context switch simulation
     group.bench_function("context_switch", |b| {
         b.iter(|| {
@@ -436,7 +432,7 @@ fn bench_process_operations(c: &mut Criterion) {
             black_box(overhead);
         });
     });
-    
+
     group.finish();
 }
 
@@ -467,4 +463,3 @@ criterion_group!(
 );
 
 criterion_main!(comprehensive_benches);
-

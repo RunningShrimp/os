@@ -90,13 +90,7 @@ pub struct BootComponent {
 impl BootComponent {
     /// Create boot component
     pub fn new(name_hash: u32, size: u32, critical: bool) -> Self {
-        BootComponent {
-            name_hash,
-            size,
-            hash: [0u8; 32],
-            timestamp: 0,
-            critical,
-        }
+        BootComponent { name_hash, size, hash: [0u8; 32], timestamp: 0, critical }
     }
 
     /// Set component hash
@@ -145,12 +139,7 @@ impl EventLogEntry {
         component: BootComponent,
         phase: MeasurementPhase,
     ) -> Self {
-        EventLogEntry {
-            sequence,
-            event,
-            component,
-            phase,
-        }
+        EventLogEntry { sequence, event, component, phase }
     }
 }
 
@@ -217,12 +206,8 @@ impl BootMeasurement {
             return false;
         }
 
-        let entry = EventLogEntry::new(
-            self.log_size,
-            event,
-            component.unwrap(),
-            self.current_phase,
-        );
+        let entry =
+            EventLogEntry::new(self.log_size, event, component.unwrap(), self.current_phase);
 
         self.event_log[self.log_size as usize] = Some(entry);
         self.log_size += 1;
@@ -427,7 +412,7 @@ mod tests {
     fn test_measure_component() {
         let mut measurement = BootMeasurement::new();
         let component = BootComponent::new(0x12345678, 2048, true);
-        
+
         assert!(measurement.measure_component(component));
         assert_eq!(measurement.get_component_count(), 1);
     }
@@ -524,7 +509,7 @@ mod tests {
     #[test]
     fn test_multiple_components() {
         let mut measurement = BootMeasurement::new();
-        
+
         for i in 0..8 {
             let component = BootComponent::new(0x1000 + i, 2048, true);
             assert!(measurement.measure_component(component));
@@ -557,10 +542,10 @@ mod tests {
     fn test_phase_transition() {
         let mut measurement = BootMeasurement::new();
         assert_eq!(measurement.current_phase, MeasurementPhase::PreBios);
-        
+
         measurement.next_phase(MeasurementPhase::BiosUefi);
         assert_eq!(measurement.current_phase, MeasurementPhase::BiosUefi);
-        
+
         measurement.next_phase(MeasurementPhase::Bootloader);
         assert_eq!(measurement.current_phase, MeasurementPhase::Bootloader);
     }
@@ -568,15 +553,15 @@ mod tests {
     #[test]
     fn test_component_size_tracking() {
         let mut measurement = BootMeasurement::new();
-        
+
         let comp1 = BootComponent::new(0x11111111, 512, true);
         let comp2 = BootComponent::new(0x22222222, 1024, true);
         let comp3 = BootComponent::new(0x33333333, 2048, true);
-        
+
         measurement.measure_component(comp1);
         measurement.measure_component(comp2);
         measurement.measure_component(comp3);
-        
+
         assert_eq!(measurement.get_component_count(), 3);
     }
 }

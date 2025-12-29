@@ -2,11 +2,10 @@
 ///
 /// Validates kernel readiness, prepares boot parameters, and ensures system is
 /// ready for transition to kernel execution.
-
 use alloc::format;
 use alloc::string::String;
-use crate::kernel_if::kernel_handoff::BootInformation;
-use crate::core::boot_sequence::BootMemoryLayout;
+
+use crate::{core::boot_sequence::BootMemoryLayout, kernel_if::kernel_handoff::BootInformation};
 
 /// Kernel readiness status
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -143,11 +142,7 @@ impl BootPreparation {
     }
 
     /// Validate kernel
-    pub fn validate_kernel(
-        &mut self,
-        signature: u32,
-        checksum: u32,
-    ) -> Result<(), &'static str> {
+    pub fn validate_kernel(&mut self, signature: u32, checksum: u32) -> Result<(), &'static str> {
         // Multiboot2 signature: 0xE85250D6
         if signature != 0xE85250D6 {
             self.kernel_readiness = KernelReadiness::InvalidSignature;
@@ -204,19 +199,28 @@ impl BootPreparation {
         status.push_str("Boot Readiness Status:\n");
         status.push_str(&format!(
             "  Parameters: {}\n",
-            if self.parameters.is_some() { "OK" } else { "MISSING" }
+            if self.parameters.is_some() {
+                "OK"
+            } else {
+                "MISSING"
+            }
         ));
-        status.push_str(&format!(
-            "  Kernel: {}\n",
-            self.kernel_readiness.description()
-        ));
+        status.push_str(&format!("  Kernel: {}\n", self.kernel_readiness.description()));
         status.push_str(&format!(
             "  Boot Info: {}\n",
-            if self.boot_info.is_some() { "OK" } else { "MISSING" }
+            if self.boot_info.is_some() {
+                "OK"
+            } else {
+                "MISSING"
+            }
         ));
         status.push_str(&format!(
             "  Memory Layout: {}\n",
-            if self.memory_layout.is_some() { "OK" } else { "MISSING" }
+            if self.memory_layout.is_some() {
+                "OK"
+            } else {
+                "MISSING"
+            }
         ));
 
         status
@@ -231,9 +235,7 @@ pub struct BootHandoff {
 impl BootHandoff {
     /// Create new boot handoff
     pub fn new() -> Self {
-        Self {
-            preparation: BootPreparation::new(),
-        }
+        Self { preparation: BootPreparation::new() }
     }
 
     /// Prepare for handoff
@@ -283,9 +285,11 @@ mod tests {
     #[test]
     fn test_kernel_readiness_description() {
         assert_eq!(KernelReadiness::Valid.description(), "Kernel valid and ready");
-        assert!(KernelReadiness::InvalidSignature
-            .description()
-            .contains("signature"));
+        assert!(
+            KernelReadiness::InvalidSignature
+                .description()
+                .contains("signature")
+        );
     }
 
     #[test]

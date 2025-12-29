@@ -2,8 +2,7 @@
 //!
 //! 本模块提供系统调用相关的类型定义。
 
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 
 /// 系统调用信息
 #[derive(Debug, Clone)]
@@ -132,34 +131,34 @@ impl SyscallStatistics {
             calls_by_type: alloc::collections::BTreeMap::new(),
         }
     }
-    
+
     /// 更新统计信息
     pub fn update(&mut self, syscall_num: usize, execution_time_ns: u64, success: bool) {
         self.total_calls += 1;
-        
+
         if success {
             self.successful_calls += 1;
         } else {
             self.failed_calls += 1;
         }
-        
+
         // 更新执行时间统计
         if execution_time_ns < self.min_execution_time_ns {
             self.min_execution_time_ns = execution_time_ns;
         }
-        
+
         if execution_time_ns > self.max_execution_time_ns {
             self.max_execution_time_ns = execution_time_ns;
         }
-        
+
         // 更新平均执行时间
         let total_time = self.avg_execution_time_ns * (self.total_calls - 1) + execution_time_ns;
         self.avg_execution_time_ns = total_time / self.total_calls;
-        
+
         // 更新各系统调用统计
         *self.calls_by_type.entry(syscall_num).or_insert(0) += 1;
     }
-    
+
     /// 重置统计信息
     pub fn reset(&mut self) {
         self.total_calls = 0;
@@ -182,10 +181,10 @@ impl Default for SyscallStatistics {
 pub trait SyscallFilter: Send + Sync {
     /// 检查是否允许执行系统调用
     fn allow_syscall(&self, context: &SyscallContext) -> bool;
-    
+
     /// 获取过滤器名称
     fn name(&self) -> &str;
-    
+
     /// 获取过滤器优先级
     fn priority(&self) -> u32 {
         100
@@ -198,15 +197,15 @@ pub trait SyscallInterceptor: Send + Sync {
     fn before_syscall(&self, context: &SyscallContext) -> Option<isize> {
         None
     }
-    
+
     /// 在系统调用执行后拦截
     fn after_syscall(&self, context: &SyscallContext, result: &mut SyscallResult) {
         // 默认实现：不做任何操作
     }
-    
+
     /// 获取拦截器名称
     fn name(&self) -> &str;
-    
+
     /// 获取拦截器优先级
     fn priority(&self) -> u32 {
         100
@@ -217,10 +216,10 @@ pub trait SyscallInterceptor: Send + Sync {
 pub trait SyscallLogger: Send + Sync {
     /// 记录系统调用
     fn log_syscall(&self, context: &SyscallContext, result: &SyscallResult);
-    
+
     /// 获取日志记录器名称
     fn name(&self) -> &str;
-    
+
     /// 获取日志级别
     fn level(&self) -> SyscallLogLevel {
         SyscallLogLevel::Info

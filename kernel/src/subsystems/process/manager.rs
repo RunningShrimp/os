@@ -11,16 +11,22 @@
 
 extern crate alloc;
 
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use core::ptr::null_mut;
-use alloc::string::String;
+
 use hashbrown::HashMap;
-use alloc::vec::Vec;
-use alloc::collections::BTreeMap;
-use crate::subsystems::sync::Mutex;
-use crate::compat::DefaultHasherBuilder;
-use crate::subsystems::mm::{kalloc, kfree, PAGE_SIZE};
-use crate::ipc::signal::SignalState;
-use crate::subsystems::mm::vm::{PageTable, free_pagetable};
+
+use crate::{
+    compat::DefaultHasherBuilder,
+    ipc::signal::SignalState,
+    subsystems::{
+        mm::{
+            PAGE_SIZE, kalloc, kfree,
+            vm::{PageTable, free_pagetable},
+        },
+        sync::Mutex,
+    },
+};
 
 // ============================================================================
 // Constants
@@ -106,9 +112,9 @@ pub struct Context {
     #[cfg(target_arch = "aarch64")]
     pub x28: usize,
     #[cfg(target_arch = "aarch64")]
-    pub fp: usize,  // x29
+    pub fp: usize, // x29
     #[cfg(target_arch = "aarch64")]
-    pub lr: usize,  // x30
+    pub lr: usize, // x30
     #[cfg(target_arch = "aarch64")]
     pub sp: usize,
 
@@ -135,21 +141,51 @@ impl Context {
         #[cfg(target_arch = "riscv64")]
         {
             Self {
-                ra: 0, sp: 0, s0: 0, s1: 0, s2: 0, s3: 0, s4: 0,
-                s5: 0, s6: 0, s7: 0, s8: 0, s9: 0, s10: 0, s11: 0,
+                ra: 0,
+                sp: 0,
+                s0: 0,
+                s1: 0,
+                s2: 0,
+                s3: 0,
+                s4: 0,
+                s5: 0,
+                s6: 0,
+                s7: 0,
+                s8: 0,
+                s9: 0,
+                s10: 0,
+                s11: 0,
             }
         }
         #[cfg(target_arch = "aarch64")]
         {
             Self {
-                x19: 0, x20: 0, x21: 0, x22: 0, x23: 0, x24: 0,
-                x25: 0, x26: 0, x27: 0, x28: 0, fp: 0, lr: 0, sp: 0,
+                x19: 0,
+                x20: 0,
+                x21: 0,
+                x22: 0,
+                x23: 0,
+                x24: 0,
+                x25: 0,
+                x26: 0,
+                x27: 0,
+                x28: 0,
+                fp: 0,
+                lr: 0,
+                sp: 0,
             }
         }
         #[cfg(target_arch = "x86_64")]
         {
             Self {
-                rbx: 0, rbp: 0, r12: 0, r13: 0, r14: 0, r15: 0, rsp: 0, rip: 0,
+                rbx: 0,
+                rbp: 0,
+                r12: 0,
+                r13: 0,
+                r14: 0,
+                r15: 0,
+                rsp: 0,
+                rip: 0,
             }
         }
     }
@@ -288,25 +324,71 @@ impl TrapFrame {
         #[cfg(target_arch = "riscv64")]
         {
             Self {
-                kernel_satp: 0, kernel_sp: 0, kernel_trap: 0, epc: 0, kernel_hartid: 0,
-                ra: 0, sp: 0, gp: 0, tp: 0, t0: 0, t1: 0, t2: 0,
-                s0: 0, s1: 0, a0: 0, a1: 0, a2: 0, a3: 0, a4: 0, a5: 0, a6: 0, a7: 0,
-                s2: 0, s3: 0, s4: 0, s5: 0, s6: 0, s7: 0, s8: 0, s9: 0, s10: 0, s11: 0,
-                t3: 0, t4: 0, t5: 0, t6: 0,
+                kernel_satp: 0,
+                kernel_sp: 0,
+                kernel_trap: 0,
+                epc: 0,
+                kernel_hartid: 0,
+                ra: 0,
+                sp: 0,
+                gp: 0,
+                tp: 0,
+                t0: 0,
+                t1: 0,
+                t2: 0,
+                s0: 0,
+                s1: 0,
+                a0: 0,
+                a1: 0,
+                a2: 0,
+                a3: 0,
+                a4: 0,
+                a5: 0,
+                a6: 0,
+                a7: 0,
+                s2: 0,
+                s3: 0,
+                s4: 0,
+                s5: 0,
+                s6: 0,
+                s7: 0,
+                s8: 0,
+                s9: 0,
+                s10: 0,
+                s11: 0,
+                t3: 0,
+                t4: 0,
+                t5: 0,
+                t6: 0,
             }
         }
         #[cfg(target_arch = "aarch64")]
         {
-            Self {
-                regs: [0; 31], sp: 0, elr: 0, spsr: 0,
-            }
+            Self { regs: [0; 31], sp: 0, elr: 0, spsr: 0 }
         }
         #[cfg(target_arch = "x86_64")]
         {
             Self {
-                rax: 0, rbx: 0, rcx: 0, rdx: 0, rsi: 0, rdi: 0, rbp: 0,
-                r8: 0, r9: 0, r10: 0, r11: 0, r12: 0, r13: 0, r14: 0, r15: 0,
-                rsp: 0, rip: 0, rflags: 0, cs: 0, ss: 0,
+                rax: 0,
+                rbx: 0,
+                rcx: 0,
+                rdx: 0,
+                rsi: 0,
+                rdi: 0,
+                rbp: 0,
+                r8: 0,
+                r9: 0,
+                r10: 0,
+                r11: 0,
+                r12: 0,
+                r13: 0,
+                r14: 0,
+                r15: 0,
+                rsp: 0,
+                rip: 0,
+                rflags: 0,
+                cs: 0,
+                ss: 0,
             }
         }
     }
@@ -320,41 +402,45 @@ use crate::posix;
 
 pub struct Proc {
     pub pid: Pid,
-    pub pgid: Pid,  // Process group ID
-    pub sid: Pid,   // Session ID
+    pub pgid: Pid, // Process group ID
+    pub sid: Pid,  // Session ID
     // User/Group IDs (POSIX credentials)
-    pub uid: posix::Uid,   // Real user ID
-    pub gid: posix::Gid,   // Real group ID
-    pub euid: posix::Uid,  // Effective user ID
-    pub egid: posix::Gid,  // Effective group ID
-    pub suid: posix::Uid,  // Saved set-user-ID
-    pub sgid: posix::Gid,  // Saved set-group-ID
+    pub uid: posix::Uid,  // Real user ID
+    pub gid: posix::Gid,  // Real group ID
+    pub euid: posix::Uid, // Effective user ID
+    pub egid: posix::Gid, // Effective group ID
+    pub suid: posix::Uid, // Saved set-user-ID
+    pub sgid: posix::Gid, // Saved set-group-ID
     pub state: ProcState,
     pub parent: Option<Pid>,
     pub kstack: usize,
     pub trapframe: *mut TrapFrame,
     pub context: Context,
-    pub ofile: [Option<usize>; NOFILE],  // Open file descriptors (index into FILE_TABLE)
+    pub ofile: [Option<usize>; NOFILE], // Open file descriptors (index into FILE_TABLE)
     /// Extended file descriptor cache for fast access (FDs 0-15)
     /// This cache reduces file table lookups for commonly used file descriptors
     /// and provides statistics and LRU/LFU replacement policies
     fd_cache: crate::subsystems::process::fd_cache::ExtendedFdCache,
     pub cwd_path: Option<String>,
-    pub cwd: Option<usize>,  // Current working directory file index
+    pub cwd: Option<usize>, // Current working directory file index
     pub signals: Option<SignalState>,
-    pub alt_signal_stack: Option<crate::posix::StackT>,  // Alternate signal stack
-    pub rlimits: [crate::posix::Rlimit; 16],  // Resource limits
-    pub chan: usize,  // Sleep channel
+    pub alt_signal_stack: Option<crate::posix::StackT>, // Alternate signal stack
+    pub rlimits: [crate::posix::Rlimit; 16],            // Resource limits
+    pub chan: usize,                                    // Sleep channel
     pub killed: bool,
-    pub xstate: i32,  // Exit status
-    pub sz: usize,    // Memory size
-    pub pagetable: *mut PageTable,  // Page table pointer
-    pub nice: i32,    // Process nice value (-20 to 19)
-    pub umask: u32,   // File creation mask
-    pub domain_id: crate::subsystems::mm::memory_isolation::ProtectionDomainId,  // Memory protection domain ID
+    pub xstate: i32,               // Exit status
+    pub sz: usize,                 // Memory size
+    pub pagetable: *mut PageTable, // Page table pointer
+    pub nice: i32,                 // Process nice value (-20 to 19)
+    pub umask: u32,                // File creation mask
+    /// Memory protection domain ID
+    pub domain_id: crate::subsystems::mm::memory_isolation::ProtectionDomainId,
     /// Namespace IDs for this process (one per namespace type)
     /// Maps namespace type to namespace ID
-    pub namespaces: alloc::collections::BTreeMap<crate::subsystems::cloud_native::namespaces::NamespaceType, u64>,
+    pub namespaces: alloc::collections::BTreeMap<
+        crate::subsystems::cloud_native::namespaces::NamespaceType,
+        u64,
+    >,
     /// Cgroup name for this process (if assigned to a cgroup)
     pub cgroup: Option<String>,
 }
@@ -392,71 +478,72 @@ impl Proc {
             sz: 0,
             pagetable: null_mut(),
             nice: 0,
-            umask: 0o022,  // Default umask
-            domain_id: 0,  // Default to kernel domain
+            umask: 0o022, // Default umask
+            domain_id: 0, // Default to kernel domain
             namespaces: alloc::collections::BTreeMap::new(),
             cgroup: None,
         }
     }
-    
+
     /// Get cached file descriptor information (O(1) lookup for FDs 0-15)
-    /// 
+    ///
     /// This function provides fast access to commonly used file descriptors
     /// without requiring a file table lookup. The cache is automatically
     /// updated when file descriptors are opened or closed.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `fd` - File descriptor number (must be 0-15 for cached FDs)
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Some(file_idx)` if the file descriptor is open and cached
     /// * `None` if the file descriptor is not open or not cached
     #[inline]
     pub fn get_cached_fd(&self, fd: i32) -> Option<usize> {
         self.fd_cache.get(fd)
     }
-    
+
     /// Update file descriptor cache when a file descriptor is opened
-    /// 
+    ///
     /// This should be called whenever a file descriptor is allocated
     /// to keep the cache synchronized with the actual file descriptor table.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `fd` - File descriptor number (must be 0-15 for cached FDs)
     /// * `file_idx` - File index in global file table
     fn update_fd_cache(&mut self, fd: i32, file_idx: usize) {
         // Get file type from file table to cache it
-        let file_type = crate::fs::file::FILE_TABLE.lock()
+        let file_type = crate::fs::file::FILE_TABLE
+            .lock()
             .get(file_idx)
             .map(|f| f.ftype)
             .unwrap_or(crate::fs::file::FileType::None);
-        
+
         self.fd_cache.update(fd, file_idx, file_type);
     }
-    
+
     /// Invalidate file descriptor cache when a file descriptor is closed
-    /// 
+    ///
     /// This should be called whenever a file descriptor is closed
     /// to keep the cache synchronized with the actual file descriptor table.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `fd` - File descriptor number (must be 0-15 for cached FDs)
     fn invalidate_fd_cache(&mut self, fd: i32) {
         self.fd_cache.invalidate(fd);
     }
-    
+
     /// Invalidate all file descriptor caches
-    /// 
+    ///
     /// This should be called when all file descriptors are closed
     /// (e.g., during process exit).
     fn invalidate_all_fd_cache(&mut self) {
         self.fd_cache.invalidate_all();
     }
-    
+
     /// Get file descriptor cache statistics
     pub fn get_fd_cache_stats(&self) -> crate::subsystems::process::fd_cache::FdCacheStats {
         self.fd_cache.get_stats()
@@ -469,23 +556,24 @@ impl Proc {
 
 /// Resource pools for efficient allocation
 struct ResourcePools {
-    stack_pool: Vec<usize>,      // store kernel stack addresses
-    trapframe_pool: Vec<usize>,  // store trapframe addresses
+    stack_pool: Vec<usize>,     // store kernel stack addresses
+    trapframe_pool: Vec<usize>, // store trapframe addresses
 }
 
 impl ResourcePools {
     const fn new() -> Self {
-        Self {
-            stack_pool: Vec::new(),
-            trapframe_pool: Vec::new(),
-        }
+        Self { stack_pool: Vec::new(), trapframe_pool: Vec::new() }
     }
 
     /// Get a kernel stack from pool or allocate new one
     fn alloc_stack(&mut self) -> Option<usize> {
         self.stack_pool.pop().or_else(|| {
             let stack = kalloc();
-            if stack.is_null() { None } else { Some(stack as usize) }
+            if stack.is_null() {
+                None
+            } else {
+                Some(stack as usize)
+            }
         })
     }
 
@@ -494,7 +582,9 @@ impl ResourcePools {
         if stack_addr != 0 && self.stack_pool.len() < NPROC {
             self.stack_pool.push(stack_addr);
         } else if stack_addr != 0 {
-            unsafe { kfree(stack_addr as *mut u8); }
+            unsafe {
+                kfree(stack_addr as *mut u8);
+            }
         }
     }
 
@@ -502,7 +592,11 @@ impl ResourcePools {
     fn alloc_trapframe(&mut self) -> Option<usize> {
         self.trapframe_pool.pop().or_else(|| {
             let tf = kalloc() as *mut TrapFrame;
-            if tf.is_null() { None } else { Some(tf as usize) }
+            if tf.is_null() {
+                None
+            } else {
+                Some(tf as usize)
+            }
         })
     }
 
@@ -511,7 +605,9 @@ impl ResourcePools {
         if tf_addr != 0 && self.trapframe_pool.len() < NPROC {
             self.trapframe_pool.push(tf_addr);
         } else if tf_addr != 0 {
-            unsafe { kfree(tf_addr as *mut u8); }
+            unsafe {
+                kfree(tf_addr as *mut u8);
+            }
         }
     }
 }
@@ -520,11 +616,15 @@ impl ResourcePools {
 pub struct ProcTable {
     procs: [Proc; NPROC],
     next_pid: Pid,
-    pid_to_index: HashMap<Pid, usize, DefaultHasherBuilder>,  // O(1) average-case PID lookup using HashMap (always initialized)
-    parent_to_children: HashMap<Pid, Vec<Pid>, DefaultHasherBuilder>,  // O(1) child lookup by parent PID (always initialized)
-    free_list: Vec<usize>,  // Free process slot indices for O(1) allocation
-    resource_pools: ResourcePools,  // Resource pools for efficient allocation
-    initialized: bool,  // Track initialization state
+    pid_to_index: HashMap<Pid, usize, DefaultHasherBuilder>, /* O(1) average-case PID lookup
+                                                              * using HashMap (always
+                                                              * initialized) */
+    parent_to_children: HashMap<Pid, Vec<Pid>, DefaultHasherBuilder>, /* O(1) child lookup by
+                                                                       * parent PID (always
+                                                                       * initialized) */
+    free_list: Vec<usize>, // Free process slot indices for O(1) allocation
+    resource_pools: ResourcePools, // Resource pools for efficient allocation
+    initialized: bool,     // Track initialization state
 }
 
 impl ProcTable {
@@ -534,8 +634,10 @@ impl ProcTable {
         Self {
             procs: [INIT_PROC; NPROC],
             next_pid: 1,
-            pid_to_index: HashMap::with_hasher(DefaultHasherBuilder),  // Will be properly initialized at runtime
-            parent_to_children: HashMap::with_hasher(DefaultHasherBuilder),  // Will be properly initialized at runtime
+            pid_to_index: HashMap::with_hasher(DefaultHasherBuilder), /* Will be properly initialized at runtime */
+            parent_to_children: HashMap::with_hasher(DefaultHasherBuilder), /* Will be properly
+                                                                       * initialized at
+                                                                       * runtime */
             free_list: Vec::new(),
             resource_pools: ResourcePools::new(),
             initialized: false,
@@ -549,8 +651,8 @@ impl ProcTable {
         let mut table = Self {
             procs: [INIT_PROC; NPROC],
             next_pid: 1,
-            pid_to_index: HashMap::with_hasher(DefaultHasherBuilder),  // Always initialized
-            parent_to_children: HashMap::with_hasher(DefaultHasherBuilder),  // Always initialized
+            pid_to_index: HashMap::with_hasher(DefaultHasherBuilder), // Always initialized
+            parent_to_children: HashMap::with_hasher(DefaultHasherBuilder), // Always initialized
             free_list: Vec::new(),
             resource_pools: ResourcePools::new(),
             initialized: false,
@@ -561,7 +663,7 @@ impl ProcTable {
         table.initialized = true;
         table
     }
-    
+
     /// Get the number of processes in the table
     pub fn len(&self) -> usize {
         self.pid_to_index.len()
@@ -578,7 +680,7 @@ impl ProcTable {
     pub fn alloc(&mut self) -> Option<&mut Proc> {
         // Ensure initialized first (before any borrows)
         self.ensure_initialized();
-        
+
         // Initialize free list if it's empty
         if self.free_list.is_empty() {
             // Populate free list with all available indices
@@ -590,7 +692,7 @@ impl ProcTable {
         // Get the first available index from free list
         let idx = self.free_list.pop()?;
         let proc = &mut self.procs[idx];
-        
+
         // Ensure the process is actually unused (sanity check)
         if proc.state != ProcState::Unused {
             // Push it back if it's not unused
@@ -602,19 +704,19 @@ impl ProcTable {
         proc.pid = new_pid;
         self.next_pid += 1;
         proc.state = ProcState::Used;
-        
+
         // Initialize ASLR for new process
         if crate::security::is_aslr_enabled() {
             let _ = crate::security::init_process_aslr_by_pid(new_pid as u64);
         }
-    
-    // Initialize process group and session ID
-    proc.pgid = new_pid;
-    proc.sid = new_pid;
-    
-    // Initialize signal state
-    proc.signals = Some(SignalState::new());
-        
+
+        // Initialize process group and session ID
+        proc.pgid = new_pid;
+        proc.sid = new_pid;
+
+        // Initialize signal state
+        proc.signals = Some(SignalState::new());
+
         // Allocate kernel stack from pool
         let kstack = match self.resource_pools.alloc_stack() {
             Some(stack) => stack,
@@ -623,9 +725,9 @@ impl ProcTable {
                 proc.signals = None;
                 self.free_list.push(idx); // Return to free list
                 return None;
-            }
+            },
         };
-        proc.kstack = kstack + PAGE_SIZE;  // Stack grows down
+        proc.kstack = kstack + PAGE_SIZE; // Stack grows down
 
         // Allocate trapframe from pool
         let tf = match self.resource_pools.alloc_trapframe() {
@@ -636,19 +738,19 @@ impl ProcTable {
                 proc.signals = None;
                 self.free_list.push(idx); // Return to free list
                 return None;
-            }
+            },
         };
         proc.trapframe = tf as *mut TrapFrame;
-        
+
         // Store PID and index before inserting into HashMap
         let pid = new_pid;
-        
+
         // Add to pid_to_index map for O(1) lookups
         // Note: We can safely insert here because ensure_initialized() was called earlier
         self.pid_to_index.insert(pid, idx);
         // RCU 分片注册（占位，不改变主路径）
         crate::process::rcu_table::with_sharded(|s| s.register(pid));
-        
+
         // Return reference to the proc (idx is valid, managed internally)
         Some(proc)
     }
@@ -701,7 +803,10 @@ impl ProcTable {
     #[inline]
     fn add_child_to_parent(&mut self, parent_pid: Pid, child_pid: Pid) {
         self.ensure_initialized();
-        self.parent_to_children.entry(parent_pid).or_insert_with(Vec::new).push(child_pid);
+        self.parent_to_children
+            .entry(parent_pid)
+            .or_insert_with(Vec::new)
+            .push(child_pid);
     }
 
     /// Remove child from parent's children list - O(1) average-case
@@ -728,37 +833,39 @@ impl ProcTable {
     /// Free a process
     pub fn free(&mut self, pid: Pid) {
         self.ensure_initialized();
-        
+
         if let Some(&idx) = self.pid_to_index.get(&pid) {
             // Get parent PID before mutable borrow
             let parent_pid = self.procs[idx].parent;
-            
+
             // Remove from parent's children list before freeing
             if let Some(parent_pid) = parent_pid {
                 self.remove_child_from_parent(parent_pid, pid);
             }
-            
+
             let proc = &mut self.procs[idx];
 
-                // Free kernel stack using resource pool
-                if proc.kstack != 0 {
-                    let stack_addr = (proc.kstack - PAGE_SIZE) as usize;
-                    self.resource_pools.free_stack(stack_addr);
-                    proc.kstack = 0;
-                }
+            // Free kernel stack using resource pool
+            if proc.kstack != 0 {
+                let stack_addr = (proc.kstack - PAGE_SIZE) as usize;
+                self.resource_pools.free_stack(stack_addr);
+                proc.kstack = 0;
+            }
 
-                // Free trapframe using resource pool
-                if !proc.trapframe.is_null() {
-                    let tf_addr = proc.trapframe as usize;
-                    self.resource_pools.free_trapframe(tf_addr);
-                    proc.trapframe = null_mut();
-                }
+            // Free trapframe using resource pool
+            if !proc.trapframe.is_null() {
+                let tf_addr = proc.trapframe as usize;
+                self.resource_pools.free_trapframe(tf_addr);
+                proc.trapframe = null_mut();
+            }
 
-                // Free page table and all user pages
-                if !proc.pagetable.is_null() {
-                    unsafe { free_pagetable(proc.pagetable); }
-                    proc.pagetable = null_mut();
+            // Free page table and all user pages
+            if !proc.pagetable.is_null() {
+                unsafe {
+                    free_pagetable(proc.pagetable);
                 }
+                proc.pagetable = null_mut();
+            }
 
             // Reset process state
             proc.state = ProcState::Unused;
@@ -882,7 +989,9 @@ pub fn parent_pid() -> Pid {
 /// Set current process PID
 fn set_current(pid: Option<Pid>) {
     let cpu_id = crate::cpu::cpuid();
-    unsafe { CURRENT_PID[cpu_id] = pid; }
+    unsafe {
+        CURRENT_PID[cpu_id] = pid;
+    }
 }
 
 /// Fork current process
@@ -891,9 +1000,49 @@ pub fn fork() -> Option<Pid> {
     let mut table = PROC_TABLE.lock();
 
     // Extract all parent data first, then release borrow
-    let (parent_pgid, parent_sid, parent_uid, parent_gid, parent_euid, parent_egid, parent_suid, parent_sgid, parent_nice, parent_umask, parent_ofile, parent_cwd_path, parent_cwd, parent_rlimits, parent_pagetable, parent_sz, parent_trapframe, parent_namespaces, parent_cgroup) = {
+    let (
+        parent_pgid,
+        parent_sid,
+        parent_uid,
+        parent_gid,
+        parent_euid,
+        parent_egid,
+        parent_suid,
+        parent_sgid,
+        parent_nice,
+        parent_umask,
+        parent_ofile,
+        parent_cwd_path,
+        parent_cwd,
+        parent_rlimits,
+        parent_pagetable,
+        parent_sz,
+        parent_trapframe,
+        parent_namespaces,
+        parent_cgroup,
+    ) = {
         let parent = table.find(parent_pid)?;
-        (parent.pgid, parent.sid, parent.uid, parent.gid, parent.euid, parent.egid, parent.suid, parent.sgid, parent.nice, parent.umask, parent.ofile.clone(), parent.cwd_path.clone(), parent.cwd, parent.rlimits.clone(), parent.pagetable, parent.sz, parent.trapframe, parent.namespaces.clone(), parent.cgroup.clone())
+        (
+            parent.pgid,
+            parent.sid,
+            parent.uid,
+            parent.gid,
+            parent.euid,
+            parent.egid,
+            parent.suid,
+            parent.sgid,
+            parent.nice,
+            parent.umask,
+            parent.ofile.clone(),
+            parent.cwd_path.clone(),
+            parent.cwd,
+            parent.rlimits.clone(),
+            parent.pagetable,
+            parent.sz,
+            parent.trapframe,
+            parent.namespaces.clone(),
+            parent.cgroup.clone(),
+        )
     };
 
     // Allocate child process (now we can use table mutably again)
@@ -905,7 +1054,7 @@ pub fn fork() -> Option<Pid> {
     child.state = ProcState::Runnable;
     child.pgid = parent_pgid;
     child.sid = parent_sid;
-    
+
     // Create security context for child process
     let security_level = crate::security::get_current_security_level(parent_pid);
     let domain_id = match crate::security::create_process_security_context(
@@ -919,9 +1068,9 @@ pub fn fork() -> Option<Pid> {
             // Failed to create security context, clean up and return None
             table.free(child_pid);
             return None;
-        }
+        },
     };
-    
+
     // Store domain ID in process
     child.domain_id = domain_id;
     // Inherit credentials from parent
@@ -933,16 +1082,16 @@ pub fn fork() -> Option<Pid> {
     child.sgid = parent_sgid;
     child.nice = parent_nice;
     child.umask = parent_umask;
-    
+
     // Drop mutable borrow of child before calling add_child_to_parent
     drop(child);
 
     // Add child to parent's children list for O(1) wait() lookup
     table.ensure_initialized();
     let child_idx = table.pid_to_index.get(&child_pid).copied();
-    
+
     table.add_child_to_parent(parent_pid, child_pid);
-    
+
     // Re-acquire child reference for remaining initialization
     let child = if let Some(idx) = child_idx {
         &mut table.procs[idx]
@@ -975,13 +1124,22 @@ pub fn fork() -> Option<Pid> {
     child.cgroup = parent_cgroup;
     // If parent is in a cgroup, add child to the same cgroup
     if let Some(ref cgroup_name) = child.cgroup {
-        if let Err(e) = crate::subsystems::cloud_native::cgroups::add_process_to_cgroup(cgroup_name, child_pid as u32) {
-            crate::println!("[fork] Warning: Failed to add child process {} to cgroup {}: {}", child_pid, cgroup_name, e);
+        if let Err(e) = crate::subsystems::cloud_native::cgroups::add_process_to_cgroup(
+            cgroup_name,
+            child_pid as u32,
+        ) {
+            crate::println!(
+                "[fork] Warning: Failed to add child process {} to cgroup {}: {}",
+                child_pid,
+                cgroup_name,
+                e
+            );
         }
     }
 
     // Copy page table with copy-on-write semantics
-    if let Some(pagetable) = unsafe { crate::subsystems::mm::vm::copy_pagetable(parent_pagetable) } {
+    if let Some(pagetable) = unsafe { crate::subsystems::mm::vm::copy_pagetable(parent_pagetable) }
+    {
         child.pagetable = pagetable;
         child.sz = parent_sz;
     } else {
@@ -994,7 +1152,7 @@ pub fn fork() -> Option<Pid> {
     unsafe {
         *child.trapframe = *parent_trapframe;
     }
-    
+
     // Set return value to 0 for child process (architecture-specific register)
     unsafe {
         #[cfg(target_arch = "riscv64")]
@@ -1048,7 +1206,7 @@ pub fn exit(status: i32) {
 
             // Reparent children to init
             reparent_children(&mut table, pid);
-            
+
             // Remove security context for the exiting process
             let _ = crate::security::remove_process_security_context(pid);
         }
@@ -1064,13 +1222,13 @@ pub fn terminate_process(pid: u64) {
     if let Some(proc) = table.find(pid as Pid) {
         // Mark process as killed
         proc.killed = true;
-        
+
         // If process is sleeping, make it runnable so it can be scheduled
         // and exit properly
         if proc.state == ProcState::Sleeping {
             proc.state = ProcState::Runnable;
         }
-        
+
         // If this is the current process, we need to yield CPU to allow
         // scheduler to clean up
         if myproc() == Some(pid as Pid) {
@@ -1107,7 +1265,9 @@ pub fn wait(status: *mut i32) -> Option<Pid> {
         // If found a zombie, free it and return
         if let Some((child_pid, xstate)) = zombie_child {
             if !status.is_null() {
-                unsafe { *status = xstate; }
+                unsafe {
+                    *status = xstate;
+                }
             }
             table.free(child_pid);
             return Some(child_pid);
@@ -1120,8 +1280,8 @@ pub fn wait(status: *mut i32) -> Option<Pid> {
 }
 
 /// Wait for a specific child process with options
-/// Arguments: pid - child PID to wait for (-1 for any child), status - pointer to status, options - wait options
-/// Returns: child PID on success, None on failure
+/// Arguments: pid - child PID to wait for (-1 for any child), status - pointer to status, options -
+/// wait options Returns: child PID on success, None on failure
 pub fn waitpid(pid: i32, status: *mut i32, options: i32) -> Option<Pid> {
     use crate::posix;
 
@@ -1178,7 +1338,10 @@ pub fn waitpid(pid: i32, status: *mut i32, options: i32) -> Option<Pid> {
                 }
 
                 // Check for running state if WNOHANG is set (no child available yet)
-                if no_hang && (child_proc.state == ProcState::Running || child_proc.state == ProcState::Runnable) {
+                if no_hang
+                    && (child_proc.state == ProcState::Running
+                        || child_proc.state == ProcState::Runnable)
+                {
                     // No status available yet, but don't block
                     return None;
                 }
@@ -1189,7 +1352,9 @@ pub fn waitpid(pid: i32, status: *mut i32, options: i32) -> Option<Pid> {
         if let Some((child_pid, xstate)) = found_child {
             // Write status to user space if requested
             if !status.is_null() {
-                unsafe { *status = xstate; }
+                unsafe {
+                    *status = xstate;
+                }
             }
 
             // Only clean up zombie processes, not stopped ones
@@ -1250,14 +1415,14 @@ pub fn getpid() -> Pid {
 }
 
 /// Allocate file descriptor for current process
-/// 
+///
 /// This function allocates a file descriptor and updates the cache
 /// for commonly used file descriptors (0-7) to enable O(1) lookup.
 pub fn fdalloc(file_idx: usize) -> Option<i32> {
     let pid = myproc()?;
     let mut table = PROC_TABLE.lock();
     let proc = table.find(pid)?;
-    
+
     for (i, slot) in proc.ofile.iter_mut().enumerate() {
         if slot.is_none() {
             *slot = Some(file_idx);
@@ -1292,7 +1457,7 @@ pub fn fdclose(fd: i32) -> Option<usize> {
 }
 
 /// Lookup file descriptor
-/// 
+///
 /// This function provides O(1) lookup for file descriptors.
 /// For commonly used file descriptors (0-15), it uses the extended cache
 /// to avoid repeated file table lookups. The cache tracks access patterns
@@ -1301,7 +1466,7 @@ pub fn fdlookup(fd: i32) -> Option<usize> {
     let pid = myproc()?;
     let table = PROC_TABLE.lock();
     let proc = table.find_ref(pid)?;
-    
+
     // Try cache first for commonly used file descriptors (0-15)
     if fd >= 0 && fd < 16 {
         if let Some(file_idx) = proc.get_cached_fd(fd) {
@@ -1311,7 +1476,7 @@ pub fn fdlookup(fd: i32) -> Option<usize> {
             }
         }
     }
-    
+
     // Fall back to regular lookup and update cache if found
     if fd >= 0 && (fd as usize) < NOFILE {
         if let Some(file_idx) = proc.ofile[fd as usize] {
@@ -1320,19 +1485,19 @@ pub fn fdlookup(fd: i32) -> Option<usize> {
             return Some(file_idx);
         }
     }
-    
+
     None
 }
 
 /// Install a file at a specific file descriptor
-/// 
+///
 /// This function installs a file at a specific file descriptor and
 /// updates the extended cache for commonly used file descriptors (0-15).
 pub fn fdinstall(fd: i32, file_idx: usize) -> Result<(), ()> {
     let pid = myproc().ok_or(())?;
     let mut table = PROC_TABLE.lock();
     let proc = table.find(pid).ok_or(())?;
-    
+
     if fd >= 0 && (fd as usize) < NOFILE {
         proc.ofile[fd as usize] = Some(file_idx);
         // Update extended cache for FDs 0-15
@@ -1376,20 +1541,20 @@ fn wakeup_pid(table: &mut ProcTable, pid: Pid) {
 fn reparent_children(table: &mut ProcTable, parent_pid: Pid) {
     // Collect children to reparent
     let mut children_to_reparent = Vec::new();
-    
+
     if let Some(children) = table.get_children(parent_pid) {
         children_to_reparent.extend_from_slice(children);
     }
-    
+
     // Reparent each child to init (PID 1)
     for &child_pid in &children_to_reparent {
         // Remove from old parent's children list first
         table.remove_child_from_parent(parent_pid, child_pid);
-        
+
         // Then update child's parent
         if let Some(child_proc) = table.find(child_pid) {
             child_proc.parent = Some(1); // Reparent to init
-            
+
             // Add to init's children list
             table.add_child_to_parent(1, child_pid);
         }

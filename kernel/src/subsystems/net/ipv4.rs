@@ -29,7 +29,7 @@ impl Ipv4Addr {
     /// Create a new IPv4 address from bytes
     pub const fn new(a: u8, b: u8, c: u8, d: u8) -> Self {
         Self {
-            addr: ((a as u32) << 24) | ((b as u32) << 16) | ((c as u32) << 8) | (d as u32)
+            addr: ((a as u32) << 24) | ((b as u32) << 16) | ((c as u32) << 8) | (d as u32),
         }
     }
 
@@ -40,9 +40,7 @@ impl Ipv4Addr {
 
     /// Create IPv4 address from u32 (network byte order)
     pub fn from_be_bytes(bytes: [u8; 4]) -> Self {
-        Self {
-            addr: u32::from_be_bytes(bytes)
-        }
+        Self { addr: u32::from_be_bytes(bytes) }
     }
 
     /// Get address as u32 (host byte order)
@@ -67,9 +65,9 @@ impl Ipv4Addr {
 
     /// Check if address is private (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
     pub const fn is_private(self) -> bool {
-        self.is_in_range(10, 0, 0, 0, 10, 255, 255, 255) ||
-        self.is_in_range(172, 16, 0, 0, 172, 31, 255, 255) ||
-        self.is_in_range(192, 168, 0, 0, 192, 168, 255, 255)
+        self.is_in_range(10, 0, 0, 0, 10, 255, 255, 255)
+            || self.is_in_range(172, 16, 0, 0, 172, 31, 255, 255)
+            || self.is_in_range(192, 168, 0, 0, 192, 168, 255, 255)
     }
 
     /// Check if address is multicast (224.0.0.0/4)
@@ -85,8 +83,14 @@ impl Ipv4Addr {
     /// Check if address is in the given range
     const fn is_in_range(
         self,
-        start_a: u8, start_b: u8, start_c: u8, start_d: u8,
-        end_a: u8, end_b: u8, end_c: u8, end_d: u8
+        start_a: u8,
+        start_b: u8,
+        start_c: u8,
+        start_d: u8,
+        end_a: u8,
+        end_b: u8,
+        end_c: u8,
+        end_d: u8,
     ) -> bool {
         let start = Self::new(start_a, start_b, start_c, start_d).addr;
         let end = Self::new(end_a, end_b, end_c, end_d).addr;
@@ -419,13 +423,8 @@ impl Ipv4Packet {
         payload: Vec<u8>,
         ttl: u8,
     ) -> Self {
-        let mut header = Ipv4Header::new(
-            source_addr,
-            dest_addr,
-            protocol,
-            payload.len() as u16,
-            ttl,
-        );
+        let mut header =
+            Ipv4Header::new(source_addr, dest_addr, protocol, payload.len() as u16, ttl);
 
         // Calculate checksum
         header.set_checksum();

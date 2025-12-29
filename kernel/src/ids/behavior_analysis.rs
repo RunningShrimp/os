@@ -1,18 +1,16 @@
 /// Behavior Analysis Module for IDS
-
 extern crate alloc;
-///
+use alloc::{string::String, sync::Arc, vec::Vec};
+use core::sync::atomic::{AtomicU64, Ordering};
+
 /// This module implements behavioral analysis to detect unusual system
 /// and user behavior that may indicate security threats.
-
-use crate::subsystems::sync::{SpinLock, Mutex};
-use crate::collections::HashMap;
-use crate::compat::DefaultHasherBuilder;
-use crate::subsystems::time::{SystemTime, UNIX_EPOCH};
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::string::String;
-use core::sync::atomic::{AtomicU64, Ordering};
+use crate::subsystems::sync::{Mutex, SpinLock};
+use crate::{
+    collections::HashMap,
+    compat::DefaultHasherBuilder,
+    subsystems::time::{SystemTime, UNIX_EPOCH},
+};
 
 /// Behavior risk level
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -214,7 +212,10 @@ impl BehaviorAnalyzer {
     }
 
     /// Initialize the behavior analyzer with the config
-    pub fn init(&mut self, _config: &crate::ids::BehaviorAnalysisConfig) -> Result<(), &'static str> {
+    pub fn init(
+        &mut self,
+        _config: &crate::ids::BehaviorAnalysisConfig,
+    ) -> Result<(), &'static str> {
         // In a real implementation we would configure models and load baselines.
         Ok(())
     }
@@ -254,7 +255,8 @@ impl BehaviorAnalyzer {
 
         // Update statistics
         self.stats.total_events += 1;
-        self.stats.events_by_category
+        self.stats
+            .events_by_category
             .entry(event_with_id.category)
             .and_modify(|count| *count += 1)
             .or_insert(1);
@@ -270,7 +272,13 @@ impl BehaviorAnalyzer {
     }
 
     /// Analyze user behavior
-    pub fn analyze_user_behavior(&mut self, user_id: u32, action: &str, resource: &str, details: &HashMap<String, String>) -> Option<BehaviorAnomaly> {
+    pub fn analyze_user_behavior(
+        &mut self,
+        user_id: u32,
+        action: &str,
+        resource: &str,
+        details: &HashMap<String, String>,
+    ) -> Option<BehaviorAnomaly> {
         let _lock = self.analyzer_lock.lock();
 
         if let Some(user_profile) = self.user_profiles.get(&user_id) {
@@ -281,25 +289,37 @@ impl BehaviorAnalyzer {
                 .as_secs();
             let current_hour = ((current_time / 3600) % 24) as u32;
 
-            let unusual_time = !user_profile.login_patterns.iter()
+            let unusual_time = !user_profile
+                .login_patterns
+                .iter()
                 .any(|(start, end)| current_hour >= *start && current_hour <= *end);
 
             // Check risk escalation
             let mut risk_factors = 0;
-            if unusual_time { risk_factors += 1; }
+            if unusual_time {
+                risk_factors += 1;
+            }
 
             // Check for unusual file access
             if let Some(file_path) = details.get("file_path") {
-                let unusual_file = !user_profile.file_patterns.iter()
+                let unusual_file = !user_profile
+                    .file_patterns
+                    .iter()
                     .any(|pattern| file_path.contains(pattern));
-                if unusual_file { risk_factors += 1; }
+                if unusual_file {
+                    risk_factors += 1;
+                }
             }
 
             // Check for unusual application usage
             if let Some(app_name) = details.get("application") {
-                let unusual_app = !user_profile.common_apps.iter()
+                let unusual_app = !user_profile
+                    .common_apps
+                    .iter()
                     .any(|app| app_name.contains(app));
-                if unusual_app { risk_factors += 1; }
+                if unusual_app {
+                    risk_factors += 1;
+                }
             }
 
             // Generate anomaly if multiple risk factors
@@ -319,7 +339,12 @@ impl BehaviorAnalyzer {
     }
 
     /// Analyze process behavior
-    pub fn analyze_process_behavior(&mut self, process_name: &str, action: &str, details: &HashMap<String, String>) -> Option<BehaviorAnomaly> {
+    pub fn analyze_process_behavior(
+        &mut self,
+        process_name: &str,
+        action: &str,
+        details: &HashMap<String, String>,
+    ) -> Option<BehaviorAnomaly> {
         let _lock = self.analyzer_lock.lock();
 
         if let Some(process_profile) = self.event_patterns.get(process_name) {
@@ -328,21 +353,33 @@ impl BehaviorAnalyzer {
 
             // Check for unusual network connections
             if let Some(remote_ip) = details.get("remote_ip") {
-                let unusual_connection = !process_profile.normal_connections.iter()
+                let unusual_connection = !process_profile
+                    .normal_connections
+                    .iter()
                     .any(|(ip, _port)| ip == remote_ip);
-                if unusual_connection { risk_factors += 1; }
+                if unusual_connection {
+                    risk_factors += 1;
+                }
             }
 
             // Check for unusual file access
             if let Some(file_path) = details.get("file_path") {
-                let unusual_access = !process_profile.file_access_patterns.iter()
+                let unusual_access = !process_profile
+                    .file_access_patterns
+                    .iter()
                     .any(|pattern| file_path.contains(pattern));
-                if unusual_access { risk_factors += 1; }
+                if unusual_access {
+                    risk_factors += 1;
+                }
             }
 
             // Check for privilege escalation attempts
             if action == "setuid" || action == "sudo" {
-                if !process_profile.common_parents.iter().any(|parent| parent.contains("sudo")) {
+                if !process_profile
+                    .common_parents
+                    .iter()
+                    .any(|parent| parent.contains("sudo"))
+                {
                     risk_factors += 2; // Higher weight for privilege escalation
                 }
             }
@@ -364,11 +401,7 @@ impl BehaviorAnalyzer {
 
     /// Get recent anomalies
     pub fn get_recent_anomalies(&self, count: usize) -> Vec<BehaviorAnomaly> {
-        self.anomalies.iter()
-            .rev()
-            .take(count)
-            .cloned()
-            .collect()
+        self.anomalies.iter().rev().take(count).cloned().collect()
     }
 
     /// Get user profile
@@ -395,20 +428,20 @@ impl BehaviorAnalyzer {
             .as_secs();
 
         // Clear old events
-        self.events.retain(|event| {
-            current_time - event.timestamp <= max_age_seconds
-        });
+        self.events
+            .retain(|event| current_time - event.timestamp <= max_age_seconds);
 
         // Clear old anomalies
-        self.anomalies.retain(|anomaly| {
-            current_time - anomaly.timestamp <= max_age_seconds
-        });
+        self.anomalies
+            .retain(|anomaly| current_time - anomaly.timestamp <= max_age_seconds);
     }
 
     /// Update user profile based on event
     fn update_user_profile(&mut self, user_id: u32, event: &BehaviorEvent) {
-        let profile = self.user_profiles.entry(user_id).or_insert_with(|| {
-            UserProfile {
+        let profile = self
+            .user_profiles
+            .entry(user_id)
+            .or_insert_with(|| UserProfile {
                 user_id,
                 username: event.subject.clone(),
                 role: String::from("Unknown"),
@@ -420,8 +453,7 @@ impl BehaviorAnalyzer {
                 risk_score: 0.0,
                 last_activity: event.timestamp,
                 created_at: event.timestamp,
-            }
-        });
+            });
 
         // Update last activity
         profile.last_activity = event.timestamp;
@@ -434,7 +466,11 @@ impl BehaviorAnalyzer {
         }
 
         if let Some(file_path) = event.details.get("file_path") {
-            if !profile.file_patterns.iter().any(|pattern| file_path.contains(pattern)) {
+            if !profile
+                .file_patterns
+                .iter()
+                .any(|pattern| file_path.contains(pattern))
+            {
                 profile.file_patterns.push(file_path.clone());
             }
         }
@@ -450,8 +486,10 @@ impl BehaviorAnalyzer {
 
     /// Update process profile based on event
     fn update_process_profile(&mut self, process_name: &str, event: &BehaviorEvent) {
-        let profile = self.event_patterns.entry(String::from(process_name)).or_insert_with(|| {
-            ProcessProfile {
+        let profile = self
+            .event_patterns
+            .entry(String::from(process_name))
+            .or_insert_with(|| ProcessProfile {
                 process_name: String::from(process_name),
                 path: event.object.clone(),
                 avg_cpu_usage: 0.0,
@@ -462,12 +500,15 @@ impl BehaviorAnalyzer {
                 file_access_patterns: Vec::new(),
                 risk_level: RiskLevel::Normal,
                 created_at: event.timestamp,
-            }
-        });
+            });
 
         // Update file access patterns
         if !event.object.is_empty() {
-            if !profile.file_access_patterns.iter().any(|pattern| event.object.contains(pattern)) {
+            if !profile
+                .file_access_patterns
+                .iter()
+                .any(|pattern| event.object.contains(pattern))
+            {
                 profile.file_access_patterns.push(event.object.clone());
             }
         }
@@ -477,7 +518,11 @@ impl BehaviorAnalyzer {
             if let Some(port_str) = event.details.get("remote_port") {
                 if let Ok(port) = port_str.parse::<u16>() {
                     let connection = (remote_ip.clone(), port);
-                    if !profile.normal_connections.iter().any(|(ip, p)| ip == remote_ip && *p == port) {
+                    if !profile
+                        .normal_connections
+                        .iter()
+                        .any(|(ip, p)| ip == remote_ip && *p == port)
+                    {
                         profile.normal_connections.push(connection);
                     }
                 }
@@ -495,7 +540,9 @@ impl BehaviorAnalyzer {
         if let Some(baseline) = self.baselines.get(&baseline_key) {
             // Check for frequency anomalies
             let current_hour = ((event.timestamp / 3600) % 24) as u32;
-            let unusual_time = !baseline.time_patterns.iter()
+            let unusual_time = !baseline
+                .time_patterns
+                .iter()
                 .any(|(start, end)| current_hour >= *start && current_hour <= *end);
 
             if unusual_time && baseline.confidence > 0.7 {
@@ -512,7 +559,14 @@ impl BehaviorAnalyzer {
     }
 
     /// Create a behavior anomaly
-    fn create_anomaly(&self, subject: String, category: BehaviorCategory, description: String, risk_level: RiskLevel, score: f32) -> BehaviorAnomaly {
+    fn create_anomaly(
+        &self,
+        subject: String,
+        category: BehaviorCategory,
+        description: String,
+        risk_level: RiskLevel,
+        score: f32,
+    ) -> BehaviorAnomaly {
         let id = self.anomaly_counter.fetch_add(1, Ordering::Relaxed);
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)

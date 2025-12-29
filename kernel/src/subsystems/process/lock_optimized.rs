@@ -12,6 +12,7 @@
 
 extern crate alloc;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
 use crate::subsystems::sync::RwLock;
 
 /// 锁定统计信息
@@ -75,16 +76,18 @@ impl LockStats {
     #[inline]
     pub fn record_contention(&self, wait_time_ns: u64) {
         self.contentions.fetch_add(1, Ordering::Relaxed);
-        
+
         // 更新平均等待时间
         let current_avg = self.avg_wait_time_ns.load(Ordering::Relaxed);
         let new_avg = (current_avg as u64 + wait_time_ns) / 2;
-        self.avg_wait_time_ns.store(new_avg as usize, Ordering::Relaxed);
-        
+        self.avg_wait_time_ns
+            .store(new_avg as usize, Ordering::Relaxed);
+
         // 更新最大等待时间
         let current_max = self.max_wait_time_ns.load(Ordering::Relaxed);
         if wait_time_ns as usize > current_max {
-            self.max_wait_time_ns.store(wait_time_ns as usize, Ordering::Relaxed);
+            self.max_wait_time_ns
+                .store(wait_time_ns as usize, Ordering::Relaxed);
         }
     }
 
@@ -204,13 +207,13 @@ pub enum FineGrainedLockType {
 pub struct OptimizedProcessLockManager {
     config: LockConfig,
     stats: LockStats,
-    
+
     /// 细粒度锁数组
     fine_grained_locks: [RwLock<()>; 7],
-    
+
     /// 主进程表读写锁
     main_table_lock: RwLock<()>,
-    
+
     /// 锁升级标志
     lock_upgrade_in_progress: AtomicBool,
 }
@@ -244,9 +247,12 @@ impl OptimizedProcessLockManager {
 
     /// 获取细粒度读锁
     #[inline]
-    pub fn acquire_fine_grained_read_lock(&self, lock_type: FineGrainedLockType) -> FineGrainedReadLockGuard {
+    pub fn acquire_fine_grained_read_lock(
+        &self,
+        lock_type: FineGrainedLockType,
+    ) -> FineGrainedReadLockGuard {
         let start_time = crate::subsystems::time::hrtime_nanos();
-        
+
         let lock = match lock_type {
             FineGrainedLockType::ProcessInfo => &self.fine_grained_locks[0],
             FineGrainedLockType::ProcessState => &self.fine_grained_locks[1],
@@ -255,31 +261,30 @@ impl OptimizedProcessLockManager {
             FineGrainedLockType::SignalState => &self.fine_grained_locks[4],
             FineGrainedLockType::SchedulingInfo => &self.fine_grained_locks[5],
         };
-        
+
         // 尝试获取读锁
         let guard = lock.read();
-        
+
         let end_time = crate::subsystems::time::hrtime_nanos();
         let wait_time = end_time.saturating_sub(start_time);
-        
+
         if wait_time > 0 {
             self.stats.record_contention(wait_time);
         }
-        
+
         self.stats.record_read_lock_acquire();
-        
-        FineGrainedReadLockGuard {
-            _guard: guard,
-            lock_type,
-            stats: &self.stats,
-        }
+
+        FineGrainedReadLockGuard { _guard: guard, lock_type, stats: &self.stats }
     }
 
     /// 获取细粒度写锁
     #[inline]
-    pub fn acquire_fine_grained_write_lock(&self, lock_type: FineGrainedLockType) -> FineGrainedWriteLockGuard {
+    pub fn acquire_fine_grained_write_lock(
+        &self,
+        lock_type: FineGrainedLockType,
+    ) -> FineGrainedWriteLockGuard {
         let start_time = crate::subsystems::time::hrtime_nanos();
-        
+
         let lock = match lock_type {
             FineGrainedLockType::ProcessInfo => &self.fine_grained_locks[0],
             FineGrainedLockType::ProcessState => &self.fine_grained_locks[1],
@@ -288,79 +293,78 @@ impl OptimizedProcessLockManager {
             FineGrainedLockType::SignalState => &self.fine_grained_locks[4],
             FineGrainedLockType::SchedulingInfo => &self.fine_grained_locks[5],
         };
-        
+
         // 尝试获取写锁
         let guard = lock.write();
-        
+
         let end_time = crate::subsystems::time::hrtime_nanos();
         let wait_time = end_time.saturating_sub(start_time);
-        
+
         if wait_time > 0 {
             self.stats.record_contention(wait_time);
         }
-        
+
         self.stats.record_write_lock_acquire();
-        
-        FineGrainedWriteLockGuard {
-            _guard: guard,
-            lock_type,
-            stats: &self.stats,
-        }
+
+        FineGrainedWriteLockGuard { _guard: guard, lock_type, stats: &self.stats }
     }
 
     /// 获取主表读锁
     #[inline]
     pub fn acquire_main_table_read_lock(&self) -> MainTableReadLockGuard {
         let start_time = crate::subsystems::time::hrtime_nanos();
-        
+
         let guard = self.main_table_lock.read();
-        
+
         let end_time = crate::subsystems::time::hrtime_nanos();
         let wait_time = end_time.saturating_sub(start_time);
-        
+
         if wait_time > 0 {
             self.stats.record_contention(wait_time);
         }
-        
+
         self.stats.record_read_lock_acquire();
-        
-        MainTableReadLockGuard {
-            _guard: guard,
-            stats: &self.stats,
-        }
+
+        MainTableReadLockGuard { _guard: guard, stats: &self.stats }
     }
 
     /// 获取主表写锁
     #[inline]
     pub fn acquire_main_table_write_lock(&self) -> MainTableWriteLockGuard {
         let start_time = crate::subsystems::time::hrtime_nanos();
-        
+
         let guard = self.main_table_lock.write();
-        
+
         let end_time = crate::subsystems::time::hrtime_nanos();
         let wait_time = end_time.saturating_sub(start_time);
-        
+
         if wait_time > 0 {
             self.stats.record_contention(wait_time);
         }
-        
+
         self.stats.record_write_lock_acquire();
-        
-        MainTableWriteLockGuard {
-            _guard: guard,
-            stats: &self.stats,
-        }
+
+        MainTableWriteLockGuard { _guard: guard, stats: &self.stats }
     }
 
     /// 尝试锁升级（读锁升级为写锁）
     #[inline]
-    pub fn try_lock_upgrade(&self, read_guard: &FineGrainedReadLockGuard) -> Option<FineGrainedWriteLockGuard> {
-        if self.lock_upgrade_in_progress.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed) != Ok(false) {
+    pub fn try_lock_upgrade(
+        &self,
+        read_guard: &FineGrainedReadLockGuard,
+    ) -> Option<FineGrainedWriteLockGuard> {
+        if self.lock_upgrade_in_progress.compare_exchange(
+            false,
+            true,
+            Ordering::Acquire,
+            Ordering::Relaxed,
+        ) != Ok(false)
+        {
             return None; // 已有锁升级在进行
         }
 
         let start_time = crate::subsystems::time::hrtime_nanos();
-        
+
         // 释放读锁并尝试获取写锁
         let lock = match read_guard.lock_type {
             FineGrainedLockType::ProcessInfo => &self.fine_grained_locks[0],
@@ -370,30 +374,31 @@ impl OptimizedProcessLockManager {
             FineGrainedLockType::SignalState => &self.fine_grained_locks[4],
             FineGrainedLockType::SchedulingInfo => &self.fine_grained_locks[5],
         };
-        
+
         // 释放读锁
         core::mem::drop(read_guard);
-        
+
         // 获取写锁
         let write_guard = lock.write();
-        
+
         let end_time = crate::subsystems::time::hrtime_nanos();
         let wait_time = end_time.saturating_sub(start_time);
-        
+
         if wait_time > self.config.lock_upgrade_timeout_ns {
             // 超时，释放写锁并返回失败
             core::mem::drop(write_guard);
-            self.lock_upgrade_in_progress.store(false, Ordering::Release);
+            self.lock_upgrade_in_progress
+                .store(false, Ordering::Release);
             return None;
         }
-        
+
         if wait_time > 0 {
             self.stats.record_contention(wait_time);
         }
-        
+
         self.stats.record_write_lock_acquire();
         self.stats.record_read_lock_release(); // 记录读锁释放
-        
+
         Some(FineGrainedWriteLockGuard {
             _guard: write_guard,
             lock_type: read_guard.lock_type,
@@ -487,7 +492,8 @@ pub mod convenience {
     #[inline]
     pub fn lock_process_info_read() -> FineGrainedReadLockGuard<'static> {
         unsafe {
-            get_global_lock_manager().acquire_fine_grained_read_lock(FineGrainedLockType::ProcessInfo)
+            get_global_lock_manager()
+                .acquire_fine_grained_read_lock(FineGrainedLockType::ProcessInfo)
         }
     }
 
@@ -495,7 +501,8 @@ pub mod convenience {
     #[inline]
     pub fn lock_process_info_write() -> FineGrainedWriteLockGuard<'static> {
         unsafe {
-            get_global_lock_manager().acquire_fine_grained_write_lock(FineGrainedLockType::ProcessInfo)
+            get_global_lock_manager()
+                .acquire_fine_grained_write_lock(FineGrainedLockType::ProcessInfo)
         }
     }
 
@@ -503,7 +510,8 @@ pub mod convenience {
     #[inline]
     pub fn lock_file_descriptors_read() -> FineGrainedReadLockGuard<'static> {
         unsafe {
-            get_global_lock_manager().acquire_fine_grained_read_lock(FineGrainedLockType::FileDescriptors)
+            get_global_lock_manager()
+                .acquire_fine_grained_read_lock(FineGrainedLockType::FileDescriptors)
         }
     }
 
@@ -511,40 +519,35 @@ pub mod convenience {
     #[inline]
     pub fn lock_file_descriptors_write() -> FineGrainedWriteLockGuard<'static> {
         unsafe {
-            get_global_lock_manager().acquire_fine_grained_write_lock(FineGrainedLockType::FileDescriptors)
+            get_global_lock_manager()
+                .acquire_fine_grained_write_lock(FineGrainedLockType::FileDescriptors)
         }
     }
 
     /// 获取主表读锁
     #[inline]
     pub fn lock_main_table_read() -> MainTableReadLockGuard<'static> {
-        unsafe {
-            get_global_lock_manager().acquire_main_table_read_lock()
-        }
+        unsafe { get_global_lock_manager().acquire_main_table_read_lock() }
     }
 
     /// 获取主表写锁
     #[inline]
     pub fn lock_main_table_write() -> MainTableWriteLockGuard<'static> {
-        unsafe {
-            get_global_lock_manager().acquire_main_table_write_lock()
-        }
+        unsafe { get_global_lock_manager().acquire_main_table_write_lock() }
     }
 
     /// 尝试锁升级
     #[inline]
-    pub fn try_upgrade_lock(read_guard: &FineGrainedReadLockGuard<'static>) -> Option<FineGrainedWriteLockGuard<'static>> {
-        unsafe {
-            get_global_lock_manager().try_lock_upgrade(read_guard)
-        }
+    pub fn try_upgrade_lock(
+        read_guard: &FineGrainedReadLockGuard<'static>,
+    ) -> Option<FineGrainedWriteLockGuard<'static>> {
+        unsafe { get_global_lock_manager().try_lock_upgrade(read_guard) }
     }
 }
 
 /// 获取锁统计信息
 pub fn get_lock_stats() -> LockStatsSnapshot {
-    unsafe {
-        get_global_lock_manager().get_stats().get_snapshot()
-    }
+    unsafe { get_global_lock_manager().get_stats().get_snapshot() }
 }
 
 /// 重置锁统计信息
@@ -564,7 +567,7 @@ pub mod adaptive {
     pub fn should_use_fine_grained() -> bool {
         // 简化实现：基于当前进程数量决定
         let proc_count = crate::process::manager::PROC_TABLE.lock().len();
-        
+
         // 如果进程数量较多，使用细粒度锁
         proc_count > 8
     }
@@ -600,7 +603,7 @@ mod tests {
     fn test_lock_stats_creation() {
         let stats = LockStats::new();
         let snapshot = stats.get_snapshot();
-        
+
         assert_eq!(snapshot.read_lock_acquires, 0);
         assert_eq!(snapshot.write_lock_acquires, 0);
         assert_eq!(snapshot.contentions, 0);
@@ -627,7 +630,7 @@ mod tests {
         let manager = OptimizedProcessLockManager::with_defaults();
         let stats = manager.get_stats();
         let snapshot = stats.get_snapshot();
-        
+
         assert_eq!(snapshot.read_lock_acquires, 0);
         assert_eq!(snapshot.write_lock_acquires, 0);
     }
@@ -635,10 +638,10 @@ mod tests {
     #[test]
     fn test_lock_contention_recording() {
         let stats = LockStats::new();
-        
+
         stats.record_contention(1000);
         stats.record_contention(2000);
-        
+
         let snapshot = stats.get_snapshot();
         assert_eq!(snapshot.contentions, 2);
         assert_eq!(snapshot.avg_wait_time_ns, 1500); // (1000 + 2000) / 2
@@ -648,7 +651,7 @@ mod tests {
     #[test]
     fn test_adaptive_strategy() {
         assert!(!adaptive::should_use_fine_grained()); // 默认进程数较少
-        
+
         // 测试操作类型判断
         assert!(adaptive::should_use_read_lock_for_operation(adaptive::OperationType::Read));
         assert!(!adaptive::should_use_read_lock_for_operation(adaptive::OperationType::Write));

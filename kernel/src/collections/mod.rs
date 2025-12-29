@@ -20,6 +20,3 @@ use crate::compat::DefaultHasherBuilder;
 pub fn new_hashmap<K, V>() -> HashMap<K, V> {
     HashMap::with_hasher(DefaultHasherBuilder)
 }
-
-
-

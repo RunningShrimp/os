@@ -7,11 +7,10 @@
 //! - Barrier synchronization primitives
 //! - Spinlock synchronization primitives
 
-use crate::posix::{Pid, ClockId};
-use crate::subsystems::sync::Mutex;
 use alloc::collections::BTreeMap;
-use core::sync::atomic::{AtomicUsize, AtomicU64, Ordering};
-use core::ptr;
+use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+
+use crate::subsystems::sync::Mutex;
 
 /// Thread attribute structure
 #[derive(Clone)]
@@ -52,14 +51,14 @@ impl ThreadAttr {
     /// Set scheduling policy
     pub fn set_sched_policy(&mut self, policy: i32) -> Result<(), ThreadError> {
         match policy {
-            crate::posix::realtime::SCHED_NORMAL |
-            crate::posix::realtime::SCHED_FIFO |
-            crate::posix::realtime::SCHED_RR |
-            crate::posix::realtime::SCHED_BATCH |
-            crate::posix::realtime::SCHED_IDLE => {
+            crate::posix::realtime::SCHED_NORMAL
+            | crate::posix::realtime::SCHED_FIFO
+            | crate::posix::realtime::SCHED_RR
+            | crate::posix::realtime::SCHED_BATCH
+            | crate::posix::realtime::SCHED_IDLE => {
                 self.sched_policy = policy;
                 Ok(())
-            }
+            },
             _ => Err(ThreadError::InvalidPolicy),
         }
     }
@@ -70,7 +69,10 @@ impl ThreadAttr {
     }
 
     /// Set scheduling parameters
-    pub fn set_sched_param(&mut self, param: crate::posix::realtime::SchedParam) -> Result<(), ThreadError> {
+    pub fn set_sched_param(
+        &mut self,
+        param: crate::posix::realtime::SchedParam,
+    ) -> Result<(), ThreadError> {
         if !param.is_valid_for_policy(self.sched_policy) {
             return Err(ThreadError::InvalidPriority);
         }
@@ -86,11 +88,10 @@ impl ThreadAttr {
     /// Set scheduling inheritance
     pub fn set_sched_inherit(&mut self, inherit: i32) -> Result<(), ThreadError> {
         match inherit {
-            crate::posix::PTHREAD_INHERIT_SCHED |
-            crate::posix::PTHREAD_EXPLICIT_SCHED => {
+            crate::posix::PTHREAD_INHERIT_SCHED | crate::posix::PTHREAD_EXPLICIT_SCHED => {
                 self.sched_inherit = inherit;
                 Ok(())
-            }
+            },
             _ => Err(ThreadError::InvalidInherit),
         }
     }
@@ -103,11 +104,10 @@ impl ThreadAttr {
     /// Set detach state
     pub fn set_detach_state(&mut self, detach: i32) -> Result<(), ThreadError> {
         match detach {
-            crate::posix::PTHREAD_CREATE_JOINABLE |
-            crate::posix::PTHREAD_CREATE_DETACHED => {
+            crate::posix::PTHREAD_CREATE_JOINABLE | crate::posix::PTHREAD_CREATE_DETACHED => {
                 self.detach_state = detach;
                 Ok(())
-            }
+            },
             _ => Err(ThreadError::InvalidDetachState),
         }
     }
@@ -119,7 +119,8 @@ impl ThreadAttr {
 
     /// Set stack size
     pub fn set_stack_size(&mut self, size: usize) -> Result<(), ThreadError> {
-        if size != 0 && size < 16384 { // Minimum 16KB stack
+        if size != 0 && size < 16384 {
+            // Minimum 16KB stack
             return Err(ThreadError::InvalidStackSize);
         }
         self.stack_size = size;
@@ -153,7 +154,10 @@ impl ThreadAttr {
     }
 
     /// Set CPU affinity
-    pub fn set_cpu_affinity(&mut self, affinity: crate::posix::realtime::CpuSet) -> Result<(), ThreadError> {
+    pub fn set_cpu_affinity(
+        &mut self,
+        affinity: crate::posix::realtime::CpuSet,
+    ) -> Result<(), ThreadError> {
         if affinity.count() == 0 {
             return Err(ThreadError::InvalidAffinity);
         }
@@ -216,18 +220,18 @@ impl Barrier {
     /// Wait at the barrier
     pub fn wait(&self) -> Result<(), ThreadError> {
         let _guard = self.mutex.lock();
-        
+
         // Mark barrier as in use
         self.state.store(1, Ordering::SeqCst);
-        
+
         // Increment waiting count
         let waiting_count = self.waiting.fetch_add(1, Ordering::SeqCst) + 1;
-        
+
         if waiting_count == self.required.load(Ordering::SeqCst) {
             // Last thread to arrive - release all
             self.waiting.store(0, Ordering::SeqCst);
             self.state.store(0, Ordering::SeqCst);
-            
+
             // In a real implementation, we would wake up all waiting threads
             // For now, we just return success
             Ok(())
@@ -242,11 +246,11 @@ impl Barrier {
     /// Destroy the barrier
     pub fn destroy(&self) -> Result<(), ThreadError> {
         let _guard = self.mutex.lock();
-        
+
         if self.waiting.load(Ordering::SeqCst) > 0 {
             return Err(ThreadError::BarrierInUse);
         }
-        
+
         self.state.store(0, Ordering::SeqCst);
         Ok(())
     }
@@ -296,7 +300,7 @@ impl Spinlock {
     /// Try to acquire the spinlock (non-blocking)
     pub fn try_lock(&self) -> bool {
         let current_thread = crate::process::thread::current_thread().unwrap_or(0) as u64;
-        
+
         // Check if already owned by this thread
         if self.owner.load(Ordering::SeqCst) == current_thread {
             self.count.fetch_add(1, Ordering::SeqCst);
@@ -304,14 +308,15 @@ impl Spinlock {
         }
 
         // Try to acquire lock
-        match self.locked.compare_exchange_weak(
-            0, 1, Ordering::Acquire, Ordering::SeqCst
-        ) {
+        match self
+            .locked
+            .compare_exchange_weak(0, 1, Ordering::Acquire, Ordering::SeqCst)
+        {
             Ok(_) => {
                 self.owner.store(current_thread, Ordering::SeqCst);
                 self.count.store(1, Ordering::SeqCst);
                 true
-            }
+            },
             Err(_) => false,
         }
     }
@@ -319,7 +324,7 @@ impl Spinlock {
     /// Acquire the spinlock (blocking)
     pub fn lock(&self) {
         let current_thread = crate::process::thread::current_thread().unwrap_or(0) as u64;
-        
+
         loop {
             // Check if already owned by this thread
             if self.owner.load(Ordering::SeqCst) == current_thread {
@@ -328,21 +333,22 @@ impl Spinlock {
             }
 
             // Try to acquire lock
-            match self.locked.compare_exchange_weak(
-                0, 1, Ordering::Acquire, Ordering::SeqCst
-            ) {
+            match self
+                .locked
+                .compare_exchange_weak(0, 1, Ordering::Acquire, Ordering::SeqCst)
+            {
                 Ok(_) => {
                     self.owner.store(current_thread, Ordering::SeqCst);
                     self.count.store(1, Ordering::SeqCst);
                     return;
-                }
+                },
                 Err(_) => {
                     // Lock is held by another thread, spin wait
                     // In a real implementation, we would use CPU pause instruction
                     for _ in 0..1000 {
                         crate::arch::wfi();
                     }
-                }
+                },
             }
         }
     }
@@ -350,7 +356,7 @@ impl Spinlock {
     /// Release the spinlock
     pub fn unlock(&self) {
         let current_thread = crate::process::thread::current_thread().unwrap_or(0) as u64;
-        
+
         // Verify ownership
         if self.owner.load(Ordering::SeqCst) != current_thread {
             // Unlocking from non-owner thread - undefined behavior
@@ -429,11 +435,16 @@ impl ThreadClock {
         let old_time = self.cpu_time.fetch_add(delta_ns, Ordering::SeqCst);
         let current_time = crate::subsystems::time::get_timestamp();
         self.last_update.store(current_time, Ordering::SeqCst);
-        
+
         // Log significant time updates
-        if delta_ns > 1_000_000 { // More than 1ms
-            crate::println!("[thread] Thread {} CPU time updated: {}ns (total: {}ns)", 
-                self.thread_id, delta_ns, old_time + delta_ns);
+        if delta_ns > 1_000_000 {
+            // More than 1ms
+            crate::println!(
+                "[thread] Thread {} CPU time updated: {}ns (total: {}ns)",
+                self.thread_id,
+                delta_ns,
+                old_time + delta_ns
+            );
         }
     }
 
@@ -536,14 +547,16 @@ impl ThreadRegistry {
 
     /// Unregister a thread
     pub fn unregister_thread(&mut self, thread_id: Pid) -> Result<ThreadAttr, ThreadError> {
-        let attr = self.thread_attrs.remove(&thread_id)
+        let attr = self
+            .thread_attrs
+            .remove(&thread_id)
             .ok_or(ThreadError::ThreadNotFound)?;
-        
+
         // Clean up associated resources
         self.barriers.remove(&thread_id);
         self.spinlocks.remove(&thread_id);
         self.clocks.remove(&thread_id);
-        
+
         Ok(attr)
     }
 
@@ -553,7 +566,11 @@ impl ThreadRegistry {
     }
 
     /// Update thread attributes
-    pub fn update_thread_attr(&mut self, thread_id: Pid, attr: ThreadAttr) -> Result<(), ThreadError> {
+    pub fn update_thread_attr(
+        &mut self,
+        thread_id: Pid,
+        attr: ThreadAttr,
+    ) -> Result<(), ThreadError> {
         if !self.thread_attrs.contains_key(&thread_id) {
             return Err(ThreadError::ThreadNotFound);
         }
@@ -566,7 +583,7 @@ impl ThreadRegistry {
         if self.barriers.contains_key(&thread_id) {
             return Err(ThreadError::BarrierInUse);
         }
-        
+
         let barrier = Barrier::new(count)?;
         self.barriers.insert(thread_id, barrier);
         Ok(())
@@ -579,7 +596,8 @@ impl ThreadRegistry {
 
     /// Remove a barrier
     pub fn remove_barrier(&mut self, thread_id: Pid) -> Result<Barrier, ThreadError> {
-        self.barriers.remove(&thread_id)
+        self.barriers
+            .remove(&thread_id)
             .ok_or(ThreadError::ThreadNotFound)
     }
 
@@ -588,7 +606,7 @@ impl ThreadRegistry {
         if self.spinlocks.contains_key(&thread_id) {
             return Err(ThreadError::ThreadNotFound);
         }
-        
+
         let spinlock = Spinlock::new();
         self.spinlocks.insert(thread_id, spinlock);
         Ok(())
@@ -601,7 +619,8 @@ impl ThreadRegistry {
 
     /// Remove a spinlock
     pub fn remove_spinlock(&mut self, thread_id: Pid) -> Result<Spinlock, ThreadError> {
-        self.spinlocks.remove(&thread_id)
+        self.spinlocks
+            .remove(&thread_id)
             .ok_or(ThreadError::ThreadNotFound)
     }
 
@@ -610,7 +629,7 @@ impl ThreadRegistry {
         if self.clocks.contains_key(&thread_id) {
             return Err(ThreadError::ThreadNotFound);
         }
-        
+
         let clock = ThreadClock::new(thread_id, clock_id);
         self.clocks.insert(thread_id, clock);
         Ok(())
@@ -623,7 +642,8 @@ impl ThreadRegistry {
 
     /// Remove a CPU clock
     pub fn remove_clock(&mut self, thread_id: Pid) -> Result<ThreadClock, ThreadError> {
-        self.clocks.remove(&thread_id)
+        self.clocks
+            .remove(&thread_id)
             .ok_or(ThreadError::ThreadNotFound)
     }
 
@@ -665,7 +685,10 @@ pub fn pthread_attr_getschedpolicy(attr: &ThreadAttr) -> i32 {
 }
 
 /// Set thread scheduling parameters
-pub fn pthread_attr_setschedparam(attr: &mut ThreadAttr, param: crate::posix::realtime::SchedParam) -> Result<(), ThreadError> {
+pub fn pthread_attr_setschedparam(
+    attr: &mut ThreadAttr,
+    param: crate::posix::realtime::SchedParam,
+) -> Result<(), ThreadError> {
     attr.set_sched_param(param)
 }
 
@@ -675,7 +698,10 @@ pub fn pthread_attr_getschedparam(attr: &ThreadAttr) -> crate::posix::realtime::
 }
 
 /// Set thread scheduling inheritance
-pub fn pthread_attr_setinheritsched(attr: &mut ThreadAttr, inherit: i32) -> Result<(), ThreadError> {
+pub fn pthread_attr_setinheritsched(
+    attr: &mut ThreadAttr,
+    inherit: i32,
+) -> Result<(), ThreadError> {
     attr.set_sched_inherit(inherit)
 }
 
@@ -685,42 +711,51 @@ pub fn pthread_attr_getinheritsched(attr: &ThreadAttr) -> i32 {
 }
 
 /// Set thread scheduling parameters
-pub fn pthread_setschedparam(thread_id: Pid, param: crate::posix::realtime::SchedParam) -> Result<(), ThreadError> {
+pub fn pthread_setschedparam(
+    thread_id: Pid,
+    param: crate::posix::realtime::SchedParam,
+) -> Result<(), ThreadError> {
     let mut registry = THREAD_REGISTRY.lock();
-    let attr = registry.thread_attrs.get_mut(&thread_id)
+    let attr = registry
+        .thread_attrs
+        .get_mut(&thread_id)
         .ok_or(ThreadError::ThreadNotFound)?;
-    
+
     attr.set_sched_param(param)
 }
 
 /// Get thread scheduling parameters
-pub fn pthread_getschedparam(thread_id: Pid) -> Result<crate::posix::realtime::SchedParam, ThreadError> {
+pub fn pthread_getschedparam(
+    thread_id: Pid,
+) -> Result<crate::posix::realtime::SchedParam, ThreadError> {
     let registry = THREAD_REGISTRY.lock();
-    let attr = registry.thread_attrs.get(&thread_id)
+    let attr = registry
+        .thread_attrs
+        .get(&thread_id)
         .ok_or(ThreadError::ThreadNotFound)?;
-    
+
     Ok(attr.get_sched_param())
 }
 
 /// Get thread CPU clock ID
 pub fn pthread_getcpuclockid(thread_id: Pid, clock_id: ClockId) -> Result<ClockId, ThreadError> {
     let mut registry = THREAD_REGISTRY.lock();
-    
+
     // Create clock if it doesn't exist
     if !registry.clocks.contains_key(&thread_id) {
         registry.create_clock(thread_id, clock_id)?;
     }
-    
+
     Ok(clock_id)
 }
 
 /// Initialize advanced thread features
 pub fn init_advanced_thread() {
     crate::println!("[thread] Initializing advanced POSIX thread features");
-    
+
     let mut registry = THREAD_REGISTRY.lock();
     registry.next_thread_id = 1000; // Reset thread ID counter
-    
+
     crate::println!("[thread] Advanced thread features initialized");
     crate::println!("[thread] Thread attribute management enabled");
     crate::println!("[thread] Barrier synchronization enabled");
@@ -731,10 +766,10 @@ pub fn init_advanced_thread() {
 /// Cleanup advanced thread features
 pub fn cleanup_advanced_thread() {
     crate::println!("[thread] Cleaning up advanced POSIX thread features");
-    
+
     let registry = THREAD_REGISTRY.lock();
     let stats = registry.get_stats();
-    
+
     crate::println!("[thread] Cleanup stats:");
     crate::println!("[thread]   Total threads: {}", stats.total_threads);
     crate::println!("[thread]   Total barriers: {}", stats.total_barriers);

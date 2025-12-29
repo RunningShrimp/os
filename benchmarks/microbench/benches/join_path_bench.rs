@@ -1,20 +1,32 @@
-use criterion::{criterion_group, criterion_main, Criterion};
 use core::hint::black_box;
+
+use criterion::{Criterion, criterion_group, criterion_main};
 
 fn join_path(base: &str, rel: &str) -> String {
     let mut out: Vec<String> = Vec::new();
     let is_abs = rel.starts_with('/');
     if !is_abs {
-        for p in base.split('/').filter(|s| !s.is_empty()) { out.push(String::from(p)); }
+        for p in base.split('/').filter(|s| !s.is_empty()) {
+            out.push(String::from(p));
+        }
     }
     for p in rel.split('/').filter(|s| !s.is_empty()) {
-        if p == "." { continue; }
-        if p == ".." { if !out.is_empty() { out.pop(); } continue; }
+        if p == "." {
+            continue;
+        }
+        if p == ".." {
+            if !out.is_empty() {
+                out.pop();
+            }
+            continue;
+        }
         out.push(String::from(p));
     }
     let mut s = String::from("/");
     for (i, seg) in out.iter().enumerate() {
-        if i > 0 { s.push('/'); }
+        if i > 0 {
+            s.push('/');
+        }
         s.push_str(seg);
     }
     s
@@ -39,4 +51,3 @@ fn bench_join_path(c: &mut Criterion) {
 
 criterion_group!(benches, bench_join_path);
 criterion_main!(benches);
-

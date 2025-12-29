@@ -1,5 +1,5 @@
 //! Core bootloader traits for dependency injection
-//! 
+//!
 //! Defines interfaces that modules must implement to reduce coupling
 //! and enable loose dependency between components.
 

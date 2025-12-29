@@ -29,15 +29,15 @@ pub mod syscall_ranges {
     /// 文件系统系统调用范围
     pub const FS_RANGE_START: usize = 100;
     pub const FS_RANGE_END: usize = 199;
-    
+
     /// 进程管理系统调用范围
     pub const PROCESS_RANGE_START: usize = 200;
     pub const PROCESS_RANGE_END: usize = 299;
-    
+
     /// 网络系统调用范围
     pub const NETWORK_RANGE_START: usize = 300;
     pub const NETWORK_RANGE_END: usize = 399;
-    
+
     /// IPC系统调用范围
     pub const IPC_RANGE_START: usize = 400;
     pub const IPC_RANGE_END: usize = 499;
@@ -67,21 +67,17 @@ pub fn validate_syscall_args(syscall_num: usize, args: &[usize]) -> bool {
     if args.len() > 6 {
         return false;
     }
-    
+
     // 根据系统调用范围进行特定验证
     match syscall_num {
-        syscall_ranges::FS_RANGE_START..=syscall_ranges::FS_RANGE_END => {
-            validate_fs_args(args)
-        }
+        syscall_ranges::FS_RANGE_START..=syscall_ranges::FS_RANGE_END => validate_fs_args(args),
         syscall_ranges::PROCESS_RANGE_START..=syscall_ranges::PROCESS_RANGE_END => {
             validate_process_args(args)
-        }
+        },
         syscall_ranges::NETWORK_RANGE_START..=syscall_ranges::NETWORK_RANGE_END => {
             validate_network_args(args)
-        }
-        syscall_ranges::IPC_RANGE_START..=syscall_ranges::IPC_RANGE_END => {
-            validate_ipc_args(args)
-        }
+        },
+        syscall_ranges::IPC_RANGE_START..=syscall_ranges::IPC_RANGE_END => validate_ipc_args(args),
         _ => false,
     }
 }
@@ -92,7 +88,7 @@ fn validate_fs_args(args: &[usize]) -> bool {
     if args.is_empty() {
         return false;
     }
-    
+
     // 根据具体的文件系统操作进行验证
     match args[0] {
         0 => args.len() >= 3, // open
@@ -111,7 +107,7 @@ fn validate_process_args(args: &[usize]) -> bool {
     if args.is_empty() {
         return false;
     }
-    
+
     // 根据具体的进程管理操作进行验证
     match args[0] {
         0 => args.len() >= 1, // fork
@@ -130,7 +126,7 @@ fn validate_network_args(args: &[usize]) -> bool {
     if args.is_empty() {
         return false;
     }
-    
+
     // 根据具体的网络操作进行验证
     match args[0] {
         0 => args.len() >= 3, // socket
@@ -150,7 +146,7 @@ fn validate_ipc_args(args: &[usize]) -> bool {
     if args.is_empty() {
         return false;
     }
-    
+
     // 根据具体的IPC操作进行验证
     match args[0] {
         0 => args.len() >= 2, // pipe
@@ -180,6 +176,6 @@ pub fn handle_syscall_result(result: core::result::Result<isize, nos_api::Error>
                 nos_api::Error::NotImplemented(_) => error_codes::ENOTSUP,
                 _ => error_codes::ERROR,
             }
-        }
+        },
     }
 }

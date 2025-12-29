@@ -7,10 +7,8 @@
 //! - Prefetch optimization
 //! - Bottleneck identification
 
+use alloc::{format, string::String, vec::Vec};
 use core::fmt;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::format;
 
 /// Boot stage timing
 #[derive(Debug, Clone)]
@@ -47,12 +45,7 @@ impl StageTiming {
 
 impl fmt::Display for StageTiming {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}: {} ms",
-            self.stage_name,
-            self.elapsed_ms()
-        )
+        write!(f, "{}: {} ms", self.stage_name, self.elapsed_ms())
     }
 }
 
@@ -68,12 +61,7 @@ pub struct CacheStats {
 impl CacheStats {
     /// Create new cache stats
     pub fn new(cache_size: u32) -> Self {
-        CacheStats {
-            cache_size,
-            hits: 0,
-            misses: 0,
-            evictions: 0,
-        }
+        CacheStats { cache_size, hits: 0, misses: 0, evictions: 0 }
     }
 
     /// Get total accesses
@@ -158,7 +146,11 @@ impl fmt::Display for PerformanceMetric {
             "{}: {} {}",
             self.metric_name,
             self.value,
-            if self.exceeds_threshold() { "(CRITICAL)" } else { "" }
+            if self.exceeds_threshold() {
+                "(CRITICAL)"
+            } else {
+                ""
+            }
         )
     }
 }
@@ -196,7 +188,11 @@ impl BootOptimizer {
 
     /// End stage timing
     pub fn end_stage(&mut self, stage_name: &str) -> bool {
-        if let Some(timing) = self.stage_timings.iter_mut().find(|t| t.stage_name == stage_name) {
+        if let Some(timing) = self
+            .stage_timings
+            .iter_mut()
+            .find(|t| t.stage_name == stage_name)
+        {
             timing.end_time = timing.start_time + 100; // Simulated elapsed
             true
         } else {
@@ -221,17 +217,12 @@ impl BootOptimizer {
 
     /// Identify slowest stage
     pub fn get_slowest_stage(&self) -> Option<&StageTiming> {
-        self.stage_timings
-            .iter()
-            .max_by_key(|t| t.elapsed_ms())
+        self.stage_timings.iter().max_by_key(|t| t.elapsed_ms())
     }
 
     /// Get total boot time
     pub fn calculate_total_boot_time(&mut self) -> u64 {
-        self.total_boot_time = self.stage_timings
-            .iter()
-            .map(|t| t.elapsed_ms())
-            .sum();
+        self.total_boot_time = self.stage_timings.iter().map(|t| t.elapsed_ms()).sum();
         self.total_boot_time
     }
 
@@ -285,25 +276,25 @@ impl BootOptimizer {
     /// Generate optimization report
     pub fn optimization_report(&self) -> String {
         let mut report = String::from("=== Boot Optimization Report ===\n");
-        
+
         report.push_str(&format!("Total Boot Time: {} ms\n", self.total_boot_time));
         report.push_str(&format!("Stages: {}\n", self.stage_count()));
-        
+
         if let Some(slowest) = self.get_slowest_stage() {
             report.push_str(&format!("Slowest Stage: {}\n", slowest));
         }
-        
+
         report.push_str(&format!("\n{}\n", self.cache_stats));
-        
+
         if self.bottleneck_count() > 0 {
             report.push_str(&format!("\nBottlenecks: {}\n", self.bottleneck_count()));
             for bottleneck in &self.bottlenecks {
                 report.push_str(&format!("  - {}\n", bottleneck));
             }
         }
-        
+
         report.push_str(&format!("Optimizations Applied: {}\n", self.optimization_count));
-        
+
         report
     }
 
@@ -358,7 +349,7 @@ mod tests {
         stats.record_hit();
         stats.record_hit();
         stats.record_miss();
-        
+
         assert!((stats.hit_rate() - 66.67).abs() < 0.1);
     }
 
@@ -368,7 +359,7 @@ mod tests {
         stats.record_hit();
         stats.record_miss();
         stats.record_eviction();
-        
+
         assert_eq!(stats.hits, 1);
         assert_eq!(stats.misses, 1);
         assert_eq!(stats.evictions, 1);
@@ -382,8 +373,7 @@ mod tests {
 
     #[test]
     fn test_performance_metric_threshold() {
-        let metric = PerformanceMetric::new("Load Time", 1500)
-            .with_threshold(1000);
+        let metric = PerformanceMetric::new("Load Time", 1500).with_threshold(1000);
         assert!(metric.exceeds_threshold());
     }
 
@@ -406,7 +396,7 @@ mod tests {
         let mut optimizer = BootOptimizer::new();
         optimizer.start_stage("Stage1");
         optimizer.end_stage("Stage1");
-        
+
         let total = optimizer.calculate_total_boot_time();
         assert!(total > 0);
     }
@@ -416,7 +406,7 @@ mod tests {
         let mut optimizer = BootOptimizer::new();
         optimizer.start_stage("Fast");
         optimizer.end_stage("Fast");
-        
+
         let slowest = optimizer.get_slowest_stage();
         assert!(slowest.is_some());
     }
@@ -425,7 +415,7 @@ mod tests {
     fn test_boot_optimizer_add_metric() {
         let mut optimizer = BootOptimizer::new();
         let metric = PerformanceMetric::new("Test", 100);
-        
+
         assert!(optimizer.add_metric(metric));
         assert_eq!(optimizer.metric_count(), 1);
     }
@@ -433,9 +423,8 @@ mod tests {
     #[test]
     fn test_boot_optimizer_bottleneck_detection() {
         let mut optimizer = BootOptimizer::new();
-        let metric = PerformanceMetric::new("Latency", 5000)
-            .with_threshold(1000);
-        
+        let metric = PerformanceMetric::new("Latency", 5000).with_threshold(1000);
+
         optimizer.add_metric(metric);
         assert!(optimizer.bottleneck_count() > 0);
     }
@@ -445,7 +434,7 @@ mod tests {
         let mut optimizer = BootOptimizer::new();
         optimizer.apply_optimization("Prefetch");
         optimizer.apply_optimization("Cache");
-        
+
         assert_eq!(optimizer.optimization_count, 2);
     }
 
@@ -455,8 +444,8 @@ mod tests {
         optimizer.start_stage("Init");
         optimizer.end_stage("Init");
         optimizer.calculate_total_boot_time();
-        
-        let (boot_time, opt_count, bottleneck_count, cache_hit) = optimizer.get_stats();                                                                    
+
+        let (boot_time, opt_count, bottleneck_count, cache_hit) = optimizer.get_stats();
         assert!(boot_time > 0);
         assert_eq!(opt_count, 0);
         assert_eq!(bottleneck_count, 0); // No bottlenecks in simple test
@@ -475,7 +464,7 @@ mod tests {
         let mut optimizer = BootOptimizer::new();
         optimizer.start_stage("Test");
         optimizer.calculate_total_boot_time();
-        
+
         let report = optimizer.optimization_report();
         assert!(report.contains("Boot Optimization Report"));
         assert!(report.contains("Total Boot Time"));

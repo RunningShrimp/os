@@ -5,7 +5,13 @@ use super::*;
 /// GLib对象系统管理器特征
 pub trait GObjectManager {
     /// 注册新的对象类型
-    fn register_type(&mut self, name: &str, parent_type: u64, size: usize, flags: u32) -> Result<u64, c_int>;
+    fn register_type(
+        &mut self,
+        name: &str,
+        parent_type: u64,
+        size: usize,
+        flags: u32,
+    ) -> Result<u64, c_int>;
 
     /// 创建对象实例
     fn create_instance(&mut self, type_id: u64, object_ptr: *mut c_void) -> Result<u64, c_int>;
@@ -17,8 +23,14 @@ pub trait GObjectManager {
     fn unref_instance(&self, instance_id: u64) -> Result<usize, c_int>;
 
     /// 注册信号
-    fn register_signal(&mut self, type_id: u64, name: &str, param_types: &[u64],
-                      return_type: u64, flags: u32) -> Result<u64, c_int>;
+    fn register_signal(
+        &mut self,
+        type_id: u64,
+        name: &str,
+        param_types: &[u64],
+        return_type: u64,
+        flags: u32,
+    ) -> Result<u64, c_int>;
 
     /// 发射信号
     fn emit_signal(&self, instance_id: u64, signal_id: u64, args: &[u64]) -> Result<usize, c_int>;
@@ -36,9 +48,14 @@ pub trait GObjectManager {
 //     }
 // }
 
-
 impl GObjectManager for () {
-    fn register_type(&mut self, name: &str, parent_type: u64, size: usize, flags: u32) -> Result<u64, c_int> {
+    fn register_type(
+        &mut self,
+        name: &str,
+        parent_type: u64,
+        size: usize,
+        flags: u32,
+    ) -> Result<u64, c_int> {
         let result = super::type_::sys_glib_object_type_register(
             name.as_ptr() as *const core::ffi::c_char,
             parent_type,
@@ -79,8 +96,14 @@ impl GObjectManager for () {
         }
     }
 
-    fn register_signal(&mut self, type_id: u64, name: &str, param_types: &[u64],
-                      return_type: u64, flags: u32) -> Result<u64, c_int> {
+    fn register_signal(
+        &mut self,
+        type_id: u64,
+        name: &str,
+        param_types: &[u64],
+        return_type: u64,
+        flags: u32,
+    ) -> Result<u64, c_int> {
         let result = super::signal::sys_glib_object_signal_register(
             type_id,
             name.as_ptr() as *const core::ffi::c_char,
@@ -116,11 +139,7 @@ impl GObjectManager for () {
             name.as_ptr() as *const core::ffi::c_char,
             value,
         );
-        if result == 0 {
-            Ok(())
-        } else {
-            Err(result)
-        }
+        if result == 0 { Ok(()) } else { Err(result) }
     }
 
     fn get_property(&self, instance_id: u64, name: &str) -> Result<u64, c_int> {
@@ -130,11 +149,7 @@ impl GObjectManager for () {
             name.as_ptr() as *const core::ffi::c_char,
             &mut value as *mut u64,
         );
-        if result == 0 {
-            Ok(value)
-        } else {
-            Err(result)
-        }
+        if result == 0 { Ok(value) } else { Err(result) }
     }
 }
 
@@ -147,9 +162,9 @@ mod tests {
         // 测试类型注册
         let type_id = super::type_::sys_glib_object_type_register(
             b"TestObject\0".as_ptr() as *const core::ffi::c_char,
-            0, // 无父类型
+            0,   // 无父类型
             128, // 128字节大小
-            0,  // 无标志
+            0,   // 无标志
         );
         assert!(type_id > 0);
 
@@ -170,7 +185,8 @@ mod tests {
 
         // 创建实例
         let dummy_ptr = 0x1000 as *mut c_void;
-        let instance_id = super::instance::sys_glib_object_instance_create(type_id as u64, dummy_ptr);
+        let instance_id =
+            super::instance::sys_glib_object_instance_create(type_id as u64, dummy_ptr);
         assert!(instance_id > 0);
 
         // 测试引用计数
@@ -226,7 +242,8 @@ mod tests {
 
         // 创建实例
         let dummy_ptr = 0x1000 as *mut c_void;
-        let instance_id = super::instance::sys_glib_object_instance_create(type_id as u64, dummy_ptr);
+        let instance_id =
+            super::instance::sys_glib_object_instance_create(type_id as u64, dummy_ptr);
         assert!(instance_id > 0);
 
         // 设置属性

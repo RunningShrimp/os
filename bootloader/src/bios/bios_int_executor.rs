@@ -2,8 +2,7 @@
 ///
 /// Handles the actual execution of BIOS interrupts after transitioning to real mode.
 /// Manages CPU context, interrupt execution, and error handling.
-
-use crate::bios::bios_realmode::{RealModeContext, RealModeExecutor, RealModeError};
+use crate::bios::bios_realmode::{RealModeContext, RealModeError, RealModeExecutor};
 
 /// BIOS interrupt execution status
 #[derive(Debug, Clone, Copy)]
@@ -41,10 +40,7 @@ pub struct BIOSInterruptExecutor {
 impl BIOSInterruptExecutor {
     /// Create new BIOS interrupt executor
     pub fn new(executor: &RealModeExecutor) -> Self {
-        Self {
-            executor: executor as *const _,
-            last_context: None,
-        }
+        Self { executor: executor as *const _, last_context: None }
     }
 
     /// Execute BIOS interrupt
@@ -53,13 +49,13 @@ impl BIOSInterruptExecutor {
 
         unsafe {
             let executor = &*self.executor;
-            
+
             // Execute interrupt
             executor.execute_int(int_num, ctx)?;
-            
+
             // Store context for later inspection
             self.last_context = Some(*ctx);
-            
+
             // Check carry flag (generic error indicator for many BIOS calls)
             if ctx.is_carry_set() {
                 Ok(ExecStatus::CarryFlagSet)
@@ -80,19 +76,16 @@ impl BIOSInterruptExecutor {
     }
 
     /// Execute E820 memory detection interrupt
-    pub fn exec_e820(
-        &mut self,
-        buffer_addr: u32,
-    ) -> IntResult {
+    pub fn exec_e820(&mut self, buffer_addr: u32) -> IntResult {
         log::debug!("Executing E820 memory detection interrupt");
         let mut ctx = RealModeContext::new();
-        
+
         // E820 parameters
-        ctx.eax = 0xE820;           // Function: E820 get memory map
-        ctx.ecx = 24;               // Entry size
-        ctx.edx = 0x534D4150;       // Signature: 'SMAP'
-        ctx.edi = buffer_addr;      // Buffer address
-        ctx.ebx = 0;                // Continuation from start
+        ctx.eax = 0xE820; // Function: E820 get memory map
+        ctx.ecx = 24; // Entry size
+        ctx.edx = 0x534D4150; // Signature: 'SMAP'
+        ctx.edi = buffer_addr; // Buffer address
+        ctx.ebx = 0; // Continuation from start
 
         self.execute(0x15, &mut ctx)
     }
@@ -109,14 +102,14 @@ impl BIOSInterruptExecutor {
     ) -> IntResult {
         log::debug!("Executing disk read interrupt");
         let mut ctx = RealModeContext::new();
-        
+
         // Disk read parameters (INT 0x13, AH=02)
-        ctx.set_ah(0x02);                      // Read sectors
-        ctx.edx = (drive as u32) & 0xFF;       // DL = drive
-        ctx.ecx = (((cylinder & 0xFF) << 8) | sector as u16) as u32;  // CH/CL
-        ctx.edx |= ((head as u32) << 8) & 0xFF00;  // DH = head
-        ctx.ebx = buffer as u32;               // Buffer offset
-        ctx.eax = (ctx.get_ah() as u32) << 8 | sectors_count as u32;  // AL = count
+        ctx.set_ah(0x02); // Read sectors
+        ctx.edx = (drive as u32) & 0xFF; // DL = drive
+        ctx.ecx = (((cylinder & 0xFF) << 8) | sector as u16) as u32; // CH/CL
+        ctx.edx |= ((head as u32) << 8) & 0xFF00; // DH = head
+        ctx.ebx = buffer as u32; // Buffer offset
+        ctx.eax = (ctx.get_ah() as u32) << 8 | sectors_count as u32; // AL = count
 
         self.execute(0x13, &mut ctx)
     }
@@ -125,7 +118,7 @@ impl BIOSInterruptExecutor {
     pub fn exec_video_mode(&mut self, mode: u8) -> IntResult {
         log::debug!("Executing video mode interrupt");
         let mut ctx = RealModeContext::new();
-        
+
         // Video mode setting (INT 0x10, AH=00)
         ctx.set_ah(0x00);
         ctx.set_al(mode);
@@ -137,11 +130,11 @@ impl BIOSInterruptExecutor {
     pub fn exec_print_char(&mut self, ch: u8) -> IntResult {
         log::debug!("Executing print char interrupt");
         let mut ctx = RealModeContext::new();
-        
+
         // Print character (INT 0x10, AH=0E)
         ctx.set_ah(0x0E);
         ctx.set_al(ch);
-        ctx.ebx = 0;  // BL = foreground color
+        ctx.ebx = 0; // BL = foreground color
 
         self.execute(0x10, &mut ctx)
     }
@@ -150,7 +143,7 @@ impl BIOSInterruptExecutor {
     pub fn exec_read_key(&mut self) -> IntResult {
         log::debug!("Executing read key interrupt");
         let mut ctx = RealModeContext::new();
-        
+
         // Read key (INT 0x16, AH=00)
         ctx.set_ah(0x00);
 

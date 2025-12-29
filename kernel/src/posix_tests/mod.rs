@@ -582,7 +582,7 @@ pub fn run_performance_stress_tests() {
 }
 
 // 导出各个子模块
-pub mod core_tests;
+pub mod core;  // 新的拆分后的core模块
 pub mod advanced_tests;
 pub mod realtime_tests;
 pub mod thread_tests;
@@ -593,6 +593,9 @@ pub mod application_tests;
 pub mod performance_tests;
 pub mod test_utils;
 pub mod test_framework;
+
+// 为了向后兼容，重新导出core模块的内容
+pub use core::*;
 
 // 重新导出常用类型和函数
 pub use test_framework::*;

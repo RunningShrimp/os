@@ -1,19 +1,20 @@
 // Fault Diagnosis Module
 
 extern crate alloc;
-//
 // 故障诊断模块
 // 提供智能故障诊断、根因分析和故障预测功能
 
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::format;
-use alloc::boxed::Box;
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
 use core::sync::atomic::{AtomicU64, Ordering};
+
 use spin::Mutex;
 
 // Import println macro
@@ -120,23 +121,13 @@ pub enum ConditionType {
 #[derive(Debug, Clone)]
 pub enum DiagnosisLogic {
     /// 简单匹配
-    SimpleMatch {
-        patterns: Vec<String>,
-    },
+    SimpleMatch { patterns: Vec<String> },
     /// 复杂规则
-    ComplexRule {
-        conditions: Vec<LogicCondition>,
-        operator: LogicOperator,
-    },
+    ComplexRule { conditions: Vec<LogicCondition>, operator: LogicOperator },
     /// 决策树
-    DecisionTree {
-        tree: DecisionTreeNode,
-    },
+    DecisionTree { tree: DecisionTreeNode },
     /// 贝叶斯网络
-    BayesianNetwork {
-        nodes: Vec<BayesianNode>,
-        edges: Vec<BayesianEdge>,
-    },
+    BayesianNetwork { nodes: Vec<BayesianNode>, edges: Vec<BayesianEdge> },
 }
 
 /// 逻辑条件
@@ -978,7 +969,10 @@ impl FaultDiagnosisEngine {
     }
 
     /// 执行诊断
-    fn perform_diagnosis(&mut self, input_data: &DiagnosisInput) -> Result<Vec<DiagnosisResult>, &'static str> {
+    fn perform_diagnosis(
+        &mut self,
+        input_data: &DiagnosisInput,
+    ) -> Result<Vec<DiagnosisResult>, &'static str> {
         let mut results = Vec::new();
 
         // 1. 症状匹配
@@ -1015,7 +1009,10 @@ impl FaultDiagnosisEngine {
     }
 
     /// 匹配症状
-    fn match_symptoms(&self, symptom_data: &[SymptomData]) -> Result<Vec<&FaultPattern>, &'static str> {
+    fn match_symptoms(
+        &self,
+        symptom_data: &[SymptomData],
+    ) -> Result<Vec<&FaultPattern>, &'static str> {
         let mut matched_patterns = Vec::new();
 
         for pattern in self.fault_patterns.values() {
@@ -1041,7 +1038,11 @@ impl FaultDiagnosisEngine {
     }
 
     /// 评估规则
-    fn evaluate_rule(&self, rule: &DiagnosisRule, input_data: &DiagnosisInput) -> Result<bool, &'static str> {
+    fn evaluate_rule(
+        &self,
+        rule: &DiagnosisRule,
+        input_data: &DiagnosisInput,
+    ) -> Result<bool, &'static str> {
         for condition in &rule.trigger_conditions {
             if !self.evaluate_trigger_condition(condition, input_data)? {
                 return Ok(false);
@@ -1051,38 +1052,44 @@ impl FaultDiagnosisEngine {
     }
 
     /// 评估触发条件
-    fn evaluate_trigger_condition(&self, condition: &TriggerCondition, input_data: &DiagnosisInput) -> Result<bool, &'static str> {
+    fn evaluate_trigger_condition(
+        &self,
+        condition: &TriggerCondition,
+        input_data: &DiagnosisInput,
+    ) -> Result<bool, &'static str> {
         match condition.condition_type {
             ConditionType::ErrorRateThreshold => {
                 // 检查错误率是否超过阈值
                 let error_rate = self.calculate_error_rate(&input_data.error_logs);
                 Ok(error_rate > condition.threshold)
-            }
+            },
             ConditionType::PerformanceDegradation => {
                 // 检查性能下降
-                let performance_score = self.calculate_performance_score(&input_data.performance_data);
+                let performance_score =
+                    self.calculate_performance_score(&input_data.performance_data);
                 Ok(performance_score < condition.threshold)
-            }
+            },
             ConditionType::ResourceExhaustion => {
                 // 检查资源耗尽
-                Ok(self.check_resource_exhaustion(&input_data.system_metrics, &condition.parameters))
-            }
+                Ok(self
+                    .check_resource_exhaustion(&input_data.system_metrics, &condition.parameters))
+            },
             ConditionType::ServiceUnavailable => {
                 // 检查服务不可用
                 Ok(self.check_service_availability(&input_data.system_metrics))
-            }
+            },
             ConditionType::NetworkPartition => {
                 // 检查网络分区
                 Ok(self.check_network_partition(&input_data.system_metrics))
-            }
+            },
             ConditionType::DataInconsistency => {
                 // 检查数据不一致
                 Ok(self.check_data_consistency(&input_data.system_metrics))
-            }
+            },
             ConditionType::CustomCondition => {
                 // 自定义条件
                 Ok(true)
-            }
+            },
         }
     }
 
@@ -1112,12 +1119,12 @@ impl FaultDiagnosisEngine {
                 "cpu_usage" | "memory_usage" => {
                     // 使用率越低越好
                     1.0 - (data_point.value / 100.0).min(1.0)
-                }
+                },
                 "response_time" => {
                     // 响应时间越低越好
                     let baseline = 100.0; // 100ms作为基准
                     1.0 - (data_point.value / baseline).min(1.0)
-                }
+                },
                 _ => 0.8, // 默认评分
             };
 
@@ -1133,7 +1140,11 @@ impl FaultDiagnosisEngine {
     }
 
     /// 检查资源耗尽
-    fn check_resource_exhaustion(&self, metrics: &BTreeMap<String, f64>, _parameters: &BTreeMap<String, String>) -> bool {
+    fn check_resource_exhaustion(
+        &self,
+        metrics: &BTreeMap<String, f64>,
+        _parameters: &BTreeMap<String, String>,
+    ) -> bool {
         // 检查关键资源使用率
         if let Some(&cpu_usage) = metrics.get("cpu_usage") {
             if cpu_usage > 95.0 {
@@ -1187,7 +1198,11 @@ impl FaultDiagnosisEngine {
     }
 
     /// 生成诊断结果
-    fn generate_diagnosis_result(&self, rule: &DiagnosisRule, input_data: &DiagnosisInput) -> Result<DiagnosisResult, &'static str> {
+    fn generate_diagnosis_result(
+        &self,
+        rule: &DiagnosisRule,
+        input_data: &DiagnosisInput,
+    ) -> Result<DiagnosisResult, &'static str> {
         let result_id = format!("diagnosis_{}", crate::subsystems::time::get_timestamp());
 
         // 生成根本原因分析
@@ -1221,7 +1236,11 @@ impl FaultDiagnosisEngine {
     }
 
     /// 生成模式诊断结果
-    fn generate_pattern_diagnosis_result(&self, pattern: &FaultPattern, input_data: &DiagnosisInput) -> Result<DiagnosisResult, &'static str> {
+    fn generate_pattern_diagnosis_result(
+        &self,
+        pattern: &FaultPattern,
+        input_data: &DiagnosisInput,
+    ) -> Result<DiagnosisResult, &'static str> {
         let result_id = format!("pattern_diagnosis_{}", crate::subsystems::time::get_timestamp());
 
         let prediction_info = if self.config.enable_prediction {
@@ -1245,23 +1264,29 @@ impl FaultDiagnosisEngine {
     }
 
     /// 分析根本原因
-    fn analyze_root_causes(&self, _rule: &DiagnosisRule, _input_data: &DiagnosisInput) -> Result<Vec<RootCause>, &'static str> {
+    fn analyze_root_causes(
+        &self,
+        _rule: &DiagnosisRule,
+        _input_data: &DiagnosisInput,
+    ) -> Result<Vec<RootCause>, &'static str> {
         // 简化的根本原因分析
-        Ok(vec![
-            RootCause {
-                id: "rc_1".to_string(),
-                description: "Resource exhaustion detected".to_string(),
-                cause_category: CauseCategory::ResourceLimitation,
-                probability: 0.8,
-                evidence_chain: Vec::new(),
-                fix_complexity: FixComplexity::Medium,
-                estimated_fix_time_hours: 2,
-            },
-        ])
+        Ok(vec![RootCause {
+            id: "rc_1".to_string(),
+            description: "Resource exhaustion detected".to_string(),
+            cause_category: CauseCategory::ResourceLimitation,
+            probability: 0.8,
+            evidence_chain: Vec::new(),
+            fix_complexity: FixComplexity::Medium,
+            estimated_fix_time_hours: 2,
+        }])
     }
 
     /// 评估影响
-    fn assess_impact(&self, _rule: &DiagnosisRule, _input_data: &DiagnosisInput) -> Result<ImpactScope, &'static str> {
+    fn assess_impact(
+        &self,
+        _rule: &DiagnosisRule,
+        _input_data: &DiagnosisInput,
+    ) -> Result<ImpactScope, &'static str> {
         Ok(ImpactScope {
             affected_components: vec!["web_service".to_string(), "database".to_string()],
             affected_users: 1000,
@@ -1277,57 +1302,72 @@ impl FaultDiagnosisEngine {
     }
 
     /// 生成修复建议
-    fn generate_remediation_actions(&self, _rule: &DiagnosisRule, _root_causes: &[RootCause]) -> Result<Vec<RemediationRecommendation>, &'static str> {
-        Ok(vec![
-            RemediationRecommendation {
-                id: "rec_1".to_string(),
-                description: "Increase system resources".to_string(),
-                recommendation_type: RecommendationType::ConfigurationChange,
-                priority: RecommendationPriority::High,
-                implementation_steps: vec![
-                    "Add more memory".to_string(),
-                    "Scale up CPU resources".to_string(),
-                ],
-                expected_outcome: "Resource utilization reduced".to_string(),
-                risk_assessment: RiskAssessment {
-                    technical_risk: 0.2,
-                    business_risk: 0.1,
-                    security_risk: 0.1,
-                    financial_risk: 0.3,
-                    overall_risk_rating: RiskRating::Low,
-                    mitigation_measures: vec!["Monitor resource usage".to_string()],
-                },
-                required_resources: vec!["Memory".to_string(), "CPU".to_string()],
-                estimated_implementation_time_hours: 1,
-                success_rate: 0.9,
+    fn generate_remediation_actions(
+        &self,
+        _rule: &DiagnosisRule,
+        _root_causes: &[RootCause],
+    ) -> Result<Vec<RemediationRecommendation>, &'static str> {
+        Ok(vec![RemediationRecommendation {
+            id: "rec_1".to_string(),
+            description: "Increase system resources".to_string(),
+            recommendation_type: RecommendationType::ConfigurationChange,
+            priority: RecommendationPriority::High,
+            implementation_steps: vec![
+                "Add more memory".to_string(),
+                "Scale up CPU resources".to_string(),
+            ],
+            expected_outcome: "Resource utilization reduced".to_string(),
+            risk_assessment: RiskAssessment {
+                technical_risk: 0.2,
+                business_risk: 0.1,
+                security_risk: 0.1,
+                financial_risk: 0.3,
+                overall_risk_rating: RiskRating::Low,
+                mitigation_measures: vec!["Monitor resource usage".to_string()],
             },
-        ])
+            required_resources: vec!["Memory".to_string(), "CPU".to_string()],
+            estimated_implementation_time_hours: 1,
+            success_rate: 0.9,
+        }])
     }
 
     /// 生成预测信息
-    fn generate_prediction_info(&self, _rule: &DiagnosisRule, _input_data: &DiagnosisInput) -> Result<PredictionInfo, &'static str> {
+    fn generate_prediction_info(
+        &self,
+        _rule: &DiagnosisRule,
+        _input_data: &DiagnosisInput,
+    ) -> Result<PredictionInfo, &'static str> {
         Ok(PredictionInfo {
             predicted_fault_probability: 0.15,
-            predicted_fault_time: Some(crate::subsystems::time::get_timestamp() + 3600 * 4), // 4小时后
+            predicted_fault_time: Some(crate::subsystems::time::get_timestamp() + 3600 * 4), /* 4小时后 */
             predicted_impact_scope: "Service degradation expected".to_string(),
             prediction_confidence: 0.7,
         })
     }
 
     /// 生成模式预测信息
-    fn generate_pattern_prediction_info(&self, pattern: &FaultPattern, _input_data: &DiagnosisInput) -> Result<PredictionInfo, &'static str> {
+    fn generate_pattern_prediction_info(
+        &self,
+        pattern: &FaultPattern,
+        _input_data: &DiagnosisInput,
+    ) -> Result<PredictionInfo, &'static str> {
         Ok(PredictionInfo {
             predicted_fault_probability: pattern.frequency,
-            predicted_fault_time: Some(crate::subsystems::time::get_timestamp() + 3600 * 6), // 6小时后
+            predicted_fault_time: Some(crate::subsystems::time::get_timestamp() + 3600 * 6), /* 6小时后 */
             predicted_impact_scope: format!("Impact: {:?}", pattern.category),
             prediction_confidence: pattern.detection_confidence,
         })
     }
 
     /// 确定严重级别
-    fn determine_severity(&self, rule: &DiagnosisRule, input_data: &DiagnosisInput) -> FaultSeverity {
+    fn determine_severity(
+        &self,
+        rule: &DiagnosisRule,
+        input_data: &DiagnosisInput,
+    ) -> FaultSeverity {
         // 基于症状和系统状态确定严重级别
-        let max_severity = input_data.symptom_data
+        let max_severity = input_data
+            .symptom_data
             .iter()
             .map(|s| s.severity)
             .fold(0.0f64, |acc, s| acc.max(s));
@@ -1346,7 +1386,10 @@ impl FaultDiagnosisEngine {
     }
 
     /// 执行预测分析
-    fn perform_prediction_analysis(&self, input_data: &DiagnosisInput) -> Result<Vec<DiagnosisResult>, &'static str> {
+    fn perform_prediction_analysis(
+        &self,
+        input_data: &DiagnosisInput,
+    ) -> Result<Vec<DiagnosisResult>, &'static str> {
         let mut results = Vec::new();
 
         for model in self.prediction_models.values() {
@@ -1359,7 +1402,11 @@ impl FaultDiagnosisEngine {
     }
 
     /// 预测故障
-    fn predict_fault(&self, model: &PredictionModel, input_data: &DiagnosisInput) -> Result<Option<DiagnosisResult>, &'static str> {
+    fn predict_fault(
+        &self,
+        model: &PredictionModel,
+        input_data: &DiagnosisInput,
+    ) -> Result<Option<DiagnosisResult>, &'static str> {
         // 简化的预测逻辑
         let fault_probability = self.calculate_fault_probability(model, input_data);
 
@@ -1398,7 +1445,11 @@ impl FaultDiagnosisEngine {
     }
 
     /// 计算故障概率
-    fn calculate_fault_probability(&self, model: &PredictionModel, input_data: &DiagnosisInput) -> f64 {
+    fn calculate_fault_probability(
+        &self,
+        model: &PredictionModel,
+        input_data: &DiagnosisInput,
+    ) -> f64 {
         // 简化的故障概率计算
         let mut risk_score = 0.0;
         let mut factor_count = 0;
@@ -1410,7 +1461,8 @@ impl FaultDiagnosisEngine {
         }
 
         // 基于症状数据
-        let severe_symptoms = input_data.symptom_data
+        let severe_symptoms = input_data
+            .symptom_data
             .iter()
             .filter(|s| s.severity > 2.0)
             .count();
@@ -1445,7 +1497,7 @@ impl FaultDiagnosisEngine {
                 "response_time" => {
                     let baseline = 100.0; // 100ms
                     (data_point.value / baseline).min(1.0)
-                }
+                },
                 _ => 0.2,
             };
 
@@ -1479,14 +1531,25 @@ impl FaultDiagnosisEngine {
         if !results.is_empty() {
             let total_confidence: f64 = results.iter().map(|r| r.confidence).sum();
             let avg_confidence = total_confidence / results.len() as f64;
-            self.stats.avg_confidence = (self.stats.avg_confidence * (self.stats.total_diagnoses - 1) as f64 + avg_confidence) / self.stats.total_diagnoses as f64;
+            self.stats.avg_confidence = (self.stats.avg_confidence
+                * (self.stats.total_diagnoses - 1) as f64
+                + avg_confidence)
+                / self.stats.total_diagnoses as f64;
         }
 
         // 更新按类别统计
         for result in results {
             // 简化处理，假设所有结果都是软件故障
-            *self.stats.diagnoses_by_category.entry(FaultCategory::Software).or_insert(0) += 1;
-            *self.stats.diagnoses_by_severity.entry(result.severity).or_insert(0) += 1;
+            *self
+                .stats
+                .diagnoses_by_category
+                .entry(FaultCategory::Software)
+                .or_insert(0) += 1;
+            *self
+                .stats
+                .diagnoses_by_severity
+                .entry(result.severity)
+                .or_insert(0) += 1;
         }
     }
 
@@ -1514,99 +1577,90 @@ impl FaultDiagnosisEngine {
 
     /// 加载预定义故障模式
     fn load_predefined_fault_patterns(&mut self) -> Result<(), &'static str> {
-        let patterns = vec![
-            FaultPattern {
-                id: "memory_leak".to_string(),
-                name: "Memory Leak Pattern".to_string(),
-                description: "Gradual memory consumption leading to system degradation".to_string(),
-                category: FaultCategory::Resource,
-                severity: FaultSeverity::Critical,
-                characteristics: vec![
-                    FaultCharacteristic {
-                        name: "gradual_memory_increase".to_string(),
-                        value: "true".to_string(),
-                        feature_type: FeatureType::Categorical,
-                        importance: 0.9,
-                    },
-                ],
-                premonition_symptoms: vec![
-                    Symptom {
-                        id: "sym_1".to_string(),
-                        name: "high_memory_usage".to_string(),
-                        description: "Memory usage is consistently high".to_string(),
-                        symptom_type: SymptomType::ResourceExhaustion,
-                        detection_metrics: vec!["memory_usage".to_string()],
-                        occurrence_probability: 0.9,
-                        duration_seconds: 1800, // 30分钟
-                    },
-                ],
-                root_causes: vec![
-                    RootCause {
-                        id: "rc_mem_1".to_string(),
-                        description: "Memory allocation not freed".to_string(),
-                        cause_category: CauseCategory::ImplementationError,
-                        probability: 0.8,
-                        evidence_chain: Vec::new(),
-                        fix_complexity: FixComplexity::Complex,
-                        estimated_fix_time_hours: 8,
-                    },
-                ],
-                impact_scope: ImpactScope {
-                    affected_components: vec!["application".to_string(), "system".to_string()],
-                    affected_users: 5000,
-                    business_impact: BusinessImpact::Major,
-                    impact_duration_minutes: 120,
-                    financial_impact: FinancialImpact {
-                        direct_loss: 2000.0,
-                        indirect_loss: 5000.0,
-                        recovery_cost: 1000.0,
-                        reputation_impact_score: 0.6,
-                    },
+        let patterns = vec![FaultPattern {
+            id: "memory_leak".to_string(),
+            name: "Memory Leak Pattern".to_string(),
+            description: "Gradual memory consumption leading to system degradation".to_string(),
+            category: FaultCategory::Resource,
+            severity: FaultSeverity::Critical,
+            characteristics: vec![FaultCharacteristic {
+                name: "gradual_memory_increase".to_string(),
+                value: "true".to_string(),
+                feature_type: FeatureType::Categorical,
+                importance: 0.9,
+            }],
+            premonition_symptoms: vec![Symptom {
+                id: "sym_1".to_string(),
+                name: "high_memory_usage".to_string(),
+                description: "Memory usage is consistently high".to_string(),
+                symptom_type: SymptomType::ResourceExhaustion,
+                detection_metrics: vec!["memory_usage".to_string()],
+                occurrence_probability: 0.9,
+                duration_seconds: 1800, // 30分钟
+            }],
+            root_causes: vec![RootCause {
+                id: "rc_mem_1".to_string(),
+                description: "Memory allocation not freed".to_string(),
+                cause_category: CauseCategory::ImplementationError,
+                probability: 0.8,
+                evidence_chain: Vec::new(),
+                fix_complexity: FixComplexity::Complex,
+                estimated_fix_time_hours: 8,
+            }],
+            impact_scope: ImpactScope {
+                affected_components: vec!["application".to_string(), "system".to_string()],
+                affected_users: 5000,
+                business_impact: BusinessImpact::Major,
+                impact_duration_minutes: 120,
+                financial_impact: FinancialImpact {
+                    direct_loss: 2000.0,
+                    indirect_loss: 5000.0,
+                    recovery_cost: 1000.0,
+                    reputation_impact_score: 0.6,
                 },
-                detection_methods: vec![
-                    DetectionMethod {
-                        id: "method_1".to_string(),
-                        name: "Memory Usage Monitoring".to_string(),
-                        method_type: DetectionMethodType::ThresholdBased,
-                        detection_metrics: vec!["memory_usage".to_string()],
-                        detection_thresholds: {
-                            let mut thresholds = BTreeMap::new();
-                            thresholds.insert("memory_usage".to_string(), 90.0);
-                            thresholds
-                        },
-                        detection_frequency_seconds: 60,
-                        accuracy: 0.95,
-                    },
-                ],
-                remediation_recommendations: vec![
-                    RemediationRecommendation {
-                        id: "rec_mem_1".to_string(),
-                        description: "Fix memory leak in application code".to_string(),
-                        recommendation_type: RecommendationType::PermanentFix,
-                        priority: RecommendationPriority::Urgent,
-                        implementation_steps: vec![
-                            "Identify memory allocation points".to_string(),
-                            "Add proper deallocation".to_string(),
-                            "Test with memory profiling tools".to_string(),
-                        ],
-                        expected_outcome: "Memory usage stabilized".to_string(),
-                        risk_assessment: RiskAssessment {
-                            technical_risk: 0.4,
-                            business_risk: 0.2,
-                            security_risk: 0.1,
-                            financial_risk: 0.3,
-                            overall_risk_rating: RiskRating::Medium,
-                            mitigation_measures: vec!["Thorough testing required".to_string()],
-                        },
-                        required_resources: vec!["Developer time".to_string(), "Testing environment".to_string()],
-                        estimated_implementation_time_hours: 8,
-                        success_rate: 0.85,
-                    },
-                ],
-                frequency: 0.1,
-                detection_confidence: 0.9,
             },
-        ];
+            detection_methods: vec![DetectionMethod {
+                id: "method_1".to_string(),
+                name: "Memory Usage Monitoring".to_string(),
+                method_type: DetectionMethodType::ThresholdBased,
+                detection_metrics: vec!["memory_usage".to_string()],
+                detection_thresholds: {
+                    let mut thresholds = BTreeMap::new();
+                    thresholds.insert("memory_usage".to_string(), 90.0);
+                    thresholds
+                },
+                detection_frequency_seconds: 60,
+                accuracy: 0.95,
+            }],
+            remediation_recommendations: vec![RemediationRecommendation {
+                id: "rec_mem_1".to_string(),
+                description: "Fix memory leak in application code".to_string(),
+                recommendation_type: RecommendationType::PermanentFix,
+                priority: RecommendationPriority::Urgent,
+                implementation_steps: vec![
+                    "Identify memory allocation points".to_string(),
+                    "Add proper deallocation".to_string(),
+                    "Test with memory profiling tools".to_string(),
+                ],
+                expected_outcome: "Memory usage stabilized".to_string(),
+                risk_assessment: RiskAssessment {
+                    technical_risk: 0.4,
+                    business_risk: 0.2,
+                    security_risk: 0.1,
+                    financial_risk: 0.3,
+                    overall_risk_rating: RiskRating::Medium,
+                    mitigation_measures: vec!["Thorough testing required".to_string()],
+                },
+                required_resources: vec![
+                    "Developer time".to_string(),
+                    "Testing environment".to_string(),
+                ],
+                estimated_implementation_time_hours: 8,
+                success_rate: 0.85,
+            }],
+            frequency: 0.1,
+            detection_confidence: 0.9,
+        }];
 
         for pattern in patterns {
             self.fault_patterns.insert(pattern.id.clone(), pattern);
@@ -1617,30 +1671,26 @@ impl FaultDiagnosisEngine {
 
     /// 加载诊断规则
     fn load_diagnosis_rules(&mut self) -> Result<(), &'static str> {
-        let rules = vec![
-            DiagnosisRule {
-                id: "high_error_rate".to_string(),
-                name: "High Error Rate Detection".to_string(),
-                description: "Detects when error rate exceeds threshold".to_string(),
-                rule_type: DiagnosisRuleType::RuleEngine,
-                trigger_conditions: vec![
-                    TriggerCondition {
-                        id: "cond_1".to_string(),
-                        condition_type: ConditionType::ErrorRateThreshold,
-                        parameters: BTreeMap::new(),
-                        threshold: 5.0,
-                        time_window_seconds: 300, // 5分钟
-                    },
-                ],
-                diagnosis_logic: DiagnosisLogic::SimpleMatch {
-                    patterns: vec!["service_degradation".to_string()],
-                },
-                confidence_weight: 0.8,
-                priority: 1,
-                enabled: true,
-                stats: RuleStats::default(),
+        let rules = vec![DiagnosisRule {
+            id: "high_error_rate".to_string(),
+            name: "High Error Rate Detection".to_string(),
+            description: "Detects when error rate exceeds threshold".to_string(),
+            rule_type: DiagnosisRuleType::RuleEngine,
+            trigger_conditions: vec![TriggerCondition {
+                id: "cond_1".to_string(),
+                condition_type: ConditionType::ErrorRateThreshold,
+                parameters: BTreeMap::new(),
+                threshold: 5.0,
+                time_window_seconds: 300, // 5分钟
+            }],
+            diagnosis_logic: DiagnosisLogic::SimpleMatch {
+                patterns: vec!["service_degradation".to_string()],
             },
-        ];
+            confidence_weight: 0.8,
+            priority: 1,
+            enabled: true,
+            stats: RuleStats::default(),
+        }];
 
         self.diagnosis_rules = rules;
         Ok(())
@@ -1648,25 +1698,23 @@ impl FaultDiagnosisEngine {
 
     /// 初始化预测模型
     fn initialize_prediction_models(&mut self) -> Result<(), &'static str> {
-        let models = vec![
-            PredictionModel {
-                id: "fault_prediction_model".to_string(),
-                name: "Basic Fault Prediction Model".to_string(),
-                model_type: PredictionModelType::TimeSeries,
-                input_features: vec![
-                    "cpu_usage".to_string(),
-                    "memory_usage".to_string(),
-                    "error_rate".to_string(),
-                    "response_time".to_string(),
-                ],
-                output_predictions: vec!["fault_probability".to_string()],
-                model_parameters: BTreeMap::new(),
-                training_dataset: "historical_fault_data".to_string(),
-                accuracy: 0.75,
-                last_trained: crate::subsystems::time::get_timestamp(),
-                prediction_window_hours: 24,
-            },
-        ];
+        let models = vec![PredictionModel {
+            id: "fault_prediction_model".to_string(),
+            name: "Basic Fault Prediction Model".to_string(),
+            model_type: PredictionModelType::TimeSeries,
+            input_features: vec![
+                "cpu_usage".to_string(),
+                "memory_usage".to_string(),
+                "error_rate".to_string(),
+                "response_time".to_string(),
+            ],
+            output_predictions: vec!["fault_probability".to_string()],
+            model_parameters: BTreeMap::new(),
+            training_dataset: "historical_fault_data".to_string(),
+            accuracy: 0.75,
+            last_trained: crate::subsystems::time::get_timestamp(),
+            prediction_window_hours: 24,
+        }];
 
         for model in models {
             self.prediction_models.insert(model.id.clone(), model);

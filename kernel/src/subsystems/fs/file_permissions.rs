@@ -6,34 +6,32 @@
 //! and fine-grained permission checking.
 
 extern crate alloc;
-use alloc::vec::Vec;
-use alloc::collections::BTreeMap;
-use alloc::string::String;
-// use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
+use crate::subsystems::fs::{DiskInode, InodeType};
+// use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use crate::subsystems::process::{Process, ProcessId};
-use crate::subsystems::fs::{InodeType, DiskInode};
 
 /// Permission bits (POSIX-compatible)
-pub const PERM_READ: u16 = 0o400;    // Owner read
-pub const PERM_WRITE: u16 = 0o200;   // Owner write
-pub const PERM_EXEC: u16 = 0o100;    // Owner execute
-pub const PERM_GREAD: u16 = 0o040;   // Group read
-pub const PERM_GWRITE: u16 = 0o020;  // Group write
-pub const PERM_GEXEC: u16 = 0o010;   // Group execute
-pub const PERM_OREAD: u16 = 0o004;   // Other read
-pub const PERM_OWRITE: u16 = 0o002;  // Other write
-pub const PERM_OEXEC: u16 = 0o001;   // Other execute
+pub const PERM_READ: u16 = 0o400; // Owner read
+pub const PERM_WRITE: u16 = 0o200; // Owner write
+pub const PERM_EXEC: u16 = 0o100; // Owner execute
+pub const PERM_GREAD: u16 = 0o040; // Group read
+pub const PERM_GWRITE: u16 = 0o020; // Group write
+pub const PERM_GEXEC: u16 = 0o010; // Group execute
+pub const PERM_OREAD: u16 = 0o004; // Other read
+pub const PERM_OWRITE: u16 = 0o002; // Other write
+pub const PERM_OEXEC: u16 = 0o001; // Other execute
 
 /// Special permission bits
-pub const PERM_SETUID: u16 = 0o4000;  // Set user ID on execution
-pub const PERM_SETGID: u16 = 0o2000;  // Set group ID on execution
-pub const PERM_STICKY: u16 = 0o1000;  // Sticky bit
+pub const PERM_SETUID: u16 = 0o4000; // Set user ID on execution
+pub const PERM_SETGID: u16 = 0o2000; // Set group ID on execution
+pub const PERM_STICKY: u16 = 0o1000; // Sticky bit
 
 /// Default file permissions
 pub const DEFAULT_FILE_PERMS: u16 = PERM_READ | PERM_WRITE | PERM_GREAD | PERM_OREAD;
-pub const DEFAULT_DIR_PERMS: u16 = PERM_READ | PERM_WRITE | PERM_EXEC | 
-                                   PERM_GREAD | PERM_GEXEC | PERM_OREAD | PERM_OEXEC;
+pub const DEFAULT_DIR_PERMS: u16 =
+    PERM_READ | PERM_WRITE | PERM_EXEC | PERM_GREAD | PERM_GEXEC | PERM_OREAD | PERM_OEXEC;
 
 /// User ID for root (superuser)
 pub const ROOT_UID: u32 = 0;
@@ -67,33 +65,31 @@ pub struct AclEntry {
 impl AclEntry {
     /// Create a new ACL entry
     pub fn new(acl_type: AclType, id: u32, permissions: u16) -> Self {
-        Self {
-            acl_type,
-            id,
-            permissions,
-            effective: true,
-        }
+        Self { acl_type, id, permissions, effective: true }
     }
 
     /// Check if this entry grants read permission
     pub fn can_read(&self) -> bool {
-        self.effective && (self.permissions & PERM_READ != 0 || 
-                          self.permissions & PERM_GREAD != 0 || 
-                          self.permissions & PERM_OREAD != 0)
+        self.effective
+            && (self.permissions & PERM_READ != 0
+                || self.permissions & PERM_GREAD != 0
+                || self.permissions & PERM_OREAD != 0)
     }
 
     /// Check if this entry grants write permission
     pub fn can_write(&self) -> bool {
-        self.effective && (self.permissions & PERM_WRITE != 0 || 
-                          self.permissions & PERM_GWRITE != 0 || 
-                          self.permissions & PERM_OWRITE != 0)
+        self.effective
+            && (self.permissions & PERM_WRITE != 0
+                || self.permissions & PERM_GWRITE != 0
+                || self.permissions & PERM_OWRITE != 0)
     }
 
     /// Check if this entry grants execute permission
     pub fn can_execute(&self) -> bool {
-        self.effective && (self.permissions & PERM_EXEC != 0 || 
-                          self.permissions & PERM_GEXEC != 0 || 
-                          self.permissions & PERM_OEXEC != 0)
+        self.effective
+            && (self.permissions & PERM_EXEC != 0
+                || self.permissions & PERM_GEXEC != 0
+                || self.permissions & PERM_OEXEC != 0)
     }
 }
 
@@ -109,23 +105,22 @@ pub struct AccessControlList {
 impl AccessControlList {
     /// Create a new empty ACL
     pub fn new() -> Self {
-        Self {
-            entries: Vec::new(),
-            default_entries: Vec::new(),
-        }
+        Self { entries: Vec::new(), default_entries: Vec::new() }
     }
 
     /// Add an ACL entry
     pub fn add_entry(&mut self, entry: AclEntry) {
         // Remove any existing entry for the same type and ID
-        self.entries.retain(|e| !(e.acl_type == entry.acl_type && e.id == entry.id));
+        self.entries
+            .retain(|e| !(e.acl_type == entry.acl_type && e.id == entry.id));
         self.entries.push(entry);
     }
 
     /// Add a default ACL entry (for directories)
     pub fn add_default_entry(&mut self, entry: AclEntry) {
         // Remove any existing default entry for the same type and ID
-        self.default_entries.retain(|e| !(e.acl_type == entry.acl_type && e.id == entry.id));
+        self.default_entries
+            .retain(|e| !(e.acl_type == entry.acl_type && e.id == entry.id));
         self.default_entries.push(entry);
     }
 
@@ -140,7 +135,13 @@ impl AccessControlList {
     }
 
     /// Check if a user has specific permissions
-    pub fn check_permissions(&self, uid: u32, gid: u32, groups: &[u32], required_perms: u16) -> bool {
+    pub fn check_permissions(
+        &self,
+        uid: u32,
+        gid: u32,
+        groups: &[u32],
+        required_perms: u16,
+    ) -> bool {
         // Check for exact user match
         for entry in &self.entries {
             if entry.acl_type == AclType::User && entry.id == uid {
@@ -267,9 +268,13 @@ pub struct FilePermissions {
 impl FilePermissions {
     /// Create new file permissions with default values
     pub fn new(uid: u32, gid: u32, is_directory: bool) -> Self {
-        let mode = if is_directory { DEFAULT_DIR_PERMS } else { DEFAULT_FILE_PERMS };
+        let mode = if is_directory {
+            DEFAULT_DIR_PERMS
+        } else {
+            DEFAULT_FILE_PERMS
+        };
         let now = crate::subsystems::time::get_timestamp();
-        
+
         Self {
             uid,
             gid,
@@ -440,18 +445,46 @@ impl FilePermissions {
 
         // Owner permissions
         result.push(if self.mode & PERM_READ != 0 { 'r' } else { '-' });
-        result.push(if self.mode & PERM_WRITE != 0 { 'w' } else { '-' });
+        result.push(if self.mode & PERM_WRITE != 0 {
+            'w'
+        } else {
+            '-'
+        });
         result.push(if self.mode & PERM_EXEC != 0 { 'x' } else { '-' });
 
         // Group permissions
-        result.push(if self.mode & PERM_GREAD != 0 { 'r' } else { '-' });
-        result.push(if self.mode & PERM_GWRITE != 0 { 'w' } else { '-' });
-        result.push(if self.mode & PERM_GEXEC != 0 { 'x' } else { '-' });
+        result.push(if self.mode & PERM_GREAD != 0 {
+            'r'
+        } else {
+            '-'
+        });
+        result.push(if self.mode & PERM_GWRITE != 0 {
+            'w'
+        } else {
+            '-'
+        });
+        result.push(if self.mode & PERM_GEXEC != 0 {
+            'x'
+        } else {
+            '-'
+        });
 
         // Other permissions
-        result.push(if self.mode & PERM_OREAD != 0 { 'r' } else { '-' });
-        result.push(if self.mode & PERM_OWRITE != 0 { 'w' } else { '-' });
-        result.push(if self.mode & PERM_OEXEC != 0 { 'x' } else { '-' });
+        result.push(if self.mode & PERM_OREAD != 0 {
+            'r'
+        } else {
+            '-'
+        });
+        result.push(if self.mode & PERM_OWRITE != 0 {
+            'w'
+        } else {
+            '-'
+        });
+        result.push(if self.mode & PERM_OEXEC != 0 {
+            'x'
+        } else {
+            '-'
+        });
 
         result
     }
@@ -535,7 +568,7 @@ impl PermissionManager {
             home_dir: "/root".to_string(),
             shell: "/bin/sh".to_string(),
         };
-        
+
         let mut users = self.users.lock();
         users.insert(ROOT_UID, root_user);
         drop(users);
@@ -546,7 +579,7 @@ impl PermissionManager {
             name: "root".to_string(),
             members: vec![ROOT_UID],
         };
-        
+
         let mut groups = self.groups.lock();
         groups.insert(ROOT_GID, root_group);
         drop(groups);
@@ -557,7 +590,7 @@ impl PermissionManager {
     /// Create a new user
     pub fn create_user(&self, name: &str, gid: u32, home_dir: &str, shell: &str) -> u32 {
         let uid = self.next_uid.fetch_add(1, Ordering::SeqCst);
-        
+
         let user = UserInfo {
             uid,
             name: name.to_string(),
@@ -566,7 +599,7 @@ impl PermissionManager {
             home_dir: home_dir.to_string(),
             shell: shell.to_string(),
         };
-        
+
         let mut users = self.users.lock();
         users.insert(uid, user);
         drop(users);
@@ -587,13 +620,9 @@ impl PermissionManager {
     /// Create a new group
     pub fn create_group(&self, name: &str) -> u32 {
         let gid = self.next_gid.fetch_add(1, Ordering::SeqCst);
-        
-        let group = GroupInfo {
-            gid,
-            name: name.to_string(),
-            members: Vec::new(),
-        };
-        
+
+        let group = GroupInfo { gid, name: name.to_string(), members: Vec::new() };
+
         let mut groups = self.groups.lock();
         groups.insert(gid, group);
         drop(groups);
@@ -629,15 +658,15 @@ impl PermissionManager {
     /// Get all groups for a user
     pub fn get_user_groups(&self, uid: u32) -> Vec<u32> {
         let mut groups = Vec::new();
-        
+
         // Get primary group
         if let Some(user) = self.get_user(uid) {
             groups.push(user.gid);
-            
+
             // Get secondary groups
             groups.extend_from_slice(&user.secondary_groups);
         }
-        
+
         // Check group memberships
         let groups_db = self.groups.lock();
         for (gid, group) in groups_db.iter() {
@@ -645,7 +674,7 @@ impl PermissionManager {
                 groups.push(*gid);
             }
         }
-        
+
         groups
     }
 
@@ -696,7 +725,7 @@ impl PermissionManager {
         }
 
         let result = perms.has_permissions(uid, gid, &groups, required_perms);
-        
+
         if !result {
             let mut stats = self.stats.lock();
             stats.denials += 1;
@@ -764,7 +793,7 @@ pub fn can_delete_file(perms: &FilePermissions, parent_perms: &FilePermissions) 
     if !can_write_file(parent_perms) {
         return false;
     }
-    
+
     // Owner can delete their own files
     if let Some(pm) = get_permission_manager() {
         let current_process = crate::subsystems::process::get_current_process();
@@ -775,13 +804,13 @@ pub fn can_delete_file(perms: &FilePermissions, parent_perms: &FilePermissions) 
             }
         }
     }
-    
+
     // Check sticky bit
     if perms.mode & PERM_STICKY != 0 {
         // With sticky bit, only owner (or root) can delete
         return false;
     }
-    
+
     // Otherwise, write permission on parent is sufficient
     true
 }

@@ -7,21 +7,19 @@
 //! - CPU topology discovery
 //! - Power state management
 
+use alloc::{format, string::String, vec::Vec};
 use core::fmt;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::format;
 
 /// ACPI signature (table identifier)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AcpiSignature {
-    RSDP,  // Root System Description Pointer
-    RSDT,  // Root System Description Table
-    XSDT,  // Extended System Description Table
-    MADT,  // Multiple APIC Description Table
-    FADT,  // Fixed ACPI Description Table
-    SSDT,  // Secondary System Description Table
-    DSDT,  // Differentiated System Description Table
+    RSDP, // Root System Description Pointer
+    RSDT, // Root System Description Table
+    XSDT, // Extended System Description Table
+    MADT, // Multiple APIC Description Table
+    FADT, // Fixed ACPI Description Table
+    SSDT, // Secondary System Description Table
+    DSDT, // Differentiated System Description Table
     Unknown,
 }
 
@@ -81,11 +79,7 @@ pub struct AcpiTableEntry {
 impl AcpiTableEntry {
     /// Create new ACPI entry
     pub fn new(entry_type: AcpiEntryType, data: u32) -> Self {
-        AcpiTableEntry {
-            entry_type,
-            data,
-            flags: 0,
-        }
+        AcpiTableEntry { entry_type, data, flags: 0 }
     }
 
     /// Enable entry
@@ -145,7 +139,9 @@ impl fmt::Display for RsdpTable {
         write!(
             f,
             "RSDP {{ revision: {}, valid: {}, xsdt: {} }}",
-            self.revision, self.is_valid, self.use_xsdt()
+            self.revision,
+            self.is_valid,
+            self.use_xsdt()
         )
     }
 }
@@ -185,11 +181,7 @@ impl AcpiTableHeader {
 
 impl fmt::Display for AcpiTableHeader {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} (rev: {}, len: {})",
-            self.signature, self.revision, self.length
-        )
+        write!(f, "{} (rev: {}, len: {})", self.signature, self.revision, self.length)
     }
 }
 
@@ -222,7 +214,7 @@ impl MadtTable {
         match entry.entry_type {
             AcpiEntryType::ProcessorLocal => self.processor_count += 1,
             AcpiEntryType::IOApic => self.ioapic_count += 1,
-            _ => {}
+            _ => {},
         }
         self.entries.push(entry);
     }
@@ -240,11 +232,7 @@ impl MadtTable {
 
 impl fmt::Display for MadtTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "MADT {{ procs: {}, ioapics: {} }}",
-            self.processor_count, self.ioapic_count
-        )
+        write!(f, "MADT {{ procs: {}, ioapics: {} }}", self.processor_count, self.ioapic_count)
     }
 }
 
@@ -277,7 +265,6 @@ impl Default for AcpiParser {
 }
 
 impl AcpiParser {
-
     /// Load RSDP
     pub fn load_rsdp(&mut self, mut rsdp: RsdpTable) -> bool {
         if !rsdp.validate() {
@@ -318,14 +305,16 @@ impl AcpiParser {
 
     /// Get processor count from MADT
     pub fn get_processor_count(&self) -> u32 {
-        self.madt.as_ref()
+        self.madt
+            .as_ref()
             .map(|m| m.get_processor_count())
             .unwrap_or(0)
     }
 
     /// Get IOAPIC count from MADT
     pub fn get_ioapic_count(&self) -> u32 {
-        self.madt.as_ref()
+        self.madt
+            .as_ref()
             .map(|m| m.get_ioapic_count())
             .unwrap_or(0)
     }

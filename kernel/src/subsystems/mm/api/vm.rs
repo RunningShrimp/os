@@ -1,20 +1,22 @@
 //! mm模块虚拟内存管理公共接口
-//! 
+//!
 //! 提供虚拟内存映射和管理功能
 
-use super::error::VmError;
-use super::types::{MapFlags, MemoryProtection, MemoryMapping, MappingType};
-use crate::subsystems::mm::vm::{PageTable, map_pages, VmArea, VmPerm, PAGE_SIZE, flush_tlb_page};
-use crate::subsystems::mm::vm::flags;
-use crate::subsystems::sync::Mutex;
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-
-use crate::subsystems::process::myproc;
+use alloc::{collections::BTreeMap, vec::Vec};
 use core::ops::Range;
 
+use super::{
+    error::VmError,
+    types::{MapFlags, MappingType, MemoryMapping, MemoryProtection},
+};
+use crate::subsystems::{
+    mm::vm::{PAGE_SIZE, PageTable, VmArea, VmPerm, flags, flush_tlb_page, map_pages},
+    process::myproc,
+    sync::Mutex,
+};
+
 /// Virtual memory area manager
-/// 
+///
 /// Manages memory mappings for a process
 pub struct VmManager {
     /// List of virtual memory areas
@@ -47,7 +49,8 @@ impl VmManager {
 
     /// Find all VMAs that overlap with the given range
     pub fn find_overlapping_vmas(&self, range: &Range<usize>) -> Vec<usize> {
-        self.vmas.iter()
+        self.vmas
+            .iter()
             .enumerate()
             .filter(|(_, vma)| vma.range.start < range.end && vma.range.end > range.start)
             .map(|(i, _)| i)
@@ -84,33 +87,33 @@ impl VmManager {
     pub fn find_free_range(&mut self, size: usize) -> Result<usize, VmError> {
         // Align size to page boundary
         let aligned_size = (size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
-        
+
         // Start from next_anon_addr and find a gap
         let mut addr = self.next_anon_addr;
         let end_addr = 0x800000000; // End of user address space
-        
+
         // Sort VMAs by start address for easier gap finding
         self.vmas.sort_by_key(|vma| vma.range.start);
-        
+
         for vma in &self.vmas {
             if addr + aligned_size <= vma.range.start {
                 // Found a gap
                 self.next_anon_addr = addr + aligned_size;
                 return Ok(addr);
             }
-            
+
             // Move to after this VMA
             if addr < vma.range.end {
                 addr = vma.range.end;
             }
         }
-        
+
         // Check if we can fit after the last VMA
         if addr + aligned_size <= end_addr {
             self.next_anon_addr = addr + aligned_size;
             return Ok(addr);
         }
-        
+
         Err(VmError::InvalidAddress)
     }
 }
@@ -125,7 +128,7 @@ fn get_current_vm_manager() -> Option<&'static Mutex<VmManager>> {
         VM_MANAGERS_INIT.call_once(|| {
             // Initialize the map
         });
-        
+
         if let Some(pid) = myproc() {
             VM_MANAGERS.get(&pid)
         } else {
@@ -140,7 +143,7 @@ pub fn init_vm_manager(pid: usize, pagetable: *mut PageTable) {
         VM_MANAGERS_INIT.call_once(|| {
             // Initialize the map
         });
-        
+
         VM_MANAGERS.insert(pid, Mutex::new(VmManager::new(pagetable)));
     }
 }
@@ -172,27 +175,32 @@ fn vm_perm_to_memory_protection(perm: &VmPerm) -> MemoryProtection {
 }
 
 /// Map memory region
-/// 
+///
 /// # Contract
 /// * Address must be page aligned
 /// * Size must be page aligned
 /// * Validate memory permissions
 /// * Update process address space
 /// * Handle address conflict
-pub fn mmap(addr: usize, size: usize, prot: MemoryProtection, flags: MapFlags) -> Result<usize, VmError> {
+pub fn mmap(
+    addr: usize,
+    size: usize,
+    prot: MemoryProtection,
+    flags: MapFlags,
+) -> Result<usize, VmError> {
     // Validate size
     if size == 0 {
         return Err(VmError::InvalidSize);
     }
-    
+
     // Align size to page boundary
     let aligned_size = (size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
-    
+
     // Get current process and VM manager
     let pid = myproc().ok_or(VmError::InvalidAddress)?;
     let vm_manager = get_current_vm_manager().ok_or(VmError::InvalidAddress)?;
     let mut vm = vm_manager.lock();
-    
+
     // Determine mapping address
     let map_addr = if flags.fixed {
         // Fixed mapping - use provided address
@@ -207,23 +215,20 @@ pub fn mmap(addr: usize, size: usize, prot: MemoryProtection, flags: MapFlags) -
         }
         vm.find_free_range(aligned_size)?
     };
-    
+
     // Create VMA
     let vma = VmArea {
-        range: Range {
-            start: map_addr,
-            end: map_addr + aligned_size,
-        },
+        range: Range { start: map_addr, end: map_addr + aligned_size },
         perm: memory_protection_to_vm_perm(&prot),
         file_backed: !flags.anonymous,
         file_offset: 0,
         lazy: !flags.anonymous, // Only use lazy allocation for file-backed mappings
-        cow: flags.private, // Private mappings are copy-on-write
+        cow: flags.private,     // Private mappings are copy-on-write
     };
-    
+
     // Add VMA to VM manager
     vm.add_vma(vma)?;
-    
+
     // For anonymous mappings, allocate physical pages immediately or lazily
     if flags.anonymous {
         // For simplicity, we'll allocate immediately
@@ -237,17 +242,17 @@ pub fn mmap(addr: usize, size: usize, prot: MemoryProtection, flags: MapFlags) -
             }
         }
     }
-    
+
     // Flush TLB for mapped region
     unsafe {
         flush_tlb_page(map_addr);
     }
-    
+
     Ok(map_addr)
 }
 
 /// Unmap memory region
-/// 
+///
 /// # Contract
 /// * Address and size must match previously mapped region
 /// * Cleanup page table entries
@@ -258,45 +263,42 @@ pub fn munmap(addr: usize, size: usize) -> Result<(), VmError> {
     if addr & (PAGE_SIZE - 1) != 0 {
         return Err(VmError::InvalidAddress);
     }
-    
+
     // Validate size
     if size == 0 {
         return Ok(()); // munmap with size 0 is a no-op
     }
-    
+
     // Align size to page boundary
     let aligned_size = (size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
-    
+
     // Get current process and VM manager
     let pid = myproc().ok_or(VmError::InvalidAddress)?;
     let vm_manager = get_current_vm_manager().ok_or(VmError::InvalidAddress)?;
     let mut vm = vm_manager.lock();
-    
+
     // Define the range to unmap
-    let unmap_range = Range {
-        start: addr,
-        end: addr + aligned_size,
-    };
-    
+    let unmap_range = Range { start: addr, end: addr + aligned_size };
+
     // Find and remove VMAs in the range
     let removed_vmas = vm.remove_vmas(&unmap_range);
-    
+
     if removed_vmas.is_empty() {
         return Err(VmError::MappingNotFound);
     }
-    
+
     // Unmap pages from page table
     // Note: In a real implementation, we would need to unmap each page individually
     // For now, we'll just flush the TLB
     unsafe {
         flush_tlb_page(addr);
     }
-    
+
     Ok(())
 }
 
 /// Change memory protection
-/// 
+///
 /// # Contract
 /// * Validate address range validity
 /// * Update page table entries
@@ -307,39 +309,36 @@ pub fn mprotect(addr: usize, size: usize, prot: MemoryProtection) -> Result<(), 
     if addr & (PAGE_SIZE - 1) != 0 {
         return Err(VmError::InvalidAddress);
     }
-    
+
     // Validate size
     if size == 0 {
         return Ok(()); // mprotect with size 0 is a no-op
     }
-    
+
     // Align size to page boundary
     let aligned_size = (size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
-    
+
     // Get current process and VM manager
     let pid = myproc().ok_or(VmError::InvalidAddress)?;
     let vm_manager = get_current_vm_manager().ok_or(VmError::InvalidAddress)?;
     let mut vm = vm_manager.lock();
-    
+
     // Define the range to protect
-    let protect_range = Range {
-        start: addr,
-        end: addr + aligned_size,
-    };
-    
+    let protect_range = Range { start: addr, end: addr + aligned_size };
+
     // Find VMAs that overlap with the range
     let overlapping_indices = vm.find_overlapping_vmas(&protect_range);
-    
+
     if overlapping_indices.is_empty() {
         return Err(VmError::MappingNotFound);
     }
-    
+
     // Update permissions for overlapping VMAs
     let new_perm = memory_protection_to_vm_perm(&prot);
-    
+
     for &idx in &overlapping_indices {
         let vma = &mut vm.vmas[idx];
-        
+
         // Check if the entire VMA is covered
         if vma.range.start >= protect_range.start && vma.range.end <= protect_range.end {
             // Update entire VMA
@@ -348,18 +347,15 @@ pub fn mprotect(addr: usize, size: usize, prot: MemoryProtection) -> Result<(), 
             // Partial coverage - split VMA
             let original_range = vma.range.clone();
             let original_perm = vma.perm;
-            
+
             // Remove original VMA
             vma.range = Range { start: 0, end: 0 }; // Mark as removed
-            
+
             // Add new VMAs with appropriate permissions
             if original_range.start < protect_range.start {
                 // Add VMA before protected region
                 vm.add_vma(VmArea {
-                    range: Range {
-                        start: original_range.start,
-                        end: protect_range.start,
-                    },
+                    range: Range { start: original_range.start, end: protect_range.start },
                     perm: original_perm,
                     file_backed: vma.file_backed,
                     file_offset: vma.file_offset,
@@ -367,7 +363,7 @@ pub fn mprotect(addr: usize, size: usize, prot: MemoryProtection) -> Result<(), 
                     cow: vma.cow,
                 })?;
             }
-            
+
             // Add VMA for protected region
             vm.add_vma(VmArea {
                 range: protect_range.clone(),
@@ -377,14 +373,11 @@ pub fn mprotect(addr: usize, size: usize, prot: MemoryProtection) -> Result<(), 
                 lazy: vma.lazy,
                 cow: vma.cow,
             })?;
-            
+
             if original_range.end > protect_range.end {
                 // Add VMA after protected region
                 vm.add_vma(VmArea {
-                    range: Range {
-                        start: protect_range.end,
-                        end: original_range.end,
-                    },
+                    range: Range { start: protect_range.end, end: original_range.end },
                     perm: original_perm,
                     file_backed: vma.file_backed,
                     file_offset: vma.file_offset + (protect_range.end - original_range.start),
@@ -394,22 +387,22 @@ pub fn mprotect(addr: usize, size: usize, prot: MemoryProtection) -> Result<(), 
             }
         }
     }
-    
+
     // Remove empty VMAs (those marked as removed)
     vm.vmas.retain(|vma| vma.range.start < vma.range.end);
-    
+
     // Update page table entries with new permissions
     // Note: In a real implementation, we would need to update each page's PTE
     // For now, we'll just flush the TLB
     unsafe {
         flush_tlb_page(addr);
     }
-    
+
     Ok(())
 }
 
 /// Flush memory mapping to device
-/// 
+///
 /// # Contract
 /// * Write dirty pages to backing store
 /// * Wait for I/O to complete
@@ -419,37 +412,34 @@ pub fn msync(addr: usize, size: usize) -> Result<(), VmError> {
     if addr & (PAGE_SIZE - 1) != 0 {
         return Err(VmError::InvalidAddress);
     }
-    
+
     // Validate size
     if size == 0 {
         return Ok(()); // msync with size 0 is a no-op
     }
-    
+
     // Align size to page boundary
     let aligned_size = (size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
-    
+
     // Get current process and VM manager
     let pid = myproc().ok_or(VmError::InvalidAddress)?;
     let vm_manager = get_current_vm_manager().ok_or(VmError::InvalidAddress)?;
     let mut vm = vm_manager.lock();
-    
+
     // Define the range to sync
-    let sync_range = Range {
-        start: addr,
-        end: addr + aligned_size,
-    };
-    
+    let sync_range = Range { start: addr, end: addr + aligned_size };
+
     // Find VMAs that overlap with the range
     let overlapping_indices = vm.find_overlapping_vmas(&sync_range);
-    
+
     if overlapping_indices.is_empty() {
         return Err(VmError::MappingNotFound);
     }
-    
+
     // For each overlapping VMA, flush dirty pages
     for &idx in &overlapping_indices {
         let vma = &vm.vmas[idx];
-        
+
         if vma.file_backed {
             // For file-backed mappings, write dirty pages to file
             // This is a simplified implementation
@@ -458,7 +448,7 @@ pub fn msync(addr: usize, size: usize) -> Result<(), VmError> {
             // 2. Check if each page is dirty
             // 3. Write dirty pages to the backing file
             // 4. Wait for I/O to complete
-            
+
             // For now, we'll just flush the TLB
             unsafe {
                 flush_tlb_page(vma.range.start);
@@ -466,50 +456,47 @@ pub fn msync(addr: usize, size: usize) -> Result<(), VmError> {
         }
         // For anonymous mappings, msync is a no-op
     }
-    
+
     Ok(())
 }
 
 /// Get memory mapping information
-/// 
+///
 /// Returns information about memory mappings in the specified range
 pub fn get_mapping_info(addr: usize, size: usize) -> Result<Vec<MemoryMapping>, VmError> {
     // Validate address
     if addr & (PAGE_SIZE - 1) != 0 {
         return Err(VmError::InvalidAddress);
     }
-    
+
     // Validate size
     if size == 0 {
         return Ok(Vec::new());
     }
-    
+
     // Align size to page boundary
     let aligned_size = (size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
-    
+
     // Get current process and VM manager
     let pid = myproc().ok_or(VmError::InvalidAddress)?;
     let vm_manager = get_current_vm_manager().ok_or(VmError::InvalidAddress)?;
     let vm = vm_manager.lock();
-    
+
     // Define the range to query
-    let query_range = Range {
-        start: addr,
-        end: addr + aligned_size,
-    };
-    
+    let query_range = Range { start: addr, end: addr + aligned_size };
+
     // Find VMAs that overlap with the range
     let overlapping_indices = vm.find_overlapping_vmas(&query_range);
-    
+
     let mut mappings = Vec::new();
-    
+
     for &idx in &overlapping_indices {
         let vma = &vm.vmas[idx];
-        
+
         // Calculate overlap range
         let overlap_start = core::cmp::max(vma.range.start, query_range.start);
         let overlap_end = core::cmp::min(vma.range.end, query_range.end);
-        
+
         // Create memory mapping
         let mapping = MemoryMapping {
             addr: overlap_start,
@@ -528,12 +515,9 @@ pub fn get_mapping_info(addr: usize, size: usize) -> Result<Vec<MemoryMapping>, 
             },
             ref_count: 1, // Simplified
         };
-        
+
         mappings.push(mapping);
     }
-    
+
     Ok(mappings)
 }
-
-
-

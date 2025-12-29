@@ -1,8 +1,9 @@
 //! 性能核心模块
-//! 
+//!
 //! 提供统一的系统调用性能统计功能
 
 use alloc::collections::BTreeMap;
+
 use spin::Mutex;
 
 /// 系统调用类型
@@ -181,7 +182,7 @@ impl UnifiedSyscallStats {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// 记录系统调用
     pub fn record_syscall(&mut self, syscall_number: u32, success: bool, time_ns: u64) {
         self.total_syscalls += 1;
@@ -190,15 +191,18 @@ impl UnifiedSyscallStats {
         } else {
             self.failed_syscalls += 1;
         }
-        
-        let stats = self.syscall_stats.entry(syscall_number).or_insert_with(|| SyscallStats {
-            syscall_number,
-            call_count: 0,
-            success_count: 0,
-            error_count: 0,
-            total_time_ns: 0,
-        });
-        
+
+        let stats = self
+            .syscall_stats
+            .entry(syscall_number)
+            .or_insert_with(|| SyscallStats {
+                syscall_number,
+                call_count: 0,
+                success_count: 0,
+                error_count: 0,
+                total_time_ns: 0,
+            });
+
         stats.call_count += 1;
         if success {
             stats.success_count += 1;
@@ -207,7 +211,7 @@ impl UnifiedSyscallStats {
         }
         stats.total_time_ns += time_ns;
     }
-    
+
     /// 清空统计
     pub fn clear(&mut self) {
         self.total_syscalls = 0;
@@ -229,10 +233,7 @@ pub struct SyscallStatsSnapshot {
 impl SyscallStatsSnapshot {
     /// 创建新的快照
     pub fn new(stats: UnifiedSyscallStats) -> Self {
-        Self {
-            timestamp: crate::subsystems::time::hrtime_nanos(),
-            stats,
-        }
+        Self { timestamp: crate::subsystems::time::hrtime_nanos(), stats }
     }
 }
 

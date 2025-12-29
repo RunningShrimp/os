@@ -19,12 +19,7 @@ pub struct Device {
 
 impl Device {
     pub fn new(device_type: DeviceType) -> Self {
-        Self {
-            device_type,
-            port_or_addr: 0,
-            irq: 0,
-            detected: false,
-        }
+        Self { device_type, port_or_addr: 0, irq: 0, detected: false }
     }
 }
 
@@ -35,10 +30,7 @@ pub struct DeviceDetector {
 
 impl DeviceDetector {
     pub fn new() -> Self {
-        Self {
-            devices: [Device::new(DeviceType::Serial); 16],
-            count: 0,
-        }
+        Self { devices: [Device::new(DeviceType::Serial); 16], count: 0 }
     }
 
     pub fn detect_all(&mut self) {
@@ -145,26 +137,22 @@ impl DeviceDetector {
             match device.device_type {
                 DeviceType::Serial => {
                     crate::drivers::console::write_str("Serial @ ");
-                }
+                },
                 DeviceType::Disk => {
                     crate::drivers::console::write_str("Disk @ ");
-                }
+                },
                 DeviceType::Nic => {
                     crate::drivers::console::write_str("NIC @ ");
-                }
+                },
                 DeviceType::Timer => {
                     crate::drivers::console::write_str("Timer @ ");
-                }
+                },
                 DeviceType::Pic => {
                     crate::drivers::console::write_str("PIC @ ");
-                }
+                },
             }
             crate::drivers::console::write_str("0x");
-            crate::drivers::console::write_str(if device.port_or_addr > 0 {
-                "..."
-            } else {
-                "0"
-            });
+            crate::drivers::console::write_str(if device.port_or_addr > 0 { "..." } else { "0" });
             crate::drivers::console::write_str("\n");
         }
     }

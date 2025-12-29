@@ -8,7 +8,7 @@ mod integration_tests {
         bios_realmode::RealModeExecutor,
         boot_orchestrator::BootConfig,
         e820_detection::E820MemoryMap,
-        init::{InitState, InitStage},
+        init::{InitStage, InitState},
         realmode_switcher::RealmModeSwitcher,
         vga::VGAWriter,
     };

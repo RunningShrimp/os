@@ -2,15 +2,15 @@
 //!
 //! This module provides error registration and lookup functionality.
 
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
+
 use nos_api::collections::BTreeMap;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::string::ToString;
-
-
-use crate::Error;
-use crate::Result;
 use spin::Mutex;
+
+use crate::{Error, Result};
 
 /// Error registry
 pub struct ErrorRegistry {
@@ -44,13 +44,13 @@ impl ErrorRegistry {
         if self.errors_by_name.contains_key(name) {
             return Err(Error::InvalidArgument("Error already exists".to_string()));
         }
-        
+
         let id = self.next_id;
         self.next_id += 1;
-        
+
         self.errors.insert(id, info);
         self.errors_by_name.insert(name.into(), id);
-        
+
         Ok(id)
     }
 
@@ -61,7 +61,8 @@ impl ErrorRegistry {
 
     /// Get an error by name
     pub fn get_by_name(&self, name: &str) -> Option<&ErrorInfo> {
-        self.errors_by_name.get(name)
+        self.errors_by_name
+            .get(name)
             .and_then(|id| self.errors.get(id))
     }
 
@@ -105,18 +106,16 @@ static GLOBAL_REGISTRY: spin::Once<Mutex<ErrorRegistry>> = spin::Once::new();
 
 /// Initialize the global error registry
 pub fn init_registry() -> Result<()> {
-    GLOBAL_REGISTRY.call_once(|| {
-        Mutex::new(ErrorRegistry::new())
-    });
+    GLOBAL_REGISTRY.call_once(|| Mutex::new(ErrorRegistry::new()));
     Ok(())
 }
 
 /// Get the global error registry
 pub fn get_registry() -> &'static Mutex<ErrorRegistry> {
-    GLOBAL_REGISTRY.get().expect("Error registry not initialized")
+    GLOBAL_REGISTRY
+        .get()
+        .expect("Error registry not initialized")
 }
-
-
 
 /// Shutdown the global error registry
 pub fn shutdown_registry() -> Result<()> {
@@ -132,7 +131,7 @@ mod tests {
     #[test]
     fn test_error_registry() {
         let mut registry = ErrorRegistry::new();
-        
+
         // Register a test error
         let info = ErrorInfo {
             name: "test_error".to_string(),
@@ -143,11 +142,11 @@ mod tests {
             metadata: BTreeMap::new(),
         };
         let id = registry.register("test_error", info).unwrap();
-        
+
         // Get error
         let retrieved = registry.get(id).unwrap();
         assert_eq!(retrieved.name, "test_error");
-        
+
         // Get by name
         let retrieved = registry.get_by_name("test_error").unwrap();
         assert_eq!(retrieved.name, "test_error");

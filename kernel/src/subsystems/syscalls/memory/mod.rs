@@ -4,14 +4,13 @@
 
 pub mod heap;
 pub mod map;
-pub mod service_impl;
 pub mod service;
+pub mod service_impl;
 
 // Re-export service types for convenience
-pub use service::{MemoryService, MemoryServiceStats, MemoryManager};
-
 // Re-export map functions
 pub use map::{mmap as sys_mmap, munmap as sys_munmap};
+pub use service::{MemoryManager, MemoryService, MemoryServiceStats};
 
 use crate::api::SyscallError;
 
@@ -39,7 +38,7 @@ pub fn dispatch(syscall_num: u32, args: &[u64]) -> Result<usize, SyscallError> {
 
             // Call mmap implementation
             sys_mmap(addr, length, prot, flags, fd, offset).map(|ptr| ptr as usize)
-        }
+        },
         // munmap syscall
         0x3002 => {
             if args.len() < 2 {
@@ -50,7 +49,7 @@ pub fn dispatch(syscall_num: u32, args: &[u64]) -> Result<usize, SyscallError> {
 
             // Call munmap implementation
             sys_munmap(addr, length).map(|_| 0)
-        }
+        },
         // Unknown memory syscall
         _ => Err(SyscallError::NotImplemented),
     }

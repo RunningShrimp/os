@@ -6,11 +6,8 @@
 //! - Fallback device selection
 //! - Recovery boot modes
 
+use alloc::{format, string::String, vec::Vec};
 use core::fmt;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::format;
-
 
 /// Boot device type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -237,11 +234,7 @@ impl FallbackBootManager {
     }
 
     /// Record boot attempt
-    pub fn record_attempt(
-        &mut self,
-        device: BootDevice,
-        result: BootAttemptResult,
-    ) -> bool {
+    pub fn record_attempt(&mut self, device: BootDevice, result: BootAttemptResult) -> bool {
         let mut attempt = BootAttempt::new(device, result);
         attempt.timestamp = self.total_attempts as u64;
 
@@ -423,7 +416,7 @@ mod tests {
     fn test_fallback_boot_manager_register_device() {
         let mut manager = FallbackBootManager::new();
         let device = BootDevice::new(BootDeviceType::HardDrive, "sda", 0x80);
-        
+
         assert!(manager.register_device(device));
         assert_eq!(manager.device_count(), 1);
     }
@@ -431,16 +424,16 @@ mod tests {
     #[test]
     fn test_fallback_boot_manager_device_priority() {
         let mut manager = FallbackBootManager::new();
-        
+
         let mut dev1 = BootDevice::new(BootDeviceType::HardDrive, "sda", 0x80);
         dev1.set_priority(20);
-        
+
         let mut dev2 = BootDevice::new(BootDeviceType::USBDevice, "usb1", 0x81);
         dev2.set_priority(10);
-        
+
         manager.register_device(dev1);
         manager.register_device(dev2);
-        
+
         let available = manager.get_available_devices();
         assert_eq!(available[0].device_type, BootDeviceType::USBDevice); // USB has priority 10
     }
@@ -450,7 +443,7 @@ mod tests {
         let mut manager = FallbackBootManager::new();
         let device = BootDevice::new(BootDeviceType::HardDrive, "sda", 0x80);
         manager.register_device(device.clone());
-        
+
         let next = manager.get_next_device();
         assert!(next.is_some());
         assert_eq!(next.unwrap().name, "sda");
@@ -460,7 +453,7 @@ mod tests {
     fn test_fallback_boot_manager_record_attempt() {
         let mut manager = FallbackBootManager::new();
         let device = BootDevice::new(BootDeviceType::HardDrive, "sda", 0x80);
-        
+
         assert!(manager.record_attempt(device.clone(), BootAttemptResult::Success));
         assert_eq!(manager.attempt_count(), 1);
         assert_eq!(manager.successful_attempts, 1);
@@ -470,11 +463,11 @@ mod tests {
     fn test_fallback_boot_manager_statistics() {
         let mut manager = FallbackBootManager::new();
         let device = BootDevice::new(BootDeviceType::HardDrive, "sda", 0x80);
-        
+
         manager.record_attempt(device.clone(), BootAttemptResult::Success);
         manager.record_attempt(device.clone(), BootAttemptResult::LoadFailed);
         manager.record_attempt(device.clone(), BootAttemptResult::Success);
-        
+
         let (total, success, failed) = manager.get_stats();
         assert_eq!(total, 3);
         assert_eq!(success, 2);
@@ -485,10 +478,10 @@ mod tests {
     fn test_fallback_boot_manager_success_rate() {
         let mut manager = FallbackBootManager::new();
         let device = BootDevice::new(BootDeviceType::HardDrive, "sda", 0x80);
-        
+
         manager.record_attempt(device.clone(), BootAttemptResult::Success);
         manager.record_attempt(device.clone(), BootAttemptResult::Success);
-        
+
         assert!((manager.success_rate() - 1.0).abs() < 0.01);
     }
 
@@ -496,10 +489,10 @@ mod tests {
     fn test_fallback_boot_manager_reset() {
         let mut manager = FallbackBootManager::new();
         let device = BootDevice::new(BootDeviceType::HardDrive, "sda", 0x80);
-        
+
         manager.register_device(device.clone());
         manager.record_attempt(device, BootAttemptResult::Success);
-        
+
         assert!(manager.attempt_count() > 0);
         manager.reset();
         assert_eq!(manager.attempt_count(), 0);
@@ -509,16 +502,16 @@ mod tests {
     #[test]
     fn test_fallback_boot_manager_try_next_device() {
         let mut manager = FallbackBootManager::new();
-        
+
         let dev1 = BootDevice::new(BootDeviceType::HardDrive, "sda", 0x80);
         let dev2 = BootDevice::new(BootDeviceType::USBDevice, "usb1", 0x81);
-        
+
         manager.register_device(dev1);
         manager.register_device(dev2);
-        
+
         let first = manager.get_next_device();
         assert_eq!(first.unwrap().name, "sda");
-        
+
         let second = manager.try_next_device();
         assert!(second.is_some());
     }

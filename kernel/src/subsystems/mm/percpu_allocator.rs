@@ -1,13 +1,16 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use core::alloc::{GlobalAlloc, Layout};
-use core::ptr::NonNull;
-use core::sync::atomic::{AtomicPtr, AtomicUsize, AtomicBool, Ordering};
+use core::{
+    alloc::{GlobalAlloc, Layout},
+    ptr::NonNull,
+    sync::atomic::{AtomicBool, AtomicPtr, AtomicUsize, Ordering},
+};
 
-use crate::subsystems::mm::allocator::HybridAllocator;
-use crate::arch::cpuid;
-use crate::subsystems::sync::Once;
+use crate::{
+    arch::cpuid,
+    subsystems::{mm::allocator::HybridAllocator, sync::Once},
+};
 
 const CACHE_LINE_SIZE: usize = 64;
 
@@ -45,12 +48,10 @@ impl PerCpuAllocatorSlot {
 
     pub fn initialize(&self, init_fn: impl FnOnce() -> HybridAllocator) {
         if !self.initialized.load(Ordering::Acquire) {
-            if let Ok(false) = self.initialized.compare_exchange(
-                false,
-                true,
-                Ordering::AcqRel,
-                Ordering::Acquire,
-            ) {
+            if let Ok(false) =
+                self.initialized
+                    .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            {
                 unsafe {
                     let allocator = Box::leak(Box::new(init_fn()));
                     (self as *const Self as *mut Self).write_volatile(Self {
@@ -226,11 +227,11 @@ impl PerCpuLocalAllocator {
                     Ok(_) => {
                         self.allocated_count.fetch_sub(1, Ordering::Relaxed);
                         return NonNull::new(head);
-                    }
+                    },
                     Err(new_head) => {
                         head = new_head;
                         continue;
-                    }
+                    },
                 }
             }
             head = block.next.map_or(core::ptr::null_mut(), |p| p.as_ptr());
@@ -260,11 +261,11 @@ impl PerCpuLocalAllocator {
                 Ok(_) => {
                     self.allocated_count.fetch_sub(1, Ordering::Relaxed);
                     return;
-                }
+                },
                 Err(new_head) => {
                     head = new_head;
                     continue;
-                }
+                },
             }
         }
     }
@@ -284,14 +285,12 @@ static mut PER_CPU_ALLOCATORS: Option<[PerCpuLocalAllocator; 256]> = None;
 static PER_CPU_ALLOCATORS_INIT: Once = Once::new();
 
 pub fn init_percpu_allocators() {
-    PER_CPU_ALLOCATORS_INIT.call_once(|| {
-        unsafe {
-            let mut allocators: [PerCpuLocalAllocator; 256] = core::mem::zeroed();
-            for i in 0..256 {
-                allocators[i] = PerCpuLocalAllocator::new();
-            }
-            PER_CPU_ALLOCATORS = Some(allocators);
+    PER_CPU_ALLOCATORS_INIT.call_once(|| unsafe {
+        let mut allocators: [PerCpuLocalAllocator; 256] = core::mem::zeroed();
+        for i in 0..256 {
+            allocators[i] = PerCpuLocalAllocator::new();
         }
+        PER_CPU_ALLOCATORS = Some(allocators);
     });
 }
 

@@ -1,5 +1,5 @@
 //! 访问控制和权限管理模块
-//! 
+//!
 //! 本模块提供系统的访问控制和权限管理功能，包括：
 //! - 用户身份验证
 //! - 权限检查
@@ -7,12 +7,16 @@
 //! - 能力管理
 //! - 访问控制列表(ACL)
 
-use crate::error::UnifiedError;
-use alloc::collections::BTreeMap;
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
-use alloc::sync::Arc;
+use alloc::{
+    collections::BTreeMap,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
+
 use spin::Mutex;
+
+use crate::error::UnifiedError;
 
 /// 用户标识符
 pub type UserId = u32;
@@ -273,21 +277,21 @@ impl AccessControlManager {
             user_capabilities: Arc::new(Mutex::new(BTreeMap::new())),
             config,
         };
-        
+
         // 初始化默认用户和组
         manager.init_default_users_and_groups();
-        
+
         // 初始化默认能力
         manager.init_default_capabilities();
-        
+
         manager
     }
-    
+
     /// 使用默认配置创建访问控制管理器
     pub fn with_default_config() -> Self {
         Self::new(AccessControlConfig::default())
     }
-    
+
     /// 初始化默认用户和组
     fn init_default_users_and_groups(&mut self) {
         // 创建root用户
@@ -302,7 +306,7 @@ impl AccessControlManager {
             user_type: UserType::Administrator,
             account_status: AccountStatus::Active,
         };
-        
+
         // 创建root组
         let root_group = GroupInfo {
             gid: 0,
@@ -310,7 +314,7 @@ impl AccessControlManager {
             members: vec![0],
             description: "System Administrators".to_string(),
         };
-        
+
         // 创建nobody用户
         let nobody_user = UserInfo {
             uid: 65534,
@@ -323,7 +327,7 @@ impl AccessControlManager {
             user_type: UserType::Guest,
             account_status: AccountStatus::Active,
         };
-        
+
         // 创建nobody组
         let nobody_group = GroupInfo {
             gid: 65534,
@@ -331,14 +335,14 @@ impl AccessControlManager {
             members: vec![65534],
             description: "Unprivileged Users".to_string(),
         };
-        
+
         // 添加到映射
         self.users.lock().insert(0, root_user);
         self.users.lock().insert(65534, nobody_user);
         self.groups.lock().insert(0, root_group);
         self.groups.lock().insert(65534, nobody_group);
     }
-    
+
     /// 初始化默认能力
     fn init_default_capabilities(&mut self) {
         // 文件系统能力
@@ -349,7 +353,7 @@ impl AccessControlManager {
             capability_type: CapabilityType::FileSystem,
             parameters: BTreeMap::new(),
         };
-        
+
         let fs_write = Capability {
             name: "fs.write".to_string(),
             description: "Write files and directories".to_string(),
@@ -357,7 +361,7 @@ impl AccessControlManager {
             capability_type: CapabilityType::FileSystem,
             parameters: BTreeMap::new(),
         };
-        
+
         // 网络能力
         let net_create = Capability {
             name: "net.create".to_string(),
@@ -366,7 +370,7 @@ impl AccessControlManager {
             capability_type: CapabilityType::Network,
             parameters: BTreeMap::new(),
         };
-        
+
         let net_connect = Capability {
             name: "net.connect".to_string(),
             description: "Connect to network endpoints".to_string(),
@@ -374,7 +378,7 @@ impl AccessControlManager {
             capability_type: CapabilityType::Network,
             parameters: BTreeMap::new(),
         };
-        
+
         // 进程管理能力
         let proc_fork = Capability {
             name: "proc.fork".to_string(),
@@ -383,7 +387,7 @@ impl AccessControlManager {
             capability_type: CapabilityType::ProcessManagement,
             parameters: BTreeMap::new(),
         };
-        
+
         let proc_kill = Capability {
             name: "proc.kill".to_string(),
             description: "Terminate processes".to_string(),
@@ -391,15 +395,27 @@ impl AccessControlManager {
             capability_type: CapabilityType::ProcessManagement,
             parameters: BTreeMap::new(),
         };
-        
+
         // 添加到能力映射
-        self.capabilities.lock().insert("fs.read".to_string(), fs_read);
-        self.capabilities.lock().insert("fs.write".to_string(), fs_write);
-        self.capabilities.lock().insert("net.create".to_string(), net_create);
-        self.capabilities.lock().insert("net.connect".to_string(), net_connect);
-        self.capabilities.lock().insert("proc.fork".to_string(), proc_fork);
-        self.capabilities.lock().insert("proc.kill".to_string(), proc_kill);
-        
+        self.capabilities
+            .lock()
+            .insert("fs.read".to_string(), fs_read);
+        self.capabilities
+            .lock()
+            .insert("fs.write".to_string(), fs_write);
+        self.capabilities
+            .lock()
+            .insert("net.create".to_string(), net_create);
+        self.capabilities
+            .lock()
+            .insert("net.connect".to_string(), net_connect);
+        self.capabilities
+            .lock()
+            .insert("proc.fork".to_string(), proc_fork);
+        self.capabilities
+            .lock()
+            .insert("proc.kill".to_string(), proc_kill);
+
         // 为root用户分配所有能力
         let root_caps = vec![
             "fs.read".to_string(),
@@ -411,7 +427,7 @@ impl AccessControlManager {
         ];
         self.user_capabilities.lock().insert(0, root_caps);
     }
-    
+
     /// 检查用户访问权限
     pub fn check_access(
         &self,
@@ -425,24 +441,24 @@ impl AccessControlManager {
             Some(user) => user.clone(),
             None => return AccessResult::DeniedResourceNotFound(format!("User {} not found", uid)),
         };
-        
+
         // 检查账户状态
         if user.account_status != AccountStatus::Active {
             return AccessResult::DeniedResourceInaccessible(format!("User account is not active"));
         }
-        
+
         // 检查ACL
         let acl = self.acl.lock();
         let mut explicit_allow = false;
         let mut explicit_deny = false;
-        
+
         // 检查用户特定的ACL条目
         for entry in acl.iter() {
-            if entry.resource_type == resource_type && 
-               (entry.resource_id == "*" || entry.resource_id == resource_id) &&
-               entry.principal_type == PrincipalType::User &&
-               entry.principal_id == uid {
-                
+            if entry.resource_type == resource_type
+                && (entry.resource_id == "*" || entry.resource_id == resource_id)
+                && entry.principal_type == PrincipalType::User
+                && entry.principal_id == uid
+            {
                 if entry.permissions.contains(&permission) {
                     match entry.access_rule {
                         AccessRule::Allow => explicit_allow = true,
@@ -451,19 +467,19 @@ impl AccessControlManager {
                 }
             }
         }
-        
+
         // 检查组特定的ACL条目
         if !explicit_deny && !explicit_allow {
             let groups = self.groups.lock();
-            
+
             // 检查主组
             if let Some(group) = groups.get(&user.gid) {
                 for entry in acl.iter() {
-                    if entry.resource_type == resource_type && 
-                       (entry.resource_id == "*" || entry.resource_id == resource_id) &&
-                       entry.principal_type == PrincipalType::Group &&
-                       entry.principal_id == user.gid {
-                        
+                    if entry.resource_type == resource_type
+                        && (entry.resource_id == "*" || entry.resource_id == resource_id)
+                        && entry.principal_type == PrincipalType::Group
+                        && entry.principal_id == user.gid
+                    {
                         if entry.permissions.contains(&permission) {
                             match entry.access_rule {
                                 AccessRule::Allow => explicit_allow = true,
@@ -473,16 +489,16 @@ impl AccessControlManager {
                     }
                 }
             }
-            
+
             // 检查附加组
             for &gid in &user.supplementary_gids {
                 if let Some(group) = groups.get(&gid) {
                     for entry in acl.iter() {
-                        if entry.resource_type == resource_type && 
-                           (entry.resource_id == "*" || entry.resource_id == resource_id) &&
-                           entry.principal_type == PrincipalType::Group &&
-                           entry.principal_id == gid {
-                            
+                        if entry.resource_type == resource_type
+                            && (entry.resource_id == "*" || entry.resource_id == resource_id)
+                            && entry.principal_type == PrincipalType::Group
+                            && entry.principal_id == gid
+                        {
                             if entry.permissions.contains(&permission) {
                                 match entry.access_rule {
                                     AccessRule::Allow => explicit_allow = true,
@@ -494,14 +510,14 @@ impl AccessControlManager {
                 }
             }
         }
-        
+
         // 检查"其他"ACL条目
         if !explicit_deny && !explicit_allow {
             for entry in acl.iter() {
-                if entry.resource_type == resource_type && 
-                   (entry.resource_id == "*" || entry.resource_id == resource_id) &&
-                   entry.principal_type == PrincipalType::Other {
-                    
+                if entry.resource_type == resource_type
+                    && (entry.resource_id == "*" || entry.resource_id == resource_id)
+                    && entry.principal_type == PrincipalType::Other
+                {
                     if entry.permissions.contains(&permission) {
                         match entry.access_rule {
                             AccessRule::Allow => explicit_allow = true,
@@ -511,23 +527,25 @@ impl AccessControlManager {
                 }
             }
         }
-        
+
         // 应用访问规则
         if explicit_deny {
             return AccessResult::DeniedPermission("Explicitly denied by ACL".to_string());
         }
-        
+
         if explicit_allow {
             return AccessResult::Allowed;
         }
-        
+
         // 如果没有明确的规则，应用默认规则
         match self.config.default_access_rule {
             AccessRule::Allow => AccessResult::Allowed,
-            AccessRule::Deny => AccessResult::DeniedPermission("Denied by default rule".to_string()),
+            AccessRule::Deny => {
+                AccessResult::DeniedPermission("Denied by default rule".to_string())
+            },
         }
     }
-    
+
     /// 检查用户能力
     pub fn check_capability(&self, uid: UserId, capability_name: &str) -> AccessResult {
         // 获取用户信息
@@ -535,17 +553,20 @@ impl AccessControlManager {
             Some(user) => user.clone(),
             None => return AccessResult::DeniedResourceNotFound(format!("User {} not found", uid)),
         };
-        
+
         // 检查账户状态
         if user.account_status != AccountStatus::Active {
             return AccessResult::DeniedResourceInaccessible(format!("User account is not active"));
         }
-        
+
         // 检查能力是否存在
         if !self.capabilities.lock().contains_key(capability_name) {
-            return AccessResult::DeniedOperationNotSupported(format!("Capability {} not found", capability_name));
+            return AccessResult::DeniedOperationNotSupported(format!(
+                "Capability {} not found",
+                capability_name
+            ));
         }
-        
+
         // 检查用户是否具有该能力
         let user_caps = self.user_capabilities.lock();
         if let Some(caps) = user_caps.get(&uid) {
@@ -553,128 +574,137 @@ impl AccessControlManager {
                 return AccessResult::Allowed;
             }
         }
-        
+
         // root用户拥有所有能力
         if uid == 0 {
             return AccessResult::Allowed;
         }
-        
-        AccessResult::DeniedPermission(format!("User {} does not have capability {}", uid, capability_name))
+
+        AccessResult::DeniedPermission(format!(
+            "User {} does not have capability {}",
+            uid, capability_name
+        ))
     }
-    
+
     /// 添加用户
     pub fn add_user(&self, user: UserInfo) -> Result<(), KernelError> {
         let mut users = self.users.lock();
-        
+
         // 检查用户是否已存在
         if users.contains_key(&user.uid) {
             return Err(KernelError::AlreadyInProgress);
         }
-        
+
         // 添加用户
         users.insert(user.uid, user);
-        
+
         Ok(())
     }
-    
+
     /// 添加组
     pub fn add_group(&self, group: GroupInfo) -> Result<(), KernelError> {
         let mut groups = self.groups.lock();
-        
+
         // 检查组是否已存在
         if groups.contains_key(&group.gid) {
             return Err(KernelError::AlreadyInProgress);
         }
-        
+
         // 添加组
         groups.insert(group.gid, group);
-        
+
         Ok(())
     }
-    
+
     /// 添加ACL条目
     pub fn add_acl_entry(&self, entry: AccessControlEntry) -> Result<(), KernelError> {
         let mut acl = self.acl.lock();
-        
+
         // 检查ACL条目数是否超过限制
         if acl.len() >= self.config.max_acl_entries {
             return Err(KernelError::OutOfSpace);
         }
-        
+
         // 添加ACL条目
         acl.push(entry);
-        
+
         Ok(())
     }
-    
+
     /// 移除ACL条目
-    pub fn remove_acl_entry(&self, resource_type: ResourceType, resource_id: &str, 
-                           principal_type: PrincipalType, principal_id: u32) -> Result<(), KernelError> {
+    pub fn remove_acl_entry(
+        &self,
+        resource_type: ResourceType,
+        resource_id: &str,
+        principal_type: PrincipalType,
+        principal_id: u32,
+    ) -> Result<(), KernelError> {
         let mut acl = self.acl.lock();
-        
+
         // 查找并移除匹配的ACL条目
         acl.retain(|entry| {
-            !(entry.resource_type == resource_type && 
-              entry.resource_id == resource_id &&
-              entry.principal_type == principal_type &&
-              entry.principal_id == principal_id)
+            !(entry.resource_type == resource_type
+                && entry.resource_id == resource_id
+                && entry.principal_type == principal_type
+                && entry.principal_id == principal_id)
         });
-        
+
         Ok(())
     }
-    
+
     /// 为用户分配能力
     pub fn grant_capability(&self, uid: UserId, capability_name: &str) -> Result<(), KernelError> {
         // 检查能力是否存在
         if !self.capabilities.lock().contains_key(capability_name) {
             return Err(KernelError::NotFound);
         }
-        
+
         // 添加能力到用户
         let mut user_caps = self.user_capabilities.lock();
         let caps = user_caps.entry(uid).or_insert_with(Vec::new);
-        
+
         if !caps.contains(&capability_name.to_string()) {
             caps.push(capability_name.to_string());
         }
-        
+
         Ok(())
     }
-    
+
     /// 撤销用户能力
     pub fn revoke_capability(&self, uid: UserId, capability_name: &str) -> Result<(), KernelError> {
         let mut user_caps = self.user_capabilities.lock();
-        
+
         if let Some(caps) = user_caps.get_mut(&uid) {
             caps.retain(|cap| cap != capability_name);
         }
-        
+
         Ok(())
     }
-    
+
     /// 获取用户信息
     pub fn get_user(&self, uid: UserId) -> Option<UserInfo> {
         self.users.lock().get(&uid).cloned()
     }
-    
+
     /// 获取组信息
     pub fn get_group(&self, gid: GroupId) -> Option<GroupInfo> {
         self.groups.lock().get(&gid).cloned()
     }
-    
+
     /// 获取用户能力列表
     pub fn get_user_capabilities(&self, uid: UserId) -> Vec<String> {
-        self.user_capabilities.lock()
+        self.user_capabilities
+            .lock()
             .get(&uid)
             .map(|caps| caps.clone())
             .unwrap_or_default()
     }
-    
+
     /// 获取所有能力
     pub fn get_all_capabilities(&self) -> BTreeMap<String, Capability> {
         self.capabilities.lock().clone()
     }
-    
+
     /// 获取ACL条目
     pub fn get_acl_entries(&self) -> Vec<AccessControlEntry> {
         self.acl.lock().clone()

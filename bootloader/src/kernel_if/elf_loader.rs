@@ -1,6 +1,5 @@
 // ELF kernel loader for bootloader
 
-
 pub const ELF_MAGIC: u32 = 0x464C457F; // "\x7FELF"
 pub const ELF_CLASS_64: u8 = 2;
 pub const ELF_DATA_LITTLE: u8 = 1;
@@ -92,8 +91,7 @@ impl ElfImage {
         unsafe {
             let phoff = (*self.header).e_phoff as usize;
             let phentsize = (*self.header).e_phentsize as usize;
-            let ph_addr = (self.header as *const _ as usize + phoff
-                + (index as usize * phentsize))
+            let ph_addr = (self.header as *const _ as usize + phoff + (index as usize * phentsize))
                 as *const ProgramHeader;
 
             if (*ph_addr).p_type != PT_LOAD {
@@ -101,8 +99,8 @@ impl ElfImage {
             }
 
             // Copy segment to memory
-            let src = (self.header as *const _ as usize
-                + (*ph_addr).p_offset as usize) as *const u8;
+            let src =
+                (self.header as *const _ as usize + (*ph_addr).p_offset as usize) as *const u8;
             let dst = (*ph_addr).p_paddr as *mut u8;
             let size = (*ph_addr).p_filesz as usize;
 
@@ -112,10 +110,8 @@ impl ElfImage {
             }
 
             // Zero BSS section
-            let bss_start =
-                ((*ph_addr).p_paddr + (*ph_addr).p_filesz) as *mut u8;
-            let bss_size =
-                ((*ph_addr).p_memsz - (*ph_addr).p_filesz) as usize;
+            let bss_start = ((*ph_addr).p_paddr + (*ph_addr).p_filesz) as *mut u8;
+            let bss_size = ((*ph_addr).p_memsz - (*ph_addr).p_filesz) as usize;
             for j in 0..bss_size {
                 *bss_start.add(j) = 0;
             }

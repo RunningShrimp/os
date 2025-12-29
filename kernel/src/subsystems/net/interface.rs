@@ -4,18 +4,22 @@
 //! and handling packet routing between interfaces.
 
 extern crate alloc;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::string::{String, ToString};
+use alloc::{
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use crate::subsystems::sync::Mutex;
 
-use super::device::{NetworkDevice, NetworkDeviceType, MacAddr, DeviceError};
-use super::packet::{Packet, PacketType};
 // PacketBuffer和PacketError在当前文件中未使用，暂时注释掉
 // use super::packet::{PacketBuffer, PacketError};
 use super::arp::ArpCache;
-use super::ipv4::Ipv4Addr;
+use super::{
+    device::{DeviceError, MacAddr, NetworkDevice, NetworkDeviceType},
+    ipv4::Ipv4Addr,
+    packet::{Packet, PacketType},
+};
+use crate::subsystems::sync::Mutex;
 
 /// Network interface configuration
 #[derive(Debug, Clone)]
@@ -72,10 +76,7 @@ pub struct Interface {
 impl Interface {
     /// Create a new network interface
     pub fn new(id: u32, device: Arc<dyn NetworkDevice>) -> Self {
-        let config = InterfaceConfig {
-            name: device.name().to_string(),
-            ..Default::default()
-        };
+        let config = InterfaceConfig { name: device.name().to_string(), ..Default::default() };
 
         Self {
             id,
@@ -129,7 +130,9 @@ impl Interface {
     /// Bring interface up
     pub fn up(&self) -> Result<(), InterfaceError> {
         // Bring device up first
-        self.device.up().map_err(|e| InterfaceError::DeviceError(e))?;
+        self.device
+            .up()
+            .map_err(|e| InterfaceError::DeviceError(e))?;
 
         // Update interface state
         self.is_up.store(true, Ordering::Relaxed);
@@ -156,7 +159,9 @@ impl Interface {
         }
 
         // Bring device down
-        self.device.down().map_err(|e| InterfaceError::DeviceError(e))?;
+        self.device
+            .down()
+            .map_err(|e| InterfaceError::DeviceError(e))?;
 
         // Clear receive queue
         {
@@ -248,7 +253,8 @@ impl Interface {
         }
 
         // Send through device
-        self.device.send_packet(packet_data)
+        self.device
+            .send_packet(packet_data)
             .map_err(|e| InterfaceError::DeviceError(e))?;
 
         // Update statistics
@@ -289,7 +295,7 @@ impl Interface {
                 stats.rx_bytes += data.len() as u64;
 
                 Ok(Some(packet))
-            }
+            },
             Ok(None) => Ok(None),
             Err(e) => Err(InterfaceError::DeviceError(e)),
         }
@@ -315,7 +321,6 @@ impl Interface {
         &self.arp_cache
     }
 
-    
     /// Reset interface statistics
     pub fn reset_stats(&self) {
         let mut stats = self.stats.lock();
@@ -325,9 +330,9 @@ impl Interface {
     /// Validate IPv4 configuration
     fn is_valid_ipv4_config(addr: Ipv4Addr, netmask: Ipv4Addr) -> bool {
         // Basic validation - could be enhanced
-        addr != Ipv4Addr::UNSPECIFIED &&
-        netmask != Ipv4Addr::UNSPECIFIED &&
-        Self::is_valid_netmask(netmask)
+        addr != Ipv4Addr::UNSPECIFIED
+            && netmask != Ipv4Addr::UNSPECIFIED
+            && Self::is_valid_netmask(netmask)
     }
 
     /// Check if netmask is valid (contiguous ones)
@@ -403,10 +408,7 @@ pub struct InterfaceManager {
 impl InterfaceManager {
     /// Create a new interface manager
     pub fn new() -> Self {
-        Self {
-            interfaces: Vec::new(),
-            next_id: AtomicU32::new(1),
-        }
+        Self { interfaces: Vec::new(), next_id: AtomicU32::new(1) }
     }
 
     /// Add a new interface
@@ -420,12 +422,18 @@ impl InterfaceManager {
 
     /// Get interface by ID
     pub fn get_interface(&self, id: u32) -> Option<Arc<Interface>> {
-        self.interfaces.iter().find(|iface| iface.id() == id).cloned()
+        self.interfaces
+            .iter()
+            .find(|iface| iface.id() == id)
+            .cloned()
     }
 
     /// Get interface by name
     pub fn get_interface_by_name(&self, name: &str) -> Option<Arc<Interface>> {
-        self.interfaces.iter().find(|iface| iface.name() == name).cloned()
+        self.interfaces
+            .iter()
+            .find(|iface| iface.name() == name)
+            .cloned()
     }
 
     /// Get all interfaces
@@ -435,7 +443,8 @@ impl InterfaceManager {
 
     /// Find interface for a given IP address
     pub fn find_interface_for_ip(&self, ip: Ipv4Addr) -> Option<Arc<Interface>> {
-        self.interfaces.iter()
+        self.interfaces
+            .iter()
             .find(|iface| iface.is_in_network(ip))
             .cloned()
     }

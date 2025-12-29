@@ -18,12 +18,13 @@
 //! rcu.update(|old| new_data); // Update with grace period wait
 //! ```
 
-use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use core::marker::PhantomData;
-use alloc::vec::Vec;
-use alloc::boxed::Box;
-use crate::subsystems::sync::Mutex;
-use crate::cpu;
+use alloc::{boxed::Box, vec::Vec};
+use core::{
+    marker::PhantomData,
+    sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+};
+
+use crate::{cpu, subsystems::sync::Mutex};
 
 /// Maximum number of CPUs supported
 const MAX_CPUS: usize = 256;
@@ -75,7 +76,7 @@ impl RcuGracePeriod {
         for _ in 0..MAX_CPUS {
             per_cpu.push(PerCpuQuiescent::new());
         }
-        
+
         Self {
             gp_counter: AtomicU64::new(0),
             per_cpu_quiescent: per_cpu,
@@ -91,7 +92,7 @@ impl RcuGracePeriod {
     pub fn quiescent_state(&self) {
         let cpu_id = self.current_cpu_id();
         let current_gp = self.gp_counter.load(Ordering::Acquire);
-        
+
         if cpu_id < self.per_cpu_quiescent.len() {
             let per_cpu = &self.per_cpu_quiescent[cpu_id];
             per_cpu.last_seen.store(current_gp, Ordering::Release);
@@ -106,7 +107,6 @@ pub fn quiescent_state() {
 }
 
 impl RcuGracePeriod {
-
     /// Start a new grace period and wait for completion
     ///
     /// This function will block until all CPUs have passed through
@@ -114,37 +114,37 @@ impl RcuGracePeriod {
     pub fn synchronize_rcu(&self) {
         // Increment grace period counter
         let new_gp = self.gp_counter.fetch_add(1, Ordering::AcqRel) + 1;
-        
+
         // Mark all CPUs as needing to report quiescent state
         for per_cpu in &self.per_cpu_quiescent {
             per_cpu.in_quiescent.store(false, Ordering::Release);
         }
-        
+
         // Wait for all CPUs to report quiescent state
         loop {
             let mut all_quiescent = true;
-            
+
             for per_cpu in &self.per_cpu_quiescent {
                 let last_seen = per_cpu.last_seen.load(Ordering::Acquire);
                 let is_quiescent = per_cpu.in_quiescent.load(Ordering::Acquire);
-                
+
                 // CPU has seen the new grace period and is quiescent
                 if last_seen >= new_gp && is_quiescent {
                     continue;
                 }
-                
+
                 all_quiescent = false;
                 break;
             }
-            
+
             if all_quiescent {
                 break;
             }
-            
+
             // Yield CPU to allow other CPUs to make progress
             core::hint::spin_loop();
         }
-        
+
         // Execute all pending callbacks
         let mut callbacks = self.callbacks.lock();
         while let Some(callback) = callbacks.pop() {
@@ -190,9 +190,7 @@ fn get_rcu_grace_period() -> &'static RcuGracePeriod {
     if !RCU_INIT.load(Ordering::Acquire) {
         init_rcu();
     }
-    unsafe {
-        RCU_GRACE_PERIOD.as_ref().unwrap()
-    }
+    unsafe { RCU_GRACE_PERIOD.as_ref().unwrap() }
 }
 
 /// Synchronize RCU - wait for grace period
@@ -234,15 +232,12 @@ impl<T> Rcu<T> {
         let gp = get_rcu_grace_period();
         if cpu_id < gp.per_cpu_quiescent.len() {
             gp.per_cpu_quiescent[cpu_id]
-                .in_quiescent.store(false, Ordering::Release);
+                .in_quiescent
+                .store(false, Ordering::Release);
         }
-        
+
         let ptr = self.data.load(Ordering::Acquire);
-        RcuReadGuard {
-            rcu: self,
-            _phantom: PhantomData,
-            _data: unsafe { &*ptr },
-        }
+        RcuReadGuard { rcu: self, _phantom: PhantomData, _data: unsafe { &*ptr } }
     }
 
     /// Update the protected value
@@ -255,24 +250,22 @@ impl<T> Rcu<T> {
         // Read current value
         let old_ptr = self.data.load(Ordering::Acquire);
         let old_value = unsafe { &*old_ptr };
-        
+
         // Create new value
         let new_value = updater(old_value);
         let new_boxed = Box::new(new_value);
         let new_ptr = Box::into_raw(new_boxed);
-        
+
         // Atomically update pointer
         let prev_ptr = self.data.swap(new_ptr, Ordering::Release);
-        
+
         // Memory barrier to ensure all readers see the new pointer
         core::sync::atomic::fence(Ordering::SeqCst);
-        
+
         // Wait for grace period and free old value
         let old_ptr = prev_ptr;
-        get_rcu_grace_period().call_rcu(Box::new(move || {
-            unsafe {
-                let _ = Box::from_raw(old_ptr);
-            }
+        get_rcu_grace_period().call_rcu(Box::new(move || unsafe {
+            let _ = Box::from_raw(old_ptr);
         }));
     }
 
@@ -336,11 +329,10 @@ mod tests {
     fn test_rcu_update() {
         let rcu = Rcu::new(42);
         rcu.update(|old| *old + 1);
-        
+
         // Note: In a real test, we'd need to wait for grace period
         // For now, we just verify the update mechanism works
         let guard = rcu.read();
         assert_eq!(*guard, 43);
     }
 }
-

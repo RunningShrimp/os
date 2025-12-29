@@ -19,22 +19,22 @@ impl SystemInfo {
 
     pub fn detect() -> Self {
         let mut info = Self::new();
-        
+
         #[cfg(target_arch = "x86_64")]
         {
             info.detect_x86_64();
         }
-        
+
         #[cfg(target_arch = "aarch64")]
         {
             info.detect_aarch64();
         }
-        
+
         #[cfg(target_arch = "riscv64")]
         {
             info.detect_riscv64();
         }
-        
+
         info
     }
 
@@ -44,7 +44,7 @@ impl SystemInfo {
         // For bootloader, assume 1 CPU and basic features
         self.cpu_count = 1;
         self.cpu_features = 0x01; // MMU support
-        
+
         // Memory detection would use Multiboot2 info
         self.total_memory = 1024 * 1024 * 1024; // 1GB assumed
         self.available_memory = self.total_memory;
@@ -55,7 +55,7 @@ impl SystemInfo {
         // ARM64 CPU detection
         self.cpu_count = 1;
         self.cpu_features = 0x02; // NEON support assumed
-        
+
         self.total_memory = 1024 * 1024 * 1024;
         self.available_memory = self.total_memory;
     }
@@ -65,7 +65,7 @@ impl SystemInfo {
         // RISC-V CPU detection
         self.cpu_count = 1;
         self.cpu_features = 0x04; // RV64I base ISA
-        
+
         self.total_memory = 1024 * 1024 * 1024;
         self.available_memory = self.total_memory;
     }

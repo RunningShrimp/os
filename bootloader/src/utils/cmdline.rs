@@ -7,8 +7,7 @@
 // - Unknown parameter skipping (error-tolerant)
 // - Dynamic memory allocation via alloc
 
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 
 pub struct CmdLine {
     args: Vec<String>,
@@ -32,21 +31,20 @@ impl CmdLine {
                         if in_arg {
                             let len = current as usize - arg_start as usize;
                             if len > 0 && len < 256 {
-                                let arg_bytes =
-                                    core::slice::from_raw_parts(arg_start, len);
+                                let arg_bytes = core::slice::from_raw_parts(arg_start, len);
                                 if let Ok(s) = core::str::from_utf8(arg_bytes) {
                                     args.push(String::from(s));
                                 }
                             }
                             in_arg = false;
                         }
-                    }
+                    },
                     _ => {
                         if !in_arg {
                             arg_start = current;
                             in_arg = true;
                         }
-                    }
+                    },
                 }
                 current = current.add(1);
             }
@@ -78,7 +76,9 @@ impl CmdLine {
     /// Get value for option with key=value format
     pub fn get_key_value(&self, key: &str) -> Option<&str> {
         for arg in &self.args {
-            if let Some(eq_pos) = arg.find('=') && &arg[..eq_pos] == key {
+            if let Some(eq_pos) = arg.find('=')
+                && &arg[..eq_pos] == key
+            {
                 return Some(&arg[eq_pos + 1..]);
             }
         }
@@ -108,7 +108,8 @@ impl CmdLine {
     /// Skip unknown parameters - returns filtered args
     /// Known parameters: flags starting with - or -- and key=value pairs
     pub fn filter_known(&self, allowed_flags: &[&str], allowed_keys: &[&str]) -> Vec<&str> {
-        self.args.iter()
+        self.args
+            .iter()
             .filter(|arg| {
                 // Check if it's a known flag
                 if arg.starts_with('-') {

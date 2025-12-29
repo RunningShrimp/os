@@ -6,21 +6,18 @@
 //! - Hybrid boot mode detection
 //! - Protocol version negotiation
 
+use alloc::{format, string::String, vec::Vec};
 use core::fmt;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::format;
-
 
 /// Boot protocol type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BootProtocolType {
-    Multiboot,          // Original Multiboot
-    Multiboot2,         // Multiboot2 (current standard)
-    Multiboot3,         // Multiboot3 (future)
-    UEFI,               // UEFI boot services
-    EFI,                // EFI (legacy)
-    DirectBoot,         // Direct boot (no bootloader protocol)
+    Multiboot,  // Original Multiboot
+    Multiboot2, // Multiboot2 (current standard)
+    Multiboot3, // Multiboot3 (future)
+    UEFI,       // UEFI boot services
+    EFI,        // EFI (legacy)
+    DirectBoot, // Direct boot (no bootloader protocol)
     Unknown,
 }
 
@@ -41,10 +38,10 @@ impl fmt::Display for BootProtocolType {
 /// Boot mode type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BootMode {
-    Legacy,             // Legacy BIOS boot
-    UEFI,               // UEFI Firmware boot
-    Hybrid,             // Supports both Legacy and UEFI
-    Secure,             // Secure Boot enabled
+    Legacy, // Legacy BIOS boot
+    UEFI,   // UEFI Firmware boot
+    Hybrid, // Supports both Legacy and UEFI
+    Secure, // Secure Boot enabled
     Unknown,
 }
 
@@ -139,9 +136,7 @@ impl ProtocolInfo {
 
     /// Check if protocol is valid
     pub fn is_valid(&self) -> bool {
-        self.version > 0
-            && self.is_available
-            && self.features.iter().all(|f| f.meets_requirement())
+        self.version > 0 && self.is_available && self.features.iter().all(|f| f.meets_requirement())
     }
 
     /// Get unsupported required features
@@ -161,7 +156,11 @@ impl fmt::Display for ProtocolInfo {
             self.protocol_type,
             self.version,
             self.boot_mode,
-            if self.is_available { "Available" } else { "Unavailable" }
+            if self.is_available {
+                "Available"
+            } else {
+                "Unavailable"
+            }
         )
     }
 }
@@ -217,7 +216,11 @@ impl AdvancedBootProtocol {
         ];
 
         for protocol_type in &protocol_priority {
-            if let Some(proto) = self.available_protocols.iter().find(|p| p.protocol_type == *protocol_type) {
+            if let Some(proto) = self
+                .available_protocols
+                .iter()
+                .find(|p| p.protocol_type == *protocol_type)
+            {
                 if proto.is_valid() {
                     self.current_protocol = Some(*protocol_type);
                     return Some(*protocol_type);
@@ -250,7 +253,9 @@ impl AdvancedBootProtocol {
 
     /// Check if protocol is available
     pub fn has_protocol(&self, protocol_type: BootProtocolType) -> bool {
-        self.available_protocols.iter().any(|p| p.protocol_type == protocol_type && p.is_available)
+        self.available_protocols
+            .iter()
+            .any(|p| p.protocol_type == protocol_type && p.is_available)
     }
 
     /// Get protocol count
@@ -268,7 +273,9 @@ impl AdvancedBootProtocol {
 
     /// Get protocol details
     pub fn get_protocol_details(&self, protocol_type: BootProtocolType) -> Option<&ProtocolInfo> {
-        self.available_protocols.iter().find(|p| p.protocol_type == protocol_type)
+        self.available_protocols
+            .iter()
+            .find(|p| p.protocol_type == protocol_type)
     }
 
     /// Check boot mode
@@ -284,13 +291,13 @@ impl AdvancedBootProtocol {
     /// Get detailed protocol report
     pub fn protocol_report(&self) -> String {
         let mut report = String::from("=== Boot Protocol Report ===\n");
-        
+
         report.push_str(&format!("Boot Mode: {}\n", self.boot_mode));
-        
+
         if let Some(current) = self.current_protocol {
             report.push_str(&format!("Current Protocol: {}\n", current));
         }
-        
+
         report.push_str(&format!("\nAvailable Protocols: {}\n", self.protocol_count()));
         for proto in &self.available_protocols {
             report.push_str(&format!("  {}\n", proto));
@@ -298,19 +305,20 @@ impl AdvancedBootProtocol {
                 report.push_str(&format!("    {}\n", feature));
             }
         }
-        
+
         report.push_str(&format!(
             "\nNegotiations: {}, Fallbacks: {}\n",
             self.protocol_negotiation_count, self.protocol_fallback_count
         ));
-        
+
         report
     }
 
     /// Check if system is ready for boot
     pub fn is_ready_for_boot(&self) -> bool {
         self.current_protocol.is_some()
-            && self.available_protocols
+            && self
+                .available_protocols
                 .iter()
                 .any(|p| p.protocol_type == self.current_protocol.unwrap() && p.is_valid())
     }
@@ -321,7 +329,9 @@ impl fmt::Display for AdvancedBootProtocol {
         write!(
             f,
             "AdvancedBootProtocol {{ mode: {}, protocols: {}, current: {:?} }}",
-            self.boot_mode, self.protocol_count(), self.current_protocol
+            self.boot_mode,
+            self.protocol_count(),
+            self.current_protocol
         )
     }
 }
@@ -359,7 +369,7 @@ mod tests {
     fn test_protocol_feature_requirement() {
         let mut feature = ProtocolFeature::new("Test", 1).required();
         assert!(!feature.meets_requirement());
-        
+
         feature.is_supported = true;
         assert!(feature.meets_requirement());
     }
@@ -376,7 +386,7 @@ mod tests {
         let mut proto = ProtocolInfo::new(BootProtocolType::UEFI, BootMode::UEFI);
         let feature = ProtocolFeature::new("Boot Services", 2);
         proto.add_feature(feature);
-        
+
         assert_eq!(proto.features.len(), 1);
     }
 
@@ -384,7 +394,7 @@ mod tests {
     fn test_protocol_info_validity() {
         let mut proto = ProtocolInfo::new(BootProtocolType::Multiboot2, BootMode::Legacy);
         assert!(!proto.is_valid()); // No version, not available
-        
+
         proto.version = 2;
         proto.is_available = true;
         assert!(proto.is_valid());
@@ -401,7 +411,7 @@ mod tests {
     fn test_advanced_boot_protocol_register() {
         let mut manager = AdvancedBootProtocol::new();
         let proto = ProtocolInfo::new(BootProtocolType::Multiboot2, BootMode::Legacy);
-        
+
         assert!(manager.register_protocol(proto));
         assert_eq!(manager.protocol_count(), 1);
     }
@@ -416,13 +426,13 @@ mod tests {
     #[test]
     fn test_advanced_boot_protocol_negotiate() {
         let mut manager = AdvancedBootProtocol::new();
-        
+
         let mut proto = ProtocolInfo::new(BootProtocolType::Multiboot2, BootMode::Legacy);
         proto.version = 2;
         proto.is_available = true;
-        
+
         manager.register_protocol(proto);
-        
+
         let result = manager.negotiate_protocol();
         assert!(result.is_some());
     }
@@ -430,10 +440,10 @@ mod tests {
     #[test]
     fn test_advanced_boot_protocol_has_protocol() {
         let mut manager = AdvancedBootProtocol::new();
-        
+
         let mut proto = ProtocolInfo::new(BootProtocolType::UEFI, BootMode::UEFI);
         proto.is_available = true;
-        
+
         manager.register_protocol(proto);
         assert!(manager.has_protocol(BootProtocolType::UEFI));
         assert!(!manager.has_protocol(BootProtocolType::Multiboot3));
@@ -442,10 +452,10 @@ mod tests {
     #[test]
     fn test_advanced_boot_protocol_statistics() {
         let mut manager = AdvancedBootProtocol::new();
-        
+
         let proto = ProtocolInfo::new(BootProtocolType::Multiboot2, BootMode::Legacy);
         manager.register_protocol(proto);
-        
+
         let (neg, fallback, count) = manager.get_stats();
         assert_eq!(count, 1);
         assert_eq!(neg, 0); // No negotiations yet
@@ -455,24 +465,24 @@ mod tests {
     #[test]
     fn test_advanced_boot_protocol_ready_for_boot() {
         let mut manager = AdvancedBootProtocol::new();
-        
+
         let mut proto = ProtocolInfo::new(BootProtocolType::Multiboot2, BootMode::Legacy);
         proto.version = 2;
         proto.is_available = true;
-        
+
         manager.register_protocol(proto);
         manager.negotiate_protocol();
-        
+
         assert!(manager.is_ready_for_boot());
     }
 
     #[test]
     fn test_advanced_boot_protocol_report() {
         let mut manager = AdvancedBootProtocol::new();
-        
+
         let proto = ProtocolInfo::new(BootProtocolType::UEFI, BootMode::UEFI);
         manager.register_protocol(proto);
-        
+
         let report = manager.protocol_report();
         assert!(report.contains("Boot Protocol Report"));
         assert!(report.contains("Available Protocols"));

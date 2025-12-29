@@ -4,6 +4,7 @@
 
 extern crate alloc;
 use alloc::vec::Vec;
+
 use super::ipv4::Ipv4Addr;
 
 /// UDP header
@@ -25,12 +26,7 @@ impl UdpHeader {
 
     /// Create a new UDP header
     pub fn new(src_port: u16, dst_port: u16, length: u16) -> Self {
-        Self {
-            src_port,
-            dst_port,
-            length,
-            checksum: 0,
-        }
+        Self { src_port, dst_port, length, checksum: 0 }
     }
 
     /// Calculate UDP checksum (including pseudo-header)
@@ -77,12 +73,7 @@ impl UdpHeader {
     }
 
     /// Set checksum
-    pub fn set_checksum(
-        &mut self,
-        source_addr: Ipv4Addr,
-        dest_addr: Ipv4Addr,
-        data: &[u8],
-    ) {
+    pub fn set_checksum(&mut self, source_addr: Ipv4Addr, dest_addr: Ipv4Addr, data: &[u8]) {
         self.checksum = 0;
         self.checksum = self.calculate_checksum(source_addr, dest_addr, data);
     }
@@ -108,12 +99,7 @@ impl UdpHeader {
         let length = u16::from_be_bytes([bytes[4], bytes[5]]);
         let checksum = u16::from_be_bytes([bytes[6], bytes[7]]);
 
-        Ok(Self {
-            src_port,
-            dst_port,
-            length,
-            checksum,
-        })
+        Ok(Self { src_port, dst_port, length, checksum })
     }
 }
 
@@ -189,17 +175,15 @@ impl UdpPacket {
     }
 
     /// Verify checksum
-    pub fn verify_checksum(
-        &self,
-        source_addr: Ipv4Addr,
-        dest_addr: Ipv4Addr,
-    ) -> bool {
+    pub fn verify_checksum(&self, source_addr: Ipv4Addr, dest_addr: Ipv4Addr) -> bool {
         // If checksum is 0, it's disabled
         if self.header.checksum == 0 {
             return true;
         }
 
-        self.header.calculate_checksum(source_addr, dest_addr, &self.payload) == 0
+        self.header
+            .calculate_checksum(source_addr, dest_addr, &self.payload)
+            == 0
     }
 }
 

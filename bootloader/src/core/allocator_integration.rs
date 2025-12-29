@@ -2,7 +2,6 @@
 ///
 /// This module integrates the DualLevelAllocator with E820 memory detection
 /// from BIOS or UEFI firmware.
-
 use crate::core::allocator::DualLevelAllocator;
 use crate::platform::bios_complete::{BiosMemoryDetector, E820Entry, MemoryRegionType};
 
@@ -82,7 +81,7 @@ impl GlobalAllocatorState {
             while offset < mmap_length {
                 let entry_addr = (mmap_addr + offset) as *const u32;
                 let entry_size = entry_addr.read_volatile();
-                
+
                 if entry_size < 24 {
                     break;
                 }
@@ -121,13 +120,13 @@ impl GlobalAllocatorState {
             log::warn!("Allocation request for 0 bytes");
             return Err("Cannot allocate zero bytes");
         }
-        
+
         // Validate alignment
         if align == 0 || !align.is_power_of_two() {
             log::error!("Invalid alignment requested: {} (must be power of 2)", align);
             return Err("Invalid alignment");
         }
-        
+
         log::debug!("Allocating {} bytes with {} byte alignment", size, align);
 
         // For P0, we use simple linear allocation
@@ -137,7 +136,12 @@ impl GlobalAllocatorState {
                 // Simple validation with alignment consideration
                 if size <= length as usize {
                     // In a real implementation, we would align the pointer here
-                    log::trace!("Allocation successful from region at {:#x}, size: {}, align: {}", base, size, align);
+                    log::trace!(
+                        "Allocation successful from region at {:#x}, size: {}, align: {}",
+                        base,
+                        size,
+                        align
+                    );
                     return Ok(base as *mut u8);
                 }
             }

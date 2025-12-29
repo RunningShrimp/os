@@ -6,12 +6,11 @@
 //!
 //! These system calls are POSIX-compatible and integrate with epoll.
 
-use crate::error::SyscallError;
-use nos_api::syscall::SyscallResult;
-use nos_api::SyscallHandler;
-use alloc::sync::Arc;
-use crate::subsystems::sync::Mutex;
-use alloc::vec::Vec;
+use alloc::{sync::Arc, vec::Vec};
+
+use nos_api::{SyscallHandler, syscall::SyscallResult};
+
+use crate::{error::SyscallError, subsystems::sync::Mutex};
 
 /// EventFd flags (Linux compatible)
 pub mod flags {
@@ -35,10 +34,7 @@ pub struct EventFdInstance {
 impl EventFdInstance {
     /// Create a new eventfd instance
     pub fn new(initval: u32, flags: i32) -> Self {
-        Self {
-            counter: initval as u64,
-            flags,
-        }
+        Self { counter: initval as u64, flags }
     }
 
     /// Read from eventfd
@@ -50,7 +46,7 @@ impl EventFdInstance {
             // Would block - in a real implementation, we'd wait here
             return Err(SyscallError::WouldBlock);
         }
-        
+
         let value_to_read = if (self.flags & flags::EFD_SEMAPHORE) != 0 {
             // Semaphore mode: read 1
             1
@@ -58,7 +54,7 @@ impl EventFdInstance {
             // Counter mode: read entire counter
             self.counter
         };
-        
+
         self.counter -= value_to_read;
         Ok(value_to_read)
     }
@@ -68,7 +64,7 @@ impl EventFdInstance {
         if value == 0xfffffffffffffffe {
             return Err(SyscallError::InvalidArgument);
         }
-        
+
         if self.counter > 0xfffffffffffffffe - value {
             if (self.flags & flags::EFD_NONBLOCK) != 0 {
                 return Err(SyscallError::WouldBlock);
@@ -76,7 +72,7 @@ impl EventFdInstance {
             // Would block - in a real implementation, we'd wait here
             return Err(SyscallError::WouldBlock);
         }
-        
+
         self.counter += value;
         Ok(())
     }
@@ -88,7 +84,7 @@ static EVENTFD_INSTANCES: Mutex<Vec<Option<EventFdInstance>>> = Mutex::new(Vec::
 /// Allocate an eventfd instance and return index
 fn alloc_eventfd_instance(initval: u32, flags: i32) -> Option<usize> {
     let mut instances = EVENTFD_INSTANCES.lock();
-    
+
     // Find a free slot
     for (idx, slot) in instances.iter_mut().enumerate() {
         if slot.is_none() {
@@ -96,7 +92,7 @@ fn alloc_eventfd_instance(initval: u32, flags: i32) -> Option<usize> {
             return Some(idx);
         }
     }
-    
+
     // No free slot, allocate new one
     let idx = instances.len();
     instances.push(Some(EventFdInstance::new(initval, flags)));
@@ -156,24 +152,22 @@ pub fn sys_eventfd(args: &[u64]) -> SyscallResult {
 /// Returns: file descriptor on success, error on failure
 pub fn sys_eventfd2(args: &[u64]) -> SyscallResult {
     let args = extract_args(args, 2)?;
-    
+
     let initval = args[0] as u32;
     let flags = args[1] as i32;
-    
+
     // Validate flags
     let valid_flags = flags::EFD_SEMAPHORE | flags::EFD_CLOEXEC | flags::EFD_NONBLOCK;
     if (flags & !valid_flags) != 0 {
         return Err(SyscallError::InvalidArgument);
     }
-    
+
     // Allocate eventfd instance
-    let instance_idx = alloc_eventfd_instance(initval, flags)
-        .ok_or(SyscallError::OutOfMemory)?;
-    
+    let instance_idx = alloc_eventfd_instance(initval, flags).ok_or(SyscallError::OutOfMemory)?;
+
     // Allocate file descriptor
-    let pid = crate::subsystems::process::manager::myproc()
-        .ok_or(SyscallError::InvalidArgument)?;
-    
+    let pid = crate::subsystems::process::manager::myproc().ok_or(SyscallError::InvalidArgument)?;
+
     let mut proc_table = crate::subsystems::process::manager::PROC_TABLE.lock();
     if let Some(proc) = proc_table.find(pid) {
         // Find free file descriptor
@@ -186,7 +180,7 @@ pub fn sys_eventfd2(args: &[u64]) -> SyscallResult {
                     eventfd_instance: Some(instance_idx),
                     ..Default::default()
                 });
-                
+
                 // Apply flags
                 if (flags & flags::EFD_NONBLOCK) != 0 {
                     file.as_mut().unwrap().nonblock = true;
@@ -194,7 +188,7 @@ pub fn sys_eventfd2(args: &[u64]) -> SyscallResult {
                 if (flags & flags::EFD_CLOEXEC) != 0 {
                     file.as_mut().unwrap().close_on_exec = true;
                 }
-                
+
                 return Ok(fd as u64);
             }
         }
@@ -203,4 +197,3 @@ pub fn sys_eventfd2(args: &[u64]) -> SyscallResult {
         Err(SyscallError::InvalidArgument)
     }
 }
-

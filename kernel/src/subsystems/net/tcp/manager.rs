@@ -4,13 +4,13 @@
 //! connection tracking, socket allocation, and connection lifecycle management.
 
 extern crate alloc;
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use alloc::vec;
+use alloc::{collections::BTreeMap, vec, vec::Vec};
 use core::sync::atomic::{AtomicU16, AtomicU32, AtomicU64, Ordering};
 
-use super::TcpState;
-use super::state::{TcpStateMachine, TcpAction};
+use super::{
+    TcpState,
+    state::{TcpAction, TcpStateMachine},
+};
 use crate::net::ipv4::Ipv4Addr;
 
 /// Port bitmap allocator for efficient port management
@@ -31,10 +31,7 @@ impl PortBitmap {
     /// Create a new port bitmap
     pub fn new() -> Self {
         let bitmap: [AtomicU64; 1024] = core::array::from_fn(|_| AtomicU64::new(0));
-        Self {
-            bitmap,
-            next_port: AtomicU16::new(1024),
-        }
+        Self { bitmap, next_port: AtomicU16::new(1024) }
     }
 
     /// Allocate a port (O(1) average case)
@@ -44,10 +41,15 @@ impl PortBitmap {
         // Try to find a free port starting from next_port
         for i in 0..(65535 - 1024 + 1) {
             let port = start_port.wrapping_add(i);
-            let adjusted_port = if port < 1024 { port.wrapping_add(1024) } else { port };
+            let adjusted_port = if port < 1024 {
+                port.wrapping_add(1024)
+            } else {
+                port
+            };
 
             if self.try_set_bit(adjusted_port) {
-                self.next_port.store(adjusted_port.wrapping_add(1), Ordering::Relaxed);
+                self.next_port
+                    .store(adjusted_port.wrapping_add(1), Ordering::Relaxed);
                 return Some(adjusted_port);
             }
         }
@@ -131,18 +133,8 @@ pub struct ConnectionId {
 
 impl ConnectionId {
     /// Create a new connection ID
-    pub fn new(
-        local_ip: Ipv4Addr,
-        local_port: u16,
-        remote_ip: Ipv4Addr,
-        remote_port: u16,
-    ) -> Self {
-        Self {
-            local_ip,
-            local_port,
-            remote_ip,
-            remote_port,
-        }
+    pub fn new(local_ip: Ipv4Addr, local_port: u16, remote_ip: Ipv4Addr, remote_port: u16) -> Self {
+        Self { local_ip, local_port, remote_ip, remote_port }
     }
 
     /// Check if this is a server connection (listening)
@@ -258,8 +250,7 @@ impl TcpConnection {
         // PacketError在当前作用域中未使用，暂时注释掉
         // use crate::net::packet::PacketError;
 
-        let tcp_packet = TcpPacket::from_bytes(packet)
-            .map_err(|_| TcpError::InvalidPacket)?;
+        let tcp_packet = TcpPacket::from_bytes(packet).map_err(|_| TcpError::InvalidPacket)?;
 
         let action = self.state_machine.process_packet(&tcp_packet);
 
@@ -272,11 +263,11 @@ impl TcpConnection {
             TcpAction::DataReceived(data) => {
                 self.recv_buffer.extend_from_slice(&data);
                 Ok(vec![action])
-            }
+            },
             TcpAction::ConnectionEstablished => {
                 self.stats.establishment_time = Some(get_current_time());
                 Ok(vec![action])
-            }
+            },
             _ => Ok(vec![action]),
         }
     }
@@ -371,7 +362,8 @@ impl TcpConnectionManager {
 
     /// Allocate a new port
     pub fn allocate_port(&mut self) -> Result<u16, TcpError> {
-        self.port_bitmap.allocate()
+        self.port_bitmap
+            .allocate()
             .ok_or(TcpError::NoPortsAvailable)
     }
 
@@ -433,7 +425,9 @@ impl TcpConnectionManager {
 
     /// Accept a new connection
     pub fn accept(&mut self, listening_id: ConnectionId) -> Result<Option<ConnectionId>, TcpError> {
-        let listening_socket = self.listening_sockets.get_mut(&listening_id)
+        let listening_socket = self
+            .listening_sockets
+            .get_mut(&listening_id)
             .ok_or(TcpError::InvalidConnection)?;
 
         // Check for pending connections (simplified implementation)
@@ -444,8 +438,8 @@ impl TcpConnectionManager {
                 TcpAction::ConnectionEstablished => {
                     has_new_connection = true;
                     break;
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
 
@@ -456,10 +450,11 @@ impl TcpConnectionManager {
                 listening_socket.id.local_ip,
                 listening_socket.id.local_port,
                 Ipv4Addr::UNSPECIFIED, // Would come from actual SYN
-                0, // Would come from actual SYN
+                0,                     // Would come from actual SYN
             );
 
-            let new_connection = TcpConnection::new(new_conn_id, listening_socket.options.clone(), true);
+            let new_connection =
+                TcpConnection::new(new_conn_id, listening_socket.options.clone(), true);
             self.connections.insert(new_conn_id, new_connection);
 
             Ok(Some(new_conn_id))
@@ -503,13 +498,15 @@ impl TcpConnectionManager {
 
     /// Find connection by ID
     pub fn get_connection(&self, conn_id: ConnectionId) -> Option<&TcpConnection> {
-        self.connections.get(&conn_id)
+        self.connections
+            .get(&conn_id)
             .or_else(|| self.listening_sockets.get(&conn_id))
     }
 
     /// Get mutable connection by ID
     pub fn get_connection_mut(&mut self, conn_id: ConnectionId) -> Option<&mut TcpConnection> {
-        self.connections.get_mut(&conn_id)
+        self.connections
+            .get_mut(&conn_id)
             .or_else(|| self.listening_sockets.get_mut(&conn_id))
     }
 

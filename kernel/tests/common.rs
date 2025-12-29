@@ -2,8 +2,7 @@
 
 extern crate alloc;
 
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 
 /// Integration test result type
 pub type IntegrationTestResult = Result<(), String>;
@@ -73,14 +72,26 @@ impl TestUtils {
         let path = alloc::format!("/tmp/{}", name);
 
         // Ensure tmp directory exists (best effort)
-        let _ = crate::vfs::vfs().mkdir("/tmp", crate::vfs::FileMode::new(crate::vfs::FileMode::S_IFDIR | crate::vfs::FileMode::S_IRWXU));
+        let _ = crate::vfs::vfs().mkdir(
+            "/tmp",
+            crate::vfs::FileMode::new(
+                crate::vfs::FileMode::S_IFDIR | crate::vfs::FileMode::S_IRWXU,
+            ),
+        );
 
-        match crate::vfs::vfs().create(&path, crate::vfs::FileMode::new(crate::vfs::FileMode::S_IFREG | crate::vfs::FileMode::S_IRUSR | crate::vfs::FileMode::S_IWUSR)) {
+        match crate::vfs::vfs().create(
+            &path,
+            crate::vfs::FileMode::new(
+                crate::vfs::FileMode::S_IFREG
+                    | crate::vfs::FileMode::S_IRUSR
+                    | crate::vfs::FileMode::S_IWUSR,
+            ),
+        ) {
             Ok(_) => {
                 // write content at offset 0
                 let _ = crate::vfs::vfs().write(&path, content, 0);
                 Ok(())
-            }
+            },
             Err(e) => Err(alloc::format!("failed to create temp file {}: {:?}", path, e)),
         }
     }
@@ -104,11 +115,7 @@ pub struct TestFixture {
 
 impl TestFixture {
     pub fn new(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            setup_fn: None,
-            cleanup_fn: None,
-        }
+        Self { name: name.to_string(), setup_fn: None, cleanup_fn: None }
     }
 
     pub fn with_setup(mut self, setup: fn() -> IntegrationTestResult) -> Self {
@@ -150,10 +157,7 @@ pub struct PerformanceTimer {
 
 impl PerformanceTimer {
     pub fn new(name: &str) -> Self {
-        Self {
-            start_time: crate::time::get_ticks(),
-            name: name.to_string(),
-        }
+        Self { start_time: crate::time::get_ticks(), name: name.to_string() }
     }
 
     pub fn elapsed_ms(&self) -> u64 {

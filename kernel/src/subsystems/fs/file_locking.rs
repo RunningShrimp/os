@@ -6,8 +6,7 @@
 //! lock upgrading/downgrading, and POSIX-compatible flock/fcntl locking.
 
 extern crate alloc;
-use alloc::vec::Vec;
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, vec::Vec};
 // use alloc::string::String;
 // use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
@@ -177,7 +176,13 @@ impl LockManager {
     }
 
     /// Try to acquire a lock
-    pub fn try_lock(&self, inode: u32, pid: ProcessId, lock_type: LockType, range: LockRange) -> Result<u64, LockError> {
+    pub fn try_lock(
+        &self,
+        inode: u32,
+        pid: ProcessId,
+        lock_type: LockType,
+        range: LockRange,
+    ) -> Result<u64, LockError> {
         // Update statistics
         {
             let mut stats = self.stats.lock();
@@ -202,7 +207,14 @@ impl LockManager {
     }
 
     /// Acquire a lock (blocking)
-    pub fn lock(&self, inode: u32, pid: ProcessId, lock_type: LockType, range: LockRange, blocking: bool) -> Result<u64, LockError> {
+    pub fn lock(
+        &self,
+        inode: u32,
+        pid: ProcessId,
+        lock_type: LockType,
+        range: LockRange,
+        blocking: bool,
+    ) -> Result<u64, LockError> {
         // Update statistics
         {
             let mut stats = self.stats.lock();
@@ -244,7 +256,9 @@ impl LockManager {
         let locks = active_locks.get_mut(&inode).ok_or(LockError::NoLock)?;
 
         // Find and remove the lock
-        let lock_pos = locks.iter().position(|l| l.lock_id == lock_id && l.pid == pid)
+        let lock_pos = locks
+            .iter()
+            .position(|l| l.lock_id == lock_id && l.pid == pid)
             .ok_or(LockError::NoLock)?;
 
         let removed_lock = locks.remove(lock_pos);
@@ -271,7 +285,7 @@ impl LockManager {
         for (inode, locks) in active_locks.iter_mut() {
             let initial_len = locks.len();
             locks.retain(|l| l.pid != pid);
-            
+
             if locks.len() != initial_len {
                 inodes_to_check.push(*inode);
             }
@@ -290,9 +304,15 @@ impl LockManager {
     }
 
     /// Check if there's a conflict with existing locks
-    fn check_conflict(&self, inode: u32, pid: ProcessId, lock_type: LockType, range: &LockRange) -> Option<ActiveLock> {
+    fn check_conflict(
+        &self,
+        inode: u32,
+        pid: ProcessId,
+        lock_type: LockType,
+        range: &LockRange,
+    ) -> Option<ActiveLock> {
         let active_locks = self.active_locks.lock();
-        
+
         if let Some(locks) = active_locks.get(&inode) {
             for lock in locks {
                 // Skip locks held by the same process
@@ -307,15 +327,15 @@ impl LockManager {
                         (LockType::Exclusive, _) | (_, LockType::Exclusive) => {
                             // Any exclusive lock conflicts with any other lock
                             return Some(lock.clone());
-                        }
+                        },
                         (LockType::Shared, LockType::Shared) => {
                             // Shared locks are compatible
                             continue;
-                        }
+                        },
                         _ => {
                             // Other combinations are conflicts
                             return Some(lock.clone());
-                        }
+                        },
                     }
                 }
             }
@@ -342,7 +362,7 @@ impl LockManager {
     fn process_pending_requests(&self, inode: u32) {
         let mut pending_requests = self.pending_requests.lock();
         let requests = pending_requests.get_mut(&inode);
-        
+
         if requests.is_none() || requests.unwrap().is_empty() {
             return;
         }
@@ -352,7 +372,10 @@ impl LockManager {
 
         for (i, request) in requests.iter().enumerate() {
             // Check if this request can now be granted
-            if self.check_conflict(inode, request.pid, request.lock_type, &request.range).is_none() {
+            if self
+                .check_conflict(inode, request.pid, request.lock_type, &request.range)
+                .is_none()
+            {
                 // Grant the lock
                 self.grant_lock(inode, request.pid, request.lock_type, request.range);
                 to_remove.push(i);
@@ -360,7 +383,7 @@ impl LockManager {
                 // Update statistics
                 let mut stats = self.stats.lock();
                 stats.successful_acquisitions += 1;
-                
+
                 // Update wait time
                 let wait_time = crate::subsystems::time::get_timestamp() - request.timestamp;
                 stats.avg_wait_time = (stats.avg_wait_time + wait_time) / 2;
@@ -384,11 +407,13 @@ impl LockManager {
         let locks = active_locks.get_mut(&inode).ok_or(LockError::NoLock)?;
 
         // Find the lock to upgrade
-        let lock_pos = locks.iter().position(|l| l.lock_id == lock_id && l.pid == pid)
+        let lock_pos = locks
+            .iter()
+            .position(|l| l.lock_id == lock_id && l.pid == pid)
             .ok_or(LockError::NoLock)?;
 
         let lock = &mut locks[lock_pos];
-        
+
         if lock.lock_type != LockType::Shared {
             return Err(LockError::InvalidOperation);
         }
@@ -415,21 +440,33 @@ impl LockManager {
             stats.lock_upgrades += 1;
         }
 
-        crate::println!("lock: upgraded lock {} to exclusive for inode {} by process {}", new_lock_id, inode, pid);
+        crate::println!(
+            "lock: upgraded lock {} to exclusive for inode {} by process {}",
+            new_lock_id,
+            inode,
+            pid
+        );
         Ok(new_lock_id)
     }
 
     /// Downgrade a lock (exclusive to shared)
-    pub fn downgrade_lock(&self, inode: u32, pid: ProcessId, lock_id: u64) -> Result<u64, LockError> {
+    pub fn downgrade_lock(
+        &self,
+        inode: u32,
+        pid: ProcessId,
+        lock_id: u64,
+    ) -> Result<u64, LockError> {
         let mut active_locks = self.active_locks.lock();
         let locks = active_locks.get_mut(&inode).ok_or(LockError::NoLock)?;
 
         // Find the lock to downgrade
-        let lock_pos = locks.iter().position(|l| l.lock_id == lock_id && l.pid == pid)
+        let lock_pos = locks
+            .iter()
+            .position(|l| l.lock_id == lock_id && l.pid == pid)
             .ok_or(LockError::NoLock)?;
 
         let lock = &mut locks[lock_pos];
-        
+
         if lock.lock_type != LockType::Exclusive {
             return Err(LockError::InvalidOperation);
         }
@@ -448,7 +485,12 @@ impl LockManager {
             stats.lock_downgrades += 1;
         }
 
-        crate::println!("lock: downgraded lock {} to shared for inode {} by process {}", new_lock_id, inode, pid);
+        crate::println!(
+            "lock: downgraded lock {} to shared for inode {} by process {}",
+            new_lock_id,
+            inode,
+            pid
+        );
         Ok(new_lock_id)
     }
 
@@ -482,13 +524,13 @@ impl LockManager {
     pub fn detect_deadlock(&self) -> Option<Vec<ProcessId>> {
         // This is a simplified deadlock detection
         // In a real implementation, we would build a wait graph and check for cycles
-        
+
         let pending_requests = self.pending_requests.lock();
         let active_locks = self.active_locks.lock();
-        
+
         // Build a simple wait graph
         let mut wait_graph: BTreeMap<ProcessId, Vec<ProcessId>> = BTreeMap::new();
-        
+
         for (inode, requests) in pending_requests.iter() {
             if let Some(locks) = active_locks.get(inode) {
                 for request in requests {
@@ -501,7 +543,7 @@ impl LockManager {
                 }
             }
         }
-        
+
         // Simple cycle detection
         for (pid, waiters) in wait_graph.iter() {
             for waiter in waiters {
@@ -515,7 +557,7 @@ impl LockManager {
                 }
             }
         }
-        
+
         None
     }
 
@@ -555,12 +597,7 @@ pub struct FileLock {
 impl FileLock {
     /// Create a new file lock
     pub fn new(inode: u32, lock_id: u64, lock_type: LockType, range: LockRange) -> Self {
-        Self {
-            inode,
-            lock_id,
-            lock_type,
-            range,
-        }
+        Self { inode, lock_id, lock_type, range }
     }
 }
 
@@ -581,7 +618,12 @@ pub fn get_lock_manager() -> Option<&'static LockManager> {
 }
 
 /// Helper function to acquire a shared lock
-pub fn acquire_shared_lock(inode: u32, pid: ProcessId, range: LockRange, blocking: bool) -> Result<FileLock, LockError> {
+pub fn acquire_shared_lock(
+    inode: u32,
+    pid: ProcessId,
+    range: LockRange,
+    blocking: bool,
+) -> Result<FileLock, LockError> {
     if let Some(lm) = get_lock_manager() {
         let lock_id = lm.lock(inode, pid, LockType::Shared, range, blocking)?;
         Ok(FileLock::new(inode, lock_id, LockType::Shared, range))
@@ -591,7 +633,12 @@ pub fn acquire_shared_lock(inode: u32, pid: ProcessId, range: LockRange, blockin
 }
 
 /// Helper function to acquire an exclusive lock
-pub fn acquire_exclusive_lock(inode: u32, pid: ProcessId, range: LockRange, blocking: bool) -> Result<FileLock, LockError> {
+pub fn acquire_exclusive_lock(
+    inode: u32,
+    pid: ProcessId,
+    range: LockRange,
+    blocking: bool,
+) -> Result<FileLock, LockError> {
     if let Some(lm) = get_lock_manager() {
         let lock_id = lm.lock(inode, pid, LockType::Exclusive, range, blocking)?;
         Ok(FileLock::new(inode, lock_id, LockType::Exclusive, range))

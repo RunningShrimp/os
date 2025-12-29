@@ -1,13 +1,8 @@
 //! Device and bus information in /sys
 
 extern crate alloc;
-use alloc::{string::String, sync::Arc};
-use crate::vfs::{
-    error::*,
-    types::*,
-    fs::InodeOps,
-};
 use super::fs::SysFsInode;
+use crate::vfs::{error::*, fs::InodeOps, types::*};
 
 /// Create /sys/devices root
 pub fn create_root() -> VfsResult<Arc<dyn InodeOps>> {
@@ -43,4 +38,3 @@ pub fn create_fs_root() -> VfsResult<Arc<dyn InodeOps>> {
 pub fn create_power_root() -> VfsResult<Arc<dyn InodeOps>> {
     Ok(Arc::new(SysFsInode::new_dir(1006)))
 }
-

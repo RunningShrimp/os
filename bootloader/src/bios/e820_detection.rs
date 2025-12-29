@@ -2,8 +2,7 @@
 ///
 /// Detects and enumerates the system memory map using the E820h interface.
 /// This is the standard way to discover available memory in x86 systems.
-
-use crate::bios::bios_realmode::{int15_e820, RealModeExecutor};
+use crate::bios::bios_realmode::{RealModeExecutor, int15_e820};
 
 /// Maximum number of E820 entries to track
 const MAX_E820_ENTRIES: usize = 32;
@@ -44,10 +43,7 @@ pub struct E820MemoryMap {
 impl E820MemoryMap {
     /// Create empty memory map
     pub fn new() -> Self {
-        Self {
-            entries: [None; MAX_E820_ENTRIES],
-            count: 0,
-        }
+        Self { entries: [None; MAX_E820_ENTRIES], count: 0 }
     }
 
     /// Add entry to memory map
@@ -173,11 +169,7 @@ mod tests {
 
     #[test]
     fn test_e820_entry_creation() {
-        let entry = E820Entry {
-            base_address: 0x0,
-            length: 0x100000,
-            entry_type: 1,
-        };
+        let entry = E820Entry { base_address: 0x0, length: 0x100000, entry_type: 1 };
 
         assert_eq!(entry.base_address, 0x0);
         assert_eq!(entry.length, 0x100000);
@@ -186,19 +178,11 @@ mod tests {
 
     #[test]
     fn test_e820_entry_types() {
-        let usable = E820Entry {
-            base_address: 0,
-            length: 0x1000,
-            entry_type: 1,
-        };
+        let usable = E820Entry { base_address: 0, length: 0x1000, entry_type: 1 };
         assert!(usable.is_usable());
         assert_eq!(usable.type_name(), "Usable RAM");
 
-        let reserved = E820Entry {
-            base_address: 0xF0000,
-            length: 0x10000,
-            entry_type: 2,
-        };
+        let reserved = E820Entry { base_address: 0xF0000, length: 0x10000, entry_type: 2 };
         assert!(!reserved.is_usable());
         assert_eq!(reserved.type_name(), "Reserved");
     }
@@ -213,11 +197,7 @@ mod tests {
     #[test]
     fn test_memory_map_add_entry() {
         let mut map = E820MemoryMap::new();
-        let entry = E820Entry {
-            base_address: 0x0,
-            length: 0x100000,
-            entry_type: 1,
-        };
+        let entry = E820Entry { base_address: 0x0, length: 0x100000, entry_type: 1 };
 
         assert!(map.add_entry(entry));
         assert_eq!(map.count, 1);
@@ -227,11 +207,7 @@ mod tests {
     #[test]
     fn test_memory_map_full() {
         let mut map = E820MemoryMap::new();
-        let entry = E820Entry {
-            base_address: 0x0,
-            length: 0x1000,
-            entry_type: 1,
-        };
+        let entry = E820Entry { base_address: 0x0, length: 0x1000, entry_type: 1 };
 
         // Fill the map
         for _ in 0..MAX_E820_ENTRIES {
@@ -246,18 +222,10 @@ mod tests {
     fn test_highest_usable_address() {
         let mut map = E820MemoryMap::new();
 
-        let entry1 = E820Entry {
-            base_address: 0x0,
-            length: 0x10000,
-            entry_type: 1,
-        };
+        let entry1 = E820Entry { base_address: 0x0, length: 0x10000, entry_type: 1 };
         map.add_entry(entry1);
 
-        let entry2 = E820Entry {
-            base_address: 0x100000,
-            length: 0x20000,
-            entry_type: 1,
-        };
+        let entry2 = E820Entry { base_address: 0x100000, length: 0x20000, entry_type: 1 };
         map.add_entry(entry2);
 
         assert_eq!(map.highest_usable_address(), 0x120000);
@@ -266,11 +234,7 @@ mod tests {
     #[test]
     fn test_is_range_usable() {
         let mut map = E820MemoryMap::new();
-        map.add_entry(E820Entry {
-            base_address: 0x0,
-            length: 0x100000,
-            entry_type: 1,
-        });
+        map.add_entry(E820Entry { base_address: 0x0, length: 0x100000, entry_type: 1 });
 
         // Range within usable area
         assert!(map.is_range_usable(0x0, 0x10000));

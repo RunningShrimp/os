@@ -9,11 +9,13 @@
 
 extern crate alloc;
 
-use crate::subsystems::syscalls::SyscallResult;
-use crate::subsystems::sync::Mutex;
 use alloc::collections::BTreeMap;
-use core::ffi::{c_int, c_void};
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::{
+    ffi::{c_int, c_void},
+    sync::atomic::{AtomicUsize, Ordering},
+};
+
+use crate::subsystems::{sync::Mutex, syscalls::SyscallResult};
 
 /// 异步操作状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,12 +102,10 @@ pub struct AsyncIOContext {
 }
 
 /// 全局异步操作注册表
-static ASYNC_OPERATIONS: Mutex<BTreeMap<u64, AsyncOperationInfo>> =
-    Mutex::new(BTreeMap::new());
+static ASYNC_OPERATIONS: Mutex<BTreeMap<u64, AsyncOperationInfo>> = Mutex::new(BTreeMap::new());
 
 /// 全局异步I/O上下文注册表
-static ASYNC_CONTEXTS: Mutex<BTreeMap<u64, AsyncIOContext>> =
-    Mutex::new(BTreeMap::new());
+static ASYNC_CONTEXTS: Mutex<BTreeMap<u64, AsyncIOContext>> = Mutex::new(BTreeMap::new());
 
 /// 下一个可用的操作ID
 static NEXT_OPERATION_ID: AtomicUsize = AtomicUsize::new(1);
@@ -122,5 +122,5 @@ pub fn get_glib_async_manager() -> &'static dyn super::manager::GAsyncManager {
 }
 
 pub mod context;
-pub mod operation;
 pub mod manager;
+pub mod operation;

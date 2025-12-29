@@ -6,11 +6,13 @@
 
 #[cfg(test)]
 mod tests {
-    use nos_bootloader::memory::bios::{BiosMemoryScanner, BiosMemoryManager};
-    use nos_bootloader::graphics::vbe::{VbeController, VbeControllerInfo};
-    use nos_bootloader::boot_menu::{BootMenuConfig, BootMenuEntry};
-    use nos_bootloader::arch::x86_64::bios::{X86_64CpuInfo, get_cpu_info, is_virtual_machine};
-    use nos_bootloader::protocol::multiboot2::{Multiboot2Protocol, create_e820_entry};
+    use nos_bootloader::{
+        arch::x86_64::bios::{X86_64CpuInfo, get_cpu_info, is_virtual_machine},
+        boot_menu::{BootMenuConfig, BootMenuEntry},
+        graphics::vbe::{VbeController, VbeControllerInfo},
+        memory::bios::{BiosMemoryManager, BiosMemoryScanner},
+        protocol::multiboot2::{Multiboot2Protocol, create_e820_entry},
+    };
 
     // Test CPU detection functionality
     #[test]
@@ -81,7 +83,6 @@ mod tests {
             let memory_map = memory_map_result.unwrap();
             println!("Memory map entries: {}", memory_map.entries.len());
             assert!(!memory_map.entries.is_empty(), "Memory map should have entries");
-
         } else {
             println!("Memory scanner initialization failed (expected in non-BIOS environment)");
         }
@@ -113,7 +114,6 @@ mod tests {
             if let Some(address) = region_result {
                 println!("Found suitable region at address: {:#X}", address);
             }
-
         } else {
             println!("Memory manager initialization failed (expected in non-BIOS environment)");
         }
@@ -156,7 +156,6 @@ mod tests {
                     println!("No suitable 1024x768x32 mode found");
                 }
             }
-
         } else {
             println!("VBE controller initialization failed (expected in non-BIOS environment)");
         }
@@ -189,7 +188,7 @@ mod tests {
 
             let info_size_result = protocol.build_info(
                 Some("quiet splash"),
-                640,  // mem_lower in KB
+                640,   // mem_lower in KB
                 32768, // mem_upper in KB
                 &e820_entries,
                 None,
@@ -203,11 +202,9 @@ mod tests {
                 // Test header validation
                 let validation_result = protocol.validate_header(0x100000);
                 println!("Header validation result: {:?}", validation_result);
-
             } else {
                 println!("Failed to build Multiboot2 info structure");
             }
-
         } else {
             println!("Multiboot2 protocol initialization failed");
         }
@@ -229,11 +226,14 @@ mod tests {
         assert!(config.validate().is_err(), "Should fail validation with no entries");
 
         // Add test entries
-        config.add_entry(BootMenuEntry::default_entry(
-            "NOS OS - Normal".to_string(),
-            "kernel.bin".to_string(),
-            "root=/dev/sda1".to_string(),
-        ).with_timeout(5));
+        config.add_entry(
+            BootMenuEntry::default_entry(
+                "NOS OS - Normal".to_string(),
+                "kernel.bin".to_string(),
+                "root=/dev/sda1".to_string(),
+            )
+            .with_timeout(5),
+        );
 
         config.add_entry(BootMenuEntry::new(
             "NOS OS - Recovery".to_string(),
@@ -251,7 +251,11 @@ mod tests {
         // Test getting default entry
         let default_entry = config.get_default_entry();
         assert!(default_entry.is_some(), "Should have a default entry");
-        assert_eq!(default_entry.unwrap().name, "NOS OS - Normal", "Default entry name should match");
+        assert_eq!(
+            default_entry.unwrap().name,
+            "NOS OS - Normal",
+            "Default entry name should match"
+        );
     }
 
     #[test]
@@ -259,11 +263,8 @@ mod tests {
         println!("Testing boot menu entry creation...");
 
         // Test basic entry creation
-        let entry = BootMenuEntry::new(
-            "Test OS".to_string(),
-            "test.bin".to_string(),
-            "test=1".to_string(),
-        );
+        let entry =
+            BootMenuEntry::new("Test OS".to_string(), "test.bin".to_string(), "test=1".to_string());
 
         assert_eq!(entry.name, "Test OS");
         assert_eq!(entry.kernel_path, "test.bin");
@@ -282,11 +283,9 @@ mod tests {
         assert!(default_entry.is_default);
 
         // Test entry with timeout
-        let timeout_entry = BootMenuEntry::new(
-            "Timeout OS".to_string(),
-            "timeout.bin".to_string(),
-            "".to_string(),
-        ).with_timeout(10);
+        let timeout_entry =
+            BootMenuEntry::new("Timeout OS".to_string(), "timeout.bin".to_string(), "".to_string())
+                .with_timeout(10);
 
         assert_eq!(timeout_entry.timeout, 10);
     }
@@ -395,7 +394,8 @@ mod test_helpers {
     }
 
     /// Helper function to create test E820 entries
-    pub fn create_test_memory_map() -> Vec<nos_bootloader::protocol::multiboot2::Multiboot2MmapEntry> {
+    pub fn create_test_memory_map() -> Vec<nos_bootloader::protocol::multiboot2::Multiboot2MmapEntry>
+    {
         vec![
             nos_bootloader::protocol::multiboot2::create_e820_entry(0x00000000, 0x0009FC00, 1),
             nos_bootloader::protocol::multiboot2::create_e820_entry(0x0009FC00, 0x00000400, 2),

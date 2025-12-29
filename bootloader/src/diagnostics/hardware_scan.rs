@@ -105,13 +105,7 @@ pub struct DmiData {
 impl DmiData {
     /// Create DMI data
     pub fn new(data_type: DmiType, type_value: u8) -> Self {
-        DmiData {
-            data_type,
-            type_value,
-            length: 0,
-            handle: 0,
-            valid: false,
-        }
+        DmiData { data_type, type_value, length: 0, handle: 0, valid: false }
     }
 
     /// Validate DMI data

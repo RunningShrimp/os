@@ -13,13 +13,15 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::string::ToString;
+use alloc::{
+    collections::BTreeMap,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+
 use spin::Mutex;
 
 use crate::time;
@@ -456,7 +458,11 @@ pub trait UsbClassDriver {
     /// 关闭设备
     fn shutdown_device(&self, device: &UsbDevice) -> Result<(), UsbError>;
     /// 处理控制传输
-    fn handle_control_transfer(&self, device: &UsbDevice, setup: &UsbSetupPacket) -> Result<Vec<u8>, UsbError>;
+    fn handle_control_transfer(
+        &self,
+        device: &UsbDevice,
+        setup: &UsbSetupPacket,
+    ) -> Result<Vec<u8>, UsbError>;
     /// 处理设备断开
     fn handle_device_disconnect(&self, device: &UsbDevice);
 }
@@ -637,7 +643,8 @@ impl UsbHostController {
     /// 获取设备
     pub fn get_device(&self, device_address: u8) -> Result<UsbDevice, UsbError> {
         let devices = self.devices.lock();
-        devices.get(&device_address)
+        devices
+            .get(&device_address)
             .cloned()
             .ok_or(UsbError::DeviceNotResponding)
     }
@@ -675,16 +682,34 @@ impl UsbHostController {
     pub fn get_statistics(&self) -> UsbStatistics {
         UsbStatistics {
             total_transfers: AtomicU64::new(self.statistics.total_transfers.load(Ordering::SeqCst)),
-            successful_transfers: AtomicU64::new(self.statistics.successful_transfers.load(Ordering::SeqCst)),
-            failed_transfers: AtomicU64::new(self.statistics.failed_transfers.load(Ordering::SeqCst)),
-            control_transfers: AtomicU64::new(self.statistics.control_transfers.load(Ordering::SeqCst)),
+            successful_transfers: AtomicU64::new(
+                self.statistics.successful_transfers.load(Ordering::SeqCst),
+            ),
+            failed_transfers: AtomicU64::new(
+                self.statistics.failed_transfers.load(Ordering::SeqCst),
+            ),
+            control_transfers: AtomicU64::new(
+                self.statistics.control_transfers.load(Ordering::SeqCst),
+            ),
             bulk_transfers: AtomicU64::new(self.statistics.bulk_transfers.load(Ordering::SeqCst)),
-            interrupt_transfers: AtomicU64::new(self.statistics.interrupt_transfers.load(Ordering::SeqCst)),
-            isochronous_transfers: AtomicU64::new(self.statistics.isochronous_transfers.load(Ordering::SeqCst)),
-            bytes_transferred: AtomicU64::new(self.statistics.bytes_transferred.load(Ordering::SeqCst)),
-            average_latency_us: AtomicU64::new(self.statistics.average_latency_us.load(Ordering::SeqCst)),
-            enumerated_devices: AtomicUsize::new(self.statistics.enumerated_devices.load(Ordering::SeqCst)),
-            connected_devices: AtomicUsize::new(self.statistics.connected_devices.load(Ordering::SeqCst)),
+            interrupt_transfers: AtomicU64::new(
+                self.statistics.interrupt_transfers.load(Ordering::SeqCst),
+            ),
+            isochronous_transfers: AtomicU64::new(
+                self.statistics.isochronous_transfers.load(Ordering::SeqCst),
+            ),
+            bytes_transferred: AtomicU64::new(
+                self.statistics.bytes_transferred.load(Ordering::SeqCst),
+            ),
+            average_latency_us: AtomicU64::new(
+                self.statistics.average_latency_us.load(Ordering::SeqCst),
+            ),
+            enumerated_devices: AtomicUsize::new(
+                self.statistics.enumerated_devices.load(Ordering::SeqCst),
+            ),
+            connected_devices: AtomicUsize::new(
+                self.statistics.connected_devices.load(Ordering::SeqCst),
+            ),
             hotplug_events: AtomicU64::new(self.statistics.hotplug_events.load(Ordering::SeqCst)),
         }
     }
@@ -701,11 +726,7 @@ impl UsbHostController {
                 UsbTransferType::Interrupt,
                 UsbTransferType::Isochronous,
             ],
-            supported_speeds: vec![
-                UsbSpeed::Low,
-                UsbSpeed::Full,
-                UsbSpeed::High,
-            ],
+            supported_speeds: vec![UsbSpeed::Low, UsbSpeed::Full, UsbSpeed::High],
             power_management: true,
             remote_wakeup: true,
             otg_support: false,
@@ -740,7 +761,7 @@ impl UsbHostController {
                         crate::arch::wfi();
                     }
                 }
-            }
+            },
             UsbHostControllerType::Xhci => {
                 // XHCI重置序列
                 unsafe {
@@ -750,10 +771,10 @@ impl UsbHostController {
                         crate::arch::wfi();
                     }
                 }
-            }
+            },
             _ => {
                 return Err(UsbError::ConfigurationError("不支持的控制器类型".to_string()));
-            }
+            },
         }
 
         Ok(())
@@ -781,11 +802,7 @@ impl UsbHostController {
                 },
                 connected_device: None,
                 capabilities: UsbPortCapabilities {
-                    supported_speeds: vec![
-                        UsbSpeed::Low,
-                        UsbSpeed::Full,
-                        UsbSpeed::High,
-                    ],
+                    supported_speeds: vec![UsbSpeed::Low, UsbSpeed::Full, UsbSpeed::High],
                     max_current: 500,
                     remote_wakeup: true,
                     power_switching: true,
@@ -813,7 +830,7 @@ impl UsbHostController {
                     let usbcmd = (self.register_base + 0x20) as *mut u32;
                     *usbcmd = *usbcmd | 0x1; // Run
                 }
-            }
+            },
             UsbHostControllerType::Xhci => {
                 unsafe {
                     let usbsts = (self.register_base + 0x24) as *mut u32;
@@ -824,10 +841,10 @@ impl UsbHostController {
                     // 启用控制器
                     *usbcmd = *usbcmd | 0x1; // Run/Stop (R/S)
                 }
-            }
+            },
             _ => {
                 return Err(UsbError::ConfigurationError("不支持的控制器类型".to_string()));
-            }
+            },
         }
 
         Ok(())
@@ -840,14 +857,14 @@ impl UsbHostController {
                     let usbcmd = (self.register_base + 0x20) as *mut u32;
                     *usbcmd = *usbcmd & !0x1; // Stop
                 }
-            }
+            },
             UsbHostControllerType::Xhci => {
                 unsafe {
                     let usbcmd = (self.register_base + 0x20) as *mut u32;
                     *usbcmd = *usbcmd & !0x1; // Run/Stop (R/S)
                 }
-            }
-            _ => {}
+            },
+            _ => {},
         }
 
         Ok(())
@@ -861,11 +878,11 @@ impl UsbHostController {
                     let portsc = (self.register_base + portsc_offset) as *mut u32;
                     *portsc = *portsc | 0x1000; // PP - Port Power
                 }
-            }
+            },
             UsbHostControllerType::Xhci => {
                 // XHCI端口电源管理更复杂，这里简化
-            }
-            _ => {}
+            },
+            _ => {},
         }
 
         Ok(())
@@ -904,13 +921,13 @@ impl UsbHostController {
                     status.low_speed = (portsc_val & 0x200) != 0;
                     status.high_speed = (portsc_val & 0x400) != 0;
                 }
-            }
+            },
             UsbHostControllerType::Xhci => {
                 // XHCI端口状态读取，简化实现
-            }
+            },
             _ => {
                 return Err(UsbError::ConfigurationError("不支持的控制器类型".to_string()));
-            }
+            },
         }
 
         Ok(status)
@@ -932,7 +949,9 @@ impl UsbHostController {
     fn handle_device_connect(&self, port_number: u8) -> Result<(), UsbError> {
         crate::println!("[usb] 端口 {} 设备连接", port_number);
 
-        self.statistics.hotplug_events.fetch_add(1, Ordering::SeqCst);
+        self.statistics
+            .hotplug_events
+            .fetch_add(1, Ordering::SeqCst);
 
         // 重置设备
         self.reset_device(port_number)?;
@@ -946,7 +965,9 @@ impl UsbHostController {
     fn handle_device_disconnect(&self, port_number: u8) -> Result<(), UsbError> {
         crate::println!("[usb] 端口 {} 设备断开", port_number);
 
-        self.statistics.hotplug_events.fetch_add(1, Ordering::SeqCst);
+        self.statistics
+            .hotplug_events
+            .fetch_add(1, Ordering::SeqCst);
 
         let mut ports = self.root_ports.lock();
         if let Some(port) = ports.get_mut(port_number as usize) {
@@ -959,7 +980,9 @@ impl UsbHostController {
                 }
 
                 port.connected_device = None;
-                self.statistics.connected_devices.fetch_sub(1, Ordering::SeqCst);
+                self.statistics
+                    .connected_devices
+                    .fetch_sub(1, Ordering::SeqCst);
             }
         }
 
@@ -982,13 +1005,13 @@ impl UsbHostController {
                         crate::arch::wfi();
                     }
                 }
-            }
+            },
             UsbHostControllerType::Xhci => {
                 // XHCI设备复位
-            }
+            },
             _ => {
                 return Err(UsbError::ConfigurationError("不支持的控制器类型".to_string()));
-            }
+            },
         }
 
         Ok(())
@@ -1045,8 +1068,12 @@ impl UsbHostController {
         }
 
         // 更新统计
-        self.statistics.enumerated_devices.fetch_add(1, Ordering::SeqCst);
-        self.statistics.connected_devices.fetch_add(1, Ordering::SeqCst);
+        self.statistics
+            .enumerated_devices
+            .fetch_add(1, Ordering::SeqCst);
+        self.statistics
+            .connected_devices
+            .fetch_add(1, Ordering::SeqCst);
 
         crate::println!("[usb] 设备枚举完成: 地址={}, 类={:?}", device_address, device_class);
 
@@ -1258,11 +1285,7 @@ impl Default for UsbControllerCapabilities {
                 UsbTransferType::Interrupt,
                 UsbTransferType::Isochronous,
             ],
-            supported_speeds: vec![
-                UsbSpeed::Low,
-                UsbSpeed::Full,
-                UsbSpeed::High,
-            ],
+            supported_speeds: vec![UsbSpeed::Low, UsbSpeed::Full, UsbSpeed::High],
             power_management: true,
             remote_wakeup: true,
             otg_support: false,

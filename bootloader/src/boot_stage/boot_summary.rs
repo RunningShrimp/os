@@ -37,8 +37,7 @@ impl BootSummary {
         if self.total_stages == 0 {
             return 100;
         }
-        ((self.completed_stages as u64 * 100) / (self.total_stages as u64))
-            as u32
+        ((self.completed_stages as u64 * 100) / (self.total_stages as u64)) as u32
     }
 
     pub fn print_summary(&self) {
@@ -50,11 +49,7 @@ impl BootSummary {
             "FAILED\n"
         });
         crate::drivers::console::write_str("Progress: ");
-        crate::drivers::console::write_str(if self.completed_stages > 0 {
-            "OK"
-        } else {
-            "0"
-        });
+        crate::drivers::console::write_str(if self.completed_stages > 0 { "OK" } else { "0" });
         crate::drivers::console::write_str("/");
         crate::drivers::console::write_str(if self.total_stages > 0 { "OK" } else { "0" });
         crate::drivers::console::write_str(" (");

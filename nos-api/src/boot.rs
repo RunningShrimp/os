@@ -3,7 +3,6 @@
 //! This module defines the unified boot parameter structures used for
 //! communication between the bootloader and the kernel.
 
-
 /// Boot protocol types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
@@ -19,13 +18,25 @@ pub enum BootProtocolType {
 /// Get the current architecture ID
 pub const fn get_current_arch_id() -> u32 {
     #[cfg(target_arch = "x86_64")]
-    { 0 }
+    {
+        0
+    }
     #[cfg(target_arch = "aarch64")]
-    { 1 }
+    {
+        1
+    }
     #[cfg(target_arch = "riscv64")]
-    { 2 }
-    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
-    { u32::MAX }
+    {
+        2
+    }
+    #[cfg(not(any(
+        target_arch = "x86_64",
+        target_arch = "aarch64",
+        target_arch = "riscv64"
+    )))]
+    {
+        u32::MAX
+    }
 }
 
 /// Memory types passed from bootloader
@@ -97,47 +108,47 @@ pub struct BootParameters {
     /// Magic number to identify valid boot parameters
     /// Must be BOOT_PARAMETERS_MAGIC
     pub magic: u64,
-    
+
     /// Version of the boot parameter structure
     /// Increment when structure layout changes
     pub version: u32,
-    
+
     /// Architecture type (0=x86_64, 1=aarch64, 2=riscv64)
     pub architecture: u32,
-    
+
     /// Boot protocol type (see BootProtocolType)
     pub boot_protocol: u32,
-    
+
     /// Memory map information
     pub memory_map: MemoryMap,
-    
+
     /// Framebuffer information (if available)
     /// Address 0 means no framebuffer
     pub framebuffer: FramebufferInfo,
-    
+
     /// ACPI RSDP address (if available)
     /// Address 0 means no ACPI
     pub acpi_rsdp: u64,
-    
+
     /// Device tree blob address (if available)
     /// Address 0 means no device tree
     pub device_tree: u64,
-    
+
     /// Command line string address (if available)
     /// Address 0 means no command line
     pub command_line: u64,
-    
+
     /// Boot timestamp (nanoseconds since boot)
     pub timestamp: u64,
-    
+
     /// Bootloader version
     pub bootloader_version: u32,
-    
+
     /// ASLR offset for address space layout randomization
     /// This is a page-aligned random offset applied to base addresses
     /// Set to 0 if ASLR is disabled
     pub aslr_offset: u64,
-    
+
     /// Reserved fields for future extensions
     pub reserved: [u64; 7], // Reduced from 8 to make room for aslr_offset
 }
@@ -146,10 +157,10 @@ impl BootParameters {
     /// Magic number for boot parameters
     /// "NOS_BOOT" in ASCII
     pub const MAGIC: u64 = 0x4E4F5342_4F4F5452;
-    
+
     /// Current version of the boot parameter structure
     pub const VERSION: u32 = 1;
-    
+
     /// Create a new empty boot parameters structure
     pub const fn new() -> Self {
         Self {
@@ -157,10 +168,7 @@ impl BootParameters {
             version: Self::VERSION,
             architecture: 0,
             boot_protocol: 0,
-            memory_map: MemoryMap {
-                entry_count: 0,
-                entries: 0,
-            },
+            memory_map: MemoryMap { entry_count: 0, entries: 0 },
             framebuffer: FramebufferInfo {
                 address: 0,
                 width: 0,
@@ -178,12 +186,12 @@ impl BootParameters {
             reserved: [0; 7],
         }
     }
-    
+
     /// Check if boot parameters are valid
     pub fn is_valid(&self) -> bool {
         self.magic == Self::MAGIC && self.version >= 1
     }
-    
+
     /// Get boot protocol type as enum
     pub fn protocol_type(&self) -> BootProtocolType {
         match self.boot_protocol {
@@ -195,27 +203,27 @@ impl BootParameters {
             _ => BootProtocolType::Unknown,
         }
     }
-    
+
     /// Check if framebuffer is available
     pub fn has_framebuffer(&self) -> bool {
         self.framebuffer.address != 0
     }
-    
+
     /// Check if ACPI is available
     pub fn has_acpi(&self) -> bool {
         self.acpi_rsdp != 0
     }
-    
+
     /// Check if device tree is available
     pub fn has_device_tree(&self) -> bool {
         self.device_tree != 0
     }
-    
+
     /// Check if command line is available
     pub fn has_command_line(&self) -> bool {
         self.command_line != 0
     }
-    
+
     /// Check version compatibility
     /// Returns true if the version is compatible with the current kernel
     pub fn is_version_compatible(&self) -> bool {
@@ -223,7 +231,7 @@ impl BootParameters {
         // Future versions should check for backward compatibility
         self.version == Self::VERSION || self.version == 1
     }
-    
+
     /// Get architecture name as string
     pub fn architecture_name(&self) -> &'static str {
         match self.architecture {
@@ -233,17 +241,17 @@ impl BootParameters {
             _ => "unknown",
         }
     }
-    
+
     /// Validate architecture matches current build
     pub fn validate_architecture(&self) -> bool {
         self.architecture == get_current_arch_id()
     }
-    
+
     /// Check if ASLR is enabled (aslr_offset != 0)
     pub fn has_aslr(&self) -> bool {
         self.aslr_offset != 0
     }
-    
+
     /// Get ASLR offset as usize
     pub fn aslr_offset_usize(&self) -> usize {
         self.aslr_offset as usize
@@ -270,8 +278,7 @@ pub unsafe fn validate_boot_parameters(params: *const BootParameters) -> bool {
     if params.is_null() {
         return false;
     }
-    
+
     let params = unsafe { &*params };
     params.is_valid()
 }
-

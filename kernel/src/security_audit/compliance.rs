@@ -1,20 +1,22 @@
 // Compliance Module for Security Audit
 
 extern crate alloc;
-//
 // 合规模块，负责检查系统是否符合各种安全合规标准
 
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::{format, vec};
-use alloc::string::String;
-use alloc::string::ToString;
+use alloc::{
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
 use core::sync::atomic::{AtomicU64, Ordering};
+
 use spin::Mutex;
 
+use super::{ComplianceResult, ComplianceStandard, ComplianceStatus, SecurityAuditStats};
 use crate::security::audit::{AuditEvent, AuditEventType, AuditSeverity};
-use super::{ComplianceStandard, ComplianceResult, ComplianceStatus, SecurityAuditStats};
 
 /// 合规检查器
 pub struct ComplianceChecker {
@@ -93,25 +95,13 @@ pub enum ComplianceCondition {
         threshold: u64,
     },
     /// 系统配置条件
-    SystemConfig {
-        config_key: String,
-        expected_value: String,
-    },
+    SystemConfig { config_key: String, expected_value: String },
     /// 文件权限条件
-    FilePermissions {
-        file_path: String,
-        expected_permissions: String,
-    },
+    FilePermissions { file_path: String, expected_permissions: String },
     /// 服务状态条件
-    ServiceStatus {
-        service_name: String,
-        expected_status: ServiceStatus,
-    },
+    ServiceStatus { service_name: String, expected_status: ServiceStatus },
     /// 自定义条件
-    Custom {
-        check_function: String,
-        parameters: Vec<String>,
-    },
+    Custom { check_function: String, parameters: Vec<String> },
 }
 
 /// 比较操作符
@@ -234,7 +224,10 @@ impl ComplianceChecker {
             self.load_default_rules(standard)?;
         }
 
-        crate::println!("[ComplianceChecker] Compliance checker initialized for {} standards", standards.len());
+        crate::println!(
+            "[ComplianceChecker] Compliance checker initialized for {} standards",
+            standards.len()
+        );
         Ok(())
     }
 
@@ -333,134 +326,122 @@ impl ComplianceChecker {
 
     /// 加载ISO 27001规则
     fn load_iso27001_rules(&self) -> Vec<ComplianceRule> {
-        vec![
-            ComplianceRule {
-                id: 2001,
-                standard: ComplianceStandard::ISO_27001,
-                category: ComplianceCategory::Monitoring,
-                name: "System Monitoring".to_string(),
-                description: "Systems must be monitored for security events".to_string(),
-                condition: ComplianceCondition::EventCount {
-                    event_type: AuditEventType::KernelEvent,
-                    time_range: (0, crate::subsystems::time::get_timestamp()),
-                    operator: ComparisonOperator::GreaterThan,
-                    threshold: 0,
-                },
-                expected_result: ExpectedResult::Boolean(true),
-                check_method: CheckMethod::EventAnalysis,
-                severity: ComplianceSeverity::Medium,
-                enabled: true,
+        vec![ComplianceRule {
+            id: 2001,
+            standard: ComplianceStandard::ISO_27001,
+            category: ComplianceCategory::Monitoring,
+            name: "System Monitoring".to_string(),
+            description: "Systems must be monitored for security events".to_string(),
+            condition: ComplianceCondition::EventCount {
+                event_type: AuditEventType::KernelEvent,
+                time_range: (0, crate::subsystems::time::get_timestamp()),
+                operator: ComparisonOperator::GreaterThan,
+                threshold: 0,
             },
-        ]
+            expected_result: ExpectedResult::Boolean(true),
+            check_method: CheckMethod::EventAnalysis,
+            severity: ComplianceSeverity::Medium,
+            enabled: true,
+        }]
     }
 
     /// 加载GDPR规则
     fn load_gdpr_rules(&self) -> Vec<ComplianceRule> {
-        vec![
-            ComplianceRule {
-                id: 3001,
-                standard: ComplianceStandard::GDPR,
-                category: ComplianceCategory::DataProtection,
-                name: "Personal Data Protection".to_string(),
-                description: "Personal data must be protected".to_string(),
-                condition: ComplianceCondition::SystemConfig {
-                    config_key: "data.personal.protection".to_string(),
-                    expected_value: "enabled".to_string(),
-                },
-                expected_result: ExpectedResult::Boolean(true),
-                check_method: CheckMethod::ConfigCheck,
-                severity: ComplianceSeverity::High,
-                enabled: true,
+        vec![ComplianceRule {
+            id: 3001,
+            standard: ComplianceStandard::GDPR,
+            category: ComplianceCategory::DataProtection,
+            name: "Personal Data Protection".to_string(),
+            description: "Personal data must be protected".to_string(),
+            condition: ComplianceCondition::SystemConfig {
+                config_key: "data.personal.protection".to_string(),
+                expected_value: "enabled".to_string(),
             },
-        ]
+            expected_result: ExpectedResult::Boolean(true),
+            check_method: CheckMethod::ConfigCheck,
+            severity: ComplianceSeverity::High,
+            enabled: true,
+        }]
     }
 
     /// 加载HIPAA规则
     fn load_hipaa_rules(&self) -> Vec<ComplianceRule> {
-        vec![
-            ComplianceRule {
-                id: 4001,
-                standard: ComplianceStandard::HIPAA,
-                category: ComplianceCategory::AccessControl,
-                name: "PHI Access Control".to_string(),
-                description: "Access to PHI must be controlled".to_string(),
-                condition: ComplianceCondition::SystemConfig {
-                    config_key: "access.phi.controlled".to_string(),
-                    expected_value: "true".to_string(),
-                },
-                expected_result: ExpectedResult::Boolean(true),
-                check_method: CheckMethod::ConfigCheck,
-                severity: ComplianceSeverity::Critical,
-                enabled: true,
+        vec![ComplianceRule {
+            id: 4001,
+            standard: ComplianceStandard::HIPAA,
+            category: ComplianceCategory::AccessControl,
+            name: "PHI Access Control".to_string(),
+            description: "Access to PHI must be controlled".to_string(),
+            condition: ComplianceCondition::SystemConfig {
+                config_key: "access.phi.controlled".to_string(),
+                expected_value: "true".to_string(),
             },
-        ]
+            expected_result: ExpectedResult::Boolean(true),
+            check_method: CheckMethod::ConfigCheck,
+            severity: ComplianceSeverity::Critical,
+            enabled: true,
+        }]
     }
 
     /// 加载NIST规则
     fn load_nist_rules(&self) -> Vec<ComplianceRule> {
-        vec![
-            ComplianceRule {
-                id: 5001,
-                standard: ComplianceStandard::NIST,
-                category: ComplianceCategory::IncidentResponse,
-                name: "Incident Response".to_string(),
-                description: "Security incidents must be responded to".to_string(),
-                condition: ComplianceCondition::EventCount {
-                    event_type: AuditEventType::SecurityViolation,
-                    time_range: (0, crate::subsystems::time::get_timestamp()),
-                    operator: ComparisonOperator::GreaterThan,
-                    threshold: 0,
-                },
-                expected_result: ExpectedResult::Boolean(true),
-                check_method: CheckMethod::EventAnalysis,
-                severity: ComplianceSeverity::Medium,
-                enabled: true,
+        vec![ComplianceRule {
+            id: 5001,
+            standard: ComplianceStandard::NIST,
+            category: ComplianceCategory::IncidentResponse,
+            name: "Incident Response".to_string(),
+            description: "Security incidents must be responded to".to_string(),
+            condition: ComplianceCondition::EventCount {
+                event_type: AuditEventType::SecurityViolation,
+                time_range: (0, crate::subsystems::time::get_timestamp()),
+                operator: ComparisonOperator::GreaterThan,
+                threshold: 0,
             },
-        ]
+            expected_result: ExpectedResult::Boolean(true),
+            check_method: CheckMethod::EventAnalysis,
+            severity: ComplianceSeverity::Medium,
+            enabled: true,
+        }]
     }
 
     /// 加载SOX规则
     fn load_sox_rules(&self) -> Vec<ComplianceRule> {
-        vec![
-            ComplianceRule {
-                id: 6001,
-                standard: ComplianceStandard::SOX,
-                category: ComplianceCategory::Logging,
-                name: "Financial Audit Trail".to_string(),
-                description: "Financial transactions must be auditable".to_string(),
-                condition: ComplianceCondition::EventCount {
-                    event_type: AuditEventType::Process,
-                    time_range: (0, crate::subsystems::time::get_timestamp()),
-                    operator: ComparisonOperator::GreaterThan,
-                    threshold: 0,
-                },
-                expected_result: ExpectedResult::Boolean(true),
-                check_method: CheckMethod::EventAnalysis,
-                severity: ComplianceSeverity::High,
-                enabled: true,
+        vec![ComplianceRule {
+            id: 6001,
+            standard: ComplianceStandard::SOX,
+            category: ComplianceCategory::Logging,
+            name: "Financial Audit Trail".to_string(),
+            description: "Financial transactions must be auditable".to_string(),
+            condition: ComplianceCondition::EventCount {
+                event_type: AuditEventType::Process,
+                time_range: (0, crate::subsystems::time::get_timestamp()),
+                operator: ComparisonOperator::GreaterThan,
+                threshold: 0,
             },
-        ]
+            expected_result: ExpectedResult::Boolean(true),
+            check_method: CheckMethod::EventAnalysis,
+            severity: ComplianceSeverity::High,
+            enabled: true,
+        }]
     }
 
     /// 加载FIPS规则
     fn load_fips_rules(&self) -> Vec<ComplianceRule> {
-        vec![
-            ComplianceRule {
-                id: 7001,
-                standard: ComplianceStandard::FIPS,
-                category: ComplianceCategory::Encryption,
-                name: "FIPS Encryption".to_string(),
-                description: "Must use FIPS approved encryption".to_string(),
-                condition: ComplianceCondition::SystemConfig {
-                    config_key: "encryption.fips.enabled".to_string(),
-                    expected_value: "true".to_string(),
-                },
-                expected_result: ExpectedResult::Boolean(true),
-                check_method: CheckMethod::ConfigCheck,
-                severity: ComplianceSeverity::Critical,
-                enabled: true,
+        vec![ComplianceRule {
+            id: 7001,
+            standard: ComplianceStandard::FIPS,
+            category: ComplianceCategory::Encryption,
+            name: "FIPS Encryption".to_string(),
+            description: "Must use FIPS approved encryption".to_string(),
+            condition: ComplianceCondition::SystemConfig {
+                config_key: "encryption.fips.enabled".to_string(),
+                expected_value: "true".to_string(),
             },
-        ]
+            expected_result: ExpectedResult::Boolean(true),
+            check_method: CheckMethod::ConfigCheck,
+            severity: ComplianceSeverity::Critical,
+            enabled: true,
+        }]
     }
 
     /// 检查单个事件
@@ -493,34 +474,38 @@ impl ComplianceChecker {
     fn rule_matches_event(&self, rule: &ComplianceRule, event: &AuditEvent) -> bool {
         match &rule.condition {
             ComplianceCondition::EventCount { event_type, time_range, .. } => {
-                event.event_type == *event_type &&
-                event.timestamp >= time_range.0 &&
-                event.timestamp <= time_range.1
-            }
+                event.event_type == *event_type
+                    && event.timestamp >= time_range.0
+                    && event.timestamp <= time_range.1
+            },
             _ => false,
         }
     }
 
     /// 执行合规检查
-    fn execute_compliance_check(&mut self, rule: &ComplianceRule, event: &AuditEvent) -> Result<(), &'static str> {
+    fn execute_compliance_check(
+        &mut self,
+        rule: &ComplianceRule,
+        event: &AuditEvent,
+    ) -> Result<(), &'static str> {
         let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         let result = match &rule.condition {
             ComplianceCondition::EventCount { event_type, time_range, operator, threshold } => {
                 self.check_event_count(*event_type, *time_range, *operator, *threshold)
-            }
+            },
             ComplianceCondition::SystemConfig { config_key, expected_value } => {
                 self.check_system_config(config_key, expected_value)
-            }
+            },
             ComplianceCondition::FilePermissions { file_path, expected_permissions } => {
                 self.check_file_permissions(file_path, expected_permissions)
-            }
+            },
             ComplianceCondition::ServiceStatus { service_name, expected_status } => {
                 self.check_service_status(service_name, *expected_status)
-            }
+            },
             ComplianceCondition::Custom { check_function, parameters } => {
                 self.check_custom(check_function, parameters)
-            }
+            },
         };
 
         let status = match result {
@@ -549,19 +534,29 @@ impl ComplianceChecker {
                 ComplianceStatus::Compliant => stats.compliant_checks += 1,
                 ComplianceStatus::NonCompliant => stats.non_compliant_checks += 1,
                 ComplianceStatus::PartiallyCompliant => stats.partially_compliant_checks += 1,
-                ComplianceStatus::Unknown => {}
+                ComplianceStatus::Unknown => {},
             }
 
             let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
             stats.avg_check_time_us = (stats.avg_check_time_us + elapsed / 1000) / 2;
         }
 
-        crate::println!("[ComplianceChecker] {} compliance check: {}", rule.name, format!("{:?}", status));
+        crate::println!(
+            "[ComplianceChecker] {} compliance check: {}",
+            rule.name,
+            format!("{:?}", status)
+        );
         Ok(())
     }
 
     /// 检查事件计数
-    fn check_event_count(&self, event_type: AuditEventType, time_range: (u64, u64), operator: ComparisonOperator, threshold: u64) -> Result<bool, &'static str> {
+    fn check_event_count(
+        &self,
+        event_type: AuditEventType,
+        time_range: (u64, u64),
+        operator: ComparisonOperator,
+        threshold: u64,
+    ) -> Result<bool, &'static str> {
         // 简化的事件计数检查
         // 实际实现会查询审计数据库
         let count = self.get_event_count_in_range(event_type, time_range);
@@ -579,13 +574,21 @@ impl ComplianceChecker {
     }
 
     /// 获取时间范围内的事件数量
-    fn get_event_count_in_range(&self, _event_type: AuditEventType, _time_range: (u64, u64)) -> u64 {
+    fn get_event_count_in_range(
+        &self,
+        _event_type: AuditEventType,
+        _time_range: (u64, u64),
+    ) -> u64 {
         // 简化实现，返回模拟数据
         5
     }
 
     /// 检查系统配置
-    fn check_system_config(&self, config_key: &str, expected_value: &str) -> Result<bool, &'static str> {
+    fn check_system_config(
+        &self,
+        config_key: &str,
+        expected_value: &str,
+    ) -> Result<bool, &'static str> {
         // 简化的系统配置检查
         // 实际实现会检查实际系统配置
         match config_key {
@@ -597,32 +600,60 @@ impl ComplianceChecker {
     }
 
     /// 检查文件权限
-    fn check_file_permissions(&self, file_path: &str, expected_permissions: &str) -> Result<bool, &'static str> {
+    fn check_file_permissions(
+        &self,
+        file_path: &str,
+        expected_permissions: &str,
+    ) -> Result<bool, &'static str> {
         // 简化的文件权限检查
-        crate::println!("[ComplianceChecker] Checking permissions for {}: expected {}", file_path, expected_permissions);
+        crate::println!(
+            "[ComplianceChecker] Checking permissions for {}: expected {}",
+            file_path,
+            expected_permissions
+        );
         Ok(true) // 简化实现
     }
 
     /// 检查服务状态
-    fn check_service_status(&self, service_name: &str, expected_status: ServiceStatus) -> Result<bool, &'static str> {
+    fn check_service_status(
+        &self,
+        service_name: &str,
+        expected_status: ServiceStatus,
+    ) -> Result<bool, &'static str> {
         // 简化的服务状态检查
-        crate::println!("[ComplianceChecker] Checking service {}: expected {:?}", service_name, expected_status);
+        crate::println!(
+            "[ComplianceChecker] Checking service {}: expected {:?}",
+            service_name,
+            expected_status
+        );
         Ok(true) // 简化实现
     }
 
     /// 检查自定义条件
-    fn check_custom(&self, check_function: &str, parameters: &[String]) -> Result<bool, &'static str> {
+    fn check_custom(
+        &self,
+        check_function: &str,
+        parameters: &[String],
+    ) -> Result<bool, &'static str> {
         // 简化的自定义检查
-        crate::println!("[ComplianceChecker] Custom check {} with parameters: {:?}", check_function, parameters);
+        crate::println!(
+            "[ComplianceChecker] Custom check {} with parameters: {:?}",
+            check_function,
+            parameters
+        );
         Ok(true) // 简化实现
     }
 
     /// 生成建议
-    fn generate_recommendations(&self, rule: &ComplianceRule, status: ComplianceStatus) -> Vec<String> {
+    fn generate_recommendations(
+        &self,
+        rule: &ComplianceRule,
+        status: ComplianceStatus,
+    ) -> Vec<String> {
         match status {
-            ComplianceStatus::Compliant => vec![
-                format!("Continue maintaining compliance for {}", rule.name),
-            ],
+            ComplianceStatus::Compliant => {
+                vec![format!("Continue maintaining compliance for {}", rule.name)]
+            },
             ComplianceStatus::NonCompliant => vec![
                 format!("Remediate non-compliance for {}", rule.name),
                 format!("Review and update {} configuration", rule.name),
@@ -654,7 +685,10 @@ impl ComplianceChecker {
     }
 
     /// 运行特定标准的合规检查
-    pub fn run_standard_check(&mut self, standard: ComplianceStandard) -> Result<Vec<ComplianceResult>, &'static str> {
+    pub fn run_standard_check(
+        &mut self,
+        standard: ComplianceStandard,
+    ) -> Result<Vec<ComplianceResult>, &'static str> {
         let mut results = Vec::new();
 
         if let Some(rules) = self.rules.get(&standard) {
@@ -689,19 +723,22 @@ impl ComplianceChecker {
     }
 
     /// 执行规则检查
-    fn execute_rule_check(&self, rule: &ComplianceRule) -> Result<ComplianceCheckResult, &'static str> {
+    fn execute_rule_check(
+        &self,
+        rule: &ComplianceRule,
+    ) -> Result<ComplianceCheckResult, &'static str> {
         let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         let result = match &rule.condition {
             ComplianceCondition::SystemConfig { config_key, expected_value } => {
                 self.check_system_config(config_key, expected_value)
-            }
+            },
             ComplianceCondition::FilePermissions { file_path, expected_permissions } => {
                 self.check_file_permissions(file_path, expected_permissions)
-            }
+            },
             ComplianceCondition::ServiceStatus { service_name, expected_status } => {
                 self.check_service_status(service_name, *expected_status)
-            }
+            },
             _ => Ok(true), // 简化实现
         };
 
@@ -727,12 +764,19 @@ impl ComplianceChecker {
 
     /// 添加合规规则
     pub fn add_rule(&mut self, rule: ComplianceRule) -> Result<(), &'static str> {
-        self.rules.entry(rule.standard).or_insert_with(Vec::new).push(rule);
+        self.rules
+            .entry(rule.standard)
+            .or_insert_with(Vec::new)
+            .push(rule);
         Ok(())
     }
 
     /// 移除合规规则
-    pub fn remove_rule(&mut self, standard: ComplianceStandard, rule_id: u64) -> Result<(), &'static str> {
+    pub fn remove_rule(
+        &mut self,
+        standard: ComplianceStandard,
+        rule_id: u64,
+    ) -> Result<(), &'static str> {
         if let Some(rules) = self.rules.get_mut(&standard) {
             rules.retain(|rule| rule.id != rule_id);
             Ok(())
@@ -757,7 +801,10 @@ impl ComplianceChecker {
     }
 
     /// 获取缓存的结果
-    pub fn get_cached_results(&self, standard: ComplianceStandard) -> Option<Vec<ComplianceResult>> {
+    pub fn get_cached_results(
+        &self,
+        standard: ComplianceStandard,
+    ) -> Option<Vec<ComplianceResult>> {
         self.result_cache.lock().get(&standard).cloned()
     }
 }

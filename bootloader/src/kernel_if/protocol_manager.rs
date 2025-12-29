@@ -4,9 +4,7 @@
 //! It handles detection, initialization, and management of different boot protocols
 //! (UEFI, BIOS, Multiboot2) with proper error handling and state management.
 
-use crate::utils::error::Result;
-use crate::protocol::BootProtocolType;
-use crate::alloc::string::ToString;
+use crate::{alloc::string::ToString, protocol::BootProtocolType, utils::error::Result};
 
 /// Protocol-specific errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,9 +23,15 @@ impl From<ProtocolError> for crate::utils::error::BootError {
     fn from(err: ProtocolError) -> Self {
         match err {
             ProtocolError::NotSupported => crate::utils::error::BootError::ProtocolNotSupported,
-            ProtocolError::InitializationFailed => crate::utils::error::BootError::ProtocolInitializationFailed("Protocol initialization failed".to_string()),
+            ProtocolError::InitializationFailed => {
+                crate::utils::error::BootError::ProtocolInitializationFailed(
+                    "Protocol initialization failed".to_string(),
+                )
+            },
             ProtocolError::InvalidState => crate::utils::error::BootError::InvalidState,
-            ProtocolError::DetectionFailed => crate::utils::error::BootError::ProtocolDetectionFailed,
+            ProtocolError::DetectionFailed => {
+                crate::utils::error::BootError::ProtocolDetectionFailed
+            },
         }
     }
 }
@@ -69,7 +73,7 @@ impl ProtocolManager {
             state: ProtocolState::Uninitialized,
             available_protocols: 0,
         };
-        
+
         // Perform initial protocol detection
         manager.detect_available_protocols();
         manager
@@ -82,7 +86,7 @@ impl ProtocolManager {
             state: ProtocolState::Uninitialized,
             available_protocols: 0,
         };
-        
+
         manager.detect_available_protocols();
         manager
     }
@@ -90,25 +94,25 @@ impl ProtocolManager {
     /// Detect available boot protocols
     fn detect_available_protocols(&mut self) {
         self.state = ProtocolState::Detecting;
-        
+
         // Reset available protocols
         self.available_protocols = 0;
-        
+
         // Detect UEFI support
         if self.is_uefi_available() {
             self.available_protocols |= UEFI_BIT;
         }
-        
+
         // Detect BIOS support
         if self.is_bios_available() {
             self.available_protocols |= BIOS_BIT;
         }
-        
+
         // Detect Multiboot2 support
         if self.is_multiboot2_available() {
             self.available_protocols |= MULTIBOOT2_BIT;
         }
-        
+
         // Select the best available protocol
         self.select_best_protocol();
     }
@@ -161,7 +165,7 @@ impl ProtocolManager {
             self.state = ProtocolState::Failed(ProtocolError::NotSupported);
             return;
         }
-        
+
         self.state = ProtocolState::Ready;
     }
 
@@ -176,7 +180,7 @@ impl ProtocolManager {
                     BootProtocolType::Bios => self.initialize_bios()?,
                     BootProtocolType::Multiboot2 => self.initialize_multiboot2()?,
                 }
-            }
+            },
             _ => {
                 // Re-detect protocols if not ready
                 self.detect_available_protocols();
@@ -184,9 +188,9 @@ impl ProtocolManager {
                     return Err(err.into());
                 }
                 return self.initialize();
-            }
+            },
         }
-        
+
         Ok(())
     }
 
@@ -242,7 +246,7 @@ impl ProtocolManager {
             BootProtocolType::Bios => BIOS_BIT,
             BootProtocolType::Multiboot2 => MULTIBOOT2_BIT,
         };
-        
+
         self.available_protocols & bit != 0
     }
 
@@ -251,7 +255,7 @@ impl ProtocolManager {
         if !self.is_protocol_available(protocol_type) {
             return Err(ProtocolError::NotSupported.into());
         }
-        
+
         self.protocol_type = protocol_type;
         self.state = ProtocolState::Uninitialized;
         self.initialize()
@@ -265,7 +269,7 @@ impl ProtocolManager {
             BootProtocolType::Bios,
             BootProtocolType::Multiboot2,
         ];
-        
+
         // Return a slice of available protocols
         // This is a bit inefficient but avoids heap allocation
         &ALL_PROTOCOLS
@@ -323,7 +327,7 @@ mod tests {
         let mut pm = ProtocolManager::new();
         // Should fail if not initialized
         assert!(pm.validate().is_err());
-        
+
         // Initialize and validate
         let _ = pm.initialize();
         assert!(pm.validate().is_ok());
@@ -333,7 +337,7 @@ mod tests {
     fn test_protocol_reset() {
         let mut pm = ProtocolManager::new();
         let initial_state = pm.state();
-        
+
         pm.reset();
         assert_eq!(pm.state(), initial_state);
     }

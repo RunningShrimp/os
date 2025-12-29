@@ -4,9 +4,7 @@
 //! Detects unsafe code patterns, validates memory operations, and tracks memory leaks.
 
 extern crate alloc;
-use alloc::string::String;
-use alloc::vec::Vec;
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
 /// Memory safety audit result
 #[derive(Debug, Clone)]
@@ -111,10 +109,7 @@ impl MemoryAuditor {
     }
 
     pub fn with_config(config: MemoryAuditConfig) -> Self {
-        Self {
-            config,
-            ..Self::new()
-        }
+        Self { config, ..Self::new() }
     }
 
     /// Run memory safety audit
@@ -153,7 +148,8 @@ impl MemoryAuditor {
             id: "UNSAFE-001".to_string(),
             severity: MemorySeverity::Informational,
             category: MemoryCategory::UnsafeCode,
-            description: "Rust memory safety guarantees enforce safety without garbage collection".to_string(),
+            description: "Rust memory safety guarantees enforce safety without garbage collection"
+                .to_string(),
             location: "kernel/src".to_string(),
             recommendation: "Continue using Rust's ownership and borrowing system".to_string(),
         });
@@ -192,9 +188,13 @@ impl MemoryAuditor {
                 id: "LEAK-001".to_string(),
                 severity: MemorySeverity::Medium,
                 category: MemoryCategory::MemoryLeak,
-                description: format!("Potential memory leaks detected: {} allocations not freed", leaks),
+                description: format!(
+                    "Potential memory leaks detected: {} allocations not freed",
+                    leaks
+                ),
                 location: "kernel/src".to_string(),
-                recommendation: "Review allocation/deallocation patterns and implement RAII".to_string(),
+                recommendation: "Review allocation/deallocation patterns and implement RAII"
+                    .to_string(),
             });
         }
     }
@@ -205,10 +205,7 @@ impl MemoryAuditor {
             return 100;
         }
 
-        let total_severity: u32 = self.findings
-            .iter()
-            .map(|f| f.severity as u32)
-            .sum();
+        let total_severity: u32 = self.findings.iter().map(|f| f.severity as u32).sum();
 
         let max_severity = self.findings.len() as u32 * 4;
         let ratio = (total_severity * 100) / max_severity;
@@ -229,7 +226,9 @@ impl MemoryAuditor {
             self.statistics.peak_allocated_bytes = self.statistics.current_allocated_bytes;
         }
 
-        *self.statistics.allocation_count_by_type
+        *self
+            .statistics
+            .allocation_count_by_type
             .entry(type_name.to_string())
             .or_insert(0) += 1;
     }

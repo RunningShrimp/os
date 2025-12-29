@@ -1,7 +1,6 @@
 //! 增强的C标准库I/O管理器
 
 extern crate alloc;
-//
 // 提供完整的文件I/O、格式化输出、缓冲管理和错误处理功能：
 // - FILE结构体和文件描述符管理
 // - 完整的printf格式化支持
@@ -9,25 +8,27 @@ extern crate alloc;
 // - 文件系统集成
 // - 错误处理和恢复
 
-use core::ffi::{c_char, c_int, c_void};
 use core::str::FromStr;
-use heapless::{String, Vec};
 
-pub type SizeT = usize;
 #[allow(non_camel_case_types)]
 pub type size_t = SizeT;
-use core::ptr::null_mut;
-use core::sync::atomic::{AtomicUsize, Ordering};
-use crate::libc::interface::{CLibResult, CLibError};
-use crate::libc::error::set_errno;
-use crate::libc::error::errno::{EINVAL, ENOENT, EMFILE, ENOMEM, EBADF};
-use crate::compat::loader::OpenFlags;
+use core::{
+    ptr::null_mut,
+    sync::atomic::{AtomicUsize, Ordering},
+};
+
+use crate::{
+    compat::loader::OpenFlags,
+    libc::{
+        error::set_errno,
+        interface::{CLibError, CLibResult},
+    },
+};
 
 /// 文件打开模式 (C库专用)
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum CFileMode {
+pub enum FileOpenMode {
     Read,
-    Write,
     Append,
     ReadWrite,
     ReadPlus,   // "r+"
@@ -38,9 +39,9 @@ pub enum CFileMode {
 /// 缓冲区类型
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BufferType {
-    NoBuffer,     // _IONBF
-    LineBuffer,   // _IOLBF
-    FullBuffer,   // _IOFBF
+    NoBuffer,   // _IONBF
+    LineBuffer, // _IOLBF
+    FullBuffer, // _IOFBF
 }
 
 /// 标准C库FILE结构体
@@ -96,10 +97,10 @@ pub struct IOManagerConfig {
 impl Default for IOManagerConfig {
     fn default() -> Self {
         Self {
-            default_buffer_size: 8192,     // 8KB
+            default_buffer_size: 8192, // 8KB
             max_open_files: 256,
             enable_line_buffering: true,
-            auto_flush_interval_ms: 100,   // 100ms
+            auto_flush_interval_ms: 100, // 100ms
             enable_performance_monitoring: true,
             enable_error_recovery: true,
         }
@@ -206,16 +207,18 @@ impl EnhancedIOManager {
                 Err(_) => {
                     set_errno(EINVAL);
                     return null_mut();
-                }
+                },
             };
 
             // 解析模式
-            let file_mode = match self.parse_file_mode(core::ffi::CStr::from_ptr(mode).to_str().unwrap_or("")) {
+            let file_mode = match self
+                .parse_file_mode(core::ffi::CStr::from_ptr(mode).to_str().unwrap_or(""))
+            {
                 Some(mode) => mode,
                 None => {
                     set_errno(EINVAL);
                     return null_mut();
-                }
+                },
             };
 
             // 通过VFS打开文件
@@ -225,7 +228,7 @@ impl EnhancedIOManager {
                 Err(_) => {
                     set_errno(ENOENT);
                     return null_mut();
-                }
+                },
             };
 
             // Use vfs_file for validation/logging
@@ -244,7 +247,7 @@ impl EnhancedIOManager {
                 Err(_) => {
                     set_errno(ENOMEM);
                     return null_mut();
-                }
+                },
             };
 
             // 设置文件大小
@@ -318,14 +321,14 @@ impl EnhancedIOManager {
                             Ok(0) => {
                                 (*file).eof = true;
                                 break;
-                            }
+                            },
                             Ok(n) => {
                                 self.stats.buffer_hits.fetch_add(1, Ordering::SeqCst);
-                            }
+                            },
                             Err(_) => {
                                 self.stats.error_count.fetch_add(1, Ordering::SeqCst);
                                 return total_read / size;
-                            }
+                            },
                         }
                     }
 
@@ -351,24 +354,32 @@ impl EnhancedIOManager {
                     Ok(n) => {
                         bytes_read = n;
                         total_read = n;
-                    }
+                    },
                     Err(_) => {
                         self.stats.error_count.fetch_add(1, Ordering::SeqCst);
                         return 0;
-                    }
+                    },
                 }
             }
 
             (*file).position += total_read as u64;
             self.stats.read_operations.fetch_add(1, Ordering::SeqCst);
-            self.stats.bytes_read.fetch_add(bytes_read, Ordering::SeqCst);
+            self.stats
+                .bytes_read
+                .fetch_add(bytes_read, Ordering::SeqCst);
 
             total_read / size
         }
     }
 
     /// 写入文件
-    pub fn fwrite(&self, ptr: *const c_void, size: size_t, nmemb: size_t, file: *mut CFile) -> size_t {
+    pub fn fwrite(
+        &self,
+        ptr: *const c_void,
+        size: size_t,
+        nmemb: size_t,
+        file: *mut CFile,
+    ) -> size_t {
         if ptr.is_null() || file.is_null() || size == 0 || nmemb == 0 {
             set_errno(EINVAL);
             return 0;
@@ -395,11 +406,11 @@ impl EnhancedIOManager {
                     match self.write_buffered_byte(file, byte) {
                         Ok(()) => {
                             total_written += 1;
-                        }
+                        },
                         Err(_) => {
                             self.stats.error_count.fetch_add(1, Ordering::SeqCst);
                             break;
-                        }
+                        },
                     }
                 }
                 bytes_written = total_written;
@@ -409,11 +420,11 @@ impl EnhancedIOManager {
                     Ok(n) => {
                         bytes_written = n;
                         total_written = n;
-                    }
+                    },
                     Err(_) => {
                         self.stats.error_count.fetch_add(1, Ordering::SeqCst);
                         return 0;
-                    }
+                    },
                 }
             }
 
@@ -422,7 +433,9 @@ impl EnhancedIOManager {
             (*file).needs_flush = true;
 
             self.stats.write_operations.fetch_add(1, Ordering::SeqCst);
-            self.stats.bytes_written.fetch_add(bytes_written, Ordering::SeqCst);
+            self.stats
+                .bytes_written
+                .fetch_add(bytes_written, Ordering::SeqCst);
 
             total_written / size
         }
@@ -439,13 +452,15 @@ impl EnhancedIOManager {
             Ok(()) => {
                 self.stats.flush_operations.fetch_add(1, Ordering::SeqCst);
                 0
-            }
+            },
             Err(e) => {
                 self.stats.error_count.fetch_add(1, Ordering::SeqCst);
-                unsafe { (*file).error = e; }
+                unsafe {
+                    (*file).error = e;
+                }
                 set_errno(e);
                 -1
-            }
+            },
         }
     }
 
@@ -490,13 +505,13 @@ impl EnhancedIOManager {
 
             // 计算新位置
             let temp_pos = match whence {
-                0 => offset, // SEEK_SET
+                0 => offset,                              // SEEK_SET
                 1 => (*file).position as c_long + offset, // SEEK_CUR
-                2 => (*file).size as c_long + offset, // SEEK_END
+                2 => (*file).size as c_long + offset,     // SEEK_END
                 _ => {
                     set_errno(EINVAL);
                     return -1;
-                }
+                },
             };
 
             if temp_pos < 0 {
@@ -606,18 +621,23 @@ impl EnhancedIOManager {
     /// 转换文件模式到VFS模式
     fn file_mode_to_vfs_mode(&self, file_mode: CFileMode) -> u32 {
         match file_mode {
-            CFileMode::Read => 0, // O_RDONLY
-            CFileMode::Write => 1 | 64 | 512, // O_WRONLY | O_CREAT | O_TRUNC
-            CFileMode::Append => 1 | 64 | 1024, // O_WRONLY | O_CREAT | O_APPEND
-            CFileMode::ReadWrite => 2, // O_RDWR
-            CFileMode::ReadPlus => 2, // O_RDWR
-            CFileMode::WritePlus => 2 | 64 | 512, // O_RDWR | O_CREAT | O_TRUNC
+            CFileMode::Read => 0,                   // O_RDONLY
+            CFileMode::Write => 1 | 64 | 512,       // O_WRONLY | O_CREAT | O_TRUNC
+            CFileMode::Append => 1 | 64 | 1024,     // O_WRONLY | O_CREAT | O_APPEND
+            CFileMode::ReadWrite => 2,              // O_RDWR
+            CFileMode::ReadPlus => 2,               // O_RDWR
+            CFileMode::WritePlus => 2 | 64 | 512,   // O_RDWR | O_CREAT | O_TRUNC
             CFileMode::AppendPlus => 2 | 64 | 1024, // O_RDWR | O_CREAT | O_APPEND
         }
     }
 
     /// 创建文件描述符
-    fn create_file_descriptor(&self, fd: c_int, mode: CFileMode, path: Option<&str>) -> Result<*mut CFile, CLibError> {
+    fn create_file_descriptor(
+        &self,
+        fd: c_int,
+        mode: CFileMode,
+        path: Option<&str>,
+    ) -> Result<*mut CFile, CLibError> {
         let layout = core::alloc::Layout::new::<CFile>();
         let c_file = unsafe { alloc::alloc::alloc(layout) as *mut CFile };
 
@@ -647,7 +667,9 @@ impl EnhancedIOManager {
             let fd_usize = fd as usize;
             if fd_usize < files.capacity() {
                 while files.len() <= fd_usize {
-                    files.push(None).map_err(|_| CLibError::InvalidParameter("文件表已满"))?;
+                    files
+                        .push(None)
+                        .map_err(|_| CLibError::InvalidParameter("文件表已满"))?;
                 }
                 files[fd_usize] = Some(c_file);
             }
@@ -679,18 +701,25 @@ impl EnhancedIOManager {
 
         if let Some(mut pool) = self.buffer_pool.try_lock() {
             if let Some(buffer) = pool.pop() {
-                unsafe { (*file).buffer = Some(buffer); }
+                unsafe {
+                    (*file).buffer = Some(buffer);
+                }
                 self.stats.buffer_hits.fetch_add(1, Ordering::SeqCst);
                 return;
             }
         }
 
         // 创建新缓冲区
-        let layout = unsafe { core::alloc::Layout::from_size_align(self.config.default_buffer_size, 8).unwrap() };
+        let layout = unsafe {
+            core::alloc::Layout::from_size_align(self.config.default_buffer_size, 8).unwrap()
+        };
         let buffer = unsafe { alloc::alloc::alloc(layout) as *mut u8 };
         if !buffer.is_null() {
-            let buffer_slice = unsafe { core::slice::from_raw_parts_mut(buffer, self.config.default_buffer_size) };
-            unsafe { (*file).buffer = Some(buffer_slice); }
+            let buffer_slice =
+                unsafe { core::slice::from_raw_parts_mut(buffer, self.config.default_buffer_size) };
+            unsafe {
+                (*file).buffer = Some(buffer_slice);
+            }
         }
 
         self.stats.buffer_misses.fetch_add(1, Ordering::SeqCst);
@@ -721,7 +750,7 @@ impl EnhancedIOManager {
                         (*file).buffer_pos = 0;
                         (*file).buffer_len = n;
                         Ok(n)
-                    }
+                    },
                     Err(e) => Err(e),
                 }
             } else {
@@ -790,7 +819,7 @@ impl EnhancedIOManager {
                         (*file).buffer_pos = 0;
                         (*file).needs_flush = false;
                         Ok(())
-                    }
+                    },
                     Err(e) => Err(e),
                 }
             } else {

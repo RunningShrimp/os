@@ -1,6 +1,5 @@
-use std::process::Command;
-use std::fs;
-use std::path::Path;
+use std::{fs, path::Path, process::Command};
+
 use anyhow::{Context, Result};
 use regex::Regex;
 
@@ -15,18 +14,21 @@ fn main() {
                 eprintln!("[xtask] syscalls error: {:#}", e);
                 std::process::exit(1);
             }
-        }
+        },
         "user-rel-exec" => {
             let target = args.next().unwrap_or_else(|| "aarch64".to_string());
             build_user(vec![target]);
-            println!("[xtask] built user execrel; run kernel with user-bin to execute /bin/execrel or chdir /tmp and exec relative hello");
-        }
+            println!(
+                "[xtask] built user execrel; run kernel with user-bin to execute /bin/execrel or \
+                 chdir /tmp and exec relative hello"
+            );
+        },
         "bench" => {
             if let Err(e) = run_bench() {
                 eprintln!("[xtask] bench error: {:#}", e);
                 std::process::exit(1);
             }
-        }
+        },
         _ => print_help(),
     }
 }
@@ -43,11 +45,20 @@ fn build_kernel(args: Vec<String>) {
     let mut cmd = Command::new("cargo");
     cmd.arg("+nightly")
         .arg("build")
-        .arg("-p").arg("kernel")
-        .arg("--target").arg(target_json)
-        .arg("-Z").arg("build-std=core,alloc")
-        .arg("-Z").arg("build-std-features=compiler-builtins-mem")
-        .arg("--features").arg(if tests { "baremetal,kernel_tests" } else { "baremetal" });
+        .arg("-p")
+        .arg("kernel")
+        .arg("--target")
+        .arg(target_json)
+        .arg("-Z")
+        .arg("build-std=core,alloc")
+        .arg("-Z")
+        .arg("build-std-features=compiler-builtins-mem")
+        .arg("--features")
+        .arg(if tests {
+            "baremetal,kernel_tests"
+        } else {
+            "baremetal"
+        });
     run(&mut cmd, "kernel build");
 }
 
@@ -62,11 +73,16 @@ fn build_user(args: Vec<String>) {
     let mut cmd = Command::new("cargo");
     cmd.arg("+nightly")
         .arg("build")
-        .arg("-p").arg("user")
-        .arg("--target").arg(target_json)
-        .arg("-Z").arg("build-std=core,alloc")
-        .arg("-Z").arg("build-std-features=compiler-builtins-mem")
-        .arg("--features").arg("user-bin");
+        .arg("-p")
+        .arg("user")
+        .arg("--target")
+        .arg(target_json)
+        .arg("-Z")
+        .arg("build-std=core,alloc")
+        .arg("-Z")
+        .arg("build-std-features=compiler-builtins-mem")
+        .arg("--features")
+        .arg("user-bin");
     run(&mut cmd, "user build");
 }
 
@@ -80,7 +96,11 @@ fn run(cmd: &mut Command, name: &str) {
 }
 
 fn print_help() {
-    println!("xtask usage:\n  cargo run -p xtask -- kernel <aarch64|riscv64|x86_64> [--tests]\n  cargo run -p xtask -- user <aarch64|riscv64|x86_64>\n  cargo run -p xtask -- syscalls\n  cargo run -p xtask -- user-rel-exec <aarch64|riscv64|x86_64>\n  cargo run -p xtask -- bench");
+    println!(
+        "xtask usage:\n  cargo run -p xtask -- kernel <aarch64|riscv64|x86_64> [--tests]\n  cargo \
+         run -p xtask -- user <aarch64|riscv64|x86_64>\n  cargo run -p xtask -- syscalls\n  cargo \
+         run -p xtask -- user-rel-exec <aarch64|riscv64|x86_64>\n  cargo run -p xtask -- bench"
+    );
 }
 
 fn run_bench() -> Result<(), anyhow::Error> {
@@ -95,7 +115,8 @@ fn generate_syscall_matrix() -> Result<()> {
     let kernel_syscalls_mod = root.join("kernel/src/syscalls/mod.rs");
     let out_path = root.join(".trae/documents/Syscall 覆盖矩阵.md");
 
-    let mod_content = fs::read_to_string(&kernel_syscalls_mod).with_context(|| format!("read {}", kernel_syscalls_mod.display()))?;
+    let mod_content = fs::read_to_string(&kernel_syscalls_mod)
+        .with_context(|| format!("read {}", kernel_syscalls_mod.display()))?;
 
     let enum_re = Regex::new(r"(?m)^\s*pub\s+enum\s+SysNum\s*\{([\s\S]*?)\}")?;
     let variant_re = Regex::new(r"(?m)^(\s*)([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\d+),")?;
@@ -122,8 +143,8 @@ fn generate_syscall_matrix() -> Result<()> {
         }
     }
 
-    impls.sort_by(|a,b| a.0.cmp(&b.0));
-    variants.sort_by(|a,b| a.1.cmp(&b.1));
+    impls.sort_by(|a, b| a.0.cmp(&b.0));
+    variants.sort_by(|a, b| a.1.cmp(&b.1));
 
     let mut lines = vec![
         String::from("# 系统调用覆盖矩阵"),
@@ -134,8 +155,16 @@ fn generate_syscall_matrix() -> Result<()> {
         String::from("|---:|---|---|---|"),
     ];
     for (name, num) in variants.iter() {
-        let func = impls.iter().find(|(n, _)| n == name).map(|(_, f)| f.clone()).unwrap_or_else(|| String::from("未实现"));
-        let note = if func == "未实现" { "未匹配到 dispatch 分支" } else { "已实现" };
+        let func = impls
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, f)| f.clone())
+            .unwrap_or_else(|| String::from("未实现"));
+        let note = if func == "未实现" {
+            "未匹配到 dispatch 分支"
+        } else {
+            "已实现"
+        };
         lines.push(format!("| {} | {} | {} | {} |", num, name, func, note));
     }
 

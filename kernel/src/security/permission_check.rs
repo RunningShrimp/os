@@ -4,13 +4,10 @@
 //! all security subsystems (ACL, Capabilities, SELinux, Seccomp, etc.)
 
 extern crate alloc;
-use alloc::string::ToString;
 
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, Ordering};
-
-
 
 /// Types of resources that can be checked
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -205,7 +202,6 @@ impl UnifiedPermissionChecker {
     fn check_acl(&self, request: &PermissionRequest) -> PermissionResult {
         use crate::security::acl::{AccessRequest, ResourceType as AclResourceType};
         
-        // Convert to ACL request format
         let acl_request = AccessRequest {
             pid: request.pid as u64,
             uid: request.uid as u32,

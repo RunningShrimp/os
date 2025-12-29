@@ -2,9 +2,12 @@
 //!
 //! 提供多级错误恢复策略，包括图形模式回退、文本模式回退和串行控制台回退。
 
-use crate::drivers::vga::VGAWriter;
-use crate::utils::error::{BootError, Result as BootResult};
 use itoa;
+
+use crate::{
+    drivers::vga::VGAWriter,
+    utils::error::{BootError, Result as BootResult},
+};
 
 /// 错误严重程度
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -142,29 +145,29 @@ impl ErrorRecoveryManager {
                 // 低严重性错误，尝试简单重试
                 self.log_recovery_attempt("Low severity error - attempting retry");
                 Ok(self.current_mode)
-            }
+            },
             ErrorSeverity::Medium => {
                 // 中等严重性错误，尝试降级输出模式
                 self.log_recovery_attempt("Medium severity error - attempting fallback");
                 self.fallback_output_mode()
-            }
+            },
             ErrorSeverity::High => {
                 // 高严重性错误，尝试重大回退
                 self.log_recovery_attempt("High severity error - attempting major fallback");
                 self.major_fallback()
-            }
+            },
             ErrorSeverity::Critical => {
                 // 致命错误，尝试最后的恢复手段
                 self.log_recovery_attempt("Critical error - attempting last resort recovery");
                 self.last_resort_recovery()
-            }
+            },
         }
     }
 
     /// 降级输出模式
     fn fallback_output_mode(&mut self) -> BootResult<OutputMode> {
         self.attempted_strategies += 1;
-        
+
         if self.attempted_strategies > self.max_retries {
             self.recovery_status = RecoveryStatus::RecoveryFailed;
             return Err(BootError::RecoveryModeFailed);
@@ -175,33 +178,33 @@ impl ErrorRecoveryManager {
                 self.log_recovery_attempt("Falling back to low resolution graphics");
                 self.current_mode = OutputMode::LowResolutionGraphics;
                 Ok(OutputMode::LowResolutionGraphics)
-            }
+            },
             OutputMode::LowResolutionGraphics => {
                 self.log_recovery_attempt("Falling back to text mode");
                 self.current_mode = OutputMode::TextMode;
                 Ok(OutputMode::TextMode)
-            }
+            },
             OutputMode::TextMode => {
                 self.log_recovery_attempt("Falling back to serial console");
                 self.current_mode = OutputMode::SerialConsole;
                 Ok(OutputMode::SerialConsole)
-            }
+            },
             OutputMode::SerialConsole => {
                 self.log_recovery_attempt("Falling back to silent mode");
                 self.current_mode = OutputMode::Silent;
                 Ok(OutputMode::Silent)
-            }
+            },
             OutputMode::Silent => {
                 self.recovery_status = RecoveryStatus::RecoveryFailed;
                 Err(BootError::RecoveryModeFailed)
-            }
+            },
         }
     }
 
     /// 重大回退
     fn major_fallback(&mut self) -> BootResult<OutputMode> {
         self.attempted_strategies += 1;
-        
+
         if self.attempted_strategies > self.max_retries {
             self.recovery_status = RecoveryStatus::RecoveryFailed;
             return Err(BootError::RecoveryModeFailed);
@@ -217,7 +220,7 @@ impl ErrorRecoveryManager {
     /// 最后手段恢复
     fn last_resort_recovery(&mut self) -> BootResult<OutputMode> {
         self.attempted_strategies += 1;
-        
+
         if self.attempted_strategies > self.max_retries {
             self.recovery_status = RecoveryStatus::RecoveryFailed;
             return Err(BootError::RecoveryModeFailed);
@@ -237,18 +240,18 @@ impl ErrorRecoveryManager {
             OutputMode::HighResolutionGraphics | OutputMode::LowResolutionGraphics => {
                 // 尝试图形模式日志记录
                 self.log_to_graphics(message);
-            }
+            },
             OutputMode::TextMode => {
                 // 尝试文本模式日志记录
                 self.log_to_text(message);
-            }
+            },
             OutputMode::SerialConsole => {
                 // 尝试串行控制台日志记录
                 self.log_to_serial(message);
-            }
+            },
             OutputMode::Silent => {
                 // 静默模式，不记录日志
-            }
+            },
         }
     }
 
@@ -335,7 +338,7 @@ pub fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     vga.write_str("\nMessage: ");
     vga.write_str(info.message().as_str().unwrap_or("No message"));
     vga.write_str("\n");
-    
+
     // Halt the system
     loop {
         core::hint::spin_loop();

@@ -3,9 +3,11 @@
 //! A tool to automatically generate comprehensive documentation from Rust source code.
 //! Supports Markdown, HTML, and JSON output formats.
 
-use std::fs::{self, File};
-use std::io::{self, BufRead, BufReader, Write};
-use std::path::Path;
+use std::{
+    fs::{self, File},
+    io::{self, BufRead, BufReader, Write},
+    path::Path,
+};
 
 /// Documentation generator configuration
 #[derive(Debug, Clone, serde::Serialize)]
@@ -126,10 +128,7 @@ pub struct DocGenerator {
 
 impl DocGenerator {
     pub fn new(config: DocGeneratorConfig) -> Self {
-        Self {
-            config,
-            modules: Vec::new(),
-        }
+        Self { config, modules: Vec::new() }
     }
 
     /// Generate documentation from source files
@@ -198,7 +197,9 @@ impl DocGenerator {
             let line = line?;
 
             if line.trim().starts_with("//!") {
-                current_module.description.push_str(&line.trim_start_matches("//! "));
+                current_module
+                    .description
+                    .push_str(&line.trim_start_matches("//! "));
                 current_module.description.push('\n');
             } else if line.trim().starts_with("///") {
                 doc_comment.push_str(&line.trim_start_matches("/// "));
@@ -247,7 +248,13 @@ impl DocGenerator {
     /// Parse a struct definition
     fn parse_struct(&self, line: &str, doc: &str) -> Option<StructDoc> {
         let rest = line.strip_prefix("pub struct ")?.trim();
-        let name = rest.split('{').next()?.split('(').next()?.split('<').next()?;
+        let name = rest
+            .split('{')
+            .next()?
+            .split('(')
+            .next()?
+            .split('<')
+            .next()?;
 
         Some(StructDoc {
             name: name.to_string(),
@@ -261,7 +268,13 @@ impl DocGenerator {
     /// Parse an enum definition
     fn parse_enum(&self, line: &str, doc: &str) -> Option<TypeDoc> {
         let rest = line.strip_prefix("pub enum ")?.trim();
-        let name = rest.split('{').next()?.split('(').next()?.split('<').next()?;
+        let name = rest
+            .split('{')
+            .next()?
+            .split('(')
+            .next()?
+            .split('<')
+            .next()?;
 
         Some(TypeDoc {
             name: name.to_string(),
@@ -272,7 +285,11 @@ impl DocGenerator {
 
     /// Parse a function definition
     fn parse_function(&self, line: &str, doc: &str) -> Option<FunctionDoc> {
-        let rest = line.strip_prefix("pub ").and_then(|s| s.strip_prefix("async "))?.strip_prefix("fn ")?.trim();
+        let rest = line
+            .strip_prefix("pub ")
+            .and_then(|s| s.strip_prefix("async "))?
+            .strip_prefix("fn ")?
+            .trim();
         let name = rest.split('(').next()?.split('<').next()?;
 
         let return_type = if line.contains("->") {
@@ -294,7 +311,13 @@ impl DocGenerator {
     /// Parse a trait definition
     fn parse_trait(&self, line: &str, doc: &str) -> Option<TraitDoc> {
         let rest = line.strip_prefix("pub trait ")?.trim();
-        let name = rest.split('{').next()?.split('(').next()?.split('<').next()?;
+        let name = rest
+            .split('{')
+            .next()?
+            .split('(')
+            .next()?
+            .split('<')
+            .next()?;
 
         Some(TraitDoc {
             name: name.to_string(),
@@ -308,8 +331,19 @@ impl DocGenerator {
     fn parse_constant(&self, line: &str, doc: &str) -> Option<ConstantDoc> {
         let rest = line.strip_prefix("pub const ")?.trim();
         let name = rest.split(':').next()?;
-        let type_name = rest.split(':').nth(1)?.split('=').next()?.trim().to_string();
-        let value = rest.split('=').nth(1)?.trim_end_matches(';').trim().to_string();
+        let type_name = rest
+            .split(':')
+            .nth(1)?
+            .split('=')
+            .next()?
+            .trim()
+            .to_string();
+        let value = rest
+            .split('=')
+            .nth(1)?
+            .trim_end_matches(';')
+            .trim()
+            .to_string();
 
         Some(ConstantDoc {
             name: name.to_string(),
@@ -427,11 +461,22 @@ impl DocGenerator {
             writeln!(file, "<meta charset='utf-8'>")?;
             writeln!(file, "<title>{}</title>", module.name)?;
             writeln!(file, "<style>")?;
-            writeln!(file, "body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }}")?;
+            writeln!(
+                file,
+                "body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; \
+                 padding: 20px; }}"
+            )?;
             writeln!(file, "h1 {{ color: #333; border-bottom: 2px solid #007acc; }}")?;
             writeln!(file, "h2 {{ color: #444; margin-top: 30px; }}")?;
-            writeln!(file, "code {{ background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }}")?;
-            writeln!(file, "pre {{ background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; }}")?;
+            writeln!(
+                file,
+                "code {{ background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }}"
+            )?;
+            writeln!(
+                file,
+                "pre {{ background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; \
+                 }}"
+            )?;
             writeln!(file, "</style>")?;
             writeln!(file, "</head>")?;
             writeln!(file, "<body>")?;
@@ -487,17 +532,41 @@ impl DocGenerator {
         modules.sort_by(|a, b| a.name.cmp(&b.name));
 
         for module in &modules {
-            writeln!(file, "- [{}]({}.md) - {}", module.name, module.name,
-                module.description.lines().next().unwrap_or("No description"))?;
+            writeln!(
+                file,
+                "- [{}]({}.md) - {}",
+                module.name,
+                module.name,
+                module
+                    .description
+                    .lines()
+                    .next()
+                    .unwrap_or("No description")
+            )?;
         }
 
         writeln!(file)?;
         writeln!(file, "## Statistics")?;
         writeln!(file)?;
         writeln!(file, "- Total modules: {}", self.modules.len())?;
-        writeln!(file, "- Total structs: {}", self.modules.iter().map(|m| m.structs.len()).sum::<usize>())?;
-        writeln!(file, "- Total functions: {}", self.modules.iter().map(|m| m.functions.len()).sum::<usize>())?;
-        writeln!(file, "- Total traits: {}", self.modules.iter().map(|m| m.traits.len()).sum::<usize>())?;
+        writeln!(
+            file,
+            "- Total structs: {}",
+            self.modules.iter().map(|m| m.structs.len()).sum::<usize>()
+        )?;
+        writeln!(
+            file,
+            "- Total functions: {}",
+            self.modules
+                .iter()
+                .map(|m| m.functions.len())
+                .sum::<usize>()
+        )?;
+        writeln!(
+            file,
+            "- Total traits: {}",
+            self.modules.iter().map(|m| m.traits.len()).sum::<usize>()
+        )?;
 
         Ok(())
     }
@@ -505,10 +574,7 @@ impl DocGenerator {
 
 fn main() {
     let config = DocGeneratorConfig {
-        input_dirs: vec![
-            "kernel/src".to_string(),
-            "bootloader/src".to_string(),
-        ],
+        input_dirs: vec!["kernel/src".to_string(), "bootloader/src".to_string()],
         output_dir: "docs/generated".to_string(),
         format: OutputFormat::Markdown,
         include_private: false,

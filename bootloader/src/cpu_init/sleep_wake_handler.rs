@@ -110,12 +110,7 @@ pub struct WakeEvent {
 impl WakeEvent {
     /// Create wake event
     pub fn new(source: WakeEventSource, timestamp: u64) -> Self {
-        WakeEvent {
-            source,
-            timestamp,
-            data: 0,
-            valid: true,
-        }
+        WakeEvent { source, timestamp, data: 0, valid: true }
     }
 }
 
@@ -258,7 +253,9 @@ impl SleepWakeHandler {
     /// Get latest wake source
     pub fn get_latest_wake_source(&self) -> Option<WakeEventSource> {
         if self.wake_event_count > 0 {
-            self.wake_events[self.wake_event_count - 1].as_ref().map(|e| e.source)
+            self.wake_events[self.wake_event_count - 1]
+                .as_ref()
+                .map(|e| e.source)
         } else {
             None
         }

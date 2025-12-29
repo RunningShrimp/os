@@ -3,7 +3,6 @@
 //! 提供灵活的配置系统，支持不同的C库实现类型和参数调整。
 //! 允许在编译时和运行时配置C库行为。
 
-use crate::libc::interface::{ImplementationType};
 use core::cell::Cell;
 
 /// C库配置结构
@@ -39,7 +38,7 @@ impl Default for LibcConfig {
             implementation: ImplementationType::Simple,
             enable_debug: cfg!(debug_assertions),
             memory_pool_size: 1024 * 1024, // 1MB
-            buffer_size: 4096,               // 4KB
+            buffer_size: 4096,             // 4KB
             enable_memory_stats: true,
             enable_call_stats: true,
             enable_error_checking: true,
@@ -57,8 +56,8 @@ impl LibcConfig {
         Self {
             implementation: ImplementationType::Minimal,
             enable_debug: false,
-            memory_pool_size: 256 * 1024,  // 256KB
-            buffer_size: 1024,              // 1KB
+            memory_pool_size: 256 * 1024, // 256KB
+            buffer_size: 1024,            // 1KB
             enable_memory_stats: false,
             enable_call_stats: false,
             enable_error_checking: true,
@@ -74,8 +73,8 @@ impl LibcConfig {
         Self {
             implementation: ImplementationType::Simple,
             enable_debug: cfg!(debug_assertions),
-            memory_pool_size: 512 * 1024,  // 512KB
-            buffer_size: 2048,              // 2KB
+            memory_pool_size: 512 * 1024, // 512KB
+            buffer_size: 2048,            // 2KB
             enable_memory_stats: true,
             enable_call_stats: true,
             enable_error_checking: true,
@@ -91,8 +90,8 @@ impl LibcConfig {
         Self {
             implementation: ImplementationType::Unified,
             enable_debug: cfg!(debug_assertions),
-            memory_pool_size: 2 * 1024 * 1024,  // 2MB
-            buffer_size: 8192,                  // 8KB
+            memory_pool_size: 2 * 1024 * 1024, // 2MB
+            buffer_size: 8192,                 // 8KB
             enable_memory_stats: true,
             enable_call_stats: true,
             enable_error_checking: true,
@@ -108,8 +107,8 @@ impl LibcConfig {
         Self {
             implementation: ImplementationType::Unified,
             enable_debug: cfg!(debug_assertions),
-            memory_pool_size: 512 * 1024,    // 512KB
-            buffer_size: 32 * 1024,          // 32KB
+            memory_pool_size: 512 * 1024, // 512KB
+            buffer_size: 32 * 1024,       // 32KB
             enable_memory_stats: true,
             enable_call_stats: true,
             enable_error_checking: true,
@@ -171,21 +170,21 @@ impl LibcConfig {
                 self.enable_memory_stats = false;
                 self.enable_call_stats = false;
                 self.enable_thread_safety = false;
-            }
+            },
             ImplementationType::Simple => {
                 self.enable_memory_stats = true;
                 self.enable_call_stats = true;
-            }
+            },
             ImplementationType::Full => {
                 self.enable_memory_stats = true;
                 self.enable_call_stats = true;
                 self.enable_thread_safety = true;
-            }
+            },
             ImplementationType::Unified => {
                 self.enable_memory_stats = true;
                 self.enable_call_stats = true;
                 self.enable_thread_safety = true;
-            }
+            },
         }
 
         self
@@ -205,11 +204,21 @@ impl LibcConfig {
     /// 计算启用的功能数量
     fn count_enabled_features(&self) -> usize {
         let mut count = 0;
-        if self.enable_debug { count += 1; }
-        if self.enable_memory_stats { count += 1; }
-        if self.enable_call_stats { count += 1; }
-        if self.enable_error_checking { count += 1; }
-        if self.enable_thread_safety { count += 1; }
+        if self.enable_debug {
+            count += 1;
+        }
+        if self.enable_memory_stats {
+            count += 1;
+        }
+        if self.enable_call_stats {
+            count += 1;
+        }
+        if self.enable_error_checking {
+            count += 1;
+        }
+        if self.enable_thread_safety {
+            count += 1;
+        }
         count
     }
 }
@@ -341,7 +350,8 @@ pub fn config_from_env(libc_type: &str) -> LibcConfig {
         "full" => LibcConfig::full(),
         "unified" => LibcConfig::unified(),
         _ => LibcConfig::unified(),
-    }.auto_adjust()
+    }
+    .auto_adjust()
 }
 
 /// 获取默认配置
@@ -369,29 +379,32 @@ impl ConfigManager {
     /// 创建新的配置管理器
     pub fn new(config: LibcConfig) -> Result<Self, ConfigError> {
         config.validate()?;
-        Ok(Self {
-            config,
-            stats: ConfigStats::default(),
-        })
+        Ok(Self { config, stats: ConfigStats::default() })
     }
 
     /// 更新配置
     pub fn update_config(&mut self, new_config: LibcConfig) -> Result<(), ConfigError> {
         new_config.validate()?;
         self.config = new_config;
-        self.stats.config_updates.set(self.stats.config_updates.get() + 1);
+        self.stats
+            .config_updates
+            .set(self.stats.config_updates.get() + 1);
         Ok(())
     }
 
     /// 获取当前配置
     pub fn config(&self) -> &LibcConfig {
-        self.stats.config_queries.set(self.stats.config_queries.get() + 1);
+        self.stats
+            .config_queries
+            .set(self.stats.config_queries.get() + 1);
         &self.config
     }
 
     /// 获取可变配置引用
     pub fn config_mut(&mut self) -> &mut LibcConfig {
-        self.stats.config_queries.set(self.stats.config_queries.get() + 1);
+        self.stats
+            .config_queries
+            .set(self.stats.config_queries.get() + 1);
         &mut self.config
     }
 

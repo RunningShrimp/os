@@ -39,9 +39,7 @@ pub struct PageTable {
 
 impl PageTable {
     pub fn new() -> Self {
-        PageTable {
-            entries: [PageTableEntry(0); 512],
-        }
+        PageTable { entries: [PageTableEntry(0); 512] }
     }
 
     pub fn get(&self, index: usize) -> PageTableEntry {

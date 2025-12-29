@@ -3,9 +3,8 @@
 //! This module provides ICMP protocol support for network diagnostics and error reporting.
 
 extern crate alloc;
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 
-use alloc::boxed::Box;
 use super::ipv4::Ipv4Addr;
 
 /// ICMP message types
@@ -78,12 +77,7 @@ pub struct IcmpHeader {
 impl IcmpHeader {
     /// Create a new ICMP header
     pub fn new(message_type: IcmpType, code: IcmpCode, rest: u32) -> Self {
-        Self {
-            message_type,
-            code,
-            checksum: 0,
-            rest,
-        }
+        Self { message_type, code, checksum: 0, rest }
     }
 
     /// Calculate checksum
@@ -209,12 +203,7 @@ impl IcmpPacket {
         let payload = bytes[8..].to_vec();
 
         let packet = Self {
-            header: IcmpHeader {
-                message_type,
-                code,
-                checksum,
-                rest,
-            },
+            header: IcmpHeader { message_type, code, checksum, rest },
             payload,
         };
 
@@ -257,9 +246,7 @@ pub struct IcmpProcessor {
 impl IcmpProcessor {
     /// Create a new ICMP processor
     pub fn new() -> Self {
-        Self {
-            echo_handler: None,
-        }
+        Self { echo_handler: None }
     }
 
     /// Set echo request handler
@@ -290,15 +277,15 @@ impl IcmpProcessor {
                         packet.payload,
                     ))
                 }
-            }
+            },
             IcmpType::EchoReply => {
                 // Handle echo reply (could notify waiting processes)
                 None
-            }
+            },
             _ => {
                 // Handle other ICMP message types
                 None
-            }
+            },
         }
     }
 }

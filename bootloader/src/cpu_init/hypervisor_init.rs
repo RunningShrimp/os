@@ -355,7 +355,7 @@ mod tests {
     fn test_control_settings_configured() {
         let mut ctrl = ControlSettings::new();
         assert!(!ctrl.are_configured());
-        
+
         ctrl.pin_based_ctls = 1;
         ctrl.proc_based_ctls = 1;
         ctrl.exit_ctls = 1;
@@ -409,7 +409,7 @@ mod tests {
         let mut hyp = HypervisorInit::new();
         hyp.setup_vmxon_region(0x1000);
         hyp.vmxon();
-        
+
         assert!(hyp.vmxoff());
         assert_eq!(hyp.get_state(), HypervisorState::Shutdown);
     }
@@ -482,7 +482,7 @@ mod tests {
         hyp.setup_vmxon_region(0x2000);
         hyp.vmxon();
         assert!(hyp.is_running());
-        
+
         hyp.vmxoff();
         assert!(!hyp.is_running());
     }
@@ -500,7 +500,7 @@ mod tests {
     fn test_initialization_sequence() {
         let mut hyp = HypervisorInit::new();
         assert_eq!(hyp.get_state(), HypervisorState::Uninitialized);
-        
+
         hyp.initialize();
         assert_eq!(hyp.get_state(), HypervisorState::RootMode);
     }

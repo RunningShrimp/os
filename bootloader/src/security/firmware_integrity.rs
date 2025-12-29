@@ -7,19 +7,17 @@
 //! - Tamper detection
 //! - Version verification
 
+use alloc::{format, string::String, vec::Vec};
 use core::fmt;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::format;
 
 /// Checksum algorithm type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChecksumAlgorithm {
-    Simple,             // Simple byte sum
-    CRC32,              // CRC-32
-    CRC64,              // CRC-64
-    Fletcher,           // Fletcher checksum
-    Adler32,            // Adler-32
+    Simple,   // Simple byte sum
+    CRC32,    // CRC-32
+    CRC64,    // CRC-64
+    Fletcher, // Fletcher checksum
+    Adler32,  // Adler-32
 }
 
 impl fmt::Display for ChecksumAlgorithm {
@@ -37,11 +35,11 @@ impl fmt::Display for ChecksumAlgorithm {
 /// Integrity status
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IntegrityStatus {
-    Valid,              // Firmware is valid
-    Modified,           // Firmware has been modified
-    Corrupted,          // Firmware is corrupted
-    Untrusted,          // Firmware is untrusted
-    Unknown,            // Status cannot be determined
+    Valid,     // Firmware is valid
+    Modified,  // Firmware has been modified
+    Corrupted, // Firmware is corrupted
+    Untrusted, // Firmware is untrusted
+    Unknown,   // Status cannot be determined
 }
 
 impl fmt::Display for IntegrityStatus {
@@ -100,11 +98,7 @@ impl fmt::Display for FirmwareRegion {
         } else {
             "?"
         };
-        write!(
-            f,
-            "{} {} @0x{:x} {} bytes",
-            status, self.region_name, self.start_address, self.size
-        )
+        write!(f, "{} {} @0x{:x} {} bytes", status, self.region_name, self.start_address, self.size)
     }
 }
 
@@ -120,12 +114,7 @@ pub struct FirmwareVersion {
 impl FirmwareVersion {
     /// Create new firmware version
     pub fn new(major: u32, minor: u32, patch: u32) -> Self {
-        FirmwareVersion {
-            major,
-            minor,
-            patch,
-            build: 0,
-        }
+        FirmwareVersion { major, minor, patch, build: 0 }
     }
 
     /// Check if version is newer than other
@@ -148,11 +137,7 @@ impl FirmwareVersion {
 impl fmt::Display for FirmwareVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.build > 0 {
-            write!(
-                f,
-                "v{}.{}.{} (build {})",
-                self.major, self.minor, self.patch, self.build
-            )
+            write!(f, "v{}.{}.{} (build {})", self.major, self.minor, self.patch, self.build)
         } else {
             write!(f, "v{}.{}.{}", self.major, self.minor, self.patch)
         }
@@ -208,13 +193,17 @@ impl FirmwareIntegrityChecker {
 
     /// Verify firmware region
     pub fn verify_region(&mut self, region_name: &str) -> bool {
-        if let Some(region) = self.regions.iter_mut().find(|r| r.region_name == region_name) {
+        if let Some(region) = self
+            .regions
+            .iter_mut()
+            .find(|r| r.region_name == region_name)
+        {
             // Simulate checksum verification
             region.calculated_checksum = region.expected_checksum; // Framework
             region.is_verified = true;
 
             self.verification_count += 1;
-            
+
             if !region.is_valid() {
                 self.verification_failures += 1;
                 self.tamper_detected = true;
@@ -296,9 +285,9 @@ impl FirmwareIntegrityChecker {
 
         report.push_str(&format!("Overall Status: {}\n", self.overall_status));
         report.push_str(&format!("Tamper Detected: {}\n", self.tamper_detected));
-        
+
         report.push_str(&format!("\nChecksum Algorithm: {}\n", self.checksum_algorithm));
-        
+
         report.push_str(&format!(
             "Version: Current {} vs Expected {}\n",
             self.current_version, self.expected_version
@@ -373,7 +362,7 @@ mod tests {
         region.expected_checksum = 0x12345678;
         region.calculated_checksum = 0x12345678;
         region.is_verified = true;
-        
+
         assert!(region.is_valid());
     }
 
@@ -383,7 +372,7 @@ mod tests {
         region.expected_checksum = 0x12345678;
         region.calculated_checksum = 0x87654321;
         region.is_verified = true;
-        
+
         assert!(region.is_modified());
     }
 
@@ -405,7 +394,7 @@ mod tests {
     fn test_firmware_version_comparison() {
         let v1 = FirmwareVersion::new(2, 0, 0);
         let v2 = FirmwareVersion::new(1, 9, 9);
-        
+
         assert!(v1.is_newer_than(&v2));
         assert!(!v2.is_newer_than(&v1));
     }
@@ -421,7 +410,7 @@ mod tests {
     fn test_firmware_integrity_checker_register_region() {
         let mut checker = FirmwareIntegrityChecker::new(ChecksumAlgorithm::CRC32);
         let region = FirmwareRegion::new("BIOS", 0x0, 0x10000);
-        
+
         assert!(checker.register_region(region));
         assert_eq!(checker.region_count(), 1);
     }
@@ -431,10 +420,10 @@ mod tests {
         let mut checker = FirmwareIntegrityChecker::new(ChecksumAlgorithm::CRC32);
         let mut region = FirmwareRegion::new("Code", 0x0, 0x1000);
         region.expected_checksum = 0xDEADBEEF;
-        
+
         checker.register_region(region);
         checker.verify_all_regions();
-        
+
         assert_eq!(checker.verified_region_count(), 1);
     }
 
@@ -442,10 +431,10 @@ mod tests {
     fn test_firmware_integrity_checker_version() {
         let mut checker = FirmwareIntegrityChecker::new(ChecksumAlgorithm::CRC64);
         let version = FirmwareVersion::new(2, 1, 0);
-        
+
         checker.set_expected_version(version.clone());
         checker.set_current_version(version);
-        
+
         assert!(checker.verify_version());
     }
 
@@ -456,11 +445,11 @@ mod tests {
         region.expected_checksum = 0x11111111;
         region.calculated_checksum = 0x22222222;
         region.is_verified = true;
-        
+
         checker.register_region(region);
         // Simulate verification failure
         checker.tamper_detected = true;
-        
+
         assert!(!checker.is_firmware_intact());
     }
 
@@ -468,10 +457,10 @@ mod tests {
     fn test_firmware_integrity_checker_statistics() {
         let mut checker = FirmwareIntegrityChecker::new(ChecksumAlgorithm::Adler32);
         let region = FirmwareRegion::new("BIOS", 0x0, 0x1000);
-        
+
         checker.register_region(region);
         checker.verify_all_regions();
-        
+
         let (count, failures, tamper) = checker.get_stats();
         assert_eq!(count, 1);
         assert_eq!(failures, 0); // Verify no verification failures
@@ -482,10 +471,10 @@ mod tests {
     fn test_firmware_integrity_checker_report() {
         let mut checker = FirmwareIntegrityChecker::new(ChecksumAlgorithm::CRC32);
         let region = FirmwareRegion::new("Code", 0x0, 0x1000);
-        
+
         checker.register_region(region);
         let report = checker.integrity_report();
-        
+
         assert!(report.contains("Firmware Integrity Report"));
         assert!(report.contains("Regions"));
     }
@@ -494,10 +483,10 @@ mod tests {
     fn test_firmware_integrity_checker_reset() {
         let mut checker = FirmwareIntegrityChecker::new(ChecksumAlgorithm::CRC32);
         let region = FirmwareRegion::new("Code", 0x0, 0x1000);
-        
+
         checker.register_region(region);
         checker.verify_all_regions();
-        
+
         assert!(checker.verified_region_count() > 0);
         checker.reset();
         assert_eq!(checker.verified_region_count(), 0);

@@ -4,9 +4,9 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use core::sync::atomic::{AtomicU64, Ordering};
+
 use crate::subsystems::sync::Mutex;
 
 /// Health check status
@@ -45,47 +45,49 @@ impl HealthChecker {
     pub fn new() -> Self {
         Self {
             last_check_time: AtomicU64::new(0),
-            check_interval_ns: 1_000_000_000, // 1 second
+            check_interval_ns: 1_000_000_000,  // 1 second
             overall_status: AtomicU64::new(0), // Healthy
         }
     }
-    
+
     /// Run health checks
     pub fn check_health(&self) -> Vec<HealthCheckResult> {
         let mut results = Vec::new();
         let current_time = crate::subsystems::time::hrtime_nanos();
-        
+
         // Check memory health
         let memory_check = self.check_memory();
         results.push(memory_check);
-        
+
         // Check process health
         let process_check = self.check_processes();
         results.push(process_check);
-        
+
         // Check CPU health
         let cpu_check = self.check_cpu();
         results.push(cpu_check);
-        
+
         // Update overall status
-        let worst_status = results.iter()
+        let worst_status = results
+            .iter()
             .map(|r| r.status)
             .max_by_key(|s| *s as u64)
             .unwrap_or(HealthStatus::Healthy);
-        
-        self.overall_status.store(worst_status as u64, Ordering::Release);
+
+        self.overall_status
+            .store(worst_status as u64, Ordering::Release);
         self.last_check_time.store(current_time, Ordering::Release);
-        
+
         results
     }
-    
+
     /// Check memory health
     fn check_memory(&self) -> HealthCheckResult {
         // In real implementation, would check:
         // - Memory usage
         // - Memory fragmentation
         // - OOM conditions
-        
+
         HealthCheckResult {
             name: "memory".to_string(),
             status: HealthStatus::Healthy,
@@ -93,22 +95,23 @@ impl HealthChecker {
             timestamp: crate::subsystems::time::hrtime_nanos(),
         }
     }
-    
+
     /// Check process health
     fn check_processes(&self) -> HealthCheckResult {
         let proc_table = crate::process::PROC_TABLE.lock();
         let total_processes = proc_table.iter().count();
-        let running_processes = proc_table.iter()
+        let running_processes = proc_table
+            .iter()
             .filter(|p| p.state == crate::process::ProcState::Running)
             .count();
         drop(proc_table);
-        
+
         let status = if running_processes == 0 && total_processes > 0 {
             HealthStatus::Degraded
         } else {
             HealthStatus::Healthy
         };
-        
+
         HealthCheckResult {
             name: "processes".to_string(),
             status,
@@ -116,14 +119,14 @@ impl HealthChecker {
             timestamp: crate::subsystems::time::hrtime_nanos(),
         }
     }
-    
+
     /// Check CPU health
     fn check_cpu(&self) -> HealthCheckResult {
         // In real implementation, would check:
         // - CPU utilization
         // - Load average
         // - Temperature (if available)
-        
+
         HealthCheckResult {
             name: "cpu".to_string(),
             status: HealthStatus::Healthy,
@@ -131,7 +134,7 @@ impl HealthChecker {
             timestamp: crate::subsystems::time::hrtime_nanos(),
         }
     }
-    
+
     /// Get overall health status
     pub fn get_overall_status(&self) -> HealthStatus {
         match self.overall_status.load(Ordering::Acquire) {
@@ -165,9 +168,6 @@ pub fn get_health_checker() -> &'static HealthChecker {
             *checker = Some(HealthChecker::new());
         }
     });
-    
-    unsafe {
-        &*(HEALTH_CHECKER.lock().as_ref().unwrap() as *const HealthChecker)
-    }
-}
 
+    unsafe { &*(HEALTH_CHECKER.lock().as_ref().unwrap() as *const HealthChecker) }
+}

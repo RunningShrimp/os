@@ -4,7 +4,6 @@
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_signal_set_operations() {

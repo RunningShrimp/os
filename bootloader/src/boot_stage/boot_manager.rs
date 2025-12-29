@@ -3,13 +3,16 @@
 /// High-level boot manager that orchestrates the entire boot process,
 /// integrating all bootloader components into a cohesive system.
 /// Includes orchestration from boot_orchestrator, boot_orchestration, boot_coordinator.
-
 use alloc::format;
 use alloc::string::String;
-use crate::boot_stage::boot_executor::BootExecutor;
-use crate::boot_stage::boot_preparation::BootHandoff;
-use crate::bios::e820_detection::E820MemoryMap;
-use crate::boot_stage::boot_diagnostics::BootStatusReport;
+
+use crate::{
+    bios::e820_detection::E820MemoryMap,
+    boot_stage::{
+        boot_diagnostics::BootStatusReport, boot_executor::BootExecutor,
+        boot_preparation::BootHandoff,
+    },
+};
 
 /// Boot stages (from orchestrator)
 #[derive(Debug, Clone, Copy)]
@@ -124,7 +127,11 @@ impl BootManager {
 
     /// Load kernel from disk
     pub fn load_kernel(&mut self, kernel_address: u64) -> Result<(), &'static str> {
-        if self.executor.execute_kernel_loading(kernel_address).is_err() {
+        if self
+            .executor
+            .execute_kernel_loading(kernel_address)
+            .is_err()
+        {
             self.status = BootManagerStatus::Failed;
             return Err("Kernel loading failed");
         }
@@ -134,11 +141,7 @@ impl BootManager {
     }
 
     /// Verify kernel signature and integrity
-    pub fn verify_kernel(
-        &mut self,
-        signature: u32,
-        checksum: u32,
-    ) -> Result<(), &'static str> {
+    pub fn verify_kernel(&mut self, signature: u32, checksum: u32) -> Result<(), &'static str> {
         // Execute kernel validation
         if self.executor.execute_kernel_validation().is_err() {
             self.status = BootManagerStatus::Failed;
@@ -278,10 +281,7 @@ mod tests {
     #[test]
     fn test_boot_manager_status_description() {
         assert_eq!(BootManagerStatus::Idle.description(), "Idle");
-        assert_eq!(
-            BootManagerStatus::ReadyForKernel.description(),
-            "Ready to execute kernel"
-        );
+        assert_eq!(BootManagerStatus::ReadyForKernel.description(), "Ready to execute kernel");
     }
 
     #[test]
@@ -325,7 +325,7 @@ mod tests {
                 2 => manager.log_error("Error 3"),
                 3 => manager.log_error("Error 4"),
                 4 => manager.log_error("Error 5"),
-                _ => {}
+                _ => {},
             }
         }
 
@@ -341,4 +341,3 @@ mod tests {
         assert!(summary.contains("Idle"));
     }
 }
-

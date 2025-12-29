@@ -1,20 +1,17 @@
 // Security Prover Module
 
 extern crate alloc;
-//
 // 安全证明器模块
 // 验证系统安全属性，包括访问控制、信息流安全等
 
-use hashbrown::{HashMap, HashSet};
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::{format, vec};
+use alloc::{collections::BTreeMap, format, sync::Arc, vec, vec::Vec};
 use core::sync::atomic::Ordering;
+
+use hashbrown::{HashMap, HashSet};
 use spin::Mutex;
-use crate::compat::DefaultHasherBuilder;
 
 use super::*;
+use crate::compat::DefaultHasherBuilder;
 
 /// 安全证明器
 pub struct SecurityProver {
@@ -65,7 +62,10 @@ impl SecurityProver {
     }
 
     /// 验证安全属性
-    pub fn verify_security(&mut self, properties: &[VerificationProperty]) -> Result<Vec<VerificationResult>, &'static str> {
+    pub fn verify_security(
+        &mut self,
+        properties: &[VerificationProperty],
+    ) -> Result<Vec<VerificationResult>, &'static str> {
         if !self.running.load(Ordering::SeqCst) {
             return Err("Security prover is not running");
         }

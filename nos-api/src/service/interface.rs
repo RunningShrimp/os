@@ -1,32 +1,33 @@
 //! Service interface traits
 
-use crate::error::Result;
-use crate::core::traits::Service;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::boxed::Box;
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
+
+use crate::{core::traits::Service, error::Result};
 
 /// Trait for service registry
 pub trait ServiceRegistry {
     /// Registers a service
     fn register(&mut self, service: Box<dyn Service>) -> Result<()>;
-    
+
     /// Unregisters a service by name
     fn unregister(&mut self, name: &str) -> Result<()>;
-    
+
     /// Finds a service by name
     fn find(&self, name: &str) -> Option<&dyn Service>;
-    
+
     /// Finds a mutable service by name
     fn find_mut(&mut self, name: &str) -> Option<&mut dyn Service>;
-    
+
     /// Lists all registered services
     fn list(&self) -> Vec<&str>;
-    
+
     /// Returns the number of registered services
     fn count(&self) -> usize;
-    
+
     /// Checks if a service is registered
     fn contains(&self, name: &str) -> bool;
 }
@@ -35,17 +36,17 @@ pub trait ServiceRegistry {
 pub trait ServiceDiscovery {
     /// Discovers services by type
     fn discover_by_type(&self, service_type: &str) -> Vec<&dyn Service>;
-    
+
     /// Discovers services by interface
     fn discover_by_interface(&self, interface: &str) -> Vec<&dyn Service>;
-    
+
     /// Discovers services by capability
     /// Finds services by capability
     fn discover_by_capability(&self, capability: &str) -> Vec<&dyn Service>;
-    
+
     /// Lists all discoverable services
     fn list_all(&self) -> Vec<&dyn Service>;
-    
+
     /// Checks if a service is discoverable
     fn is_discoverable(&self, name: &str) -> bool;
 }
@@ -54,19 +55,19 @@ pub trait ServiceDiscovery {
 pub trait ServiceCommunication {
     /// Message type
     type Message;
-    
+
     /// Sends a message to a service
     fn send(&mut self, service_name: &str, message: Self::Message) -> Result<()>;
-    
+
     /// Receives a message from a service
     fn receive(&mut self, service_name: &str) -> Result<Option<Self::Message>>;
-    
+
     /// Broadcasts a message to all services
     fn broadcast(&mut self, message: Self::Message) -> Result<()>;
-    
+
     /// Subscribes to messages from a service
     fn subscribe(&mut self, service_name: &str) -> Result<()>;
-    
+
     /// Unsubscribes from messages from a service
     fn unsubscribe(&mut self, service_name: &str) -> Result<()>;
 }
@@ -75,19 +76,19 @@ pub trait ServiceCommunication {
 pub trait ServiceLifecycle {
     /// Starts a service
     fn start(&mut self, name: &str) -> Result<()>;
-    
+
     /// Stops a service
     fn stop(&mut self, name: &str) -> Result<()>;
-    
+
     /// Restarts a service
     fn restart(&mut self, name: &str) -> Result<()>;
-    
+
     /// Returns the status of a service
     fn status(&self, name: &str) -> ServiceStatus;
-    
+
     /// Lists all running services
     fn list_running(&self) -> Vec<&str>;
-    
+
     /// Lists all stopped services
     fn list_stopped(&self) -> Vec<&str>;
 }
@@ -144,12 +145,12 @@ impl ServiceDependency {
             optional,
         }
     }
-    
+
     /// Creates a required dependency
     pub fn required(name: &str, version: &str) -> Self {
         Self::new(name, version, false)
     }
-    
+
     /// Creates an optional dependency
     pub fn optional(name: &str, version: &str) -> Self {
         Self::new(name, version, true)
@@ -194,43 +195,43 @@ impl ServiceMetadata {
             interfaces: Vec::new(),
         }
     }
-    
+
     /// Sets the description
     pub fn with_description(mut self, description: &str) -> Self {
         self.description = description.to_string();
         self
     }
-    
+
     /// Sets the author
     pub fn with_author(mut self, author: &str) -> Self {
         self.author = author.to_string();
         self
     }
-    
+
     /// Sets the license
     pub fn with_license(mut self, license: &str) -> Self {
         self.license = license.to_string();
         self
     }
-    
+
     /// Sets the priority
     pub fn with_priority(mut self, priority: ServicePriority) -> Self {
         self.priority = priority;
         self
     }
-    
+
     /// Adds a dependency
     pub fn with_dependency(mut self, dependency: ServiceDependency) -> Self {
         self.dependencies.push(dependency);
         self
     }
-    
+
     /// Adds a capability
     pub fn with_capability(mut self, capability: &str) -> Self {
         self.capabilities.push(capability.to_string());
         self
     }
-    
+
     /// Adds an interface
     pub fn with_interface(mut self, interface: &str) -> Self {
         self.interfaces.push(interface.to_string());

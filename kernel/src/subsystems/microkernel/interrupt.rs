@@ -7,8 +7,11 @@
 extern crate alloc;
 use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use crate::subsystems::sync::Mutex;
-use crate::reliability::{EINVAL, ENOENT, EBUSY};
+
+use crate::{
+    reliability::{EBUSY, EINVAL, ENOENT},
+    subsystems::sync::Mutex,
+};
 
 /// Interrupt vector numbers (x86_64 example)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -157,11 +160,11 @@ pub type InterruptHandler = extern "C" fn(&InterruptContext);
 pub struct InterruptContext {
     pub vector: InterruptVector,
     pub error_code: Option<u64>,
-    pub rip: u64,         // Instruction pointer
-    pub cs: u64,          // Code segment
-    pub rflags: u64,      // CPU flags
-    pub rsp: u64,         // Stack pointer
-    pub ss: u64,          // Stack segment
+    pub rip: u64,    // Instruction pointer
+    pub cs: u64,     // Code segment
+    pub rflags: u64, // CPU flags
+    pub rsp: u64,    // Stack pointer
+    pub ss: u64,     // Stack segment
     pub registers: Registers,
 }
 
@@ -188,10 +191,21 @@ pub struct Registers {
 impl Registers {
     pub fn new() -> Self {
         Self {
-            rax: 0, rbx: 0, rcx: 0, rdx: 0,
-            rsi: 0, rdi: 0, rbp: 0,
-            r8: 0, r9: 0, r10: 0, r11: 0,
-            r12: 0, r13: 0, r14: 0, r15: 0,
+            rax: 0,
+            rbx: 0,
+            rcx: 0,
+            rdx: 0,
+            rsi: 0,
+            rdi: 0,
+            rbp: 0,
+            r8: 0,
+            r9: 0,
+            r10: 0,
+            r11: 0,
+            r12: 0,
+            r13: 0,
+            r14: 0,
+            r15: 0,
         }
     }
 }
@@ -211,17 +225,28 @@ impl InterruptContext {
     }
 
     pub fn is_exception(&self) -> bool {
-        matches!(self.vector,
-            InterruptVector::DivideError | InterruptVector::Debug |
-            InterruptVector::NonMaskableInterrupt | InterruptVector::Breakpoint |
-            InterruptVector::Overflow | InterruptVector::BoundRangeExceeded |
-            InterruptVector::InvalidOpcode | InterruptVector::DeviceNotAvailable |
-            InterruptVector::DoubleFault | InterruptVector::InvalidTSS |
-            InterruptVector::SegmentNotPresent | InterruptVector::StackSegmentFault |
-            InterruptVector::GeneralProtectionFault | InterruptVector::PageFault |
-            InterruptVector::X87FloatingPoint | InterruptVector::AlignmentCheck |
-            InterruptVector::MachineCheck | InterruptVector::SimdFloatingPoint |
-            InterruptVector::Virtualization | InterruptVector::Security
+        matches!(
+            self.vector,
+            InterruptVector::DivideError
+                | InterruptVector::Debug
+                | InterruptVector::NonMaskableInterrupt
+                | InterruptVector::Breakpoint
+                | InterruptVector::Overflow
+                | InterruptVector::BoundRangeExceeded
+                | InterruptVector::InvalidOpcode
+                | InterruptVector::DeviceNotAvailable
+                | InterruptVector::DoubleFault
+                | InterruptVector::InvalidTSS
+                | InterruptVector::SegmentNotPresent
+                | InterruptVector::StackSegmentFault
+                | InterruptVector::GeneralProtectionFault
+                | InterruptVector::PageFault
+                | InterruptVector::X87FloatingPoint
+                | InterruptVector::AlignmentCheck
+                | InterruptVector::MachineCheck
+                | InterruptVector::SimdFloatingPoint
+                | InterruptVector::Virtualization
+                | InterruptVector::Security
         )
     }
 
@@ -371,7 +396,12 @@ impl VectorTable {
         }
     }
 
-    pub fn register_handler(&self, vector: u8, handler: InterruptHandler, priority: u8) -> Result<(), i32> {
+    pub fn register_handler(
+        &self,
+        vector: u8,
+        handler: InterruptHandler,
+        priority: u8,
+    ) -> Result<(), i32> {
         let mut entries = self.entries.lock();
 
         if entries.contains_key(&vector) {
@@ -396,7 +426,10 @@ impl VectorTable {
 
     pub fn get_handler(&self, vector: u8) -> Option<InterruptHandler> {
         let entries = self.entries.lock();
-        entries.get(&vector).filter(|e| e.enabled).map(|e| e.handler)
+        entries
+            .get(&vector)
+            .filter(|e| e.enabled)
+            .map(|e| e.handler)
     }
 
     pub fn enable_handler(&self, vector: u8) -> Result<(), i32> {
@@ -444,7 +477,9 @@ impl VectorTable {
                 entry.add_execution_time(end_time - start_time);
 
                 // Update global interrupt statistics
-                super::MICROKERNEL_STATS.interrupt_count.fetch_add(1, Ordering::SeqCst);
+                super::MICROKERNEL_STATS
+                    .interrupt_count
+                    .fetch_add(1, Ordering::SeqCst);
             } else {
                 // Handler disabled
                 self.stats.increment_spurious();
@@ -489,8 +524,14 @@ impl MicroInterruptHandler {
         }
     }
 
-    pub fn register_interrupt_handler(&self, vector: InterruptVector, handler: InterruptHandler, priority: u8) -> Result<(), i32> {
-        self.vector_table.register_handler(vector.as_u8(), handler, priority)
+    pub fn register_interrupt_handler(
+        &self,
+        vector: InterruptVector,
+        handler: InterruptHandler,
+        priority: u8,
+    ) -> Result<(), i32> {
+        self.vector_table
+            .register_handler(vector.as_u8(), handler, priority)
     }
 
     pub fn unregister_interrupt_handler(&self, vector: InterruptVector) -> Result<(), i32> {
@@ -505,10 +546,16 @@ impl MicroInterruptHandler {
         self.vector_table.disable_handler(vector.as_u8())
     }
 
-    pub fn handle_interrupt(&mut self, vector: u8, error_code: Option<u64>, context: &mut InterruptContext) {
+    pub fn handle_interrupt(
+        &mut self,
+        vector: u8,
+        error_code: Option<u64>,
+        context: &mut InterruptContext,
+    ) {
         self.interrupt_count.fetch_add(1, Ordering::SeqCst);
         self.nested_count.fetch_add(1, Ordering::SeqCst);
-        self.current_interrupt.store(vector as u64, Ordering::SeqCst);
+        self.current_interrupt
+            .store(vector as u64, Ordering::SeqCst);
 
         context.vector = InterruptVector::from_u8(vector);
         context.error_code = error_code;
@@ -549,12 +596,12 @@ impl MicroInterruptHandler {
 
 /// Default interrupt handlers
 extern "C" fn default_exception_handler(context: &InterruptContext) {
-    crate::println!("Exception {}: Error code: {:?}",
-        context.vector.as_u8(),
-        context.error_code
-    );
-    crate::println!("RIP: 0x{:x}, RSP: 0x{:x}, RFLAGS: 0x{:x}",
-        context.rip, context.rsp, context.rflags
+    crate::println!("Exception {}: Error code: {:?}", context.vector.as_u8(), context.error_code);
+    crate::println!(
+        "RIP: 0x{:x}, RSP: 0x{:x}, RFLAGS: 0x{:x}",
+        context.rip,
+        context.rsp,
+        context.rflags
     );
 
     // In a real system, this would terminate the current process or panic
@@ -589,10 +636,18 @@ pub fn init() -> Result<(), i32> {
     let handler = MicroInterruptHandler::new();
 
     // Register default handlers
-    handler.register_interrupt_handler(InterruptVector::GeneralProtectionFault, default_exception_handler, 0)?;
+    handler.register_interrupt_handler(
+        InterruptVector::GeneralProtectionFault,
+        default_exception_handler,
+        0,
+    )?;
     handler.register_interrupt_handler(InterruptVector::PageFault, default_exception_handler, 0)?;
     handler.register_interrupt_handler(InterruptVector::Timer, default_irq_handler, 0)?;
-    handler.register_interrupt_handler(InterruptVector::SystemCall, default_system_call_handler, 0)?;
+    handler.register_interrupt_handler(
+        InterruptVector::SystemCall,
+        default_system_call_handler,
+        0,
+    )?;
 
     unsafe {
         GLOBAL_INTERRUPT_HANDLER = Some(handler);
@@ -604,9 +659,7 @@ pub fn init() -> Result<(), i32> {
 
 /// Get global interrupt handler
 pub fn get_interrupt_handler() -> Option<&'static mut MicroInterruptHandler> {
-    unsafe {
-        GLOBAL_INTERRUPT_HANDLER.as_mut()
-    }
+    unsafe { GLOBAL_INTERRUPT_HANDLER.as_mut() }
 }
 
 /// Enable interrupts globally

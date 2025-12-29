@@ -4,15 +4,17 @@
 //! POSIX socket API and the underlying TCP/IP implementation.
 
 extern crate alloc;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
+use alloc::{sync::Arc, vec::Vec};
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use super::ipv4::Ipv4Addr;
-use super::tcp::manager::{TcpConnection, TcpConnectionManager};
-use super::udp::UdpSocket;
-use super::udp::UdpSocketState;
-use super::tcp::TcpState;
+use super::{
+    ipv4::Ipv4Addr,
+    tcp::{
+        TcpState,
+        manager::{TcpConnection, TcpConnectionManager},
+    },
+    udp::{UdpSocket, UdpSocketState},
+};
 
 /// Socket types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,9 +34,9 @@ impl SocketType {
     pub fn default_protocol(self) -> i32 {
         match self {
             SocketType::Stream => 6,    // TCP
-            SocketType::Datagram => 17,  // UDP
-            SocketType::Raw => 0,        // IP protocol
-            SocketType::SeqPacket => 0,  // Implementation specific
+            SocketType::Datagram => 17, // UDP
+            SocketType::Raw => 0,       // IP protocol
+            SocketType::SeqPacket => 0, // Implementation specific
         }
     }
 
@@ -78,11 +80,7 @@ pub struct SocketAddr {
 impl SocketAddr {
     /// Create a new IPv4 socket address
     pub fn new_ipv4(ip: Ipv4Addr, port: u16) -> Self {
-        Self {
-            family: ProtocolFamily::IPv4,
-            port,
-            ip,
-        }
+        Self { family: ProtocolFamily::IPv4, port, ip }
     }
 
     /// Create a new IPv4 address from octets
@@ -144,7 +142,7 @@ impl SocketAddr {
                     posix_addr.sa_data[5],
                 );
                 Some(Self::new_ipv4(ip, port))
-            }
+            },
             _ => None,
         }
     }
@@ -204,17 +202,19 @@ impl SocketOptions {
             SocketOption::Broadcast(value) => self.broadcast = value,
             SocketOption::Linger(linger) => self.linger = Some(linger),
             SocketOption::SndBuf(size) => {
-                if size == 0 || size > (1 << 30) { // Max 1GB
+                if size == 0 || size > (1 << 30) {
+                    // Max 1GB
                     return Err(SocketError::InvalidValue);
                 }
                 self.sndbuf = size;
-            }
+            },
             SocketOption::RcvBuf(size) => {
-                if size == 0 || size > (1 << 30) { // Max 1GB
+                if size == 0 || size > (1 << 30) {
+                    // Max 1GB
                     return Err(SocketError::InvalidValue);
                 }
                 self.rcvbuf = size;
-            }
+            },
             SocketOption::NoDelay(value) => self.nodelay = value,
         }
         Ok(())
@@ -233,7 +233,7 @@ impl SocketOptions {
                 } else {
                     SocketOptionValue::Linger(LingerOption { on: false, time: 0 })
                 }
-            }
+            },
             SocketOption::SndBuf(_) => SocketOptionValue::U32(self.sndbuf),
             SocketOption::RcvBuf(_) => SocketOptionValue::U32(self.rcvbuf),
             SocketOption::NoDelay(_) => SocketOptionValue::Bool(self.nodelay),
@@ -382,24 +382,24 @@ impl TcpSocketWrapper {
         // 1. Pin user buffer pages to prevent swapping
         // 2. Map pages directly to network device DMA
         // 3. Send without copying to kernel space
-        
+
         // For now, use PacketBuffer to minimize copies
         use crate::net::packet::PacketBuffer;
-        
+
         // Create a packet buffer that can be used for DMA
         let mut packet_buf = match PacketBuffer::new(data.len()) {
             Ok(buf) => buf,
             Err(_) => return Err(SocketError::NoBufferSpace),
         };
-        
+
         // Write data to packet buffer (single copy instead of multiple)
         if let Err(_) = packet_buf.write_bytes(data) {
             return Err(SocketError::NotConnected);
         }
-        
+
         // Get DMA buffer for network device
         let (_dma_ptr, _dma_len) = packet_buf.prepare_for_dma_read();
-        
+
         // Send via TCP connection if available
         if let Some(ref _connection) = self.connection {
             // Mutex在当前作用域中未使用，暂时注释掉
@@ -407,16 +407,16 @@ impl TcpSocketWrapper {
             // Get mutable access to connection
             // Note: This requires proper synchronization in real implementation
             // For now, we'll use the regular send path but with optimized buffer
-            
+
             // In a real zero-copy implementation, we would:
             // 1. Pass the DMA buffer directly to the network device driver
             // 2. The driver would send without copying
             // 3. Release the buffer after transmission completes
-            
+
             // For now, fall back to regular send but with optimized buffer
             return self.send(data);
         }
-        
+
         // Fall back to regular send if no connection
         self.send(data)
     }
@@ -444,46 +444,46 @@ impl TcpSocketWrapper {
         // 1. Pin user buffer pages to prevent swapping
         // 2. Map network device DMA directly to user pages
         // 3. Receive without copying through kernel buffers
-        
+
         // For now, use PacketBuffer to minimize copies
         use crate::net::packet::PacketBuffer;
-        
+
         // Receive from TCP connection if available
         if let Some(ref _connection) = self.connection {
             // Mutex在当前作用域中未使用，暂时注释掉
             // use crate::subsystems::sync::Mutex;
-            
+
             // In a real zero-copy implementation:
             // 1. Prepare user buffer for DMA
             // 2. Register buffer with network device
             // 3. Device writes directly to user buffer
             // 4. Unregister buffer after reception
-            
+
             // For now, use optimized receive path
             // Create a packet buffer for receiving
             let mut packet_buf = match PacketBuffer::new(buf.len()) {
                 Ok(buf) => buf,
                 Err(_) => return Err(SocketError::NoBufferSpace),
             };
-            
+
             // Get DMA buffer for network device to write to
             let (_dma_ptr, _dma_len) = packet_buf.as_dma_buffer();
-            
+
             // In real implementation, network device would write directly here
             // For now, receive into packet buffer first
             let mut temp_buf = alloc::vec![0u8; buf.len().min(8192)];
             let received = self.recv(&mut temp_buf)?;
-            
+
             if received > 0 {
                 // Copy from packet buffer to user buffer (minimized copy)
                 let copy_len = received.min(buf.len());
                 buf[..copy_len].copy_from_slice(&temp_buf[..copy_len]);
                 return Ok(copy_len);
             }
-            
+
             return Ok(0);
         }
-        
+
         // Fall back to regular recv if no connection
         self.recv(buf)
     }
@@ -573,28 +573,32 @@ impl UdpSocketWrapper {
     }
 
     /// Send data with zero-copy optimization (UDP)
-    pub fn send_to_zero_copy(&mut self, data: &[u8], dest: SocketAddr) -> Result<usize, SocketError> {
+    pub fn send_to_zero_copy(
+        &mut self,
+        data: &[u8],
+        dest: SocketAddr,
+    ) -> Result<usize, SocketError> {
         if self.state != UdpSocketState::Bound {
             return Err(SocketError::NotBound);
         }
 
         // Zero-copy UDP send: Use PacketBuffer for DMA-optimized transfer
         use crate::net::packet::PacketBuffer;
-        
+
         // Create packet buffer for DMA transfer
         let mut packet_buf = match PacketBuffer::new(data.len()) {
             Ok(buf) => buf,
             Err(_) => return Err(SocketError::NoBufferSpace),
         };
-        
+
         // Write data to packet buffer
         if let Err(_) = packet_buf.write_bytes(data) {
             return Err(SocketError::NotBound);
         }
-        
+
         // Get DMA buffer for network device
         let (_dma_ptr, _dma_len) = packet_buf.prepare_for_dma_read();
-        
+
         // In real implementation, pass DMA buffer directly to UDP layer
         // For now, fall back to regular send
         self.send_to(data, dest)
@@ -613,35 +617,38 @@ impl UdpSocketWrapper {
     }
 
     /// Receive data with zero-copy optimization (UDP)
-    pub fn recv_from_zero_copy(&mut self, buf: &mut [u8]) -> Result<(usize, SocketAddr), SocketError> {
+    pub fn recv_from_zero_copy(
+        &mut self,
+        buf: &mut [u8],
+    ) -> Result<(usize, SocketAddr), SocketError> {
         if self.state != UdpSocketState::Bound {
             return Err(SocketError::NotBound);
         }
 
         // Zero-copy UDP receive: Use PacketBuffer for DMA-optimized transfer
         use crate::net::packet::PacketBuffer;
-        
+
         // Create packet buffer for receiving
         let mut packet_buf = match PacketBuffer::new(buf.len()) {
             Ok(buf) => buf,
             Err(_) => return Err(SocketError::NoBufferSpace),
         };
-        
+
         // Get DMA buffer for network device to write to
         let (_dma_ptr, _dma_len) = packet_buf.as_dma_buffer();
-        
+
         // In real implementation, network device writes directly to DMA buffer
         // For now, receive into temporary buffer
         let mut temp_buf = alloc::vec![0u8; buf.len().min(8192)];
         let (received, addr) = self.recv_from(&mut temp_buf)?;
-        
+
         if received > 0 {
             // Copy to user buffer (minimized copy)
             let copy_len = received.min(buf.len());
             buf[..copy_len].copy_from_slice(&temp_buf[..copy_len]);
             return Ok((copy_len, addr));
         }
-        
+
         Ok((0, SocketAddr::new_ipv4_from_octets(127, 0, 0, 1, 8080)))
     }
 
@@ -691,11 +698,7 @@ impl Clone for RawSocketWrapper {
 impl RawSocketWrapper {
     /// Create a new raw socket
     pub fn new(options: SocketOptions) -> Self {
-        Self {
-            state: false,
-            options,
-            nonblocking: AtomicBool::new(false),
-        }
+        Self { state: false, options, nonblocking: AtomicBool::new(false) }
     }
 
     /// Close socket

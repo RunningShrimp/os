@@ -1,15 +1,13 @@
 //! Unified Error Handling Framework
-//! 
+//!
 //! This module provides a comprehensive error handling framework that
 //! unifies all error types across the kernel. It includes error conversion
 //! mechanisms, error context management, and error recovery integration.
 
 extern crate alloc;
 
-use alloc::string::String;
-use alloc::format;
-use core::fmt;
-use core::any::Any;
+use alloc::{format, string::String};
+use core::{any::Any, fmt};
 
 // Re-export existing unified error types
 use super::unified::*;
@@ -44,20 +42,19 @@ pub enum FrameworkError {
 pub trait IntoFrameworkError {
     /// Convert self into a FrameworkError
     fn into_framework_error(self) -> FrameworkError;
-    
+
     /// Convert self into a FrameworkError with context
     fn with_context(self, context: &str, location: &str) -> FrameworkError;
 }
 
 /// Error conversion implementation for UnifiedError
 
-
 /// Error conversion implementation for &str
 impl IntoFrameworkError for &str {
     fn into_framework_error(self) -> FrameworkError {
         UnifiedError::Other(self.to_string()).into_framework_error()
     }
-    
+
     fn with_context(self, context: &str, location: &str) -> FrameworkError {
         UnifiedError::Other(self.to_string()).with_context(context, location)
     }
@@ -68,7 +65,7 @@ impl IntoFrameworkError for String {
     fn into_framework_error(self) -> FrameworkError {
         UnifiedError::Other(self).into_framework_error()
     }
-    
+
     fn with_context(self, context: &str, location: &str) -> FrameworkError {
         UnifiedError::Other(self).with_context(context, location)
     }
@@ -80,11 +77,11 @@ macro_rules! err {
     ($err:expr) => {
         $err.into_framework_error()
     };
-    
+
     ($err:expr, $context:expr) => {
         $err.with_context($context, module_path!())
     };
-    
+
     ($err:expr, $context:expr, $location:expr) => {
         $err.with_context($context, $location)
     };
@@ -96,11 +93,11 @@ macro_rules! res {
     ($res:expr) => {
         $res.map_err(|e| e.into_framework_error())
     };
-    
+
     ($res:expr, $context:expr) => {
         $res.map_err(|e| e.with_context($context, module_path!()))
     };
-    
+
     ($res:expr, $context:expr, $location:expr) => {
         $res.map_err(|e| e.with_context($context, $location))
     };
@@ -110,10 +107,10 @@ macro_rules! res {
 pub trait FrameworkErrorHandler: Send + Sync + 'static {
     /// Handle an error and return appropriate action
     fn handle_error(&self, error: &FrameworkError) -> ErrorAction;
-    
+
     /// Check if this handler can handle the given error
     fn can_handle(&self, error: &FrameworkError) -> bool;
-    
+
     /// Get handler name for identification
     fn name(&self) -> &str;
 }
@@ -134,17 +131,17 @@ impl FrameworkErrorManager {
             recovery_strategies: alloc::vec::Vec::new(),
         }
     }
-    
+
     /// Add a framework error handler
     pub fn add_framework_handler(&mut self, handler: Box<dyn FrameworkErrorHandler>) {
         self.handlers.push(handler);
     }
-    
+
     /// Add an error recovery strategy
     pub fn add_recovery_strategy(&mut self, strategy: Box<dyn ErrorRecovery>) {
         self.recovery_strategies.push(strategy);
     }
-    
+
     /// Handle an error using the framework
     pub fn handle_framework_error(&self, error: FrameworkError) -> ErrorAction {
         // Try framework handlers first
@@ -156,26 +153,24 @@ impl FrameworkErrorManager {
                 }
             }
         }
-        
+
         // Try recovery strategies
         for strategy in &self.recovery_strategies {
             if strategy.recover(&error) {
                 return ErrorAction::Recover;
             }
         }
-        
+
         // Fall back to inner error manager
         match &error {
-            FrameworkError::Unified(e) => {
-                self.inner.handle_error(e.clone(), "")
-            }
-            FrameworkError::Contextual { error, context, location } => {
-                self.inner.handle_error(error.clone(), &format!("{} at {}", context, location))
-            }
+            FrameworkError::Unified(e) => self.inner.handle_error(e.clone(), ""),
+            FrameworkError::Contextual { error, context, location } => self
+                .inner
+                .handle_error(error.clone(), &format!("{} at {}", context, location)),
             FrameworkError::Chain { error, cause } => {
                 let context = format!("caused by: {}", cause);
                 self.inner.handle_error(error.clone(), &context)
-            }
+            },
         }
     }
 }
@@ -184,7 +179,7 @@ impl FrameworkErrorManager {
 pub trait ErrorRecovery: Send + Sync + 'static {
     /// Attempt to recover from an error
     fn recover(&self, error: &FrameworkError) -> bool;
-    
+
     /// Get recovery strategy name
     fn strategy_name(&self) -> &str;
 }
@@ -201,18 +196,18 @@ impl ErrorRecovery for DefaultErrorRecovery {
                     // Try to free some memory
                     crate::mm::free_unused_memory();
                     true
-                }
+                },
                 UnifiedError::ResourceBusy => {
                     // Wait and retry
                     crate::time::sleep(10);
                     true
-                }
+                },
                 _ => false,
             },
             _ => false,
         }
     }
-    
+
     fn strategy_name(&self) -> &str {
         "default"
     }
@@ -234,19 +229,19 @@ impl ErrorContextBuilder {
             location: module_path!().to_string(),
         }
     }
-    
+
     /// Add context information
     pub fn with_context(mut self, context: &str) -> Self {
         self.context = context.to_string();
         self
     }
-    
+
     /// Set error location
     pub fn with_location(mut self, location: &str) -> Self {
         self.location = location.to_string();
         self
     }
-    
+
     /// Build the framework error
     pub fn build(self) -> FrameworkError {
         FrameworkError::Contextual {
@@ -264,10 +259,10 @@ impl fmt::Display for FrameworkError {
             FrameworkError::Unified(e) => write!(f, "{:?}", e),
             FrameworkError::Contextual { error, context, location } => {
                 write!(f, "{}: {:?} at {}", context, error, location)
-            }
+            },
             FrameworkError::Chain { error, cause } => {
                 write!(f, "{:?}: caused by {}", error, cause)
-            }
+            },
         }
     }
 }
@@ -286,25 +281,25 @@ impl core::error::Error for FrameworkError {
 /// Initialize the error framework
 pub fn init_framework() -> FrameworkResult<()> {
     crate::log_info!("Initializing unified error framework");
-    
+
     // Initialize existing error handling
     super::init()?;
-    
+
     // Add default recovery strategy
     let recovery = DefaultErrorRecovery;
     let mut manager = super::get_error_manager();
     manager.add_recovery_strategy(Box::new(recovery));
-    
+
     Ok(())
 }
 
 /// Shutdown the error framework
 pub fn shutdown_framework() -> FrameworkResult<()> {
     crate::log_info!("Shutting down unified error framework");
-    
+
     // Shutdown existing error handling
     super::shutdown()?;
-    
+
     Ok(())
 }
 
@@ -317,7 +312,7 @@ macro_rules! try_context {
             Err(e) => return Err(e.with_context($context, module_path!())),
         }
     };
-    
+
     ($expr:expr, $context:expr, $location:expr) => {
         match $expr {
             Ok(val) => val,
@@ -331,7 +326,7 @@ macro_rules! bail {
     ($err:expr) => {
         return Err($err.into_framework_error());
     };
-    
+
     ($err:expr, $context:expr) => {
         return Err($err.with_context($context, module_path!()));
     };
@@ -344,7 +339,7 @@ macro_rules! ensure {
             bail!($err);
         }
     };
-    
+
     ($cond:expr, $err:expr, $context:expr) => {
         if !$cond {
             bail!($err, $context);

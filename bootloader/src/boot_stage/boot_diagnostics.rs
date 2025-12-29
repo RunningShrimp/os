@@ -2,7 +2,6 @@
 ///
 /// Provides comprehensive diagnostics for boot process verification and debugging.
 /// Tracks boot events, validates each stage, and provides detailed status reporting.
-
 use crate::boot_stage::boot_loader::{BootEnvironment, BootStatus, LoadedKernel};
 
 /// Boot event types for diagnostic tracking
@@ -45,17 +44,13 @@ impl BootEvent {
 #[derive(Debug, Clone, Copy)]
 pub struct DiagnosticRecord {
     pub event: BootEvent,
-    pub timestamp: u32,  // In ticks (1/18 second)
+    pub timestamp: u32, // In ticks (1/18 second)
     pub success: bool,
 }
 
 impl DiagnosticRecord {
     pub fn new(event: BootEvent) -> Self {
-        Self {
-            event,
-            timestamp: 0,
-            success: true,
-        }
+        Self { event, timestamp: 0, success: true }
     }
 
     pub fn with_timestamp(mut self, timestamp: u32) -> Self {
@@ -80,11 +75,7 @@ impl BootDiagnostics {
     pub fn new() -> Self {
         // For now, we'll set boot_start_time to 0 since we don't have a real-time clock yet
         // This can be updated when RTC functionality is added
-        Self {
-            events: [None; 32],
-            event_count: 0,
-            boot_start_time: 0,
-        }
+        Self { events: [None; 32], event_count: 0, boot_start_time: 0 }
     }
 
     /// Set the boot start time
@@ -109,7 +100,11 @@ impl BootDiagnostics {
     }
 
     /// Log event with success status
-    pub fn log_event_result(&mut self, event: BootEvent, success: bool) -> Result<(), &'static str> {
+    pub fn log_event_result(
+        &mut self,
+        event: BootEvent,
+        success: bool,
+    ) -> Result<(), &'static str> {
         if self.event_count >= 32 {
             return Err("Event log full");
         }
@@ -236,12 +231,24 @@ impl BootVerification {
     /// Count passed checks
     pub fn passed_checks(&self) -> usize {
         let mut count = 0;
-        if self.memory_detected { count += 1; }
-        if self.memory_validated { count += 1; }
-        if self.disk_accessible { count += 1; }
-        if self.kernel_loaded { count += 1; }
-        if self.kernel_valid { count += 1; }
-        if self.boot_info_valid { count += 1; }
+        if self.memory_detected {
+            count += 1;
+        }
+        if self.memory_validated {
+            count += 1;
+        }
+        if self.disk_accessible {
+            count += 1;
+        }
+        if self.kernel_loaded {
+            count += 1;
+        }
+        if self.kernel_valid {
+            count += 1;
+        }
+        if self.boot_info_valid {
+            count += 1;
+        }
         count
     }
 }

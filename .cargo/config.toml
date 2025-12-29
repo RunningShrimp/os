@@ -1,3 +1,12 @@
+[build]
+rustflags = ["-D", "warnings"]
+
+[target.x86_64-unknown-none]
+rustflags = ["-D", "warnings"]
+
+[target.aarch64-unknown-none]
+rustflags = ["-D", "warnings"]
+
 [target."targets/aarch64-nostd.json"]
 linker = "rust-lld"
 rustflags = ["-Clink-arg=-Tkernel/linker-aarch64.ld"]

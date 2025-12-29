@@ -12,8 +12,9 @@
 
 extern crate alloc;
 
-use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
 use core::hint::black_box;
+
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 
 // Note: These benchmarks require the kernel to be compiled as a library
 // and may need adjustments for no_std environment
@@ -25,8 +26,10 @@ use core::hint::black_box;
 /// Benchmark fast-path syscall dispatch (RCU-optimized)
 #[cfg(feature = "syscalls")]
 fn bench_fast_path_dispatch(c: &mut Criterion) {
-    use kernel::subsystems::syscalls::dispatch::unified::{init_unified_dispatcher, get_unified_dispatcher, UnifiedDispatcherConfig};
-    
+    use kernel::subsystems::syscalls::dispatch::unified::{
+        UnifiedDispatcherConfig, get_unified_dispatcher, init_unified_dispatcher,
+    };
+
     // Initialize dispatcher
     let config = UnifiedDispatcherConfig {
         enable_fast_path: true,
@@ -36,7 +39,7 @@ fn bench_fast_path_dispatch(c: &mut Criterion) {
         fast_path_update_interval: 1000,
     };
     init_unified_dispatcher(config);
-    
+
     // Register a fast-path handler
     if let Some(dispatcher_mutex) = get_unified_dispatcher() {
         let dispatcher = dispatcher_mutex.lock();
@@ -44,7 +47,7 @@ fn bench_fast_path_dispatch(c: &mut Criterion) {
             let _ = d.register_fast_path(0x1004, |_num, _args| Ok(12345));
         }
     }
-    
+
     c.bench_function("fast_path_dispatch", |b| {
         b.iter(|| {
             if let Some(dispatcher_mutex) = get_unified_dispatcher() {
@@ -60,10 +63,15 @@ fn bench_fast_path_dispatch(c: &mut Criterion) {
 /// Benchmark regular syscall dispatch (RCU-optimized handlers map)
 #[cfg(feature = "syscalls")]
 fn bench_regular_dispatch(c: &mut Criterion) {
-    use kernel::subsystems::syscalls::dispatch::unified::{init_unified_dispatcher, get_unified_dispatcher, UnifiedDispatcherConfig};
-    use kernel::subsystems::syscalls::interface::{SyscallHandler, SyscallError, SyscallResult};
     use alloc::sync::Arc;
-    
+
+    use kernel::subsystems::syscalls::{
+        dispatch::unified::{
+            UnifiedDispatcherConfig, get_unified_dispatcher, init_unified_dispatcher,
+        },
+        interface::{SyscallError, SyscallHandler, SyscallResult},
+    };
+
     // Initialize dispatcher
     let config = UnifiedDispatcherConfig {
         enable_fast_path: false, // Disable fast-path to test regular dispatch
@@ -73,23 +81,23 @@ fn bench_regular_dispatch(c: &mut Criterion) {
         fast_path_update_interval: 1000,
     };
     init_unified_dispatcher(config);
-    
+
     // Create a simple handler
     struct TestHandler;
     impl SyscallHandler for TestHandler {
         fn handle(&self, _args: &[u64]) -> SyscallResult {
             Ok(12345)
         }
-        
+
         fn get_syscall_number(&self) -> u32 {
             0x2000
         }
-        
+
         fn get_name(&self) -> &'static str {
             "test_handler"
         }
     }
-    
+
     // Register handler
     if let Some(dispatcher_mutex) = get_unified_dispatcher() {
         let dispatcher = dispatcher_mutex.lock();
@@ -98,7 +106,7 @@ fn bench_regular_dispatch(c: &mut Criterion) {
             let _ = d.register_handler(0x2000, handler);
         }
     }
-    
+
     c.bench_function("regular_dispatch", |b| {
         b.iter(|| {
             if let Some(dispatcher_mutex) = get_unified_dispatcher() {
@@ -114,8 +122,10 @@ fn bench_regular_dispatch(c: &mut Criterion) {
 /// Benchmark syscall dispatch with multiple concurrent readers (RCU benefit)
 #[cfg(feature = "syscalls")]
 fn bench_concurrent_dispatch(c: &mut Criterion) {
-    use kernel::subsystems::syscalls::dispatch::unified::{init_unified_dispatcher, get_unified_dispatcher, UnifiedDispatcherConfig};
-    
+    use kernel::subsystems::syscalls::dispatch::unified::{
+        UnifiedDispatcherConfig, get_unified_dispatcher, init_unified_dispatcher,
+    };
+
     // Initialize dispatcher
     let config = UnifiedDispatcherConfig {
         enable_fast_path: true,
@@ -125,7 +135,7 @@ fn bench_concurrent_dispatch(c: &mut Criterion) {
         fast_path_update_interval: 1000,
     };
     init_unified_dispatcher(config);
-    
+
     // Register fast-path handlers
     if let Some(dispatcher_mutex) = get_unified_dispatcher() {
         let dispatcher = dispatcher_mutex.lock();
@@ -135,7 +145,7 @@ fn bench_concurrent_dispatch(c: &mut Criterion) {
             }
         }
     }
-    
+
     c.bench_function("concurrent_dispatch", |b| {
         b.iter(|| {
             // Simulate concurrent reads (no locks needed with RCU)
@@ -159,7 +169,7 @@ fn bench_concurrent_dispatch(c: &mut Criterion) {
 fn bench_fast_errno_conversion(c: &mut Criterion) {
     use kernel::error::unified_mapping::fast_unified_error_to_errno;
     use nos_api::core::types::KernelError;
-    
+
     let errors = [
         KernelError::PermissionDenied,
         KernelError::NotFound,
@@ -170,7 +180,7 @@ fn bench_fast_errno_conversion(c: &mut Criterion) {
         KernelError::Busy,
         KernelError::WouldBlock,
     ];
-    
+
     c.bench_function("fast_errno_conversion", |b| {
         b.iter(|| {
             for error in &errors {
@@ -182,9 +192,8 @@ fn bench_fast_errno_conversion(c: &mut Criterion) {
 
 /// Benchmark unified error to errno conversion (static match)
 fn bench_unified_error_to_errno(c: &mut Criterion) {
-    use kernel::error::unified_mapping::unified_error_to_errno;
-    use kernel::error::unified::UnifiedError;
-    
+    use kernel::error::{unified::UnifiedError, unified_mapping::unified_error_to_errno};
+
     let errors = [
         UnifiedError::InvalidArgument,
         UnifiedError::NotFound,
@@ -194,7 +203,7 @@ fn bench_unified_error_to_errno(c: &mut Criterion) {
         UnifiedError::Busy,
         UnifiedError::WouldBlock,
     ];
-    
+
     c.bench_function("unified_error_to_errno", |b| {
         b.iter(|| {
             for error in &errors {
@@ -206,16 +215,18 @@ fn bench_unified_error_to_errno(c: &mut Criterion) {
 
 /// Benchmark error handling overhead (with and without fast path)
 fn bench_error_handling_overhead(c: &mut Criterion) {
-    use kernel::error::unified_mapping::{fast_unified_error_to_errno, unified_error_to_errno};
+    use kernel::error::{
+        unified::UnifiedError,
+        unified_mapping::{fast_unified_error_to_errno, unified_error_to_errno},
+    };
     use nos_api::core::types::KernelError;
-    use kernel::error::unified::UnifiedError;
-    
+
     c.bench_function("error_handling_overhead", |b| {
         b.iter(|| {
             // Fast path (direct KernelError -> Errno)
             let kernel_error = KernelError::PermissionDenied;
             let _errno1 = black_box(fast_unified_error_to_errno(&kernel_error));
-            
+
             // Regular path (UnifiedError -> Errno)
             let unified_error = UnifiedError::PermissionDenied;
             let _errno2 = black_box(unified_error_to_errno(&unified_error));
@@ -230,15 +241,17 @@ fn bench_error_handling_overhead(c: &mut Criterion) {
 /// Benchmark buddy allocator performance (optimized with bitmap)
 #[cfg(feature = "memory_management")]
 fn bench_buddy_allocator(c: &mut Criterion) {
-    use kernel::subsystems::mm::optimized_page_allocator::{OptimizedPageAllocator, BuddyAllocator};
-    
+    use kernel::subsystems::mm::optimized_page_allocator::{
+        BuddyAllocator, OptimizedPageAllocator,
+    };
+
     c.bench_function("buddy_allocator_optimized", |b| {
         // Initialize allocator with 1MB
         let mut allocator = OptimizedPageAllocator::new(1, 0);
         unsafe {
             allocator.init(0x100000, 0x200000); // 1MB range
         }
-        
+
         b.iter(|| {
             let pfn = allocator.allocate_page();
             if let Some(pfn) = pfn {
@@ -253,10 +266,10 @@ fn bench_buddy_allocator(c: &mut Criterion) {
 #[cfg(feature = "memory_management")]
 fn bench_slab_allocator(c: &mut Criterion) {
     c.bench_function("slab_allocator", |b| {
-    use nos_memory_management::allocator::slab::OptimizedSlabAllocator;
-    
-    let mut allocator = OptimizedSlabAllocator::new();
-    
+        use nos_memory_management::allocator::slab::OptimizedSlabAllocator;
+
+        let mut allocator = OptimizedSlabAllocator::new();
+
         b.iter(|| {
             let ptr = allocator.allocate(64).unwrap();
             black_box(ptr);
@@ -269,10 +282,10 @@ fn bench_slab_allocator(c: &mut Criterion) {
 #[cfg(feature = "memory_management")]
 fn bench_tiered_allocator(c: &mut Criterion) {
     c.bench_function("tiered_allocator", |b| {
-    use nos_memory_management::allocator::tiered::TieredMemoryAllocator;
-    
-    let mut allocator = TieredMemoryAllocator::new();
-    
+        use nos_memory_management::allocator::tiered::TieredMemoryAllocator;
+
+        let mut allocator = TieredMemoryAllocator::new();
+
         b.iter(|| {
             let ptr = allocator.allocate(256).unwrap();
             black_box(ptr);
@@ -285,12 +298,12 @@ fn bench_tiered_allocator(c: &mut Criterion) {
 #[cfg(feature = "memory_management")]
 fn bench_allocator_sizes(c: &mut Criterion) {
     c.bench_function("allocator_sizes", |b| {
-    use nos_memory_management::allocator::buddy::OptimizedBuddyAllocator;
-    
-    let mut allocator = OptimizedBuddyAllocator::new(4 * 1024 * 1024); // 4MB
-    
-    let sizes = [64, 256, 1024, 4096, 16384, 65536];
-    
+        use nos_memory_management::allocator::buddy::OptimizedBuddyAllocator;
+
+        let mut allocator = OptimizedBuddyAllocator::new(4 * 1024 * 1024); // 4MB
+
+        let sizes = [64, 256, 1024, 4096, 16384, 65536];
+
         b.iter(|| {
             for &size in &sizes {
                 let ptr = allocator.allocate(size).unwrap();
@@ -304,19 +317,20 @@ fn bench_allocator_sizes(c: &mut Criterion) {
 /// Benchmark memory allocator fragmentation
 #[cfg(feature = "memory_management")]
 fn bench_allocator_fragmentation(c: &mut Criterion) {
-    use nos_memory_management::allocator::buddy::OptimizedBuddyAllocator;
     use alloc::vec::Vec;
-    
+
+    use nos_memory_management::allocator::buddy::OptimizedBuddyAllocator;
+
     let mut allocator = OptimizedBuddyAllocator::new(1024 * 1024); // 1MB
     let mut ptrs = Vec::new();
-    
+
     // Allocate many small blocks to create fragmentation
     for _ in 0..100 {
         if let Ok(ptr) = allocator.allocate(64) {
             ptrs.push(ptr);
         }
     }
-    
+
     c.bench_function("allocator_fragmentation", |b| {
         b.iter(|| {
             // Try to allocate a large block (should be harder with fragmentation)
@@ -324,7 +338,7 @@ fn bench_allocator_fragmentation(c: &mut Criterion) {
             black_box(ptr);
         });
     });
-    
+
     // Cleanup
     for ptr in ptrs {
         allocator.deallocate(ptr, 64);
@@ -338,14 +352,18 @@ fn bench_allocator_fragmentation(c: &mut Criterion) {
 /// Benchmark complete syscall path (dispatch + error handling)
 #[cfg(feature = "syscalls")]
 fn bench_complete_syscall_path(c: &mut Criterion) {
-    use kernel::subsystems::syscalls::dispatch::unified::{init_unified_dispatcher, get_unified_dispatcher, UnifiedDispatcherConfig};
-    use kernel::error::unified_mapping::fast_unified_error_to_errno;
+    use kernel::{
+        error::unified_mapping::fast_unified_error_to_errno,
+        subsystems::syscalls::dispatch::unified::{
+            UnifiedDispatcherConfig, get_unified_dispatcher, init_unified_dispatcher,
+        },
+    };
     use nos_api::core::types::KernelError;
-    
+
     // Initialize dispatcher
     let config = UnifiedDispatcherConfig::default();
     init_unified_dispatcher(config);
-    
+
     // Register handler that returns error
     if let Some(dispatcher_mutex) = get_unified_dispatcher() {
         let dispatcher = dispatcher_mutex.lock();
@@ -355,7 +373,7 @@ fn bench_complete_syscall_path(c: &mut Criterion) {
             });
         }
     }
-    
+
     c.bench_function("complete_syscall_path", |b| {
         b.iter(|| {
             if let Some(dispatcher_mutex) = get_unified_dispatcher() {
@@ -404,4 +422,3 @@ criterion_group!(
 );
 
 criterion_main!(benches);
-

@@ -5,18 +5,24 @@
 
 extern crate alloc;
 
+pub mod cgroups;
+pub mod container;
+pub mod namespaces;
 pub mod oci;
 pub mod virtio;
-pub mod container;
-pub mod cgroups;
-pub mod namespaces;
 
-use crate::subsystems::microkernel::service_registry::{ServiceInfo, InterfaceVersion, ServiceCategory, get_service_registry};
-use crate::subsystems;
-use crate::reliability::{EINVAL, ENOENT, ENOMEM, EIO};
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::format;
+use alloc::{
+    format,
+    string::{String, ToString},
+};
+
+use crate::{
+    reliability::{EINVAL, EIO, ENOENT, ENOMEM},
+    subsystems,
+    subsystems::microkernel::service_registry::{
+        InterfaceVersion, ServiceCategory, ServiceInfo, get_service_registry,
+    },
+};
 
 /// 云原生服务ID
 pub const CLOUD_NATIVE_SERVICE_ID: u64 = 100;
@@ -177,7 +183,10 @@ impl CloudNativeService {
     }
 
     /// 创建容器
-    pub fn create_container(&mut self, config: container::ContainerConfig) -> Result<container::ContainerId, i32> {
+    pub fn create_container(
+        &mut self,
+        config: container::ContainerConfig,
+    ) -> Result<container::ContainerId, i32> {
         if self.status != CloudNativeServiceStatus::Running {
             return Err(EIO);
         }
@@ -264,8 +273,8 @@ impl CloudNativeService {
     fn update_resource_usage(&mut self) {
         // 这里应该调用实际的资源监控接口
         // 简化实现，使用占位符值
-        self.stats.memory_usage = self.stats.container_count as u64 *
-            (self.config.resource_limits.max_memory_per_container_mb * 1024 * 1024) as u64;
+        self.stats.memory_usage = self.stats.container_count as u64
+            * (self.config.resource_limits.max_memory_per_container_mb * 1024 * 1024) as u64;
         self.stats.cpu_usage_percent = 0.0; // 实际应该计算CPU使用率
         self.stats.network_io_bps = 0;
         self.stats.disk_io_bps = 0;
@@ -338,9 +347,7 @@ pub fn init() -> Result<(), i32> {
 
 /// 获取云原生服务引用
 pub fn get_service() -> Option<&'static mut CloudNativeService> {
-    unsafe {
-        CLOUD_NATIVE_SERVICE.as_mut()
-    }
+    unsafe { CLOUD_NATIVE_SERVICE.as_mut() }
 }
 
 /// 获取云原生服务统计信息

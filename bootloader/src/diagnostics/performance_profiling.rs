@@ -6,10 +6,8 @@
 //! - Performance reports
 //! - Optimization suggestions
 
+use alloc::{format, string::String, vec::Vec};
 use core::fmt;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::format;
 
 /// Performance metric type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,10 +64,7 @@ impl PerformanceMetric {
 
 impl fmt::Display for PerformanceMetric {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}: {} {}", self.name, self.value, self.unit
-        )
+        write!(f, "{}: {} {}", self.name, self.value, self.unit)
     }
 }
 
@@ -96,7 +91,13 @@ impl Bottleneck {
     /// Set percentage
     pub fn set_percentage(&mut self, pct: u32) {
         self.percentage = pct;
-        self.severity = if pct > 50 { 3 } else if pct > 30 { 2 } else { 1 };
+        self.severity = if pct > 50 {
+            3
+        } else if pct > 30 {
+            2
+        } else {
+            1
+        };
     }
 }
 
@@ -162,7 +163,10 @@ impl fmt::Display for PerformanceSample {
         write!(
             f,
             "{}: {}ms (CPU: {}%, MEM: {}MB)",
-            self.component, self.duration(), self.cpu_usage, self.memory_peak
+            self.component,
+            self.duration(),
+            self.cpu_usage,
+            self.memory_peak
         )
     }
 }
@@ -258,8 +262,11 @@ impl BootProfiler {
         }
 
         if let Some(slowest) = self.get_slowest_component() {
-            report.push_str(&format!("\nSlowest: {} ({}ms)\n", 
-                slowest.component, slowest.duration()));
+            report.push_str(&format!(
+                "\nSlowest: {} ({}ms)\n",
+                slowest.component,
+                slowest.duration()
+            ));
         }
 
         report

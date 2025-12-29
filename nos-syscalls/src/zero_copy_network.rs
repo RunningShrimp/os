@@ -3,15 +3,12 @@
 //! This module provides system calls for zero-copy network operations,
 //! which eliminate data copying between kernel and user space for improved performance.
 
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::boxed::Box;
-use alloc::string::ToString;
-use alloc::format;
-use alloc::vec::Vec;
-use nos_api::{Result, Error};
+use alloc::{boxed::Box, collections::BTreeMap, format, string::ToString, sync::Arc, vec::Vec};
+
+use nos_api::{Error, Result};
 use spin::Mutex;
-use crate::{SyscallHandler, SyscallDispatcher};
+
+use crate::{SyscallDispatcher, SyscallHandler};
 
 /// Zero-copy buffer flags
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -104,11 +101,13 @@ impl ZeroCopySocket {
             zero_copy_enabled: true,
         }
     }
-    
+
     pub fn register_buffer(&self, buffer: ZeroCopyBuffer) -> Result<()> {
         if buffer.size > self.max_buffer_size {
-            return Err(Error::InvalidArgument(format!("Buffer size {} exceeds maximum {}",
-                buffer.size, self.max_buffer_size)));
+            return Err(Error::InvalidArgument(format!(
+                "Buffer size {} exceeds maximum {}",
+                buffer.size, self.max_buffer_size
+            )));
         }
 
         let mut buffers = self.buffers.lock();
@@ -117,19 +116,21 @@ impl ZeroCopySocket {
         sys_trace_with_args!("Registered buffer {} for socket fd {}", buffer_id, self.fd);
         Ok(())
     }
-    
+
     pub fn unregister_buffer(&self, id: u64) -> Result<()> {
         let mut buffers = self.buffers.lock();
-        buffers.remove(&id).ok_or_else(|| Error::NotFound(format!("Buffer {} not found", id)))?;
+        buffers
+            .remove(&id)
+            .ok_or_else(|| Error::NotFound(format!("Buffer {} not found", id)))?;
         sys_trace_with_args!("Unregistered buffer {} from socket fd {}", id, self.fd);
         Ok(())
     }
-    
+
     pub fn get_buffer(&self, id: u64) -> Option<Arc<ZeroCopyBuffer>> {
         let buffers = self.buffers.lock();
         buffers.get(&id).cloned()
     }
-    
+
     pub fn queue_send(&self, buffer: ZeroCopyBuffer) -> Result<()> {
         if !self.zero_copy_enabled {
             return Err(Error::InvalidState("Zero-copy is disabled".to_string()));
@@ -157,15 +158,15 @@ impl ZeroCopySocket {
         recv_queue.push(buffer);
         Ok(())
     }
-    
+
     pub fn enable_zero_copy(&mut self) {
         self.zero_copy_enabled = true;
     }
-    
+
     pub fn disable_zero_copy(&mut self) {
         self.zero_copy_enabled = false;
     }
-    
+
     pub fn is_zero_copy_enabled(&self) -> bool {
         self.zero_copy_enabled
     }
@@ -198,62 +199,68 @@ impl ZeroCopyManager {
             total_allocated: Mutex::new(0),
         }
     }
-    
+
     pub fn create_socket(&self, fd: i32, max_buffer_size: usize) -> Result<u64> {
         let socket = Arc::new(ZeroCopySocket::new(fd, max_buffer_size));
-        
+
         let mut sockets = self.sockets.lock();
         sockets.insert(fd, socket);
-        
+
         sys_trace_with_args!("Created zero-copy socket for fd {}", fd);
-        
+
         Ok(fd as u64)
     }
-    
+
     pub fn get_socket(&self, fd: i32) -> Option<Arc<ZeroCopySocket>> {
         let sockets = self.sockets.lock();
         sockets.get(&fd).cloned()
     }
-    
+
     pub fn close_socket(&self, fd: i32) -> Result<()> {
         let mut sockets = self.sockets.lock();
-        sockets.remove(&fd).ok_or_else(|| Error::NotFound(format!("Socket fd {} not found", fd)))?;
+        sockets
+            .remove(&fd)
+            .ok_or_else(|| Error::NotFound(format!("Socket fd {} not found", fd)))?;
         sys_trace_with_args!("Closed zero-copy socket fd {}", fd);
         Ok(())
     }
-    
-    pub fn create_buffer(&self, fd: i32, size: usize, flags: ZeroCopyFlags) -> Result<ZeroCopyBuffer> {
-        let socket = self.get_socket(fd)
+
+    pub fn create_buffer(
+        &self,
+        fd: i32,
+        size: usize,
+        flags: ZeroCopyFlags,
+    ) -> Result<ZeroCopyBuffer> {
+        let socket = self
+            .get_socket(fd)
             .ok_or_else(|| Error::NotFound(format!("Socket fd {} not found", fd)))?;
-        
+
         let mut next_id = self.next_buffer_id.lock();
         let id = *next_id;
         *next_id += 1;
-        
+
         let mut next_addr = self.next_addr.lock();
         let addr = *next_addr;
         *next_addr += size;
-        
+
         let mut total_allocated = self.total_allocated.lock();
         *total_allocated += size;
-        
-        let buffer = ZeroCopyBuffer {
+
+        let buffer = ZeroCopyBuffer { id, addr, size, flags, refcount: 1, owner_fd: Some(fd) };
+
+        socket.register_buffer(buffer.clone())?;
+
+        sys_trace_with_args!(
+            "Created zero-copy buffer {} at addr {:#x}, size={}, fd={}",
             id,
             addr,
             size,
-            flags,
-            refcount: 1,
-            owner_fd: Some(fd),
-        };
-        
-        socket.register_buffer(buffer.clone())?;
-        
-        sys_trace_with_args!("Created zero-copy buffer {} at addr {:#x}, size={}, fd={}", 
-                   id, addr, size, fd);
-        
+            fd
+        );
+
         Ok(buffer)
     }
-    
+
     pub fn get_allocated_bytes(&self) -> usize {
         *self.total_allocated.lock()
     }
@@ -266,11 +273,9 @@ pub struct ZeroCopySendHandler {
 
 impl ZeroCopySendHandler {
     pub fn new() -> Self {
-        Self {
-            manager: Arc::new(ZeroCopyManager::new()),
-        }
+        Self { manager: Arc::new(ZeroCopyManager::new()) }
     }
-    
+
     pub fn manager(&self) -> &Arc<ZeroCopyManager> {
         &self.manager
     }
@@ -286,35 +291,45 @@ impl SyscallHandler for ZeroCopySendHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_ZERO_COPY_SEND
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 4 {
-            return Err(Error::InvalidArgument("Insufficient arguments for zero-copy send".to_string()));
+            return Err(Error::InvalidArgument(
+                "Insufficient arguments for zero-copy send".to_string(),
+            ));
         }
 
         let fd = args[0] as i32;
         let buffer_id = args[1] as u64;
         let offset = args[2];
         let length = args[3];
-        
-        let socket = self.manager.get_socket(fd)
+
+        let socket = self
+            .manager
+            .get_socket(fd)
             .ok_or_else(|| Error::NotFound(format!("Socket fd {} not found", fd)))?;
-        
-        let buffer = socket.get_buffer(buffer_id)
+
+        let buffer = socket
+            .get_buffer(buffer_id)
             .ok_or_else(|| Error::NotFound(format!("Buffer {} not found", buffer_id)))?;
-        
+
         if offset + length > buffer.size {
             return Err(Error::InvalidArgument("Offset + length exceeds buffer size".to_string()));
         }
-        
+
         socket.queue_send((*buffer).clone())?;
-        
-        sys_trace_with_args!("zero_copy_send: fd={}, buffer_id={}, offset={}, length={}",
-                   fd, buffer_id, offset, length);
-        
+
+        sys_trace_with_args!(
+            "zero_copy_send: fd={}, buffer_id={}, offset={}, length={}",
+            fd,
+            buffer_id,
+            offset,
+            length
+        );
+
         Ok(length as isize)
     }
-    
+
     fn name(&self) -> &str {
         "zero_copy_send"
     }
@@ -335,35 +350,45 @@ impl SyscallHandler for ZeroCopyRecvHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_ZERO_COPY_RECV
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 4 {
-            return Err(Error::InvalidArgument("Insufficient arguments for zero-copy recv".to_string()));
+            return Err(Error::InvalidArgument(
+                "Insufficient arguments for zero-copy recv".to_string(),
+            ));
         }
 
         let fd = args[0] as i32;
         let buffer_id = args[1] as u64;
         let offset = args[2];
         let length = args[3];
-        
-        let socket = self.manager.get_socket(fd)
+
+        let socket = self
+            .manager
+            .get_socket(fd)
             .ok_or_else(|| Error::NotFound(format!("Socket fd {} not found", fd)))?;
-        
-        let buffer = socket.get_buffer(buffer_id)
+
+        let buffer = socket
+            .get_buffer(buffer_id)
             .ok_or_else(|| Error::NotFound(format!("Buffer {} not found", buffer_id)))?;
-        
+
         if offset + length > buffer.size {
             return Err(Error::InvalidArgument("Offset + length exceeds buffer size".to_string()));
         }
-        
+
         socket.queue_recv((*buffer).clone())?;
-        
-        sys_trace_with_args!("zero_copy_recv: fd={}, buffer_id={}, offset={}, length={}",
-                   fd, buffer_id, offset, length);
-        
+
+        sys_trace_with_args!(
+            "zero_copy_recv: fd={}, buffer_id={}, offset={}, length={}",
+            fd,
+            buffer_id,
+            offset,
+            length
+        );
+
         Ok(length as isize)
     }
-    
+
     fn name(&self) -> &str {
         "zero_copy_recv"
     }
@@ -384,21 +409,23 @@ impl SyscallHandler for ZeroCopyCreateBufferHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_ZERO_COPY_CREATE_BUFFER
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 3 {
-            return Err(Error::InvalidArgument("Insufficient arguments for create buffer".to_string()));
+            return Err(Error::InvalidArgument(
+                "Insufficient arguments for create buffer".to_string(),
+            ));
         }
 
         let fd = args[0] as i32;
         let size = args[1];
         let flags = ZeroCopyFlags::from_bits(args[2] as u32);
-        
+
         let buffer = self.manager.create_buffer(fd, size, flags)?;
-        
+
         Ok(buffer.id as isize)
     }
-    
+
     fn name(&self) -> &str {
         "zero_copy_create_buffer"
     }
@@ -419,23 +446,27 @@ impl SyscallHandler for ZeroCopyDestroyBufferHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_ZERO_COPY_DESTROY_BUFFER
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 2 {
-            return Err(Error::InvalidArgument("Insufficient arguments for destroy buffer".to_string()));
+            return Err(Error::InvalidArgument(
+                "Insufficient arguments for destroy buffer".to_string(),
+            ));
         }
 
         let fd = args[0] as i32;
         let buffer_id = args[1] as u64;
-        
-        let socket = self.manager.get_socket(fd)
+
+        let socket = self
+            .manager
+            .get_socket(fd)
             .ok_or_else(|| Error::NotFound(format!("Socket fd {} not found", fd)))?;
-        
+
         socket.unregister_buffer(buffer_id)?;
-        
+
         Ok(0)
     }
-    
+
     fn name(&self) -> &str {
         "zero_copy_destroy_buffer"
     }
@@ -445,12 +476,12 @@ impl SyscallHandler for ZeroCopyDestroyBufferHandler {
 pub fn register_syscalls(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     let handler = ZeroCopySendHandler::new();
     let manager = handler.manager().clone();
-    
+
     dispatcher.register_handler(2000, Box::new(handler));
     dispatcher.register_handler(2001, Box::new(ZeroCopyRecvHandler::new(manager.clone())));
     dispatcher.register_handler(2002, Box::new(ZeroCopyCreateBufferHandler::new(manager.clone())));
     dispatcher.register_handler(2003, Box::new(ZeroCopyDestroyBufferHandler::new(manager)));
-    
+
     Ok(())
 }
 
@@ -469,7 +500,7 @@ mod tests {
     #[test]
     fn test_zero_copy_socket() {
         let socket = ZeroCopySocket::new(3, 4096);
-        
+
         let buffer = ZeroCopyBuffer {
             id: 1,
             addr: 0x1000,
@@ -478,28 +509,30 @@ mod tests {
             refcount: 1,
             owner_fd: Some(3),
         };
-        
+
         socket.register_buffer(buffer.clone()).unwrap();
         assert!(socket.get_buffer(1).is_some());
-        
+
         socket.unregister_buffer(1).unwrap();
         assert!(socket.get_buffer(1).is_none());
-        
+
         assert_eq!(socket.is_zero_copy_enabled(), true);
     }
 
     #[test]
     fn test_zero_copy_manager() {
         let manager = ZeroCopyManager::new();
-        
+
         let _ = manager.create_socket(3, 4096).unwrap();
         assert!(manager.get_socket(3).is_some());
-        
-        let buffer = manager.create_buffer(3, 1024, ZeroCopyFlags::ReadWrite).unwrap();
+
+        let buffer = manager
+            .create_buffer(3, 1024, ZeroCopyFlags::ReadWrite)
+            .unwrap();
         assert_eq!(buffer.owner_fd, Some(3));
-        
+
         assert_eq!(manager.get_allocated_bytes(), 1024);
-        
+
         manager.close_socket(3).unwrap();
         assert!(manager.get_socket(3).is_none());
     }
@@ -508,7 +541,7 @@ mod tests {
     fn test_zero_copy_handler() {
         let handler = ZeroCopySendHandler::new();
         assert_eq!(handler.name(), "zero_copy_send");
-        
+
         let result = handler.execute(&[]);
         assert!(result.is_err());
     }

@@ -14,7 +14,12 @@ pub trait GLibEpollManager {
     fn remove_event_source(&mut self, epfd: c_int, fd: c_int) -> Result<(), c_int>;
 
     /// 等待事件
-    fn wait_events(&mut self, epfd: c_int, events: &mut [EpollEvent], timeout: c_int) -> Result<usize, c_int>;
+    fn wait_events(
+        &mut self,
+        epfd: c_int,
+        events: &mut [EpollEvent],
+        timeout: c_int,
+    ) -> Result<usize, c_int>;
 
     /// 关闭epoll实例
     fn close_epoll_instance(&mut self, epfd: c_int) -> Result<(), c_int>;
@@ -32,34 +37,28 @@ impl Default for GLibEpollManager {
 impl GLibEpollManager for () {
     fn create_epoll_instance(&mut self) -> Result<c_int, c_int> {
         let result = super::instance::sys_glib_epoll_create();
-        if result >= 0 {
-            Ok(result)
-        } else {
-            Err(result)
-        }
+        if result >= 0 { Ok(result) } else { Err(result) }
     }
 
     fn add_event_source(&mut self, epfd: c_int, fd: c_int, events: u32) -> Result<(), c_int> {
         let result = super::instance::sys_glib_epoll_add_source(epfd, fd, events);
-        if result == 0 {
-            Ok(())
-        } else {
-            Err(result)
-        }
+        if result == 0 { Ok(()) } else { Err(result) }
     }
 
     fn remove_event_source(&mut self, epfd: c_int, fd: c_int) -> Result<(), c_int> {
         let result = super::instance::sys_glib_epoll_remove_source(epfd, fd);
-        if result == 0 {
-            Ok(())
-        } else {
-            Err(result)
-        }
+        if result == 0 { Ok(()) } else { Err(result) }
     }
 
-    fn wait_events(&mut self, epfd: c_int, events: &mut [EpollEvent], timeout: c_int) -> Result<usize, c_int> {
+    fn wait_events(
+        &mut self,
+        epfd: c_int,
+        events: &mut [EpollEvent],
+        timeout: c_int,
+    ) -> Result<usize, c_int> {
         let maxevents = events.len() as c_int;
-        let result = super::instance::sys_glib_epoll_wait(epfd, events.as_mut_ptr(), maxevents, timeout);
+        let result =
+            super::instance::sys_glib_epoll_wait(epfd, events.as_mut_ptr(), maxevents, timeout);
         if result >= 0 {
             Ok(result as usize)
         } else {
@@ -69,11 +68,7 @@ impl GLibEpollManager for () {
 
     fn close_epoll_instance(&mut self, epfd: c_int) -> Result<(), c_int> {
         let result = super::instance::sys_glib_epoll_close(epfd);
-        if result == 0 {
-            Ok(())
-        } else {
-            Err(result)
-        }
+        if result == 0 { Ok(()) } else { Err(result) }
     }
 
     fn get_instance_stats(&self, epfd: c_int) -> Result<GLibEpollInstance, ()> {
@@ -86,12 +81,9 @@ impl GLibEpollManager for () {
             total_events: AtomicUsize::new(0),
         };
 
-        let result = super::instance::sys_glib_epoll_stats(epfd, &mut instance as *mut GLibEpollInstance);
-        if result == 0 {
-            Ok(instance)
-        } else {
-            Err(())
-        }
+        let result =
+            super::instance::sys_glib_epoll_stats(epfd, &mut instance as *mut GLibEpollInstance);
+        if result == 0 { Ok(instance) } else { Err(()) }
     }
 }
 
@@ -145,7 +137,8 @@ mod tests {
             total_events: AtomicUsize::new(0),
         };
 
-        let result = super::instance::sys_glib_epoll_stats(epfd, &mut stats as *mut GLibEpollInstance);
+        let result =
+            super::instance::sys_glib_epoll_stats(epfd, &mut stats as *mut GLibEpollInstance);
         assert_eq!(result, 0);
         assert_eq!(stats.epfd, epfd);
         assert_eq!(stats.source_count.load(Ordering::SeqCst), 0);

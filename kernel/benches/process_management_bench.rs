@@ -11,14 +11,15 @@
 
 extern crate alloc;
 
-use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
-use core::hint::black_box;
 use alloc::vec::Vec;
+use core::hint::black_box;
+
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use hashbrown::HashMap;
 
+use crate::process::manager::{NPROC, ProcState};
 // Import process management functions from the crate being tested
-use crate::process::manager::{ProcTable, PROC_TABLE, init as init_process_system};
-use crate::process::manager::{ProcState, NPROC};
+use crate::process::manager::{PROC_TABLE, ProcTable, init as init_process_system};
 
 // ============================================================================
 // Benchmark Setup and Teardown
@@ -35,7 +36,8 @@ fn setup_process_table() -> ProcTable {
 /// Clean up process table after benchmarking
 fn cleanup_process_table(mut table: ProcTable) {
     // Free all allocated processes
-    let pids_to_free: Vec<_> = table.iter()
+    let pids_to_free: Vec<_> = table
+        .iter()
         .filter(|p| p.state != ProcState::Unused)
         .map(|p| p.pid)
         .collect();
@@ -76,7 +78,7 @@ fn bench_process_allocation(c: &mut Criterion) {
 
                     black_box(table);
                 })
-            }
+            },
         );
     }
 
@@ -153,7 +155,8 @@ fn bench_process_lookup(c: &mut Criterion) {
                     },
                     |(mut table, pids): (ProcTable, Vec<usize>)| {
                         // Benchmark: lookup each process multiple times
-                        for _ in 0..10 { // Multiple lookups per process
+                        for _ in 0..10 {
+                            // Multiple lookups per process
                             for &pid in &pids {
                                 let proc = table.find(pid);
                                 black_box(proc);
@@ -165,9 +168,9 @@ fn bench_process_lookup(c: &mut Criterion) {
                             table.free(pid);
                         }
                     },
-                    criterion::BatchSize::SmallInput
+                    criterion::BatchSize::SmallInput,
                 )
-            }
+            },
         );
     }
 
@@ -183,7 +186,8 @@ fn bench_process_lookup_hashmap(c: &mut Criterion) {
                 let mut table = setup_process_table();
                 let mut pids = Vec::new();
 
-                for _ in 0..NPROC/2 { // Half capacity to test hash map performance
+                for _ in 0..NPROC / 2 {
+                    // Half capacity to test hash map performance
                     if let Some(proc) = table.alloc() {
                         pids.push(proc.pid);
                     }
@@ -212,7 +216,7 @@ fn bench_process_lookup_hashmap(c: &mut Criterion) {
                     table.free(pid);
                 }
             },
-            criterion::BatchSize::SmallInput
+            criterion::BatchSize::SmallInput,
         )
     });
 }
@@ -252,9 +256,9 @@ fn bench_process_destruction(c: &mut Criterion) {
 
                         black_box(table);
                     },
-                    criterion::BatchSize::SmallInput
+                    criterion::BatchSize::SmallInput,
                 )
-            }
+            },
         );
     }
 
@@ -268,7 +272,8 @@ fn bench_process_destruction_with_pools(c: &mut Criterion) {
             let mut table = setup_process_table();
 
             // Cycle: allocate, use, free, reallocate
-            for _ in 0..5 { // Multiple cycles
+            for _ in 0..5 {
+                // Multiple cycles
                 let mut pids = Vec::new();
 
                 // Allocate all available processes
@@ -336,7 +341,7 @@ fn bench_mixed_process_operations(c: &mut Criterion) {
 
                     black_box(table);
                 })
-            }
+            },
         );
     }
 
@@ -352,7 +357,7 @@ fn bench_process_table_iteration(c: &mut Criterion) {
                 let mut table = setup_process_table();
                 let mut pids = Vec::new();
 
-                for _ in 0..NPROC/2 {
+                for _ in 0..NPROC / 2 {
                     if let Some(proc) = table.alloc() {
                         pids.push(proc.pid);
                     }
@@ -380,7 +385,7 @@ fn bench_process_table_iteration(c: &mut Criterion) {
                     table.free(pid);
                 }
             },
-            criterion::BatchSize::SmallInput
+            criterion::BatchSize::SmallInput,
         )
     });
 }
@@ -398,7 +403,7 @@ fn bench_performance_validation(c: &mut Criterion) {
         b.iter(|| {
             // Simulate old O(n) lookup performance
             let mut processes = Vec::new();
-            for i in 1..=NPROC/4 {
+            for i in 1..=NPROC / 4 {
                 processes.push(i);
             }
 
@@ -426,7 +431,7 @@ fn bench_performance_validation(c: &mut Criterion) {
                 let mut table = setup_process_table();
                 let mut pids = Vec::new();
 
-                for _ in 0..NPROC/4 {
+                for _ in 0..NPROC / 4 {
                     if let Some(proc) = table.alloc() {
                         pids.push(proc.pid);
                     }
@@ -451,7 +456,7 @@ fn bench_performance_validation(c: &mut Criterion) {
                     table.free(pid);
                 }
             },
-            criterion::BatchSize::SmallInput
+            criterion::BatchSize::SmallInput,
         )
     });
 

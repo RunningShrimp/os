@@ -1,21 +1,22 @@
 // Forensics Module for Security Audit
 
 extern crate alloc;
-//
 // 取证模块，负责安全事件的取证分析和调查
 
-use alloc::format;
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::string::ToString;
+use alloc::{
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
 use core::sync::atomic::{AtomicU64, Ordering};
+
 use spin::Mutex;
 
+use super::{ForensicEvent, ForensicFinding, ForensicFindingType, ForensicReport};
 use crate::security::audit::{AuditEvent, AuditEventType, AuditSeverity};
-use super::{ForensicReport, ForensicFinding, ForensicFindingType, ForensicEvent};
 
 /// 取证分析器
 pub struct ForensicAnalyzer {
@@ -374,39 +375,56 @@ impl ForensicAnalyzer {
     /// 初始化取证分析器
     pub fn init(&mut self) -> Result<(), &'static str> {
         // 加载攻击模式
-        self.analysis_engine.lock().pattern_matcher.load_attack_patterns()?;
+        self.analysis_engine
+            .lock()
+            .pattern_matcher
+            .load_attack_patterns()?;
 
         // 构建系统基线
-        self.analysis_engine.lock().behavior_analyzer.build_system_baseline()?;
+        self.analysis_engine
+            .lock()
+            .behavior_analyzer
+            .build_system_baseline()?;
 
         crate::println!("[ForensicAnalyzer] Forensic analyzer initialized");
         Ok(())
     }
 
     /// 分析时间范围
-    pub fn analyze_time_range(&mut self, time_range: (u64, u64)) -> Result<ForensicReport, &'static str> {
+    pub fn analyze_time_range(
+        &mut self,
+        time_range: (u64, u64),
+    ) -> Result<ForensicReport, &'static str> {
         let start_time = crate::subsystems::time::get_timestamp_nanos();
 
         // 获取时间范围内的事件
         let events = self.get_events_in_time_range(time_range)?;
 
         // 模式匹配分析
-        let attack_findings = self.analysis_engine.lock()
+        let attack_findings = self
+            .analysis_engine
+            .lock()
             .pattern_matcher
             .match_attack_patterns(&events)?;
 
         // 异常检测分析
-        let anomaly_findings = self.analysis_engine.lock()
+        let anomaly_findings = self
+            .analysis_engine
+            .lock()
             .pattern_matcher
             .detect_anomalies(&events)?;
 
         // 行为分析
-        let behavior_findings = self.analysis_engine.lock()
+        let behavior_findings = self
+            .analysis_engine
+            .lock()
             .behavior_analyzer
             .analyze_behavior(&events)?;
 
         // 构建时间线
-        let timeline = self.analysis_engine.lock()
+        let timeline = self
+            .analysis_engine
+            .lock()
             .timeline_builder
             .build_timeline(&events)?;
 
@@ -451,30 +469,34 @@ impl ForensicAnalyzer {
     }
 
     /// 获取时间范围内的事件
-    fn get_events_in_time_range(&self, time_range: (u64, u64)) -> Result<Vec<AuditEvent>, &'static str> {
+    fn get_events_in_time_range(
+        &self,
+        time_range: (u64, u64),
+    ) -> Result<Vec<AuditEvent>, &'static str> {
         // 简化实现，返回模拟数据
         // 实际实现会从审计数据库查询
-        let events = vec![
-            AuditEvent {
-                id: 1,
-                event_type: AuditEventType::SecurityViolation,
-                timestamp: time_range.0 + 1000,
-                pid: 1234,
-                uid: 1000,
-                gid: 1000,
-                severity: AuditSeverity::Critical,
-                message: "Security violation detected".to_string(),
-                data: BTreeMap::new(),
-                source_location: None,
-                tid: 1234,
-                syscall: None,
-            }
-        ];
+        let events = vec![AuditEvent {
+            id: 1,
+            event_type: AuditEventType::SecurityViolation,
+            timestamp: time_range.0 + 1000,
+            pid: 1234,
+            uid: 1000,
+            gid: 1000,
+            severity: AuditSeverity::Critical,
+            message: "Security violation detected".to_string(),
+            data: BTreeMap::new(),
+            source_location: None,
+            tid: 1234,
+            syscall: None,
+        }];
         Ok(events)
     }
 
     /// 构建相关性图
-    fn build_correlation_graph(&self, events: &[AuditEvent]) -> Result<CorrelationGraph, &'static str> {
+    fn build_correlation_graph(
+        &self,
+        events: &[AuditEvent],
+    ) -> Result<CorrelationGraph, &'static str> {
         // 简化的相关性图构建
         let mut nodes = Vec::new();
         let mut edges = Vec::new();
@@ -502,11 +524,7 @@ impl ForensicAnalyzer {
             edges.push(edge);
         }
 
-        Ok(CorrelationGraph {
-            nodes,
-            edges,
-            properties: BTreeMap::new(),
-        })
+        Ok(CorrelationGraph { nodes, edges, properties: BTreeMap::new() })
     }
 
     /// 生成建议
@@ -518,18 +536,18 @@ impl ForensicAnalyzer {
                 ForensicFindingType::SystemIntrusion => {
                     recommendations.push("立即隔离受影响的系统".to_string());
                     recommendations.push("进行全面的安全扫描".to_string());
-                }
+                },
                 ForensicFindingType::DataLeak => {
                     recommendations.push("通知相关利益方".to_string());
                     recommendations.push("评估数据泄露影响".to_string());
-                }
+                },
                 ForensicFindingType::Malware => {
                     recommendations.push("清除恶意软件".to_string());
                     recommendations.push("更新防病毒定义".to_string());
-                }
+                },
                 _ => {
                     recommendations.push("进一步调查此安全事件".to_string());
-                }
+                },
             }
         }
 
@@ -550,10 +568,7 @@ impl ForensicAnalyzer {
 impl PatternMatcher {
     /// 创建新的模式匹配器
     pub fn new() -> Self {
-        Self {
-            attack_patterns: Vec::new(),
-            anomaly_patterns: Vec::new(),
-        }
+        Self { attack_patterns: Vec::new(), anomaly_patterns: Vec::new() }
     }
 
     /// 加载攻击模式
@@ -571,11 +586,15 @@ impl PatternMatcher {
     }
 
     /// 匹配攻击模式
-    pub fn match_attack_patterns(&self, events: &[AuditEvent]) -> Result<Vec<ForensicFinding>, &'static str> {
+    pub fn match_attack_patterns(
+        &self,
+        events: &[AuditEvent],
+    ) -> Result<Vec<ForensicFinding>, &'static str> {
         let mut findings = Vec::new();
 
         // 简化的攻击模式匹配
-        let failed_logins = events.iter()
+        let failed_logins = events
+            .iter()
             .filter(|e| e.event_type == AuditEventType::Authentication)
             .count();
 
@@ -594,11 +613,15 @@ impl PatternMatcher {
     }
 
     /// 检测异常
-    pub fn detect_anomalies(&self, events: &[AuditEvent]) -> Result<Vec<ForensicFinding>, &'static str> {
+    pub fn detect_anomalies(
+        &self,
+        events: &[AuditEvent],
+    ) -> Result<Vec<ForensicFinding>, &'static str> {
         let mut findings = Vec::new();
 
         // 简化的异常检测
-        let critical_events = events.iter()
+        let critical_events = events
+            .iter()
             .filter(|e| e.severity == AuditSeverity::Critical)
             .count();
 
@@ -637,7 +660,10 @@ impl BehaviorAnalyzer {
     }
 
     /// 分析行为
-    pub fn analyze_behavior(&self, events: &[AuditEvent]) -> Result<Vec<ForensicFinding>, &'static str> {
+    pub fn analyze_behavior(
+        &self,
+        events: &[AuditEvent],
+    ) -> Result<Vec<ForensicFinding>, &'static str> {
         // 简化的行为分析
         Ok(Vec::new())
     }
@@ -646,14 +672,14 @@ impl BehaviorAnalyzer {
 impl TimelineBuilder {
     /// 创建新的时间线构建器
     pub fn new() -> Self {
-        Self {
-            event_timeline: Vec::new(),
-            key_moments: Vec::new(),
-        }
+        Self { event_timeline: Vec::new(), key_moments: Vec::new() }
     }
 
     /// 构建时间线
-    pub fn build_timeline(&mut self, events: &[AuditEvent]) -> Result<Vec<ForensicEvent>, &'static str> {
+    pub fn build_timeline(
+        &mut self,
+        events: &[AuditEvent],
+    ) -> Result<Vec<ForensicEvent>, &'static str> {
         let mut timeline = Vec::new();
 
         for (i, event) in events.iter().enumerate() {

@@ -4,9 +4,8 @@
 //! interface and next hop for packet delivery.
 
 extern crate alloc;
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
+
 use super::ipv4::Ipv4Addr;
 // Interface在当前文件中未使用，暂时注释掉
 // use super::interface::Interface;
@@ -49,21 +48,18 @@ impl RouteEntry {
 
     /// Check if this route matches the given destination
     pub fn matches(&self, destination: Ipv4Addr) -> bool {
-        (destination.to_u32() & self.netmask.to_u32()) ==
-        (self.destination.to_u32() & self.netmask.to_u32())
+        (destination.to_u32() & self.netmask.to_u32())
+            == (self.destination.to_u32() & self.netmask.to_u32())
     }
 
     /// Get the network address
     pub fn network(&self) -> Ipv4Addr {
-        Ipv4Addr::from_u32(
-            self.destination.to_u32() & self.netmask.to_u32()
-        )
+        Ipv4Addr::from_u32(self.destination.to_u32() & self.netmask.to_u32())
     }
 
     /// Check if this is a default route (0.0.0.0/0)
     pub fn is_default(&self) -> bool {
-        self.destination == Ipv4Addr::UNSPECIFIED &&
-        self.netmask == Ipv4Addr::UNSPECIFIED
+        self.destination == Ipv4Addr::UNSPECIFIED && self.netmask == Ipv4Addr::UNSPECIFIED
     }
 
     /// Get the prefix length of the netmask
@@ -131,16 +127,20 @@ impl RoutingTable {
     /// Add a route to the table
     pub fn add_route(&mut self, route: RouteEntry) {
         // Remove existing route for the same network if it exists
-        self.entries.retain(|r| {
-            !(r.network() == route.network() && r.interface_id == route.interface_id)
-        });
+        self.entries
+            .retain(|r| !(r.network() == route.network() && r.interface_id == route.interface_id));
 
         self.entries.push(route);
         self.invalidate_cache();
     }
 
     /// Remove a route from the table
-    pub fn remove_route(&mut self, destination: Ipv4Addr, netmask: Ipv4Addr, interface_id: u32) -> bool {
+    pub fn remove_route(
+        &mut self,
+        destination: Ipv4Addr,
+        netmask: Ipv4Addr,
+        interface_id: u32,
+    ) -> bool {
         let network = destination.to_u32() & netmask.to_u32();
         let original_len = self.entries.len();
 
@@ -165,10 +165,12 @@ impl RoutingTable {
 
         // Simple approach: return a direct reference without caching
         // This avoids borrow checker issues with self-borrowing
-        self.entries.iter()
+        self.entries
+            .iter()
             .filter(|r| r.active && r.matches(destination))
             .min_by(|a, b| {
-                a.metric.cmp(&b.metric)
+                a.metric
+                    .cmp(&b.metric)
                     .then_with(|| b.prefix_len().cmp(&a.prefix_len()))
             })
     }
@@ -205,7 +207,7 @@ impl RoutingTable {
             Ipv4Addr::UNSPECIFIED,
             Some(gateway),
             interface_id,
-            1
+            1,
         );
         self.add_route(route);
     }
@@ -326,10 +328,7 @@ pub struct RouteManager {
 impl RouteManager {
     /// Create a new route manager
     pub fn new() -> Self {
-        Self {
-            main_table: RoutingTable::new(),
-            tables: BTreeMap::new(),
-        }
+        Self { main_table: RoutingTable::new(), tables: BTreeMap::new() }
     }
 
     /// Get the main routing table
@@ -369,7 +368,12 @@ pub mod common_routes {
     use super::*;
 
     /// Add common local routes
-    pub fn add_local_routes(table: &mut RoutingTable, interface_id: u32, local_ip: Ipv4Addr, netmask: Ipv4Addr) {
+    pub fn add_local_routes(
+        table: &mut RoutingTable,
+        interface_id: u32,
+        local_ip: Ipv4Addr,
+        netmask: Ipv4Addr,
+    ) {
         // Direct route to local network
         table.add_direct_route(local_ip, netmask, interface_id);
 

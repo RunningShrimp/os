@@ -3,11 +3,9 @@
 //! This module provides abstract interfaces for system call handling,
 //! breaking the circular dependency between syscalls and services modules.
 
-use nos_api::Result;
+use alloc::{string::String, sync::Arc, vec::Vec};
 
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::string::String;
+use nos_api::Result;
 
 /// System call dispatcher interface
 /// This trait defines the interface for dispatching system calls
@@ -22,7 +20,7 @@ pub trait SyscallDispatcher {
     /// # Returns
     /// * `isize` - System call return value
     fn dispatch(&self, syscall_num: usize, args: &[usize]) -> isize;
-    
+
     /// Get system call statistics
     ///
     /// # Returns
@@ -66,7 +64,7 @@ pub trait ServiceManager {
     /// # Returns
     /// * `Result<()>` - Success or error
     fn register_service(&mut self, service: Arc<dyn Service>) -> Result<()>;
-    
+
     /// Get a service by name
     ///
     /// # Arguments
@@ -75,13 +73,13 @@ pub trait ServiceManager {
     /// # Returns
     /// * `Option<Arc<dyn Service>>` - Service if found
     fn get_service(&self, name: &str) -> Option<Arc<dyn Service>>;
-    
+
     /// List all registered services
     ///
     /// # Returns
     /// * `Vec<&str>` - List of service names
     fn list_services(&self) -> Vec<&str>;
-    
+
     /// Get service statistics
     ///
     /// # Returns
@@ -102,11 +100,7 @@ pub struct ServiceStats {
 
 impl Default for ServiceStats {
     fn default() -> Self {
-        Self {
-            total_services: 0,
-            active_services: 0,
-            failed_services: 0,
-        }
+        Self { total_services: 0, active_services: 0, failed_services: 0 }
     }
 }
 
@@ -118,25 +112,25 @@ pub trait Service {
     /// # Returns
     /// * `&str` - Service name
     fn name(&self) -> &str;
-    
+
     /// Get service version
     ///
     /// # Returns
     /// * `&str` - Service version
     fn version(&self) -> &str;
-    
+
     /// Initialize the service
     ///
     /// # Returns
     /// * `Result<()>` - Success or error
     fn initialize(&mut self) -> Result<()>;
-    
+
     /// Shutdown the service
     ///
     /// # Returns
     /// * `Result<()>` - Success or error
     fn shutdown(&mut self) -> Result<()>;
-    
+
     /// Handle a system call
     ///
     /// # Arguments
@@ -146,13 +140,13 @@ pub trait Service {
     /// # Returns
     /// * `isize` - System call return value
     fn handle_syscall(&mut self, syscall_num: usize, args: &[usize]) -> isize;
-    
+
     /// Get service status
     ///
     /// # Returns
     /// * `ServiceStatus` - Service status
     fn get_status(&self) -> ServiceStatus;
-    
+
     /// Get service health
     ///
     /// # Returns

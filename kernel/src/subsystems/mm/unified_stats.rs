@@ -1,5 +1,4 @@
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
+use alloc::{collections::BTreeMap, vec::Vec};
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 // Re-export MemoryType for external use
@@ -67,7 +66,7 @@ impl AllocationStats {
         self.current_allocations += 1;
         self.total_allocated_bytes += size;
         self.current_allocated_bytes += size;
-        
+
         if self.current_allocations > self.peak_allocations {
             self.peak_allocations = self.current_allocations;
         }
@@ -75,14 +74,14 @@ impl AllocationStats {
             self.peak_allocated_bytes = self.current_allocated_bytes;
         }
     }
-    
+
     pub fn record_deallocation(&mut self, size: u64) {
         self.total_deallocations += 1;
         self.current_allocations = self.current_allocations.saturating_sub(1);
         self.total_deallocated_bytes += size;
         self.current_allocated_bytes = self.current_allocated_bytes.saturating_sub(size);
     }
-    
+
     pub fn record_failure(&mut self) {
         self.allocation_failures += 1;
     }
@@ -122,24 +121,31 @@ impl AtomicAllocationStats {
     pub fn record_allocation(&self, size: u64) {
         self.total_allocations.fetch_add(1, Ordering::Relaxed);
         let current = self.current_allocations.fetch_add(1, Ordering::Relaxed) + 1;
-        self.total_allocated_bytes.fetch_add(size, Ordering::Relaxed);
-        let current_bytes = self.current_allocated_bytes.fetch_add(size, Ordering::Relaxed) + size;
-        
+        self.total_allocated_bytes
+            .fetch_add(size, Ordering::Relaxed);
+        let current_bytes = self
+            .current_allocated_bytes
+            .fetch_add(size, Ordering::Relaxed)
+            + size;
+
         self.peak_allocations.fetch_max(current, Ordering::Relaxed);
-        self.peak_allocated_bytes.fetch_max(current_bytes, Ordering::Relaxed);
+        self.peak_allocated_bytes
+            .fetch_max(current_bytes, Ordering::Relaxed);
     }
-    
+
     pub fn record_deallocation(&self, size: u64) {
         self.total_deallocations.fetch_add(1, Ordering::Relaxed);
         self.current_allocations.fetch_sub(1, Ordering::Relaxed);
-        self.total_deallocated_bytes.fetch_add(size, Ordering::Relaxed);
-        self.current_allocated_bytes.fetch_sub(size, Ordering::Relaxed);
+        self.total_deallocated_bytes
+            .fetch_add(size, Ordering::Relaxed);
+        self.current_allocated_bytes
+            .fetch_sub(size, Ordering::Relaxed);
     }
-    
+
     pub fn record_failure(&self) {
         self.allocation_failures.fetch_add(1, Ordering::Relaxed);
     }
-    
+
     pub fn snapshot(&self) -> AllocationStats {
         AllocationStats {
             total_allocations: self.total_allocations.load(Ordering::Relaxed),
@@ -185,15 +191,15 @@ impl LightweightAllocationStats {
     pub fn record_fast_path(&self) {
         self.fast_path_hits.fetch_add(1, Ordering::Relaxed);
     }
-    
+
     pub fn record_slow_path(&self) {
         self.slow_path_allocations.fetch_add(1, Ordering::Relaxed);
     }
-    
+
     pub fn record_failure(&self) {
         self.failed_allocations.fetch_add(1, Ordering::Relaxed);
     }
-    
+
     pub fn get_stats(&self) -> (usize, usize, usize) {
         (
             self.fast_path_hits.load(Ordering::Relaxed),
@@ -201,15 +207,11 @@ impl LightweightAllocationStats {
             self.failed_allocations.load(Ordering::Relaxed),
         )
     }
-    
+
     pub fn hit_ratio(&self) -> f64 {
         let hits = self.fast_path_hits.load(Ordering::Relaxed) as f64;
         let total = (hits + self.slow_path_allocations.load(Ordering::Relaxed) as f64);
-        if total == 0.0 {
-            0.0
-        } else {
-            hits / total
-        }
+        if total == 0.0 { 0.0 } else { hits / total }
     }
 }
 
@@ -238,28 +240,28 @@ impl ExtendedAllocationStats {
         self.fast_path_hits.fetch_add(1, Ordering::Relaxed);
         self.base.record_allocation(size);
     }
-    
+
     pub fn record_slow_path(&self, size: u64) {
         self.slow_path_allocations.fetch_add(1, Ordering::Relaxed);
         self.base.record_allocation(size);
     }
-    
+
     pub fn record_deallocation(&self, size: u64) {
         self.base.record_deallocation(size);
     }
-    
+
     pub fn record_failure(&self) {
         self.base.record_failure();
     }
-    
+
     pub fn record_defragmentation(&self) {
         self.defragmentation_runs.fetch_add(1, Ordering::Relaxed);
     }
-    
+
     pub fn snapshot(&self) -> AllocationStats {
         self.base.snapshot()
     }
-    
+
     pub fn get_extended_stats(&self) -> (AllocationStats, usize, usize, usize) {
         (
             self.snapshot(),

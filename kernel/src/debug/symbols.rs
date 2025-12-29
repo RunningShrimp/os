@@ -1,7 +1,6 @@
 // 调试符号支持模块
 
 extern crate alloc;
-//
 // 提供全面的调试符号支持，包括符号表管理、符号解析、
 // 地址反向查找和调试信息生成。
 //
@@ -14,14 +13,16 @@ extern crate alloc;
 // - DWARF调试信息解析
 // - 符号缓存优化
 
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec;
-use alloc::vec::Vec;
-use alloc::format;
-use alloc::string::String;
-use alloc::string::ToString;
+use alloc::{
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+
 use spin::Mutex;
 
 // Import println macro
@@ -562,28 +563,39 @@ impl SymbolTableManager {
         // 如果是函数符号，添加到函数范围映射
         if symbol.symbol_type == SymbolType::Function {
             let mut ranges = self.function_ranges.lock();
-            ranges.insert(symbol.address, FunctionRange {
-                name: symbol.name.clone(),
-                start_address: symbol.address,
-                end_address: symbol.address + symbol.size,
-                entry_address: symbol.address,
-                source_file: symbol.source_file.clone(),
-                start_line: symbol.line_number,
-                end_line: None,
-            });
+            ranges.insert(
+                symbol.address,
+                FunctionRange {
+                    name: symbol.name.clone(),
+                    start_address: symbol.address,
+                    end_address: symbol.address + symbol.size,
+                    entry_address: symbol.address,
+                    source_file: symbol.source_file.clone(),
+                    start_line: symbol.line_number,
+                    end_line: None,
+                },
+            );
         }
 
         // 更新统计
         match symbol.symbol_type {
-            SymbolType::Function => self.statistics.function_symbols.fetch_add(1, Ordering::SeqCst),
-            SymbolType::Variable => self.statistics.variable_symbols.fetch_add(1, Ordering::SeqCst),
+            SymbolType::Function => self
+                .statistics
+                .function_symbols
+                .fetch_add(1, Ordering::SeqCst),
+            SymbolType::Variable => self
+                .statistics
+                .variable_symbols
+                .fetch_add(1, Ordering::SeqCst),
             SymbolType::Type => self.statistics.type_symbols.fetch_add(1, Ordering::SeqCst),
             _ => 0,
         };
         self.statistics.total_symbols.fetch_add(1, Ordering::SeqCst);
 
         let lookup_time = crate::subsystems::time::timestamp_nanos() - start_time;
-        self.statistics.total_lookup_time.fetch_add(lookup_time, Ordering::SeqCst);
+        self.statistics
+            .total_lookup_time
+            .fetch_add(lookup_time, Ordering::SeqCst);
 
         Ok(())
     }
@@ -629,14 +641,11 @@ impl SymbolTableManager {
 
         self.statistics.lookups.fetch_add(1, Ordering::SeqCst);
         let lookup_time = crate::subsystems::time::timestamp_nanos() - start_time;
-        self.statistics.total_lookup_time.fetch_add(lookup_time, Ordering::SeqCst);
+        self.statistics
+            .total_lookup_time
+            .fetch_add(lookup_time, Ordering::SeqCst);
 
-        Ok(SymbolLookupResult {
-            symbol,
-            exact_match,
-            similar_symbols,
-            lookup_time,
-        })
+        Ok(SymbolLookupResult { symbol, exact_match, similar_symbols, lookup_time })
     }
 
     /// 反向查找（地址到符号）
@@ -645,7 +654,11 @@ impl SymbolTableManager {
 
         // 在地址到符号的映射中查找
         let address_map = self.address_to_symbol.lock();
-        let symbol_name = address_map.range(..=address).rev().next().map(|(_, name)| name.clone());
+        let symbol_name = address_map
+            .range(..=address)
+            .rev()
+            .next()
+            .map(|(_, name)| name.clone());
 
         let symbol = if let Some(name) = &symbol_name {
             let global_symbols = self.global_symbols.lock();
@@ -675,12 +688,18 @@ impl SymbolTableManager {
     }
 
     /// 添加模块符号
-    pub fn add_module_symbols(&self, module_name: String, symbols: Vec<DebugSymbol>) -> Result<(), SymbolError> {
+    pub fn add_module_symbols(
+        &self,
+        module_name: String,
+        symbols: Vec<DebugSymbol>,
+    ) -> Result<(), SymbolError> {
         let mut module_symbols = self.module_symbols.lock();
 
         for symbol in symbols {
             // 添加到模块符号表
-            let module_list = module_symbols.entry(module_name.clone()).or_insert_with(Vec::new);
+            let module_list = module_symbols
+                .entry(module_name.clone())
+                .or_insert_with(Vec::new);
             module_list.push(symbol.clone());
 
             // 同时添加到全局符号表（如果还没有）
@@ -694,7 +713,14 @@ impl SymbolTableManager {
             }
         }
 
-        crate::println!("[symbols] 添加模块 {} 的 {} 个符号", module_name, module_symbols.get(&module_name).map(|s| s.len()).unwrap_or(0));
+        crate::println!(
+            "[symbols] 添加模块 {} 的 {} 个符号",
+            module_name,
+            module_symbols
+                .get(&module_name)
+                .map(|s| s.len())
+                .unwrap_or(0)
+        );
 
         Ok(())
     }
@@ -760,7 +786,7 @@ impl SymbolTableManager {
                         symbol.name
                     ));
                 }
-            }
+            },
             ExportFormat::Json => {
                 output.push_str("{\n  \"symbols\": [\n");
                 let mut first = true;
@@ -778,19 +804,17 @@ impl SymbolTableManager {
                     ));
                 }
                 output.push_str("\n  ]\n}");
-            }
+            },
             ExportFormat::Nm => {
                 // nm格式输出
                 for symbol in global_symbols.values() {
                     let nm_type = symbol.nm_symbol_type();
                     output.push_str(&format!(
                         "{:018x} {} {}\n",
-                        symbol.address,
-                        nm_type,
-                        symbol.name
+                        symbol.address, nm_type, symbol.name
                     ));
                 }
-            }
+            },
         }
 
         Ok(output)
@@ -799,29 +823,19 @@ impl SymbolTableManager {
     /// 获取统计信息
     pub fn get_statistics(&self) -> SymbolStatistics {
         SymbolStatistics {
-            total_symbols: AtomicUsize::new(
-                self.statistics.total_symbols.load(Ordering::SeqCst)
-            ),
+            total_symbols: AtomicUsize::new(self.statistics.total_symbols.load(Ordering::SeqCst)),
             function_symbols: AtomicUsize::new(
-                self.statistics.function_symbols.load(Ordering::SeqCst)
+                self.statistics.function_symbols.load(Ordering::SeqCst),
             ),
             variable_symbols: AtomicUsize::new(
-                self.statistics.variable_symbols.load(Ordering::SeqCst)
+                self.statistics.variable_symbols.load(Ordering::SeqCst),
             ),
-            type_symbols: AtomicUsize::new(
-                self.statistics.type_symbols.load(Ordering::SeqCst)
-            ),
-            cache_hits: AtomicU64::new(
-                self.statistics.cache_hits.load(Ordering::SeqCst)
-            ),
-            cache_misses: AtomicU64::new(
-                self.statistics.cache_misses.load(Ordering::SeqCst)
-            ),
-            lookups: AtomicU64::new(
-                self.statistics.lookups.load(Ordering::SeqCst)
-            ),
+            type_symbols: AtomicUsize::new(self.statistics.type_symbols.load(Ordering::SeqCst)),
+            cache_hits: AtomicU64::new(self.statistics.cache_hits.load(Ordering::SeqCst)),
+            cache_misses: AtomicU64::new(self.statistics.cache_misses.load(Ordering::SeqCst)),
+            lookups: AtomicU64::new(self.statistics.lookups.load(Ordering::SeqCst)),
             total_lookup_time: AtomicU64::new(
-                self.statistics.total_lookup_time.load(Ordering::SeqCst)
+                self.statistics.total_lookup_time.load(Ordering::SeqCst),
             ),
         }
     }
@@ -833,7 +847,11 @@ impl SymbolTableManager {
     }
 
     /// 私有辅助方法
-    fn find_similar_symbols(&self, name: &str, symbols: &BTreeMap<String, DebugSymbol>) -> Vec<DebugSymbol> {
+    fn find_similar_symbols(
+        &self,
+        name: &str,
+        symbols: &BTreeMap<String, DebugSymbol>,
+    ) -> Vec<DebugSymbol> {
         let mut similar = Vec::new();
 
         for (symbol_name, symbol) in symbols {
@@ -908,7 +926,8 @@ impl SymbolTableManager {
         let mappings = self.line_mappings.lock();
 
         // 找到最接近的行号映射
-        let mapping = mappings.iter()
+        let mapping = mappings
+            .iter()
             .filter(|m| m.address <= address)
             .max_by_key(|m| m.address);
 
@@ -917,14 +936,15 @@ impl SymbolTableManager {
             line: m.line_number,
             column: m.column_number,
             function_name: None, // 需要从符号表查找
-            line_content: None,   // 需要读取文件内容
+            line_content: None,  // 需要读取文件内容
         })
     }
 
     fn find_containing_function(&self, address: usize) -> Option<FunctionRange> {
         let ranges = self.function_ranges.lock();
 
-        ranges.iter()
+        ranges
+            .iter()
             .find(|(_, range)| address >= range.start_address && address <= range.end_address)
             .map(|(_, range)| range.clone())
     }
@@ -1064,7 +1084,8 @@ fn add_builtin_symbols(manager: &SymbolTableManager) -> Result<(), SymbolError> 
 /// 获取全局符号表管理器
 pub fn get_symbol_manager() -> Result<Arc<SymbolTableManager>, SymbolError> {
     let manager = SYMBOL_MANAGER.lock();
-    manager.as_ref()
+    manager
+        .as_ref()
         .cloned()
         .ok_or(SymbolError::SymbolNotFound("符号管理器未初始化".to_string()))
 }

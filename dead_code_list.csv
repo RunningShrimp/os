@@ -1,0 +1,20 @@
+file,line,item_type,item_name,context,action
+kernel/src/lib.rs,125,enum,NetworkError,"net_stack feature stub",keep
+kernel/src/lib.rs,127,enum,Packet,"net_stack feature stub",keep
+kernel/src/lib.rs,131,struct,SocketAddr,"net_stack feature stub",keep
+kernel/src/lib.rs,133,enum,Socket,"net_stack feature stub",keep
+kernel/src/lib.rs,135,enum,SocketOptions,"net_stack feature stub",keep
+kernel/src/lib.rs,137,enum,SocketType,"net_stack feature stub",keep
+kernel/src/lib.rs,139,enum,ProtocolFamily,"net_stack feature stub",keep
+kernel/src/lib.rs,141,struct,TcpSocketWrapper,"net_stack feature stub",keep
+kernel/src/lib.rs,144,struct,UdpSocketWrapper,"net_stack feature stub",keep
+kernel/src/lib.rs,146,enum,SocketError,"net_stack feature stub",keep
+kernel/src/lib.rs,148,struct,RawSocketWrapper,"net_stack feature stub",keep
+kernel/src/lib.rs,155,struct,TcpOptions,"net_stack feature stub",keep
+kernel/src/lib.rs,157,struct,ConnectionId,"net_stack feature stub",keep
+kernel/src/lib.rs,159,struct,TcpConnectionManager,"net_stack feature stub",keep
+kernel/src/lib.rs,161,enum,TcpError,"net_stack feature stub",keep
+kernel/src/lib.rs,167,struct,Ipv4Addr,"net_stack feature stub",keep
+kernel/src/platform/drivers/mod.rs,93,struct,VirtioBlk,"TODO placeholder",implement_or_remove
+kernel/src/platform/drivers/mod.rs,99,fn,VirtioBlk::new,"TODO placeholder",implement_or_remove
+kernel/src/subsystems/process/elf.rs,453,enum,AuxType,"ELF auxiliary vector",review_usage

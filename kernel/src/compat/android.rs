@@ -9,8 +9,6 @@
 
 extern crate alloc;
 
-use crate::compat::*;
-
 /// Android compatibility module
 pub struct AndroidModule {
     bionic_runtime: BionicRuntime,
@@ -50,7 +48,6 @@ impl PlatformModule for AndroidModule {
     fn shutdown(&mut self) -> Result<(), &'static str> {
         Ok(())
     }
-
 }
 
 /// Bionic runtime (Android C library)

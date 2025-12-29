@@ -1,21 +1,29 @@
 //! 系统调用分发器模块
-//! 
+//!
 //! 本模块实现了系统调用的路由和分发功能，包括：
 //! - SyscallDispatcher: 核心分发器
 //! - 系统调用路由逻辑
 //! - 性能监控和统计
 //! - 错误处理和日志记录
-//! 
+//!
 //! 分发器是系统调用处理的核心组件，负责将系统调用请求路由到相应的服务。
 
-use crate::error::UnifiedError;
-use crate::subsystems::syscalls::services::traits::*;
-use crate::subsystems::syscalls::services::registry::{ServiceRegistry, Version};
-use alloc::collections::BTreeMap;
-use alloc::string::{String, ToString};
-use alloc::sync::Arc;
-use alloc::vec::Vec;
+use alloc::{
+    collections::BTreeMap,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
+
 use spin::Mutex;
+
+use crate::{
+    error::UnifiedError,
+    subsystems::syscalls::services::{
+        registry::{ServiceRegistry, Version},
+        traits::*,
+    },
+};
 
 // 定义Result类型别名，使用DispatcherError作为错误类型
 pub type Result<T> = core::result::Result<T, DispatcherError>;
@@ -46,98 +54,93 @@ struct LruCache {
 
 impl LruCache {
     fn new(size_limit: usize) -> Self {
-        Self {
-            map: BTreeMap::new(),
-            head: None,
-            tail: None,
-            size_limit,
-        }
+        Self { map: BTreeMap::new(), head: None, tail: None, size_limit }
     }
-    
+
     /// 获取缓存条目，如果存在则将其移到头部（最近使用）
     /// 注意：当前版本的缓存不支持版本化，仅作为演示
     fn get(&mut self, syscall_num: u32, version: Option<Version>) -> Option<String> {
         // 简单的实现：不支持版本化缓存
         None
     }
-    
+
     /// 插入缓存条目，如果超过大小限制则淘汰最旧的（尾节点）
     /// 注意：当前版本的缓存不支持版本化，仅作为演示
     fn put(&mut self, syscall_num: u32, version: Option<Version>, service_name: String) {
         // 简单的实现：不支持版本化缓存
     }
-    
+
     /// 移除缓存条目
     fn remove(&mut self, syscall_num: u32, version: Option<Version>) {
         if let Some(node) = self.map.get(&syscall_num) {
             let prev = node.prev;
             let next = node.next;
-            
+
             // 更新前一个节点的next
             if let Some(prev_num) = prev {
                 self.map.get_mut(&prev_num).unwrap().next = next;
             }
-            
+
             // 更新后一个节点的prev
             if let Some(next_num) = next {
                 self.map.get_mut(&next_num).unwrap().prev = prev;
             }
-            
+
             // 更新头节点
             if self.head == Some(syscall_num) {
                 self.head = next;
             }
-            
+
             // 更新尾节点
             if self.tail == Some(syscall_num) {
                 self.tail = prev;
             }
-            
+
             // 从map中移除
             self.map.remove(&syscall_num);
         }
     }
-    
+
     /// 将节点移到头部
     fn move_to_head(&mut self, syscall_num: u32, version: Option<Version>) {
         if self.head == Some(syscall_num) {
             return; // 已经是头节点
         }
-        
+
         // 获取当前节点信息
         let node = self.map.get(&syscall_num).unwrap();
         let prev = node.prev;
         let next = node.next;
-        
+
         // 更新前一个节点的next
         if let Some(prev_num) = prev {
             self.map.get_mut(&prev_num).unwrap().next = next;
         }
-        
+
         // 更新后一个节点的prev
         if let Some(next_num) = next {
             self.map.get_mut(&next_num).unwrap().prev = prev;
         }
-        
+
         // 更新尾节点（如果当前节点是尾节点）
         if self.tail == Some(syscall_num) {
             self.tail = prev;
         }
-        
+
         // 将当前节点插入到头部
         let mut node = self.map.get_mut(&syscall_num).unwrap();
         node.prev = None;
         node.next = self.head;
-        
+
         // 更新原头节点的prev
         if let Some(head_num) = self.head {
             self.map.get_mut(&head_num).unwrap().prev = Some(syscall_num);
         }
-        
+
         // 设置为新头节点
         self.head = Some(syscall_num);
     }
-    
+
     /// 辅助函数：获取当前时间（秒）
     fn get_current_time_sec(&self) -> u64 {
         // 实际实现应该调用系统时间函数
@@ -153,22 +156,22 @@ impl LruCache {
 pub struct SyscallDispatcher {
     /// 服务注册表引用
     registry: Arc<ServiceRegistry>,
-    
+
     /// 快速路径缓存：小容量，低延迟，使用LRU
     fast_path_cache: Arc<Mutex<LruCache>>,
-    
+
     /// 普通路径缓存：大容量，使用LRU
     normal_path_cache: Arc<Mutex<LruCache>>,
-    
+
     /// 分发统计信息
     stats: Arc<Mutex<DispatchStats>>,
-    
+
     /// 分发器配置
     config: DispatcherConfig,
 }
 
 /// 缓存的服务信息
-/// 
+///
 /// 包含系统调用处理服务的缓存信息。
 #[derive(Debug, Clone)]
 pub struct CachedServiceInfo {
@@ -183,10 +186,9 @@ pub struct CachedServiceInfo {
 }
 
 /// 分发统计信息
-/// 
+///
 /// 记录分发的性能和使用统计。
-#[derive(Debug, Default)]
-#[derive(Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct DispatchStats {
     /// 总分发次数
     pub total_dispatches: u64,
@@ -229,9 +231,9 @@ impl Default for DispatcherConfig {
     fn default() -> Self {
         Self {
             enable_cache: true,
-            fast_path_cache_size: 256, // 小容量，快速访问
+            fast_path_cache_size: 256,    // 小容量，快速访问
             normal_path_cache_size: 2048, // 大容量，普通访问
-            cache_ttl_seconds: 300, // 5分钟
+            cache_ttl_seconds: 300,       // 5分钟
             enable_stats: true,
             enable_verbose_logging: false,
             max_retries: 3,
@@ -240,7 +242,7 @@ impl Default for DispatcherConfig {
 }
 
 /// 分发结果
-/// 
+///
 /// 包含系统调用分发的结果信息。
 #[derive(Debug)]
 pub struct DispatchResult {
@@ -258,14 +260,14 @@ pub struct DispatchResult {
 
 impl SyscallDispatcher {
     /// 创建新的系统调用分发器
-    /// 
+    ///
     /// # 参数
-    /// 
+    ///
     /// * `registry` - 服务注册表引用
     /// * `config` - 分发器配置
-    /// 
+    ///
     /// # 返回值
-    /// 
+    ///
     /// * `Self` - 新的分发器实例
     pub fn new(registry: Arc<ServiceRegistry>, config: DispatcherConfig) -> Self {
         Self {
@@ -276,20 +278,20 @@ impl SyscallDispatcher {
             config,
         }
     }
-    
+
     /// 使用默认配置创建分发器
-    /// 
+    ///
     /// # 参数
-    /// 
+    ///
     /// * `registry` - 服务注册表引用
-    /// 
+    ///
     /// # 返回值
-    /// 
+    ///
     /// * `Self` - 新的分发器实例
     pub fn with_default_config(registry: Arc<ServiceRegistry>) -> Self {
         Self::new(registry, DispatcherConfig::default())
     }
-    
+
     /// 分发系统调用
     ///
     /// 将系统调用请求分发到相应的服务处理器。
@@ -304,30 +306,35 @@ impl SyscallDispatcher {
     ///
     /// * `Ok(DispatchResult)` - 分发结果
     /// * `Err(Error)` - 分发失败
-    pub fn dispatch(&self, syscall_number: u32, args: &[u64], version: Option<Version>) -> Result<DispatchResult> {
+    pub fn dispatch(
+        &self,
+        syscall_number: u32,
+        args: &[u64],
+        version: Option<Version>,
+    ) -> Result<DispatchResult> {
         let start_time = self.get_current_time_ns();
-        
+
         // 更新统计信息
         if self.config.enable_stats {
             self.update_dispatch_stats(syscall_number);
         }
-        
+
         // 查找处理服务
         let service_name = self.find_service_for_syscall(syscall_number, version)?;
-        
+
         // 执行系统调用
         let result = self.execute_syscall(&service_name, syscall_number, args, start_time);
-        
+
         // 记录详细日志
         if self.config.enable_verbose_logging {
             if let Ok(ref dispatch_result) = result {
                 self.log_dispatch_details(&service_name, syscall_number, args, dispatch_result);
             }
         }
-        
+
         result
     }
-    
+
     /// 分发系统调用（向后兼容版本）
     ///
     /// 将系统调用请求分发到相应的服务处理器，使用默认版本。
@@ -341,31 +348,32 @@ impl SyscallDispatcher {
     ///
     /// * `Ok(DispatchResult)` - 分发结果
     /// * `Err(Error)` - 分发失败
-    pub fn dispatch_with_default_version(&self, syscall_number: u32, args: &[u64]) -> Result<DispatchResult> {
+    pub fn dispatch_with_default_version(
+        &self,
+        syscall_number: u32,
+        args: &[u64],
+    ) -> Result<DispatchResult> {
         self.dispatch(syscall_number, args, None)
     }
-    
+
     /// 批量分发系统调用
-    /// 
+    ///
     /// 批量处理多个系统调用，提高效率。
-    /// 
+    ///
     /// # 参数
-    /// 
+    ///
     /// * `requests` - 系统调用请求列表
-    /// 
+    ///
     /// # 返回值
-    /// 
+    ///
     /// * `Vec<Result<DispatchResult>>` - 分发结果列表
-    pub fn batch_dispatch(
-        &self,
-        requests: &[(u32, Vec<u64>)],
-    ) -> Vec<Result<DispatchResult>> {
+    pub fn batch_dispatch(&self, requests: &[(u32, Vec<u64>)]) -> Vec<Result<DispatchResult>> {
         requests
             .iter()
             .map(|(syscall_num, args)| self.dispatch_with_default_version(*syscall_num, args))
             .collect()
     }
-    
+
     /// 查找系统调用的处理服务
     ///
     /// # 参数
@@ -377,7 +385,11 @@ impl SyscallDispatcher {
     ///
     /// * `Ok(String)` - 服务名称
     /// * `Err(Error)` - 查找失败
-    fn find_service_for_syscall(&self, syscall_number: u32, version: Option<Version>) -> Result<String> {
+    fn find_service_for_syscall(
+        &self,
+        syscall_number: u32,
+        version: Option<Version>,
+    ) -> Result<String> {
         // 首先检查缓存
         // 注意：当前版本的缓存不支持版本化，仅作为演示
         if self.config.enable_cache {
@@ -386,58 +398,60 @@ impl SyscallDispatcher {
             if let Some(service_name) = fast_cache.get(syscall_number, version) {
                 // 缓存命中
                 drop(fast_cache);
-                
+
                 // 更新统计
                 if self.config.enable_stats {
                     let mut stats = self.stats.lock();
                     stats.cache_hits += 1;
                 }
-                
+
                 return Ok(service_name);
             }
             drop(fast_cache);
-            
+
             // 2. 检查普通路径缓存
             let mut normal_cache = self.normal_path_cache.lock();
             if let Some(service_name) = normal_cache.get(syscall_number, version) {
                 // 缓存命中
                 drop(normal_cache);
-                
+
                 // 更新统计
                 if self.config.enable_stats {
                     let mut stats = self.stats.lock();
                     stats.cache_hits += 1;
                 }
-                
+
                 return Ok(service_name);
             }
             drop(normal_cache);
-            
+
             // 缓存未命中
             if self.config.enable_stats {
                 let mut stats = self.stats.lock();
                 stats.cache_misses += 1;
             }
         }
-        
+
         // 从注册表查找
-        let service_name = self.registry.get_syscall_service(syscall_number, version)?
+        let service_name = self
+            .registry
+            .get_syscall_service(syscall_number, version)?
             .ok_or_else(|| DispatcherError::SyscallNotSupported(syscall_number))?;
-        
+
         Ok(service_name)
     }
-    
+
     /// 执行系统调用
-    /// 
+    ///
     /// # 参数
-    /// 
+    ///
     /// * `service_name` - 服务名称
     /// * `syscall_number` - 系统调用号
     /// * `args` - 系统调用参数
     /// * `start_time` - 开始时间
-    /// 
+    ///
     /// # 返回值
-    /// 
+    ///
     /// * `Ok(DispatchResult)` - 执行结果
     /// * `Err(Error)` - 执行失败
     fn execute_syscall(
@@ -448,28 +462,32 @@ impl SyscallDispatcher {
         start_time: u64,
     ) -> Result<DispatchResult> {
         let mut retries = 0;
-        
+
         while retries <= self.config.max_retries {
             match self.try_execute_syscall(service_name, syscall_number, args, start_time) {
                 Ok(result) => return Ok(result),
-                Err(DispatcherError::ServiceUnavailable(_)) if retries < self.config.max_retries => {
+                Err(DispatcherError::ServiceUnavailable(_))
+                    if retries < self.config.max_retries =>
+                {
                     retries += 1;
                     // 简单的退避策略
                     self.sleep_ns(1000 * retries as u64);
-                }
-                Err(e) => return Ok(DispatchResult {
-                    success: false,
-                    return_value: 0,
-                    error: Some(KernelError::from(e)),
-                    dispatch_time_ns: self.get_current_time_ns() - start_time,
-                    service_name: service_name.to_string(),
-                }),
+                },
+                Err(e) => {
+                    return Ok(DispatchResult {
+                        success: false,
+                        return_value: 0,
+                        error: Some(KernelError::from(e)),
+                        dispatch_time_ns: self.get_current_time_ns() - start_time,
+                        service_name: service_name.to_string(),
+                    })
+                },
             }
         }
-        
+
         Err(DispatcherError::MaxRetriesExceeded(syscall_number))
     }
-    
+
     /// 尝试执行系统调用
     ///
     /// 单次执行尝试，不包含重试逻辑。
@@ -481,17 +499,20 @@ impl SyscallDispatcher {
         start_time: u64,
     ) -> Result<DispatchResult> {
         // 从注册表获取服务实例
-        let mut service_ref = self.registry.get_service_mut_ref(service_name)?
+        let mut service_ref = self
+            .registry
+            .get_service_mut_ref(service_name)?
             .ok_or_else(|| DispatcherError::ServiceUnavailable(service_name.to_string()))?;
 
         // 尝试将服务转换为 SyscallService
-        let syscall_service = service_ref.as_any_mut()
+        let syscall_service = service_ref
+            .as_any_mut()
             .downcast_mut::<dyn SyscallService>();
 
         if let Some(syscall_service) = syscall_service {
             // 执行系统调用
             let result = syscall_service.handle_syscall(syscall_number, args);
-            
+
             let end_time = self.get_current_time_ns();
             let dispatch_time = end_time - start_time;
 
@@ -500,7 +521,7 @@ impl SyscallDispatcher {
                     // 更新成功统计
                     let mut stats = self.stats.lock();
                     stats.successful_dispatches += 1;
-                    
+
                     Ok(DispatchResult {
                         success: true,
                         return_value,
@@ -513,7 +534,7 @@ impl SyscallDispatcher {
                     // 更新失败统计
                     let mut stats = self.stats.lock();
                     stats.failed_dispatches += 1;
-                    
+
                     Ok(DispatchResult {
                         success: false,
                         return_value: 0,
@@ -521,27 +542,30 @@ impl SyscallDispatcher {
                         dispatch_time_ns: dispatch_time,
                         service_name: service_name.to_string(),
                     })
-                }
+                },
             }
         } else {
             // 服务不是系统调用服务
-            Err(DispatcherError::InvalidParameters(format!("Service '{}' is not a syscall service", service_name)))
+            Err(DispatcherError::InvalidParameters(format!(
+                "Service '{}' is not a syscall service",
+                service_name
+            )))
         }
     }
     /// 清空缓存
     pub fn clear_cache(&self) {
         let mut fast_cache = self.fast_path_cache.lock();
         let mut normal_cache = self.normal_path_cache.lock();
-        
+
         fast_cache.map.clear();
         fast_cache.head = None;
         fast_cache.tail = None;
-        
+
         normal_cache.map.clear();
         normal_cache.head = None;
         normal_cache.tail = None;
     }
-    
+
     /// 获取缓存大小
     ///
     /// # 返回值
@@ -552,25 +576,24 @@ impl SyscallDispatcher {
         let normal_cache = self.normal_path_cache.lock();
         fast_cache.map.len() + normal_cache.map.len()
     }
-    
+
     /// 更新分发统计
 
-    /// 
     /// # 参数
-    /// 
+    ///
     /// * `syscall_number` - 系统调用号
     fn update_dispatch_stats(&self, syscall_number: u32) {
         let mut stats = self.stats.lock();
         stats.total_dispatches += 1;
-        
+
         // 更新特定系统调用的计数
         *stats.syscall_counts.entry(syscall_number).or_insert(0) += 1;
     }
-    
+
     /// 记录分发详情
-    /// 
+    ///
     /// # 参数
-    /// 
+    ///
     /// * `service_name` - 服务名称
     /// * `syscall_number` - 系统调用号
     /// * `args` - 系统调用参数
@@ -593,49 +616,49 @@ impl SyscallDispatcher {
             result.return_value,
             result.dispatch_time_ns
         );
-        
+
         // 在实际实现中，这里应该调用日志系统
         // println!("{}", log_message);
     }
-    
+
     /// 获取当前时间（纳秒）
     fn get_current_time_ns(&self) -> u64 {
         // 这里应该实现真实的时间获取
         // 暂时返回固定值
         0
     }
-    
+
     /// 睡眠指定纳秒数
-    /// 
+    ///
     /// # 参数
-    /// 
+    ///
     /// * `duration_ns` - 睡眠时间（纳秒）
     fn sleep_ns(&self, duration_ns: u64) {
         // 这里应该实现真实的睡眠功能
         // 暂时为空实现
     }
-    
+
     /// 获取分发统计信息
-    /// 
+    ///
     /// # 返回值
-    /// 
+    ///
     /// * `DispatchStats` - 当前统计信息
     pub fn get_stats(&self) -> DispatchStats {
         self.stats.lock().clone()
     }
-    
+
     /// 重置统计信息
     pub fn reset_stats(&self) {
         let mut stats = self.stats.lock();
         *stats = DispatchStats::default();
     }
-    
+
     /// 预热缓存
-    /// 
+    ///
     /// 为常用的系统调用预热缓存。
-    /// 
+    ///
     /// # 参数
-    /// 
+    ///
     /// * `syscall_numbers` - 要预热的系统调用号列表
     pub fn warmup_cache(&self, syscall_numbers: &[u32]) {
         for &syscall_num in syscall_numbers {
@@ -645,7 +668,7 @@ impl SyscallDispatcher {
 }
 
 /// 系统调用分发错误类型
-/// 
+///
 /// 定义分发过程中可能出现的错误。
 #[derive(Debug, Clone)]
 pub enum DispatcherError {
@@ -666,19 +689,19 @@ impl core::fmt::Display for DispatcherError {
         match self {
             DispatcherError::SyscallNotSupported(num) => {
                 write!(f, "Syscall {} is not supported", num)
-            }
+            },
             DispatcherError::ServiceUnavailable(name) => {
                 write!(f, "Service '{}' is unavailable", name)
-            }
+            },
             DispatcherError::MaxRetriesExceeded(num) => {
                 write!(f, "Max retries exceeded for syscall {}", num)
-            }
+            },
             DispatcherError::CacheError(msg) => {
                 write!(f, "Cache error: {}", msg)
-            }
+            },
             DispatcherError::InvalidParameters(msg) => {
                 write!(f, "Invalid parameters: {}", msg)
-            }
+            },
         }
     }
 }

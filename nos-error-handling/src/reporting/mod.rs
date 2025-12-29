@@ -2,13 +2,16 @@
 //!
 //! This module provides error reporting and logging functionality.
 
-use spin::Mutex;
-use crate::Result;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::format;
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
+
 use nos_api::collections::BTreeMap;
+use spin::Mutex;
+
+use crate::Result;
 
 /// Error reporter
 #[derive(Default)]
@@ -36,36 +39,43 @@ impl ErrorReporter {
         for destination in &self.destinations {
             destination.report_error(error_record)?;
         }
-        
+
         // Update statistics
         let mut stats = self.stats.lock();
         stats.total_reported += 1;
-        *stats.reports_by_severity.entry(error_record.severity).or_insert(0) += 1;
-        
+        *stats
+            .reports_by_severity
+            .entry(error_record.severity)
+            .or_insert(0) += 1;
+
         Ok(())
     }
 
     /// Generate an error report
-    pub fn generate_report(&self, errors: &[crate::types::ErrorRecord], time_range: Option<(u64, u64)>) -> Result<String> {
+    pub fn generate_report(
+        &self,
+        errors: &[crate::types::ErrorRecord],
+        time_range: Option<(u64, u64)>,
+    ) -> Result<String> {
         let mut report = String::from("# Error Report\n\n");
-        
+
         // Add report header
         report.push_str(&format!("Generated at: {}\n", crate::common::get_timestamp()));
         report.push_str(&format!("Total errors: {}\n\n", errors.len()));
-        
+
         // Add error summary
         let mut summary = BTreeMap::new();
         for error in errors {
             *summary.entry(error.category).or_insert(0) += 1;
         }
-        
+
         report.push_str("## Error Summary\n\n");
         for (category, count) in summary.iter() {
             report.push_str(&format!("- {:?}: {}\n", category, count));
         }
-        
+
         report.push_str("\n## Error Details\n\n");
-        
+
         // Add error details
         for error in errors {
             // Filter by time range if specified
@@ -74,7 +84,7 @@ impl ErrorReporter {
                     continue;
                 }
             }
-            
+
             report.push_str(&format!("### Error #{}\n", error.id));
             report.push_str(&format!("- Code: {}\n", error.code));
             report.push_str(&format!("- Type: {:?}\n", error.error_type));
@@ -86,7 +96,7 @@ impl ErrorReporter {
             report.push_str(&format!("- Source: {}:{}\n", error.source.file, error.source.line));
             report.push('\n');
         }
-        
+
         Ok(report)
     }
 
@@ -111,10 +121,8 @@ impl ErrorReporter {
     /// Add default destinations
     fn add_default_destinations(&mut self) {
         // Add console destination
-        self.add_destination(ReportDestination::Console {
-            level: ReportLevel::Error,
-        });
-        
+        self.add_destination(ReportDestination::Console { level: ReportLevel::Error });
+
         // Add file destination
         self.add_destination(ReportDestination::File {
             path: "/var/log/nos_errors.log".to_string(),
@@ -177,7 +185,13 @@ impl ReportDestination {
                 }
                 Ok(())
             },
-            ReportDestination::Network { address: _, port: _, protocol: _, level, auth_token: _ } => {
+            ReportDestination::Network {
+                address: _,
+                port: _,
+                protocol: _,
+                level,
+                auth_token: _,
+            } => {
                 // Check if the error severity is high enough
                 if error_record.severity as u8 >= (*level) as u8 {
                     // In a real implementation, we would send to the network
@@ -222,17 +236,17 @@ static GLOBAL_REPORTER: spin::Once<Mutex<ErrorReporter>> = spin::Once::new();
 
 /// Initialize the global error reporter
 pub fn init_reporter() -> Result<()> {
-    GLOBAL_REPORTER.call_once(|| {
-        Mutex::new(ErrorReporter::new())
-    });
-    
+    GLOBAL_REPORTER.call_once(|| Mutex::new(ErrorReporter::new()));
+
     // Initialize the reporter
     GLOBAL_REPORTER.get().unwrap().lock().init()
 }
 
 /// Get the global error reporter
 pub fn get_reporter() -> &'static Mutex<ErrorReporter> {
-    GLOBAL_REPORTER.get().expect("Error reporter not initialized")
+    GLOBAL_REPORTER
+        .get()
+        .expect("Error reporter not initialized")
 }
 
 /// Internal function to get the global error reporter
@@ -254,7 +268,10 @@ pub fn report_error(error: &crate::types::ErrorRecord) -> Result<()> {
 }
 
 /// Generate an error report
-pub fn generate_report(errors: &[crate::types::ErrorRecord], time_range: Option<(u64, u64)>) -> Result<String> {
+pub fn generate_report(
+    errors: &[crate::types::ErrorRecord],
+    time_range: Option<(u64, u64)>,
+) -> Result<String> {
     let reporter = get_reporter_internal().lock();
     reporter.generate_report(errors, time_range)
 }
@@ -271,17 +288,15 @@ mod tests {
     #[test]
     fn test_error_reporter() {
         let mut reporter = ErrorReporter::new();
-        
+
         // Add a test destination
-        let destination = ReportDestination::Console {
-            level: ReportLevel::Error,
-        };
+        let destination = ReportDestination::Console { level: ReportLevel::Error };
         reporter.add_destination(destination);
-        
+
         // Report a test error
         let error_record = crate::types::ErrorRecord::default();
         assert!(reporter.report_error(&error_record).is_ok());
-        
+
         // Check statistics
         let stats = reporter.get_stats();
         assert_eq!(stats.total_reported, 1);
@@ -293,7 +308,7 @@ mod tests {
         assert!(ReportLevel::Info < ReportLevel::Warning);
         assert!(ReportLevel::Warning < ReportLevel::Error);
         assert!(ReportLevel::Error < ReportLevel::Critical);
-        
+
         assert_eq!(ReportLevel::default(), ReportLevel::Error);
     }
 

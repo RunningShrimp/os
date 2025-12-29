@@ -139,12 +139,7 @@ pub struct PcrValue {
 impl PcrValue {
     /// Create PCR value
     pub fn new(index: PcrIndex, algorithm: TpmAlgorithm) -> Self {
-        PcrValue {
-            index,
-            algorithm,
-            hash: [0u8; 64],
-            hash_len: 0,
-        }
+        PcrValue { index, algorithm, hash: [0u8; 64], hash_len: 0 }
     }
 
     /// Set hash value
@@ -321,7 +316,7 @@ impl TpmDriver {
                 } else {
                     false
                 }
-            }
+            },
             Err(_) => false,
         }
     }
@@ -329,11 +324,7 @@ impl TpmDriver {
     /// Read PCR value
     pub fn pcr_read(&self, index: PcrIndex) -> Option<PcrValue> {
         let idx = index as usize;
-        if idx < 24 {
-            self.pcr_values[idx]
-        } else {
-            None
-        }
+        if idx < 24 { self.pcr_values[idx] } else { None }
     }
 
     /// Get PCR count
@@ -759,7 +750,7 @@ mod tests {
             PcrIndex::Pcr7,
             PcrIndex::Pcr10,
         ];
-        
+
         for idx in indices.iter() {
             let pcr = PcrValue::new(*idx, TpmAlgorithm::SHA256);
             assert_eq!(pcr.index, *idx);

@@ -1,9 +1,8 @@
 //! Error handling tests
 
-use nos_error_handling::core;
-use nos_error_handling::types;
-use nos_error_handling::kernel_integration;
 use std::collections::BTreeMap;
+
+use nos_error_handling::{core, kernel_integration, types};
 
 #[test]
 fn test_error_handling_init() {
@@ -64,7 +63,7 @@ fn test_error_record() {
         resolution_method: None,
         metadata: BTreeMap::new(),
     };
-    
+
     assert_eq!(error_record.id, 1);
     assert_eq!(error_record.code, 100);
     assert_eq!(error_record.error_type, types::ErrorType::RuntimeError);
@@ -84,7 +83,10 @@ fn test_error_record() {
     assert_eq!(error_record.timestamp, 1234567890);
     assert_eq!(error_record.context.user_input, Some("test input".to_string()));
     assert_eq!(error_record.context.related_data, vec![1, 2, 3, 4]);
-    assert_eq!(error_record.context.operation_sequence, vec!["step1".to_string(), "step2".to_string()]);
+    assert_eq!(
+        error_record.context.operation_sequence,
+        vec!["step1".to_string(), "step2".to_string()]
+    );
     assert_eq!(error_record.context.preconditions, vec!["pre1".to_string()]);
     assert_eq!(error_record.context.postconditions, vec!["post1".to_string()]);
     assert_eq!(error_record.recovery_actions, vec![]);
@@ -106,7 +108,7 @@ fn test_error_severity() {
     assert!(types::ErrorSeverity::High < types::ErrorSeverity::Error);
     assert!(types::ErrorSeverity::Error < types::ErrorSeverity::Critical);
     assert!(types::ErrorSeverity::Critical < types::ErrorSeverity::Fatal);
-    
+
     assert_eq!(types::ErrorSeverity::default(), types::ErrorSeverity::Info);
 }
 
@@ -115,7 +117,7 @@ fn test_error_category() {
     // Test error category
     assert_eq!(types::ErrorCategory::System, types::ErrorCategory::System);
     assert_ne!(types::ErrorCategory::System, types::ErrorCategory::Memory);
-    
+
     assert_eq!(types::ErrorCategory::default(), types::ErrorCategory::System);
 }
 
@@ -139,12 +141,12 @@ fn test_error_handling_engine() {
     // Test error handling engine
     let config = kernel_integration::ErrorHandlingConfig::default();
     let mut engine = kernel_integration::ErrorHandlingEngine::new(config);
-    
+
     assert!(engine.init().is_ok());
-    
+
     let stats = engine.get_statistics();
     assert_eq!(stats.total_errors, 0);
-    
+
     assert!(engine.shutdown().is_ok());
 }
 

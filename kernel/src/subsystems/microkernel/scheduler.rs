@@ -4,20 +4,22 @@
 //! This is a simplified scheduler focused on efficiency and low latency.
 
 extern crate alloc;
-use alloc::collections::VecDeque;
-use alloc::vec::Vec;
+use alloc::{collections::VecDeque, vec::Vec};
 use core::sync::atomic::{AtomicUsize, Ordering};
-use crate::subsystems::sync::Mutex;
-use crate::reliability::{EINVAL, ESRCH};
-use crate::process::thread::{ThreadState, Tid};
+
+use crate::{
+    process::thread::{ThreadState, Tid},
+    reliability::{EINVAL, ESRCH},
+    subsystems::sync::Mutex,
+};
 
 /// Scheduling policies
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SchedulingPolicy {
-    Normal,      // Normal time-sharing scheduling
-    FIFO,        // Real-time FIFO scheduling
-    RR,          // Real-time round-robin scheduling
-    Idle,        // Low priority idle scheduling
+    Normal, // Normal time-sharing scheduling
+    FIFO,   // Real-time FIFO scheduling
+    RR,     // Real-time round-robin scheduling
+    Idle,   // Low priority idle scheduling
 }
 
 /// CPU affinity mask (simplified - up to 64 CPUs)
@@ -56,9 +58,9 @@ pub struct MicroTcb {
     pub policy: SchedulingPolicy,
     pub state: ThreadState,
     pub cpu_affinity: CpuAffinity,
-    pub time_slice: u32,      // Remaining time slice in ticks
-    pub total_runtime: u64,   // Total runtime in nanoseconds
-    pub last_run: u64,        // Last time this thread ran
+    pub time_slice: u32,        // Remaining time slice in ticks
+    pub total_runtime: u64,     // Total runtime in nanoseconds
+    pub last_run: u64,          // Last time this thread ran
     pub wake_time: Option<u64>, // Time to wake up from sleep
 }
 
@@ -78,13 +80,13 @@ impl MicroTcb {
     }
 
     pub fn is_ready(&self) -> bool {
-        self.state == ThreadState::Runnable &&
-        self.wake_time.map_or(true, |wt| wt <= get_current_time())
+        self.state == ThreadState::Runnable
+            && self.wake_time.map_or(true, |wt| wt <= get_current_time())
     }
 
     pub fn is_runnable(&self) -> bool {
-        matches!(self.state, ThreadState::Runnable | ThreadState::Running) &&
-        self.wake_time.map_or(true, |wt| wt <= get_current_time())
+        matches!(self.state, ThreadState::Runnable | ThreadState::Running)
+            && self.wake_time.map_or(true, |wt| wt <= get_current_time())
     }
 }
 
@@ -133,7 +135,10 @@ impl CpuScheduler {
         }
     }
 
-    pub fn get_next_thread(&self, tcb_map: &crate::subsystems::sync::Mutex<alloc::collections::BTreeMap<Tid, MicroTcb>>) -> Option<Tid> {
+    pub fn get_next_thread(
+        &self,
+        tcb_map: &crate::subsystems::sync::Mutex<alloc::collections::BTreeMap<Tid, MicroTcb>>,
+    ) -> Option<Tid> {
         // Find highest priority runnable thread
         let mut best_thread = None;
         let mut best_priority = i32::MIN;
@@ -232,7 +237,8 @@ impl MicroScheduler {
 
         // Add to ready queue if becoming ready
         if state == ThreadState::Runnable {
-            if let Some(scheduler) = self.cpu_schedulers.get_mut(0) { // TODO: CPU selection
+            if let Some(scheduler) = self.cpu_schedulers.get_mut(0) {
+                // TODO: CPU selection
                 if !scheduler.ready_queue.contains(&tid) {
                     scheduler.enqueue(tid)?;
                 }
@@ -299,7 +305,8 @@ impl MicroScheduler {
                         tcb.wake_time = None;
 
                         // Add to ready queue
-                        if let Some(scheduler) = self.cpu_schedulers.get_mut(0) { // TODO: CPU selection
+                        if let Some(scheduler) = self.cpu_schedulers.get_mut(0) {
+                            // TODO: CPU selection
                             let _ = scheduler.enqueue(*tid);
                         }
                     }
@@ -322,7 +329,9 @@ impl MicroScheduler {
                 scheduler.update_load_average();
 
                 // Update statistics
-                super::MICROKERNEL_STATS.scheduler_runs.fetch_add(1, Ordering::SeqCst);
+                super::MICROKERNEL_STATS
+                    .scheduler_runs
+                    .fetch_add(1, Ordering::SeqCst);
             }
 
             scheduler.current_thread
@@ -332,7 +341,8 @@ impl MicroScheduler {
     }
 
     pub fn get_current_thread(&self, cpu_id: u8) -> Option<Tid> {
-        self.cpu_schedulers.get(cpu_id as usize)
+        self.cpu_schedulers
+            .get(cpu_id as usize)
             .and_then(|s| s.current_thread)
     }
 
@@ -345,13 +355,15 @@ impl MicroScheduler {
     }
 
     pub fn get_load_average(&self, cpu_id: u8) -> f64 {
-        self.cpu_schedulers.get(cpu_id as usize)
+        self.cpu_schedulers
+            .get(cpu_id as usize)
             .map(|s| s.load_average)
             .unwrap_or(0.0)
     }
 
     pub fn get_ready_queue_len(&self, cpu_id: u8) -> usize {
-        self.cpu_schedulers.get(cpu_id as usize)
+        self.cpu_schedulers
+            .get(cpu_id as usize)
             .map(|s| s.ready_queue.len())
             .unwrap_or(0)
     }
@@ -390,9 +402,7 @@ pub fn init() -> Result<(), i32> {
 
 /// Get global scheduler instance
 pub fn get_scheduler() -> Option<&'static mut MicroScheduler> {
-    unsafe {
-        GLOBAL_SCHEDULER.as_mut()
-    }
+    unsafe { GLOBAL_SCHEDULER.as_mut() }
 }
 
 /// Yield current CPU

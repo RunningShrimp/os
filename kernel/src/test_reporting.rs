@@ -12,7 +12,6 @@ extern crate alloc;
 use alloc::string::String;
 use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
-use core::time::Duration;
 
 /// Comprehensive test report
 #[derive(Debug, Clone)]

@@ -47,10 +47,18 @@ pub fn get_kernel_info() -> KernelInfo {
         major: KERNEL_VERSION_MAJOR,
         minor: KERNEL_VERSION_MINOR,
         patch: KERNEL_VERSION_PATCH,
-        build_date: option_env!("VERGEN_BUILD_DATE").unwrap_or("unknown").to_string(),
-        build_time: option_env!("VERGEN_BUILD_TIME").unwrap_or("unknown").to_string(),
-        commit_hash: option_env!("VERGEN_GIT_SHA").unwrap_or("unknown").to_string(),
-        target_triple: option_env!("VERGEN_TARGET_TRIPLE").unwrap_or("unknown").to_string(),
+        build_date: option_env!("VERGEN_BUILD_DATE")
+            .unwrap_or("unknown")
+            .to_string(),
+        build_time: option_env!("VERGEN_BUILD_TIME")
+            .unwrap_or("unknown")
+            .to_string(),
+        commit_hash: option_env!("VERGEN_GIT_SHA")
+            .unwrap_or("unknown")
+            .to_string(),
+        target_triple: option_env!("VERGEN_TARGET_TRIPLE")
+            .unwrap_or("unknown")
+            .to_string(),
         features: get_enabled_features(),
     }
 }
@@ -58,21 +66,21 @@ pub fn get_kernel_info() -> KernelInfo {
 /// 获取启用的功能
 fn get_enabled_features() -> Vec<String> {
     let mut features = Vec::new();
-    
+
     // 移除了无效的 #[cfg(feature = "std")] 条件编译
-    
+
     #[cfg(feature = "log")]
     features.push("log".to_string());
-    
+
     #[cfg(feature = "debug_subsystems")]
     features.push("debug_subsystems".to_string());
-    
+
     #[cfg(feature = "formal_verification")]
     features.push("formal_verification".to_string());
-    
+
     #[cfg(feature = "security_audit")]
     features.push("security_audit".to_string());
-    
+
     features
 }
 
@@ -80,13 +88,13 @@ fn get_enabled_features() -> Vec<String> {
 pub fn initialize_kernel() -> Result<()> {
     // 初始化架构特定代码
     crate::arch::initialize()?;
-    
+
     // 初始化中断处理
     crate::trap::initialize()?;
-    
+
     // 初始化同步原语
     crate::subsystems::sync::initialize()?;
-    
+
     Ok(())
 }
 
@@ -94,16 +102,15 @@ pub fn initialize_kernel() -> Result<()> {
 pub fn shutdown_kernel() -> Result<()> {
     // 关闭中断处理
     crate::trap::shutdown()?;
-    
+
     // 关闭架构特定代码
     crate::arch::shutdown()?;
-    
+
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_kernel_info() {
@@ -118,7 +125,7 @@ mod tests {
     #[test]
     fn test_enabled_features() {
         let features = get_enabled_features();
-        
+
         // 至少应该有默认功能
         assert!(!features.is_empty());
     }

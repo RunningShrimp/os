@@ -9,16 +9,15 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU64, Ordering};
-use crate::subsystems::mm::memory_isolation::{
-    ProtectionDomainId, MemoryRegionId, 
-    DomainPermissions, MemoryRegionType, AccessValidationResult,
-    get_memory_isolation_manager, init_memory_isolation
-};
-use crate::syscall::SyscallResult;
+use alloc::{collections::BTreeMap, vec::Vec};
 
+use crate::{
+    subsystems::mm::memory_isolation::{
+        AccessValidationResult, DomainPermissions, MemoryRegionId, MemoryRegionType,
+        ProtectionDomainId, get_memory_isolation_manager, init_memory_isolation,
+    },
+    syscall::SyscallResult,
+};
 /// Security context for a process
 #[derive(Debug, Clone)]
 pub struct SecurityContext {
@@ -154,7 +153,7 @@ impl SecurityManager {
     pub fn init(&mut self) -> Result<(), SecurityError> {
         // Initialize memory isolation
         init_memory_isolation()?;
-        
+
         // Create system security context
         let system_context = SecurityContext {
             pid: 0,
@@ -175,9 +174,9 @@ impl SecurityManager {
             ],
             sandboxed: false,
         };
-        
+
         self.security_contexts.insert(0, system_context);
-        
+
         Ok(())
     }
 
@@ -191,7 +190,7 @@ impl SecurityManager {
     ) -> Result<ProtectionDomainId, SecurityError> {
         // Get parent context if available
         let parent_context = parent_pid.and_then(|p| self.security_contexts.get(&p));
-        
+
         // Create new protection domain
         let domain_permissions = match security_level {
             SecurityLevel::Untrusted => DomainPermissions::default(),
@@ -224,13 +223,17 @@ impl SecurityManager {
                 can_modify_protection_keys: true,
             },
         };
-        
+
         let domain_name = format!("process_{}", pid);
         let domain_id = {
             let mut isolation_manager = get_memory_isolation_manager().lock();
-            isolation_manager.create_domain(domain_name, domain_permissions, security_level >= SecurityLevel::High)?
+            isolation_manager.create_domain(
+                domain_name,
+                domain_permissions,
+                security_level >= SecurityLevel::High,
+            )?
         };
-        
+
         // Determine capabilities based on security level and parent
         let capabilities = match security_level {
             SecurityLevel::Untrusted => vec![],
@@ -255,18 +258,12 @@ impl SecurityManager {
                 Capability::ManageFilesystem,
             ],
         };
-        
+
         // Create security context
-        let context = SecurityContext {
-            pid,
-            domain_id,
-            security_level,
-            capabilities,
-            sandboxed,
-        };
-        
+        let context = SecurityContext { pid, domain_id, security_level, capabilities, sandboxed };
+
         self.security_contexts.insert(pid, context);
-        
+
         Ok(domain_id)
     }
 
@@ -285,18 +282,22 @@ impl SecurityManager {
         is_write: bool,
         is_execute: bool,
     ) -> Result<bool, SecurityError> {
-        let context = self.security_contexts.get(&pid)
+        let context = self
+            .security_contexts
+            .get(&pid)
             .ok_or(SecurityError::ProcessNotFound)?;
-        
+
         // Update statistics
-        self.stats.total_access_attempts.fetch_add(1, Ordering::Relaxed);
-        
+        self.stats
+            .total_access_attempts
+            .fetch_add(1, Ordering::Relaxed);
+
         // Validate access through memory isolation manager
         let result = {
             let isolation_manager = get_memory_isolation_manager().lock();
             isolation_manager.validate_access(context.domain_id, addr, size, is_write, is_execute)
         };
-        
+
         // Log access attempt
         let audit_entry = MemoryAccessAuditEntry {
             timestamp: self.get_timestamp(),
@@ -305,19 +306,25 @@ impl SecurityManager {
             to_domain_id: None,
             address: addr,
             size,
-            access_type: if is_execute { MemoryAccessType::Execute } 
-                       else if is_write { MemoryAccessType::Write } 
-                       else { MemoryAccessType::Read },
+            access_type: if is_execute {
+                MemoryAccessType::Execute
+            } else if is_write {
+                MemoryAccessType::Write
+            } else {
+                MemoryAccessType::Read
+            },
             result,
         };
-        
+
         self.log_access_attempt(audit_entry);
-        
+
         // Update violation statistics
         if result != AccessValidationResult::Allowed {
-            self.stats.total_access_violations.fetch_add(1, Ordering::Relaxed);
+            self.stats
+                .total_access_violations
+                .fetch_add(1, Ordering::Relaxed);
         }
-        
+
         Ok(result == AccessValidationResult::Allowed)
     }
 
@@ -328,15 +335,19 @@ impl SecurityManager {
         syscall_number: u32,
         args: &[usize],
     ) -> Result<bool, SecurityError> {
-        let context = self.security_contexts.get(&pid)
+        let context = self
+            .security_contexts
+            .get(&pid)
             .ok_or(SecurityError::ProcessNotFound)?;
-        
+
         // Update statistics
-        self.stats.total_syscall_attempts.fetch_add(1, Ordering::Relaxed);
-        
+        self.stats
+            .total_syscall_attempts
+            .fetch_add(1, Ordering::Relaxed);
+
         // Check if syscall is allowed based on security level and capabilities
         let allowed = self.check_syscall_permission(context, syscall_number, args)?;
-        
+
         // Log syscall attempt
         let audit_entry = MemoryAccessAuditEntry {
             timestamp: self.get_timestamp(),
@@ -346,16 +357,22 @@ impl SecurityManager {
             address: syscall_number as usize,
             size: args.len(),
             access_type: MemoryAccessType::Syscall,
-            result: if allowed { AccessValidationResult::Allowed } else { AccessValidationResult::DeniedPermission },
+            result: if allowed {
+                AccessValidationResult::Allowed
+            } else {
+                AccessValidationResult::DeniedPermission
+            },
         };
-        
+
         self.log_access_attempt(audit_entry);
-        
+
         // Update violation statistics
         if !allowed {
-            self.stats.total_syscall_violations.fetch_add(1, Ordering::Relaxed);
+            self.stats
+                .total_syscall_violations
+                .fetch_add(1, Ordering::Relaxed);
         }
-        
+
         Ok(allowed)
     }
 
@@ -369,42 +386,48 @@ impl SecurityManager {
         // System calls that require special permissions
         match syscall_number {
             // Memory management syscalls
-            1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 => { // mmap, munmap, etc.
+            1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 => {
+                // mmap, munmap, etc.
                 // Check if process has memory management capabilities
-                Ok(context.capabilities.contains(&Capability::ReadAnyMemory) ||
-                   context.capabilities.contains(&Capability::WriteAnyMemory))
-            }
-            
+                Ok(context.capabilities.contains(&Capability::ReadAnyMemory)
+                    || context.capabilities.contains(&Capability::WriteAnyMemory))
+            },
+
             // Process management syscalls
-            10 | 11 | 12 | 13 | 14 | 15 => { // fork, exec, etc.
+            10 | 11 | 12 | 13 | 14 | 15 => {
+                // fork, exec, etc.
                 // Check if process has process management capabilities
                 Ok(context.capabilities.contains(&Capability::ManageProcesses))
-            }
-            
+            },
+
             // System management syscalls
-            20 | 21 | 22 | 23 | 24 | 25 => { // reboot, shutdown, etc.
+            20 | 21 | 22 | 23 | 24 | 25 => {
+                // reboot, shutdown, etc.
                 // Only system level can perform these operations
                 Ok(context.security_level >= SecurityLevel::System)
-            }
-            
+            },
+
             // Device management syscalls
-            30 | 31 | 32 | 33 | 34 | 35 => { // open, close, read, write, etc.
+            30 | 31 | 32 | 33 | 34 | 35 => {
+                // open, close, read, write, etc.
                 // Check if process has device management capabilities
                 Ok(context.capabilities.contains(&Capability::ManageDevices))
-            }
-            
+            },
+
             // Network management syscalls
-            40 | 41 | 42 | 43 | 44 | 45 => { // socket, bind, etc.
+            40 | 41 | 42 | 43 | 44 | 45 => {
+                // socket, bind, etc.
                 // Check if process has network management capabilities
                 Ok(context.capabilities.contains(&Capability::ManageNetwork))
-            }
-            
+            },
+
             // File system management syscalls
-            50 | 51 | 52 | 53 | 54 | 55 => { // mkdir, rmdir, etc.
+            50 | 51 | 52 | 53 | 54 | 55 => {
+                // mkdir, rmdir, etc.
                 // Check if process has file system management capabilities
                 Ok(context.capabilities.contains(&Capability::ManageFilesystem))
-            }
-            
+            },
+
             // Default: allow basic syscalls for all processes
             _ => Ok(true),
         }
@@ -413,10 +436,11 @@ impl SecurityManager {
     /// Log access attempt
     fn log_access_attempt(&mut self, entry: MemoryAccessAuditEntry) {
         self.audit_log.push(entry);
-        
+
         // Trim audit log if it exceeds maximum size
         if self.audit_log.len() > self.max_audit_log_size {
-            self.audit_log.drain(0..self.audit_log.len() - self.max_audit_log_size);
+            self.audit_log
+                .drain(0..self.audit_log.len() - self.max_audit_log_size);
         }
     }
 
@@ -453,14 +477,16 @@ impl SecurityManager {
         pid: u32,
         new_level: SecurityLevel,
     ) -> Result<(), SecurityError> {
-        let context = self.security_contexts.get_mut(&pid)
+        let context = self
+            .security_contexts
+            .get_mut(&pid)
             .ok_or(SecurityError::ProcessNotFound)?;
-        
+
         context.security_level = new_level;
-        
+
         // Update domain permissions if needed
         // This would require updating the memory isolation manager
-        
+
         Ok(())
     }
 
@@ -470,13 +496,15 @@ impl SecurityManager {
         pid: u32,
         capability: Capability,
     ) -> Result<(), SecurityError> {
-        let context = self.security_contexts.get_mut(&pid)
+        let context = self
+            .security_contexts
+            .get_mut(&pid)
             .ok_or(SecurityError::ProcessNotFound)?;
-        
+
         if !context.capabilities.contains(&capability) {
             context.capabilities.push(capability);
         }
-        
+
         Ok(())
     }
 
@@ -486,11 +514,13 @@ impl SecurityManager {
         pid: u32,
         capability: &Capability,
     ) -> Result<(), SecurityError> {
-        let context = self.security_contexts.get_mut(&pid)
+        let context = self
+            .security_contexts
+            .get_mut(&pid)
             .ok_or(SecurityError::ProcessNotFound)?;
-        
+
         context.capabilities.retain(|c| c != capability);
-        
+
         Ok(())
     }
 
@@ -510,21 +540,27 @@ impl SecurityManager {
         size: usize,
         region_type: MemoryRegionType,
     ) -> Result<MemoryRegionId, SecurityError> {
-        let context = self.security_contexts.get(&pid)
+        let context = self
+            .security_contexts
+            .get(&pid)
             .ok_or(SecurityError::ProcessNotFound)?;
-        
+
         // Check if process has secure memory access capability
-        if !context.capabilities.contains(&Capability::AccessSecureRegions) {
+        if !context
+            .capabilities
+            .contains(&Capability::AccessSecureRegions)
+        {
             return Err(SecurityError::PermissionDenied);
         }
-        
+
         // Create secure region through memory isolation manager
         let region_id = {
             let mut isolation_manager = get_memory_isolation_manager().lock();
-            isolation_manager.create_secure_region(context.domain_id, size, region_type)
+            isolation_manager
+                .create_secure_region(context.domain_id, size, region_type)
                 .map_err(|_| SecurityError::SecureRegionCreationFailed)?
         };
-        
+
         Ok(region_id)
     }
 
@@ -534,21 +570,27 @@ impl SecurityManager {
         pid: u32,
         region_id: MemoryRegionId,
     ) -> Result<(), SecurityError> {
-        let context = self.security_contexts.get(&pid)
+        let context = self
+            .security_contexts
+            .get(&pid)
             .ok_or(SecurityError::ProcessNotFound)?;
-        
+
         // Check if process has secure memory access capability
-        if !context.capabilities.contains(&Capability::AccessSecureRegions) {
+        if !context
+            .capabilities
+            .contains(&Capability::AccessSecureRegions)
+        {
             return Err(SecurityError::PermissionDenied);
         }
-        
+
         // Zero secure region through memory isolation manager
         {
             let mut isolation_manager = get_memory_isolation_manager().lock();
-            isolation_manager.zero_secure_region(context.domain_id, region_id)
+            isolation_manager
+                .zero_secure_region(context.domain_id, region_id)
                 .map_err(|_| SecurityError::SecureRegionOperationFailed)?
         };
-        
+
         Ok(())
     }
 }
@@ -569,7 +611,8 @@ pub enum SecurityError {
 }
 
 /// Global security manager instance
-static SECURITY_MANAGER: crate::subsystems::sync::Mutex<SecurityManager> = crate::subsystems::sync::Mutex::new(SecurityManager::new());
+static SECURITY_MANAGER: crate::subsystems::sync::Mutex<SecurityManager> =
+    crate::subsystems::sync::Mutex::new(SecurityManager::new());
 
 /// Initialize security system
 pub fn init_security() -> Result<(), SecurityError> {
@@ -639,10 +682,7 @@ pub fn create_secure_memory_region(
 }
 
 /// Zero secure memory region (convenience function)
-pub fn zero_secure_memory_region(
-    pid: u32,
-    region_id: MemoryRegionId,
-) -> Result<(), SecurityError> {
+pub fn zero_secure_memory_region(pid: u32, region_id: MemoryRegionId) -> Result<(), SecurityError> {
     let mut manager = SECURITY_MANAGER.lock();
     manager.zero_secure_memory_region(pid, region_id)
 }
@@ -651,20 +691,16 @@ pub fn zero_secure_memory_region(
 mod tests {
     use super::*;
 
-    #[test]
     fn test_security_context_creation() {
         let mut manager = SecurityManager::new();
         manager.init().unwrap();
-        
-        let domain_id = manager.create_process_security_context(
-            1,
-            Some(0),
-            SecurityLevel::Medium,
-            false,
-        ).unwrap();
-        
+
+        let domain_id = manager
+            .create_process_security_context(1, Some(0), SecurityLevel::Medium, false)
+            .unwrap();
+
         assert!(domain_id > 0);
-        
+
         let context = manager.get_security_context(1).unwrap();
         assert_eq!(context.pid, 1);
         assert_eq!(context.security_level, SecurityLevel::Medium);
@@ -675,14 +711,11 @@ mod tests {
     fn test_memory_access_validation() {
         let mut manager = SecurityManager::new();
         manager.init().unwrap();
-        
-        let domain_id = manager.create_process_security_context(
-            1,
-            Some(0),
-            SecurityLevel::Medium,
-            false,
-        ).unwrap();
-        
+
+        let domain_id = manager
+            .create_process_security_context(1, Some(0), SecurityLevel::Medium, false)
+            .unwrap();
+
         // This test would need actual memory regions to be set up
         // For now, just test the function call
         let result = manager.validate_memory_access(1, 0x1000, 0x100, true, false);
@@ -694,20 +727,21 @@ mod tests {
     fn test_capability_management() {
         let mut manager = SecurityManager::new();
         manager.init().unwrap();
-        
-        let domain_id = manager.create_process_security_context(
-            1,
-            Some(0),
-            SecurityLevel::Medium,
-            false,
-        ).unwrap();
-        
+
+        let domain_id = manager
+            .create_process_security_context(1, Some(0), SecurityLevel::Medium, false)
+            .unwrap();
+
         // Add capability
-        manager.add_capability(1, Capability::ReadAnyMemory).unwrap();
+        manager
+            .add_capability(1, Capability::ReadAnyMemory)
+            .unwrap();
         assert!(manager.has_capability(1, &Capability::ReadAnyMemory));
-        
+
         // Remove capability
-        manager.remove_capability(1, &Capability::ReadAnyMemory).unwrap();
+        manager
+            .remove_capability(1, &Capability::ReadAnyMemory)
+            .unwrap();
         assert!(!manager.has_capability(1, &Capability::ReadAnyMemory));
     }
 }

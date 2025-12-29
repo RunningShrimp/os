@@ -9,8 +9,6 @@
 
 extern crate alloc;
 
-use crate::compat::*;
-
 /// iOS compatibility module
 pub struct IOSModule {
     uikit_framework: UIKitFramework,
@@ -52,7 +50,6 @@ impl PlatformModule for IOSModule {
     fn shutdown(&mut self) -> Result<(), &'static str> {
         Ok(())
     }
-
 }
 
 /// UIKit framework

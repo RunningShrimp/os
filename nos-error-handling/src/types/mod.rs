@@ -2,13 +2,10 @@
 //!
 //! This module provides common types for error handling.
 
-use alloc::collections::BTreeMap;
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
 /// Error severity
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum ErrorSeverity {
     /// Informational
     #[default]
@@ -30,8 +27,7 @@ pub enum ErrorSeverity {
 }
 
 /// Error category
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum ErrorCategory {
     /// System error
     #[default]
@@ -69,8 +65,7 @@ pub enum ErrorCategory {
 }
 
 /// Error status
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ErrorStatus {
     /// New error
     #[default]
@@ -92,8 +87,7 @@ pub enum ErrorStatus {
 }
 
 /// Error type
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ErrorType {
     /// Runtime error
     #[default]
@@ -125,8 +119,7 @@ pub enum ErrorType {
 }
 
 /// Recovery strategy
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RecoveryStrategy {
     /// No recovery
     #[default]
@@ -306,8 +299,7 @@ pub struct RecoveryAction {
 }
 
 /// Recovery action type
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RecoveryActionType {
     /// Retry operation
     #[default]
@@ -377,7 +369,7 @@ mod tests {
         assert!(ErrorSeverity::Warning < ErrorSeverity::Error);
         assert!(ErrorSeverity::Error < ErrorSeverity::Critical);
         assert!(ErrorSeverity::Critical < ErrorSeverity::Fatal);
-        
+
         assert_eq!(ErrorSeverity::default(), ErrorSeverity::Info);
     }
 
@@ -385,7 +377,7 @@ mod tests {
     fn test_error_category() {
         assert_eq!(ErrorCategory::System, ErrorCategory::System);
         assert_ne!(ErrorCategory::System, ErrorCategory::Memory);
-        
+
         assert_eq!(ErrorCategory::default(), ErrorCategory::System);
     }
 

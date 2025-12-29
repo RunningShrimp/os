@@ -5,17 +5,20 @@
 
 extern crate alloc;
 
-use core::ptr::null_mut;
 use alloc::sync::Arc;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::ptr::null_mut;
 
-use crate::subsystems::sync::Mutex;
-use crate::subsystems::sync::primitives::{MutexEnhanced, CondVar};
-use crate::process::getpid;
-use crate::subsystems::mm::PAGE_SIZE;
-use crate::reliability::{EINVAL, EAGAIN, ESRCH, EDEADLK, EBUSY};
+use crate::{
+    reliability::{EAGAIN, EBUSY, EDEADLK, EINVAL, ESRCH},
+    subsystems::{
+        mm::PAGE_SIZE,
+        sync::{
+            Mutex,
+            primitives::{CondVar, MutexEnhanced},
+        },
+    },
+};
 
-// ============================================================================
 // Constants and Types
 // ============================================================================
 
@@ -154,10 +157,7 @@ pub struct PthreadKeyT {
 
 impl Default for PthreadKeyT {
     fn default() -> Self {
-        Self {
-            key: 0,
-            destructor: None,
-        }
+        Self { key: 0, destructor: None }
     }
 }
 
@@ -234,8 +234,9 @@ impl PthreadControlBlock {
 }
 
 /// Global thread registry
-static THREAD_REGISTRY: Mutex<alloc::collections::BTreeMap<PthreadT, Arc<Mutex<PthreadControlBlock>>>> =
-    Mutex::new(alloc::collections::BTreeMap::new());
+static THREAD_REGISTRY: Mutex<
+    alloc::collections::BTreeMap<PthreadT, Arc<Mutex<PthreadControlBlock>>>,
+> = Mutex::new(alloc::collections::BTreeMap::new());
 
 // ============================================================================
 // Thread management
@@ -288,7 +289,7 @@ pub unsafe extern "C" fn pthread_create(
             // Return handle to caller
             *thread = handle;
             0
-        }
+        },
         Err(_) => EAGAIN,
     }
 }
@@ -379,7 +380,7 @@ pub unsafe extern "C" fn pthread_join(thread: PthreadT, retval: *mut *mut u8) ->
             THREAD_REGISTRY.lock().remove(&thread);
 
             0
-        }
+        },
         None => ESRCH,
     }
 }
@@ -474,8 +475,9 @@ pub unsafe extern "C" fn pthread_cancel(thread: PthreadT) -> i32 {
         pcb_guard.cancel_pending = true;
 
         // If cancellation is enabled and type is asynchronous, cancel immediately
-        if pcb_guard.cancel_state == PTHREAD_CANCEL_ENABLE &&
-           pcb_guard.cancel_type == PTHREAD_CANCEL_ASYNCHRONOUS {
+        if pcb_guard.cancel_state == PTHREAD_CANCEL_ENABLE
+            && pcb_guard.cancel_type == PTHREAD_CANCEL_ASYNCHRONOUS
+        {
             if pcb_guard.thread_id != 0 {
                 crate::process::thread::thread_cancel(pcb_guard.thread_id);
             }
@@ -486,10 +488,7 @@ pub unsafe extern "C" fn pthread_cancel(thread: PthreadT) -> i32 {
 }
 
 /// Set thread cancellation state
-pub unsafe extern "C" fn pthread_setcancelstate(
-    state: i32,
-    oldstate: *mut i32,
-) -> i32 {
+pub unsafe extern "C" fn pthread_setcancelstate(state: i32, oldstate: *mut i32) -> i32 {
     let current_handle = pthread_self();
 
     // Find current thread control block
@@ -527,17 +526,14 @@ pub unsafe extern "C" fn pthread_setcancelstate(
                 }
 
                 0
-            }
+            },
             _ => EINVAL,
         }
     }
 }
 
 /// Set thread cancellation type
-pub unsafe extern "C" fn pthread_setcanceltype(
-    type_: i32,
-    oldtype: *mut i32,
-) -> i32 {
+pub unsafe extern "C" fn pthread_setcanceltype(type_: i32, oldtype: *mut i32) -> i32 {
     let current_handle = pthread_self();
 
     // Find current thread control block
@@ -566,16 +562,17 @@ pub unsafe extern "C" fn pthread_setcanceltype(
                 pcb_guard.cancel_type = type_;
 
                 // Check if cancellation is now pending
-                if type_ == PTHREAD_CANCEL_ASYNCHRONOUS &&
-                   pcb_guard.cancel_pending &&
-                   pcb_guard.cancel_state == PTHREAD_CANCEL_ENABLE {
+                if type_ == PTHREAD_CANCEL_ASYNCHRONOUS
+                    && pcb_guard.cancel_pending
+                    && pcb_guard.cancel_state == PTHREAD_CANCEL_ENABLE
+                {
                     if pcb_guard.thread_id != 0 {
                         crate::process::thread::thread_cancel(pcb_guard.thread_id);
                     }
                 }
 
                 0
-            }
+            },
             _ => EINVAL,
         }
     }
@@ -615,10 +612,7 @@ pub unsafe extern "C" fn pthread_cleanup_push(
         let mut pcb_guard = pcb.lock();
 
         // Create cleanup handler (simplified - only one handler supported)
-        let handler = PthreadCleanupHandler {
-            routine: Some(routine),
-            arg,
-        };
+        let handler = PthreadCleanupHandler { routine: Some(routine), arg };
 
         // Store handler
         pcb_guard.cleanup_handler = Some(handler);
@@ -710,9 +704,9 @@ pub unsafe extern "C" fn pthread_mutex_init(
     if mutex.is_null() {
         return EINVAL;
     }
-    
+
     let mut mutex_obj = PthreadMutexT::default();
-    
+
     // Apply attributes if provided
     if !attr.is_null() {
         let attr_ref = &*attr;
@@ -721,13 +715,13 @@ pub unsafe extern "C" fn pthread_mutex_init(
         mutex_obj.protocol = attr_ref.protocol;
         mutex_obj.prioceiling = attr_ref.prioceiling;
         mutex_obj.shared = attr_ref.shared;
-        
+
         // Create recursive mutex if requested
         if attr_ref.type_ == PTHREAD_MUTEX_RECURSIVE {
             mutex_obj.lock = MutexEnhanced::new_recursive(());
         }
     }
-    
+
     *mutex = mutex_obj;
     0
 }
@@ -737,10 +731,10 @@ pub unsafe extern "C" fn pthread_mutex_lock(mutex: *mut PthreadMutexT) -> i32 {
     if mutex.is_null() {
         return EINVAL;
     }
-    
+
     let mutex_ref = &mut *mutex;
     let current_tid = crate::process::thread::current_thread();
-    
+
     // Error checking mutex: detect deadlock
     if mutex_ref.type_ == PTHREAD_MUTEX_ERRORCHECK {
         if let Some(owner) = mutex_ref.owner_tid {
@@ -749,15 +743,15 @@ pub unsafe extern "C" fn pthread_mutex_lock(mutex: *mut PthreadMutexT) -> i32 {
             }
         }
     }
-    
+
     // Lock the mutex
     let _guard = mutex_ref.lock.lock();
-    
+
     // Store owner for error checking
     if mutex_ref.type_ == PTHREAD_MUTEX_ERRORCHECK {
         mutex_ref.owner_tid = current_tid;
     }
-    
+
     // Note: Guard is dropped when function returns, which unlocks the mutex
     // This is a limitation of the C API - we can't store guards across calls
     // In a real implementation, we would need to store guards in thread-local storage
@@ -769,10 +763,10 @@ pub unsafe extern "C" fn pthread_mutex_trylock(mutex: *mut PthreadMutexT) -> i32
     if mutex.is_null() {
         return EINVAL;
     }
-    
+
     let mutex_ref = &mut *mutex;
     let current_tid = crate::process::thread::current_thread();
-    
+
     // Error checking mutex: detect deadlock
     if mutex_ref.type_ == PTHREAD_MUTEX_ERRORCHECK {
         if let Some(owner) = mutex_ref.owner_tid {
@@ -781,7 +775,7 @@ pub unsafe extern "C" fn pthread_mutex_trylock(mutex: *mut PthreadMutexT) -> i32
             }
         }
     }
-    
+
     // Try to lock the mutex
     if let Some(_guard) = mutex_ref.lock.try_lock() {
         // Store owner for error checking
@@ -824,18 +818,12 @@ pub struct PthreadCondT {
 
 impl Default for PthreadCondT {
     fn default() -> Self {
-        Self {
-            cond: CondVar::new(),
-            initialized: true,
-        }
+        Self { cond: CondVar::new(), initialized: true }
     }
 }
 
 /// Initialize a condition variable
-pub unsafe extern "C" fn pthread_cond_init(
-    cond: *mut PthreadCondT,
-    attr: *const u8,
-) -> i32 {
+pub unsafe extern "C" fn pthread_cond_init(cond: *mut PthreadCondT, attr: *const u8) -> i32 {
     if cond.is_null() {
         return 1;
     }
@@ -851,59 +839,52 @@ pub unsafe extern "C" fn pthread_cond_wait(
     if cond.is_null() || mutex.is_null() {
         return EINVAL;
     }
-    
+
     let cond_ref = &*cond;
     if !cond_ref.initialized {
         return EINVAL;
     }
-    
+
     let mutex_ref = &mut *mutex;
-    
+
     // Wait on condition variable (this will unlock mutex, wait, then re-lock)
     cond_ref.cond.wait(&mutex_ref.lock);
-    
+
     0
 }
 
-
 /// Signal a condition variable
-pub unsafe extern "C" fn pthread_cond_signal(
-    cond: *mut PthreadCondT,
-) -> i32 {
+pub unsafe extern "C" fn pthread_cond_signal(cond: *mut PthreadCondT) -> i32 {
     if cond.is_null() {
         return EINVAL;
     }
-    
+
     let cond_ref = &*cond;
     if !cond_ref.initialized {
         return EINVAL;
     }
-    
+
     cond_ref.cond.signal();
     0
 }
 
 /// Broadcast a condition variable
-pub unsafe extern "C" fn pthread_cond_broadcast(
-    cond: *mut PthreadCondT,
-) -> i32 {
+pub unsafe extern "C" fn pthread_cond_broadcast(cond: *mut PthreadCondT) -> i32 {
     if cond.is_null() {
         return EINVAL;
     }
-    
+
     let cond_ref = &*cond;
     if !cond_ref.initialized {
         return EINVAL;
     }
-    
+
     cond_ref.cond.broadcast();
     0
 }
 
 /// Destroy a condition variable
-pub unsafe extern "C" fn pthread_cond_destroy(
-    _cond: *mut PthreadCondT,
-) -> i32 {
+pub unsafe extern "C" fn pthread_cond_destroy(_cond: *mut PthreadCondT) -> i32 {
     0 // Nothing to destroy
 }
 
@@ -960,7 +941,7 @@ pub unsafe extern "C" fn pthread_attr_setdetachstate(
         PTHREAD_CREATE_JOINABLE | PTHREAD_CREATE_DETACHED => {
             (*attr).detachstate = detachstate;
             0
-        }
+        },
         _ => EINVAL,
     }
 }
@@ -1071,7 +1052,7 @@ pub unsafe extern "C" fn pthread_attr_setscope(
         PTHREAD_SCOPE_SYSTEM | PTHREAD_SCOPE_PROCESS => {
             (*attr).scope = contentionscope;
             0
-        }
+        },
         _ => EINVAL,
     }
 }
@@ -1089,10 +1070,7 @@ pub unsafe extern "C" fn pthread_attr_getschedpolicy(
 }
 
 /// Set scheduling policy attribute
-pub unsafe extern "C" fn pthread_attr_setschedpolicy(
-    attr: *mut PthreadAttrT,
-    policy: i32,
-) -> i32 {
+pub unsafe extern "C" fn pthread_attr_setschedpolicy(attr: *mut PthreadAttrT, policy: i32) -> i32 {
     if attr.is_null() {
         return EINVAL;
     }
@@ -1100,7 +1078,7 @@ pub unsafe extern "C" fn pthread_attr_setschedpolicy(
         SCHED_OTHER | SCHED_FIFO | SCHED_RR | SCHED_BATCH | SCHED_IDLE => {
             (*attr).schedpolicy = policy;
             0
-        }
+        },
         _ => EINVAL,
     }
 }
@@ -1153,7 +1131,7 @@ pub unsafe extern "C" fn pthread_attr_setinheritsched(
         PTHREAD_INHERIT_SCHED | PTHREAD_EXPLICIT_SCHED => {
             (*attr).inheritsched = inheritsched;
             0
-        }
+        },
         _ => EINVAL,
     }
 }
@@ -1166,8 +1144,9 @@ pub unsafe extern "C" fn pthread_attr_setinheritsched(
 static NEXT_KEY_ID: AtomicUsize = AtomicUsize::new(1);
 
 /// Key registry
-static KEY_REGISTRY: Mutex<alloc::collections::BTreeMap<u32, Option<unsafe extern "C" fn(*mut u8)>>> =
-    Mutex::new(alloc::collections::BTreeMap::new());
+static KEY_REGISTRY: Mutex<
+    alloc::collections::BTreeMap<u32, Option<unsafe extern "C" fn(*mut u8)>>,
+> = Mutex::new(alloc::collections::BTreeMap::new());
 
 /// Create a thread-specific data key
 pub unsafe extern "C" fn pthread_key_create(
@@ -1181,10 +1160,7 @@ pub unsafe extern "C" fn pthread_key_create(
     let key_id = NEXT_KEY_ID.fetch_add(1, Ordering::SeqCst) as u32;
     KEY_REGISTRY.lock().insert(key_id, destructor);
 
-    *key = PthreadKeyT {
-        key: key_id,
-        destructor,
-    };
+    *key = PthreadKeyT { key: key_id, destructor };
 
     0
 }
@@ -1212,10 +1188,7 @@ pub unsafe extern "C" fn pthread_getspecific(key: PthreadKeyT) -> *mut u8 {
 }
 
 /// Set thread-specific data
-pub unsafe extern "C" fn pthread_setspecific(
-    key: PthreadKeyT,
-    value: *const u8,
-) -> i32 {
+pub unsafe extern "C" fn pthread_setspecific(key: PthreadKeyT, value: *const u8) -> i32 {
     let current_handle = pthread_self();
 
     // Find current thread control block
@@ -1244,9 +1217,7 @@ pub struct PthreadOnceT {
 
 impl Default for PthreadOnceT {
     fn default() -> Self {
-        Self {
-            done: AtomicUsize::new(0),
-        }
+        Self { done: AtomicUsize::new(0) }
     }
 }
 
@@ -1267,7 +1238,11 @@ pub unsafe extern "C" fn pthread_once(
     }
 
     // Try to acquire initialization lock
-    if once.done.compare_exchange(0, 1, Ordering::Acquire, Ordering::Relaxed).is_ok() {
+    if once
+        .done
+        .compare_exchange(0, 1, Ordering::Acquire, Ordering::Relaxed)
+        .is_ok()
+    {
         // Execute initialization routine
         init_routine();
 

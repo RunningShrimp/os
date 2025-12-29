@@ -5,7 +5,7 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+
 use crate::subsystems::time::hrtime_nanos;
 
 /// System call benchmark results
@@ -34,18 +34,22 @@ pub struct SyscallBenchmarkResult {
 }
 
 /// Benchmark a system call
-pub fn benchmark_syscall<F>(name: &'static str, iterations: usize, syscall_fn: F) -> SyscallBenchmarkResult
+pub fn benchmark_syscall<F>(
+    name: &'static str,
+    iterations: usize,
+    syscall_fn: F,
+) -> SyscallBenchmarkResult
 where
     F: Fn() -> Result<u64, i32>,
 {
     let mut latencies = Vec::with_capacity(iterations);
     let mut total_time = 0u64;
-    
+
     // Warmup
     for _ in 0..10 {
         let _ = syscall_fn();
     }
-    
+
     // Benchmark
     let start_time = hrtime_nanos();
     for _ in 0..iterations {
@@ -57,7 +61,7 @@ where
         total_time += latency;
     }
     let end_time = hrtime_nanos();
-    
+
     // Calculate statistics
     latencies.sort();
     let avg_latency = total_time / iterations as u64;
@@ -66,14 +70,14 @@ where
     let p50_idx = iterations / 2;
     let p95_idx = (iterations as f64 * 0.95) as usize;
     let p99_idx = (iterations as f64 * 0.99) as usize;
-    
+
     let p50_latency = latencies[p50_idx.min(iterations - 1)];
     let p95_latency = latencies[p95_idx.min(iterations - 1)];
     let p99_latency = latencies[p99_idx.min(iterations - 1)];
-    
+
     let elapsed_ns = end_time - start_time;
     let throughput = (iterations as f64 * 1_000_000_000.0) / elapsed_ns as f64;
-    
+
     SyscallBenchmarkResult {
         syscall_name: name,
         iterations,
@@ -92,7 +96,11 @@ where
 pub fn print_benchmark_result(result: &SyscallBenchmarkResult) {
     crate::println!("[benchmark] {}:", result.syscall_name);
     crate::println!("  Iterations: {}", result.iterations);
-    crate::println!("  Average latency: {} ns ({:.2} us)", result.avg_latency_ns, result.avg_latency_ns as f64 / 1000.0);
+    crate::println!(
+        "  Average latency: {} ns ({:.2} us)",
+        result.avg_latency_ns,
+        result.avg_latency_ns as f64 / 1000.0
+    );
     crate::println!("  Min latency: {} ns", result.min_latency_ns);
     crate::println!("  Max latency: {} ns", result.max_latency_ns);
     crate::println!("  P50 latency: {} ns", result.p50_latency_ns);
@@ -104,21 +112,20 @@ pub fn print_benchmark_result(result: &SyscallBenchmarkResult) {
 /// Run all system call benchmarks
 pub fn run_all_syscall_benchmarks() {
     crate::println!("[benchmark] Running system call benchmarks...");
-    
+
     // Benchmark getpid
     let getpid_result = benchmark_syscall("getpid", 10000, || {
         let pid = crate::process::myproc();
         Ok(pid.unwrap_or(0) as u64)
     });
     print_benchmark_result(&getpid_result);
-    
+
     // Benchmark gettid
     let gettid_result = benchmark_syscall("gettid", 10000, || {
         let tid = crate::process::thread::thread_self();
         Ok(tid as u64)
     });
     print_benchmark_result(&gettid_result);
-    
+
     crate::println!("[benchmark] System call benchmarks completed");
 }
-

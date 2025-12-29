@@ -6,16 +6,21 @@
 
 extern crate alloc;
 
-use core::ptr::null_mut;
 // use alloc::sync::Arc;
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use alloc::{collections::BTreeMap, vec::Vec};
+use core::{
+    ptr::null_mut,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
-use crate::subsystems::sync::{Mutex, Once};
-use crate::process::{Pid, Context, TrapFrame};
-use crate::subsystems::mm::{kalloc, kfree, PAGE_SIZE};
-use crate::ipc::signal::SignalState;
+use crate::{
+    ipc::signal::SignalState,
+    process::{Context, Pid, TrapFrame},
+    subsystems::{
+        mm::{PAGE_SIZE, kalloc, kfree},
+        sync::{Mutex, Once},
+    },
+};
 
 // ============================================================================
 // Constants and Types
@@ -92,10 +97,7 @@ pub struct SchedParam {
 
 impl Default for SchedParam {
     fn default() -> Self {
-        Self {
-            priority: 10,
-            timeslice: 10,
-        }
+        Self { priority: 10, timeslice: 10 }
     }
 }
 
@@ -114,7 +116,7 @@ pub struct Thread {
     /// Scheduling information
     pub sched_policy: SchedPolicy,
     pub sched_param: SchedParam,
-    pub static_prio: u8,  // Static priority
+    pub static_prio: u8, // Static priority
     pub normal_prio: u8, // Normal priority
     pub dyn_prio: u8,    // Dynamic priority
 
@@ -127,8 +129,8 @@ pub struct Thread {
     pub trapframe: *mut TrapFrame,
 
     /// Stack information
-    pub kstack: usize,    // Kernel stack top
-    pub ustack: usize,    // User stack top (for user threads)
+    pub kstack: usize, // Kernel stack top
+    pub ustack: usize, // User stack top (for user threads)
     pub stack_size: usize,
 
     /// Thread entry point and arguments
@@ -137,8 +139,8 @@ pub struct Thread {
     pub return_value: *mut u8,
 
     /// Thread relationships
-    pub parent_tid: Option<Tid>,  // Creator thread (for joinable threads)
-    pub joiner_tid: Option<Tid>,  // Thread waiting to join this thread
+    pub parent_tid: Option<Tid>, // Creator thread (for joinable threads)
+    pub joiner_tid: Option<Tid>, // Thread waiting to join this thread
 
     /// Thread flags and attributes
     pub detached: bool,
@@ -280,7 +282,7 @@ impl Thread {
                 pools.free_stack(kstack_addr);
                 self.kstack = 0;
                 return Err(ThreadError::OutOfMemory);
-            }
+            },
         };
         self.trapframe = trapframe_addr as *mut TrapFrame;
 
@@ -307,14 +309,14 @@ impl Thread {
                 tf.kernel_sp = self.kstack;
             }
         }
-        
+
         // Initialize context for this thread
         crate::subsystems::process::context_switch::init_context(
             &mut self.context,
             self.kstack,
             0, // Entry point will be set later
             0, // No argument initially
-            self.thread_type == ThreadType::User
+            self.thread_type == ThreadType::User,
         );
     }
 
@@ -328,14 +330,14 @@ impl Thread {
                 tf.sp = self.kstack;
             }
         }
-        
+
         // Initialize context for this thread
         crate::subsystems::process::context_switch::init_context(
             &mut self.context,
             self.kstack,
             0, // Entry point will be set later
             0, // No argument initially
-            self.thread_type == ThreadType::User
+            self.thread_type == ThreadType::User,
         );
     }
 
@@ -352,14 +354,14 @@ impl Thread {
             self.fs_base = 0;
             self.gs_base = 0;
         }
-        
+
         // Initialize context for this thread
         crate::subsystems::process::context_switch::init_context(
             &mut self.context,
             self.kstack,
             0, // Entry point will be set later
             0, // No argument initially
-            self.thread_type == ThreadType::User
+            self.thread_type == ThreadType::User,
         );
     }
 
@@ -438,12 +440,12 @@ impl Thread {
     }
 
     /// Clean up thread resources and return them to object pools
-    /// 
+    ///
     /// This function returns kernel stacks and trapframes to the resource pools
     /// for reuse, reducing memory fragmentation and allocation overhead.
     pub fn cleanup(&mut self) {
         let pools = get_thread_pools();
-        
+
         // Return kernel stack to pool for reuse
         if self.kstack != 0 {
             let stack_addr = self.kstack - PAGE_SIZE;
@@ -534,20 +536,24 @@ impl ThreadTable {
     }
 
     /// Allocate a new thread using object pool
-    /// 
+    ///
     /// This function provides O(1) allocation by reusing freed thread slots
     /// from the free_slots list, reducing memory fragmentation and allocation overhead.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `pid` - Process ID that owns this thread
     /// * `thread_type` - Type of thread (Kernel, User, or Main)
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Ok(&mut Thread)` if allocation succeeds
     /// * `Err(ThreadError)` if no slots are available
-    pub fn alloc_thread(&mut self, pid: Pid, thread_type: ThreadType) -> Result<&mut Thread, ThreadError> {
+    pub fn alloc_thread(
+        &mut self,
+        pid: Pid,
+        thread_type: ThreadType,
+    ) -> Result<&mut Thread, ThreadError> {
         // Get free slot from object pool (O(1))
         let slot_idx = match self.free_slots.pop() {
             Some(idx) => idx,
@@ -564,7 +570,7 @@ impl ThreadTable {
                     Some(idx) => idx,
                     None => return Err(ThreadError::NoSlotsAvailable),
                 }
-            }
+            },
         };
 
         let tid = self.next_tid.fetch_add(1, Ordering::SeqCst);
@@ -576,7 +582,10 @@ impl ThreadTable {
         thread.init(tid, pid, thread_type)?;
 
         // Add to PID mapping
-        self.pid_to_tids.entry(pid).or_insert_with(Vec::new).push(tid);
+        self.pid_to_tids
+            .entry(pid)
+            .or_insert_with(Vec::new)
+            .push(tid);
 
         // Update active count
         self.active_count.fetch_add(1, Ordering::SeqCst);
@@ -624,16 +633,16 @@ impl ThreadTable {
     }
 
     /// Free a thread and return it to the object pool
-    /// 
+    ///
     /// This function cleans up thread resources and returns the thread slot
     /// to the free_slots pool for reuse, reducing memory fragmentation.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `tid` - Thread ID to free
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Ok(())` if the thread was successfully freed
     /// * `Err(ThreadError)` if the thread ID is invalid
     pub fn free_thread(&mut self, tid: Tid) -> Result<(), ThreadError> {
@@ -683,13 +692,15 @@ impl ThreadTable {
 
     /// Get iterator over all threads
     pub fn iter(&self) -> impl Iterator<Item = &Thread> {
-        self.threads.iter()
+        self.threads
+            .iter()
             .filter(|t| t.state != ThreadState::Unused)
     }
 
     /// Get mutable iterator over all threads
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Thread> {
-        self.threads.iter_mut()
+        self.threads
+            .iter_mut()
             .filter(|t| t.state != ThreadState::Unused)
     }
 }
@@ -697,8 +708,8 @@ impl ThreadTable {
 /// Thread resource pools for efficient allocation
 /// Reuses freed kernel stacks and trapframes to reduce memory fragmentation
 struct ThreadResourcePools {
-    stack_pool: Mutex<alloc::vec::Vec<usize>>,      // Reusable kernel stack addresses
-    trapframe_pool: Mutex<alloc::vec::Vec<usize>>,  // Reusable trapframe addresses
+    stack_pool: Mutex<alloc::vec::Vec<usize>>, // Reusable kernel stack addresses
+    trapframe_pool: Mutex<alloc::vec::Vec<usize>>, // Reusable trapframe addresses
 }
 
 impl ThreadResourcePools {
@@ -714,7 +725,11 @@ impl ThreadResourcePools {
         let mut pool = self.stack_pool.lock();
         pool.pop().or_else(|| {
             let stack = kalloc();
-            if stack.is_null() { None } else { Some(stack as usize) }
+            if stack.is_null() {
+                None
+            } else {
+                Some(stack as usize)
+            }
         })
     }
 
@@ -728,7 +743,9 @@ impl ThreadResourcePools {
             } else {
                 // Pool is full, free the memory
                 drop(pool);
-                unsafe { kfree(stack_addr as *mut u8); }
+                unsafe {
+                    kfree(stack_addr as *mut u8);
+                }
             }
         }
     }
@@ -738,7 +755,11 @@ impl ThreadResourcePools {
         let mut pool = self.trapframe_pool.lock();
         pool.pop().or_else(|| {
             let tf = kalloc() as *mut TrapFrame;
-            if tf.is_null() { None } else { Some(tf as usize) }
+            if tf.is_null() {
+                None
+            } else {
+                Some(tf as usize)
+            }
         })
     }
 
@@ -752,7 +773,9 @@ impl ThreadResourcePools {
             } else {
                 // Pool is full, free the memory
                 drop(pool);
-                unsafe { kfree(tf_addr as *mut u8); }
+                unsafe {
+                    kfree(tf_addr as *mut u8);
+                }
             }
         }
     }
@@ -796,10 +819,10 @@ static mut CURRENT_THREAD: [Option<Tid>; 8] = [None; 8];
 pub fn init() {
     let table = thread_table();
     crate::println!("thread: Thread subsystem initialized (max_threads={})", table.max_threads());
-    
+
     // Initialize context switch subsystem
     crate::subsystems::process::context_switch::init();
-    
+
     // Initialize real-time scheduler
     crate::subsystems::scheduler::init_rt_scheduler();
     crate::println!("thread: Real-time scheduler initialized");
@@ -814,7 +837,9 @@ pub fn current_thread() -> Option<Tid> {
 /// Set current thread ID
 pub fn set_current_thread(tid: Option<Tid>) {
     let cpu_id = crate::cpu::cpuid();
-    unsafe { CURRENT_THREAD[cpu_id] = tid; }
+    unsafe {
+        CURRENT_THREAD[cpu_id] = tid;
+    }
 }
 
 /// Get current thread
@@ -865,7 +890,12 @@ pub fn thread_exit(retval: *mut u8) -> ! {
                             // Clear the child TID pointer (set to 0)
                             unsafe {
                                 let zero_val = 0i32;
-                                let _ = crate::subsystems::mm::vm::copyin(pagetable, thread.child_tid_ptr as *mut u8, thread.child_tid_ptr, core::mem::size_of::<i32>());
+                                let _ = crate::subsystems::mm::vm::copyin(
+                                    pagetable,
+                                    thread.child_tid_ptr as *mut u8,
+                                    thread.child_tid_ptr,
+                                    core::mem::size_of::<i32>(),
+                                );
                             }
                         }
                     }
@@ -902,7 +932,8 @@ pub fn thread_join(target_tid: Tid) -> Result<*mut u8, ThreadError> {
     let mut table = thread_table();
 
     // Find target thread
-    let target_thread = table.find_thread(target_tid)
+    let target_thread = table
+        .find_thread(target_tid)
         .ok_or(ThreadError::InvalidThreadId)?;
 
     // Check if thread is joinable
@@ -923,7 +954,8 @@ pub fn thread_join(target_tid: Tid) -> Result<*mut u8, ThreadError> {
     }
 
     // Wait for thread to terminate
-    let current_thread = table.find_thread(current_tid)
+    let current_thread = table
+        .find_thread(current_tid)
         .ok_or(ThreadError::InvalidThreadId)?;
 
     current_thread.joiner_tid = Some(target_tid);
@@ -949,8 +981,7 @@ pub fn thread_join(target_tid: Tid) -> Result<*mut u8, ThreadError> {
 /// Detach a thread
 pub fn thread_detach(tid: Tid) -> Result<(), ThreadError> {
     let mut table = thread_table();
-    let thread = table.find_thread(tid)
-        .ok_or(ThreadError::InvalidThreadId)?;
+    let thread = table.find_thread(tid).ok_or(ThreadError::InvalidThreadId)?;
 
     if thread.detached {
         return Ok(()); // Already detached
@@ -992,11 +1023,11 @@ pub fn schedule() {
     // Check real-time scheduler first
     let current_time = crate::subsystems::time::timestamp_nanos();
     let mut next_tid = None;
-    
+
     if let Some(rt_scheduler) = crate::subsystems::scheduler::get_rt_scheduler() {
         next_tid = rt_scheduler.pick_next_rt_task(current_time);
     }
-    
+
     // If no RT thread found, fall back to unified scheduler
     if next_tid.is_none() {
         // Use unified scheduler with priority queues (O(log n) instead of O(n))
@@ -1030,7 +1061,7 @@ pub fn schedule() {
         let cpu = crate::cpu::mycpu();
         cpu.update_load_stats(false);
         cpu.load_stats.context_switches += 1;
-        
+
         let mut table = thread_table();
         if let Some(thread) = table.find_thread(tid) {
             thread.set_running();
@@ -1063,29 +1094,33 @@ pub fn schedule() {
             if let Some(current_thread) = current_tid.and_then(|tid| table.find_thread(tid)) {
                 // Check if we're switching between threads of the same process
                 let same_process = current_thread.pid == thread.pid;
-                
+
                 // Use fast path if same process, otherwise use full context switch
                 let result = if same_process {
-                    unsafe { 
+                    unsafe {
                         crate::subsystems::process::context_switch::fast_context_switch(
-                            &mut current_thread.context, 
-                            &thread.context, 
-                            true
+                            &mut current_thread.context,
+                            &thread.context,
+                            true,
                         )
                     }
                 } else {
-                    unsafe { 
+                    unsafe {
                         crate::subsystems::process::context_switch::context_switch(
-                            &mut current_thread.context, 
-                            &thread.context
+                            &mut current_thread.context,
+                            &thread.context,
                         )
                     }
                 };
-                
+
                 if let Err(e) = result {
                     crate::println!("thread: Context switch failed: {:?}", e);
                     // Fall back to simple logging
-                    crate::println!("thread: Switched to thread {} (PID {})", thread.tid, thread.pid);
+                    crate::println!(
+                        "thread: Switched to thread {} (PID {})",
+                        thread.tid,
+                        thread.pid
+                    );
                 }
             } else {
                 // No current thread, just set up the new thread
@@ -1095,21 +1130,23 @@ pub fn schedule() {
     } else {
         // No runnable threads - optimize idle behavior
         set_current_thread(None);
-        
+
         // Update CPU load statistics
         let cpu_id = crate::cpu::cpuid();
         let cpu = crate::cpu::mycpu();
         cpu.update_load_stats(true);
-        
+
         // Check if we should enter deep sleep
         if cpu.should_deep_sleep() {
             // Enter deep sleep mode (only for non-boot CPUs)
             if cpu_id > 0 {
-                cpu.deep_sleep.store(true, core::sync::atomic::Ordering::Relaxed);
+                cpu.deep_sleep
+                    .store(true, core::sync::atomic::Ordering::Relaxed);
                 // In a full implementation, this would use architecture-specific
                 // deep sleep instructions (e.g., WFI with power management)
                 crate::arch::wfi();
-                cpu.deep_sleep.store(false, core::sync::atomic::Ordering::Relaxed);
+                cpu.deep_sleep
+                    .store(false, core::sync::atomic::Ordering::Relaxed);
             } else {
                 // Boot CPU should use regular WFI
                 crate::arch::wfi();
@@ -1126,7 +1163,7 @@ pub fn schedule() {
 fn find_realtime_thread(current_tid: Option<Tid>) -> Option<Tid> {
     let table = thread_table();
     let mut highest_prio_rt: Option<(Tid, u8)> = None;
-    
+
     // Search for RT threads (FIFO or RoundRobin policy)
     for tid in 1..MAX_THREADS {
         if let Some(thread) = table.find_thread_ref(tid) {
@@ -1143,13 +1180,13 @@ fn find_realtime_thread(current_tid: Option<Tid>) -> Option<Tid> {
                         } else {
                             highest_prio_rt = Some((tid, priority));
                         }
-                    }
-                    _ => {}
+                    },
+                    _ => {},
                 }
             }
         }
     }
-    
+
     highest_prio_rt.map(|(tid, _)| tid)
 }
 
@@ -1160,20 +1197,20 @@ fn ensure_main_threads() {
         let process_table = crate::process::PROC_TABLE.lock();
         let thread_table = thread_table();
 
-        process_table.iter()
-            .filter(|proc| proc.state == crate::process::ProcState::Runnable ||
-                          proc.state == crate::process::ProcState::Running)
+        process_table
+            .iter()
+            .filter(|proc| {
+                proc.state == crate::process::ProcState::Runnable
+                    || proc.state == crate::process::ProcState::Running
+            })
             .filter_map(|proc| {
                 // Check if process already has threads
-                let has_threads = thread_table.find_threads_by_pid(proc.pid).iter().any(|t| {
-                    t.thread_type == ThreadType::Main && t.state != ThreadState::Unused
-                });
+                let has_threads = thread_table
+                    .find_threads_by_pid(proc.pid)
+                    .iter()
+                    .any(|t| t.thread_type == ThreadType::Main && t.state != ThreadState::Unused);
 
-                if !has_threads {
-                    Some(proc.pid)
-                } else {
-                    None
-                }
+                if !has_threads { Some(proc.pid) } else { None }
             })
             .collect::<Vec<_>>()
     };
@@ -1210,8 +1247,8 @@ fn init_main_thread_from_process(thread: &mut Thread, proc: &crate::process::Pro
         &mut thread.context,
         thread.kstack,
         proc.context.rip, // Use process's instruction pointer
-        0, // No argument for main thread
-        false // Kernel thread
+        0,                // No argument for main thread
+        false,            // Kernel thread
     );
 
     // Main threads inherit the process state
@@ -1255,16 +1292,13 @@ pub fn thread_set_tls(tls_base: usize) {
 
 /// Get thread-specific data
 pub fn thread_get_tls() -> usize {
-    get_current_thread()
-        .map(|t| t.tls_base)
-        .unwrap_or(0)
+    get_current_thread().map(|t| t.tls_base).unwrap_or(0)
 }
 
 /// Set thread CPU affinity
 pub fn thread_setaffinity(tid: Tid, cpu_mask: u64) -> Result<(), ThreadError> {
     let mut table = thread_table();
-    let thread = table.find_thread(tid)
-        .ok_or(ThreadError::InvalidThreadId)?;
+    let thread = table.find_thread(tid).ok_or(ThreadError::InvalidThreadId)?;
 
     thread.set_cpu_affinity(cpu_mask);
     Ok(())
@@ -1273,7 +1307,8 @@ pub fn thread_setaffinity(tid: Tid, cpu_mask: u64) -> Result<(), ThreadError> {
 /// Get thread CPU affinity
 pub fn thread_getaffinity(tid: Tid) -> Result<u64, ThreadError> {
     let table = thread_table();
-    let thread = table.find_thread_ref(tid)
+    let thread = table
+        .find_thread_ref(tid)
         .ok_or(ThreadError::InvalidThreadId)?;
 
     Ok(thread.cpus_allowed)
@@ -1286,8 +1321,7 @@ pub fn thread_setschedparam(
     param: SchedParam,
 ) -> Result<(), ThreadError> {
     let mut table = thread_table();
-    let thread = table.find_thread(tid)
-        .ok_or(ThreadError::InvalidThreadId)?;
+    let thread = table.find_thread(tid).ok_or(ThreadError::InvalidThreadId)?;
 
     thread.sched_policy = policy;
     thread.sched_param = param;
@@ -1306,7 +1340,8 @@ pub fn thread_setschedparam(
                 period_ms: 0, // Default: not periodic
                 execution_time_ms: param.timeslice,
                 deadline_ms: param.timeslice * 2, // Default: 2x timeslice
-                bandwidth_percent: (param.priority as u32 * 10).min(80), // Scale priority to bandwidth
+                bandwidth_percent: (param.priority as u32 * 10).min(80), /* Scale priority to
+                                                   * bandwidth */
                 active: true,
                 creation_time: crate::subsystems::time::timestamp_nanos(),
                 next_activation: crate::subsystems::time::timestamp_nanos(),
@@ -1315,7 +1350,7 @@ pub fn thread_setschedparam(
                 timeslice_ms: param.timeslice,
                 timeslice_remaining: param.timeslice,
             };
-            
+
             // Check admission control
             if rt_scheduler.check_admission(&rt_task) {
                 let _ = rt_scheduler.add_rt_task(rt_task);
@@ -1331,7 +1366,8 @@ pub fn thread_setschedparam(
 /// Get thread scheduling parameters
 pub fn thread_getschedparam(tid: Tid) -> Result<(SchedPolicy, SchedParam), ThreadError> {
     let table = thread_table();
-    let thread = table.find_thread_ref(tid)
+    let thread = table
+        .find_thread_ref(tid)
         .ok_or(ThreadError::InvalidThreadId)?;
 
     Ok((thread.sched_policy, thread.sched_param))
@@ -1341,7 +1377,8 @@ pub fn thread_getschedparam(tid: Tid) -> Result<(SchedPolicy, SchedParam), Threa
 pub fn activate_rt_task(tid: Tid) -> Result<(), ThreadError> {
     if let Some(rt_scheduler) = crate::subsystems::scheduler::get_rt_scheduler() {
         let current_time = crate::subsystems::time::timestamp_nanos();
-        rt_scheduler.activate_task(tid, current_time)
+        rt_scheduler
+            .activate_task(tid, current_time)
             .map_err(|_| ThreadError::InvalidOperation)
     } else {
         Err(ThreadError::InvalidOperation)
@@ -1351,7 +1388,8 @@ pub fn activate_rt_task(tid: Tid) -> Result<(), ThreadError> {
 /// Deactivate a real-time task
 pub fn deactivate_rt_task(tid: Tid) -> Result<(), ThreadError> {
     if let Some(rt_scheduler) = crate::subsystems::scheduler::get_rt_scheduler() {
-        rt_scheduler.deactivate_task(tid)
+        rt_scheduler
+            .deactivate_task(tid)
             .map_err(|_| ThreadError::InvalidOperation)
     } else {
         Err(ThreadError::InvalidOperation)
@@ -1433,7 +1471,7 @@ pub fn get_thread_stats() -> ThreadStats {
             ThreadState::Runnable => stats.runnable_threads += 1,
             ThreadState::Blocked => stats.blocked_threads += 1,
             ThreadState::Zombie => stats.zombie_threads += 1,
-            _ => {}
+            _ => {},
         }
 
         if thread.thread_type == ThreadType::Kernel {

@@ -1,7 +1,8 @@
 // Object signal management functions
 
-use super::*;
 use core::ptr;
+
+use super::*;
 
 /// 注册对象信号
 ///
@@ -25,8 +26,13 @@ pub extern "C" fn sys_glib_object_signal_register(
     return_type: u64,
     flags: u32,
 ) -> SyscallResult {
-    crate::println!("[glib_object] 注册信号: type={}, params={}, return={}, flags=0x{:x}",
-        type_id, param_count, return_type, flags);
+    crate::println!(
+        "[glib_object] 注册信号: type={}, params={}, return={}, flags=0x{:x}",
+        type_id,
+        param_count,
+        return_type,
+        flags
+    );
 
     // 验证参数
     if type_id == 0 || name.is_null() {
@@ -101,8 +107,12 @@ pub extern "C" fn sys_glib_object_signal_register(
         }
     }
 
-    crate::println!("[glib_object] 成功注册信号: {} (ID={}, Type={})",
-        signal_name, signal_id, type_id);
+    crate::println!(
+        "[glib_object] 成功注册信号: {} (ID={}, Type={})",
+        signal_name,
+        signal_id,
+        type_id
+    );
     signal_id as SyscallResult
 }
 
@@ -124,8 +134,12 @@ pub extern "C" fn sys_glib_object_signal_emit(
     args: *const u64,
     arg_count: usize,
 ) -> SyscallResult {
-    crate::println!("[glib_object] 发射信号: instance={}, signal={}, args={}",
-        instance_id, signal_id, arg_count);
+    crate::println!(
+        "[glib_object] 发射信号: instance={}, signal={}, args={}",
+        instance_id,
+        signal_id,
+        arg_count
+    );
 
     // 验证参数
     if instance_id == 0 || signal_id == 0 {
@@ -141,7 +155,7 @@ pub extern "C" fn sys_glib_object_signal_emit(
             None => {
                 crate::println!("[glib_object] 对象实例不存在: {}", instance_id);
                 return -2; // ENOENT
-            }
+            },
         }
     };
 
@@ -164,8 +178,12 @@ pub extern "C" fn sys_glib_object_signal_emit(
         }
     };
 
-    crate::println!("[glib_object] 信号发射完成: instance={}, signal={}, handlers={}",
-        instance_id, signal_id, handler_count);
+    crate::println!(
+        "[glib_object] 信号发射完成: instance={}, signal={}, handlers={}",
+        instance_id,
+        signal_id,
+        handler_count
+    );
 
     // 实际的信号调用由用户空间GLib处理，这里只做统计
     handler_count as SyscallResult

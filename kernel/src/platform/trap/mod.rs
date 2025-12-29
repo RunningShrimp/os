@@ -3,8 +3,6 @@
 //! This module handles traps (interrupts and exceptions) from both
 //! user and kernel mode.
 
-
-
 // ============================================================================
 // RISC-V Trap Handling
 // ============================================================================
@@ -12,7 +10,7 @@
 #[cfg(target_arch = "riscv64")]
 mod riscv64 {
     use super::*;
-    
+
     /// RISC-V trap causes
     pub mod cause {
         pub const INSTRUCTION_MISALIGNED: usize = 0;
@@ -28,24 +26,24 @@ mod riscv64 {
         pub const INSTRUCTION_PAGE_FAULT: usize = 12;
         pub const LOAD_PAGE_FAULT: usize = 13;
         pub const STORE_PAGE_FAULT: usize = 15;
-        
+
         pub const SUPERVISOR_SOFTWARE: usize = 0x8000_0000_0000_0001;
         pub const SUPERVISOR_TIMER: usize = 0x8000_0000_0000_0005;
         pub const SUPERVISOR_EXTERNAL: usize = 0x8000_0000_0000_0009;
     }
-    
+
     /// Handle trap from user mode
     pub fn usertrap() {
         let scause: usize;
         let sepc: usize;
         let stval: usize;
-        
+
         unsafe {
             core::arch::asm!("csrr {}, scause", out(reg) scause);
             core::arch::asm!("csrr {}, sepc", out(reg) sepc);
             core::arch::asm!("csrr {}, stval", out(reg) stval);
         }
-        
+
         if scause == cause::USER_ECALL {
             // System call - handled by usertrap assembly which has trapframe
             // This is a placeholder; real implementation passes trapframe
@@ -54,41 +52,45 @@ mod riscv64 {
             handle_interrupt(scause);
         } else {
             // Exception
-            crate::println!("usertrap: unexpected scause={:#x} sepc={:#x} stval={:#x}",
-                scause, sepc, stval);
+            crate::println!(
+                "usertrap: unexpected scause={:#x} sepc={:#x} stval={:#x}",
+                scause,
+                sepc,
+                stval
+            );
         }
     }
-    
+
     /// Handle trap from kernel mode
     pub fn kerneltrap() {
         let scause: usize;
         let sepc: usize;
-        
+
         unsafe {
             core::arch::asm!("csrr {}, scause", out(reg) scause);
             core::arch::asm!("csrr {}, sepc", out(reg) sepc);
         }
-        
+
         if scause & 0x8000_0000_0000_0000 != 0 {
             handle_interrupt(scause);
         } else {
             panic!("kerneltrap: scause={:#x} sepc={:#x}", scause, sepc);
         }
     }
-    
+
     fn handle_interrupt(scause: usize) {
         match scause {
             cause::SUPERVISOR_TIMER => {
                 // Timer interrupt - yield CPU
                 crate::subsystems::time::timer_interrupt();
-            }
+            },
             cause::SUPERVISOR_EXTERNAL => {
                 // External interrupt (e.g., UART)
                 // TODO: Handle external interrupts
-            }
+            },
             _ => {
                 crate::println!("unexpected interrupt: {:#x}", scause);
-            }
+            },
         }
     }
 }
@@ -99,7 +101,7 @@ mod riscv64 {
 
 #[cfg(target_arch = "aarch64")]
 mod aarch64 {
-    
+
     /// Exception Syndrome Register (ESR) exception classes
     pub mod ec {
         pub const SVC64: u32 = 0x15;
@@ -108,45 +110,44 @@ mod aarch64 {
         pub const INST_ABORT_LOWER: u32 = 0x20;
         pub const INST_ABORT_SAME: u32 = 0x21;
     }
-    
+
     /// Handle exception from EL0
     pub fn handle_sync_el0() {
         let esr: u64;
         let elr: u64;
         let far: u64;
-        
+
         unsafe {
             core::arch::asm!("mrs {}, esr_el1", out(reg) esr);
             core::arch::asm!("mrs {}, elr_el1", out(reg) elr);
             core::arch::asm!("mrs {}, far_el1", out(reg) far);
         }
-        
+
         let ec = ((esr >> 26) & 0x3F) as u32;
-        
+
         match ec {
             ec::SVC64 => {
                 // System call - handled by assembly with trapframe
-            }
+            },
             ec::DATA_ABORT_LOWER | ec::INST_ABORT_LOWER => {
                 crate::println!("Page fault at {:#x}, esr={:#x}", far, esr);
-            }
+            },
             _ => {
-                crate::println!("Unexpected exception: ec={:#x} esr={:#x} elr={:#x}",
-                    ec, esr, elr);
-            }
+                crate::println!("Unexpected exception: ec={:#x} esr={:#x} elr={:#x}", ec, esr, elr);
+            },
         }
     }
-    
+
     /// Handle IRQ from EL0
     pub fn handle_irq_el0() {
         handle_irq();
     }
-    
+
     /// Handle IRQ from EL1
     pub fn handle_irq_el1() {
         handle_irq();
     }
-    
+
     fn handle_irq() {
         // TODO: Read interrupt controller to determine source
         crate::subsystems::time::timer_interrupt();
@@ -160,7 +161,7 @@ mod aarch64 {
 #[cfg(target_arch = "x86_64")]
 mod x86_64 {
     use super::*;
-    
+
     /// x86_64 exception vectors
     pub mod vector {
         pub const DIVIDE_ERROR: u8 = 0;
@@ -181,36 +182,43 @@ mod x86_64 {
         pub const ALIGNMENT_CHECK: u8 = 17;
         pub const MACHINE_CHECK: u8 = 18;
         pub const SIMD_ERROR: u8 = 19;
-        
+
         pub const SYSCALL: u8 = 0x80;
         pub const TIMER: u8 = 32;
     }
-    
+
     /// Handle trap/interrupt
     pub fn trap_handler(vector: u8, error_code: usize, rip: usize) {
         match vector {
             vector::SYSCALL => {
                 // System call - handled by assembly with trapframe
-            }
+            },
             vector::PAGE_FAULT => {
                 let cr2: usize;
                 unsafe {
                     core::arch::asm!("mov {}, cr2", out(reg) cr2);
                 }
-                crate::println!("Page fault at {:#x}, error={:#x}, rip={:#x}",
-                    cr2, error_code, rip);
-            }
+                crate::println!(
+                    "Page fault at {:#x}, error={:#x}, rip={:#x}",
+                    cr2,
+                    error_code,
+                    rip
+                );
+            },
             vector::TIMER => {
                 crate::subsystems::time::timer_interrupt();
-            }
+            },
             vector::GENERAL_PROTECTION => {
-                panic!("General protection fault: error={:#x} rip={:#x}",
-                    error_code, rip);
-            }
+                panic!("General protection fault: error={:#x} rip={:#x}", error_code, rip);
+            },
             _ => {
-                crate::println!("Unhandled trap: vector={} error={:#x} rip={:#x}",
-                    vector, error_code, rip);
-            }
+                crate::println!(
+                    "Unhandled trap: vector={} error={:#x} rip={:#x}",
+                    vector,
+                    error_code,
+                    rip
+                );
+            },
         }
     }
 }
@@ -220,7 +228,8 @@ mod x86_64 {
 // ============================================================================
 
 #[cfg(all(feature = "baremetal", target_arch = "riscv64"))]
-core::arch::global_asm!(r#"
+core::arch::global_asm!(
+    r#"
 .section .text
 .globl kernelvec
 .align 4
@@ -296,7 +305,8 @@ kernelvec:
     addi sp, sp, 256
     
     sret
-"#);
+"#
+);
 
 #[cfg(all(feature = "baremetal", target_arch = "riscv64"))]
 #[unsafe(no_mangle)]
@@ -305,7 +315,8 @@ pub extern "C" fn kerneltrap_rust() {
 }
 
 #[cfg(all(feature = "baremetal", target_arch = "aarch64"))]
-core::arch::global_asm!(r#"
+core::arch::global_asm!(
+    r#"
 .section .text
 .globl exception_vector
 .align 11
@@ -361,7 +372,8 @@ handle_sync_el0:
 
 handle_irq_el0:
     ret
-"#);
+"#
+);
 
 // ============================================================================
 // Public API
@@ -376,11 +388,11 @@ pub fn init() {
             fn kernelvec();
         }
         core::arch::asm!("csrw stvec, {}", in(reg) kernelvec as usize);
-        
+
         // Enable interrupts
         core::arch::asm!("csrsi sstatus, 2"); // Set SIE bit
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     unsafe {
         // Set exception vector base
@@ -389,7 +401,7 @@ pub fn init() {
         }
         core::arch::asm!("msr vbar_el1, {}", in(reg) exception_vector as *const () as usize);
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     {
         // IDT setup would go here
@@ -403,13 +415,13 @@ pub fn handle(cause: usize, epc: usize, tval: usize) {
         let _ = (cause, epc, tval);
         riscv64::kerneltrap();
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     {
         let _ = (cause, epc, tval);
         // Handled by specific handlers
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     {
         let _ = tval;
@@ -426,10 +438,10 @@ pub fn usertrapret() {
             fn uservec();
             fn userret();
         }
-        
+
         // Set stvec to uservec for user traps
         core::arch::asm!("csrw stvec, {}", in(reg) uservec as usize);
-        
+
         // TODO: Set up trapframe and call userret
     }
 }

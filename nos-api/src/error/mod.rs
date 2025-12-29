@@ -2,9 +2,7 @@
 
 use core::fmt;
 extern crate alloc;
-use alloc::string::{String, ToString};
-use alloc::format;
-
+use alloc::{format, string::String};
 
 /// Common error type used throughout NOS operating system
 #[derive(Debug, Clone)]
@@ -161,13 +159,13 @@ impl ErrorBuilder {
     pub fn new(error: Error) -> Self {
         Self { error }
     }
-    
+
     /// Adds context to the error
     pub fn context(mut self, _context: &str) -> Self {
         self.error = Error::SystemError(format!("{}: {}", _context, self.error));
         self
     }
-    
+
     /// Builds the final error
     pub fn build(self) -> Error {
         self.error

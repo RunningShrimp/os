@@ -1,7 +1,5 @@
 //! POSIX AIO Types (aio.h)
 
-use super::types::{off_t, size_t, aio_reqprio_t};
-
 /// AIO operation codes
 pub const LIO_READ: i32 = 0;
 pub const LIO_WRITE: i32 = 1;
@@ -23,10 +21,7 @@ pub struct SigVal {
 
 impl Default for SigVal {
     fn default() -> Self {
-        Self {
-            sival_int: 0,
-            sival_ptr: 0,
-        }
+        Self { sival_int: 0, sival_ptr: 0 }
     }
 }
 

@@ -1,10 +1,9 @@
+use alloc::string::String;
 /// Boot Information Builder
 ///
 /// Constructs complete boot information structure for kernel.
 /// Handles memory maps, modules, command lines, and boot parameters.
-
 use alloc::vec::Vec;
-use alloc::string::String;
 
 /// Memory map entry type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

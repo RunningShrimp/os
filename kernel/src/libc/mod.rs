@@ -14,25 +14,22 @@
 
 extern crate alloc;
 
-use alloc::{format, string::String};
-use core::ffi::{c_void, c_int, c_char, c_uint};
-
+use core::ffi::{c_char, c_int, c_uint, c_void};
 // 核心接口和 errors handling
-pub mod interface;
-pub mod error;
 pub mod config;
-pub mod memory_adapter;
-pub mod io_manager;
+pub mod error;
 pub mod formatter;
+pub mod interface;
+pub mod io_manager;
+pub mod memory_adapter;
 
 // 标准库扩展模块
-pub mod math_lib;
-pub mod string_lib;
-pub mod time_lib;
-pub mod random_lib;
 pub mod env_lib;
+pub mod math_lib;
+pub mod random_lib;
+pub mod string_lib;
 pub mod sysinfo_lib;
-
+pub mod time_lib;
 
 // 具体实现版本
 pub mod implementations;
@@ -48,7 +45,7 @@ pub mod io_tests;
 
 /// 标准库全面测试套件
 #[cfg(test)]
-pub mod standard_tests;// 重新导出核心组件
+pub mod standard_tests; // 重新导出核心组件
 pub use interface::*;
 // 错误处理函数 - 直接使用 error 模块中的函数，不需要重新导出
 
@@ -91,19 +88,19 @@ pub fn init() -> Result<(), String> {
         interface::ImplementationType::Minimal => {
             crate::println!("[libc] 使用统一C库实现（最小配置）");
             crate::libc::implementations::create_unified_c_lib()
-        }
+        },
         interface::ImplementationType::Simple => {
             crate::println!("[libc] 使用统一C库实现（简化配置）");
             crate::libc::implementations::create_unified_c_lib()
-        }
+        },
         interface::ImplementationType::Full => {
             crate::println!("[libc] 使用统一C库实现（完整配置）");
             crate::libc::implementations::create_unified_c_lib()
-        }
+        },
         interface::ImplementationType::Unified => {
             crate::println!("[libc] 使用统一C库实现");
             crate::libc::implementations::create_unified_c_lib()
-        }
+        },
     };
 
     // 4. 初始化C库实例
@@ -131,12 +128,14 @@ pub fn init() -> Result<(), String> {
 
     // 8. 打印配置信息
     let summary = unsafe { config::get_config().summary() };
-    crate::println!("[libc] C库配置: 实现类型={:?}, 内存池={}MB, 缓冲区={}KB, 最大FD={}, 功能数={}",
+    crate::println!(
+        "[libc] C库配置: 实现类型={:?}, 内存池={}MB, 缓冲区={}KB, 最大FD={}, 功能数={}",
         summary.implementation,
         summary.memory_pool_mb,
         summary.buffer_kb,
         summary.max_fds,
-        summary.features_enabled);
+        summary.features_enabled
+    );
 
     crate::println!("[libc] C标准库支持模块初始化完成");
     Ok(())
@@ -299,7 +298,14 @@ pub use convenience::*;
 /// C库状态报告
 pub fn print_status_report() {
     crate::println!("\n=== C标准库状态报告 ===");
-    crate::println!("初始化状态: {}", if is_initialized() { "已初始化" } else { "未初始化" });
+    crate::println!(
+        "初始化状态: {}",
+        if is_initialized() {
+            "已初始化"
+        } else {
+            "未初始化"
+        }
+    );
 
     if is_initialized() {
         let stats = get_stats();

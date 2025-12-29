@@ -3,8 +3,6 @@
 //! 定义了所有C标准库实现的统一接口，确保不同实现版本之间的一致性。
 //! 这个接口为内存管理、字符串操作、I/O操作等核心C库功能提供了标准化的API。
 
-use core::ffi::{c_char, c_int, c_void, c_uint};
-
 pub type SizeT = usize;
 #[allow(non_camel_case_types)]
 pub type size_t = SizeT;
@@ -209,7 +207,6 @@ pub trait CLibInterface {
 
     // === I/O操作函数 ===
 
-
     /// 输出字符串并换行
     ///
     /// # 参数
@@ -338,8 +335,6 @@ pub trait CLibInterface {
     fn clearerr(&self, file: *mut c_void);
 
     // === 增强格式化函数 ===
-
-
 
     /// 输入单个字符
     ///
@@ -585,7 +580,13 @@ pub trait CLibInterface {
     /// * `nmemb` - 元素数量
     /// * `size` - 每个元素的大小
     /// * `compar` - 比较函数指针
-    fn qsort(&self, base: *mut c_void, nmemb: size_t, size: size_t, compar: extern "C" fn(*const c_void, *const c_void) -> c_int);
+    fn qsort(
+        &self,
+        base: *mut c_void,
+        nmemb: size_t,
+        size: size_t,
+        compar: extern "C" fn(*const c_void, *const c_void) -> c_int,
+    );
 
     /// 二分搜索
     ///
@@ -599,7 +600,14 @@ pub trait CLibInterface {
     /// # 返回值
     /// * 找到时返回指向匹配元素的指针
     /// * 未找到时返回NULL
-    fn bsearch(&self, key: *const c_void, base: *const c_void, nmemb: size_t, size: size_t, compar: extern "C" fn(*const c_void, *const c_void) -> c_int) -> *mut c_void;
+    fn bsearch(
+        &self,
+        key: *const c_void,
+        base: *const c_void,
+        nmemb: size_t,
+        size: size_t,
+        compar: extern "C" fn(*const c_void, *const c_void) -> c_int,
+    ) -> *mut c_void;
 
     // === 除法函数 ===
 
@@ -804,8 +812,7 @@ pub fn is_c_lib_initialized() -> bool {
 ///
 /// 提供常用的C库宏和常量定义
 pub mod macros {
-    use core::ffi::{c_void, c_int};
-    
+    use core::ffi::{c_int, c_void};
     /// NULL指针定义
     pub const NULL: *mut c_void = core::ptr::null_mut();
 

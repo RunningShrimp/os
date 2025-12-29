@@ -12,20 +12,23 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloc::format;
-use alloc::sync::Arc;
-use alloc::vec;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::boxed::Box;
-use alloc::string::ToString;
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use spin::Mutex;
 
-use crate::time;
-use crate::services::driver::{DeviceType, DeviceStatus, DeviceResources};
+use crate::{
+    services::driver::{DeviceResources, DeviceStatus, DeviceType},
+    time,
+};
 
 // Placeholder resource types
 pub struct MemoryResource {
@@ -460,9 +463,13 @@ impl core::fmt::Display for DeviceManagerError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             DeviceManagerError::DeviceNotFound(id) => write!(f, "设备未找到: {}", id),
-            DeviceManagerError::UnsupportedDeviceType(dt) => write!(f, "不支持的设备类型: {:?}", dt),
+            DeviceManagerError::UnsupportedDeviceType(dt) => {
+                write!(f, "不支持的设备类型: {:?}", dt)
+            },
             DeviceManagerError::ResourceAllocationFailed(msg) => write!(f, "资源分配失败: {}", msg),
-            DeviceManagerError::DeviceInitializationFailed(msg) => write!(f, "设备初始化失败: {}", msg),
+            DeviceManagerError::DeviceInitializationFailed(msg) => {
+                write!(f, "设备初始化失败: {}", msg)
+            },
             DeviceManagerError::HotplugError(msg) => write!(f, "热插拔错误: {}", msg),
             DeviceManagerError::PowerManagementError(msg) => write!(f, "电源管理错误: {}", msg),
             DeviceManagerError::MonitorError(msg) => write!(f, "监控器错误: {}", msg),
@@ -525,7 +532,10 @@ impl DeviceManager {
     }
 
     /// 添加设备监控器
-    pub fn add_device_monitor(&self, monitor: Box<dyn DeviceMonitor>) -> Result<(), DeviceManagerError> {
+    pub fn add_device_monitor(
+        &self,
+        monitor: Box<dyn DeviceMonitor>,
+    ) -> Result<(), DeviceManagerError> {
         crate::println!("[device_manager] 添加设备监控器: {}", monitor.name());
 
         let mut monitors = self.device_monitors.lock();
@@ -620,14 +630,19 @@ impl DeviceManager {
     /// 获取指定类型的设备
     pub fn get_devices_by_type(&self, device_type: DeviceType) -> Vec<ManagedDevice> {
         let devices = self.devices.lock();
-        devices.values()
+        devices
+            .values()
             .filter(|d| d.device.device_type == device_type)
             .cloned()
             .collect()
     }
 
     /// 设置设备电源状态
-    pub fn set_device_power_state(&self, device_id: u32, power_state: DevicePowerState) -> Result<(), DeviceManagerError> {
+    pub fn set_device_power_state(
+        &self,
+        device_id: u32,
+        power_state: DevicePowerState,
+    ) -> Result<(), DeviceManagerError> {
         let mut devices = self.devices.lock();
         if let Some(managed_device) = devices.get_mut(&device_id) {
             let old_state = managed_device.power_state;
@@ -637,16 +652,19 @@ impl DeviceManager {
             managed_device.last_activity = time::timestamp_millis();
 
             // 通知电源管理器
-            self.power_manager.lock().notify_power_change(
-                device_id,
-                old_state,
-                power_state,
-            )?;
+            self.power_manager
+                .lock()
+                .notify_power_change(device_id, old_state, power_state)?;
 
             // 更新统计
             self.statistics.power_events.fetch_add(1, Ordering::SeqCst);
 
-            crate::println!("[device_manager] 设备 {} 电源状态: {:?} -> {:?}", device_id, old_state, power_state);
+            crate::println!(
+                "[device_manager] 设备 {} 电源状态: {:?} -> {:?}",
+                device_id,
+                old_state,
+                power_state
+            );
         } else {
             return Err(DeviceManagerError::DeviceNotFound(device_id));
         }
@@ -666,22 +684,24 @@ impl DeviceManager {
         let mut events = self.hotplug_events.lock();
         events.push(event.clone());
 
-        self.statistics.total_hotplug_events.fetch_add(1, Ordering::SeqCst);
+        self.statistics
+            .total_hotplug_events
+            .fetch_add(1, Ordering::SeqCst);
 
         match event.event_type {
             HotplugEventType::DeviceConnected => {
                 self.handle_device_connect_event(event)?;
-            }
+            },
             HotplugEventType::DeviceDisconnected => {
                 self.handle_device_disconnect_event(event)?;
-            }
+            },
             HotplugEventType::DeviceError => {
                 self.handle_device_error_event(event)?;
-            }
+            },
             HotplugEventType::PowerStateChanged => {
                 self.handle_power_state_change_event(event)?;
-            }
-            _ => {}
+            },
+            _ => {},
         }
 
         Ok(())
@@ -693,11 +713,23 @@ impl DeviceManager {
             total_devices: AtomicUsize::new(self.statistics.total_devices.load(Ordering::SeqCst)),
             active_devices: AtomicUsize::new(self.statistics.active_devices.load(Ordering::SeqCst)),
             error_devices: AtomicUsize::new(self.statistics.error_devices.load(Ordering::SeqCst)),
-            total_hotplug_events: AtomicU64::new(self.statistics.total_hotplug_events.load(Ordering::SeqCst)),
-            device_connect_events: AtomicU64::new(self.statistics.device_connect_events.load(Ordering::SeqCst)),
-            device_disconnect_events: AtomicU64::new(self.statistics.device_disconnect_events.load(Ordering::SeqCst)),
+            total_hotplug_events: AtomicU64::new(
+                self.statistics.total_hotplug_events.load(Ordering::SeqCst),
+            ),
+            device_connect_events: AtomicU64::new(
+                self.statistics.device_connect_events.load(Ordering::SeqCst),
+            ),
+            device_disconnect_events: AtomicU64::new(
+                self.statistics
+                    .device_disconnect_events
+                    .load(Ordering::SeqCst),
+            ),
             power_events: AtomicU64::new(self.statistics.power_events.load(Ordering::SeqCst)),
-            average_response_time_us: AtomicU64::new(self.statistics.average_response_time_us.load(Ordering::SeqCst)),
+            average_response_time_us: AtomicU64::new(
+                self.statistics
+                    .average_response_time_us
+                    .load(Ordering::SeqCst),
+            ),
             resource_allocation_success_rate: self.statistics.resource_allocation_success_rate,
         }
     }
@@ -796,13 +828,17 @@ impl DeviceManager {
     fn allocate_device_resources(&self, device: &Device) -> Result<(), DeviceManagerError> {
         crate::println!("[device_manager] 为设备 {} 分配资源", device.name);
 
-        self.resource_manager.lock().allocate_resources_for_device(device)
+        self.resource_manager
+            .lock()
+            .allocate_resources_for_device(device)
     }
 
     fn release_device_resources(&self, device: &Device) -> Result<(), DeviceManagerError> {
         crate::println!("[device_manager] 释放设备 {} 的资源", device.name);
 
-        self.resource_manager.lock().release_resources_for_device(device)
+        self.resource_manager
+            .lock()
+            .release_resources_for_device(device)
     }
 
     fn bind_device_driver(&self, device: &Device) -> Result<(), DeviceManagerError> {
@@ -828,7 +864,9 @@ impl DeviceManager {
 
             crate::println!("[device_manager] 设备 {} 初始化完成", device_id);
 
-            self.statistics.active_devices.fetch_add(1, Ordering::SeqCst);
+            self.statistics
+                .active_devices
+                .fetch_add(1, Ordering::SeqCst);
         }
 
         Ok(())
@@ -851,7 +889,9 @@ impl DeviceManager {
         crate::println!("[device_manager] 通知设备连接: {}", device.name);
 
         // 通知相关组件
-        self.statistics.device_connect_events.fetch_add(1, Ordering::SeqCst);
+        self.statistics
+            .device_connect_events
+            .fetch_add(1, Ordering::SeqCst);
 
         Ok(())
     }
@@ -859,12 +899,18 @@ impl DeviceManager {
     fn notify_device_disconnected(&self, device: &Device) -> Result<(), DeviceManagerError> {
         crate::println!("[device_manager] 通知设备断开: {}", device.name);
 
-        self.statistics.device_disconnect_events.fetch_add(1, Ordering::SeqCst);
+        self.statistics
+            .device_disconnect_events
+            .fetch_add(1, Ordering::SeqCst);
 
         Ok(())
     }
 
-    fn notify_driver_device_removed(&self, driver_name: &str, device: &Device) -> Result<(), DeviceManagerError> {
+    fn notify_driver_device_removed(
+        &self,
+        driver_name: &str,
+        device: &Device,
+    ) -> Result<(), DeviceManagerError> {
         // 通知驱动程序设备移除
         // TODO: Implement driver notification
         // if let Some(driver_manager) = crate::drivers::get_driver_manager() {
@@ -883,12 +929,17 @@ impl DeviceManager {
         // 添加设备
         self.add_device(device)?;
 
-        self.statistics.device_connect_events.fetch_add(1, Ordering::SeqCst);
+        self.statistics
+            .device_connect_events
+            .fetch_add(1, Ordering::SeqCst);
 
         Ok(())
     }
 
-    fn handle_device_disconnect_event(&self, event: HotplugEvent) -> Result<(), DeviceManagerError> {
+    fn handle_device_disconnect_event(
+        &self,
+        event: HotplugEvent,
+    ) -> Result<(), DeviceManagerError> {
         crate::println!("[device_manager] 处理设备断开事件: {:?}", event.device_location);
 
         // 查找对应的设备并移除
@@ -900,7 +951,9 @@ impl DeviceManager {
             }
         }
 
-        self.statistics.device_disconnect_events.fetch_add(1, Ordering::SeqCst);
+        self.statistics
+            .device_disconnect_events
+            .fetch_add(1, Ordering::SeqCst);
 
         Ok(())
     }
@@ -921,7 +974,10 @@ impl DeviceManager {
         Ok(())
     }
 
-    fn handle_power_state_change_event(&self, event: HotplugEvent) -> Result<(), DeviceManagerError> {
+    fn handle_power_state_change_event(
+        &self,
+        event: HotplugEvent,
+    ) -> Result<(), DeviceManagerError> {
         crate::println!("[device_manager] 处理电源状态变化事件: {:?}", event.device_location);
 
         // 从事件数据解析电源状态
@@ -968,7 +1024,10 @@ impl DeviceManager {
         device.device_type == event.device_type
     }
 
-    fn parse_power_state(&self, power_state_str: &str) -> Result<DevicePowerState, DeviceManagerError> {
+    fn parse_power_state(
+        &self,
+        power_state_str: &str,
+    ) -> Result<DevicePowerState, DeviceManagerError> {
         match power_state_str {
             "PowerOff" => Ok(DevicePowerState::PowerOff),
             "Sleep" => Ok(DevicePowerState::Sleep),
@@ -997,7 +1056,12 @@ impl DevicePowerManager {
     }
 
     /// 通知电源变化
-    pub fn notify_power_change(&self, device_id: u32, old_state: DevicePowerState, new_state: DevicePowerState) -> Result<(), DeviceManagerError> {
+    pub fn notify_power_change(
+        &self,
+        device_id: u32,
+        old_state: DevicePowerState,
+        new_state: DevicePowerState,
+    ) -> Result<(), DeviceManagerError> {
         // 更新设备电源状态
         let mut power_states = self.device_power_states.lock();
         power_states.insert(device_id, new_state);
@@ -1066,19 +1130,13 @@ impl DeviceResourceManager {
 
         // 分配内存资源
         for region in &device.resources.memory_regions {
-            let resource = MemoryResource {
-                start: region.start,
-                size: region.size,
-            };
+            let resource = MemoryResource { start: region.start, size: region.size };
             self.allocate_memory_resource(&resource)?;
         }
 
         // 分配IO资源
         for port_range in &device.resources.io_ports {
-            let resource = IoResource {
-                start: port_range.start,
-                count: port_range.count,
-            };
+            let resource = IoResource { start: port_range.start, count: port_range.count };
             self.allocate_io_resource(&resource)?;
         }
 
@@ -1138,7 +1196,10 @@ impl DeviceResourceManager {
         Ok(())
     }
 
-    fn allocate_memory_resource(&self, _resource: &MemoryResource) -> Result<(), DeviceManagerError> {
+    fn allocate_memory_resource(
+        &self,
+        _resource: &MemoryResource,
+    ) -> Result<(), DeviceManagerError> {
         // 简化实现
         Ok(())
     }
@@ -1148,9 +1209,14 @@ impl DeviceResourceManager {
         Ok(())
     }
 
-    fn allocate_interrupt_resource(&self, _resource: &InterruptResource, device_id: u32) -> Result<(), DeviceManagerError> {
+    fn allocate_interrupt_resource(
+        &self,
+        _resource: &InterruptResource,
+        device_id: u32,
+    ) -> Result<(), DeviceManagerError> {
         let mut interrupt_resources = self.interrupt_resources.lock();
-        let pool = interrupt_resources.entry("default".to_string())
+        let pool = interrupt_resources
+            .entry("default".to_string())
             .or_insert_with(|| InterruptResourcePool {
                 name: "default".to_string(),
                 available_interrupts: (32..64).collect(), // 中断32-63
@@ -1168,9 +1234,14 @@ impl DeviceResourceManager {
         }
     }
 
-    fn allocate_dma_resource(&self, resource: &DmaResource, device_id: u32) -> Result<(), DeviceManagerError> {
+    fn allocate_dma_resource(
+        &self,
+        resource: &DmaResource,
+        device_id: u32,
+    ) -> Result<(), DeviceManagerError> {
         let mut dma_resources = self.dma_resources.lock();
-        let pool = dma_resources.entry("default".to_string())
+        let pool = dma_resources
+            .entry("default".to_string())
             .or_insert_with(|| DmaResourcePool {
                 name: "default".to_string(),
                 available_channels: vec![0, 1, 2, 3, 4, 5, 6, 7],
@@ -1189,7 +1260,8 @@ impl DeviceResourceManager {
 }
 
 /// 全局设备管理器实例
-static DEVICE_MANAGER: spin::Mutex<Option<alloc::sync::Arc<DeviceManager>>> = spin::Mutex::new(None);
+static DEVICE_MANAGER: spin::Mutex<Option<alloc::sync::Arc<DeviceManager>>> =
+    spin::Mutex::new(None);
 
 /// 初始化设备管理子系统
 pub fn init() -> Result<(), DeviceManagerError> {
@@ -1221,7 +1293,10 @@ fn add_builtin_monitors(manager: &mut DeviceManager) -> Result<(), DeviceManager
 /// 获取全局设备管理器
 pub fn get_device_manager() -> Result<alloc::sync::Arc<DeviceManager>, DeviceManagerError> {
     let manager = DEVICE_MANAGER.lock();
-    manager.as_ref().cloned().ok_or(DeviceManagerError::SystemError("设备管理器未初始化".to_string()))
+    manager
+        .as_ref()
+        .cloned()
+        .ok_or(DeviceManagerError::SystemError("设备管理器未初始化".to_string()))
 }
 
 /// PCI设备监控器

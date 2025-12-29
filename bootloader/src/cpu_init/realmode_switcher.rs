@@ -13,11 +13,7 @@ pub struct CPUState {
 
 impl CPUState {
     pub fn new() -> Self {
-        Self {
-            cr0: 0,
-            cr3: 0,
-            cr4: 0,
-        }
+        Self { cr0: 0, cr3: 0, cr4: 0 }
     }
 }
 
@@ -29,26 +25,20 @@ pub struct RealmModeSwitcher {
 impl RealmModeSwitcher {
     /// Create new switcher
     pub fn new() -> Self {
-        Self {
-            saved_state: None,
-        }
+        Self { saved_state: None }
     }
 
     /// Enter real mode (bare metal only)
     #[cfg(target_os = "none")]
     pub unsafe fn enter_real_mode(&mut self) -> Result<(), &'static str> {
         // Save current state
-        let state = CPUState {
-            cr0: 0,
-            cr3: 0,
-            cr4: 0,
-        };
+        let state = CPUState { cr0: 0, cr3: 0, cr4: 0 };
         self.saved_state = Some(state);
 
         // Disable interrupts
         #[cfg(target_arch = "x86_64")]
         core::arch::asm!("cli", options(nostack, preserves_flags));
-        
+
         #[cfg(not(target_arch = "x86_64"))]
         {
             // Non-x86 architectures use different interrupt control methods
@@ -120,11 +110,11 @@ mod tests {
     fn test_mode_switching_sequence() {
         unsafe {
             let mut switcher = RealmModeSwitcher::new();
-            
+
             // Enter real mode
             assert!(switcher.enter_real_mode().is_ok());
             assert!(switcher.has_saved_state());
-            
+
             // Exit real mode
             assert!(switcher.exit_real_mode().is_ok());
             assert!(!switcher.has_saved_state());

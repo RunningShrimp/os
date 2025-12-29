@@ -23,14 +23,11 @@ pub struct BootState {
 
 impl BootState {
     pub fn new() -> Self {
-        Self {
-            current_phase: AtomicU32::new(BootPhase::Start as u32),
-        }
+        Self { current_phase: AtomicU32::new(BootPhase::Start as u32) }
     }
 
     pub fn set_phase(&self, phase: BootPhase) {
-        self.current_phase
-            .store(phase as u32, Ordering::Release);
+        self.current_phase.store(phase as u32, Ordering::Release);
     }
 
     pub fn get_phase(&self) -> u32 {
@@ -53,9 +50,7 @@ impl Default for BootState {
     }
 }
 
-pub static BOOT_STATE: BootState = BootState {
-    current_phase: AtomicU32::new(0),
-};
+pub static BOOT_STATE: BootState = BootState { current_phase: AtomicU32::new(0) };
 
 pub fn set_phase(phase: BootPhase) {
     BOOT_STATE.set_phase(phase);

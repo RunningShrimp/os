@@ -10,12 +10,14 @@
 //! - Buffer statistics and monitoring
 
 extern crate alloc;
-use alloc::collections::BTreeMap;
-use alloc::collections::VecDeque;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::string::String;
-use core::sync::atomic::{AtomicU64, AtomicU32, AtomicUsize, AtomicBool, Ordering};
+use alloc::{
+    collections::{BTreeMap, VecDeque},
+    string::String,
+    sync::Arc,
+    vec::Vec,
+};
+use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
+
 use spin::Mutex;
 
 use crate::time;
@@ -211,11 +213,7 @@ impl NetworkBuffer {
 
     /// Reserve tailroom space
     pub fn reserve_tailroom(&mut self, len: usize) -> bool {
-        if len <= self.tailroom() {
-            true
-        } else {
-            false
-        }
+        if len <= self.tailroom() { true } else { false }
     }
 
     /// Push data to the beginning of buffer
@@ -271,7 +269,8 @@ impl NetworkBuffer {
         if len <= self.metadata.data_len {
             let mut data = Vec::with_capacity(len);
             unsafe {
-                let src = (self.addr + self.metadata.headroom + self.metadata.data_len - len) as *const u8;
+                let src = (self.addr + self.metadata.headroom + self.metadata.data_len - len)
+                    as *const u8;
                 data.set_len(len);
                 core::ptr::copy_nonoverlapping(src, data.as_mut_ptr(), len);
             }
@@ -393,7 +392,8 @@ impl BufferStats {
     /// Record buffer access
     pub fn record_access(&self) {
         self.access_count.fetch_add(1, Ordering::Relaxed);
-        self.last_access.store(time::get_monotonic_time(), Ordering::Relaxed);
+        self.last_access
+            .store(time::get_monotonic_time(), Ordering::Relaxed);
     }
 
     /// Record bytes read
@@ -532,12 +532,12 @@ impl BufferPool {
     pub fn preallocate(&self, count: usize) -> usize {
         let current = self.current_buffers.load(Ordering::Relaxed);
         let to_allocate = core::cmp::min(count, self.max_buffers - current);
-        
+
         for _ in 0..to_allocate {
             // In real implementation, this would allocate actual buffers
             self.current_buffers.fetch_add(1, Ordering::Relaxed);
         }
-        
+
         to_allocate
     }
 }
@@ -624,7 +624,7 @@ impl NetworkBufferManager {
 
         // Allocate new buffer
         let handle = self.next_handle.fetch_add(1, Ordering::SeqCst);
-        
+
         // Allocate memory
         let addr = if flags.dma_capable {
             // Allocate DMA-capable memory
@@ -676,9 +676,15 @@ impl NetworkBufferManager {
         }
 
         // Update statistics
-        self.global_stats.total_buffers.fetch_add(1, Ordering::Relaxed);
-        self.global_stats.total_memory.fetch_add(size as u64, Ordering::Relaxed);
-        self.global_stats.allocations.fetch_add(1, Ordering::Relaxed);
+        self.global_stats
+            .total_buffers
+            .fetch_add(1, Ordering::Relaxed);
+        self.global_stats
+            .total_memory
+            .fetch_add(size as u64, Ordering::Relaxed);
+        self.global_stats
+            .allocations
+            .fetch_add(1, Ordering::Relaxed);
 
         Ok(handle)
     }
@@ -722,9 +728,15 @@ impl NetworkBufferManager {
         }
 
         // Update statistics
-        self.global_stats.total_buffers.fetch_sub(1, Ordering::Relaxed);
-        self.global_stats.total_memory.fetch_sub(buffer.metadata.size as u64, Ordering::Relaxed);
-        self.global_stats.deallocations.fetch_add(1, Ordering::Relaxed);
+        self.global_stats
+            .total_buffers
+            .fetch_sub(1, Ordering::Relaxed);
+        self.global_stats
+            .total_memory
+            .fetch_sub(buffer.metadata.size as u64, Ordering::Relaxed);
+        self.global_stats
+            .deallocations
+            .fetch_add(1, Ordering::Relaxed);
 
         Ok(())
     }
@@ -759,7 +771,7 @@ impl NetworkBufferManager {
         };
 
         let pool = Arc::new(BufferPool::new(name, buffer_size, max_buffers, metadata));
-        
+
         let mut pools = self.pools.lock();
         pools.insert(buffer_size, pool);
 
@@ -826,7 +838,7 @@ impl NetworkBufferManager {
     pub fn garbage_collect(&self, max_age: u64) -> usize {
         let mut collected = 0;
         let now = time::get_monotonic_time();
-        
+
         let buffers = self.buffers.lock();
         for (handle, buffer) in buffers.iter() {
             if buffer.age() > max_age && buffer.ref_count.load(Ordering::Relaxed) == 1 {
@@ -835,7 +847,7 @@ impl NetworkBufferManager {
                 }
             }
         }
-        
+
         collected
     }
 
@@ -915,7 +927,7 @@ pub enum BufferError {
 }
 
 /// Global network buffer manager instance
-static GLOBAL_BUFFER_MANAGER: once_cell::sync::Lazy<Mutex<NetworkBufferManager>> = 
+static GLOBAL_BUFFER_MANAGER: once_cell::sync::Lazy<Mutex<NetworkBufferManager>> =
     once_cell::sync::Lazy::new(|| Mutex::new(NetworkBufferManager::new()));
 
 /// Get global network buffer manager
@@ -927,7 +939,7 @@ pub fn get_global_buffer_manager() -> &'static Mutex<NetworkBufferManager> {
 pub fn init_buffer_management() -> Result<(), BufferError> {
     let manager = get_global_buffer_manager();
     let mut manager = manager.lock();
-    
+
     // Create default buffer pools
     manager.create_pool(
         "small".to_string(),
@@ -936,7 +948,7 @@ pub fn init_buffer_management() -> Result<(), BufferError> {
         BufferType::Packet,
         BufferFlags::default(),
     )?;
-    
+
     manager.create_pool(
         "medium".to_string(),
         1024,
@@ -944,7 +956,7 @@ pub fn init_buffer_management() -> Result<(), BufferError> {
         BufferType::Packet,
         BufferFlags::default(),
     )?;
-    
+
     manager.create_pool(
         "large".to_string(),
         4096,
@@ -952,7 +964,7 @@ pub fn init_buffer_management() -> Result<(), BufferError> {
         BufferType::Packet,
         BufferFlags::default(),
     )?;
-    
+
     manager.create_pool(
         "jumbo".to_string(),
         9000,
@@ -960,20 +972,16 @@ pub fn init_buffer_management() -> Result<(), BufferError> {
         BufferType::Packet,
         BufferFlags::default(),
     )?;
-    
+
     // Create DMA buffer pool
     manager.create_pool(
         "dma".to_string(),
         4096,
         200,
         BufferType::Dma,
-        BufferFlags {
-            dma_capable: true,
-            cacheable: false,
-            ..Default::default()
-        },
+        BufferFlags { dma_capable: true, cacheable: false, ..Default::default() },
     )?;
-    
+
     log::info!("Network buffer management initialized");
     Ok(())
 }
@@ -983,9 +991,13 @@ pub mod utils {
     use super::*;
 
     /// Calculate optimal buffer size for packet
-    pub fn calculate_optimal_buffer_size(packet_size: usize, headroom: usize, tailroom: usize) -> usize {
+    pub fn calculate_optimal_buffer_size(
+        packet_size: usize,
+        headroom: usize,
+        tailroom: usize,
+    ) -> usize {
         let total_size = packet_size + headroom + tailroom;
-        
+
         // Round up to nearest cache line size (64 bytes)
         (total_size + 63) & !63
     }
@@ -996,29 +1008,32 @@ pub mod utils {
         if flags.dma_capable && !flags.writable {
             return false;
         }
-        
+
         // Cacheable and DMA-capable are mutually exclusive
         if flags.cacheable && flags.dma_capable {
             return false;
         }
-        
+
         true
     }
 
     /// Estimate memory usage for buffer pools
     pub fn estimate_pool_memory_usage(pools: &[Arc<BufferPool>]) -> u64 {
         let mut total = 0u64;
-        
+
         for pool in pools {
             let stats = pool.get_stats();
             total += (stats.buffer_size * stats.current_buffers) as u64;
         }
-        
+
         total
     }
 
     /// Find best buffer pool for size
-    pub fn find_best_pool_for_size(pools: &[Arc<BufferPool>], size: usize) -> Option<Arc<BufferPool>> {
+    pub fn find_best_pool_for_size(
+        pools: &[Arc<BufferPool>],
+        size: usize,
+    ) -> Option<Arc<BufferPool>> {
         pools
             .iter()
             .filter(|pool| pool.buffer_size >= size)
@@ -1041,14 +1056,14 @@ pub mod utils {
         if buffers.is_empty() {
             return None;
         }
-        
+
         let mut current = buffers[0].clone();
-        
+
         for buffer in buffers.iter().skip(1) {
             // In a real implementation, this would properly chain buffers
             // For now, we'll just return the first buffer
         }
-        
+
         Some(current)
     }
 
@@ -1056,29 +1071,33 @@ pub mod utils {
     pub fn flatten_buffer_chain(buffer: &NetworkBuffer) -> Option<Vec<u8>> {
         let mut total_len = buffer.total_len();
         let mut result = Vec::with_capacity(total_len);
-        
+
         // Copy data from first buffer
         unsafe {
             let src = buffer.data();
             result.set_len(buffer.len());
             core::ptr::copy_nonoverlapping(src, result.as_mut_ptr(), buffer.len());
         }
-        
+
         // Copy data from chained buffers
         let mut current = buffer.next();
         let mut offset = buffer.len();
-        
+
         while let Some(next_buffer) = current {
             unsafe {
                 let src = next_buffer.data();
                 result.set_len(offset + next_buffer.len());
-                core::ptr::copy_nonoverlapping(src, result.as_mut_ptr().add(offset), next_buffer.len());
+                core::ptr::copy_nonoverlapping(
+                    src,
+                    result.as_mut_ptr().add(offset),
+                    next_buffer.len(),
+                );
             }
-            
+
             offset += next_buffer.len();
             current = next_buffer.next();
         }
-        
+
         Some(result)
     }
 }

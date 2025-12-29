@@ -65,8 +65,7 @@ impl BootConfig {
 
     pub fn set_cmdline(&mut self, cmdline: &[u8]) {
         let len = core::cmp::min(cmdline.len(), 512);
-        self.cmdline_buffer[..len]
-            .copy_from_slice(&cmdline[..len]);
+        self.cmdline_buffer[..len].copy_from_slice(&cmdline[..len]);
         self.cmdline_len = len;
     }
 
@@ -84,12 +83,12 @@ impl BootConfig {
         let mut chars = cmdline.chars();
         let mut current_param = String::new();
         let mut in_value = false;
-        
+
         loop {
             match chars.next() {
                 Some('=') => {
                     in_value = true;
-                }
+                },
                 Some(' ') | Some('\t') | None => {
                     // End of parameter or value
                     if !current_param.is_empty() {
@@ -97,24 +96,24 @@ impl BootConfig {
                     }
                     current_param.clear();
                     in_value = false;
-                    
+
                     if chars.as_str().is_empty() {
                         break;
                     }
-                }
+                },
                 Some(c) => {
                     current_param.push(c);
-                }
+                },
             }
         }
     }
-    
+
     /// Apply a single flag from command line
     fn apply_single_flag(&mut self, flag: &str, is_value: bool) {
         if flag.is_empty() {
             return;
         }
-        
+
         // Simple boolean flags
         match flag {
             "verbose" => self.verbosity = 2,
@@ -131,10 +130,10 @@ impl BootConfig {
                     self.try_parse_graphics_mode(flag);
                 }
                 // Unknown flags are silently ignored (error-tolerant)
-            }
+            },
         }
     }
-    
+
     /// Try to parse graphics mode string
     /// Format: WIDTHxHEIGHT@BPP (e.g., "1024x768@32")
     fn try_parse_graphics_mode(&mut self, mode_str: &str) {
@@ -142,37 +141,35 @@ impl BootConfig {
         let mut height_str = String::new();
         let mut bpp_str = String::new();
         let mut state = 0; // 0=width, 1=height, 2=bpp
-        
+
         for c in mode_str.chars() {
             match c {
                 'x' | 'X' if state == 0 => {
                     state = 1;
-                }
+                },
                 '@' if state == 1 => {
                     state = 2;
-                }
-                '0'..='9' => {
-                    match state {
-                        0 => width_str.push(c),
-                        1 => height_str.push(c),
-                        2 => bpp_str.push(c),
-                        _ => {}
-                    }
-                }
+                },
+                '0'..='9' => match state {
+                    0 => width_str.push(c),
+                    1 => height_str.push(c),
+                    2 => bpp_str.push(c),
+                    _ => {},
+                },
                 _ => {
                     // Invalid character, stop parsing
                     return;
-                }
+                },
             }
         }
-        
+
         // Validate and apply parsed values
         if let (Ok(w), Ok(h)) = (width_str.parse::<u16>(), height_str.parse::<u16>()) {
             // Strict resolution validation: 320-4096 x 200-2160
             if w >= 320 && w <= 4096 && h >= 200 && h <= 2160 {
                 self.graphics_width = w;
                 self.graphics_height = h;
-                
+
                 // Parse BPP if provided, default to 32
                 if !bpp_str.is_empty() {
                     if let Ok(bpp) = bpp_str.parse::<u8>() {

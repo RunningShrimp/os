@@ -99,7 +99,9 @@ impl FrequencyGovernor {
         match mode {
             ScalingMode::Performance => self.current_frequency = self.max_frequency,
             ScalingMode::PowerSave => self.current_frequency = self.min_frequency,
-            ScalingMode::Balanced => self.current_frequency = (self.min_frequency + self.max_frequency) / 2,
+            ScalingMode::Balanced => {
+                self.current_frequency = (self.min_frequency + self.max_frequency) / 2
+            },
             ScalingMode::Custom => {},
         }
     }
@@ -247,7 +249,7 @@ impl DvfsScalingManager {
     pub fn get_governor_mut(&mut self, id: u32) -> Option<&mut FrequencyGovernor> {
         let governor_count = self.governor_count;
         let governors_ptr = self.governors.as_mut_ptr();
-        
+
         for i in 0..governor_count {
             unsafe {
                 if let Some(g) = (*governors_ptr.add(i)).as_mut() {
@@ -287,7 +289,7 @@ impl DvfsScalingManager {
     pub fn get_voltage_controller_mut(&mut self, id: u32) -> Option<&mut VoltageController> {
         let controller_count = self.controller_count;
         let controllers_ptr = self.voltage_controllers.as_mut_ptr();
-        
+
         for i in 0..controller_count {
             unsafe {
                 if let Some(c) = (*controllers_ptr.add(i)).as_mut() {

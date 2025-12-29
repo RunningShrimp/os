@@ -3,17 +3,22 @@
 //! 提供TOML和JSON格式的配置解析功能，
 //! 支持基于配置文件的服务注册和条件评估。
 
-use crate::infrastructure::di_container::{
-    DIContainer, ServiceLifecycle, ServiceCondition
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    vec::Vec,
 };
-use crate::infrastructure::ServiceFactory;
-use crate::protocol::BootProtocolType;
-use alloc::boxed::Box;
-use alloc::collections::BTreeMap;
-use alloc::format;
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
 use core::any::Any;
+
+use crate::{
+    infrastructure::{
+        ServiceFactory,
+        di_container::{DIContainer, ServiceCondition, ServiceLifecycle},
+    },
+    protocol::BootProtocolType,
+};
 
 /// 配置错误类型
 #[derive(Debug)]
@@ -103,12 +108,12 @@ impl ConditionConfig {
             ConditionConfig::FeatureEnabled(feature) => {
                 let feature = feature.clone().leak();
                 ServiceCondition::FeatureEnabled(feature)
-            }
+            },
             ConditionConfig::Custom(_func_name) => {
                 // 在实际实现中，这里会查找并调用自定义条件函数
                 // 现在使用默认的Always条件
                 ServiceCondition::Always
-            }
+            },
         }
     }
 }
@@ -123,32 +128,32 @@ impl ConfigParser {
         // 在实际项目中，应该使用专门的TOML解析库
         Self::parse_config_str(toml_str, "toml")
     }
-    
+
     /// 从JSON字符串解析配置
     pub fn parse_json(json_str: &str) -> Result<DIContainerConfig, ConfigError> {
         // 简化的JSON解析实现
         // 在实际项目中，应该使用专门的JSON解析库
         Self::parse_config_str(json_str, "json")
     }
-    
+
     /// 从配置字符串解析（内部方法）
     fn parse_config_str(config_str: &str, _format: &str) -> Result<DIContainerConfig, ConfigError> {
         // 这里是一个简化的解析实现
         // 实际项目中应该使用专业的解析库
-        
+
         let mut config = DIContainerConfig::default();
-        
+
         // 简单的键值对解析（仅用于演示）
         for line in config_str.lines() {
             let line = line.trim();
             if line.is_empty() || line.starts_with('#') {
                 continue;
             }
-            
+
             if let Some((key, value)) = line.split_once('=') {
                 let key = key.trim().to_string();
                 let value = value.trim().to_string();
-                
+
                 match key.as_str() {
                     "default_protocol" => {
                         config.default_protocol = match value.as_str() {
@@ -157,45 +162,47 @@ impl ConfigParser {
                             "Multiboot2" => BootProtocolType::Multiboot2,
                             _ => BootProtocolType::Bios,
                         };
-                    }
+                    },
                     "enable_lazy_loading" => {
                         config.enable_lazy_loading = value == "true";
-                    }
+                    },
                     "enable_circular_dependency_check" => {
                         config.enable_circular_dependency_check = value == "true";
-                    }
+                    },
                     _ => {
                         // 其他配置值
                         config.config_values.insert(key, value);
-                    }
+                    },
                 }
             }
         }
-        
+
         Ok(config)
     }
-    
+
     /// 验证配置
     pub fn validate_config(config: &DIContainerConfig) -> Result<(), ConfigError> {
         // 验证服务配置
         for (name, service_config) in &config.services {
             // 验证服务类型
             if service_config.service_type.is_empty() {
-                return Err(ConfigError::ValidationError(
-                    format!("Service '{}' has empty type", name)
-                ));
+                return Err(ConfigError::ValidationError(format!(
+                    "Service '{}' has empty type",
+                    name
+                )));
             }
-            
+
             // 验证依赖
             for dep in &service_config.dependencies {
                 if !config.services.contains_key(dep) {
-                    return Err(ConfigError::DependencyError(
-                        format!("Service '{}' depends on non-existent service '{}'", name, dep)
-                    ));
+                    return Err(ConfigError::DependencyError(format!(
+                        "Service '{}' depends on non-existent service '{}'",
+                        name, dep
+                    )));
                 }
             }
         }
-        
+
         Ok(())
     }
 }
@@ -219,19 +226,19 @@ impl ServiceFactory for ConfigurableServiceFactory {
         match self.service_config.service_type.as_str() {
             "BootConfigRepository" => {
                 Ok(Box::new(crate::domain::repositories::DefaultBootConfigRepository))
-            }
+            },
             "DomainEventPublisher" => {
                 Ok(Box::new(crate::domain::events::SimpleEventPublisher::new()))
-            }
-            _ => Err("Unknown service type in configuration")
+            },
+            _ => Err("Unknown service type in configuration"),
         }
     }
-    
+
     fn get_service_type(&self) -> &'static str {
         // Use Box::leak to convert String to &'static str
         Box::leak(Box::new(self.service_config.service_type.clone())) as &'static str
     }
-    
+
     fn get_dependencies(&self) -> Vec<&'static str> {
         self.service_config.dependencies
             .iter()
@@ -249,196 +256,178 @@ impl DIContainer {
         // 现在返回一个默认容器
         Ok(Self::new(BootProtocolType::Bios))
     }
-    
+
     /// 从TOML配置字符串创建容器
     pub fn from_toml_config(toml_str: &str) -> Result<Self, ConfigError> {
         let config = ConfigParser::parse_toml(toml_str)?;
         ConfigParser::validate_config(&config)?;
-        
+
         let container = Self::new(config.default_protocol);
-        
+
         // 设置配置值
         for (key, value) in &config.config_values {
             container.set_config_value(key.clone(), value.clone());
         }
-        
+
         // 注册服务
         for (name, service_config) in config.services {
             let factory = ConfigurableServiceFactory::new(service_config.clone());
-            let condition = service_config.condition
-                .map(|c| c.to_service_condition());
-            
+            let condition = service_config.condition.map(|c| c.to_service_condition());
+
             let result = match service_config.lifecycle {
-                ServiceLifecycle::Singleton => {
-                    container.register_singleton(
+                ServiceLifecycle::Singleton => container.register_singleton(
                     Box::leak(Box::new(service_config.service_type.clone())) as &'static str,
                     factory,
                     condition,
-                )
-            }
-            ServiceLifecycle::Transient => {
-                container.register_transient(
+                ),
+                ServiceLifecycle::Transient => container.register_transient(
                     Box::leak(Box::new(service_config.service_type.clone())) as &'static str,
                     factory,
                     condition,
-                )
-            }
-            ServiceLifecycle::Scoped => {
-                container.register_scoped(
+                ),
+                ServiceLifecycle::Scoped => container.register_scoped(
                     Box::leak(Box::new(service_config.service_type.clone())) as &'static str,
                     factory,
                     condition,
-                )
-            }
+                ),
             };
-            
+
             if let Err(e) = result {
-                return Err(ConfigError::ValidationError(
-                    format!("Failed to register service '{}': {}", name, e)
-                ));
+                return Err(ConfigError::ValidationError(format!(
+                    "Failed to register service '{}': {}",
+                    name, e
+                )));
             }
         }
-        
+
         Ok(container)
     }
-    
+
     /// 从JSON配置字符串创建容器
     pub fn from_json_config(json_str: &str) -> Result<Self, ConfigError> {
         let config = ConfigParser::parse_json(json_str)?;
         ConfigParser::validate_config(&config)?;
-        
+
         let container = Self::new(config.default_protocol);
-        
+
         // 设置配置值
         for (key, value) in &config.config_values {
             container.set_config_value(key.clone(), value.clone());
         }
-        
+
         // 注册服务
         for (name, service_config) in config.services {
             let factory = ConfigurableServiceFactory::new(service_config.clone());
-            let condition = service_config.condition
-                .map(|c| c.to_service_condition());
-            
+            let condition = service_config.condition.map(|c| c.to_service_condition());
+
             let result = match service_config.lifecycle {
-                ServiceLifecycle::Singleton => {
-                    container.register_singleton(
-                        service_config.service_type.leak(),
-                        factory,
-                        condition,
-                    )
-                }
-                ServiceLifecycle::Transient => {
-                    container.register_transient(
-                        service_config.service_type.leak(),
-                        factory,
-                        condition,
-                    )
-                }
-                ServiceLifecycle::Scoped => {
-                    container.register_scoped(
-                        service_config.service_type.leak(),
-                        factory,
-                        condition,
-                    )
-                }
+                ServiceLifecycle::Singleton => container.register_singleton(
+                    service_config.service_type.leak(),
+                    factory,
+                    condition,
+                ),
+                ServiceLifecycle::Transient => container.register_transient(
+                    service_config.service_type.leak(),
+                    factory,
+                    condition,
+                ),
+                ServiceLifecycle::Scoped => container.register_scoped(
+                    service_config.service_type.leak(),
+                    factory,
+                    condition,
+                ),
             };
-            
+
             if let Err(e) = result {
-                return Err(ConfigError::ValidationError(
-                    format!("Failed to register service '{}': {}", name, e)
-                ));
+                return Err(ConfigError::ValidationError(format!(
+                    "Failed to register service '{}': {}",
+                    name, e
+                )));
             }
         }
-        
+
         Ok(container)
     }
-    
+
     /// 应用配置到现有容器
     pub fn apply_config(&mut self, config: DIContainerConfig) -> Result<(), ConfigError> {
         ConfigParser::validate_config(&config)?;
-        
+
         // 设置配置值
         for (key, value) in &config.config_values {
             self.set_config_value(key.clone(), value.clone());
         }
-        
+
         // 注册服务
         for (name, service_config) in config.services {
             let factory = ConfigurableServiceFactory::new(service_config.clone());
-            let condition = service_config.condition
-                .map(|c| c.to_service_condition());
-            
+            let condition = service_config.condition.map(|c| c.to_service_condition());
+
             let result = match service_config.lifecycle {
-                ServiceLifecycle::Singleton => {
-                    self.register_singleton(
+                ServiceLifecycle::Singleton => self.register_singleton(
                     Box::leak(Box::new(service_config.service_type.clone())) as &'static str,
                     factory,
                     condition,
-                )
-            }
-            ServiceLifecycle::Transient => {
-                self.register_transient(
+                ),
+                ServiceLifecycle::Transient => self.register_transient(
                     Box::leak(Box::new(service_config.service_type.clone())) as &'static str,
                     factory,
                     condition,
-                )
-            }
-            ServiceLifecycle::Scoped => {
-                self.register_scoped(
+                ),
+                ServiceLifecycle::Scoped => self.register_scoped(
                     Box::leak(Box::new(service_config.service_type.clone())) as &'static str,
                     factory,
                     condition,
-                )
-            }
+                ),
             };
-            
+
             if let Err(e) = result {
-                return Err(ConfigError::ValidationError(
-                    format!("Failed to register service '{}': {}", name, e)
-                ));
+                return Err(ConfigError::ValidationError(format!(
+                    "Failed to register service '{}': {}",
+                    name, e
+                )));
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// 生成当前配置的TOML表示
     pub fn generate_toml_config(&self) -> String {
         let mut toml = String::new();
-        
+
         // 容器配置
         toml.push_str("[di_container]\n");
         toml.push_str(&format!("default_protocol = \"{:?}\"\n", self.protocol_type()));
         toml.push_str("enable_lazy_loading = true\n");
         toml.push_str("enable_circular_dependency_check = true\n\n");
-        
+
         // 服务配置
         toml.push_str("[services]\n");
-        
+
         let services = self.get_registered_services();
         for service_name in services {
             toml.push_str(&format!("[services.{}]\n", service_name));
             toml.push_str(&format!("type = \"{}\"\n", service_name));
             // 在实际实现中，这里会包含更多配置信息
         }
-        
+
         toml
     }
-    
+
     /// 生成当前配置的JSON表示
     pub fn generate_json_config(&self) -> String {
         let mut json = String::new();
-        
+
         json.push_str("{\n");
         json.push_str("  \"di_container\": {\n");
         json.push_str(&format!("    \"default_protocol\": \"{:?}\",\n", self.protocol_type()));
         json.push_str("    \"enable_lazy_loading\": true,\n");
         json.push_str("    \"enable_circular_dependency_check\": true\n");
         json.push_str("  },\n");
-        
+
         json.push_str("  \"services\": {\n");
-        
+
         let services = self.get_registered_services();
         for (i, service_name) in services.iter().enumerate() {
             json.push_str(&format!("    \"{}\": {{\n", service_name));
@@ -450,10 +439,10 @@ impl DIContainer {
             }
             json.push_str("\n");
         }
-        
+
         json.push_str("  }\n");
         json.push_str("}\n");
-        
+
         json
     }
 }
@@ -461,7 +450,7 @@ impl DIContainer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_config_parsing() {
         let toml_config = r#"
@@ -472,60 +461,69 @@ enable_lazy_loading = true
 type = "TestService"
 lifecycle = "Singleton"
 "#;
-        
+
         let result = ConfigParser::parse_toml(toml_config);
         assert!(result.is_ok());
-        
+
         let config = result.unwrap();
         assert_eq!(config.default_protocol, BootProtocolType::Bios);
         assert!(config.enable_lazy_loading);
         assert!(config.services.contains_key("test_service"));
     }
-    
+
     #[test]
     fn test_config_validation() {
         let mut config = DIContainerConfig::default();
-        
+
         // 添加有效服务
-        config.services.insert("service1".to_string(), ServiceConfig {
-            service_type: "Service1".to_string(),
-            lifecycle: ServiceLifecycle::Singleton,
-            implementation: None,
-            condition: None,
-            dependencies: Vec::new(),
-        });
-        
+        config.services.insert(
+            "service1".to_string(),
+            ServiceConfig {
+                service_type: "Service1".to_string(),
+                lifecycle: ServiceLifecycle::Singleton,
+                implementation: None,
+                condition: None,
+                dependencies: Vec::new(),
+            },
+        );
+
         // 验证应该成功
         let result = ConfigParser::validate_config(&config);
         assert!(result.is_ok());
-        
+
         // 添加有依赖的服务
-        config.services.insert("service2".to_string(), ServiceConfig {
-            service_type: "Service2".to_string(),
-            lifecycle: ServiceLifecycle::Singleton,
-            implementation: None,
-            condition: None,
-            dependencies: vec!["service1".to_string()],
-        });
-        
+        config.services.insert(
+            "service2".to_string(),
+            ServiceConfig {
+                service_type: "Service2".to_string(),
+                lifecycle: ServiceLifecycle::Singleton,
+                implementation: None,
+                condition: None,
+                dependencies: vec!["service1".to_string()],
+            },
+        );
+
         // 验证应该成功
         let result = ConfigParser::validate_config(&config);
         assert!(result.is_ok());
-        
+
         // 添加有不存在的依赖的服务
-        config.services.insert("service3".to_string(), ServiceConfig {
-            service_type: "Service3".to_string(),
-            lifecycle: ServiceLifecycle::Singleton,
-            implementation: None,
-            condition: None,
-            dependencies: vec!["nonexistent".to_string()],
-        });
-        
+        config.services.insert(
+            "service3".to_string(),
+            ServiceConfig {
+                service_type: "Service3".to_string(),
+                lifecycle: ServiceLifecycle::Singleton,
+                implementation: None,
+                condition: None,
+                dependencies: vec!["nonexistent".to_string()],
+            },
+        );
+
         // 验证应该失败
         let result = ConfigParser::validate_config(&config);
         assert!(result.is_err());
     }
-    
+
     #[test]
     fn test_condition_config_conversion() {
         let always_condition = ConditionConfig::Always;
@@ -534,24 +532,24 @@ lifecycle = "Singleton"
             ServiceCondition::Always => {}, // 成功
             _ => panic!("Expected Always condition"),
         }
-        
+
         let protocol_condition = ConditionConfig::ProtocolType(BootProtocolType::Uefi);
         let service_condition = protocol_condition.to_service_condition();
         match service_condition {
             ServiceCondition::ProtocolType(BootProtocolType::Uefi) => {}, // 成功
             _ => panic!("Expected ProtocolType condition"),
         }
-        
+
         let feature_condition = ConditionConfig::FeatureEnabled("test_feature".to_string());
         let service_condition = feature_condition.to_service_condition();
         match service_condition {
             ServiceCondition::FeatureEnabled(feature) => {
                 assert_eq!(feature, "test_feature");
-            }
+            },
             _ => panic!("Expected FeatureEnabled condition"),
         }
     }
-    
+
     #[test]
     fn test_container_from_config() {
         let toml_config = r#"
@@ -562,19 +560,19 @@ enable_lazy_loading = true
 type = "BootConfigRepository"
 lifecycle = "Singleton"
 "#;
-        
+
         let result = DIContainer::from_toml_config(toml_config);
         assert!(result.is_ok());
-        
+
         let container = result.unwrap();
         assert_eq!(container.protocol_type(), BootProtocolType::Bios);
         assert!(container.is_service_registered("BootConfigRepository"));
     }
-    
+
     #[test]
     fn test_config_generation() {
         let container = DIContainer::new(BootProtocolType::Bios);
-        
+
         // 注册一些服务
         let _ = container.register_singleton(
             "TestService1",
@@ -586,20 +584,20 @@ lifecycle = "Singleton"
             crate::infrastructure::di_container::DefaultBootConfigRepositoryFactory,
             None,
         );
-        
+
         // 生成TOML配置
         let toml_config = container.generate_toml_config();
         assert!(toml_config.contains("default_protocol"));
         assert!(toml_config.contains("TestService1"));
         assert!(toml_config.contains("TestService2"));
-        
+
         // 生成JSON配置
         let json_config = container.generate_json_config();
         assert!(json_config.contains("default_protocol"));
         assert!(json_config.contains("TestService1"));
         assert!(json_config.contains("TestService2"));
     }
-    
+
     #[test]
     fn test_configurable_service_factory() {
         let service_config = ServiceConfig {
@@ -609,16 +607,17 @@ lifecycle = "Singleton"
             condition: None,
             dependencies: Vec::new(),
         };
-        
+
         let factory = ConfigurableServiceFactory::new(service_config);
         let container = DIContainer::new(BootProtocolType::Bios);
-        
+
         let result = factory.create_instance(&container);
         assert!(result.is_ok());
-        
+
         let instance = result.unwrap();
         // 验证实例类型
-        let downcasted = instance.downcast::<crate::domain::repositories::DefaultBootConfigRepository>();
+        let downcasted =
+            instance.downcast::<crate::domain::repositories::DefaultBootConfigRepository>();
         assert!(downcasted.is_ok());
     }
 }

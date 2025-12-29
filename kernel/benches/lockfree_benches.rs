@@ -3,7 +3,7 @@
 extern crate alloc;
 use alloc::vec::Vec;
 
-use crate::benches::{Benchmark, BenchmarkRunner, BenchmarkConfig, Timer};
+use crate::benches::{Benchmark, BenchmarkConfig, BenchmarkRunner, Timer};
 
 /// Benchmark for LockFreeHashMap insertion
 pub struct HashMapInsertBenchmark {

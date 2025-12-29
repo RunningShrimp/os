@@ -1,11 +1,11 @@
 //! mm模块页面管理公共接口
-//! 
+//!
 //! 提供页面级别的内存管理功能
 
 use super::{AllocError, PhysicalError, PhysicalPage};
 
 /// Get page size
-/// 
+///
 /// # Return
 /// * `usize` - System page size
 pub fn get_page_size() -> usize {
@@ -14,7 +14,7 @@ pub fn get_page_size() -> usize {
 }
 
 /// Allocate pages
-/// 
+///
 /// # Contract
 /// * Allocated pages must be continuous
 /// * Must track allocated pages
@@ -26,7 +26,7 @@ pub fn allocate_pages(count: usize) -> Result<*mut [u8], AllocError> {
 }
 
 /// Free pages
-/// 
+///
 /// # Contract
 /// * Can only free previously allocated pages
 /// * Must update allocation status
@@ -38,7 +38,7 @@ pub fn free_pages(pages: *mut [u8], count: usize) -> Result<(), AllocError> {
 }
 
 /// Allocate physical pages
-/// 
+///
 /// # Contract
 /// * Allocated pages must be continuous
 /// * Must track allocated pages
@@ -50,7 +50,7 @@ pub fn allocate_physical_pages(count: usize) -> Result<PhysicalPage, PhysicalErr
 }
 
 /// Free physical pages
-/// 
+///
 /// # Contract
 /// * Can only free previously allocated pages
 /// * Must update allocation status

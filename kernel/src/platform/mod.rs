@@ -1,43 +1,44 @@
 pub mod arch;
-pub mod drivers;
 pub mod boot;
+pub mod drivers;
 pub mod trap;
 
-use crate::BootParameters;
 use nos_api::Result;
+
+use crate::BootParameters;
 
 /// Initialize platform subsystems
 pub fn init_platform(boot_params: &BootParameters) -> Result<()> {
     // Store boot parameters
     boot::init_from_boot_parameters(boot_params);
-    
+
     // Early architecture initialization
     arch::early_init();
-    
+
     // Print boot information
     boot::print_boot_info();
-    
+
     // Initialize memory from boot info
     boot::init_memory_from_boot_info();
-    
+
     // Initialize framebuffer
     boot::init_framebuffer_from_boot_info();
-    
+
     // Initialize ACPI
     boot::init_acpi_from_boot_info();
-    
+
     // Initialize device tree
     boot::init_device_tree_from_boot_info();
-    
+
     // Initialize device manager
     drivers::device_manager::init()?;
-    
+
     // Initialize devices
     drivers::init();
-    
+
     // Initialize trap handling
     trap::init();
-    
+
     Ok(())
 }
 

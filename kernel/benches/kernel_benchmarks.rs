@@ -9,8 +9,9 @@
 
 extern crate alloc;
 
-use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
 use core::hint::black_box;
+
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 
 /// Benchmark memory allocation performance
 fn bench_memory_allocation(c: &mut Criterion) {
@@ -547,8 +548,10 @@ fn bench_network_data_path(c: &mut Criterion) {
 
             // Simulate routing table lookup
             let mut route_found = false;
-            for _ in 0..100 { // Simulate routing table size
-                if black_box(true) { // Simulate route match
+            for _ in 0..100 {
+                // Simulate routing table size
+                if black_box(true) {
+                    // Simulate route match
                     route_found = true;
                     break;
                 }
@@ -569,26 +572,21 @@ criterion_group!(
     bench_hashmap_operations,
     bench_syscall_simulation,
     bench_context_switch_simulation,
-
     // Syscall latency benchmarks
     bench_syscall_dispatch_latency,
     bench_syscall_categories_latency,
-
     // Memory allocation speed benchmarks
     bench_memory_allocation_sizes,
     bench_kernel_memory_allocation,
     bench_memory_mapping_operations,
-
     // Process creation/destruction benchmarks
     bench_process_table_operations,
     bench_process_creation_simulation,
     bench_process_destruction_simulation,
-
     // File I/O throughput benchmarks
     bench_file_descriptor_operations,
     bench_pipe_operations,
     bench_vfs_operations,
-
     // Network operations benchmarks
     bench_socket_operations,
     bench_network_syscall_dispatch,

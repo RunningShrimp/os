@@ -10,16 +10,14 @@
 extern crate alloc;
 
 use alloc::format;
-use core::ffi::{c_char, c_int};
 use core::str::FromStr;
-use heapless::{String, Vec};
-use crate::libc::error::set_errno;
-use crate::libc::error::errno::{EINVAL, ENOMEM};
-use crate::reliability::{EPERM, EAGAIN};
-use crate::subsystems::sync::Mutex;
 
+use crate::{
+    libc::error::set_errno,
+    reliability::{EAGAIN, EPERM},
+    subsystems::sync::Mutex,
+};
 /// 环境变量条目
-#[derive(Debug, Clone)]
 pub struct EnvEntry {
     /// 变量名
     pub name: String<256>,
@@ -88,13 +86,7 @@ pub struct EnhancedEnvManager {
 }
 
 /// 系统环境变量前缀
-static SYSTEM_ENV_PREFIXES: [&str; 5] = [
-    "PATH",
-    "HOME",
-    "USER",
-    "SHELL",
-    "TERM",
-];
+static SYSTEM_ENV_PREFIXES: [&str; 5] = ["PATH", "HOME", "USER", "SHELL", "TERM"];
 
 impl EnhancedEnvManager {
     /// 创建新的环境变量管理器
@@ -133,7 +125,7 @@ impl EnhancedEnvManager {
                 Err(_) => {
                     self.stats.lock().query_misses += 1;
                     return core::ptr::null();
-                }
+                },
             }
         };
 
@@ -163,7 +155,7 @@ impl EnhancedEnvManager {
                 Err(_) => {
                     set_errno(EINVAL);
                     return -1;
-                }
+                },
             }
         };
 
@@ -173,13 +165,14 @@ impl EnhancedEnvManager {
                 Err(_) => {
                     set_errno(EINVAL);
                     return -1;
-                }
+                },
             }
         };
 
         // 长度检查
-        if name_str.len() > self.config.max_name_length ||
-           value_str.len() > self.config.max_value_length {
+        if name_str.len() > self.config.max_name_length
+            || value_str.len() > self.config.max_value_length
+        {
             set_errno(ENOMEM);
             return -1;
         }
@@ -228,11 +221,11 @@ impl EnhancedEnvManager {
                 };
 
                 match table.push(entry) {
-                    Ok(_) => {}
+                    Ok(_) => {},
                     Err(_) => {
                         set_errno(ENOMEM);
                         return -1;
-                    }
+                    },
                 }
 
                 self.stats.lock().current_count = table.len();
@@ -261,7 +254,7 @@ impl EnhancedEnvManager {
                 Err(_) => {
                     set_errno(EINVAL);
                     return -1;
-                }
+                },
             }
         };
 
@@ -320,8 +313,8 @@ impl EnhancedEnvManager {
         crate::println!("查询未命中次数: {}", stats.query_misses);
 
         if stats.query_hits + stats.query_misses > 0 {
-            let hit_rate = (stats.query_hits as f64 /
-                           (stats.query_hits + stats.query_misses) as f64) * 100.0;
+            let hit_rate =
+                (stats.query_hits as f64 / (stats.query_hits + stats.query_misses) as f64) * 100.0;
             crate::println!("查询命中率: {:.2}%", hit_rate);
         }
 
@@ -396,8 +389,9 @@ impl EnhancedEnvManager {
             let array_layout = unsafe {
                 core::alloc::Layout::from_size_align(
                     (count + 1) * core::mem::size_of::<*mut c_char>(),
-                    core::mem::align_of::<*mut c_char>()
-                ).unwrap()
+                    core::mem::align_of::<*mut c_char>(),
+                )
+                .unwrap()
             };
             let array_ptr = unsafe { alloc::alloc::alloc(array_layout) as *mut *mut c_char };
 
@@ -410,10 +404,7 @@ impl EnhancedEnvManager {
             for (i, entry) in table.iter().enumerate() {
                 let env_string = format!("{}={}", entry.name, entry.value);
                 let string_layout = unsafe {
-                    core::alloc::Layout::from_size_align(
-                        env_string.len() + 1,
-                        1
-                    ).unwrap()
+                    core::alloc::Layout::from_size_align(env_string.len() + 1, 1).unwrap()
                 };
                 let string_ptr = unsafe { alloc::alloc::alloc(string_layout) as *mut c_char };
 
@@ -422,7 +413,7 @@ impl EnhancedEnvManager {
                         core::ptr::copy_nonoverlapping(
                             env_string.as_ptr(),
                             string_ptr as *mut u8,
-                            env_string.len()
+                            env_string.len(),
                         );
                         *string_ptr.add(env_string.len()) = 0;
                     }
@@ -435,10 +426,9 @@ impl EnhancedEnvManager {
                     for j in 0..i {
                         if let ptr = unsafe { *array_ptr.add(j) } {
                             unsafe {
-                                let layout = core::alloc::Layout::from_size_align(
-                                    self.strlen(ptr) + 1,
-                                    1
-                                ).unwrap();
+                                let layout =
+                                    core::alloc::Layout::from_size_align(self.strlen(ptr) + 1, 1)
+                                        .unwrap();
                                 alloc::alloc::dealloc(ptr as *mut u8, layout);
                             }
                         }
@@ -487,7 +477,9 @@ impl EnhancedEnvManager {
 
     /// 检查是否为系统环境变量
     fn is_system_variable(&self, name: &str) -> bool {
-        self.sys_prefixes.iter().any(|&prefix| name.starts_with(prefix))
+        self.sys_prefixes
+            .iter()
+            .any(|&prefix| name.starts_with(prefix))
     }
 
     /// 加载初始环境变量
@@ -497,27 +489,15 @@ impl EnhancedEnvManager {
 
         // 设置PATH变量
         let path_value = "/usr/local/bin:/usr/bin:/bin";
-        self.setenv(
-            b"PATH\0".as_ptr() as *const c_char,
-            path_value.as_ptr() as *const c_char,
-            0
-        );
+        self.setenv(b"PATH\0".as_ptr() as *const c_char, path_value.as_ptr() as *const c_char, 0);
 
         // 设置USER变量
         let user_value = "root";
-        self.setenv(
-            b"USER\0".as_ptr() as *const c_char,
-            user_value.as_ptr() as *const c_char,
-            0
-        );
+        self.setenv(b"USER\0".as_ptr() as *const c_char, user_value.as_ptr() as *const c_char, 0);
 
         // 设置SHELL变量
         let shell_value = "/bin/sh";
-        self.setenv(
-            b"SHELL\0".as_ptr() as *const c_char,
-            shell_value.as_ptr() as *const c_char,
-            0
-        );
+        self.setenv(b"SHELL\0".as_ptr() as *const c_char, shell_value.as_ptr() as *const c_char, 0);
 
         Ok(())
     }

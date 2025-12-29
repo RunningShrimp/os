@@ -3,12 +3,11 @@
 //! This module provides configurable, dynamic error recovery strategies
 //! that integrate with error statistics and monitoring.
 
-use super::{UnifiedError, ErrorContext, ErrorSeverity, ErrorAction, ErrorStats};
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+use super::{ErrorAction, ErrorContext, ErrorSeverity, ErrorStats, UnifiedError};
 use crate::subsystems::sync::Mutex;
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use alloc::string::String;
-use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 
 /// Recovery strategy configuration
 #[derive(Debug, Clone)]
@@ -141,13 +140,17 @@ impl RecoveryManager {
     }
 
     /// Determine recovery action for an error
-    pub fn determine_recovery_action(&self, error: &UnifiedError, context: &ErrorContext) -> Option<RecoveryAction> {
+    pub fn determine_recovery_action(
+        &self,
+        error: &UnifiedError,
+        context: &ErrorContext,
+    ) -> Option<RecoveryAction> {
         if !self.is_enabled() {
             return None;
         }
 
         let config = self.config.lock();
-        
+
         // Check if auto-recovery is disabled
         if !config.auto_recover {
             return None;
@@ -155,16 +158,20 @@ impl RecoveryManager {
 
         // Get error type string
         let error_type = format!("{:?}", error);
-        
+
         // Check if we've exceeded max attempts for this error type
         let attempts = {
             let recovery_attempts = self.recovery_attempts.lock();
             recovery_attempts.get(&error_type).copied().unwrap_or(0)
         };
-        
+
         if attempts >= config.max_attempts {
             if config.log_recovery {
-                crate::log_warn!("Recovery: Max attempts ({}) exceeded for error type: {}", config.max_attempts, error_type);
+                crate::log_warn!(
+                    "Recovery: Max attempts ({}) exceeded for error type: {}",
+                    config.max_attempts,
+                    error_type
+                );
             }
             return None;
         }
@@ -174,19 +181,19 @@ impl RecoveryManager {
             ErrorSeverity::Info | ErrorSeverity::Warning => {
                 // Low severity errors: usually no recovery needed
                 None
-            }
+            },
             ErrorSeverity::Error => {
                 // Medium severity: try recovery based on error type
                 self.get_recovery_action_for_error(error, &config)
-            }
+            },
             ErrorSeverity::Critical => {
                 // Critical errors: aggressive recovery
                 Some(RecoveryAction::Reset)
-            }
+            },
             ErrorSeverity::Fatal => {
                 // Fatal errors: no recovery possible
                 None
-            }
+            },
         };
 
         if let Some(action) = action {
@@ -218,7 +225,7 @@ impl RecoveryManager {
         config: &RecoveryStrategyConfig,
     ) -> Option<RecoveryAction> {
         let error_type = format!("{:?}", error);
-        
+
         // Check if there's a specific action configured for this error type
         if let Some(action) = config.error_type_actions.get(&error_type) {
             return Some(*action);
@@ -228,27 +235,19 @@ impl RecoveryManager {
         match error {
             UnifiedError::OutOfMemory | UnifiedError::MemoryError(_) => {
                 Some(RecoveryAction::Degrade)
-            }
-            UnifiedError::FileSystemError(_) => {
-                Some(RecoveryAction::Retry)
-            }
-            UnifiedError::NetworkError(_) => {
-                Some(RecoveryAction::Retry)
-            }
-            UnifiedError::ProcessError(_) => {
-                Some(RecoveryAction::Reset)
-            }
-            UnifiedError::DriverError(_) => {
-                Some(RecoveryAction::Reset)
-            }
+            },
+            UnifiedError::FileSystemError(_) => Some(RecoveryAction::Retry),
+            UnifiedError::NetworkError(_) => Some(RecoveryAction::Retry),
+            UnifiedError::ProcessError(_) => Some(RecoveryAction::Reset),
+            UnifiedError::DriverError(_) => Some(RecoveryAction::Reset),
             UnifiedError::SecurityError(_) => {
                 // Security errors: no automatic recovery
                 None
-            }
+            },
             _ => {
                 // Default: try retry
                 Some(RecoveryAction::Retry)
-            }
+            },
         }
     }
 
@@ -273,38 +272,39 @@ impl RecoveryManager {
                     crate::log_info!("Recovery: Retrying operation for error: {}", error_type);
                 }
                 RecoveryResult::Success
-            }
+            },
             RecoveryAction::Fallback => {
                 // Fallback: switch to alternative implementation
                 if config.log_recovery {
-                    crate::log_info!("Recovery: Using fallback implementation for error: {}", error_type);
+                    crate::log_info!(
+                        "Recovery: Using fallback implementation for error: {}",
+                        error_type
+                    );
                 }
                 self.execute_fallback(error, context)
-            }
+            },
             RecoveryAction::Degrade => {
                 // Degrade: reduce functionality gracefully
                 if config.log_recovery {
                     crate::log_info!("Recovery: Degrading functionality for error: {}", error_type);
                 }
                 self.execute_degradation(error, context)
-            }
+            },
             RecoveryAction::Reset => {
                 // Reset: reset the component
                 if config.log_recovery {
                     crate::log_info!("Recovery: Resetting component for error: {}", error_type);
                 }
                 self.execute_reset(error, context)
-            }
+            },
             RecoveryAction::Restart => {
                 // Restart: restart the subsystem
                 if config.log_recovery {
                     crate::log_warn!("Recovery: Restarting subsystem for error: {}", error_type);
                 }
                 self.execute_restart(error, context)
-            }
-            RecoveryAction::NoRecovery => {
-                RecoveryResult::NotApplicable
-            }
+            },
+            RecoveryAction::NoRecovery => RecoveryResult::NotApplicable,
         }
     }
 
@@ -326,10 +326,8 @@ impl RecoveryManager {
                     crate::log_info!("Recovery: Triggering memory pressure degradation");
                 }
                 RecoveryResult::Success
-            }
-            _ => {
-                RecoveryResult::Failed
-            }
+            },
+            _ => RecoveryResult::Failed,
         }
     }
 
@@ -340,15 +338,13 @@ impl RecoveryManager {
                 // Reset driver
                 // TODO: Implement driver reset
                 RecoveryResult::Success
-            }
+            },
             UnifiedError::ProcessError(_) => {
                 // Reset process state
                 // TODO: Implement process reset
                 RecoveryResult::Success
-            }
-            _ => {
-                RecoveryResult::Failed
-            }
+            },
+            _ => RecoveryResult::Failed,
         }
     }
 
@@ -366,7 +362,7 @@ impl RecoveryManager {
         let mut stats = self.stats.lock();
         stats.successful_recoveries += 1;
         *stats.successes_by_error_type.entry(error_type).or_insert(0) += 1;
-        
+
         // Reset recovery attempt count on success
         let mut recovery_attempts = self.recovery_attempts.lock();
         recovery_attempts.remove(&format!("{:?}", error));
@@ -399,10 +395,10 @@ impl RecoveryManager {
     pub fn reset_stats(&self) {
         let mut stats = self.stats.lock();
         *stats = RecoveryStats::default();
-        
+
         let mut recovery_attempts = self.recovery_attempts.lock();
         recovery_attempts.clear();
-        
+
         let mut error_counts = self.error_counts.lock();
         error_counts.clear();
     }
@@ -410,7 +406,7 @@ impl RecoveryManager {
     /// Configure adaptive recovery based on error statistics
     pub fn configure_adaptive_recovery(&self, error_stats: &ErrorStats) {
         let mut config = self.config.lock();
-        
+
         // Adjust max attempts based on error rate
         if error_stats.critical_errors > 10 {
             // High error rate: reduce recovery attempts to avoid thrashing
@@ -444,19 +440,23 @@ pub fn init_recovery_manager() {
 
 /// Get recovery manager
 pub fn get_recovery_manager() -> Option<&'static RecoveryManager> {
-    unsafe {
-        RECOVERY_MANAGER.as_ref()
-    }
+    unsafe { RECOVERY_MANAGER.as_ref() }
 }
 
 /// Determine recovery action for an error
-pub fn determine_recovery_action(error: &UnifiedError, context: &ErrorContext) -> Option<RecoveryAction> {
-    get_recovery_manager()
-        .and_then(|mgr| mgr.determine_recovery_action(error, context))
+pub fn determine_recovery_action(
+    error: &UnifiedError,
+    context: &ErrorContext,
+) -> Option<RecoveryAction> {
+    get_recovery_manager().and_then(|mgr| mgr.determine_recovery_action(error, context))
 }
 
 /// Execute recovery action
-pub fn execute_recovery(action: RecoveryAction, error: &UnifiedError, context: &ErrorContext) -> RecoveryResult {
+pub fn execute_recovery(
+    action: RecoveryAction,
+    error: &UnifiedError,
+    context: &ErrorContext,
+) -> RecoveryResult {
     get_recovery_manager()
         .map(|mgr| mgr.execute_recovery(action, error, context))
         .unwrap_or(RecoveryResult::NotApplicable)
@@ -517,4 +517,3 @@ mod tests {
         assert_eq!(stats.successful_recoveries, 1);
     }
 }
-

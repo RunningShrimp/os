@@ -5,11 +5,15 @@
 //! from its implementation, helping to break circular dependencies
 //! between modules.
 
-use alloc::string::String;
-use alloc::vec::Vec;
-use crate::types::stubs::{pid_t, uid_t, gid_t};
-use crate::error::unified_framework::{FrameworkError, IntoFrameworkError, FrameworkResult};
-use crate::error::unified::UnifiedError;
+use alloc::{string::String, vec::Vec};
+
+use crate::{
+    error::{
+        unified::UnifiedError,
+        unified_framework::{FrameworkError, FrameworkResult, IntoFrameworkError},
+    },
+    types::stubs::{gid_t, pid_t, uid_t},
+};
 
 /// Memory manager trait
 ///
@@ -25,7 +29,11 @@ pub trait MemoryManager {
     /// # Returns
     /// * `Ok(PhysicalAddress)` - Physical address of allocated memory
     /// * `Err(MemoryError)` - Memory allocation error
-    fn allocate_physical(&self, size: usize, flags: AllocationFlags) -> Result<PhysicalAddress, MemoryError>;
+    fn allocate_physical(
+        &self,
+        size: usize,
+        flags: AllocationFlags,
+    ) -> Result<PhysicalAddress, MemoryError>;
 
     /// Deallocate physical memory
     ///
@@ -43,7 +51,11 @@ pub trait MemoryManager {
     /// # Returns
     /// * `Ok(VirtualAddress)` - Virtual address of allocated memory
     /// * `Err(MemoryError)` - Memory allocation error
-    fn allocate_virtual(&self, size: usize, flags: AllocationFlags) -> Result<VirtualAddress, MemoryError>;
+    fn allocate_virtual(
+        &self,
+        size: usize,
+        flags: AllocationFlags,
+    ) -> Result<VirtualAddress, MemoryError>;
 
     /// Deallocate virtual memory
     ///
@@ -63,7 +75,13 @@ pub trait MemoryManager {
     /// # Returns
     /// * `Ok(())` - Success
     /// * `Err(MemoryError)` - Mapping error
-    fn map_memory(&self, vaddr: VirtualAddress, paddr: PhysicalAddress, size: usize, flags: MappingFlags) -> Result<(), MemoryError>;
+    fn map_memory(
+        &self,
+        vaddr: VirtualAddress,
+        paddr: PhysicalAddress,
+        size: usize,
+        flags: MappingFlags,
+    ) -> Result<(), MemoryError>;
 
     /// Unmap virtual memory
     ///
@@ -82,7 +100,12 @@ pub trait MemoryManager {
     /// # Returns
     /// * `Ok(())` - Success
     /// * `Err(MemoryError)` - Protection change error
-    fn protect_memory(&self, vaddr: VirtualAddress, size: usize, flags: ProtectionFlags) -> Result<(), MemoryError>;
+    fn protect_memory(
+        &self,
+        vaddr: VirtualAddress,
+        size: usize,
+        flags: ProtectionFlags,
+    ) -> Result<(), MemoryError>;
 
     /// Get memory statistics
     ///
@@ -148,7 +171,12 @@ pub trait MemoryManager {
     /// # Returns
     /// * `Ok(())` - Success
     /// * `Err(MemoryError)` - Advice error
-    fn advise_memory(&self, vaddr: VirtualAddress, size: usize, advice: MemoryAdvice) -> Result<(), MemoryError>;
+    fn advise_memory(
+        &self,
+        vaddr: VirtualAddress,
+        size: usize,
+        advice: MemoryAdvice,
+    ) -> Result<(), MemoryError>;
 }
 
 /// Process memory manager trait
@@ -195,7 +223,11 @@ pub trait ProcessMemoryManager {
     /// # Returns
     /// * `Ok(VirtualAddress)` - Virtual address of allocated memory
     /// * `Err(MemoryError)` - Memory allocation error
-    fn allocate_current_process_memory(&self, size: usize, flags: AllocationFlags) -> Result<VirtualAddress, MemoryError>;
+    fn allocate_current_process_memory(
+        &self,
+        size: usize,
+        flags: AllocationFlags,
+    ) -> Result<VirtualAddress, MemoryError>;
 
     /// Deallocate memory in the current process
     ///
@@ -442,26 +474,44 @@ impl IntoFrameworkError for MemoryError {
             MemoryError::NotMapped => UnifiedError::NotFound.into_framework_error(),
             MemoryError::MappingConflict => UnifiedError::InvalidState.into_framework_error(),
             MemoryError::ResourceBusy => UnifiedError::ResourceBusy.into_framework_error(),
-            MemoryError::ResourceUnavailable => UnifiedError::ResourceUnavailable.into_framework_error(),
+            MemoryError::ResourceUnavailable => {
+                UnifiedError::ResourceUnavailable.into_framework_error()
+            },
             MemoryError::InvalidArgument => UnifiedError::InvalidArgument.into_framework_error(),
             MemoryError::NotSupported => UnifiedError::NotSupported.into_framework_error(),
             MemoryError::Unknown => UnifiedError::Unknown.into_framework_error(),
         }
     }
-    
+
     fn with_context(self, context: &str, location: &str) -> FrameworkError {
         match self {
             MemoryError::OutOfMemory => UnifiedError::OutOfMemory.with_context(context, location),
-            MemoryError::InvalidAddress => UnifiedError::InvalidAddress.with_context(context, location),
-            MemoryError::InvalidSize => UnifiedError::InvalidArgument.with_context(context, location),
-            MemoryError::InvalidFlags => UnifiedError::InvalidArgument.with_context(context, location),
-            MemoryError::PermissionDenied => UnifiedError::PermissionDenied.with_context(context, location),
-            MemoryError::AlreadyMapped => UnifiedError::AlreadyExists.with_context(context, location),
+            MemoryError::InvalidAddress => {
+                UnifiedError::InvalidAddress.with_context(context, location)
+            },
+            MemoryError::InvalidSize => {
+                UnifiedError::InvalidArgument.with_context(context, location)
+            },
+            MemoryError::InvalidFlags => {
+                UnifiedError::InvalidArgument.with_context(context, location)
+            },
+            MemoryError::PermissionDenied => {
+                UnifiedError::PermissionDenied.with_context(context, location)
+            },
+            MemoryError::AlreadyMapped => {
+                UnifiedError::AlreadyExists.with_context(context, location)
+            },
             MemoryError::NotMapped => UnifiedError::NotFound.with_context(context, location),
-            MemoryError::MappingConflict => UnifiedError::InvalidState.with_context(context, location),
+            MemoryError::MappingConflict => {
+                UnifiedError::InvalidState.with_context(context, location)
+            },
             MemoryError::ResourceBusy => UnifiedError::ResourceBusy.with_context(context, location),
-            MemoryError::ResourceUnavailable => UnifiedError::ResourceUnavailable.with_context(context, location),
-            MemoryError::InvalidArgument => UnifiedError::InvalidArgument.with_context(context, location),
+            MemoryError::ResourceUnavailable => {
+                UnifiedError::ResourceUnavailable.with_context(context, location)
+            },
+            MemoryError::InvalidArgument => {
+                UnifiedError::InvalidArgument.with_context(context, location)
+            },
             MemoryError::NotSupported => UnifiedError::NotSupported.with_context(context, location),
             MemoryError::Unknown => UnifiedError::Unknown.with_context(context, location),
         }
@@ -502,10 +552,6 @@ impl Default for MappingFlags {
 
 impl Default for ProtectionFlags {
     fn default() -> Self {
-        Self {
-            read: true,
-            write: true,
-            execute: false,
-        }
+        Self { read: true, write: true, execute: false }
     }
 }

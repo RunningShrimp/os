@@ -5,12 +5,9 @@
 
 extern crate alloc;
 
-use alloc::sync::Arc;
-use alloc::collections::BTreeMap;
-use alloc::boxed::Box;
-use crate::subsystems::sync::Mutex;
-use crate::reliability::{EOK, EINVAL, ENOENT, EAGAIN};
-use crate::posix::SemT;
+use alloc::{boxed::Box, collections::BTreeMap, sync::Arc};
+
+use crate::{posix::SemT, subsystems::sync::Mutex};
 
 /// Semaphore descriptor
 struct SemaphoreDescriptor {
@@ -63,11 +60,7 @@ const SEM_NAME_MAX: usize = 251;
 ///
 /// # Returns
 /// * 0 on success, error code on failure
-pub unsafe extern "C" fn sem_init(
-    sem: *mut SemT,
-    pshared: i32,
-    value: u32,
-) -> i32 {
+pub unsafe extern "C" fn sem_init(sem: *mut SemT, pshared: i32, value: u32) -> i32 {
     if sem.is_null() {
         return EINVAL;
     }
@@ -258,12 +251,7 @@ pub unsafe extern "C" fn sem_getvalue(sem: SemT, sval: *mut i32) -> i32 {
 ///
 /// # Returns
 /// * Pointer to semaphore on success, SEM_FAILED on failure
-pub unsafe extern "C" fn sem_open(
-    name: *const i8,
-    oflag: i32,
-    mode: u32,
-    value: u32,
-) -> SemT {
+pub unsafe extern "C" fn sem_open(name: *const i8, oflag: i32, mode: u32, value: u32) -> SemT {
     if name.is_null() {
         return SemT { sem_internal: core::ptr::null_mut() };
     }
@@ -274,9 +262,11 @@ pub unsafe extern "C" fn sem_open(
         return SemT { sem_internal: core::ptr::null_mut() };
     }
 
-    let name_str = alloc::string::String::from_utf8_lossy(
-        core::slice::from_raw_parts(name as *const u8, name_len)
-    ).into_owned();
+    let name_str = alloc::string::String::from_utf8_lossy(core::slice::from_raw_parts(
+        name as *const u8,
+        name_len,
+    ))
+    .into_owned();
 
     // Check for invalid name characters
     if name_str.starts_with('/') {
@@ -295,7 +285,9 @@ pub unsafe extern "C" fn sem_open(
         }
 
         // Increment reference count and return existing semaphore
-        existing.ref_count.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+        existing
+            .ref_count
+            .fetch_add(1, core::sync::atomic::Ordering::SeqCst);
         SemT { sem_internal: Arc::into_raw(existing.clone()) as *mut u8 }
     } else if is_creating {
         // Create new semaphore
@@ -346,7 +338,9 @@ pub unsafe extern "C" fn sem_close(sem: SemT) -> i32 {
     }
 
     // Decrement reference count
-    let old_count = sem_ref.ref_count.fetch_sub(1, core::sync::atomic::Ordering::SeqCst);
+    let old_count = sem_ref
+        .ref_count
+        .fetch_sub(1, core::sync::atomic::Ordering::SeqCst);
     if old_count <= 1 {
         // This was the last reference, remove from registry
         if let Some(name) = &sem_ref.name {
@@ -379,9 +373,11 @@ pub unsafe extern "C" fn sem_unlink(name: *const i8) -> i32 {
         return EINVAL;
     }
 
-    let name_str = alloc::string::String::from_utf8_lossy(
-        core::slice::from_raw_parts(name as *const u8, name_len)
-    ).into_owned();
+    let name_str = alloc::string::String::from_utf8_lossy(core::slice::from_raw_parts(
+        name as *const u8,
+        name_len,
+    ))
+    .into_owned();
 
     let mut registry = NAMED_SEMAPHORES.lock();
     match registry.remove(&name_str) {

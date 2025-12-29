@@ -3,22 +3,21 @@
 //! This module provides performance monitoring and analysis tools
 //! for NOS operating system to improve maintainability and optimization.
 
-use {
-    alloc::{
-        collections::BTreeMap,
-        sync::Arc,
-        vec::Vec,
-        string::{String, ToString},
-        boxed::Box,
-        format,
-    },
-    spin::Mutex,
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
 };
-use nos_api::Result;
-use crate::{SyscallHandler, SyscallDispatcher};
-use crate::logging::output_report;
 use core::sync::atomic::{AtomicU64, Ordering};
+
 use libm::sqrt;
+use nos_api::Result;
+use spin::Mutex;
+
+use crate::{SyscallDispatcher, SyscallHandler, logging::output_report};
 
 /// Performance metric types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,19 +70,19 @@ impl PerformanceMetric {
             tags: Vec::new(),
         }
     }
-    
+
     /// Add a tag
     pub fn with_tag(mut self, tag: String) -> Self {
         self.tags.push(tag);
         self
     }
-    
+
     /// Update metric value
     pub fn update(&mut self, value: f64) {
         self.value = value;
         self.timestamp = Self::get_time_us();
     }
-    
+
     /// Increment counter metric
     pub fn increment(&mut self) {
         if self.metric_type == MetricType::Counter {
@@ -91,7 +90,7 @@ impl PerformanceMetric {
             self.timestamp = Self::get_time_us();
         }
     }
-    
+
     /// Add to gauge metric
     pub fn add(&mut self, delta: f64) {
         if self.metric_type == MetricType::Gauge {
@@ -99,7 +98,7 @@ impl PerformanceMetric {
             self.timestamp = Self::get_time_us();
         }
     }
-    
+
     /// Record timer measurement
     pub fn record_time(&mut self, duration_us: u64) {
         if self.metric_type == MetricType::Timer {
@@ -109,7 +108,7 @@ impl PerformanceMetric {
             self.timestamp = Self::get_time_us();
         }
     }
-    
+
     /// Get current time in microseconds
     fn get_time_us() -> u64 {
         // In a real implementation, this would use a high-precision timer
@@ -152,12 +151,12 @@ impl MonitorStats {
             start_time: PerformanceMonitor::get_time_us(),
         }
     }
-    
+
     /// Record a metric update
     pub fn record_update(&mut self) {
         self.total_updates += 1;
     }
-    
+
     /// Get uptime in microseconds
     pub fn uptime_us(&self) -> u64 {
         PerformanceMonitor::get_time_us() - self.start_time
@@ -169,7 +168,7 @@ impl PerformanceMonitor {
     pub fn new() -> Self {
         Self::with_history_limit(1000)
     }
-    
+
     /// Create a new performance monitor with history limit
     pub fn with_history_limit(limit: usize) -> Self {
         Self {
@@ -179,7 +178,7 @@ impl PerformanceMonitor {
             stats: MonitorStats::new(),
         }
     }
-    
+
     /// Register a new metric
     pub fn register_metric(&mut self, metric: PerformanceMetric) -> Result<()> {
         let name = metric.name.clone();
@@ -188,7 +187,7 @@ impl PerformanceMonitor {
         self.stats.total_metrics += 1;
         Ok(())
     }
-    
+
     /// Update a metric value
     pub fn update_metric(&mut self, name: &str, value: f64) -> Result<()> {
         if let Some(metric) = self.metrics.get_mut(name) {
@@ -197,12 +196,10 @@ impl PerformanceMonitor {
             self.stats.record_update();
             Ok(())
         } else {
-            Err(nos_api::Error::NotFound(
-                format!("Metric '{}' not found", name)
-            ))
+            Err(nos_api::Error::NotFound(format!("Metric '{}' not found", name)))
         }
     }
-    
+
     /// Increment a counter metric
     pub fn increment_metric(&mut self, name: &str) -> Result<()> {
         if self.metrics.contains_key(name) {
@@ -219,7 +216,7 @@ impl PerformanceMonitor {
             Err(nos_api::Error::NotFound(format!("Metric '{}' not found", name)))
         }
     }
-    
+
     /// Add to a gauge metric
     pub fn add_to_metric(&mut self, name: &str, delta: f64) -> Result<()> {
         if self.metrics.contains_key(name) {
@@ -236,7 +233,7 @@ impl PerformanceMonitor {
             Err(nos_api::Error::NotFound(format!("Metric '{}' not found", name)))
         }
     }
-    
+
     /// Record a timer measurement
     pub fn record_timer(&mut self, name: &str, duration_us: u64) -> Result<()> {
         if self.metrics.contains_key(name) {
@@ -250,61 +247,61 @@ impl PerformanceMonitor {
             self.stats.record_update();
             Ok(())
         } else {
-            Err(nos_api::Error::NotFound(
-                format!("Metric '{}' not found", name)
-            ))
+            Err(nos_api::Error::NotFound(format!("Metric '{}' not found", name)))
         }
     }
-    
+
     /// Add value to history
     fn add_to_history(&mut self, name: &str, value: f64) {
         if let Some(history) = self.history.get_mut(name) {
             history.push(value);
-            
+
             // Limit history size
             if history.len() > self.history_limit {
                 history.remove(0);
             }
         }
     }
-    
+
     /// Get metric value
     pub fn get_metric(&self, name: &str) -> Option<&PerformanceMetric> {
         self.metrics.get(name)
     }
-    
+
     /// Get metric history
     pub fn get_metric_history(&self, name: &str) -> Option<&Vec<f64>> {
         self.history.get(name)
     }
-    
+
     /// Get all metrics
     pub fn get_all_metrics(&self) -> Vec<&PerformanceMetric> {
         self.metrics.values().collect()
     }
-    
+
     /// Get monitor statistics
     pub fn get_stats(&self) -> &MonitorStats {
         &self.stats
     }
-    
+
     /// Generate performance report
     pub fn generate_report(&self) -> String {
         let mut report = String::from("=== Performance Monitor Report ===\n");
-        
+
         report.push_str(&format!("Total metrics: {}\n", self.stats.total_metrics));
         report.push_str(&format!("Total updates: {}\n", self.stats.total_updates));
         report.push_str(&format!("Uptime: {}μs\n", self.stats.uptime_us()));
-        
+
         report.push_str("\nMetrics:\n");
         for metric in self.metrics.values() {
             report.push_str(&format!(
                 "  {}: {:.2} {} ({})\n",
                 metric.name, metric.value, metric.unit, metric.description
             ));
-            
+
             // Add history statistics if available
-            if let Some(history) = self.history.get(&metric.name) && !history.is_empty() {
+            if let Some(history) = self.history.get(&metric.name)
+                && !history.is_empty()
+            {
                 let min = history.iter().fold(f64::INFINITY, |a, &b| a.min(b));
                 let max = history.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
                 let avg = history.iter().sum::<f64>() / history.len() as f64;
@@ -315,10 +312,10 @@ impl PerformanceMonitor {
                 ));
             }
         }
-        
+
         report
     }
-    
+
     /// Get current time in microseconds
     fn get_time_us() -> u64 {
         // In a real implementation, this would use a high-precision timer
@@ -390,27 +387,23 @@ pub enum TrendDirection {
 impl PerformanceAnalyzer {
     /// Create a new performance analyzer
     pub fn new(monitor: Arc<Mutex<PerformanceMonitor>>) -> Self {
-        Self {
-            monitor,
-            results: BTreeMap::new(),
-        }
+        Self { monitor, results: BTreeMap::new() }
     }
-    
+
     /// Analyze all metrics
     pub fn analyze_all(&mut self) -> Result<()> {
         // Collect metric names first to avoid borrowing conflicts
         let metric_names: Vec<String> = {
             let monitor = self.monitor.lock();
-            monitor.metrics.keys().cloned()
-                .collect()
+            monitor.metrics.keys().cloned().collect()
         };
-        
+
         for metric_name in &metric_names {
             self.analyze_metric(metric_name)?;
         }
         Ok(())
     }
-    
+
     /// Analyze a specific metric
     pub fn analyze_metric(&mut self, metric_name: &str) -> Result<()> {
         let history: Option<Vec<f64>> = {
@@ -422,23 +415,23 @@ impl PerformanceAnalyzer {
                 None
             }
         };
-        
+
         if let Some(history) = history {
             if history.len() < 10 {
                 return Err(nos_api::Error::InvalidArgument(
-                    "Insufficient data for analysis".to_string()
+                    "Insufficient data for analysis".to_string(),
                 ));
             }
-            
+
             // Perform trend analysis
             let trend = self.analyze_trend(&history);
-            
+
             // Perform anomaly detection
             let anomaly = self.detect_anomalies(&history);
-            
+
             // Store results
             let timestamp = PerformanceMonitor::get_time_us();
-            
+
             self.results.insert(
                 metric_name.to_string(),
                 AnalysisResult {
@@ -449,7 +442,7 @@ impl PerformanceAnalyzer {
                     timestamp,
                 },
             );
-            
+
             self.results.insert(
                 format!("{}_anomaly", metric_name),
                 AnalysisResult {
@@ -460,32 +453,28 @@ impl PerformanceAnalyzer {
                     timestamp,
                 },
             );
-            
+
             Ok(())
         } else {
-            Err(nos_api::Error::NotFound(
-                format!("Metric '{}' not found", metric_name)
-            ))
+            Err(nos_api::Error::NotFound(format!("Metric '{}' not found", metric_name)))
         }
     }
-    
+
     /// Analyze trend
     fn analyze_trend(&self, history: &[f64]) -> TrendDirection {
         if history.len() < 2 {
             return TrendDirection::Stable;
         }
-        
+
         // Simple linear regression to determine trend
         let n = history.len() as f64;
         let sum_x: f64 = (0..history.len()).map(|i| i as f64).sum();
         let sum_y: f64 = history.iter().sum();
-        let sum_xy: f64 = history.iter().enumerate()
-            .map(|(i, &y)| i as f64 * y)
-            .sum();
+        let sum_xy: f64 = history.iter().enumerate().map(|(i, &y)| i as f64 * y).sum();
         let sum_x2: f64 = (0..history.len()).map(|i| (i as f64) * (i as f64)).sum();
-        
+
         let slope = (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x * sum_x);
-        
+
         if slope > 0.1 {
             TrendDirection::Increasing
         } else if slope < -0.1 {
@@ -494,24 +483,23 @@ impl PerformanceAnalyzer {
             TrendDirection::Stable
         }
     }
-    
+
     /// Detect anomalies
     fn detect_anomalies(&self, history: &[f64]) -> f32 {
         if history.len() < 3 {
             return 0.0;
         }
-        
+
         // Simple anomaly detection using standard deviation
         let mean = history.iter().sum::<f64>() / history.len() as f64;
-        let variance = history.iter()
-            .map(|x| (x - mean) * (x - mean))
-            .sum::<f64>() / history.len() as f64;
+        let variance =
+            history.iter().map(|x| (x - mean) * (x - mean)).sum::<f64>() / history.len() as f64;
         let std_dev = sqrt(variance);
-        
+
         // Check if last value is an outlier
         let last_value = history[history.len() - 1];
         let z_score = (last_value - mean) / std_dev;
-        
+
         // Convert z-score to anomaly score (0-1)
         if z_score.abs() > 3.0 {
             1.0 // High anomaly
@@ -523,23 +511,26 @@ impl PerformanceAnalyzer {
             0.0 // No anomaly
         }
     }
-    
+
     /// Get analysis results
     pub fn get_results(&self) -> &BTreeMap<String, AnalysisResult> {
         &self.results
     }
-    
+
     /// Generate analysis report
     pub fn generate_report(&self) -> String {
         let mut report = String::from("=== Performance Analysis Report ===\n");
-        
+
         for (name, result) in &self.results {
             report.push_str(&format!(
                 "  {}: {:?} = {:?} (confidence: {:.1}%)\n",
-                name, result.analysis_type, result.result, result.confidence * 100.0
+                name,
+                result.analysis_type,
+                result.result,
+                result.confidence * 100.0
             ));
         }
-        
+
         report
     }
 }
@@ -553,11 +544,9 @@ pub struct SyscallMonitor {
 impl SyscallMonitor {
     /// Create a new syscall monitor
     pub fn new() -> Self {
-        Self {
-            monitor: Arc::new(Mutex::new(PerformanceMonitor::new())),
-        }
+        Self { monitor: Arc::new(Mutex::new(PerformanceMonitor::new())) }
     }
-    
+
     pub fn new_with_monitor(monitor: Arc<Mutex<PerformanceMonitor>>) -> Self {
         Self { monitor }
     }
@@ -567,27 +556,27 @@ impl SyscallHandler for SyscallMonitor {
     fn id(&self) -> u32 {
         crate::types::SYS_PERF_MONITOR
     }
-    
+
     fn name(&self) -> &str {
         "perf_monitor"
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         let monitor = &self.monitor;
-        
+
         // Parse arguments
         if args.len() < 2 {
             return Err(nos_api::Error::InvalidArgument(
-                "Insufficient arguments for performance monitor".to_string()
+                "Insufficient arguments for performance monitor".to_string(),
             ));
         }
-        
+
         let operation = args[0];
         let metric_name_ptr = args[1];
-        
+
         // In a real implementation, this would read the metric name from memory
         let metric_name = format!("metric_{}", metric_name_ptr);
-        
+
         match operation {
             0 => {
                 // Get metric value
@@ -599,9 +588,7 @@ impl SyscallHandler for SyscallMonitor {
                 if let Some(value) = metric_value {
                     Ok(value as isize)
                 } else {
-                    Err(nos_api::Error::NotFound(
-                        format!("Metric '{}' not found", metric_name)
-                    ))
+                    Err(nos_api::Error::NotFound(format!("Metric '{}' not found", metric_name)))
                 }
             },
             1 => {
@@ -613,17 +600,11 @@ impl SyscallHandler for SyscallMonitor {
             },
             2 => {
                 // Generate report
-                let report = {
-                    monitor.lock().generate_report()
-                };
+                let report = { monitor.lock().generate_report() };
                 output_report(&report);
                 Ok(0)
             },
-            _ => {
-                Err(nos_api::Error::InvalidArgument(
-                    format!("Invalid operation: {}", operation)
-                ))
-            }
+            _ => Err(nos_api::Error::InvalidArgument(format!("Invalid operation: {}", operation))),
         }
     }
 }
@@ -632,7 +613,7 @@ impl SyscallHandler for SyscallMonitor {
 pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     // Create performance monitor
     let monitor = Arc::new(Mutex::new(PerformanceMonitor::new()));
-    
+
     // Register standard metrics
     monitor.lock().register_metric(PerformanceMetric::new(
         "syscall_count".to_string(),
@@ -641,7 +622,7 @@ pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
         "count".to_string(),
         "Total number of system calls".to_string(),
     ))?;
-    
+
     monitor.lock().register_metric(PerformanceMetric::new(
         "cpu_usage".to_string(),
         MetricType::Gauge,
@@ -649,7 +630,7 @@ pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
         "percent".to_string(),
         "CPU usage percentage".to_string(),
     ))?;
-    
+
     monitor.lock().register_metric(PerformanceMetric::new(
         "memory_usage".to_string(),
         MetricType::Gauge,
@@ -657,7 +638,7 @@ pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
         "bytes".to_string(),
         "Memory usage in bytes".to_string(),
     ))?;
-    
+
     monitor.lock().register_metric(PerformanceMetric::new(
         "syscall_latency".to_string(),
         MetricType::Timer,
@@ -665,18 +646,18 @@ pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
         "microseconds".to_string(),
         "Average system call latency".to_string(),
     ))?;
-    
+
     // Register performance monitor system call
     let monitor_handler = SyscallMonitor::new_with_monitor(monitor.clone());
     dispatcher.register_handler(crate::types::SYS_PERF_MONITOR, Box::new(monitor_handler));
-    
+
     // Create analyzer and run analysis
     let mut analyzer = PerformanceAnalyzer::new(monitor);
     analyzer.analyze_all()?;
-    
+
     // Print analysis report
     let report = analyzer.generate_report();
     output_report(&report);
-    
+
     Ok(())
 }

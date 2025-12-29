@@ -5,29 +5,38 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use alloc::vec;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::format;
-use core::sync::atomic::{AtomicU64, Ordering};
-use spin::Mutex;
-use alloc::sync::Arc;
-
-use crate::debug::session::{DebugSession, DebugSessionType, DebugSessionStatus, DebugEvent, DebugEventType, DebugLevel, SessionConfig, ProcessInfo, ProcessState, ProcessMemoryUsage};
-use crate::debug::breakpoint::{BreakpointManager, Breakpoint, BreakpointType, BreakpointStatus};
-use crate::debug::analyzer::{
-    MemoryAnalyzer, MemorySnapshot, MemoryRegion, MemoryRegionType, MemoryPermissions,
-    LeakDetector, LeakDetectionStats, MemoryUsageStatistics,
-    StackAnalyzer, StackOverflowDetector, StackFrame,
-    PerformanceAnalyzer, PerformanceCounter, CounterType, PerformanceSample,
-    HotspotAnalysis, HotspotAnalysisConfig, PerformanceAnalysisConfig,
-    SystemState, CPUInfo, MemoryInfo, NetworkInfo, PerformanceSnapshot,
-    InterfaceStatus, InterfaceState, InterfaceType,
+use alloc::{
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
 };
-use crate::debug::types::{SymbolManager, Symbol, SymbolType, SymbolScope, DebugInfo, DebugFormat, DebugFeature, DebugConfig, DebugStats};
-use crate::debug::plugin::DebugPlugin;
+use core::sync::atomic::{AtomicU64, Ordering};
+
+use spin::Mutex;
+
+use crate::debug::{
+    analyzer::{
+        CPUInfo, CounterType, HotspotAnalysis, HotspotAnalysisConfig, InterfaceState,
+        InterfaceStatus, InterfaceType, LeakDetectionStats, LeakDetector, MemoryAnalyzer,
+        MemoryInfo, MemoryPermissions, MemoryRegion, MemoryRegionType, MemorySnapshot,
+        MemoryUsageStatistics, NetworkInfo, PerformanceAnalysisConfig, PerformanceAnalyzer,
+        PerformanceCounter, PerformanceSample, PerformanceSnapshot, StackAnalyzer, StackFrame,
+        StackOverflowDetector, SystemState,
+    },
+    breakpoint::{Breakpoint, BreakpointManager, BreakpointStatus, BreakpointType},
+    plugin::DebugPlugin,
+    session::{
+        DebugEvent, DebugEventType, DebugLevel, DebugSession, DebugSessionStatus, DebugSessionType,
+        ProcessInfo, ProcessMemoryUsage, ProcessState, SessionConfig,
+    },
+    types::{
+        DebugConfig, DebugFeature, DebugFormat, DebugInfo, DebugStats, Symbol, SymbolManager,
+        SymbolScope, SymbolType,
+    },
+};
 
 /// 调试管理器
 pub struct DebugManager {
@@ -126,7 +135,12 @@ impl DebugManager {
     }
 
     /// 开始调试会话
-    pub fn start_debug_session(&mut self, session_name: &str, session_type: DebugSessionType, config: Option<SessionConfig>) -> Result<String, &'static str> {
+    pub fn start_debug_session(
+        &mut self,
+        session_name: &str,
+        session_type: DebugSessionType,
+        config: Option<SessionConfig>,
+    ) -> Result<String, &'static str> {
         let session_id = format!("debug_{}", self.session_counter.fetch_add(1, Ordering::SeqCst));
         let start_time = crate::subsystems::time::get_timestamp();
 
@@ -164,24 +178,32 @@ impl DebugManager {
             session.debug_events.push(event);
         }
 
-        crate::println!("[DebugManager] Debug session '{}' started (ID: {})", session_name, session_id);
+        crate::println!(
+            "[DebugManager] Debug session '{}' started (ID: {})",
+            session_name,
+            session_id
+        );
         Ok(session_id)
     }
 
     /// 停止调试会话
     pub fn stop_debug_session(&mut self, session_id: &str) -> Result<(), &'static str> {
         let end_time = crate::subsystems::time::get_timestamp();
-        
+
         // 先获取需要的信息，避免同时持有多个借用
         let (session_name, start_time) = {
-            let session = self.active_sessions.get(session_id)
+            let session = self
+                .active_sessions
+                .get(session_id)
                 .ok_or("Debug session not found")?;
             (session.name.clone(), session.start_time)
         };
 
         // 更新会话状态
         {
-            let session = self.active_sessions.get_mut(session_id)
+            let session = self
+                .active_sessions
+                .get_mut(session_id)
                 .ok_or("Debug session not found")?;
             session.status = DebugSessionStatus::Completed;
             session.end_time = Some(end_time);
@@ -190,11 +212,15 @@ impl DebugManager {
         // 更新统计信息
         let duration = end_time - start_time;
         self.stats.successful_sessions += 1;
-        self.stats.avg_session_duration = (self.stats.avg_session_duration * (self.stats.total_sessions - 1) + duration) / self.stats.total_sessions;
+        self.stats.avg_session_duration =
+            (self.stats.avg_session_duration * (self.stats.total_sessions - 1) + duration)
+                / self.stats.total_sessions;
 
         // 添加结束事件
         {
-            let session = self.active_sessions.get_mut(session_id)
+            let session = self
+                .active_sessions
+                .get_mut(session_id)
                 .ok_or("Debug session not found")?;
             let end_event = DebugEvent {
                 id: format!("event_{}", end_time),
@@ -209,13 +235,25 @@ impl DebugManager {
             session.debug_events.push(end_event);
         }
 
-        crate::println!("[DebugManager] Debug session '{}' completed (ID: {})", session_name, session_id);
+        crate::println!(
+            "[DebugManager] Debug session '{}' completed (ID: {})",
+            session_name,
+            session_id
+        );
         Ok(())
     }
 
     /// 设置断点
-    pub fn set_breakpoint(&mut self, address: u64, breakpoint_type: BreakpointType, description: Option<String>) -> Result<u64, &'static str> {
-        let breakpoint_id = self.breakpoint_manager.breakpoint_counter.fetch_add(1, Ordering::SeqCst);
+    pub fn set_breakpoint(
+        &mut self,
+        address: u64,
+        breakpoint_type: BreakpointType,
+        description: Option<String>,
+    ) -> Result<u64, &'static str> {
+        let breakpoint_id = self
+            .breakpoint_manager
+            .breakpoint_counter
+            .fetch_add(1, Ordering::SeqCst);
 
         let breakpoint = Breakpoint {
             id: breakpoint_id,
@@ -232,7 +270,9 @@ impl DebugManager {
             data: BTreeMap::new(),
         };
 
-        self.breakpoint_manager.breakpoints.insert(breakpoint_id, breakpoint);
+        self.breakpoint_manager
+            .breakpoints
+            .insert(breakpoint_id, breakpoint);
         self.stats.breakpoints_set += 1;
 
         crate::println!("[DebugManager] Breakpoint set at 0x{:x} (ID: {})", address, breakpoint_id);
@@ -241,7 +281,12 @@ impl DebugManager {
 
     /// 移除断点
     pub fn remove_breakpoint(&mut self, breakpoint_id: u64) -> Result<(), &'static str> {
-        if self.breakpoint_manager.breakpoints.remove(&breakpoint_id).is_some() {
+        if self
+            .breakpoint_manager
+            .breakpoints
+            .remove(&breakpoint_id)
+            .is_some()
+        {
             self.stats.breakpoints_set -= 1;
             crate::println!("[DebugManager] Breakpoint {} removed", breakpoint_id);
             Ok(())
@@ -251,7 +296,11 @@ impl DebugManager {
     }
 
     /// 创建内存快照
-    pub fn create_memory_snapshot(&mut self, process_id: u32, thread_id: u32) -> Result<u64, &'static str> {
+    pub fn create_memory_snapshot(
+        &mut self,
+        process_id: u32,
+        thread_id: u32,
+    ) -> Result<u64, &'static str> {
         let snapshot_id = self.memory_analyzer.memory_snapshots.len() as u64 + 1;
         let timestamp = crate::subsystems::time::get_timestamp();
 
@@ -270,7 +319,12 @@ impl DebugManager {
         self.memory_analyzer.memory_snapshots.push(snapshot);
         self.stats.memory_snapshots_taken += 1;
 
-        crate::println!("[DebugManager] Memory snapshot created (ID: {}) for process {}, thread {}", snapshot_id, process_id, thread_id);
+        crate::println!(
+            "[DebugManager] Memory snapshot created (ID: {}) for process {}, thread {}",
+            snapshot_id,
+            process_id,
+            thread_id
+        );
         Ok(snapshot_id)
     }
 
@@ -339,24 +393,26 @@ impl DebugManager {
     fn collect_stack_info(&self, _thread_id: u32) -> Result<Vec<StackFrame>, &'static str> {
         // 简化实现，实际实现需要调用栈遍历
         // TODO: 使用 thread_id 参数来获取特定线程的堆栈信息
-        Ok(vec![
-            StackFrame {
-                return_address: 0x7FFFFFF0,
-                frame_pointer: 0x7FFFFF00,
-                stack_pointer: 0x7FFFF000,
-                function_address: 0x400100,
-                function_name: Some("main".to_string()),
-                module_name: Some("kernel".to_string()),
-                source_location: None,
-                local_variables: Vec::new(),
-                parameters: Vec::new(),
-                frame_size: 0x1000,
-            },
-        ])
+        Ok(vec![StackFrame {
+            return_address: 0x7FFFFFF0,
+            frame_pointer: 0x7FFFFF00,
+            stack_pointer: 0x7FFFF000,
+            function_address: 0x400100,
+            function_name: Some("main".to_string()),
+            module_name: Some("kernel".to_string()),
+            source_location: None,
+            local_variables: Vec::new(),
+            parameters: Vec::new(),
+            frame_size: 0x1000,
+        }])
     }
 
     /// 创建性能采样
-    pub fn create_performance_sample(&mut self, process_id: u32, _thread_id: u32) -> Result<String, &'static str> {
+    pub fn create_performance_sample(
+        &mut self,
+        process_id: u32,
+        _thread_id: u32,
+    ) -> Result<String, &'static str> {
         let sample_id = format!("sample_{}", crate::subsystems::time::get_timestamp());
         let timestamp = crate::subsystems::time::get_timestamp();
 
@@ -368,10 +424,14 @@ impl DebugManager {
 
         // 更新性能计数器（在创建sample之前）
         // 先克隆键值对，避免借用检查问题
-        let sample_data_clone: Vec<(String, f64)> = sample_data.iter().map(|(k, v)| (k.clone(), *v)).collect();
+        let sample_data_clone: Vec<(String, f64)> =
+            sample_data.iter().map(|(k, v)| (k.clone(), *v)).collect();
         for (key, value) in &sample_data_clone {
-            let counter = self.performance_analyzer.performance_counters
-                .entry(key.clone()).or_insert_with(|| PerformanceCounter {
+            let counter = self
+                .performance_analyzer
+                .performance_counters
+                .entry(key.clone())
+                .or_insert_with(|| PerformanceCounter {
                     id: key.clone(),
                     name: key.clone(),
                     counter_type: CounterType::Counter,
@@ -391,7 +451,8 @@ impl DebugManager {
 
             // 计算平均值
             if counter.reset_count > 0 {
-                counter.average_value = counter.total_value as f64 / (counter.reset_count + 1) as f64;
+                counter.average_value =
+                    counter.total_value as f64 / (counter.reset_count + 1) as f64;
             } else {
                 counter.average_value = counter.total_value as f64;
             }
@@ -413,11 +474,11 @@ impl DebugManager {
                 thread_count: 1,
                 memory_usage: ProcessMemoryUsage {
                     virtual_size: 8 * 1024 * 1024 * 1024, // 8GB
-                    resident_size: 512 * 1024 * 1024, // 512MB
+                    resident_size: 512 * 1024 * 1024,     // 512MB
                     shared_size: 0,
-                    text_size: 2 * 1024 * 1024, // 2MB
+                    text_size: 2 * 1024 * 1024,   // 2MB
                     data_size: 100 * 1024 * 1024, // 100MB
-                    stack_size: 8 * 1024 * 1024, // 8MB
+                    stack_size: 8 * 1024 * 1024,  // 8MB
                 },
                 cpu_usage: 25.5,
             },
@@ -460,10 +521,10 @@ impl DebugManager {
     /// 收集内存信息
     fn collect_memory_info(&self) -> MemoryInfo {
         MemoryInfo {
-            total_memory: 8 * 1024 * 1024 * 1024, // 8GB
+            total_memory: 8 * 1024 * 1024 * 1024,     // 8GB
             available_memory: 6 * 1024 * 1024 * 1024, // 6GB
-            used_memory: 2 * 1024 * 1024 * 1024, // 2GB
-            cached_memory: 512 * 1024 * 1024, // 512MB
+            used_memory: 2 * 1024 * 1024 * 1024,      // 2GB
+            cached_memory: 512 * 1024 * 1024,         // 512MB
             swap_memory: 0,
             shared_memory: 0,
             memory_usage: 25.0,
@@ -478,7 +539,7 @@ impl DebugManager {
                 InterfaceStatus {
                     interface_name: "eth0".to_string(),
                     status: InterfaceState::Up,
-                    speed: 1000, // 1Gbps
+                    speed: 1000,           // 1Gbps
                     rx_bytes: 1024 * 1024, // 1MB
                     tx_bytes: 2048 * 1024, // 2MB
                     rx_packets: 100,
@@ -529,14 +590,18 @@ impl DebugManager {
 
         if let Some(symbol) = found_symbol {
             // 缓存符号
-            self.symbol_manager.symbol_cache.insert(address, symbol.clone());
+            self.symbol_manager
+                .symbol_cache
+                .insert(address, symbol.clone());
             return Some(symbol);
         }
 
         // 尝试从源文件映射中解析
         if let Some(symbol) = self.resolve_symbol_from_mappings(address) {
             // 缓存符号
-            self.symbol_manager.symbol_cache.insert(address, symbol.clone());
+            self.symbol_manager
+                .symbol_cache
+                .insert(address, symbol.clone());
             return Some(symbol);
         }
 
@@ -546,7 +611,9 @@ impl DebugManager {
     /// 从源文件映射解析符号
     fn resolve_symbol_from_mappings(&self, address: u64) -> Option<Symbol> {
         for mapping in self.symbol_manager.source_mappings.values() {
-            if address >= mapping.target_address && address < mapping.target_address + mapping.mapping_size {
+            if address >= mapping.target_address
+                && address < mapping.target_address + mapping.mapping_size
+            {
                 // 在行号映射中查找
                 for line_mapping in &mapping.line_mappings {
                     let target_addr = mapping.target_address + line_mapping.address_offset;

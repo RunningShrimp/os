@@ -41,10 +41,7 @@ impl PartitionTypeGUID {
     }
 
     pub fn is_bootable(&self) -> bool {
-        matches!(
-            self,
-            Self::EFISystem | Self::LinuxBoot | Self::BIOSBoot
-        )
+        matches!(self, Self::EFISystem | Self::LinuxBoot | Self::BIOSBoot)
     }
 
     pub fn description(&self) -> &'static str {
@@ -188,12 +185,7 @@ impl GPTHandler {
         }
 
         // Get revision (4 bytes at offset 8)
-        self.header.revision = u32::from_le_bytes([
-            sector[8],
-            sector[9],
-            sector[10],
-            sector[11],
-        ]);
+        self.header.revision = u32::from_le_bytes([sector[8], sector[9], sector[10], sector[11]]);
 
         // Get header size (4 bytes at offset 12)
         self.header.header_size =
@@ -201,23 +193,19 @@ impl GPTHandler {
 
         // Get primary LBA (8 bytes at offset 24)
         self.header.primary_lba = u64::from_le_bytes([
-            sector[24], sector[25], sector[26], sector[27], sector[28], sector[29],
-            sector[30], sector[31],
+            sector[24], sector[25], sector[26], sector[27], sector[28], sector[29], sector[30],
+            sector[31],
         ]);
 
         // Get partition entry LBA (8 bytes at offset 72)
         self.header.partition_entry_lba = u64::from_le_bytes([
-            sector[72], sector[73], sector[74], sector[75], sector[76], sector[77],
-            sector[78], sector[79],
+            sector[72], sector[73], sector[74], sector[75], sector[76], sector[77], sector[78],
+            sector[79],
         ]);
 
         // Get partition count (4 bytes at offset 80)
-        self.header.partition_entry_count = u32::from_le_bytes([
-            sector[80],
-            sector[81],
-            sector[82],
-            sector[83],
-        ]);
+        self.header.partition_entry_count =
+            u32::from_le_bytes([sector[80], sector[81], sector[82], sector[83]]);
 
         self.valid = self.header.verify_signature();
 
@@ -255,9 +243,7 @@ impl GPTHandler {
 
     /// Check if GPT is valid
     pub fn is_valid(&self) -> bool {
-        self.valid
-            && self.header.verify_signature()
-            && self.header.verify_revision()
+        self.valid && self.header.verify_signature() && self.header.verify_revision()
     }
 }
 
@@ -278,9 +264,11 @@ mod tests {
 
     #[test]
     fn test_partition_type_guid_description() {
-        assert!(PartitionTypeGUID::LinuxFilesystem
-            .description()
-            .contains("Linux"));
+        assert!(
+            PartitionTypeGUID::LinuxFilesystem
+                .description()
+                .contains("Linux")
+        );
     }
 
     #[test]

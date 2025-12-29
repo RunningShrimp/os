@@ -2,38 +2,26 @@
 //!
 //! This module provides process management related system calls.
 
-use alloc::string::ToString;
-use alloc::boxed::Box;
+use alloc::{boxed::Box, string::ToString};
+
 use nos_api::Result;
-use crate::SyscallHandler;
-use crate::SyscallDispatcher;
+
+use crate::{SyscallDispatcher, SyscallHandler};
 
 /// Register process system call handlers
 pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     // Register fork system call
-    dispatcher.register_handler(
-        crate::types::SYS_FORK,
-        Box::new(ForkHandler)
-    );
-    
+    dispatcher.register_handler(crate::types::SYS_FORK, Box::new(ForkHandler));
+
     // Register exec system call
-    dispatcher.register_handler(
-        crate::types::SYS_EXEC,
-        Box::new(ExecHandler)
-    );
-    
+    dispatcher.register_handler(crate::types::SYS_EXEC, Box::new(ExecHandler));
+
     // Register wait system call
-    dispatcher.register_handler(
-        crate::types::SYS_WAIT,
-        Box::new(WaitHandler)
-    );
-    
+    dispatcher.register_handler(crate::types::SYS_WAIT, Box::new(WaitHandler));
+
     // Register exit system call
-    dispatcher.register_handler(
-        crate::types::SYS_EXIT,
-        Box::new(ExitHandler)
-    );
-    
+    dispatcher.register_handler(crate::types::SYS_EXIT, Box::new(ExitHandler));
+
     Ok(())
 }
 
@@ -44,12 +32,12 @@ impl SyscallHandler for ForkHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_FORK
     }
-    
+
     fn execute(&self, _args: &[usize]) -> Result<isize> {
         // TODO: Implement actual fork logic
         Ok(0) // Return child PID in parent, 0 in child
     }
-    
+
     fn name(&self) -> &str {
         "fork"
     }
@@ -62,23 +50,23 @@ impl SyscallHandler for ExecHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_EXEC
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 2 {
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
         }
-        
+
         let pathname = args[0] as *const u8;
         let argv = args[1] as *const *const u8;
-        
+
         // TODO: Implement actual exec logic using parameters:
         // pathname: Path to executable file
         // argv: Array of argument strings
         sys_trace_with_args!("exec called with: pathname={:?}, argv={:?}", pathname, argv);
-        
+
         Ok(0)
     }
-    
+
     fn name(&self) -> &str {
         "exec"
     }
@@ -91,23 +79,23 @@ impl SyscallHandler for WaitHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_WAIT
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 2 {
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
         }
-        
+
         let pid = args[0] as i32;
         let status = args[1] as *mut i32;
-        
+
         // TODO: Implement actual wait logic using parameters:
         // pid: Process ID to wait for, or -1 for any child process
         // status: Pointer to store exit status information
         sys_trace_with_args!("wait called with: pid={}, status={:?}", pid, status);
-        
+
         Ok(pid as isize) // Return child PID
     }
-    
+
     fn name(&self) -> &str {
         "wait"
     }
@@ -120,12 +108,12 @@ impl SyscallHandler for ExitHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_EXIT
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.is_empty() {
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
         }
-        
+
         let status = args[0] as i32;
 
         // TODO: Implement actual exit logic using parameters:
@@ -134,7 +122,7 @@ impl SyscallHandler for ExitHandler {
 
         Ok(0)
     }
-    
+
     fn name(&self) -> &str {
         "exit"
     }

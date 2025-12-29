@@ -1,7 +1,6 @@
 /// Kernel Entry Handler
 ///
 /// Manages kernel entry point detection, validation, and handoff preparation.
-
 use alloc::format;
 use alloc::string::String;
 
@@ -51,9 +50,7 @@ impl KernelEntry {
     }
 
     pub fn is_valid(&self) -> bool {
-        self.entry_point != 0
-            && self.entry_type.is_supported()
-            && self.page_aligned
+        self.entry_point != 0 && self.entry_type.is_supported() && self.page_aligned
     }
 
     pub fn validate(&self) -> Result<(), &'static str> {
@@ -107,11 +104,7 @@ pub struct KernelEntryHandler {
 impl KernelEntryHandler {
     /// Create new kernel entry handler
     pub fn new() -> Self {
-        Self {
-            entry: None,
-            parameters: None,
-            validation_passed: false,
-        }
+        Self { entry: None, parameters: None, validation_passed: false }
     }
 
     /// Set kernel entry
@@ -164,9 +157,7 @@ impl KernelEntryHandler {
 
     /// Check if ready for transfer
     pub fn is_ready(&self) -> bool {
-        self.validation_passed
-            && self.entry.is_some()
-            && self.parameters.is_some()
+        self.validation_passed && self.entry.is_some() && self.parameters.is_some()
     }
 
     /// Prepare for kernel transfer
@@ -211,9 +202,11 @@ mod tests {
 
     #[test]
     fn test_kernel_entry_type_description() {
-        assert!(KernelEntryType::Multiboot2
-            .description()
-            .contains("Multiboot2"));
+        assert!(
+            KernelEntryType::Multiboot2
+                .description()
+                .contains("Multiboot2")
+        );
         assert!(KernelEntryType::ELF64DirectJump.is_supported());
     }
 

@@ -7,11 +7,12 @@
 //! - 错误处理测试
 //! - 并发I/O测试
 
-use crate::libc::interface::CLibInterface;
-use crate::libc::implementations::simple::SimpleCLib;
-use crate::libc::io_manager::{EnhancedIOManager, IOManagerConfig};
-use crate::libc::formatter::{EnhancedFormatter};
 use core::ffi::{c_char, c_int, c_void};
+
+use crate::libc::{
+    implementations::simple::SimpleCLib,
+    io_manager::{EnhancedIOManager, IOManagerConfig},
+};
 
 /// 运行所有I/O测试
 pub fn run_all_io_tests() {
@@ -46,12 +47,7 @@ fn test_basic_io_operations(libc: &SimpleCLib) {
 
     // 测试printf功能
     let result = unsafe {
-        libc.printf(
-            b"Basic test: number=%d, string=%s, hex=%#x\0".as_ptr(),
-            42,
-            "Hello",
-            255
-        )
+        libc.printf(b"Basic test: number=%d, string=%s, hex=%#x\0".as_ptr(), 42, "Hello", 255)
     };
     if result > 0 {
         crate::println!("  ✅ printf基本格式化测试通过");
@@ -84,20 +80,13 @@ fn test_file_operations(libc: &SimpleCLib) {
 
     unsafe {
         // 测试文件打开（可能失败，这是正常的）
-        let file = libc.fopen(
-            b"/test.txt\0".as_ptr(),
-            b"w\0".as_ptr()
-        );
+        let file = libc.fopen(b"/test.txt\0".as_ptr(), b"w\0".as_ptr());
 
         if !file.is_null() {
             // 测试写入
             let test_data = b"Hello, File I/O!";
-            let written = libc.fwrite(
-                test_data.as_ptr() as *const c_void,
-                1,
-                test_data.len(),
-                file
-            );
+            let written =
+                libc.fwrite(test_data.as_ptr() as *const c_void, 1, test_data.len(), file);
 
             if written == test_data.len() {
                 crate::println!("  ✅ 文件写入测试通过");
@@ -136,7 +125,7 @@ fn test_formatting_capabilities(libc: &SimpleCLib) {
                 -123,
                 456,
                 0xABCD,
-                0755
+                0755,
             );
             if result > 0 {
                 crate::println!("  ✅ fprintf格式化测试通过");
@@ -151,11 +140,14 @@ fn test_formatting_capabilities(libc: &SimpleCLib) {
             b"snprintf test: %s %d %f\0".as_ptr(),
             "Hello",
             42,
-            3.14159
+            3.14159,
         );
         if result > 0 && result < buffer.len() as c_int {
             crate::println!("  ✅ snprintf格式化测试通过");
-            crate::println!("    结果: {}", core::str::from_utf8(&buffer[..result as usize]).unwrap_or("(invalid)"));
+            crate::println!(
+                "    结果: {}",
+                core::str::from_utf8(&buffer[..result as usize]).unwrap_or("(invalid)")
+            );
         }
     }
 
@@ -167,7 +159,9 @@ fn test_buffer_management(libc: &SimpleCLib) {
     crate::println!("\n🧪 测试缓冲区管理...");
 
     let io_stats = libc.io_manager.get_stats();
-    let initial_flushes = io_stats.flush_operations.load(core::sync::atomic::Ordering::SeqCst);
+    let initial_flushes = io_stats
+        .flush_operations
+        .load(core::sync::atomic::Ordering::SeqCst);
 
     unsafe {
         // 创建文件进行缓冲区测试
@@ -179,7 +173,7 @@ fn test_buffer_management(libc: &SimpleCLib) {
                 let result = libc.fprintf(
                     file,
                     b"Buffer test line %d: This is a test string to fill the buffer\0".as_ptr(),
-                    i
+                    i,
                 );
                 if result < 0 {
                     crate::println!("  ❌ 缓冲区写入失败");
@@ -198,7 +192,9 @@ fn test_buffer_management(libc: &SimpleCLib) {
     }
 
     // 检查刷新操作是否增加
-    let final_flushes = io_stats.flush_operations.load(core::sync::atomic::Ordering::SeqCst);
+    let final_flushes = io_stats
+        .flush_operations
+        .load(core::sync::atomic::Ordering::SeqCst);
     if final_flushes > initial_flushes {
         crate::println!("  ✅ 缓冲区统计更新正常");
     }
@@ -245,7 +241,7 @@ fn test_standard_streams(libc: &SimpleCLib) {
                 stdout as *mut c_void,
                 b"Standard output test: PID=%d, time=%ld\0".as_ptr(),
                 libc.getpid(),
-                1234567890
+                1234567890,
             );
             if result > 0 {
                 crate::println!("  ✅ stdout测试通过");
@@ -258,7 +254,7 @@ fn test_standard_streams(libc: &SimpleCLib) {
             let result = libc.fprintf(
                 stderr as *mut c_void,
                 b"Standard error test: error code=%d\0".as_ptr(),
-                404
+                404,
             );
             if result > 0 {
                 crate::println!("  ✅ stderr测试通过");
@@ -284,9 +280,15 @@ fn test_format_specifiers(libc: &SimpleCLib) {
     unsafe {
         // 测试各种格式说明符
         let test_cases = [
-            (b"Integers: %d, %ld, %lld\0".as_ptr(), [42i64 as c_int, 1000i64 as c_int, 999999i64 as c_int]),
+            (
+                b"Integers: %d, %ld, %lld\0".as_ptr(),
+                [42i64 as c_int, 1000i64 as c_int, 999999i64 as c_int],
+            ),
             (b"Unsigned: %u, %lu\0".as_ptr(), [42u32 as c_int, 1000000u64 as c_int]),
-            (b"Hexadecimal: %x, %X, %#x\0".as_ptr(), [255u32 as c_int, 255u32 as c_int, 255u32 as c_int]),
+            (
+                b"Hexadecimal: %x, %X, %#x\0".as_ptr(),
+                [255u32 as c_int, 255u32 as c_int, 255u32 as c_int],
+            ),
             (b"Octal: %o, %#o\0".as_ptr(), [755u32 as c_int, 755u32 as c_int]),
             (b"Characters: %c, %s\0".as_ptr(), ['A' as c_int, b"Hello\0".as_ptr() as c_int]),
             (b"Pointers: %p\0".as_ptr(), [0x12345678usize as c_int]),
@@ -303,7 +305,12 @@ fn test_format_specifiers(libc: &SimpleCLib) {
         }
 
         // 测试宽度和精度
-        let width_result = libc.printf(b"Width and precision: |%10d|, |%-10s|, |%5.3f|\0".as_ptr(), 42, "Hello", 3.14159);
+        let width_result = libc.printf(
+            b"Width and precision: |%10d|, |%-10s|, |%5.3f|\0".as_ptr(),
+            42,
+            "Hello",
+            3.14159,
+        );
         if width_result > 0 {
             crate::println!("  ✅ 宽度和精度测试通过");
         }
@@ -348,10 +355,16 @@ fn test_buffered_io_performance(libc: &SimpleCLib) {
             crate::println!("    - 平均每次写入: {} μs", (elapsed * 1000) / write_count);
 
             let stats = libc.io_manager.get_stats();
-            crate::println!("    - 缓冲区命中率: {:.2}%",
-                (stats.buffer_hits.load(core::sync::atomic::Ordering::SeqCst) as f64 /
-                (stats.buffer_hits.load(core::sync::atomic::Ordering::SeqCst) +
-                 stats.buffer_misses.load(core::sync::atomic::Ordering::SeqCst)) as f64) * 100.0);
+            crate::println!(
+                "    - 缓冲区命中率: {:.2}%",
+                (stats.buffer_hits.load(core::sync::atomic::Ordering::SeqCst) as f64
+                    / (stats.buffer_hits.load(core::sync::atomic::Ordering::SeqCst)
+                        + stats
+                            .buffer_misses
+                            .load(core::sync::atomic::Ordering::SeqCst))
+                        as f64)
+                    * 100.0
+            );
 
             crate::println!("  ✅ 缓冲区I/O性能测试完成");
         } else {
@@ -388,7 +401,7 @@ pub fn concurrent_io_test() {
                         file,
                         b"Thread %d - operation %d: Concurrent I/O test data\0".as_ptr(),
                         i,
-                        j
+                        j,
                     );
                 }
                 libc.fclose(file);

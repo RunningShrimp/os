@@ -1,5 +1,6 @@
-use criterion::{criterion_group, criterion_main, Criterion};
 use core::hint::black_box;
+
+use criterion::{Criterion, criterion_group, criterion_main};
 
 fn sim_copy_chunked(dst: &mut [u8], src: &[u8], page: usize) {
     let mut copied = 0usize;
@@ -8,7 +9,7 @@ fn sim_copy_chunked(dst: &mut [u8], src: &[u8], page: usize) {
         let va = core::hint::black_box(copied);
         let page_off = va & (page - 1);
         let chunk = core::cmp::min(len - copied, page - page_off);
-        dst[copied..copied+chunk].copy_from_slice(&src[copied..copied+chunk]);
+        dst[copied..copied + chunk].copy_from_slice(&src[copied..copied + chunk]);
         copied += chunk;
     }
 }
@@ -30,4 +31,3 @@ fn bench_copyin_copyout(c: &mut Criterion) {
 
 criterion_group!(benches, bench_copyin_copyout);
 criterion_main!(benches);
-

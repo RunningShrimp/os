@@ -139,7 +139,7 @@ impl CpuPowerController {
             cpu_id,
             current_cstate: CpuPowerState::C0,
             max_cstate: CpuPowerState::C3,
-            c_latencies: [0, 1, 10, 100], // Example latencies
+            c_latencies: [0, 1, 10, 100],       // Example latencies
             power_consumption: [25, 20, 15, 5], // Example power in mW
         }
     }
@@ -223,7 +223,7 @@ impl AcpiPowerDomainManager {
     pub fn get_domain_mut(&mut self, id: u32) -> Option<&mut PowerDomain> {
         let domain_count = self.domain_count;
         let domains_ptr = self.domains.as_mut_ptr();
-        
+
         for i in 0..domain_count {
             unsafe {
                 if let Some(d) = (*domains_ptr.add(i)).as_mut() {
@@ -263,7 +263,7 @@ impl AcpiPowerDomainManager {
     pub fn get_cpu_controller_mut(&mut self, cpu_id: u32) -> Option<&mut CpuPowerController> {
         let cpu_count = self.cpu_count;
         let controllers_ptr = self.cpu_controllers.as_mut_ptr();
-        
+
         for i in 0..cpu_count {
             unsafe {
                 if let Some(c) = (*controllers_ptr.add(i)).as_mut() {
@@ -409,7 +409,10 @@ mod tests {
     #[test]
     fn test_cpu_power_consumption() {
         let ctrl = CpuPowerController::new(0);
-        assert!(ctrl.get_power_consumption(CpuPowerState::C3) < ctrl.get_power_consumption(CpuPowerState::C0));
+        assert!(
+            ctrl.get_power_consumption(CpuPowerState::C3)
+                < ctrl.get_power_consumption(CpuPowerState::C0)
+        );
     }
 
     #[test]

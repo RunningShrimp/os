@@ -41,7 +41,7 @@ pub fn mmap(
     _prot: u32,
     _flags: u32,
     _fd: i32,
-    _offset: usize
+    _offset: usize,
 ) -> Result<usize, crate::api::SyscallError> {
     // Stub implementation
     Ok(0)

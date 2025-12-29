@@ -18,7 +18,7 @@
 //! # Usage
 //!
 //! ```rust
-//! use nos_services::{ServiceRegistry, Service};
+//! use nos_services::{Service, ServiceRegistry};
 //!
 //! // Create a service registry
 //! let mut registry = ServiceRegistry::new();
@@ -36,23 +36,25 @@
 extern crate alloc;
 
 // Core modules
-pub mod registry;
-pub mod discovery;
 pub mod core;
+pub mod discovery;
 pub mod fs;
-pub mod process;
-pub mod network;
 pub mod ipc;
+pub mod network;
+pub mod process;
+pub mod registry;
 pub mod types;
 
 // Re-export commonly used items
-pub use registry::{ServiceRegistry, ServiceInfo, register_service, unregister_service, get_service, get_stats};
-pub use discovery::{ServiceDiscovery, ServiceDescriptor};
-pub use core::{Service, ServiceStatus, ServiceStats};
-pub use core::{ServiceManager, ServiceConfig};
-// Note: fs, process, network, ipc modules are not re-exported to avoid unused import warnings
-pub use types::{ServicePriority, ServiceMetrics, ServiceDependency};
+pub use core::{Service, ServiceConfig, ServiceManager, ServiceStats, ServiceStatus};
+
+pub use discovery::{ServiceDescriptor, ServiceDiscovery};
+pub use registry::{
+    ServiceInfo, ServiceRegistry, get_service, get_stats, register_service, unregister_service,
+};
 pub use types::service_type::*;
+// Note: fs, process, network, ipc modules are not re-exported to avoid unused import warnings
+pub use types::{ServiceDependency, ServiceMetrics, ServicePriority};
 
 // Re-export traits module as alias to core
 pub mod traits {
@@ -70,10 +72,10 @@ pub mod traits {
 pub fn init_services() -> nos_api::Result<()> {
     // Initialize service registry
     registry::init_registry()?;
-    
+
     // Initialize service discovery
     discovery::init_discovery()?;
-    
+
     Ok(())
 }
 
@@ -88,10 +90,10 @@ pub fn init_services() -> nos_api::Result<()> {
 pub fn shutdown_services() -> nos_api::Result<()> {
     // Shutdown service discovery
     discovery::shutdown_discovery()?;
-    
+
     // Shutdown service registry
     registry::shutdown_registry()?;
-    
+
     Ok(())
 }
 
@@ -103,8 +105,6 @@ pub fn shutdown_services() -> nos_api::Result<()> {
 pub fn get_service_stats() -> ServiceStats {
     return registry::get_stats();
 }
-
-
 
 #[cfg(test)]
 mod tests {

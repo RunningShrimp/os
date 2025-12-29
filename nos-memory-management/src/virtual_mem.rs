@@ -1,7 +1,8 @@
 //! Virtual memory management module
 
 use nos_api::Result;
-use crate::physical::{PAGE_SIZE, PAGE_SHIFT, page_round_up, page_round_down};
+
+use crate::physical::{PAGE_SHIFT, PAGE_SIZE, page_round_down, page_round_up};
 
 /// A virtual address
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

@@ -1,46 +1,54 @@
 //! Memory management interface
 
-use crate::error::Result;
-use crate::core::types::{PhysAddr, VirtAddr, Size, PageNum, MemoryProtection, MemoryMappingType};
+use crate::{
+    core::types::{MemoryMappingType, MemoryProtection, PageNum, PhysAddr, Size, VirtAddr},
+    error::Result,
+};
 
 /// Trait for memory manager
 pub trait MemoryManager {
     /// Allocates physical memory
     fn alloc_phys(&mut self, size: Size) -> Result<PhysAddr>;
-    
+
     /// Frees physical memory
     fn free_phys(&mut self, addr: PhysAddr, size: Size) -> Result<()>;
-    
+
     /// Allocates virtual memory
     fn alloc_virt(&mut self, size: Size) -> Result<VirtAddr>;
-    
+
     /// Frees virtual memory
     fn free_virt(&mut self, addr: VirtAddr, size: Size) -> Result<()>;
-    
+
     /// Maps physical memory to virtual memory
-    fn map(&mut self, phys: PhysAddr, virt: VirtAddr, size: Size, prot: MemoryProtection) -> Result<()>;
-    
+    fn map(
+        &mut self,
+        phys: PhysAddr,
+        virt: VirtAddr,
+        size: Size,
+        prot: MemoryProtection,
+    ) -> Result<()>;
+
     /// Unmaps virtual memory
     fn unmap(&mut self, virt: VirtAddr, size: Size) -> Result<()>;
-    
+
     /// Changes memory protection
     fn protect(&mut self, virt: VirtAddr, size: Size, prot: MemoryProtection) -> Result<()>;
-    
+
     /// Returns physical address for virtual address
     fn virt_to_phys(&self, virt: VirtAddr) -> Option<PhysAddr>;
-    
+
     /// Returns virtual address for physical address
     fn phys_to_virt(&self, phys: PhysAddr) -> Option<VirtAddr>;
-    
+
     /// Returns available physical memory
     fn available_phys(&self) -> Size;
-    
+
     /// Returns available virtual memory
     fn available_virt(&self) -> Size;
-    
+
     /// Returns total physical memory
     fn total_phys(&self) -> Size;
-    
+
     /// Returns total virtual memory
     fn total_virt(&self) -> Size;
 }
@@ -49,22 +57,22 @@ pub trait MemoryManager {
 pub trait PageAllocator {
     /// Allocates a page
     fn alloc_page(&mut self) -> Result<PageNum>;
-    
+
     /// Allocates multiple pages
     fn alloc_pages(&mut self, count: PageNum) -> Result<PageNum>;
-    
+
     /// Frees a page
     fn free_page(&mut self, page: PageNum) -> Result<()>;
-    
+
     /// Frees multiple pages
     fn free_pages(&mut self, start: PageNum, count: PageNum) -> Result<()>;
-    
+
     /// Returns number of free pages
     fn free_pages_count(&self) -> PageNum;
-    
+
     /// Returns total number of pages
     fn total_pages(&self) -> PageNum;
-    
+
     /// Returns page size
     fn page_size(&self) -> Size;
 }
@@ -72,18 +80,24 @@ pub trait PageAllocator {
 /// Trait for memory mapper
 pub trait MemoryMapper {
     /// Maps a memory region
-    fn map_region(&mut self, phys: PhysAddr, virt: VirtAddr, size: Size, 
-                   prot: MemoryProtection, mapping_type: MemoryMappingType) -> Result<()>;
-    
+    fn map_region(
+        &mut self,
+        phys: PhysAddr,
+        virt: VirtAddr,
+        size: Size,
+        prot: MemoryProtection,
+        mapping_type: MemoryMappingType,
+    ) -> Result<()>;
+
     /// Unmaps a memory region
     fn unmap_region(&mut self, virt: VirtAddr, size: Size) -> Result<()>;
-    
+
     /// Changes protection of a memory region
     fn protect_region(&mut self, virt: VirtAddr, size: Size, prot: MemoryProtection) -> Result<()>;
-    
+
     /// Flushes memory mappings
     fn flush(&mut self, virt: VirtAddr, size: Size) -> Result<()>;
-    
+
     /// Invalidates memory mappings
     fn invalidate(&mut self, virt: VirtAddr, size: Size) -> Result<()>;
 }
@@ -92,22 +106,22 @@ pub trait MemoryMapper {
 pub trait MemoryCache {
     /// Flushes cache
     fn flush(&mut self) -> Result<()>;
-    
+
     /// Invalidates cache
     fn invalidate(&mut self) -> Result<()>;
-    
+
     /// Flushes specific cache line
     fn flush_line(&mut self, addr: VirtAddr) -> Result<()>;
-    
+
     /// Invalidates specific cache line
     fn invalidate_line(&mut self, addr: VirtAddr) -> Result<()>;
-    
+
     /// Returns cache size
     fn size(&self) -> Size;
-    
+
     /// Returns cache line size
     fn line_size(&self) -> Size;
-    
+
     /// Returns cache associativity
     fn associativity(&self) -> u32;
 }
@@ -116,16 +130,16 @@ pub trait MemoryCache {
 pub trait MemoryProtectionUnit {
     /// Sets memory protection for a region
     fn set_protection(&mut self, addr: VirtAddr, size: Size, prot: MemoryProtection) -> Result<()>;
-    
+
     /// Gets memory protection for a region
     fn get_protection(&self, addr: VirtAddr) -> Option<MemoryProtection>;
-    
+
     /// Enables memory protection
     fn enable(&mut self) -> Result<()>;
-    
+
     /// Disables memory protection
     fn disable(&mut self) -> Result<()>;
-    
+
     /// Returns true if memory protection is enabled
     fn is_enabled(&self) -> bool;
 }
@@ -134,13 +148,13 @@ pub trait MemoryProtectionUnit {
 pub trait MemoryStats {
     /// Returns memory usage statistics
     fn usage(&self) -> MemoryUsage;
-    
+
     /// Returns memory allocation statistics
     fn allocation(&self) -> MemoryAllocation;
-    
+
     /// Returns memory fragmentation statistics
     fn fragmentation(&self) -> MemoryFragmentation;
-    
+
     /// Returns memory error statistics
     fn errors(&self) -> MemoryErrors;
 }

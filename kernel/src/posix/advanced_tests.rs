@@ -14,12 +14,9 @@ use crate::posix::advanced_signal::*;
 use crate::posix::realtime::*;
 use crate::posix::advanced_thread::*;
 use crate::posix::security::*;
-use crate::subsystems::syscalls::common::SyscallError;
 use alloc::string::String;
 use alloc::vec::Vec;
-use alloc::string::ToString;
 
-/// Test result type
 pub type TestResult = Result<(), String>;
 
 /// Test context for managing test state

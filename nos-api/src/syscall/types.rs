@@ -32,41 +32,34 @@ impl SyscallArgs {
         arg4: usize,
         arg5: usize,
     ) -> Self {
-        Self {
-            arg0,
-            arg1,
-            arg2,
-            arg3,
-            arg4,
-            arg5,
-        }
+        Self { arg0, arg1, arg2, arg3, arg4, arg5 }
     }
-    
+
     /// Creates empty system call arguments
     pub fn empty() -> Self {
         Self::new(0, 0, 0, 0, 0, 0)
     }
-    
+
     /// Creates system call arguments with one argument
     pub fn with1(arg0: usize) -> Self {
         Self::new(arg0, 0, 0, 0, 0, 0)
     }
-    
+
     /// Creates system call arguments with two arguments
     pub fn with2(arg0: usize, arg1: usize) -> Self {
         Self::new(arg0, arg1, 0, 0, 0, 0)
     }
-    
+
     /// Creates system call arguments with three arguments
     pub fn with3(arg0: usize, arg1: usize, arg2: usize) -> Self {
         Self::new(arg0, arg1, arg2, 0, 0, 0)
     }
-    
+
     /// Creates system call arguments with four arguments
     pub fn with4(arg0: usize, arg1: usize, arg2: usize, arg3: usize) -> Self {
         Self::new(arg0, arg1, arg2, arg3, 0, 0)
     }
-    
+
     /// Creates system call arguments with five arguments
     pub fn with5(arg0: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize) -> Self {
         Self::new(arg0, arg1, arg2, arg3, arg4, 0)
@@ -87,22 +80,22 @@ impl SyscallResult {
     pub fn success(value: isize) -> Self {
         SyscallResult::Success(value)
     }
-    
+
     /// Creates an error result
     pub fn error(error: KernelError) -> Self {
         SyscallResult::Error(error)
     }
-    
+
     /// Returns true if result is success
     pub fn is_success(&self) -> bool {
         matches!(self, SyscallResult::Success(_))
     }
-    
+
     /// Returns true if result is error
     pub fn is_error(&self) -> bool {
         matches!(self, SyscallResult::Error(_))
     }
-    
+
     /// Returns success value if successful
     pub fn success_value(&self) -> Option<isize> {
         match self {
@@ -110,7 +103,7 @@ impl SyscallResult {
             _ => None,
         }
     }
-    
+
     /// Returns error if failed
     pub fn error_value(&self) -> Option<KernelError> {
         match self {

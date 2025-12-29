@@ -6,10 +6,8 @@
 //! - Cache warming
 //! - Performance metrics
 
+use alloc::{format, string::String, vec::Vec};
 use core::fmt;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::format;
 
 /// Cache level
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -136,12 +134,7 @@ pub struct CacheWarmupEntry {
 impl CacheWarmupEntry {
     /// Create new entry
     pub fn new(address: u64, size: u32) -> Self {
-        CacheWarmupEntry {
-            address,
-            size,
-            priority: 0,
-            is_warmed: false,
-        }
+        CacheWarmupEntry { address, size, priority: 0, is_warmed: false }
     }
 
     /// Set priority
@@ -160,7 +153,9 @@ impl fmt::Display for CacheWarmupEntry {
         write!(
             f,
             "Entry {{ addr: 0x{:x}, size: {}KB, warmed: {} }}",
-            self.address, self.size / 1024, self.is_warmed
+            self.address,
+            self.size / 1024,
+            self.is_warmed
         )
     }
 }
@@ -268,7 +263,9 @@ impl CacheOptimizer {
         let _memory_cycles = 200;
         log::trace!("Estimating average memory latency");
 
-        let total_accesses: u64 = self.cache_levels.iter()
+        let total_accesses: u64 = self
+            .cache_levels
+            .iter()
             .map(|c| c.hits + c.misses)
             .sum::<u64>()
             .max(1);
@@ -278,13 +275,13 @@ impl CacheOptimizer {
             match cache.level {
                 CacheLevel::L1I | CacheLevel::L1D => {
                     total_cycles += cache.hits * (l1_hit_cycles as u64);
-                }
+                },
                 CacheLevel::L2 => {
                     total_cycles += cache.hits * (l2_hit_cycles as u64);
-                }
+                },
                 CacheLevel::L3 => {
                     total_cycles += cache.hits * (l3_hit_cycles as u64);
-                }
+                },
             }
         }
 
@@ -305,8 +302,10 @@ impl CacheOptimizer {
             report.push_str(&format!("{}\n", cache));
         }
 
-        report.push_str(&format!("\nEstimated Avg Latency: {} cycles\n", 
-            self.estimate_avg_latency()));
+        report.push_str(&format!(
+            "\nEstimated Avg Latency: {} cycles\n",
+            self.estimate_avg_latency()
+        ));
         report.push_str(&format!("Warmup Entries: {}\n", self.warmup_entries.len()));
 
         report

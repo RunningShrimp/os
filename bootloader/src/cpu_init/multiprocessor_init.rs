@@ -6,10 +6,8 @@
 //! - Application Processor (AP) startup
 //! - CPU handoff and synchronization
 
+use alloc::{format, string::String, vec::Vec};
 use core::fmt;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::format;
 
 /// CPU type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -82,9 +80,9 @@ impl fmt::Display for CpuInfo {
 /// APIC mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApicMode {
-    PIC,        // Legacy PIC mode
-    APIC,       // Local APIC
-    X2APIC,     // Extended x2APIC
+    PIC,    // Legacy PIC mode
+    APIC,   // Local APIC
+    X2APIC, // Extended x2APIC
     Unknown,
 }
 
@@ -205,11 +203,7 @@ impl ApStartupRecord {
 
 impl fmt::Display for ApStartupRecord {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "AP{}: {} (Attempts: {})",
-            self.cpu_id, self.status, self.attempts
-        )
+        write!(f, "AP{}: {} (Attempts: {})", self.cpu_id, self.status, self.attempts)
     }
 }
 
@@ -310,7 +304,8 @@ impl MultiprocessorInit {
     /// Start all APs
     pub fn start_all_aps(&mut self) -> bool {
         let mut started = 0;
-        let ap_count = self.cpus
+        let ap_count = self
+            .cpus
             .iter()
             .filter(|c| c.cpu_type == CpuType::ApplicationProcessor)
             .count();
@@ -348,7 +343,8 @@ impl MultiprocessorInit {
             return 0;
         }
 
-        let successful = self.ap_records
+        let successful = self
+            .ap_records
             .iter()
             .filter(|r| r.status == ApStartupStatus::Running)
             .count();

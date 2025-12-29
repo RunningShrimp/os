@@ -10,10 +10,10 @@
 pub const PIT_BASE: u16 = 0x40;
 
 /// PIT register ports
-pub const PIT_CHANNEL_0: u16 = 0x40;  // Counter 0
-pub const PIT_CHANNEL_1: u16 = 0x41;  // Counter 1
-pub const PIT_CHANNEL_2: u16 = 0x42;  // Counter 2
-pub const PIT_CONTROL: u16 = 0x43;    // Control word
+pub const PIT_CHANNEL_0: u16 = 0x40; // Counter 0
+pub const PIT_CHANNEL_1: u16 = 0x41; // Counter 1
+pub const PIT_CHANNEL_2: u16 = 0x42; // Counter 2
+pub const PIT_CONTROL: u16 = 0x43; // Control word
 
 /// PIT clock frequency (1.193182 MHz)
 pub const PIT_CLOCK_HZ: u32 = 1193182;
@@ -77,17 +77,8 @@ pub struct PitControl {
 
 impl PitControl {
     /// Create PIT control word
-    pub fn new(
-        counter: PitCounter,
-        access_mode: AccessMode,
-        mode: PitMode,
-    ) -> Self {
-        PitControl {
-            counter,
-            access_mode,
-            mode,
-            binary_mode: true,
-        }
+    pub fn new(counter: PitCounter, access_mode: AccessMode, mode: PitMode) -> Self {
+        PitControl { counter, access_mode, mode, binary_mode: true }
     }
 
     /// Encode to control register value
@@ -176,11 +167,8 @@ impl PitTimer {
         self.reload_value = (PIT_CLOCK_HZ / frequency) as u16;
 
         // Configure counter 0 for rate generator mode
-        let control = PitControl::new(
-            PitCounter::Counter0,
-            AccessMode::BothBytes,
-            PitMode::RateGenerator,
-        );
+        let control =
+            PitControl::new(PitCounter::Counter0, AccessMode::BothBytes, PitMode::RateGenerator);
 
         self.write_control(control.encode());
 
@@ -199,11 +187,7 @@ impl PitTimer {
         }
 
         self.current_mode = mode;
-        let control = PitControl::new(
-            PitCounter::Counter0,
-            AccessMode::BothBytes,
-            mode,
-        );
+        let control = PitControl::new(PitCounter::Counter0, AccessMode::BothBytes, mode);
 
         self.write_control(control.encode());
         true
@@ -403,22 +387,16 @@ mod tests {
 
     #[test]
     fn test_pit_control_creation() {
-        let ctrl = PitControl::new(
-            PitCounter::Counter0,
-            AccessMode::BothBytes,
-            PitMode::RateGenerator,
-        );
+        let ctrl =
+            PitControl::new(PitCounter::Counter0, AccessMode::BothBytes, PitMode::RateGenerator);
         assert_eq!(ctrl.counter, PitCounter::Counter0);
         assert!(ctrl.binary_mode);
     }
 
     #[test]
     fn test_pit_control_encode() {
-        let ctrl = PitControl::new(
-            PitCounter::Counter0,
-            AccessMode::BothBytes,
-            PitMode::RateGenerator,
-        );
+        let ctrl =
+            PitControl::new(PitCounter::Counter0, AccessMode::BothBytes, PitMode::RateGenerator);
         let encoded = ctrl.encode();
         assert_eq!(encoded & 0xC0, 0x00); // Counter 0
         assert_eq!(encoded & 0x30, 0x30); // Both bytes
@@ -468,7 +446,7 @@ mod tests {
         let mut timer = PitTimer::new();
         timer.initialize(1000);
         assert_eq!(timer.get_tick_count(), 0);
-        
+
         timer.on_tick();
         timer.on_tick();
         assert_eq!(timer.get_tick_count(), 2);
@@ -478,7 +456,7 @@ mod tests {
     fn test_pit_timer_elapsed_ms() {
         let mut timer = PitTimer::new();
         timer.initialize(1000);
-        
+
         // 1000 ticks at 1000 Hz = 1000 ms
         for _ in 0..1000 {
             timer.on_tick();
@@ -491,7 +469,7 @@ mod tests {
         let mut timer = PitTimer::new();
         timer.initialize(1000);
         timer.on_tick();
-        
+
         let report = timer.timer_report();
         assert!(report.initialized);
         assert_eq!(report.frequency, 1000);
@@ -523,7 +501,7 @@ mod tests {
     fn test_hpet_timer_counter() {
         let mut timer = HpetTimer::new();
         timer.initialize();
-        
+
         assert_eq!(timer.get_main_counter(), 0);
         timer.set_main_counter(0x1000);
         assert_eq!(timer.get_main_counter(), 0x1000);
@@ -533,7 +511,7 @@ mod tests {
     fn test_hpet_timer_tick() {
         let mut timer = HpetTimer::new();
         timer.initialize();
-        
+
         assert_eq!(timer.get_tick_count(), 0);
         timer.on_tick();
         timer.on_tick();
@@ -545,7 +523,7 @@ mod tests {
         let mut timer = HpetTimer::new();
         timer.initialize();
         timer.on_tick();
-        
+
         let report = timer.hpet_report();
         assert!(report.enabled);
         assert_eq!(report.tick_count, 1);
@@ -556,7 +534,7 @@ mod tests {
     fn test_pit_reload_value_calculation() {
         let mut timer = PitTimer::new();
         timer.initialize(1000);
-        
+
         // For 1000 Hz: reload = 1193182 / 1000 = 1193
         assert_eq!(timer.reload_value, 1193);
     }
@@ -564,10 +542,10 @@ mod tests {
     #[test]
     fn test_pit_timer_different_frequencies() {
         let mut timer = PitTimer::new();
-        
+
         assert!(timer.initialize(100));
         assert_eq!(timer.reload_value, PIT_CLOCK_HZ / 100);
-        
+
         assert!(timer.set_frequency(1000));
         assert_eq!(timer.reload_value, PIT_CLOCK_HZ / 1000);
     }
@@ -593,11 +571,8 @@ mod tests {
 
     #[test]
     fn test_pit_control_bcd_mode() {
-        let mut ctrl = PitControl::new(
-            PitCounter::Counter0,
-            AccessMode::BothBytes,
-            PitMode::RateGenerator,
-        );
+        let mut ctrl =
+            PitControl::new(PitCounter::Counter0, AccessMode::BothBytes, PitMode::RateGenerator);
         ctrl.binary_mode = false;
         assert_eq!(ctrl.encode() & 0x01, 0x01);
     }

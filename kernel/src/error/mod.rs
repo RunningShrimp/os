@@ -22,40 +22,35 @@ pub fn shutdown() -> crate::error::UnifiedResult<()> {
 }
 
 // Re-export submodules
-pub mod unified;
-pub mod unified_mapping;
 pub mod panic_handler;
 pub mod recovery;
+pub mod unified;
+pub mod unified_mapping;
 
 // Re-export unified mapping
-pub use unified_mapping::{
-    Errno, UnifiedErrorMapper, init_error_mapper, get_error_mapper,
-    unified_error_to_errno, api_syscall_error_to_errno,
-};
-
 // Re-export main types for convenience
 pub use unified::{
-    UnifiedError, UnifiedResult, ErrorContext, ErrorSeverity,
-    MemoryError, FileSystemError, NetworkError, ProcessError,
-    SyscallError, DriverError, SecurityError,
+    DriverError, ErrorContext, ErrorSeverity, FileSystemError, MemoryError, NetworkError,
+    ProcessError, SecurityError, SyscallError, UnifiedError, UnifiedResult,
+};
+pub use unified_mapping::{
+    Errno, UnifiedErrorMapper, api_syscall_error_to_errno, get_error_mapper, init_error_mapper,
+    unified_error_to_errno,
 };
 
 // Re-export framework types
 pub mod unified_framework;
 pub use unified_framework::{
-    FrameworkError, FrameworkResult, IntoFrameworkError,
-    FrameworkErrorHandler, FrameworkErrorManager,
-    ErrorRecovery, DefaultErrorRecovery,
-    ErrorContextBuilder,
+    DefaultErrorRecovery, ErrorContextBuilder, ErrorRecovery, FrameworkError,
+    FrameworkErrorHandler, FrameworkErrorManager, FrameworkResult, IntoFrameworkError,
     init_framework, shutdown_framework,
 };
 
 // Health monitoring
 pub mod health;
 pub use health::{
-    HealthLevel, HealthSeverity, HealthMetric, HealthThreshold,
-    HealthStatus, HealthStats, HealthMonitor,
-    init_health_monitor, get_health_monitor,
+    HealthLevel, HealthMetric, HealthMonitor, HealthSeverity, HealthStats, HealthStatus,
+    HealthThreshold, get_health_monitor, init_health_monitor,
 };
 
 // TODO: Implement and re-export errno types
@@ -65,7 +60,7 @@ pub use health::{
 pub trait ErrorHandler {
     /// Handle an error
     fn handle_error(&self, error: &ErrorContext) -> ErrorAction;
-    
+
     /// Check if this handler can handle the given error
     fn can_handle(&self, error: &UnifiedError) -> bool;
 }
@@ -103,83 +98,94 @@ impl ErrorManager {
             critical_error_count: core::sync::atomic::AtomicUsize::new(0),
         }
     }
-    
+
     /// Add an error handler
     pub fn add_handler(&mut self, handler: Box<dyn ErrorHandler>) {
         self.handlers.push(handler);
     }
-    
+
     /// Handle an error (with recovery integration)
     pub fn handle_error(&self, error: UnifiedError, context: &str) -> ErrorAction {
         // Record error for recovery statistics
         if let Some(recovery_mgr) = recovery::get_recovery_manager() {
             recovery_mgr.record_error(&error);
         }
-        
+
         // Create error context
         let error_context = ErrorContext::new(error.clone(), context);
-        
+
         // Increment error counters
-        self.error_count.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
-        
+        self.error_count
+            .fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+
         if error_context.severity >= ErrorSeverity::Critical {
-            self.critical_error_count.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+            self.critical_error_count
+                .fetch_add(1, core::sync::atomic::Ordering::Relaxed);
         }
-        
+
         // Try to find a handler that can handle this error
         for handler in &self.handlers {
             if handler.can_handle(&error) {
                 let action = handler.handle_error(&error_context);
-                
+
                 // If handler suggests recovery, integrate with recovery manager
                 if action == ErrorAction::Recover {
-                    if let Some(recovery_action) = recovery::determine_recovery_action(&error, &error_context) {
-                        let recovery_result = recovery::execute_recovery(recovery_action, &error, &error_context);
+                    if let Some(recovery_action) =
+                        recovery::determine_recovery_action(&error, &error_context)
+                    {
+                        let recovery_result =
+                            recovery::execute_recovery(recovery_action, &error, &error_context);
                         match recovery_result {
                             recovery::RecoveryResult::Success => {
                                 recovery::record_recovery_success(&error);
                                 return ErrorAction::Ignore;
-                            }
-                            recovery::RecoveryResult::Failed | recovery::RecoveryResult::Timeout => {
+                            },
+                            recovery::RecoveryResult::Failed
+                            | recovery::RecoveryResult::Timeout => {
                                 recovery::record_recovery_failure(&error);
                                 return ErrorAction::Propagate;
-                            }
-                            _ => {}
+                            },
+                            _ => {},
                         }
                     }
                 }
-                
+
                 return action;
             }
         }
-        
+
         // Default action based on severity (with recovery support)
         match error_context.severity {
             ErrorSeverity::Info | ErrorSeverity::Warning => ErrorAction::Log,
             ErrorSeverity::Error => {
                 // For errors, try recovery if available
-                if let Some(recovery_action) = recovery::determine_recovery_action(&error, &error_context) {
-                    let recovery_result = recovery::execute_recovery(recovery_action, &error, &error_context);
+                if let Some(recovery_action) =
+                    recovery::determine_recovery_action(&error, &error_context)
+                {
+                    let recovery_result =
+                        recovery::execute_recovery(recovery_action, &error, &error_context);
                     match recovery_result {
                         recovery::RecoveryResult::Success => {
                             recovery::record_recovery_success(&error);
                             ErrorAction::Ignore
-                        }
-                        _ => ErrorAction::Propagate
+                        },
+                        _ => ErrorAction::Propagate,
                     }
                 } else {
                     ErrorAction::Propagate
                 }
-            }
+            },
             ErrorSeverity::Critical | ErrorSeverity::Fatal => ErrorAction::Panic,
         }
     }
-    
+
     /// Get error statistics
     pub fn get_stats(&self) -> ErrorStats {
         ErrorStats {
             total_errors: self.error_count.load(core::sync::atomic::Ordering::Relaxed),
-            critical_errors: self.critical_error_count.load(core::sync::atomic::Ordering::Relaxed),
+            critical_errors: self
+                .critical_error_count
+                .load(core::sync::atomic::Ordering::Relaxed),
         }
     }
 }
@@ -195,7 +201,8 @@ pub struct ErrorStats {
 
 /// Global error manager
 static mut ERROR_MANAGER: ErrorManager = ErrorManager::new();
-static ERROR_MANAGER_INIT: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+static ERROR_MANAGER_INIT: core::sync::atomic::AtomicBool =
+    core::sync::atomic::AtomicBool::new(false);
 
 /// Get the global error manager
 pub fn get_error_manager() -> &'static mut ErrorManager {
@@ -211,28 +218,29 @@ pub fn get_error_manager() -> &'static mut ErrorManager {
 /// Handle an error with context (with recovery support)
 pub fn handle_error(error: UnifiedError, context: &str) -> ErrorAction {
     let action = get_error_manager().handle_error(error.clone(), context);
-    
+
     // If action is Recover, try to execute recovery
     if action == ErrorAction::Recover {
         let error_context = ErrorContext::new(error.clone(), context);
         if let Some(recovery_action) = recovery::determine_recovery_action(&error, &error_context) {
-            let recovery_result = recovery::execute_recovery(recovery_action, &error, &error_context);
+            let recovery_result =
+                recovery::execute_recovery(recovery_action, &error, &error_context);
             match recovery_result {
                 recovery::RecoveryResult::Success => {
                     recovery::record_recovery_success(&error);
                     return ErrorAction::Ignore; // Recovery succeeded, ignore error
-                }
+                },
                 recovery::RecoveryResult::Failed | recovery::RecoveryResult::Timeout => {
                     recovery::record_recovery_failure(&error);
                     return ErrorAction::Propagate; // Recovery failed, propagate error
-                }
+                },
                 recovery::RecoveryResult::NotApplicable => {
                     // No recovery available, use original action
-                }
+                },
             }
         }
     }
-    
+
     action
 }
 
@@ -261,22 +269,22 @@ impl ErrorHandler for DefaultErrorHandler {
             UnifiedError::MemoryError(MemoryError::OutOfMemory) => {
                 crate::log_error!("Out of memory: {}", error.description);
                 ErrorAction::Recover
-            }
+            },
             UnifiedError::FileSystemError(FileSystemError::PermissionDenied) => {
                 crate::log_warn!("Permission denied: {}", error.description);
                 ErrorAction::Propagate
-            }
+            },
             UnifiedError::SecurityError(SecurityError::AccessDenied) => {
                 crate::log_error!("Security violation: {}", error.description);
                 ErrorAction::Panic
-            }
+            },
             _ => {
                 crate::log_error!("Error: {}", error.description);
                 ErrorAction::Propagate
-            }
+            },
         }
     }
-    
+
     fn can_handle(&self, _error: &UnifiedError) -> bool {
         true // Default handler can handle all errors
     }

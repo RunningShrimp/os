@@ -2,8 +2,10 @@
 //!
 //! These tests verify that different kernel components work together correctly.
 
-use kernel::tests::common::{TestUtils, TestFixture, PerformanceTimer, IntegrationTestResult};
-use kernel::tests::common::{integration_test_assert, integration_test_assert_eq};
+use kernel::tests::common::{
+    IntegrationTestResult, PerformanceTimer, TestFixture, TestUtils, integration_test_assert,
+    integration_test_assert_eq,
+};
 
 #[test]
 fn test_kernel_initialization() -> IntegrationTestResult {

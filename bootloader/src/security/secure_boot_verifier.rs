@@ -6,10 +6,8 @@
 //! - Certificate chain verification
 //! - Trusted CA store management
 
+use alloc::{format, string::String, vec::Vec};
 use core::fmt;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::format;
 
 /// Hash algorithm type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -108,8 +106,8 @@ impl Sha256Hasher {
     pub fn new() -> Self {
         Sha256Hasher {
             state: [
-                0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-                0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+                0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
+                0x5be0cd19,
             ],
             data_length: 0,
         }
@@ -130,8 +128,8 @@ impl Sha256Hasher {
     /// Reset hasher
     pub fn reset(&mut self) {
         self.state = [
-            0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-            0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+            0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
+            0x5be0cd19,
         ];
         self.data_length = 0;
     }
@@ -187,12 +185,7 @@ impl RsaPublicKey {
 
 impl fmt::Display for RsaPublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "RSA {} (e={})",
-            self.key_strength_bits(),
-            self.exponent
-        )
+        write!(f, "RSA {} (e={})", self.key_strength_bits(), self.exponent)
     }
 }
 
@@ -227,11 +220,8 @@ impl CertificateChainEntry {
     pub fn validate(&mut self) -> bool {
         let is_self_signed = self.is_self_signed();
         self.self_signed = is_self_signed;
-        
-        if !self.subject.is_empty()
-            && !self.issuer.is_empty()
-            && self.public_key.is_valid()
-        {
+
+        if !self.subject.is_empty() && !self.issuer.is_empty() && self.public_key.is_valid() {
             true
         } else {
             false
@@ -327,8 +317,8 @@ impl SignatureVerifier {
 
         // Framework for actual RSA verification
         // In real implementation, would perform RSA-PKCS#1 v1.5 verification
-        let result = signature.len() == certificate.public_key.key_length as usize
-            && !data_hash.is_zero();
+        let result =
+            signature.len() == certificate.public_key.key_length as usize && !data_hash.is_zero();
 
         if result {
             self.verification_count += 1;
@@ -390,10 +380,14 @@ impl SignatureVerifier {
     /// Get detailed report
     pub fn detailed_report(&self) -> String {
         format!(
-            "SignatureVerifier {{ hash: {}, sig: {}, chain: {}, trusted_cas: {}, verified: {}, failed: {} }}",
-            self.hash_algorithm, self.signature_algorithm,
-            self.chain_length(), self.trusted_ca_count(),
-            self.verification_count, self.failure_count
+            "SignatureVerifier {{ hash: {}, sig: {}, chain: {}, trusted_cas: {}, verified: {}, \
+             failed: {} }}",
+            self.hash_algorithm,
+            self.signature_algorithm,
+            self.chain_length(),
+            self.trusted_ca_count(),
+            self.verification_count,
+            self.failure_count
         )
     }
 
@@ -487,7 +481,7 @@ mod tests {
     fn test_rsa_public_key_validity() {
         let mut key = RsaPublicKey::new(256);
         assert!(!key.is_valid());
-        
+
         key.set_modulus(vec![0x01; 256]);
         assert!(key.is_valid());
     }
@@ -509,7 +503,7 @@ mod tests {
     fn test_certificate_chain_validate() {
         let mut entry = CertificateChainEntry::new("Subject", "Issuer", 256);
         entry.public_key.set_modulus(vec![0x02; 256]);
-        
+
         assert!(entry.validate());
     }
 
@@ -522,26 +516,29 @@ mod tests {
 
     #[test]
     fn test_signature_verifier_add_trusted_ca() {
-        let mut verifier = SignatureVerifier::new(HashAlgorithm::SHA256, SignatureAlgorithm::RSA4096);
+        let mut verifier =
+            SignatureVerifier::new(HashAlgorithm::SHA256, SignatureAlgorithm::RSA4096);
         assert!(verifier.add_trusted_ca("Root CA"));
         assert_eq!(verifier.trusted_ca_count(), 1);
     }
 
     #[test]
     fn test_signature_verifier_add_certificate() {
-        let mut verifier = SignatureVerifier::new(HashAlgorithm::SHA256, SignatureAlgorithm::RSA2048);
+        let mut verifier =
+            SignatureVerifier::new(HashAlgorithm::SHA256, SignatureAlgorithm::RSA2048);
         let mut cert = CertificateChainEntry::new("Subject", "Issuer", 256);
         cert.public_key.set_modulus(vec![0x03; 256]);
-        
+
         assert!(verifier.add_certificate(cert));
         assert_eq!(verifier.chain_length(), 1);
     }
 
     #[test]
     fn test_signature_verifier_verify_ca() {
-        let mut verifier = SignatureVerifier::new(HashAlgorithm::SHA256, SignatureAlgorithm::RSA2048);
+        let mut verifier =
+            SignatureVerifier::new(HashAlgorithm::SHA256, SignatureAlgorithm::RSA2048);
         verifier.add_trusted_ca("Root CA");
-        
+
         let cert = CertificateChainEntry::new("Subject", "Root CA", 256);
         assert!(verifier.verify_ca(&cert));
     }
@@ -556,9 +553,10 @@ mod tests {
 
     #[test]
     fn test_signature_verifier_reset() {
-        let mut verifier = SignatureVerifier::new(HashAlgorithm::SHA256, SignatureAlgorithm::RSA2048);
+        let mut verifier =
+            SignatureVerifier::new(HashAlgorithm::SHA256, SignatureAlgorithm::RSA2048);
         verifier.add_trusted_ca("CA");
-        
+
         assert!(verifier.trusted_ca_count() > 0);
         verifier.reset();
         assert_eq!(verifier.trusted_ca_count(), 0);

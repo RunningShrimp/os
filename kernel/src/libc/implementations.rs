@@ -14,22 +14,18 @@
 
 extern crate alloc;
 use alloc::boxed::Box;
-
-use crate::libc::CLibInterface;
-use crate::libc::interface::{size_t, DivT, LDivT, CLibResult, CLibStats, c_long};
-use core::ffi::{c_int, c_char, c_void, c_uint, c_double};
-
+use core::ffi::{c_char, c_double, c_int, c_uint, c_void};
 
 // 导入增强库模块
 use crate::libc::string_lib::EnhancedStringLib;
-use crate::libc::time_lib::EnhancedTimeLib;
-use crate::libc::math_lib::EnhancedMathLib;
-use crate::libc::random_lib::EnhancedRandomGenerator;
-use crate::libc::env_lib::EnhancedEnvManager;
-use crate::libc::sysinfo_lib::EnhancedSystemInfo;
-use crate::libc::random_lib::RandomConfig;
-use crate::libc::env_lib::EnvConfig;
-use crate::libc::sysinfo_lib::SystemInfoConfig;
+use crate::libc::{
+    CLibInterface,
+    env_lib::{EnhancedEnvManager, EnvConfig},
+    math_lib::EnhancedMathLib,
+    random_lib::{EnhancedRandomGenerator, RandomConfig},
+    sysinfo_lib::{EnhancedSystemInfo, SystemInfoConfig},
+    time_lib::EnhancedTimeLib,
+};
 
 /// C标准库实现类型
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -38,10 +34,8 @@ pub enum ImplementationType {
     Unified,
 }
 
-
-
 /// 统一的C标准库实现
-/// 
+///
 /// 提供完整的C标准库接口，包括：
 /// - 字符串处理
 /// - 时间函数
@@ -93,12 +87,13 @@ impl UnifiedCLib {
         }
 
         crate::println!("[unified] 初始化统一C标准库");
-        
+
         // 初始化各个子模块
         self.random_generator.initialize();
         let _ = self.env_manager.initialize();
-        
-        self.initialized.store(true, core::sync::atomic::Ordering::SeqCst);
+
+        self.initialized
+            .store(true, core::sync::atomic::Ordering::SeqCst);
         crate::println!("[unified] 统一C标准库初始化完成");
         Ok(())
     }
@@ -117,9 +112,7 @@ impl CLibInterface for UnifiedCLib {
             return -1;
         }
 
-        let str_val = unsafe {
-            core::ffi::CStr::from_ptr(s).to_str().unwrap_or("")
-        };
+        let str_val = unsafe { core::ffi::CStr::from_ptr(s).to_str().unwrap_or("") };
 
         crate::println!("{}", str_val);
         str_val.len() as c_int + 1 // +1 for newline
@@ -389,11 +382,23 @@ impl CLibInterface for UnifiedCLib {
         0
     }
 
-    fn fread(&self, ptr: *mut c_void, _size: size_t, nmemb: size_t, _stream: *mut c_void) -> size_t {
+    fn fread(
+        &self,
+        ptr: *mut c_void,
+        _size: size_t,
+        nmemb: size_t,
+        _stream: *mut c_void,
+    ) -> size_t {
         0
     }
 
-    fn fwrite(&self, ptr: *const c_void, _size: size_t, nmemb: size_t, _stream: *mut c_void) -> size_t {
+    fn fwrite(
+        &self,
+        ptr: *const c_void,
+        _size: size_t,
+        nmemb: size_t,
+        _stream: *mut c_void,
+    ) -> size_t {
         0
     }
 
@@ -417,8 +422,7 @@ impl CLibInterface for UnifiedCLib {
         0
     }
 
-    fn clearerr(&self, _stream: *mut c_void) {
-    }
+    fn clearerr(&self, _stream: *mut c_void) {}
 
     // 字符串转换函数 - 使用增强字符串库
     fn strtol(&self, nptr: *const c_char, endptr: *mut *mut c_char, base: c_int) -> c_long {
@@ -480,7 +484,9 @@ impl CLibInterface for UnifiedCLib {
     }
 
     fn perror(&self, s: *const c_char) {
-        let prefix = if s.is_null() { "" } else {
+        let prefix = if s.is_null() {
+            ""
+        } else {
             unsafe { core::ffi::CStr::from_ptr(s).to_str().unwrap_or("") }
         };
         crate::println!("{}: Unknown error", prefix);
@@ -515,7 +521,13 @@ impl CLibInterface for UnifiedCLib {
         self.env_manager.unsetenv(name)
     }
 
-    fn qsort(&self, base: *mut c_void, nmemb: size_t, _size: size_t, compar: extern "C" fn(*const c_void, *const c_void) -> c_int) {
+    fn qsort(
+        &self,
+        base: *mut c_void,
+        nmemb: size_t,
+        _size: size_t,
+        compar: extern "C" fn(*const c_void, *const c_void) -> c_int,
+    ) {
         // 使用 base 和 nmemb 进行排序操作
         // TODO: 实现实际的排序逻辑
         let _base_ptr = base; // 使用 base 进行验证
@@ -524,7 +536,14 @@ impl CLibInterface for UnifiedCLib {
         crate::println!("[unified] qsort called");
     }
 
-    fn bsearch(&self, key: *const c_void, base: *const c_void, nmemb: size_t, _size: size_t, compar: extern "C" fn(*const c_void, *const c_void) -> c_int) -> *mut c_void {
+    fn bsearch(
+        &self,
+        key: *const c_void,
+        base: *const c_void,
+        nmemb: size_t,
+        _size: size_t,
+        compar: extern "C" fn(*const c_void, *const c_void) -> c_int,
+    ) -> *mut c_void {
         // 使用 key, base, nmemb 进行二分查找操作
         // TODO: 实现实际的二分查找逻辑
         let _key_ptr = key; // 使用 key 进行验证
@@ -535,17 +554,11 @@ impl CLibInterface for UnifiedCLib {
     }
 
     fn div(&self, numer: c_int, denom: c_int) -> DivT {
-        DivT {
-            quot: numer / denom,
-            rem: numer % denom
-        }
+        DivT { quot: numer / denom, rem: numer % denom }
     }
 
     fn ldiv(&self, numer: c_long, denom: c_long) -> LDivT {
-        LDivT {
-            quot: numer / denom,
-            rem: numer % denom
-        }
+        LDivT { quot: numer / denom, rem: numer % denom }
     }
 
     fn initialize(&self) -> CLibResult<()> {
@@ -563,16 +576,12 @@ pub fn create_unified_c_lib() -> &'static dyn CLibInterface {
     use spin::Once;
     static INIT: Once = Once::new();
     static mut UNIFIED: Option<UnifiedCLib> = None;
-    
-    INIT.call_once(|| {
-        unsafe {
-            UNIFIED = Some(UnifiedCLib::new());
-        }
+
+    INIT.call_once(|| unsafe {
+        UNIFIED = Some(UnifiedCLib::new());
     });
-    
-    unsafe {
-        UNIFIED.as_ref().unwrap() as &'static dyn CLibInterface
-    }
+
+    unsafe { UNIFIED.as_ref().unwrap() as &'static dyn CLibInterface }
 }
 
 /// 创建完整C库实现

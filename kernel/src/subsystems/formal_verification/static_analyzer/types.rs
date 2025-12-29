@@ -1,9 +1,8 @@
 //! Static Analyzer Types
-//! 
+//!
 //! This module defines all the core types used by the static analyzer.
 
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use core::sync::atomic::AtomicBool;
 
 /// Analysis level
@@ -151,11 +150,6 @@ pub struct AnalysisStats {
 impl AnalysisStats {
     /// Create new analysis statistics
     pub fn new() -> Self {
-        Self {
-            total_time_ms: 0,
-            passes: 0,
-            results: 0,
-            memory_usage: 0,
-        }
+        Self { total_time_ms: 0, passes: 0, results: 0, memory_usage: 0 }
     }
 }

@@ -1,17 +1,19 @@
 //! POSIX Message Queue Implementation
-//! 
+//!
 //! This module provides POSIX-compliant message queues (mqueue) with
 //! priority-based message delivery, notification mechanisms, and resource limits.
 
 extern crate alloc;
 
-use alloc::collections::VecDeque;
-use alloc::vec::Vec;
+use alloc::{collections::VecDeque, vec::Vec};
 use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+
 use spin::Mutex;
 
-use crate::subsystems::process::Pid;
-use crate::subsystems::ipc::signal::{SIGEV_SIGNAL, SIGEV_NONE};
+use crate::subsystems::{
+    ipc::signal::{SIGEV_NONE, SIGEV_SIGNAL},
+    process::Pid,
+};
 
 /// Message queue attributes
 #[derive(Debug, Clone)]
@@ -29,8 +31,8 @@ pub struct MqAttr {
 impl Default for MqAttr {
     fn default() -> Self {
         Self {
-            mq_maxmsg: 10,      // Default: 10 messages
-            mq_msgsize: 8192,   // Default: 8KB messages
+            mq_maxmsg: 10,    // Default: 10 messages
+            mq_msgsize: 8192, // Default: 8KB messages
             mq_curmsgs: 0,
             mq_flags: 0,
         }
@@ -136,7 +138,8 @@ impl MessageQueue {
     /// Send a message to the queue
     pub fn send(&self, msg: MqMessage, timeout_ms: u32) -> Result<(), MqError> {
         // Update last activity
-        self.last_activity.store(crate::subsystems::time::timestamp_nanos(), Ordering::Relaxed);
+        self.last_activity
+            .store(crate::subsystems::time::timestamp_nanos(), Ordering::Relaxed);
 
         // Check if queue is open
         if !self.open.load(Ordering::Relaxed) {
@@ -172,16 +175,21 @@ impl MessageQueue {
                         let messages = self.messages.lock();
                         if messages.len() < self.attr.mq_maxmsg as usize {
                             // Remove from waiting senders
-                            self.waiting_senders.lock().retain(|&pid| pid != current_pid);
+                            self.waiting_senders
+                                .lock()
+                                .retain(|&pid| pid != current_pid);
                             break;
                         }
                     }
 
                     // Check timeout
-                    let elapsed = (crate::subsystems::time::timestamp_nanos() - start_time) / 1000000;
+                    let elapsed =
+                        (crate::subsystems::time::timestamp_nanos() - start_time) / 1000000;
                     if elapsed >= timeout_ms as u64 {
                         // Remove from waiting senders
-                        self.waiting_senders.lock().retain(|&pid| pid != current_pid);
+                        self.waiting_senders
+                            .lock()
+                            .retain(|&pid| pid != current_pid);
                         return Err(MqError::Timeout);
                     }
 
@@ -207,11 +215,12 @@ impl MessageQueue {
             {
                 let mut stats = self.stats.lock();
                 stats.total_messages_sent += 1;
-                
+
                 // Update queue depth statistics
                 let current_depth = messages.len() as u64;
-                stats.avg_queue_depth = 
-                    (stats.avg_queue_depth * (stats.total_messages_sent - 1) as f64 + current_depth as f64) 
+                stats.avg_queue_depth = (stats.avg_queue_depth
+                    * (stats.total_messages_sent - 1) as f64
+                    + current_depth as f64)
                     / stats.total_messages_sent as f64;
                 stats.max_queue_depth = stats.max_queue_depth.max(current_depth);
             }
@@ -226,7 +235,8 @@ impl MessageQueue {
     /// Receive a message from the queue
     pub fn receive(&self, max_size: usize, timeout_ms: u32) -> Result<MqMessage, MqError> {
         // Update last activity
-        self.last_activity.store(crate::subsystems::time::timestamp_nanos(), Ordering::Relaxed);
+        self.last_activity
+            .store(crate::subsystems::time::timestamp_nanos(), Ordering::Relaxed);
 
         // Check if queue is open
         if !self.open.load(Ordering::Relaxed) {
@@ -238,25 +248,26 @@ impl MessageQueue {
         let msg = loop {
             {
                 let mut messages = self.messages.lock();
-                
+
                 if let Some(msg) = messages.pop_front() {
                     // Update current message count
                     self.attr.mq_curmsgs = messages.len() as u64;
-                    
+
                     // Update statistics
                     {
                         let mut stats = self.stats.lock();
                         stats.total_messages_received += 1;
-                        
+
                         // Update wait time statistics
-                        let wait_time = (crate::subsystems::time::timestamp_nanos() - start_time) / 1000;
+                        let wait_time =
+                            (crate::subsystems::time::timestamp_nanos() - start_time) / 1000;
                         stats.total_wait_time_us += wait_time;
                         stats.max_wait_time_us = stats.max_wait_time_us.max(wait_time);
                     }
-                    
+
                     // Wake up waiting senders
                     self.wakeup_senders();
-                    
+
                     break msg;
                 } else if timeout_ms == 0 {
                     return Err(MqError::QueueEmpty);
@@ -264,7 +275,7 @@ impl MessageQueue {
                     // Add to waiting receivers
                     let current_pid = crate::process::myproc().unwrap_or(0);
                     self.waiting_receivers.lock().push(current_pid);
-                    
+
                     // Release lock and wait
                     drop(messages);
                 }
@@ -275,7 +286,9 @@ impl MessageQueue {
             if elapsed >= timeout_ms as u64 {
                 // Remove from waiting receivers
                 let current_pid = crate::process::myproc().unwrap_or(0);
-                self.waiting_receivers.lock().retain(|&pid| pid != current_pid);
+                self.waiting_receivers
+                    .lock()
+                    .retain(|&pid| pid != current_pid);
                 return Err(MqError::Timeout);
             }
 
@@ -304,9 +317,10 @@ impl MessageQueue {
         // Can't change maxmsg or msgsize while queue has messages
         {
             let messages = self.messages.lock();
-            if !messages.is_empty() && 
-               (attr.mq_maxmsg != self.attr.mq_maxmsg || 
-                attr.mq_msgsize != self.attr.mq_msgsize) {
+            if !messages.is_empty()
+                && (attr.mq_maxmsg != self.attr.mq_maxmsg
+                    || attr.mq_msgsize != self.attr.mq_msgsize)
+            {
                 return Err(MqError::InvalidOperation);
             }
         }
@@ -340,7 +354,7 @@ impl MessageQueue {
             let mut messages = self.messages.lock();
             let dropped_count = messages.len() as u64;
             messages.clear();
-            
+
             // Update statistics
             let mut stats = self.stats.lock();
             stats.total_messages_dropped += dropped_count;
@@ -399,7 +413,7 @@ impl MessageQueue {
     /// Wake up waiting receivers
     fn wakeup_receivers(&self) {
         let mut waiting_receivers = self.waiting_receivers.lock();
-        
+
         for &pid in waiting_receivers.iter() {
             // Wake up process
             let mut proc_table = crate::process::manager::PROC_TABLE.lock();
@@ -409,14 +423,14 @@ impl MessageQueue {
                 }
             }
         }
-        
+
         waiting_receivers.clear();
     }
 
     /// Wake up waiting senders
     fn wakeup_senders(&self) {
         let mut waiting_senders = self.waiting_senders.lock();
-        
+
         for &pid in waiting_senders.iter() {
             // Wake up process
             let mut proc_table = crate::process::manager::PROC_TABLE.lock();
@@ -426,7 +440,7 @@ impl MessageQueue {
                 }
             }
         }
-        
+
         waiting_senders.clear();
     }
 
@@ -439,23 +453,26 @@ impl MessageQueue {
     /// Send notification if configured
     fn send_notification(&self) {
         let notify = self.notify.lock();
-        
+
         match notify.notify_type {
             SIGEV_SIGNAL => {
                 // Send signal to process
-                if let Some(proc) = crate::process::manager::PROC_TABLE.lock().find_ref(notify.pid) {
+                if let Some(proc) = crate::process::manager::PROC_TABLE
+                    .lock()
+                    .find_ref(notify.pid)
+                {
                     if let Some(ref signals) = proc.signals {
                         let _ = signals.send_signal(notify.signal as u32);
                     }
                 }
-                
+
                 // Update statistics
                 let mut stats = self.stats.lock();
                 stats.total_notifications_sent += 1;
-            }
+            },
             _ => {
                 // Other notification types not implemented yet
-            }
+            },
         }
     }
 }
@@ -528,7 +545,7 @@ impl MessageQueueManager {
         // Create new queue
         let queue = MessageQueue::new(name.clone(), attr);
         let queue_id = self.next_queue_id.fetch_add(1, Ordering::SeqCst);
-        
+
         // Add to manager
         {
             let mut queues = self.queues.lock();
@@ -541,10 +558,10 @@ impl MessageQueueManager {
     /// Open an existing message queue
     pub fn open_queue(&self, name: &str) -> Result<u64, MqError> {
         let queues = self.queues.lock();
-        
+
         if let Some(&queue_ptr) = queues.get(name) {
             let queue = unsafe { &mut *queue_ptr };
-            
+
             // Check if queue is open
             if queue.open.load(Ordering::Relaxed) {
                 Ok(queue_id_from_name(name))
@@ -559,7 +576,7 @@ impl MessageQueueManager {
     /// Close a message queue
     pub fn close_queue(&self, name: &str) -> Result<(), MqError> {
         let mut queues = self.queues.lock();
-        
+
         if let Some(&queue_ptr) = queues.get(name) {
             let queue = unsafe { &mut *queue_ptr };
             queue.close()
@@ -571,7 +588,7 @@ impl MessageQueueManager {
     /// Unlink (destroy) a message queue
     pub fn unlink_queue(&self, name: &str) -> Result<(), MqError> {
         let mut queues = self.queues.lock();
-        
+
         if let Some(queue_ptr) = queues.remove(name) {
             let queue = unsafe { Box::from_raw(queue_ptr) };
             queue.unlink()
@@ -593,7 +610,12 @@ impl MessageQueueManager {
     }
 
     /// Receive a message from a queue
-    pub fn receive_message(&self, name: &str, max_size: usize, timeout_ms: u32) -> Result<MqMessage, MqError> {
+    pub fn receive_message(
+        &self,
+        name: &str,
+        max_size: usize,
+        timeout_ms: u32,
+    ) -> Result<MqMessage, MqError> {
         let queue = self.get_queue(name).ok_or(MqError::QueueNotFound)?;
         queue.receive(max_size, timeout_ms)
     }
@@ -676,18 +698,14 @@ static MQ_MANAGER_INIT: spin::Once = spin::Once::new();
 
 /// Initialize the global message queue manager
 pub fn init_mq_manager() {
-    MQ_MANAGER_INIT.call_once(|| {
-        unsafe {
-            MQ_MANAGER = Some(MessageQueueManager::new());
-        }
+    MQ_MANAGER_INIT.call_once(|| unsafe {
+        MQ_MANAGER = Some(MessageQueueManager::new());
     });
 }
 
 /// Get the global message queue manager
 pub fn get_mq_manager() -> Option<&'static MessageQueueManager> {
-    unsafe {
-        MQ_MANAGER.as_ref()
-    }
+    unsafe { MQ_MANAGER.as_ref() }
 }
 
 /// Create a new message queue

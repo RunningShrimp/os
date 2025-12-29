@@ -6,8 +6,9 @@
 //! - Boot failures and recovery
 //! - Performance metrics
 
-use crate::utils::error::Result;
 use alloc::string::String;
+
+use crate::utils::error::Result;
 
 /// Boot diagnostic information
 #[derive(Debug, Clone)]
@@ -100,12 +101,7 @@ impl BootDiagnostics {
     /// Generate boot summary string
     pub fn summary(&self) -> String {
         let mut summary = alloc::format!(
-            "Boot Summary:\n\
-             Time: {}ms\n\
-             CPU Count: {}\n\
-             Memory: {}MB\n\
-             Graphics: {:?}\n\
-             Phases: {}",
+            "Boot Summary:\nTime: {}ms\nCPU Count: {}\nMemory: {}MB\nGraphics: {:?}\nPhases: {}",
             self.total_boot_time,
             self.hardware_info.cpu_count,
             self.hardware_info.total_memory_mb,

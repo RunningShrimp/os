@@ -60,12 +60,7 @@ pub struct ApicConfig {
 impl ApicConfig {
     /// Create APIC configuration
     pub fn new(base_address: u64, apic_id: u8, is_bsp: bool) -> Self {
-        ApicConfig {
-            base_address,
-            apic_id,
-            is_bsp,
-            enabled: false,
-        }
+        ApicConfig { base_address, apic_id, is_bsp, enabled: false }
     }
 }
 
@@ -85,12 +80,7 @@ pub struct InterruptSource {
 impl InterruptSource {
     /// Create interrupt source
     pub fn new(irq: u8, vector: u8, priority: InterruptPriority) -> Self {
-        InterruptSource {
-            irq,
-            vector,
-            priority,
-            masked: false,
-        }
+        InterruptSource { irq, vector, priority, masked: false }
     }
 }
 
@@ -137,32 +127,36 @@ impl Pic8259a {
     pub fn initialize(&mut self, vector_offset: u8) -> bool {
         // ICW1: Initialize sequence
         self.write_port(self.master_base + PIC_CMD_PORT, 0x11);
-        
+
         // ICW2: Vector offset for master
         self.write_port(self.master_base + PIC_DATA_PORT, vector_offset);
 
         if self.mode == PicMode::Cascaded {
             // ICW1: Initialize slave
             self.write_port(self.slave_base + PIC_CMD_PORT, 0x11);
-            
+
             // ICW2: Vector offset for slave
             self.write_port(self.slave_base + PIC_DATA_PORT, vector_offset + 8);
 
             // ICW3: Master - slave on IRQ2
             self.write_port(self.master_base + PIC_DATA_PORT, 0x04);
-            
+
             // ICW3: Slave - connected to master IRQ2
             self.write_port(self.slave_base + PIC_DATA_PORT, 0x02);
         }
 
         // ICW4: 8086 mode
         self.write_port(self.master_base + PIC_DATA_PORT, 0x01);
-        
+
         if self.mode == PicMode::Cascaded {
             self.write_port(self.slave_base + PIC_DATA_PORT, 0x01);
         }
 
-        self.irq_count = if self.mode == PicMode::Cascaded { 16 } else { 8 };
+        self.irq_count = if self.mode == PicMode::Cascaded {
+            16
+        } else {
+            8
+        };
         true
     }
 
@@ -200,7 +194,7 @@ impl Pic8259a {
         }
 
         let eoi_command = 0x20u8;
-        
+
         if irq < 8 {
             self.write_port(self.master_base + PIC_CMD_PORT, eoi_command);
         } else {
@@ -214,9 +208,12 @@ impl Pic8259a {
     /// Update mask register (OCW1)
     fn update_mask_register(&mut self) {
         self.write_port(self.master_base + PIC_DATA_PORT, (self.interrupt_mask & 0xFF) as u8);
-        
+
         if self.mode == PicMode::Cascaded {
-            self.write_port(self.slave_base + PIC_DATA_PORT, ((self.interrupt_mask >> 8) & 0xFF) as u8);
+            self.write_port(
+                self.slave_base + PIC_DATA_PORT,
+                ((self.interrupt_mask >> 8) & 0xFF) as u8,
+            );
         }
     }
 
@@ -285,12 +282,7 @@ impl InterruptRouter {
     }
 
     /// Route IRQ to vector
-    pub fn route_irq(
-        &mut self,
-        irq: u8,
-        vector: u8,
-        priority: InterruptPriority,
-    ) -> bool {
+    pub fn route_irq(&mut self, irq: u8, vector: u8, priority: InterruptPriority) -> bool {
         if irq >= 16 {
             return false;
         }
@@ -408,7 +400,7 @@ mod tests {
     fn test_mask_irq() {
         let mut pic = Pic8259a::new(PicMode::Cascaded);
         pic.initialize(32);
-        
+
         assert!(pic.mask_irq(0));
         assert!(pic.is_masked(0));
     }
@@ -417,7 +409,7 @@ mod tests {
     fn test_unmask_irq() {
         let mut pic = Pic8259a::new(PicMode::Cascaded);
         pic.initialize(32);
-        
+
         pic.mask_irq(0);
         assert!(pic.unmask_irq(0));
         assert!(!pic.is_masked(0));
@@ -427,7 +419,7 @@ mod tests {
     fn test_irq_out_of_range() {
         let mut pic = Pic8259a::new(PicMode::Cascaded);
         pic.initialize(32);
-        
+
         assert!(!pic.mask_irq(20));
         assert!(!pic.unmask_irq(20));
     }
@@ -482,7 +474,7 @@ mod tests {
     fn test_route_irq() {
         let mut router = InterruptRouter::new();
         router.initialize_pic(32);
-        
+
         assert!(router.route_irq(0, 32, InterruptPriority::Level0));
         assert_eq!(router.total_routed(), 1);
     }
@@ -491,11 +483,11 @@ mod tests {
     fn test_route_multiple_irqs() {
         let mut router = InterruptRouter::new();
         router.initialize_pic(32);
-        
+
         for i in 0..8 {
             assert!(router.route_irq(i, 32 + i, InterruptPriority::Level0));
         }
-        
+
         assert_eq!(router.total_routed(), 8);
     }
 
@@ -504,9 +496,9 @@ mod tests {
         let mut router = InterruptRouter::new();
         router.initialize_pic(32);
         router.route_irq(0, 32, InterruptPriority::Level0);
-        
+
         assert!(router.mask_interrupt(0));
-        
+
         let routing = router.get_routing(0).unwrap();
         assert!(routing.masked);
     }
@@ -517,9 +509,9 @@ mod tests {
         router.initialize_pic(32);
         router.route_irq(0, 32, InterruptPriority::Level0);
         router.mask_interrupt(0);
-        
+
         assert!(router.unmask_interrupt(0));
-        
+
         let routing = router.get_routing(0).unwrap();
         assert!(!routing.masked);
     }
@@ -529,7 +521,7 @@ mod tests {
         let mut router = InterruptRouter::new();
         router.initialize_pic(32);
         router.route_irq(5, 37, InterruptPriority::Level5);
-        
+
         let routing = router.get_routing(5).unwrap();
         assert_eq!(routing.irq, 5);
         assert_eq!(routing.vector, 37);
@@ -540,7 +532,7 @@ mod tests {
     fn test_acknowledge_irq() {
         let mut router = InterruptRouter::new();
         router.initialize_pic(32);
-        
+
         assert!(router.acknowledge_irq(0));
         assert!(router.acknowledge_irq(10));
     }
@@ -549,12 +541,12 @@ mod tests {
     fn test_enabled_count() {
         let mut router = InterruptRouter::new();
         router.initialize_pic(32);
-        
+
         router.route_irq(0, 32, InterruptPriority::Level0);
         router.route_irq(1, 33, InterruptPriority::Level1);
-        
+
         assert_eq!(router.enabled_count(), 2);
-        
+
         router.mask_interrupt(0);
         assert_eq!(router.enabled_count(), 1);
     }
@@ -563,11 +555,11 @@ mod tests {
     fn test_routing_report() {
         let mut router = InterruptRouter::new();
         router.initialize_pic(32);
-        
+
         router.route_irq(0, 32, InterruptPriority::Level0);
         router.route_irq(1, 33, InterruptPriority::Level1);
         router.mask_interrupt(1);
-        
+
         let report = router.routing_report();
         assert_eq!(report.total_routed, 2);
         assert_eq!(report.enabled_interrupts, 1);
@@ -584,10 +576,10 @@ mod tests {
     fn test_pic_mask_register() {
         let mut pic = Pic8259a::new(PicMode::Cascaded);
         pic.initialize(32);
-        
+
         pic.mask_irq(0);
         pic.mask_irq(5);
-        
+
         let mask = pic.get_mask();
         assert_eq!(mask & 0x01, 0x01);
         assert_eq!(mask & 0x20, 0x20);
@@ -597,7 +589,7 @@ mod tests {
     fn test_cascaded_vs_single_mode() {
         let cascaded = Pic8259a::new(PicMode::Cascaded);
         let single = Pic8259a::new(PicMode::Single);
-        
+
         assert_eq!(cascaded.irq_count, 0); // Not initialized yet
         assert_eq!(single.irq_count, 0);
     }
@@ -606,15 +598,15 @@ mod tests {
     fn test_multiple_masking_operations() {
         let mut router = InterruptRouter::new();
         router.initialize_pic(32);
-        
+
         for i in 0..8 {
             router.route_irq(i, 32 + i, InterruptPriority::Level0);
         }
-        
+
         for i in 0..4 {
             router.mask_interrupt(i);
         }
-        
+
         assert_eq!(router.enabled_count(), 4);
     }
 }

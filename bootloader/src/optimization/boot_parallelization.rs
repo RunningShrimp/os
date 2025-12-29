@@ -6,10 +6,8 @@
 //! - Work queue management
 //! - Synchronization primitives
 
+use alloc::{format, string::String, vec::Vec};
 use core::fmt;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::format;
 
 /// Task status
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -145,7 +143,8 @@ impl TaskQueue {
 
     /// Get next runnable task
     pub fn get_next_runnable(&self) -> Option<&BootTask> {
-        let completed: Vec<u32> = self.tasks
+        let completed: Vec<u32> = self
+            .tasks
             .iter()
             .filter(|t| t.status == TaskStatus::Completed)
             .map(|t| t.task_id)
@@ -256,10 +255,15 @@ impl BootParallelizer {
         if self.task_queue.get_running_count() >= self.max_parallel_tasks {
             return None;
         }
-        
+
         if let Some(task) = self.task_queue.get_next_runnable() {
             let task_id = task.task_id;
-            if let Some(t) = self.task_queue.tasks.iter_mut().find(|x| x.task_id == task_id) {
+            if let Some(t) = self
+                .task_queue
+                .tasks
+                .iter_mut()
+                .find(|x| x.task_id == task_id)
+            {
                 t.status = TaskStatus::Running;
             }
             Some(task_id)
@@ -267,12 +271,12 @@ impl BootParallelizer {
             None
         }
     }
-    
+
     /// Get maximum parallel tasks limit
     pub fn max_parallel_tasks(&self) -> u32 {
         self.max_parallel_tasks
     }
-    
+
     /// Set maximum parallel tasks limit
     pub fn set_max_parallel_tasks(&mut self, limit: u32) -> bool {
         self.max_parallel_tasks = limit;
@@ -296,10 +300,7 @@ impl BootParallelizer {
 
     /// Get speedup estimate
     pub fn estimate_speedup(&self) -> f32 {
-        let total_time: u64 = self.task_queue.tasks
-            .iter()
-            .map(|t| t.execution_time)
-            .sum();
+        let total_time: u64 = self.task_queue.tasks.iter().map(|t| t.execution_time).sum();
 
         if self.total_boot_time > 0 {
             total_time as f32 / self.total_boot_time as f32

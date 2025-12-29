@@ -1,0 +1,3 @@
+# Clippy 配置
+warn-on-all-wildcard-imports = true
+msrv = "2024.0"

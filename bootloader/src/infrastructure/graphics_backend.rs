@@ -4,8 +4,8 @@
 //! for UEFI GOP and BIOS VBE graphics systems.
 
 use alloc::boxed::Box;
-use crate::domain::boot_config::GraphicsMode;
-use crate::protocol::FramebufferInfo;
+
+use crate::{domain::boot_config::GraphicsMode, protocol::FramebufferInfo};
 
 /// Framebuffer pixel format
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,10 +65,7 @@ pub struct UefiGopBackend {
 #[cfg(feature = "uefi_support")]
 impl UefiGopBackend {
     pub fn new() -> Self {
-        Self {
-            framebuffer_info: None,
-            initialized: false,
-        }
+        Self { framebuffer_info: None, initialized: false }
     }
 }
 
@@ -82,7 +79,8 @@ impl GraphicsBackend for UefiGopBackend {
         }
 
         let fb_info = FramebufferInfo {
-            address: 0xF0000000,  // Test framebuffer address (would be set by UEFI GOP in real implementation)
+            address: 0xF0000000, /* Test framebuffer address (would be set by UEFI GOP in real
+                                  * implementation) */
             width: mode.width as u32,
             height: mode.height as u32,
             pitch: mode.scanline_bytes() as u32,
@@ -289,7 +287,8 @@ impl GraphicsBackend for UefiGopBackend {
                         if (font_row >> (7 - dx)) & 1 != 0 {
                             let pixel_offset = (row_y as usize * stride_pixels) + pixel_x as usize;
 
-                            // SAFETY: Assumes framebuffer address is valid and coordinates are within bounds
+                            // SAFETY: Assumes framebuffer address is valid and coordinates are
+                            // within bounds
                             unsafe {
                                 fb_ptr.add(pixel_offset).write(color);
                             }
@@ -309,12 +308,11 @@ impl GraphicsBackend for UefiGopBackend {
 
     fn supports_mode(&self, mode: &GraphicsMode) -> bool {
         // GOP supports wide range of modes
-        mode.width >= 640 && mode.width <= 4096
-            && mode.height >= 480 && mode.height <= 2160
+        mode.width >= 640 && mode.width <= 4096 && mode.height >= 480 && mode.height <= 2160
     }
 
     fn pixel_format(&self) -> PixelFormat {
-        PixelFormat::BGR  // GOP typically uses BGR
+        PixelFormat::BGR // GOP typically uses BGR
     }
 }
 
@@ -564,7 +562,8 @@ impl GraphicsBackend for VbeBackend {
                         if (font_row >> (7 - dx)) & 1 != 0 {
                             let pixel_offset = (row_y as usize * stride_pixels) + pixel_x as usize;
 
-                            // SAFETY: Assumes framebuffer address is valid and coordinates are within bounds
+                            // SAFETY: Assumes framebuffer address is valid and coordinates are
+                            // within bounds
                             unsafe {
                                 fb_ptr.add(pixel_offset).write(color);
                             }
@@ -589,8 +588,15 @@ impl GraphicsBackend for VbeBackend {
     fn pixel_format(&self) -> PixelFormat {
         // Get current mode and determine pixel format from mode info
         if let Some(current_mode) = self.vbe_controller.get_current_mode() {
-            if let Ok(mode_info) = self.vbe_controller.get_controller().get_mode_info_details(current_mode) {
-                return self.vbe_controller.get_controller().determine_pixel_format(&mode_info);
+            if let Ok(mode_info) = self
+                .vbe_controller
+                .get_controller()
+                .get_mode_info_details(current_mode)
+            {
+                return self
+                    .vbe_controller
+                    .get_controller()
+                    .determine_pixel_format(&mode_info);
             }
         }
         // Default to RGB if we can't determine the format
@@ -624,7 +630,7 @@ pub fn create_graphics_backend(
             {
                 Err("No graphics backend available for Multiboot2")
             }
-        }
+        },
     }
 }
 
@@ -646,7 +652,7 @@ mod tests {
         let backend = VbeBackend::new();
         let mode_1024 = GraphicsMode::new(1024, 768, 32).unwrap();
         let mode_1920 = GraphicsMode::new(1920, 1080, 32).unwrap();
-        
+
         assert!(backend.supports_mode(&mode_1024));
         assert!(backend.supports_mode(&mode_1920));
     }

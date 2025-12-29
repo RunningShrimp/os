@@ -1,7 +1,9 @@
 // Memory-mapped I/O utilities
 
-use core::marker::PhantomData;
-use core::ptr::{read_volatile, write_volatile};
+use core::{
+    marker::PhantomData,
+    ptr::{read_volatile, write_volatile},
+};
 
 /// Generic MMIO register wrapper
 pub struct MmioReg<T> {
@@ -17,10 +19,7 @@ impl<T> MmioReg<T> {
     /// - `addr` must be properly aligned for type `T`
     /// - The memory at `addr` must be accessible for reading and writing
     pub unsafe fn new(addr: usize) -> Self {
-        Self {
-            addr: addr as *mut T,
-            _phantom: PhantomData,
-        }
+        Self { addr: addr as *mut T, _phantom: PhantomData }
     }
 
     /// Read volatile value

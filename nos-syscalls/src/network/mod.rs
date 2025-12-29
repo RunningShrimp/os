@@ -2,32 +2,23 @@
 //!
 //! This module provides network related system calls.
 
-use alloc::string::ToString;
-use alloc::boxed::Box;
+use alloc::{boxed::Box, string::ToString};
+
 use nos_api::Result;
-use crate::SyscallHandler;
-use crate::SyscallDispatcher;
+
+use crate::{SyscallDispatcher, SyscallHandler};
 
 /// Register network system call handlers
 pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     // Register socket system call
-    dispatcher.register_handler(
-        crate::types::SYS_SOCKET,
-        Box::new(SocketHandler)
-    );
-    
+    dispatcher.register_handler(crate::types::SYS_SOCKET, Box::new(SocketHandler));
+
     // Register connect system call
-    dispatcher.register_handler(
-        crate::types::SYS_CONNECT,
-        Box::new(ConnectHandler)
-    );
-    
+    dispatcher.register_handler(crate::types::SYS_CONNECT, Box::new(ConnectHandler));
+
     // Register accept system call
-    dispatcher.register_handler(
-        crate::types::SYS_ACCEPT,
-        Box::new(AcceptHandler)
-    );
-    
+    dispatcher.register_handler(crate::types::SYS_ACCEPT, Box::new(AcceptHandler));
+
     Ok(())
 }
 
@@ -38,25 +29,30 @@ impl SyscallHandler for SocketHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_SOCKET
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 3 {
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
         }
-        
+
         let domain = args[0] as i32;
         let type_ = args[1] as i32;
         let protocol = args[2] as i32;
-        
+
         // TODO: Implement actual socket logic using parameters:
         // domain: Address family (AF_INET, AF_INET6, etc.)
         // type_: Socket type (SOCK_STREAM, SOCK_DGRAM, etc.)
         // protocol: Protocol type (0 for default protocol)
-        sys_trace_with_args!("socket called with: domain={}, type={}, protocol={}", domain, type_, protocol);
-        
+        sys_trace_with_args!(
+            "socket called with: domain={}, type={}, protocol={}",
+            domain,
+            type_,
+            protocol
+        );
+
         Ok(3) // Return a dummy socket descriptor
     }
-    
+
     fn name(&self) -> &str {
         "socket"
     }
@@ -69,12 +65,12 @@ impl SyscallHandler for ConnectHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_CONNECT
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 3 {
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
         }
-        
+
         let sockfd = args[0] as i32;
         let addr = args[1] as *const u8;
         let addrlen = args[2] as u32;
@@ -83,11 +79,16 @@ impl SyscallHandler for ConnectHandler {
         // sockfd: Socket file descriptor
         // addr: Pointer to socket address structure
         // addrlen: Size of socket address structure
-        sys_trace_with_args!("connect called with: sockfd={}, addr={:?}, addrlen={}", sockfd, addr, addrlen);
+        sys_trace_with_args!(
+            "connect called with: sockfd={}, addr={:?}, addrlen={}",
+            sockfd,
+            addr,
+            addrlen
+        );
 
         Ok(0)
     }
-    
+
     fn name(&self) -> &str {
         "connect"
     }
@@ -100,25 +101,30 @@ impl SyscallHandler for AcceptHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_ACCEPT
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 3 {
             return Err(nos_api::Error::InvalidArgument("Insufficient arguments".to_string()));
         }
-        
+
         let sockfd = args[0] as i32;
         let addr = args[1] as *mut u8;
         let addrlen = args[2] as *mut u32;
-        
+
         // TODO: Implement actual accept logic using parameters:
         // sockfd: Socket file descriptor for listening
         // addr: Pointer to store client address
         // addrlen: Pointer to store client address length
-        sys_trace_with_args!("accept called with: sockfd={}, addr={:?}, addrlen={:?}", sockfd, addr, addrlen);
-        
+        sys_trace_with_args!(
+            "accept called with: sockfd={}, addr={:?}, addrlen={:?}",
+            sockfd,
+            addr,
+            addrlen
+        );
+
         Ok(4) // Return a dummy socket descriptor
     }
-    
+
     fn name(&self) -> &str {
         "accept"
     }

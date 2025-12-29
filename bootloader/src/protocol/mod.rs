@@ -67,13 +67,7 @@ pub struct FramebufferInfo {
 impl FramebufferInfo {
     /// Create new framebuffer info
     pub fn new(address: usize, width: u32, height: u32, pitch: u32, bpp: u32) -> Self {
-        Self {
-            address,
-            width,
-            height,
-            pitch,
-            bpp,
-        }
+        Self { address, width, height, pitch, bpp }
     }
 
     /// Calculate buffer size in bytes

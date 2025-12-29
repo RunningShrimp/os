@@ -3,12 +3,11 @@
 //! This module provides advanced memory management system calls,
 //! including memory-mapped files, huge pages, and NUMA-aware allocation.
 
-use alloc::string::ToString;
-use alloc::boxed::Box;
-use alloc::format;
-use nos_api::{Result, Error};
-use crate::SyscallHandler;
-use crate::SyscallDispatcher;
+use alloc::{boxed::Box, format, string::ToString};
+
+use nos_api::{Error, Result};
+
+use crate::{SyscallDispatcher, SyscallHandler};
 
 /// Memory protection flags
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -35,7 +34,7 @@ impl MemProtection {
             _ => Self::Read,
         }
     }
-    
+
     pub fn to_bits(&self) -> u32 {
         *self as u32
     }
@@ -69,7 +68,7 @@ impl MapFlags {
             _ => Self::Private,
         }
     }
-    
+
     pub fn to_bits(&self) -> u32 {
         *self as u32
     }
@@ -151,7 +150,7 @@ impl AdvancedMemoryManager {
             huge_page_1gb: 1024 * 1024 * 1024,
         }
     }
-    
+
     pub fn allocate(&mut self, options: &AdvancedMmapOptions, size: usize) -> Result<MemoryRegion> {
         let aligned_size = if options.huge_page_size.is_some() {
             let page_size = match options.huge_page_size.unwrap() {
@@ -163,10 +162,10 @@ impl AdvancedMemoryManager {
         } else {
             ((size + 4095) / 4096) * 4096
         };
-        
+
         let addr = self.next_addr;
         self.next_addr += aligned_size;
-        
+
         let region = MemoryRegion {
             addr,
             size: aligned_size,
@@ -174,34 +173,45 @@ impl AdvancedMemoryManager {
             numa_node: options.numa_node,
             refcount: 1,
         };
-        
+
         self.regions.insert(addr, region.clone());
-        sys_trace_with_args!("Allocated memory region: addr={:#x}, size={}, numa_node={:?}", 
-                   addr, aligned_size, options.numa_node);
-        
+        sys_trace_with_args!(
+            "Allocated memory region: addr={:#x}, size={}, numa_node={:?}",
+            addr,
+            aligned_size,
+            options.numa_node
+        );
+
         Ok(region)
     }
-    
+
     pub fn deallocate(&mut self, addr: usize) -> Result<()> {
-        self.regions.remove(&addr)
+        self.regions
+            .remove(&addr)
             .ok_or_else(|| Error::NotFound(format!("Memory region at {:#x} not found", addr)))?;
         sys_trace_with_args!("Deallocated memory region: addr={:#x}", addr);
         Ok(())
     }
-    
+
     pub fn protect(&mut self, addr: usize, size: usize, protection: MemProtection) -> Result<()> {
-        let region = self.regions.get_mut(&addr)
+        let region = self
+            .regions
+            .get_mut(&addr)
             .ok_or_else(|| Error::NotFound(format!("Memory region at {:#x} not found", addr)))?;
         region.protection = protection;
-        sys_trace_with_args!("Protected memory region: addr={:#x}, size={:#x}, protection={:?}", 
-                   addr, size, protection);
+        sys_trace_with_args!(
+            "Protected memory region: addr={:#x}, size={:#x}, protection={:?}",
+            addr,
+            size,
+            protection
+        );
         Ok(())
     }
-    
+
     pub fn get_region(&self, addr: usize) -> Option<&MemoryRegion> {
         self.regions.get(&addr)
     }
-    
+
     pub fn get_regions(&self) -> alloc::vec::Vec<&MemoryRegion> {
         self.regions.values().collect()
     }
@@ -218,7 +228,7 @@ impl AdvancedMmapHandler {
             manager: alloc::sync::Arc::new(spin::Mutex::new(AdvancedMemoryManager::new())),
         }
     }
-    
+
     pub fn manager(&self) -> &alloc::sync::Arc<spin::Mutex<AdvancedMemoryManager>> {
         &self.manager
     }
@@ -234,10 +244,12 @@ impl SyscallHandler for AdvancedMmapHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_ADVANCED_MMAP
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 6 {
-            return Err(Error::InvalidArgument("Insufficient arguments for advanced mmap".to_string()));
+            return Err(Error::InvalidArgument(
+                "Insufficient arguments for advanced mmap".to_string(),
+            ));
         }
 
         let addr = args[0];
@@ -252,22 +264,33 @@ impl SyscallHandler for AdvancedMmapHandler {
             flags,
             numa_policy: None,
             numa_node: None,
-            huge_page_size: if flags == MapFlags::Huge2MB { Some(2) }
-                        else if flags == MapFlags::Huge1GB { Some(1) }
-                        else { None },
+            huge_page_size: if flags == MapFlags::Huge2MB {
+                Some(2)
+            } else if flags == MapFlags::Huge1GB {
+                Some(1)
+            } else {
+                None
+            },
             compress: false,
             cache_hint: CacheHint::Default,
         };
 
         let mut manager = self.manager.lock();
         let region = manager.allocate(&options, length)?;
-        
-        sys_trace_with_args!("advanced_mmap: addr={:#x}, length={}, prot={:?}, flags={:?}, fd={}, offset={:#x}",
-                   addr, length, prot, flags, fd, offset);
-        
+
+        sys_trace_with_args!(
+            "advanced_mmap: addr={:#x}, length={}, prot={:?}, flags={:?}, fd={}, offset={:#x}",
+            addr,
+            length,
+            prot,
+            flags,
+            fd,
+            offset
+        );
+
         Ok(region.addr as isize)
     }
-    
+
     fn name(&self) -> &str {
         "advanced_mmap"
     }
@@ -288,10 +311,12 @@ impl SyscallHandler for AdvancedMprotectHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_ADVANCED_MPROTECT
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 3 {
-            return Err(Error::InvalidArgument("Insufficient arguments for advanced mprotect".to_string()));
+            return Err(Error::InvalidArgument(
+                "Insufficient arguments for advanced mprotect".to_string(),
+            ));
         }
 
         let addr = args[0];
@@ -300,12 +325,12 @@ impl SyscallHandler for AdvancedMprotectHandler {
 
         let mut manager = self.manager.lock();
         manager.protect(addr, len, prot)?;
-        
+
         sys_trace_with_args!("advanced_mprotect: addr={:#x}, len={}, prot={:?}", addr, len, prot);
-        
+
         Ok(0)
     }
-    
+
     fn name(&self) -> &str {
         "advanced_mprotect"
     }
@@ -326,10 +351,12 @@ impl SyscallHandler for AdvancedMunmapHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_ADVANCED_MUNMAP
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 2 {
-            return Err(Error::InvalidArgument("Insufficient arguments for advanced munmap".to_string()));
+            return Err(Error::InvalidArgument(
+                "Insufficient arguments for advanced munmap".to_string(),
+            ));
         }
 
         let addr = args[0];
@@ -337,12 +364,12 @@ impl SyscallHandler for AdvancedMunmapHandler {
 
         let mut manager = self.manager.lock();
         manager.deallocate(addr)?;
-        
+
         sys_trace_with_args!("advanced_munmap: addr={:#x}, length={:#x}", addr, length);
-        
+
         Ok(0)
     }
-    
+
     fn name(&self) -> &str {
         "advanced_munmap"
     }
@@ -363,19 +390,23 @@ impl SyscallHandler for MemoryStatsHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_MEMORY_STATS
     }
-    
+
     fn execute(&self, _args: &[usize]) -> Result<isize> {
         let manager = self.manager.lock();
         let regions = manager.get_regions();
-        
+
         let total_regions = regions.len();
         let total_bytes: usize = regions.iter().map(|r| r.size).sum();
-        
-        sys_trace_with_args!("memory_stats: regions={}, total_bytes={}", total_regions, total_bytes);
-        
+
+        sys_trace_with_args!(
+            "memory_stats: regions={}, total_bytes={}",
+            total_regions,
+            total_bytes
+        );
+
         Ok((total_regions * 8) as isize)
     }
-    
+
     fn name(&self) -> &str {
         "memory_stats"
     }
@@ -385,12 +416,12 @@ impl SyscallHandler for MemoryStatsHandler {
 pub fn register_syscalls(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     let handler = AdvancedMmapHandler::new();
     let manager = handler.manager().clone();
-    
+
     dispatcher.register_handler(1000, Box::new(handler));
     dispatcher.register_handler(1001, Box::new(AdvancedMprotectHandler::new(manager.clone())));
     dispatcher.register_handler(1002, Box::new(AdvancedMunmapHandler::new(manager.clone())));
     dispatcher.register_handler(1003, Box::new(MemoryStatsHandler::new(manager)));
-    
+
     Ok(())
 }
 
@@ -415,7 +446,7 @@ mod tests {
     #[test]
     fn test_memory_manager() {
         let mut manager = AdvancedMemoryManager::new();
-        
+
         let options = AdvancedMmapOptions {
             protection: MemProtection::ReadWrite,
             flags: MapFlags::Private,
@@ -425,13 +456,13 @@ mod tests {
             compress: false,
             cache_hint: CacheHint::Default,
         };
-        
+
         let region = manager.allocate(&options, 4096).unwrap();
         assert_eq!(region.size, 4096);
-        
+
         let found = manager.get_region(region.addr).unwrap();
         assert_eq!(found.addr, region.addr);
-        
+
         manager.deallocate(region.addr).unwrap();
         assert!(manager.get_region(region.addr).is_none());
     }
@@ -440,10 +471,10 @@ mod tests {
     fn test_advanced_mmap_handler() {
         let handler = AdvancedMmapHandler::new();
         assert_eq!(handler.name(), "advanced_mmap");
-        
+
         let result = handler.execute(&[]);
         assert!(result.is_err());
-        
+
         let result = handler.execute(&[0x1000, 4096, 0x3, 0x2, 3, 0]);
         assert!(result.is_ok());
     }
@@ -452,7 +483,7 @@ mod tests {
     fn test_memory_stats_handler() {
         let handler = AdvancedMmapHandler::new();
         let stats_handler = MemoryStatsHandler::new(handler.manager().clone());
-        
+
         let result = stats_handler.execute(&[]);
         assert!(result.is_ok());
     }

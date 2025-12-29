@@ -5,9 +5,7 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
 /// 调试插件
 #[derive(Debug, Clone)]
@@ -72,4 +70,3 @@ pub enum PluginInterface {
     /// 专用接口
     Specialized,
 }
-

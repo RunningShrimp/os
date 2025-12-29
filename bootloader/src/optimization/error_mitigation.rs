@@ -6,10 +6,8 @@
 //! - Recovery tactics
 //! - Error reporting
 
+use alloc::{format, string::String, vec::Vec};
 use core::fmt;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::format;
 
 /// Error category
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -143,12 +141,7 @@ pub struct MitigationRecord {
 impl MitigationRecord {
     /// Create new record
     pub fn new(error: BootError, strategy: MitigationStrategy) -> Self {
-        MitigationRecord {
-            error,
-            strategy,
-            success: false,
-            attempts: 0,
-        }
+        MitigationRecord { error, strategy, success: false, attempts: 0 }
     }
 
     /// Increment attempts
@@ -167,7 +160,9 @@ impl fmt::Display for MitigationRecord {
         write!(
             f,
             "{}: {} [{}]",
-            self.error, self.strategy, if self.success { "Success" } else { "Failed" }
+            self.error,
+            self.strategy,
+            if self.success { "Success" } else { "Failed" }
         )
     }
 }
@@ -224,26 +219,26 @@ impl ErrorMitigator {
                     record.mark_success();
                     self.recovered_errors += 1;
                 }
-            }
+            },
             MitigationStrategy::Fallback => {
                 record.mark_success();
                 self.recovered_errors += 1;
-            }
+            },
             MitigationStrategy::Skip => {
                 record.mark_success();
                 self.recovered_errors += 1;
-            }
+            },
             MitigationStrategy::Reduce => {
                 record.mark_success();
                 self.recovered_errors += 1;
-            }
+            },
             MitigationStrategy::Ignore => {
                 record.mark_success();
                 self.recovered_errors += 1;
-            }
+            },
             MitigationStrategy::Halt => {
                 self.unrecoverable_errors += 1;
-            }
+            },
         }
 
         let success = record.success;

@@ -68,35 +68,35 @@ impl CPUIDInfo {
 /// CPU feature flags
 #[derive(Debug, Clone, Copy)]
 pub struct CPUFeatures {
-    pub fpu: bool,          // x87 FPU
-    pub vme: bool,          // Virtual mode extension
-    pub de: bool,           // Debug extension
-    pub pse: bool,          // Page size extension
-    pub tsc: bool,          // Time stamp counter
-    pub msr: bool,          // Model specific registers
-    pub pae: bool,          // Physical address extension
-    pub mce: bool,          // Machine check exception
-    pub cx8: bool,          // CMPXCHG8B instruction
-    pub apic: bool,         // APIC on chip
-    pub sep: bool,          // SYSENTER/SYSEXIT
-    pub mtrr: bool,         // Memory type range registers
-    pub pge: bool,          // PTE global bit
-    pub mca: bool,          // Machine check architecture
-    pub cmov: bool,         // Conditional move
-    pub pat: bool,          // Page attribute table
-    pub pse36: bool,        // 36-bit PSE
-    pub psn: bool,          // Processor serial number
-    pub clfsh: bool,        // CLFLUSH instruction
-    pub ds: bool,           // Debug store
-    pub acpi: bool,         // ACPI support
-    pub mmx: bool,          // MMX
-    pub fxsr: bool,         // FXSAVE/FXRSTOR
-    pub sse: bool,          // SSE
-    pub sse2: bool,         // SSE2
-    pub ss: bool,           // Self snoop
-    pub htt: bool,          // Hyper-threading
-    pub tm: bool,           // Thermal monitor
-    pub ia64: bool,         // IA64
+    pub fpu: bool,   // x87 FPU
+    pub vme: bool,   // Virtual mode extension
+    pub de: bool,    // Debug extension
+    pub pse: bool,   // Page size extension
+    pub tsc: bool,   // Time stamp counter
+    pub msr: bool,   // Model specific registers
+    pub pae: bool,   // Physical address extension
+    pub mce: bool,   // Machine check exception
+    pub cx8: bool,   // CMPXCHG8B instruction
+    pub apic: bool,  // APIC on chip
+    pub sep: bool,   // SYSENTER/SYSEXIT
+    pub mtrr: bool,  // Memory type range registers
+    pub pge: bool,   // PTE global bit
+    pub mca: bool,   // Machine check architecture
+    pub cmov: bool,  // Conditional move
+    pub pat: bool,   // Page attribute table
+    pub pse36: bool, // 36-bit PSE
+    pub psn: bool,   // Processor serial number
+    pub clfsh: bool, // CLFLUSH instruction
+    pub ds: bool,    // Debug store
+    pub acpi: bool,  // ACPI support
+    pub mmx: bool,   // MMX
+    pub fxsr: bool,  // FXSAVE/FXRSTOR
+    pub sse: bool,   // SSE
+    pub sse2: bool,  // SSE2
+    pub ss: bool,    // Self snoop
+    pub htt: bool,   // Hyper-threading
+    pub tm: bool,    // Thermal monitor
+    pub ia64: bool,  // IA64
 }
 
 impl CPUFeatures {
@@ -177,27 +177,69 @@ impl CPUFeatures {
     /// Count enabled features
     pub fn count(&self) -> u32 {
         let mut count = 0;
-        if self.fpu { count += 1; }
-        if self.vme { count += 1; }
-        if self.de { count += 1; }
-        if self.pse { count += 1; }
-        if self.tsc { count += 1; }
-        if self.msr { count += 1; }
-        if self.pae { count += 1; }
-        if self.mce { count += 1; }
-        if self.cx8 { count += 1; }
-        if self.apic { count += 1; }
-        if self.sep { count += 1; }
-        if self.mtrr { count += 1; }
-        if self.pge { count += 1; }
-        if self.mca { count += 1; }
-        if self.cmov { count += 1; }
-        if self.pat { count += 1; }
-        if self.pse36 { count += 1; }
-        if self.mmx { count += 1; }
-        if self.sse { count += 1; }
-        if self.sse2 { count += 1; }
-        if self.htt { count += 1; }
+        if self.fpu {
+            count += 1;
+        }
+        if self.vme {
+            count += 1;
+        }
+        if self.de {
+            count += 1;
+        }
+        if self.pse {
+            count += 1;
+        }
+        if self.tsc {
+            count += 1;
+        }
+        if self.msr {
+            count += 1;
+        }
+        if self.pae {
+            count += 1;
+        }
+        if self.mce {
+            count += 1;
+        }
+        if self.cx8 {
+            count += 1;
+        }
+        if self.apic {
+            count += 1;
+        }
+        if self.sep {
+            count += 1;
+        }
+        if self.mtrr {
+            count += 1;
+        }
+        if self.pge {
+            count += 1;
+        }
+        if self.mca {
+            count += 1;
+        }
+        if self.cmov {
+            count += 1;
+        }
+        if self.pat {
+            count += 1;
+        }
+        if self.pse36 {
+            count += 1;
+        }
+        if self.mmx {
+            count += 1;
+        }
+        if self.sse {
+            count += 1;
+        }
+        if self.sse2 {
+            count += 1;
+        }
+        if self.htt {
+            count += 1;
+        }
         count
     }
 }
@@ -228,7 +270,7 @@ impl HardwareInitializer {
         self.cpu_features.pae = true;
         self.cpu_features.msr = true;
         self.cpu_features.tsc = true;
-        
+
         Ok(())
     }
 
@@ -298,7 +340,7 @@ mod tests {
 
     #[test]
     fn test_cpu_features_from_edx() {
-        let edx = (1 << 0) | (1 << 6) | (1 << 5);  // FPU, PAE, MSR
+        let edx = (1 << 0) | (1 << 6) | (1 << 5); // FPU, PAE, MSR
         let features = CPUFeatures::from_edx(edx);
         assert!(features.fpu);
         assert!(features.pae);

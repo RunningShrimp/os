@@ -1,19 +1,16 @@
 /// Anomaly Detection Module for IDS
-
 extern crate alloc;
-///
+use alloc::{string::String, sync::Arc, vec::Vec};
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
 /// This module implements machine learning-based anomaly detection
 /// to identify unusual patterns that may indicate security threats.
-
-use crate::subsystems::sync::{SpinLock, Mutex};
-use crate::collections::VecDeque;
-use crate::collections::HashMap;
-use crate::compat::DefaultHasherBuilder;
-use crate::subsystems::time::{SystemTime, UNIX_EPOCH};
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::string::String;
-use core::sync::atomic::{AtomicU64, AtomicBool, Ordering};
+use crate::subsystems::sync::{Mutex, SpinLock};
+use crate::{
+    collections::{HashMap, VecDeque},
+    compat::DefaultHasherBuilder,
+    subsystems::time::{SystemTime, UNIX_EPOCH},
+};
 
 /// Simple square root implementation for no_std environment
 fn sqrt_f64(x: f64) -> f64 {
@@ -260,7 +257,8 @@ impl StatisticalDetector {
             let alpha = 1.0 / self.count as f64;
             let delta = value - self.moving_average;
             self.moving_average += alpha * delta;
-            self.variance = self.variance * (1.0 - alpha) + alpha * alpha * delta * delta * (self.count as f64 - 1.0);
+            self.variance = self.variance * (1.0 - alpha)
+                + alpha * alpha * delta * delta * (self.count as f64 - 1.0);
         }
 
         // Check if we have enough data
@@ -408,7 +406,8 @@ impl ClusteringDetector {
     fn run_kmeans(&mut self, features: &[FeatureVector]) {
         let mut assignments = vec![0; features.len()];
 
-        for _ in 0..20 { // Max iterations
+        for _ in 0..20 {
+            // Max iterations
             // Assign points to nearest cluster
             for (i, feature) in features.iter().enumerate() {
                 let mut min_dist = f64::INFINITY;
@@ -496,7 +495,10 @@ impl AnomalyDetector {
     }
 
     /// Initialize the detector with configuration
-    pub fn init(&mut self, config: &crate::ids::AnomalyDetectionConfig) -> Result<(), &'static str> {
+    pub fn init(
+        &mut self,
+        config: &crate::ids::AnomalyDetectionConfig,
+    ) -> Result<(), &'static str> {
         if !config.enabled {
             // If disabled, mark as untrained/idle
             self.trained.store(false, Ordering::SeqCst);
@@ -507,7 +509,9 @@ impl AnomalyDetector {
         if let Some(algo) = config.algorithms.first() {
             self.algorithm = match algo {
                 crate::ids::AnomalyAlgorithm::Statistical => DetectionAlgorithm::Statistical,
-                crate::ids::AnomalyAlgorithm::MachineLearning => DetectionAlgorithm::MachineLearning,
+                crate::ids::AnomalyAlgorithm::MachineLearning => {
+                    DetectionAlgorithm::MachineLearning
+                },
                 _ => DetectionAlgorithm::Statistical,
             };
         }
@@ -544,7 +548,10 @@ impl AnomalyDetector {
                         Some(self.create_anomaly(
                             AnomalyCategory::Performance,
                             AnomalySeverity::Medium,
-                            alloc::format!("Statistical anomaly detected in metric: {}", metric_name),
+                            alloc::format!(
+                                "Statistical anomaly detected in metric: {}",
+                                metric_name
+                            ),
                             score,
                             vec![(String::from(metric_name), value)],
                         ))
@@ -554,7 +561,7 @@ impl AnomalyDetector {
                 } else {
                     None
                 }
-            }
+            },
             _ => None, // Other algorithms need feature vectors
         }
     }
@@ -569,8 +576,9 @@ impl AnomalyDetector {
                 self.feature_buffer.push(feature.clone());
 
                 // Train if we have enough samples
-                if self.feature_buffer.len() >= self.clustering.params.min_training_samples &&
-                   !self.trained.load(Ordering::Relaxed) {
+                if self.feature_buffer.len() >= self.clustering.params.min_training_samples
+                    && !self.trained.load(Ordering::Relaxed)
+                {
                     self.clustering.train(self.feature_buffer.clone());
                     self.trained.store(true, Ordering::Relaxed);
                 }
@@ -579,20 +587,25 @@ impl AnomalyDetector {
                 if self.trained.load(Ordering::Relaxed) {
                     if let Some((is_anomaly, score)) = self.clustering.analyze(&feature) {
                         if is_anomaly && score > 0.5 {
-                            return Some(self.create_anomaly(
-                                AnomalyCategory::Security,
-                                AnomalySeverity::High,
-                                String::from("Machine learning anomaly detected"),
-                                score,
-                                feature.labels.iter().zip(feature.features.iter())
-                                    .map(|(label, &value)| (label.clone(), value))
-                                    .collect(),
-                            ));
+                            return Some(
+                                self.create_anomaly(
+                                    AnomalyCategory::Security,
+                                    AnomalySeverity::High,
+                                    String::from("Machine learning anomaly detected"),
+                                    score,
+                                    feature
+                                        .labels
+                                        .iter()
+                                        .zip(feature.features.iter())
+                                        .map(|(label, &value)| (label.clone(), value))
+                                        .collect(),
+                                ),
+                            );
                         }
                     }
                 }
-            }
-            _ => {}
+            },
+            _ => {},
         }
 
         None
@@ -600,11 +613,7 @@ impl AnomalyDetector {
 
     /// Get recent anomalies
     pub fn get_recent_anomalies(&self, count: usize) -> Vec<Anomaly> {
-        self.anomalies.iter()
-            .rev()
-            .take(count)
-            .cloned()
-            .collect()
+        self.anomalies.iter().rev().take(count).cloned().collect()
     }
 
     /// Get anomaly statistics
@@ -710,7 +719,8 @@ pub fn export_anomalies(anomalies: &[Anomaly]) -> alloc::string::String {
 
     for anomaly in anomalies {
         output.push_str(&alloc::format!(
-            "Anomaly ID: {}\nCategory: {:?}\nSeverity: {:?}\nConfidence: {:.2}\nDescription: {}\nTimestamp: {}\nMetrics: {}\nSuggested Actions: {}\n\n",
+            "Anomaly ID: {}\nCategory: {:?}\nSeverity: {:?}\nConfidence: {:.2}\nDescription: \
+             {}\nTimestamp: {}\nMetrics: {}\nSuggested Actions: {}\n\n",
             anomaly.id,
             anomaly.category,
             anomaly.severity,

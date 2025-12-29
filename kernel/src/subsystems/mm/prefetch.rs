@@ -13,6 +13,7 @@ use alloc::{
     collections::{BTreeMap, VecDeque},
     vec::Vec,
 };
+
 use crate::subsystems::sync::Mutex;
 
 /// Prefetch strategy enum
@@ -64,12 +65,7 @@ struct StrideState {
 
 impl Default for StrideState {
     fn default() -> Self {
-        Self {
-            stride: 0,
-            confidence: 0,
-            last_addr: 0,
-            consistent_count: 0,
-        }
+        Self { stride: 0, confidence: 0, last_addr: 0, consistent_count: 0 }
     }
 }
 
@@ -98,7 +94,7 @@ impl MarkovState {
             // Create all possible sequences from current sequence
             for i in 0..self.current.len() {
                 let seq = self.current[i..].to_vec();
-                
+
                 // Update transition count
                 let entry = self.transitions.entry(seq).or_insert_with(BTreeMap::new);
                 let count = entry.entry(page).or_insert(0);
@@ -120,12 +116,14 @@ impl MarkovState {
             let seq = self.current[i..].to_vec();
             if let Some(transitions) = self.transitions.get(&seq) {
                 // Find the most frequent transition
-                if let Some((&next_page, &_count)) = transitions.iter().max_by_key(|(_, &count)| count) {
+                if let Some((&next_page, &_count)) =
+                    transitions.iter().max_by_key(|(_, &count)| count)
+                {
                     return Some(next_page);
                 }
             }
         }
-        
+
         None
     }
 }
@@ -242,7 +240,7 @@ impl AdaptivePrefetcher {
         // Evaluate performance of different strategies
         // This is a simplified version - in real implementation, we would
         // track performance of each strategy separately
-        
+
         let best_strategy = if hit_rate < 0.3 {
             // Low hit rate - try sequential
             PrefetchStrategy::Sequential
@@ -266,7 +264,7 @@ impl AdaptivePrefetcher {
         let current_page = access.addr / access.page_size;
         let next_page = current_page + 1;
         let next_addr = next_page * access.page_size;
-        
+
         // Issue prefetch for next page
         self.issue_prefetch(next_addr);
     }
@@ -274,15 +272,17 @@ impl AdaptivePrefetcher {
     /// Perform stride prefetching
     fn prefetch_stride(&mut self, access: MemoryAccessPattern) {
         let current_page = access.addr / access.page_size;
-        
+
         // Update stride detection
         if self.stride_state.last_addr != 0 {
-            let new_stride = current_page as isize - (self.stride_state.last_addr / access.page_size) as isize;
-            
+            let new_stride =
+                current_page as isize - (self.stride_state.last_addr / access.page_size) as isize;
+
             if new_stride == self.stride_state.stride {
                 // Consistent stride - increase confidence
                 self.stride_state.consistent_count += 1;
-                self.stride_state.confidence = core::cmp::min(100, self.stride_state.confidence + 10);
+                self.stride_state.confidence =
+                    core::cmp::min(100, self.stride_state.confidence + 10);
             } else {
                 // New stride - reset
                 self.stride_state.stride = new_stride;
@@ -295,7 +295,7 @@ impl AdaptivePrefetcher {
         if self.stride_state.confidence > 70 && self.stride_state.stride != 0 {
             let next_page = (current_page as isize + self.stride_state.stride) as usize;
             let next_addr = next_page * access.page_size;
-            
+
             self.issue_prefetch(next_addr);
         }
 
@@ -315,7 +315,7 @@ impl AdaptivePrefetcher {
     fn issue_prefetch(&self, addr: usize) {
         // In a real implementation, this would interact with the MMU
         // to issue a hardware prefetch or populate the cache
-        
+
         // For now, just log the prefetch
         #[cfg(feature = "debug")]
         crate::println!("[prefetch] Prefetching address: 0x{:x}", addr);

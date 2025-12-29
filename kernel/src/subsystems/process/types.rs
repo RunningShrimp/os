@@ -3,6 +3,7 @@
 //! Unified type definitions for process management
 
 use alloc::sync::Arc;
+
 use spin::Mutex;
 
 /// Process ID type
@@ -21,13 +22,9 @@ pub struct Process {
 
 impl Process {
     pub fn new(pid: ProcessId, parent_pid: ProcessId, name: &str) -> Self {
-        Self {
-            pid,
-            parent_pid,
-            name: alloc::string::String::from(name),
-        }
+        Self { pid, parent_pid, name: alloc::string::String::from(name) }
     }
-    
+
     pub fn id(&self) -> ProcessId {
         self.pid
     }
@@ -44,7 +41,7 @@ impl Thread {
     pub fn new(tid: ThreadId, process_id: ProcessId) -> Self {
         Self { tid, process_id }
     }
-    
+
     pub fn id(&self) -> ThreadId {
         self.tid
     }

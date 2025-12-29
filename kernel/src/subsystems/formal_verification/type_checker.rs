@@ -1,24 +1,28 @@
 // Type Checker Module
 
 extern crate alloc;
-//
 // 类型检查器模块
 // 实现静态类型检查和类型推导功能
 
-use hashbrown::{HashMap, HashSet};
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::{format, vec};
-use alloc::boxed::Box;
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
 use core::sync::atomic::Ordering;
-use spin::Mutex;
-use crate::compat::DefaultHasherBuilder;
 
-use super::*;
-use super::static_analyzer::{PrimitiveType, Scope, SourceLocation};
+use hashbrown::{HashMap, HashSet};
+use spin::Mutex;
+
+use super::{
+    static_analyzer::{PrimitiveType, Scope, SourceLocation},
+    *,
+};
+use crate::compat::DefaultHasherBuilder;
 
 /// 类型检查器
 pub struct TypeChecker {
@@ -653,7 +657,10 @@ impl TypeChecker {
     }
 
     /// 执行类型检查
-    pub fn check_types(&mut self, targets: &[VerificationTarget]) -> Result<Vec<VerificationResult>, &'static str> {
+    pub fn check_types(
+        &mut self,
+        targets: &[VerificationTarget],
+    ) -> Result<Vec<VerificationResult>, &'static str> {
         if !self.running.load(Ordering::SeqCst) {
             return Err("Type checker is not running");
         }
@@ -670,7 +677,10 @@ impl TypeChecker {
     }
 
     /// 检查单个目标
-    fn check_target(&mut self, target: &VerificationTarget) -> Result<VerificationResult, &'static str> {
+    fn check_target(
+        &mut self,
+        target: &VerificationTarget,
+    ) -> Result<VerificationResult, &'static str> {
         let _start_time_ms = 0u64; // TODO: Implement proper timestamp
 
         // 模拟类型检查过程
@@ -681,17 +691,37 @@ impl TypeChecker {
         // 根据目标类型执行不同的检查
         match target.target_type {
             VerificationTargetType::Function => {
-                self.check_function_target(target, &mut type_errors, &mut type_warnings, &mut inferred_types)?;
-            }
+                self.check_function_target(
+                    target,
+                    &mut type_errors,
+                    &mut type_warnings,
+                    &mut inferred_types,
+                )?;
+            },
             VerificationTargetType::Struct => {
-                self.check_struct_target(target, &mut type_errors, &mut type_warnings, &mut inferred_types)?;
-            }
+                self.check_struct_target(
+                    target,
+                    &mut type_errors,
+                    &mut type_warnings,
+                    &mut inferred_types,
+                )?;
+            },
             VerificationTargetType::Module => {
-                self.check_module_target(target, &mut type_errors, &mut type_warnings, &mut inferred_types)?;
-            }
+                self.check_module_target(
+                    target,
+                    &mut type_errors,
+                    &mut type_warnings,
+                    &mut inferred_types,
+                )?;
+            },
             _ => {
-                self.check_generic_target(target, &mut type_errors, &mut type_warnings, &mut inferred_types)?;
-            }
+                self.check_generic_target(
+                    target,
+                    &mut type_errors,
+                    &mut type_warnings,
+                    &mut inferred_types,
+                )?;
+            },
         }
 
         let elapsed_ms = 0u64; // TODO: Implement proper timestamp
@@ -733,9 +763,9 @@ impl TypeChecker {
             VerificationStatus::Failed
         };
 
-        let severity = if checking_result.type_errors.iter().any(|e|
+        let severity = if checking_result.type_errors.iter().any(|e| {
             matches!(e.error_type, TypeErrorType::TypeMismatch | TypeErrorType::UndefinedType)
-        ) {
+        }) {
             VerificationSeverity::Error
         } else if !checking_result.type_warnings.is_empty() {
             VerificationSeverity::Warning
@@ -772,7 +802,13 @@ impl TypeChecker {
     }
 
     /// 检查函数目标
-    fn check_function_target(&self, target: &VerificationTarget, errors: &mut Vec<TypeError>, warnings: &mut Vec<TypeWarning>, inferred: &mut HashMap<String, Type, DefaultHasherBuilder>) -> Result<(), &'static str> {
+    fn check_function_target(
+        &self,
+        target: &VerificationTarget,
+        errors: &mut Vec<TypeError>,
+        warnings: &mut Vec<TypeWarning>,
+        inferred: &mut HashMap<String, Type, DefaultHasherBuilder>,
+    ) -> Result<(), &'static str> {
         // 模拟函数类型检查
         inferred.insert("return".to_string(), Type::Primitive(PrimitiveType::I32));
         inferred.insert("param1".to_string(), Type::Primitive(PrimitiveType::I32));
@@ -782,12 +818,7 @@ impl TypeChecker {
         warnings.push(TypeWarning {
             id: 1,
             warning_type: TypeWarningType::UnusedVariable,
-            location: SourceLocation {
-                file: target.path.clone(),
-                line: 5,
-                column: 10,
-                length: 8,
-            },
+            location: SourceLocation { file: target.path.clone(), line: 5, column: 10, length: 8 },
             message: "Parameter 'unused_param' is never used".to_string(),
             suggestion: Some("Remove unused parameter or prefix with '_'".to_string()),
         });
@@ -796,7 +827,13 @@ impl TypeChecker {
     }
 
     /// 检查结构体目标
-    fn check_struct_target(&self, target: &VerificationTarget, errors: &mut Vec<TypeError>, warnings: &mut Vec<TypeWarning>, inferred: &mut HashMap<String, Type, DefaultHasherBuilder>) -> Result<(), &'static str> {
+    fn check_struct_target(
+        &self,
+        target: &VerificationTarget,
+        errors: &mut Vec<TypeError>,
+        warnings: &mut Vec<TypeWarning>,
+        inferred: &mut HashMap<String, Type, DefaultHasherBuilder>,
+    ) -> Result<(), &'static str> {
         // 模拟结构体类型检查
         let struct_type = Type::Struct(StructType {
             name: target.name.clone(),
@@ -841,7 +878,13 @@ impl TypeChecker {
     }
 
     /// 检查模块目标
-    fn check_module_target(&self, target: &VerificationTarget, errors: &mut Vec<TypeError>, warnings: &mut Vec<TypeWarning>, inferred: &mut HashMap<String, Type, DefaultHasherBuilder>) -> Result<(), &'static str> {
+    fn check_module_target(
+        &self,
+        target: &VerificationTarget,
+        errors: &mut Vec<TypeError>,
+        warnings: &mut Vec<TypeWarning>,
+        inferred: &mut HashMap<String, Type, DefaultHasherBuilder>,
+    ) -> Result<(), &'static str> {
         // 模拟模块类型检查
         inferred.insert("module_type".to_string(), Type::Primitive(PrimitiveType::Void));
 
@@ -849,12 +892,7 @@ impl TypeChecker {
         warnings.push(TypeWarning {
             id: 2,
             warning_type: TypeWarningType::DeadCode,
-            location: SourceLocation {
-                file: target.path.clone(),
-                line: 30,
-                column: 5,
-                length: 15,
-            },
+            location: SourceLocation { file: target.path.clone(), line: 30, column: 5, length: 15 },
             message: "Unreachable code detected in module".to_string(),
             suggestion: Some("Remove unreachable code".to_string()),
         });
@@ -863,14 +901,23 @@ impl TypeChecker {
     }
 
     /// 检查通用目标
-    fn check_generic_target(&self, target: &VerificationTarget, errors: &mut Vec<TypeError>, warnings: &mut Vec<TypeWarning>, inferred: &mut HashMap<String, Type, DefaultHasherBuilder>) -> Result<(), &'static str> {
+    fn check_generic_target(
+        &self,
+        target: &VerificationTarget,
+        errors: &mut Vec<TypeError>,
+        warnings: &mut Vec<TypeWarning>,
+        inferred: &mut HashMap<String, Type, DefaultHasherBuilder>,
+    ) -> Result<(), &'static str> {
         // 模拟通用类型检查
-        inferred.insert("generic_var".to_string(), Type::TypeVariable(TypeVariable {
-            name: "T".to_string(),
-            id: 1,
-            constraints: Vec::new(),
-            is_solved: false,
-        }));
+        inferred.insert(
+            "generic_var".to_string(),
+            Type::TypeVariable(TypeVariable {
+                name: "T".to_string(),
+                id: 1,
+                constraints: Vec::new(),
+                is_solved: false,
+            }),
+        );
 
         Ok(())
     }
@@ -880,28 +927,56 @@ impl TypeChecker {
         self.type_environment = TypeEnvironment::new();
 
         // 添加基础类型
-        self.type_environment.type_bindings.insert("bool".to_string(), Type::Primitive(PrimitiveType::Bool));
-        self.type_environment.type_bindings.insert("i8".to_string(), Type::Primitive(PrimitiveType::I8));
-        self.type_environment.type_bindings.insert("i16".to_string(), Type::Primitive(PrimitiveType::I16));
-        self.type_environment.type_bindings.insert("i32".to_string(), Type::Primitive(PrimitiveType::I32));
-        self.type_environment.type_bindings.insert("i64".to_string(), Type::Primitive(PrimitiveType::I64));
-        self.type_environment.type_bindings.insert("u8".to_string(), Type::Primitive(PrimitiveType::U8));
-        self.type_environment.type_bindings.insert("u16".to_string(), Type::Primitive(PrimitiveType::U16));
-        self.type_environment.type_bindings.insert("u32".to_string(), Type::Primitive(PrimitiveType::U32));
-        self.type_environment.type_bindings.insert("u64".to_string(), Type::Primitive(PrimitiveType::U64));
-        self.type_environment.type_bindings.insert("f32".to_string(), Type::Primitive(PrimitiveType::F32));
-        self.type_environment.type_bindings.insert("f64".to_string(), Type::Primitive(PrimitiveType::F64));
-        self.type_environment.type_bindings.insert("char".to_string(), Type::Primitive(PrimitiveType::Char));
-        self.type_environment.type_bindings.insert("void".to_string(), Type::Primitive(PrimitiveType::Void));
+        self.type_environment
+            .type_bindings
+            .insert("bool".to_string(), Type::Primitive(PrimitiveType::Bool));
+        self.type_environment
+            .type_bindings
+            .insert("i8".to_string(), Type::Primitive(PrimitiveType::I8));
+        self.type_environment
+            .type_bindings
+            .insert("i16".to_string(), Type::Primitive(PrimitiveType::I16));
+        self.type_environment
+            .type_bindings
+            .insert("i32".to_string(), Type::Primitive(PrimitiveType::I32));
+        self.type_environment
+            .type_bindings
+            .insert("i64".to_string(), Type::Primitive(PrimitiveType::I64));
+        self.type_environment
+            .type_bindings
+            .insert("u8".to_string(), Type::Primitive(PrimitiveType::U8));
+        self.type_environment
+            .type_bindings
+            .insert("u16".to_string(), Type::Primitive(PrimitiveType::U16));
+        self.type_environment
+            .type_bindings
+            .insert("u32".to_string(), Type::Primitive(PrimitiveType::U32));
+        self.type_environment
+            .type_bindings
+            .insert("u64".to_string(), Type::Primitive(PrimitiveType::U64));
+        self.type_environment
+            .type_bindings
+            .insert("f32".to_string(), Type::Primitive(PrimitiveType::F32));
+        self.type_environment
+            .type_bindings
+            .insert("f64".to_string(), Type::Primitive(PrimitiveType::F64));
+        self.type_environment
+            .type_bindings
+            .insert("char".to_string(), Type::Primitive(PrimitiveType::Char));
+        self.type_environment
+            .type_bindings
+            .insert("void".to_string(), Type::Primitive(PrimitiveType::Void));
 
         // 添加隐式转换规则
-        self.type_environment.implicit_conversions.push(ImplicitConversion {
-            source_type: Type::Primitive(PrimitiveType::I32),
-            target_type: Type::Primitive(PrimitiveType::F64),
-            cost: 1,
-            conversion_function: None,
-            is_safe: true,
-        });
+        self.type_environment
+            .implicit_conversions
+            .push(ImplicitConversion {
+                source_type: Type::Primitive(PrimitiveType::I32),
+                target_type: Type::Primitive(PrimitiveType::F64),
+                cost: 1,
+                conversion_function: None,
+                is_safe: true,
+            });
 
         Ok(())
     }
@@ -920,8 +995,10 @@ impl TypeChecker {
 
         self.stats.avg_checking_time_ms =
             (self.stats.avg_checking_time_ms + result.verification_time_ms) / 2;
-        self.stats.max_checking_time_ms =
-            self.stats.max_checking_time_ms.max(result.verification_time_ms);
+        self.stats.max_checking_time_ms = self
+            .stats
+            .max_checking_time_ms
+            .max(result.verification_time_ms);
     }
 
     /// 获取统计信息

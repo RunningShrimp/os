@@ -1,23 +1,25 @@
 // Verification Pipeline Module
 
 extern crate alloc;
-//
 // 验证管道模块
 // 整合所有形式化验证工具，提供统一的验证流程
 
-use hashbrown::{HashMap, HashSet};
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::{format, vec};
-use alloc::boxed::Box;
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
 use core::sync::atomic::Ordering;
+
+use hashbrown::{HashMap, HashSet};
 use spin::Mutex;
-use crate::compat::DefaultHasherBuilder;
 
 use super::*;
+use crate::compat::DefaultHasherBuilder;
 
 /// 验证管道
 pub struct VerificationPipeline {
@@ -157,7 +159,11 @@ impl VerificationPipeline {
     }
 
     /// 执行验证
-    pub fn execute_verification(&mut self, targets: &[VerificationTarget], properties: &[VerificationProperty]) -> Result<Vec<VerificationResult>, &'static str> {
+    pub fn execute_verification(
+        &mut self,
+        targets: &[VerificationTarget],
+        properties: &[VerificationProperty],
+    ) -> Result<Vec<VerificationResult>, &'static str> {
         if !self.running.load(Ordering::SeqCst) {
             return Err("Verification pipeline is not running");
         }
@@ -182,51 +188,52 @@ impl VerificationPipeline {
                     let result = self.execute_model_checking_phase(targets, &mut phase);
                     self.phases[i] = phase;
                     result
-                }
+                },
                 VerificationType::TheoremProving => {
                     let mut phase = self.phases[i].clone();
                     let result = self.execute_theorem_proving_phase(properties, &mut phase);
                     self.phases[i] = phase;
                     result
-                }
+                },
                 VerificationType::StaticAnalysis => {
                     let mut phase = self.phases[i].clone();
                     let result = self.execute_static_analysis_phase(targets, &mut phase);
                     self.phases[i] = phase;
                     result
-                }
+                },
                 VerificationType::TypeChecking => {
                     let mut phase = self.phases[i].clone();
                     let result = self.execute_type_checking_phase(targets, &mut phase);
                     self.phases[i] = phase;
                     result
-                }
+                },
                 VerificationType::MemorySafety => {
                     let mut phase = self.phases[i].clone();
                     let result = self.execute_memory_safety_phase(targets, &mut phase);
                     self.phases[i] = phase;
                     result
-                }
+                },
                 VerificationType::ConcurrencyVerification => {
                     let mut phase = self.phases[i].clone();
                     let result = self.execute_concurrency_phase(targets, &mut phase);
                     self.phases[i] = phase;
                     result
-                }
+                },
                 VerificationType::SecurityVerification => {
                     let mut phase = self.phases[i].clone();
                     let result = self.execute_security_phase(properties, &mut phase);
                     self.phases[i] = phase;
                     result
-                }
-                _ => {
-                    Ok(Vec::new())
-                }
+                },
+                _ => Ok(Vec::new()),
             }?;
 
             if phase_results.is_empty() {
                 self.phases[i].status = PhaseStatus::Completed;
-            } else if phase_results.iter().any(|r| matches!(r.status, VerificationStatus::Failed)) {
+            } else if phase_results
+                .iter()
+                .any(|r| matches!(r.status, VerificationStatus::Failed))
+            {
                 self.phases[i].status = PhaseStatus::Failed;
                 if self.config.fail_fast {
                     return Ok(phase_results);
@@ -246,7 +253,11 @@ impl VerificationPipeline {
     }
 
     /// 执行模型检查阶段
-    fn execute_model_checking_phase(&self, targets: &[VerificationTarget], _phase: &VerificationPhase) -> Result<Vec<VerificationResult>, &'static str> {
+    fn execute_model_checking_phase(
+        &self,
+        targets: &[VerificationTarget],
+        _phase: &VerificationPhase,
+    ) -> Result<Vec<VerificationResult>, &'static str> {
         // 模拟模型检查阶段
         let mut results = Vec::new();
 
@@ -271,7 +282,11 @@ impl VerificationPipeline {
     }
 
     /// 执行定理证明阶段
-    fn execute_theorem_proving_phase(&self, properties: &[VerificationProperty], _phase: &VerificationPhase) -> Result<Vec<VerificationResult>, &'static str> {
+    fn execute_theorem_proving_phase(
+        &self,
+        properties: &[VerificationProperty],
+        _phase: &VerificationPhase,
+    ) -> Result<Vec<VerificationResult>, &'static str> {
         // 模拟定理证明阶段
         let mut results = Vec::new();
 
@@ -294,7 +309,11 @@ impl VerificationPipeline {
     }
 
     /// 执行静态分析阶段
-    fn execute_static_analysis_phase(&self, targets: &[VerificationTarget], _phase: &VerificationPhase) -> Result<Vec<VerificationResult>, &'static str> {
+    fn execute_static_analysis_phase(
+        &self,
+        targets: &[VerificationTarget],
+        _phase: &VerificationPhase,
+    ) -> Result<Vec<VerificationResult>, &'static str> {
         // 模拟静态分析阶段
         let mut results = Vec::new();
 
@@ -317,7 +336,11 @@ impl VerificationPipeline {
     }
 
     /// 执行类型检查阶段
-    fn execute_type_checking_phase(&self, targets: &[VerificationTarget], _phase: &VerificationPhase) -> Result<Vec<VerificationResult>, &'static str> {
+    fn execute_type_checking_phase(
+        &self,
+        targets: &[VerificationTarget],
+        _phase: &VerificationPhase,
+    ) -> Result<Vec<VerificationResult>, &'static str> {
         // 模拟类型检查阶段
         let mut results = Vec::new();
 
@@ -340,7 +363,11 @@ impl VerificationPipeline {
     }
 
     /// 执行内存安全阶段
-    fn execute_memory_safety_phase(&self, targets: &[VerificationTarget], _phase: &VerificationPhase) -> Result<Vec<VerificationResult>, &'static str> {
+    fn execute_memory_safety_phase(
+        &self,
+        targets: &[VerificationTarget],
+        _phase: &VerificationPhase,
+    ) -> Result<Vec<VerificationResult>, &'static str> {
         // 模拟内存安全验证阶段
         let mut results = Vec::new();
 
@@ -363,7 +390,11 @@ impl VerificationPipeline {
     }
 
     /// 执行并发验证阶段
-    fn execute_concurrency_phase(&self, targets: &[VerificationTarget], _phase: &VerificationPhase) -> Result<Vec<VerificationResult>, &'static str> {
+    fn execute_concurrency_phase(
+        &self,
+        targets: &[VerificationTarget],
+        _phase: &VerificationPhase,
+    ) -> Result<Vec<VerificationResult>, &'static str> {
         // 模拟并发验证阶段
         let mut results = Vec::new();
 
@@ -386,7 +417,11 @@ impl VerificationPipeline {
     }
 
     /// 执行安全验证阶段
-    fn execute_security_phase(&self, properties: &[VerificationProperty], _phase: &VerificationPhase) -> Result<Vec<VerificationResult>, &'static str> {
+    fn execute_security_phase(
+        &self,
+        properties: &[VerificationProperty],
+        _phase: &VerificationPhase,
+    ) -> Result<Vec<VerificationResult>, &'static str> {
         // 模拟安全验证阶段
         let mut results = Vec::new();
 
@@ -499,7 +534,10 @@ impl VerificationPipeline {
         self.stats.total_verifications += 1;
         self.stats.targets_verified += results.len() as u64;
 
-        if results.iter().all(|r| matches!(r.status, VerificationStatus::Verified)) {
+        if results
+            .iter()
+            .all(|r| matches!(r.status, VerificationStatus::Verified))
+        {
             self.stats.successful_verifications += 1;
         } else {
             self.stats.failed_verifications += 1;
@@ -507,8 +545,7 @@ impl VerificationPipeline {
 
         self.stats.avg_execution_time_ms =
             (self.stats.avg_execution_time_ms + execution_time_ms) / 2;
-        self.stats.max_execution_time_ms =
-            self.stats.max_execution_time_ms.max(execution_time_ms);
+        self.stats.max_execution_time_ms = self.stats.max_execution_time_ms.max(execution_time_ms);
     }
 
     /// 获取统计信息

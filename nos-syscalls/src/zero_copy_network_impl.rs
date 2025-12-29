@@ -3,20 +3,13 @@
 //! This module provides a comprehensive zero-copy network I/O implementation
 //! for high-performance networking in the NOS operating system.
 
-use {
-    alloc::{
-        collections::BTreeMap,
-        sync::Arc,
-        vec::Vec,
-        string::ToString,
-        boxed::Box,
-        format,
-    },
-    spin::Mutex,
-};
-use nos_api::Result;
-use crate::SyscallDispatcher;
+use alloc::{boxed::Box, collections::BTreeMap, format, string::ToString, sync::Arc, vec::Vec};
 use core::sync::atomic::{AtomicU64, Ordering};
+
+use nos_api::Result;
+use spin::Mutex;
+
+use crate::SyscallDispatcher;
 
 /// Network buffer descriptor for zero-copy operations
 #[derive(Debug, Clone)]
@@ -42,12 +35,12 @@ impl NetworkBuffer {
             flags: 0,
         }
     }
-    
+
     /// Set buffer flags
     pub fn set_flags(&mut self, flags: u32) {
         self.flags = flags;
     }
-    
+
     /// Get buffer flags
     pub fn flags(&self) -> u32 {
         self.flags
@@ -85,7 +78,7 @@ impl ZeroCopyNetworkManager {
             next_conn_id: AtomicU64::new(1),
         })
     }
-    
+
     /// Register a new network buffer
     pub fn register_buffer(&self, buffer: &NetworkBuffer) -> u64 {
         let id = buffer.id;
@@ -93,19 +86,19 @@ impl ZeroCopyNetworkManager {
         buffers.insert(id, buffer.clone());
         id
     }
-    
+
     /// Unregister a network buffer
     pub fn unregister_buffer(&self, buffer_id: u64) -> Option<NetworkBuffer> {
         let mut buffers = self.buffers.lock();
         buffers.remove(&buffer_id)
     }
-    
+
     /// Get a buffer by ID
     pub fn get_buffer(&self, buffer_id: u64) -> Option<NetworkBuffer> {
         let buffers = self.buffers.lock();
         buffers.get(&buffer_id).cloned()
     }
-    
+
     /// Create a new network connection
     pub fn create_connection(&mut self, fd: i32) -> Result<u64> {
         let conn_id = self.next_conn_id.fetch_add(1, Ordering::SeqCst);
@@ -113,13 +106,13 @@ impl ZeroCopyNetworkManager {
         self.connections.lock().insert(fd, connection);
         Ok(conn_id)
     }
-    
+
     /// Close a network connection
     pub fn close_connection(&mut self, fd: i32) -> Result<()> {
         self.connections.lock().remove(&fd);
         Ok(())
     }
-    
+
     /// Get a connection by file descriptor
     pub fn get_connection(&self, fd: i32) -> Option<Arc<NetworkConnection>> {
         let connections = self.connections.lock();
@@ -166,47 +159,47 @@ impl NetworkConnection {
             pending_recvs: spin::Mutex::new(Vec::new()),
         }
     }
-    
+
     /// Set connection state
     pub fn set_state(&mut self, state: ConnectionState) {
         self.state = state;
     }
-    
+
     /// Get connection state
     pub fn state(&self) -> ConnectionState {
         self.state
     }
-    
+
     /// Add a pending send buffer
     pub fn add_pending_send(&self, buffer_id: u64) {
         // Create a placeholder buffer with just the ID
         let mut pending_sends = self.pending_sends.lock();
         pending_sends.push(NetworkBuffer { id: buffer_id, addr: 0, size: 0, flags: 0 });
     }
-    
+
     /// Add a pending receive buffer
     pub fn add_pending_recv(&self, buffer_id: u64) {
         // Create a placeholder buffer with just the ID
         let mut pending_recvs = self.pending_recvs.lock();
         pending_recvs.push(NetworkBuffer { id: buffer_id, addr: 0, size: 0, flags: 0 });
     }
-    
+
     /// Get pending send buffers
     pub fn pending_sends(&self) -> spin::MutexGuard<'_, Vec<NetworkBuffer>> {
         self.pending_sends.lock()
     }
-    
+
     /// Get pending receive buffers
     pub fn pending_recvs(&self) -> spin::MutexGuard<'_, Vec<NetworkBuffer>> {
         self.pending_recvs.lock()
     }
-    
+
     /// Clear completed send buffers
     pub fn clear_completed_sends(&self) {
         let mut pending_sends = self.pending_sends.lock();
         pending_sends.clear();
     }
-    
+
     /// Clear completed receive buffers
     pub fn clear_completed_recvs(&self) {
         let mut pending_recvs = self.pending_recvs.lock();
@@ -224,7 +217,7 @@ impl ZeroCopySendHandler {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn new_with_manager(manager: Arc<ZeroCopyNetworkManager>) -> Self {
         Self { manager }
     }
@@ -233,7 +226,9 @@ impl ZeroCopySendHandler {
 impl Default for ZeroCopySendHandler {
     fn default() -> Self {
         Self {
-            manager: Arc::new(ZeroCopyNetworkManager::new().expect("Failed to create ZeroCopyNetworkManager")),
+            manager: Arc::new(
+                ZeroCopyNetworkManager::new().expect("Failed to create ZeroCopyNetworkManager"),
+            ),
         }
     }
 }
@@ -242,44 +237,42 @@ impl crate::SyscallHandler for ZeroCopySendHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_ZERO_COPY_SEND
     }
-    
+
     fn name(&self) -> &str {
         "zero_copy_send"
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 4 {
             return Err(nos_api::Error::InvalidArgument(
-                "Insufficient arguments for zero-copy send".to_string()
+                "Insufficient arguments for zero-copy send".to_string(),
             ));
         }
-        
+
         let fd = args[0] as i32;
         let buffer_addr = args[1];
         let buffer_size = args[2];
         let flags = args[3] as u32;
-        
+
         // Create a network buffer descriptor
         let mut buffer = NetworkBuffer::new(buffer_addr, buffer_size);
         buffer.set_flags(flags | buffer_flags::IN_USE);
-        
+
         // In alloc environment, use the manager
         // Get the connection first
         if let Some(connection) = self.manager.get_connection(fd) {
             // Register the buffer
             let buffer_id = self.manager.register_buffer(&buffer);
-            
+
             // Safely modify the connection using Mutex lock
             let conn = connection;
             conn.add_pending_send(buffer_id);
-            
+
             // In a real implementation, this would trigger DMA transfer
             // For now, just return the buffer ID
             Ok(buffer_id as isize)
         } else {
-            Err(nos_api::Error::NotFound(
-                format!("Connection not found for fd: {}", fd)
-            ))
+            Err(nos_api::Error::NotFound(format!("Connection not found for fd: {}", fd)))
         }
     }
 }
@@ -294,7 +287,7 @@ impl ZeroCopyRecvHandler {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn new_with_manager(manager: Arc<ZeroCopyNetworkManager>) -> Self {
         Self { manager }
     }
@@ -303,7 +296,9 @@ impl ZeroCopyRecvHandler {
 impl Default for ZeroCopyRecvHandler {
     fn default() -> Self {
         Self {
-            manager: Arc::new(ZeroCopyNetworkManager::new().expect("Failed to create ZeroCopyNetworkManager")),
+            manager: Arc::new(
+                ZeroCopyNetworkManager::new().expect("Failed to create ZeroCopyNetworkManager"),
+            ),
         }
     }
 }
@@ -312,45 +307,44 @@ impl crate::SyscallHandler for ZeroCopyRecvHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_ZERO_COPY_RECV
     }
-    
+
     fn name(&self) -> &str {
         "zero_copy_recv"
     }
-    
+
     fn execute(&self, args: &[usize]) -> Result<isize> {
         if args.len() < 3 {
             return Err(nos_api::Error::InvalidArgument(
-                "Insufficient arguments for zero-copy receive".to_string()
+                "Insufficient arguments for zero-copy receive".to_string(),
             ));
         }
-        
+
         let fd = args[0] as i32;
         let buffer_addr = args[1];
         let buffer_size = args[2];
-        
+
         // Create a network buffer descriptor
         let mut buffer = NetworkBuffer::new(buffer_addr, buffer_size);
         buffer.set_flags(buffer_flags::WRITE_ONLY | buffer_flags::IN_USE);
-        
+
         // In alloc environment, use the manager
         // Get the connection first
         if let Some(connection) = self.manager.get_connection(fd) {
             // Register the buffer
             let buffer_id = self.manager.register_buffer(&buffer);
-            
+
             // Add buffer to pending receives
-            let conn = Arc::as_ref(&connection) as *const NetworkConnection as *mut NetworkConnection;
+            let conn =
+                Arc::as_ref(&connection) as *const NetworkConnection as *mut NetworkConnection;
             unsafe {
                 (*conn).add_pending_recv(buffer_id);
             }
-            
+
             // In a real implementation, this would trigger DMA transfer
             // For now, just return the buffer ID
             Ok(buffer_id as isize)
         } else {
-            Err(nos_api::Error::NotFound(
-                format!("Connection not found for fd: {}", fd)
-            ))
+            Err(nos_api::Error::NotFound(format!("Connection not found for fd: {}", fd)))
         }
     }
 }
@@ -358,16 +352,12 @@ impl crate::SyscallHandler for ZeroCopyRecvHandler {
 /// Register zero-copy network I/O system call handlers
 pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     // Register zero-copy send system call
-    dispatcher.register_handler(
-        crate::types::SYS_ZERO_COPY_SEND,
-        Box::new(ZeroCopySendHandler::new())
-    );
-    
+    dispatcher
+        .register_handler(crate::types::SYS_ZERO_COPY_SEND, Box::new(ZeroCopySendHandler::new()));
+
     // Register zero-copy receive system call
-    dispatcher.register_handler(
-        crate::types::SYS_ZERO_COPY_RECV,
-        Box::new(ZeroCopyRecvHandler::new())
-    );
-    
+    dispatcher
+        .register_handler(crate::types::SYS_ZERO_COPY_RECV, Box::new(ZeroCopyRecvHandler::new()));
+
     Ok(())
 }

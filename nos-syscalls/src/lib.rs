@@ -1,7 +1,7 @@
 //! NOS System Calls
 //!
-//! This crate provides the system call interface and dispatch mechanism for the NOS operating system.
-//! It includes system call handlers, dispatch logic, and related utilities.
+//! This crate provides the system call interface and dispatch mechanism for the NOS operating
+//! system. It includes system call handlers, dispatch logic, and related utilities.
 //!
 //! # Architecture
 //!
@@ -19,14 +19,11 @@
 //! # Usage
 //!
 //! ```rust
-//! use nos_syscalls::{dispatch, SyscallId};
+//! use nos_syscalls::{SyscallId, dispatch};
 //!
 //! // Dispatch a system call
-//! let result = dispatch(SyscallId::Read, &[
-//!     fd as usize,
-//!     buffer.as_ptr() as usize,
-//!     count as usize
-//! ]);
+//! let result =
+//!     dispatch(SyscallId::Read, &[fd as usize, buffer.as_ptr() as usize, count as usize]);
 //! ```
 
 #![no_std]
@@ -49,22 +46,22 @@ pub mod logging;
 
 // Re-export core functionality
 pub mod core {
-    pub mod traits;
+    pub mod dispatcher;
     pub mod registry; // Registry trait definitions only
-    pub mod dispatcher; // Dispatcher implementation
+    pub mod traits; // Dispatcher implementation
 }
 
 // System call type definitions and constants
-pub mod types;
 pub mod common;
+pub mod types;
 
 // System call category modules (type definitions only, no implementations)
 pub mod fs;
-pub mod process;
-pub mod network;
 pub mod ipc;
-pub mod signal;
 pub mod memory;
+pub mod network;
+pub mod process;
+pub mod signal;
 pub mod time;
 
 // Advanced system call type definitions
@@ -72,35 +69,34 @@ pub mod time;
 pub mod advanced_mmap;
 
 // Re-export core functionality
-pub use core::traits::{
-    SyscallHandler, SyscallValidator, SyscallLogger,
-    SyscallInterceptor, SyscallFilter, SyscallContext
+pub use core::{
+    dispatcher::{SyscallDispatcher, get_dispatcher, init_dispatcher},
+    registry::{SyscallInfo, SyscallRegistry},
+    traits::{
+        SyscallContext, SyscallFilter, SyscallHandler, SyscallInterceptor, SyscallLogger,
+        SyscallValidator,
+    },
 };
-pub use core::registry::SyscallRegistry;
-
-pub use core::registry::SyscallInfo;
-pub use core::dispatcher::SyscallDispatcher;
-pub use core::dispatcher::{init_dispatcher, get_dispatcher};
-pub use optimized_syscall_path::{
-    OptimizedSyscallDispatcher, OptimizedSyscallHandler, register_handlers
-};
-pub use types::*;
 
 // Re-export SyscallResult from nos_api
 pub use nos_api::syscall::SyscallResult;
+pub use optimized_syscall_path::{
+    OptimizedSyscallDispatcher, OptimizedSyscallHandler, register_handlers,
+};
+pub use types::*;
 
 // Note: The following modules contain implementation details that should be
 // moved to kernel/subsystems/syscalls. They are kept here temporarily for
 // backward compatibility but will be deprecated.
 // Declare alloc-dependent modules
+pub mod adaptive_scheduler;
 pub mod async_ops;
 pub mod epoll;
-pub mod zero_copy_network;
-pub mod optimized_syscall_path;
-pub mod adaptive_scheduler;
 pub mod modular_framework;
-pub mod testing_framework;
+pub mod optimized_syscall_path;
 pub mod performance_monitor;
+pub mod testing_framework;
+pub mod zero_copy_network;
 pub mod zero_copy_network_impl;
 
 /// System call number constants
@@ -113,7 +109,7 @@ pub mod syscall_numbers {
     pub const SYS_EXIT: u32 = 0x1003;
     pub const SYS_GETPID: u32 = 0x1004;
     pub const SYS_GETPPID: u32 = 0x1005;
-    
+
     // File system syscalls (standard Linux numbers for x86_64)
     pub const SYS_READ: u32 = 0;
     pub const SYS_WRITE: u32 = 1;
@@ -465,10 +461,8 @@ pub mod syscall_numbers {
 
 // Re-export syscall numbers for convenience
 
-
 /// System call statistics
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct SyscallStats {
     /// Total number of system calls
     pub total_calls: u64,
@@ -479,7 +473,6 @@ pub struct SyscallStats {
     /// Number of errors
     pub error_count: u64,
 }
-
 
 #[cfg(test)]
 mod tests {

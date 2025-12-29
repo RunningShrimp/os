@@ -1,31 +1,28 @@
 /// Intrusion Detection System (IDS) Module
-
 extern crate alloc;
 
+pub mod anomaly_detection;
+pub mod behavior_analysis;
+pub mod correlation_engine;
+pub mod host_ids;
 /// 入侵检测系统模块
 /// 提供全面的入侵检测和防御功能，包括网络入侵检测、主机入侵检测、异常检测等
-
 pub mod network_ids;
-pub mod host_ids;
-pub mod anomaly_detection;
-pub mod signature_detection;
-pub mod behavior_analysis;
-pub mod threat_intelligence;
 pub mod response_engine;
-pub mod correlation_engine;
+pub mod signature_detection;
+pub mod threat_intelligence;
 
 // Re-export only network_ids which is used by other modules
-pub use network_ids::*;
+use alloc::{collections::BTreeMap, string::String, sync::Arc, vec::Vec};
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::string::String;
-use core::sync::atomic::{AtomicU64, AtomicBool, Ordering};
+pub use network_ids::*;
 use spin::Mutex;
 
-use crate::security::audit::{AuditEvent, AuditEventType, AuditSeverity};
-use crate::net::Packet as NetworkPacket;
+use crate::{
+    net::Packet as NetworkPacket,
+    security::audit::{AuditEvent, AuditEventType, AuditSeverity},
+};
 
 /// 入侵检测系统状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -470,10 +467,14 @@ impl IntrusionDetectionSystem {
             status: IdsStatus::Uninitialized,
             network_ids: Arc::new(Mutex::new(network_ids::NetworkIds::new())),
             host_ids: Arc::new(Mutex::new(host_ids::HostIds::new())),
-            anomaly_detector: Arc::new(Mutex::new(anomaly_detection::AnomalyDetector::new(anomaly_detection::DetectionAlgorithm::Statistical))),
+            anomaly_detector: Arc::new(Mutex::new(anomaly_detection::AnomalyDetector::new(
+                anomaly_detection::DetectionAlgorithm::Statistical,
+            ))),
             signature_detector: Arc::new(Mutex::new(signature_detection::SignatureEngine::new())),
             behavior_analyzer: Arc::new(Mutex::new(behavior_analysis::BehaviorAnalyzer::new())),
-            threat_intelligence: Arc::new(Mutex::new(threat_intelligence::ThreatIntelligence::new())),
+            threat_intelligence: Arc::new(Mutex::new(
+                threat_intelligence::ThreatIntelligence::new(),
+            )),
             response_engine: Arc::new(Mutex::new(response_engine::ResponseEngine::new())),
             correlation_engine: Arc::new(Mutex::new(correlation_engine::CorrelationEngine::new())),
             detection_history: Vec::new(),
@@ -504,7 +505,10 @@ impl IntrusionDetectionSystem {
     }
 
     /// 处理网络包
-    pub fn process_packet(&mut self, packet: &NetworkPacket) -> Result<Vec<IntrusionDetection>, &'static str> {
+    pub fn process_packet(
+        &mut self,
+        packet: &NetworkPacket,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         if !self.running.load(Ordering::SeqCst) {
             return Ok(Vec::new());
         }
@@ -522,10 +526,10 @@ impl IntrusionDetectionSystem {
                         detections.push(processed_detection);
                     }
                 }
-            }
+            },
             Err(e) => {
                 crate::println!("[IDS] Network packet analysis failed: {}", e);
-            }
+            },
         }
 
         // 更新统计
@@ -542,7 +546,10 @@ impl IntrusionDetectionSystem {
     }
 
     /// 处理系统事件
-    pub fn process_system_event(&mut self, event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
+    pub fn process_system_event(
+        &mut self,
+        event: &AuditEvent,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         if !self.running.load(Ordering::SeqCst) {
             return Ok(Vec::new());
         }
@@ -560,10 +567,10 @@ impl IntrusionDetectionSystem {
                         detections.push(processed_detection);
                     }
                 }
-            }
+            },
             Err(e) => {
                 crate::println!("[IDS] Host event analysis failed: {}", e);
-            }
+            },
         }
 
         // 更新统计
@@ -586,7 +593,11 @@ impl IntrusionDetectionSystem {
         }
 
         // 检查是否在威胁情报黑名单中
-        if let Ok(is_threat) = self.threat_intelligence.lock().is_threat_source(&detection.source) {
+        if let Ok(is_threat) = self
+            .threat_intelligence
+            .lock()
+            .is_threat_source(&detection.source)
+        {
             if is_threat {
                 return true; // 威胁情报命中，验证通过
             }
@@ -612,8 +623,14 @@ impl IntrusionDetectionSystem {
         // 更新统计
         {
             let mut stats = self.stats.lock();
-            *stats.detections_by_type.entry(detection.detection_type).or_insert(0) += 1;
-            *stats.detections_by_threat_level.entry(detection.threat_level).or_insert(0) += 1;
+            *stats
+                .detections_by_type
+                .entry(detection.detection_type)
+                .or_insert(0) += 1;
+            *stats
+                .detections_by_threat_level
+                .entry(detection.threat_level)
+                .or_insert(0) += 1;
         }
 
         detection
@@ -622,14 +639,18 @@ impl IntrusionDetectionSystem {
     /// 执行响应动作
     fn execute_response_actions(&mut self, detection: &IntrusionDetection) {
         for action in &detection.recommended_response {
-            match self.response_engine.lock().execute_action(action.clone(), detection) {
+            match self
+                .response_engine
+                .lock()
+                .execute_action(action.clone(), detection)
+            {
                 Ok(_) => {
                     let mut stats = self.stats.lock();
                     stats.responses_executed += 1;
-                }
+                },
                 Err(e) => {
                     crate::println!("[IDS] Response action failed: {}", e);
-                }
+                },
             }
         }
     }
@@ -647,12 +668,19 @@ impl IntrusionDetectionSystem {
             .cloned()
             .collect();
 
-        self.correlation_engine.lock().analyze_correlations(&recent_detections)
+        self.correlation_engine
+            .lock()
+            .analyze_correlations(&recent_detections)
     }
 
     /// 更新威胁情报
-    pub fn update_threat_intelligence(&mut self, threat_data: Vec<ThreatData>) -> Result<(), &'static str> {
-        self.threat_intelligence.lock().update_intelligence(threat_data)
+    pub fn update_threat_intelligence(
+        &mut self,
+        threat_data: Vec<ThreatData>,
+    ) -> Result<(), &'static str> {
+        self.threat_intelligence
+            .lock()
+            .update_intelligence(threat_data)
     }
 
     /// 获取系统状态
@@ -671,9 +699,13 @@ impl IntrusionDetectionSystem {
 
         // 重新初始化相关模块
         if self.running.load(Ordering::SeqCst) {
-            self.network_ids.lock().init(&self.config.network_ids_config)?;
+            self.network_ids
+                .lock()
+                .init(&self.config.network_ids_config)?;
             self.host_ids.lock().init(&self.config.host_ids_config)?;
-            self.response_engine.lock().init(&self.config.response_mode)?;
+            self.response_engine
+                .lock()
+                .init(&self.config.response_mode)?;
         }
 
         Ok(())
@@ -705,7 +737,8 @@ impl IntrusionDetectionSystem {
     /// 获取检测历史
     pub fn get_detection_history(&self, limit: Option<usize>) -> Vec<IntrusionDetection> {
         match limit {
-            Some(limit) => self.detection_history
+            Some(limit) => self
+                .detection_history
                 .iter()
                 .rev()
                 .take(limit)
@@ -943,7 +976,10 @@ impl Default for AnomalyDetectionConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            algorithms: vec![AnomalyAlgorithm::Statistical, AnomalyAlgorithm::MachineLearning],
+            algorithms: vec![
+                AnomalyAlgorithm::Statistical,
+                AnomalyAlgorithm::MachineLearning,
+            ],
             sensitivity: 0.7,
             training_data_size: 10000,
             update_interval_hours: 24,

@@ -1,21 +1,25 @@
 // Monitoring Module for Security Audit
 
 extern crate alloc;
-//
 // 监控模块，负责安全审计系统的实时监控和告警
 
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::{format, vec};
-use alloc::string::String;
-use alloc::string::ToString;
-use core::sync::atomic::{AtomicU64, AtomicBool, Ordering};
+use alloc::{
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
 use spin::Mutex;
 
-use crate::security::audit::{AuditEvent, AuditEventType, AuditSeverity};
-use super::{AlertConfig, AlertChannel, AlertRule, AlertRateLimit};
-use crate::security_audit::reporting::{ChartType, DataSourceType, DataPoint, Column, Row};
+use super::{AlertChannel, AlertConfig, AlertRateLimit, AlertRule};
+use crate::{
+    security::audit::{AuditEvent, AuditEventType, AuditSeverity},
+    security_audit::reporting::{ChartType, Column, DataPoint, DataSourceType, Row},
+};
 
 /// 审计监控器
 pub struct AuditMonitor {
@@ -186,23 +190,19 @@ impl Default for DashboardConfig {
                 DashboardType::Security,
                 DashboardType::Compliance,
             ],
-            visualizations: vec![
-                VisualizationConfig {
-                    id: 1,
-                    name: "Event Rate Chart".to_string(),
-                    chart_type: ChartType::Line,
-                    metrics: vec!["event_rate".to_string()],
-                    time_range: TimeRange::LastHour,
-                },
-            ],
-            data_sources: vec![
-                DataSourceConfig {
-                    id: 1,
-                    name: "Audit Metrics".to_string(),
-                    source_type: DataSourceType::AuditDatabase,
-                    query: "SELECT * FROM metrics".to_string(),
-                },
-            ],
+            visualizations: vec![VisualizationConfig {
+                id: 1,
+                name: "Event Rate Chart".to_string(),
+                chart_type: ChartType::Line,
+                metrics: vec!["event_rate".to_string()],
+                time_range: TimeRange::LastHour,
+            }],
+            data_sources: vec![DataSourceConfig {
+                id: 1,
+                name: "Audit Metrics".to_string(),
+                source_type: DataSourceType::AuditDatabase,
+                query: "SELECT * FROM metrics".to_string(),
+            }],
         }
     }
 }
@@ -736,10 +736,18 @@ impl AuditMonitor {
     pub fn init(&mut self) -> Result<(), &'static str> {
         // 初始化各个组件
         self.alert_manager.lock().init(&self.config.alert_config)?;
-        self.performance_monitor.lock().init(&self.config.performance_thresholds)?;
-        self.health_checker.lock().init(&self.config.health_check_config)?;
-        self.metrics_collector.lock().init(&self.config.metrics_config)?;
-        self.dashboard_generator.lock().init(&self.config.dashboard_config)?;
+        self.performance_monitor
+            .lock()
+            .init(&self.config.performance_thresholds)?;
+        self.health_checker
+            .lock()
+            .init(&self.config.health_check_config)?;
+        self.metrics_collector
+            .lock()
+            .init(&self.config.metrics_config)?;
+        self.dashboard_generator
+            .lock()
+            .init(&self.config.dashboard_config)?;
 
         self.running.store(true, Ordering::SeqCst);
         crate::println!("[AuditMonitor] Audit monitor initialized");
@@ -774,7 +782,10 @@ impl AuditMonitor {
         let metrics_collected = self.metrics_collector.lock().collect_metrics()?;
 
         // 告警检查
-        let alerts_triggered = self.alert_manager.lock().check_alerts(&performance_issues, &health_results)?;
+        let alerts_triggered = self
+            .alert_manager
+            .lock()
+            .check_alerts(&performance_issues, &health_results)?;
 
         // 仪表板更新
         self.dashboard_generator.lock().update_dashboards()?;
@@ -784,7 +795,10 @@ impl AuditMonitor {
             let mut stats = self.stats.lock();
             stats.total_monitoring_cycles += 1;
             stats.performance_issues += performance_issues.len() as u64;
-            stats.health_check_failures += health_results.iter().filter(|r| r.status != HealthStatus::Healthy).count() as u64;
+            stats.health_check_failures += health_results
+                .iter()
+                .filter(|r| r.status != HealthStatus::Healthy)
+                .count() as u64;
             stats.metrics_collected += metrics_collected as u64;
             stats.dashboard_updates += 1;
             stats.alerts_triggered += alerts_triggered as u64;
@@ -804,8 +818,13 @@ impl AuditMonitor {
     }
 
     /// 获取仪表板
-    pub fn get_dashboard(&mut self, dashboard_type: DashboardType) -> Result<Dashboard, &'static str> {
-        self.dashboard_generator.lock().get_dashboard(dashboard_type)
+    pub fn get_dashboard(
+        &mut self,
+        dashboard_type: DashboardType,
+    ) -> Result<Dashboard, &'static str> {
+        self.dashboard_generator
+            .lock()
+            .get_dashboard(dashboard_type)
     }
 
     /// 获取监控统计
@@ -838,7 +857,11 @@ impl AlertManager {
         Ok(())
     }
 
-    pub fn check_alerts(&mut self, _performance_issues: &[String], _health_results: &[HealthCheckResult]) -> Result<u64, &'static str> {
+    pub fn check_alerts(
+        &mut self,
+        _performance_issues: &[String],
+        _health_results: &[HealthCheckResult],
+    ) -> Result<u64, &'static str> {
         let mut alerts_triggered = 0;
 
         // 简化的告警检查逻辑
@@ -875,17 +898,21 @@ impl AlertManager {
         Ok(alerts_triggered)
     }
 
-    fn send_alert_to_channel(&self, alert: &Alert, channel: AlertChannel) -> Result<(), &'static str> {
+    fn send_alert_to_channel(
+        &self,
+        alert: &Alert,
+        channel: AlertChannel,
+    ) -> Result<(), &'static str> {
         match channel {
             AlertChannel::Log => {
                 crate::println!("[ALERT] {}: {}", alert.title, alert.message);
-            }
+            },
             AlertChannel::Console => {
                 crate::println!("[CONSOLE ALERT] {}: {}", alert.title, alert.message);
-            }
+            },
             _ => {
                 crate::println!("[ALERT] Sending to {:?}: {}", channel, alert.title);
-            }
+            },
         }
         Ok(())
     }
@@ -982,7 +1009,10 @@ impl HealthChecker {
         // 更新统计
         {
             self.stats.total_checks += 1;
-            let successful = results.iter().filter(|r| r.status == HealthStatus::Healthy).count();
+            let successful = results
+                .iter()
+                .filter(|r| r.status == HealthStatus::Healthy)
+                .count();
             self.stats.successful_checks += successful as u64;
             self.stats.failed_checks += (results.len() - successful) as u64;
 
@@ -995,8 +1025,12 @@ impl HealthChecker {
 
     fn perform_health_check(&self, check: HealthCheck) -> (HealthStatus, String) {
         match check {
-            HealthCheck::DatabaseConnection => (HealthStatus::Healthy, "Database connection OK".to_string()),
-            HealthCheck::FileSystemAccess => (HealthStatus::Healthy, "File system accessible".to_string()),
+            HealthCheck::DatabaseConnection => {
+                (HealthStatus::Healthy, "Database connection OK".to_string())
+            },
+            HealthCheck::FileSystemAccess => {
+                (HealthStatus::Healthy, "File system accessible".to_string())
+            },
             HealthCheck::MemoryUsage => {
                 let memory_usage = 67.8;
                 if memory_usage < 80.0 {
@@ -1004,8 +1038,10 @@ impl HealthChecker {
                 } else {
                     (HealthStatus::Warning, format!("High memory usage: {}%", memory_usage))
                 }
-            }
-            HealthCheck::EventProcessing => (HealthStatus::Healthy, "Event processing normal".to_string()),
+            },
+            HealthCheck::EventProcessing => {
+                (HealthStatus::Healthy, "Event processing normal".to_string())
+            },
             _ => (HealthStatus::Unknown, "Check not implemented".to_string()),
         }
     }
@@ -1040,13 +1076,12 @@ impl MetricsCollector {
             let metric_name = format!("{:?}", metric_type);
             let value = self.generate_metric_value(*metric_type);
 
-            let point = MetricPoint {
-                timestamp: current_time,
-                value,
-                labels: BTreeMap::new(),
-            };
+            let point = MetricPoint { timestamp: current_time, value, labels: BTreeMap::new() };
 
-            self.metrics_store.entry(metric_name.clone()).or_insert_with(Vec::new).push(point);
+            self.metrics_store
+                .entry(metric_name.clone())
+                .or_insert_with(Vec::new)
+                .push(point);
             metrics_count += 1;
         }
 
@@ -1057,7 +1092,8 @@ impl MetricsCollector {
             self.stats.metrics_collected += metrics_count as u64;
 
             let elapsed = crate::subsystems::time::get_timestamp_nanos() - start_time;
-            self.stats.avg_collection_time_us = (self.stats.avg_collection_time_us + elapsed / 1000) / 2;
+            self.stats.avg_collection_time_us =
+                (self.stats.avg_collection_time_us + elapsed / 1000) / 2;
         }
 
         Ok(metrics_count)
@@ -1100,7 +1136,10 @@ impl DashboardGenerator {
         Ok(())
     }
 
-    pub fn get_dashboard(&mut self, dashboard_type: DashboardType) -> Result<Dashboard, &'static str> {
+    pub fn get_dashboard(
+        &mut self,
+        dashboard_type: DashboardType,
+    ) -> Result<Dashboard, &'static str> {
         if !self.dashboard_cache.contains_key(&dashboard_type) {
             self.generate_dashboard(dashboard_type)?;
         }
@@ -1121,18 +1160,26 @@ impl DashboardGenerator {
             },
         };
 
-        self.dashboard_cache.insert(dashboard_type, dashboard.clone());
+        self.dashboard_cache
+            .insert(dashboard_type, dashboard.clone());
 
         // 更新统计
         {
             self.stats.total_generations += 1;
-            *self.stats.generations_by_type.entry(dashboard_type).or_insert(0) += 1;
+            *self
+                .stats
+                .generations_by_type
+                .entry(dashboard_type)
+                .or_insert(0) += 1;
         }
 
         Ok(())
     }
 
-    fn generate_visualizations(&self, dashboard_type: DashboardType) -> Result<Vec<VisualizationComponent>, &'static str> {
+    fn generate_visualizations(
+        &self,
+        dashboard_type: DashboardType,
+    ) -> Result<Vec<VisualizationComponent>, &'static str> {
         let mut visualizations = Vec::new();
 
         match dashboard_type {
@@ -1148,7 +1195,7 @@ impl DashboardGenerator {
                     }),
                     config: BTreeMap::new(),
                 });
-            }
+            },
             DashboardType::Performance => {
                 visualizations.push(VisualizationComponent {
                     id: 2,
@@ -1161,8 +1208,8 @@ impl DashboardGenerator {
                     }),
                     config: BTreeMap::new(),
                 });
-            }
-            _ => {}
+            },
+            _ => {},
         }
 
         Ok(visualizations)

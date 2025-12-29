@@ -18,19 +18,11 @@ pub struct PostResult {
 
 impl PostResult {
     pub fn success(test_name: &'static str) -> Self {
-        Self {
-            passed: true,
-            test_name,
-            error_code: 0,
-        }
+        Self { passed: true, test_name, error_code: 0 }
     }
 
     pub fn failure(test_name: &'static str, code: u32) -> Self {
-        Self {
-            passed: false,
-            test_name,
-            error_code: code,
-        }
+        Self { passed: false, test_name, error_code: code }
     }
 
     pub fn print(&self) {
@@ -123,12 +115,7 @@ pub fn test_paging() -> PostResult {
 pub fn run_all_tests() -> bool {
     crate::drivers::console::write_str("Running POST tests...\n");
 
-    let results = [
-        test_memory(),
-        test_cpu(),
-        test_interrupts(),
-        test_paging(),
-    ];
+    let results = [test_memory(), test_cpu(), test_interrupts(), test_paging()];
 
     let mut all_passed = true;
     for result in &results {
@@ -158,6 +145,6 @@ pub fn run_test(test: PostTest) -> PostResult {
         PostTest::AllTests => {
             let _ = run_all_tests();
             PostResult::success("All")
-        }
+        },
     }
 }

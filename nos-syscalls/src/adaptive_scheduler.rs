@@ -4,18 +4,19 @@
 //! for optimizing task scheduling in NOS operating system.
 
 use alloc::{
+    boxed::Box,
     collections::BTreeMap,
+    format,
+    string::{String, ToString},
     sync::Arc,
     vec::Vec,
-    string::{String, ToString},
-    boxed::Box,
-    format,
 };
-use spin::Mutex;
-use nos_api::Result;
-use crate::{SyscallHandler, SyscallDispatcher};
-use crate::logging::output_report;
 use core::sync::atomic::{AtomicU64, Ordering};
+
+use nos_api::Result;
+use spin::Mutex;
+
+use crate::{SyscallDispatcher, SyscallHandler, logging::output_report};
 
 /// Task priority levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -82,35 +83,35 @@ impl TaskStats {
             cache_hit_rate: 0.0,
         }
     }
-    
+
     /// Update statistics after execution
     pub fn update_execution(&mut self, exec_time_us: u64, was_preempted: bool) {
         self.total_exec_time_us += exec_time_us;
         self.time_slices += 1;
-        
+
         // Update average slice time
         if self.time_slices > 0 {
             self.avg_slice_time_us = self.total_exec_time_us / self.time_slices;
         }
-        
+
         if was_preempted {
             self.preemptions += 1;
         } else {
             self.voluntary_yields += 1;
         }
     }
-    
+
     /// Update cache hit rate
     pub fn update_cache_hit_rate(&mut self, hit_rate: f32) {
         self.cache_hit_rate = hit_rate;
     }
-    
+
     /// Get task efficiency score (0-100)
     pub fn efficiency_score(&self) -> f32 {
         if self.total_exec_time_us == 0 {
             return 100.0;
         }
-        
+
         // Calculate efficiency based on cache hit rate and preemption ratio
         let cache_factor = self.cache_hit_rate;
         let preemption_ratio = if self.time_slices > 0 {
@@ -118,7 +119,7 @@ impl TaskStats {
         } else {
             100.0
         };
-        
+
         (cache_factor + preemption_ratio) / 2.0
     }
 }
@@ -167,18 +168,18 @@ impl TaskControlBlock {
             cpu_usage_percent: 0.0,
         }
     }
-    
+
     /// Calculate initial time slice based on priority
     fn calculate_initial_time_slice(priority: TaskPriority) -> u64 {
         match priority {
-            TaskPriority::Realtime => 1000,    // 1ms for real-time tasks
-            TaskPriority::High => 5000,      // 5ms for high priority tasks
-            TaskPriority::Normal => 10000,    // 10ms for normal tasks
-            TaskPriority::Low => 20000,      // 20ms for low priority tasks
-            TaskPriority::Idle => 50000,      // 50ms for idle tasks
+            TaskPriority::Realtime => 1000, // 1ms for real-time tasks
+            TaskPriority::High => 5000,     // 5ms for high priority tasks
+            TaskPriority::Normal => 10000,  // 10ms for normal tasks
+            TaskPriority::Low => 20000,     // 20ms for low priority tasks
+            TaskPriority::Idle => 50000,    // 50ms for idle tasks
         }
     }
-    
+
     /// Update task priority with boost
     pub fn boost_priority(&mut self, boost: bool) {
         if boost {
@@ -199,12 +200,12 @@ impl TaskControlBlock {
             }
         }
     }
-    
+
     /// Update time slice based on task behavior
     pub fn update_time_slice(&mut self) {
         // Adaptive time slice based on task efficiency
         let efficiency = self.stats.efficiency_score();
-        
+
         // Increase time slice for efficient tasks, decrease for inefficient ones
         let adjustment = if efficiency > 80.0 {
             1.2 // Increase by 20%
@@ -213,17 +214,17 @@ impl TaskControlBlock {
         } else {
             1.0 // No change
         };
-        
+
         self.time_slice_us = (self.time_slice_us as f32 * adjustment) as u64;
-        
+
         // Clamp to reasonable bounds
         self.time_slice_us = self.time_slice_us.clamp(1000, 50000);
     }
-    
+
     /// Update CPU usage estimate
     pub fn update_cpu_usage(&mut self, current_time: u64) {
         let time_since_last = current_time.saturating_sub(self.last_exec_time_us);
-        
+
         if time_since_last > 0 {
             // Simple exponential moving average for CPU usage
             let instant_usage = (self.time_slice_us as f32 / time_since_last as f32) * 100.0;
@@ -274,12 +275,12 @@ impl SchedulerStats {
             cpu_utilization: 0.0,
         }
     }
-    
+
     /// Record a context switch
     pub fn record_context_switch(&mut self) {
         self.context_switches += 1;
     }
-    
+
     /// Update CPU utilization
     pub fn update_cpu_utilization(&mut self, utilization: f32) {
         self.cpu_utilization = self.cpu_utilization * 0.9 + utilization * 0.1;
@@ -304,11 +305,11 @@ pub struct AdaptiveParameters {
 impl Default for AdaptiveParameters {
     fn default() -> Self {
         Self {
-            min_time_slice_us: 1000,    // 1ms minimum
-            max_time_slice_us: 50000,   // 50ms maximum
-            boost_threshold: 0.7,        // Boost if efficiency < 70%
-            cpu_usage_threshold: 80.0,   // Boost if CPU usage > 80%
-            cache_hit_threshold: 60.0,    // Consider cache hit rate < 60% as poor
+            min_time_slice_us: 1000,   // 1ms minimum
+            max_time_slice_us: 50000,  // 50ms maximum
+            boost_threshold: 0.7,      // Boost if efficiency < 70%
+            cpu_usage_threshold: 80.0, // Boost if CPU usage > 80%
+            cache_hit_threshold: 60.0, // Consider cache hit rate < 60% as poor
         }
     }
 }
@@ -351,14 +352,14 @@ impl AdaptiveScheduler {
     pub fn add_task(&mut self, name: String, priority: TaskPriority) -> Result<u64> {
         let task_id = self.next_task_id.fetch_add(1, Ordering::SeqCst);
         let task = Arc::new(TaskControlBlock::new(task_id, name, priority));
-        
+
         self.tasks.insert(task_id, task.clone());
         self.ready_queues[priority as usize].push(task);
         self.stats.total_scheduled += 1;
-        
+
         Ok(task_id)
     }
-    
+
     /// Remove a task from the scheduler
     pub fn remove_task(&mut self, task_id: u64) -> Result<()> {
         if let Some(task) = self.tasks.remove(&task_id) {
@@ -367,7 +368,9 @@ impl AdaptiveScheduler {
             self.ready_queues[priority].retain(|t| t.task_id != task_id);
 
             // If it was the current task, clear it
-            if let Some(current) = &self.current_task && current.task_id == task_id {
+            if let Some(current) = &self.current_task
+                && current.task_id == task_id
+            {
                 self.current_task = None;
             }
 
@@ -376,7 +379,7 @@ impl AdaptiveScheduler {
             Err(nos_api::Error::NotFound(format!("Task {} not found", task_id)))
         }
     }
-    
+
     /// Schedule the next task to run
     pub fn schedule_next(&mut self) -> Option<Arc<TaskControlBlock>> {
         // Find highest priority ready task
@@ -384,64 +387,64 @@ impl AdaptiveScheduler {
             if let Some(task) = queue.first() {
                 let task = task.clone();
                 queue.remove(0);
-                
+
                 // Record context switch if changing tasks
                 if self.current_task.is_some() {
                     self.stats.record_context_switch();
                 }
-                
+
                 self.current_task = Some(task.clone());
                 return Some(task);
             }
         }
-        
+
         // No tasks ready
         self.current_task = None;
         None
     }
-    
+
     /// Yield the current task
     pub fn yield_current(&mut self) -> Result<()> {
         if let Some(mut task) = self.current_task.take() {
             // Extract values before mutable borrowing
             let time_slice_us = task.time_slice_us;
             let priority = task.priority as usize;
-            
+
             // Update task statistics
-            Arc::make_mut(&mut task).stats.update_execution(time_slice_us, false);
-            
+            Arc::make_mut(&mut task)
+                .stats
+                .update_execution(time_slice_us, false);
+
             // Re-queue with same priority
             self.ready_queues[priority].push(task);
-            
+
             Ok(())
         } else {
-            Err(nos_api::Error::InvalidArgument(
-                "No current task to yield".to_string()
-            ))
+            Err(nos_api::Error::InvalidArgument("No current task to yield".to_string()))
         }
     }
-    
+
     /// Preempt the current task
     pub fn preempt_current(&mut self) -> Result<()> {
         if let Some(mut task) = self.current_task.take() {
             // Extract values before mutable borrowing
             let time_slice_us = task.time_slice_us;
             let priority = task.priority as usize;
-            
+
             // Update task statistics
-            Arc::make_mut(&mut task).stats.update_execution(time_slice_us, true);
-            
+            Arc::make_mut(&mut task)
+                .stats
+                .update_execution(time_slice_us, true);
+
             // Re-queue with same priority
             self.ready_queues[priority].push(task);
-            
+
             Ok(())
         } else {
-            Err(nos_api::Error::InvalidArgument(
-                "No current task to preempt".to_string()
-            ))
+            Err(nos_api::Error::InvalidArgument("No current task to preempt".to_string()))
         }
     }
-    
+
     /// Update scheduler state
     pub fn update(&mut self, current_time: u64) {
         // Update current task
@@ -450,7 +453,7 @@ impl AdaptiveScheduler {
             unsafe {
                 (*task).update_cpu_usage(current_time);
                 (*task).update_time_slice();
-                
+
                 // Check if task needs priority boost
                 let efficiency = (*task).stats.efficiency_score();
                 if efficiency < self.adaptive_params.boost_threshold {
@@ -460,7 +463,7 @@ impl AdaptiveScheduler {
                 }
             }
         }
-        
+
         // Update scheduler statistics
         let total_tasks = self.tasks.len() as u64;
         if total_tasks > 0 {
@@ -473,22 +476,22 @@ impl AdaptiveScheduler {
             self.stats.update_cpu_utilization(utilization);
         }
     }
-    
+
     /// Get scheduler statistics
     pub fn get_stats(&self) -> &SchedulerStats {
         &self.stats
     }
-    
+
     /// Get task by ID
     pub fn get_task(&self, task_id: u64) -> Option<&Arc<TaskControlBlock>> {
         self.tasks.get(&task_id)
     }
-    
+
     /// Get current task
     pub fn get_current_task(&self) -> Option<&Arc<TaskControlBlock>> {
         self.current_task.as_ref()
     }
-    
+
     /// Get ready queue sizes
     pub fn get_ready_queue_sizes(&self) -> [usize; 5] {
         [
@@ -510,11 +513,9 @@ pub struct TaskSchedulerHandler {
 impl TaskSchedulerHandler {
     /// Create a new task scheduler handler
     pub fn new() -> Self {
-        Self {
-            scheduler: Arc::new(Mutex::new(AdaptiveScheduler::new())),
-        }
+        Self { scheduler: Arc::new(Mutex::new(AdaptiveScheduler::new())) }
     }
-    
+
     pub fn new_with_scheduler(scheduler: Arc<Mutex<AdaptiveScheduler>>) -> Self {
         Self { scheduler }
     }
@@ -524,11 +525,11 @@ impl SyscallHandler for TaskSchedulerHandler {
     fn id(&self) -> u32 {
         crate::types::SYS_SCHED_YIELD
     }
-    
+
     fn name(&self) -> &str {
         "sched_yield"
     }
-    
+
     fn execute(&self, _args: &[usize]) -> Result<isize> {
         self.scheduler.lock().yield_current()?;
         Ok(0)
@@ -539,35 +540,39 @@ impl SyscallHandler for TaskSchedulerHandler {
 pub fn register_handlers(dispatcher: &mut SyscallDispatcher) -> Result<()> {
     // Create adaptive scheduler
     let scheduler = Arc::new(Mutex::new(AdaptiveScheduler::new()));
-    
+
     // Register task yield system call
     let yield_handler = TaskSchedulerHandler::new_with_scheduler(scheduler.clone());
     dispatcher.register_handler(crate::types::SYS_SCHED_YIELD, Box::new(yield_handler));
-    
+
     // Print scheduler report
     let report = get_scheduler_report(&scheduler.lock());
     output_report(&report);
-    
+
     Ok(())
 }
 
 /// Get scheduler report
 pub fn get_scheduler_report(scheduler: &AdaptiveScheduler) -> String {
     let mut report = String::from("=== Adaptive Scheduler Report ===\n");
-    
+
     let stats = scheduler.get_stats();
     report.push_str(&format!("Total tasks scheduled: {}\n", stats.total_scheduled));
     report.push_str(&format!("Context switches: {}\n", stats.context_switches));
     report.push_str(&format!("CPU utilization: {:.1}%\n", stats.cpu_utilization));
-    
+
     let queue_sizes = scheduler.get_ready_queue_sizes();
-    report.push_str(&format!("Ready queue sizes: [{}, {}, {}, {}, {}]\n",
-        queue_sizes[0], queue_sizes[1], queue_sizes[2], queue_sizes[3], queue_sizes[4]));
-    
+    report.push_str(&format!(
+        "Ready queue sizes: [{}, {}, {}, {}, {}]\n",
+        queue_sizes[0], queue_sizes[1], queue_sizes[2], queue_sizes[3], queue_sizes[4]
+    ));
+
     if let Some(current) = scheduler.get_current_task() {
-        report.push_str(&format!("Current task: {} (ID: {}, Priority: {:?})\n",
-            current.name, current.task_id, current.priority));
+        report.push_str(&format!(
+            "Current task: {} (ID: {}, Priority: {:?})\n",
+            current.name, current.task_id, current.priority
+        ));
     }
-    
+
     report
 }

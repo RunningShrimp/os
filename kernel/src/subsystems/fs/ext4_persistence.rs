@@ -1,21 +1,21 @@
 //! Ext4 File System Persistence Implementation
-//! 
+//!
 //! This module implements the persistence layer for the Ext4 file system,
 //! providing robust data integrity, journaling, and recovery mechanisms.
 //! It ensures that file system operations are properly persisted to disk
 //! and can be recovered after system crashes or power failures.
 
 extern crate alloc;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::collections::BTreeMap;
-use crate::drivers::BlockDevice;
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 // use crate::subsystems::sync::{Sleeplock, Mutex};
 // use crate::subsystems::fs::fs_impl::{BSIZE, BufFlags, Buf, BufCache, CacheKey};
 // use crate::subsystems::fs::ext4::{Ext4SuperBlock, Ext4GroupDesc, Ext4Inode, EXT4_MAGIC};
 // use crate::subsystems::fs::ext4_enhanced::*;
-// use crate::subsystems::fs::journaling_fs::{JournalingFileSystem, JournalEntry, JournalTransaction};
-use core::sync::atomic::{AtomicU32, AtomicU64, AtomicBool, Ordering};
+// use crate::subsystems::fs::journaling_fs::{JournalingFileSystem, JournalEntry,
+// JournalTransaction};
+use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+
+use crate::drivers::BlockDevice;
 
 // ============================================================================
 // Persistence Constants and Structures
@@ -299,7 +299,7 @@ impl Ext4Persistence {
         let blocks_per_group = sb.s_blocks_per_group;
         let total_blocks = ((sb.s_blocks_count_hi as u64) << 32) | (sb.s_blocks_count_lo as u64);
         let group_count = (total_blocks + blocks_per_group as u64 - 1) / blocks_per_group as u64;
-        
+
         Self {
             dev,
             sb,
@@ -360,28 +360,28 @@ impl Ext4Persistence {
             checkpoint_timer: AtomicU64::new(0),
         }
     }
-    
+
     /// Initialize the persistence layer
     pub fn init(&mut self) -> Result<(), &'static str> {
         // In a real implementation, this would initialize the persistence layer
         Ok(())
     }
-    
+
     /// Enable persistence
     pub fn enable(&self) {
         self.persistence_enabled.store(true, Ordering::SeqCst);
     }
-    
+
     /// Disable persistence
     pub fn disable(&self) {
         self.persistence_enabled.store(false, Ordering::SeqCst);
     }
-    
+
     /// Check if persistence is enabled
     pub fn is_enabled(&self) -> bool {
         self.persistence_enabled.load(Ordering::SeqCst)
     }
-    
+
     /// Get current time
     fn get_current_time(&self) -> u64 {
         // TODO: wire to real time source; for now use monotonic ticks
@@ -399,24 +399,24 @@ impl Ext4Persistence {
                 wb.dirty_timeout = 30;
                 wb.max_dirty_blocks = 1024;
                 wb.priority = 5;
-            }
+            },
             Ext4WritePolicy::LatencyOptimized => {
                 // 更激进的合并：更长的超时&更大的批量
                 wb.interval = 10;
                 wb.dirty_timeout = 60;
                 wb.max_dirty_blocks = 4096;
                 wb.priority = 3;
-            }
+            },
             Ext4WritePolicy::Durability => {
                 // 更保守：更短的超时&更小的批量
                 wb.interval = 2;
                 wb.dirty_timeout = 5;
                 wb.max_dirty_blocks = 256;
                 wb.priority = 8;
-            }
+            },
         }
     }
-    
+
     /// Calculate checksum for data
     fn calculate_checksum(&self, data: &[u8]) -> u32 {
         // Simple checksum implementation for now
@@ -426,21 +426,21 @@ impl Ext4Persistence {
         }
         sum
     }
-    
+
     /// Writeback dirty blocks
     pub fn writeback_dirty_blocks(&self) -> Result<(), &'static str> {
         // Ensure policy is applied before each cycle (policy may be changed at runtime)
         self.apply_write_policy();
         let mut wb = self.writeback_control.lock();
-        
+
         if wb.in_progress || wb.dirty_blocks == 0 {
             return Ok(());
         }
-        
+
         wb.in_progress = true;
         let current_time = self.get_current_time();
         wb.last_writeback = current_time;
-        
+
         // Get dirty blocks
         let mut dirty_blocks = self.dirty_blocks.lock();
         // 先按块号排序，便于底层设备做顺序写合并
@@ -463,14 +463,14 @@ impl Ext4Persistence {
                 break;
             }
         }
-        
+
         // Release lock before writing
         drop(dirty_blocks);
-        
+
         // Write blocks
         let mut written_blocks = 0;
         let mut failed_blocks = 0;
-        
+
         for (block_num, dirty_block) in blocks_to_write {
             // Verify checksum
             let calculated_checksum = self.calculate_checksum(&dirty_block.data);
@@ -478,13 +478,13 @@ impl Ext4Persistence {
                 failed_blocks += 1;
                 continue;
             }
-            
+
             // Write block to disk
             if let Err(_) = self.dev.write(block_num as usize, &dirty_block.data) {
                 failed_blocks += 1;
                 continue;
             }
-            
+
             // Mark as clean
             {
                 let mut dirty_blocks = self.dirty_blocks.lock();
@@ -492,36 +492,36 @@ impl Ext4Persistence {
                     block.dirty = false;
                 }
             }
-            
+
             written_blocks += 1;
         }
-        
+
         // Update writeback control
         wb.written_blocks += written_blocks;
         wb.failed_blocks += failed_blocks;
         wb.dirty_blocks -= written_blocks;
         wb.in_progress = false;
-        
+
         // Update statistics
         {
             let mut stats = self.stats.lock();
             stats.writeback_operations += 1;
             stats.total_bytes_written += written_blocks as u64 * self.block_size as u64;
         }
-        
+
         Ok(());
     }
-    
+
     /// Flush all dirty blocks
     pub fn flush_dirty_blocks(&self) -> Result<(), &'static str> {
         let mut wb = self.writeback_control.lock();
-        
+
         if wb.in_progress {
             return Ok(());
         }
-        
+
         wb.in_progress = true;
-        
+
         // Get all dirty blocks
         let mut dirty_blocks = self.dirty_blocks.lock();
         let blocks_to_write: Vec<_> = dirty_blocks
@@ -529,14 +529,14 @@ impl Ext4Persistence {
             .filter(|(_, block)| block.dirty)
             .map(|(num, block)| (*num, block.clone()))
             .collect();
-        
+
         // Release lock before writing
         drop(dirty_blocks);
-        
+
         // Write blocks
         let mut written_blocks = 0;
         let mut failed_blocks = 0;
-        
+
         for (block_num, dirty_block) in blocks_to_write {
             // Verify checksum
             let calculated_checksum = self.calculate_checksum(&dirty_block.data);
@@ -544,13 +544,13 @@ impl Ext4Persistence {
                 failed_blocks += 1;
                 continue;
             }
-            
+
             // Write block to disk
             if let Err(_) = self.dev.write(block_num as usize, &dirty_block.data) {
                 failed_blocks += 1;
                 continue;
             }
-            
+
             // Mark as clean
             {
                 let mut dirty_blocks = self.dirty_blocks.lock();
@@ -558,32 +558,32 @@ impl Ext4Persistence {
                     block.dirty = false;
                 }
             }
-            
+
             written_blocks += 1;
         }
-        
+
         // Update writeback control
         wb.written_blocks += written_blocks;
         wb.failed_blocks += failed_blocks;
         wb.dirty_blocks -= written_blocks;
         wb.in_progress = false;
-        
+
         // Update statistics
         {
             let mut stats = self.stats.lock();
             stats.flush_operations += 1;
             stats.total_bytes_written += written_blocks as u64 * self.block_size as u64;
         }
-        
+
         Ok(());
     }
-    
+
     /// Get persistence statistics
     pub fn get_stats(&self) -> (u64, u64) {
         let stats = self.stats.lock();
         (stats.total_bytes_written, stats.total_bytes_read)
     }
-    
+
     /// Reset statistics
     pub fn reset_stats(&self) {
         let mut stats = self.stats.lock();

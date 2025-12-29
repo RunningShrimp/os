@@ -1,28 +1,18 @@
 //! SysFS file system for testing
 
 extern crate alloc;
-use core::sync::atomic::Ordering;
-
-use alloc::sync::Arc;
-use alloc::boxed::Box;
-use alloc::string::ToString;
-use alloc::string::String;
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
+use alloc::{collections::BTreeMap, string::ToString, sync::Arc, vec::Vec};
 use core::sync::atomic::{AtomicUsize, Ordering};
+
 use spin::Mutex;
 
-use crate::vfs_interface::{SuperBlock, Inode, FileAttr as VfsInterfaceFileAttr, FileType as VfsFileType, DirEntryType};
-use crate::subsystems::fs::{
-    FileMode,
-    VfsError,
-};
-use crate::subsystems::fs::api::DirEntry;
-use crate::vfs::types::FsStats;
-use crate::subsystems::fs::FilesystemStats;
-use super::{
-    error::*,
-    types::*,
+use super::{error::*, types::*};
+use crate::{
+    subsystems::fs::{FileMode, FilesystemStats, api::DirEntry},
+    vfs::types::FsStats,
+    vfs_interface::{
+        DirEntryType, FileAttr as VfsInterfaceFileAttr, FileType as VfsFileType, Inode, SuperBlock,
+    },
 };
 
 /// SysFS file system type
@@ -32,7 +22,7 @@ impl crate::vfs_interface::FileSystemType for SysFsType {
     fn name(&self) -> &str {
         "sysfs"
     }
-    
+
     fn mount(&self, _device: Option<&str>, _flags: u32) -> Result<Arc<dyn SuperBlock>, VfsError> {
         Ok(Arc::new(SysFsSuperBlock::new()))
     }
@@ -51,7 +41,7 @@ impl SysFsSuperBlock {
             next_ino: AtomicUsize::new(2),
         }
     }
-    
+
     fn alloc_ino(&self) -> u64 {
         self.next_ino.fetch_add(1, Ordering::Relaxed) as u64
     }
@@ -61,15 +51,15 @@ impl SuperBlock for SysFsSuperBlock {
     fn root(&self) -> Arc<dyn Inode> {
         self.root.clone()
     }
-    
+
     fn fs_type(&self) -> &str {
         "sysfs"
     }
-    
+
     fn sync(&self) -> Result<(), VfsError> {
         Ok(())
     }
-    
+
     fn statfs(&self) -> Result<FilesystemStats, VfsError> {
         let total_files = self.next_ino.load(Ordering::Relaxed) as u64;
         let stats = FsStats {
@@ -93,7 +83,7 @@ impl SuperBlock for SysFsSuperBlock {
         };
         Ok(stats.into())
     }
-    
+
     fn unmount(&self) -> Result<(), VfsError> {
         Ok(())
     }
@@ -131,7 +121,7 @@ impl SysFsInode {
             children: Mutex::new(BTreeMap::new()),
         }
     }
-    
+
     fn new_file(ino: u64, name: &str) -> Self {
         Self {
             name: Mutex::new(name.to_string()),
@@ -154,7 +144,7 @@ impl SysFsInode {
             children: Mutex::new(BTreeMap::new()),
         }
     }
-    
+
     fn new_symlink(ino: u64, name: &str, target: &str) -> Self {
         Self {
             name: Mutex::new(name.to_string()),
@@ -203,17 +193,20 @@ impl Inode for SysFsInode {
         // Default implementation - no-op
         Ok(())
     }
-    
+
     fn lookup(&self, name: &str) -> Result<Arc<dyn Inode>, VfsError> {
         let children = self.children.lock();
-        children.get(name)
-            .cloned()
-            .ok_or(VfsError::NoEntry)
+        children.get(name).cloned().ok_or(VfsError::NoEntry)
     }
-    
-    fn create(&self, name: &str, mode: FileMode, file_type: VfsFileType) -> Result<Arc<dyn Inode>, VfsError> {
+
+    fn create(
+        &self,
+        name: &str,
+        mode: FileMode,
+        file_type: VfsFileType,
+    ) -> Result<Arc<dyn Inode>, VfsError> {
         let mut children = self.children.lock();
-        
+
         if children.contains_key(name) {
             return Err(VfsError::Exists);
         }
@@ -235,68 +228,68 @@ impl Inode for SysFsInode {
         children.insert(name.to_string(), inode.clone());
         Ok(inode)
     }
-    
+
     fn mkdir(&self, name: &str, mode: FileMode) -> Result<Arc<dyn Inode>, VfsError> {
         self.create(name, mode, VfsFileType::Directory)
     }
-    
+
     fn unlink(&self, name: &str) -> Result<(), VfsError> {
         let mut children = self.children.lock();
-        
+
         let inode = children.get(name).ok_or(VfsError::NoEntry)?;
         let attr = inode.getattr()?;
         if attr.file_type == DirEntryType::Directory {
             return Err(VfsError::IsDirectory);
         }
-        
+
         children.remove(name);
         Ok(())
     }
-    
+
     fn rmdir(&self, name: &str) -> Result<(), VfsError> {
         let mut children = self.children.lock();
-        
+
         let inode = children.get(name).ok_or(VfsError::NoEntry)?;
         let attr = inode.getattr()?;
         if attr.file_type != DirEntryType::Directory {
             return Err(VfsError::NotDirectory);
         }
-        
+
         if !inode.is_empty()? {
             return Err(VfsError::NotEmpty);
         }
-        
+
         children.remove(name);
         Ok(())
     }
-    
+
     fn is_empty(&self) -> Result<bool, VfsError> {
         let children = self.children.lock();
         Ok(children.is_empty())
     }
-    
+
     fn link(&self, _name: &str, _inode: Arc<dyn Inode>) -> Result<(), VfsError> {
         Err(VfsError::IoError)
     }
-    
+
     fn symlink(&self, _name: &str, _target: &str) -> Result<Arc<dyn Inode>, VfsError> {
         Err(VfsError::IoError)
     }
-    
+
     fn readlink(&self) -> Result<String, VfsError> {
         Err(VfsError::IoError)
     }
-    
+
     fn readdir(&self) -> Result<Vec<DirEntry>, VfsError> {
         let attr = self.attr.lock();
         if attr.file_type != DirEntryType::Directory {
             return Err(VfsError::NotDirectory);
         }
         drop(attr);
-        
+
         let children = self.children.lock();
         let mut entries = Vec::new();
-        
+
         for (name, inode) in children.iter() {
             let iattr = inode.getattr()?;
             entries.push(DirEntry {
@@ -306,14 +299,14 @@ impl Inode for SysFsInode {
                 inode: iattr.inode,
             });
         }
-        
+
         Ok(entries)
     }
-    
+
     fn read(&self, _offset: u64, _buf: &mut [u8]) -> Result<usize, VfsError> {
         Err(VfsError::ReadOnly)
     }
-    
+
     fn write(&self, _offset: u64, _buf: &[u8]) -> Result<usize, VfsError> {
         Err(VfsError::ReadOnly)
     }
@@ -325,7 +318,7 @@ impl Inode for SysFsInode {
     fn mode(&self) -> FileMode {
         FileMode::new(self.attr.lock().mode)
     }
-    
+
     fn file_type(&self) -> VfsFileType {
         match self.attr.lock().file_type {
             DirEntryType::File => VfsFileType::RegularFile,
@@ -337,31 +330,35 @@ impl Inode for SysFsInode {
             DirEntryType::Socket => VfsFileType::Socket,
         }
     }
-    
+
     fn name(&self) -> String {
         self.name.lock().clone()
     }
 
     fn parent(&self) -> Option<Arc<dyn Inode>> {
-        self.parent_ino.lock().and_then(|parent_ino| {
-            self.children.lock().get(&".".to_string())
-                .cloned()
-        })
+        self.parent_ino
+            .lock()
+            .and_then(|parent_ino| self.children.lock().get(&".".to_string()).cloned())
     }
-    
+
     fn symlink_target(&self) -> Option<String> {
         None
     }
-    
+
     fn sync(&self) -> Result<(), VfsError> {
         Ok(())
     }
-    
+
     fn truncate(&self, _size: u64) -> Result<(), VfsError> {
         Err(VfsError::IoError)
     }
-    
-    fn rename(&self, _old_name: &str, _new_dir: &dyn Inode, _new_name: &str) -> Result<(), VfsError> {
+
+    fn rename(
+        &self,
+        _old_name: &str,
+        _new_dir: &dyn Inode,
+        _new_name: &str,
+    ) -> Result<(), VfsError> {
         Err(VfsError::IoError)
     }
 }

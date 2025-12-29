@@ -2,12 +2,15 @@
 //!
 //! This module provides error diagnostic tools and analysis.
 
+use alloc::{
+    collections::BTreeMap,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
+
 use spin::Mutex;
-use alloc::vec::Vec;
-use alloc::vec;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::collections::BTreeMap;
+
 use crate::Result;
 
 /// Diagnostic analyzer
@@ -38,11 +41,11 @@ impl DiagnosticAnalyzer {
                 rule.analyze(error_record)?;
             }
         }
-        
+
         // Update statistics
         let mut stats = self.stats.lock();
         stats.total_analyzed += 1;
-        
+
         Ok(())
     }
 
@@ -76,10 +79,12 @@ impl DiagnosticAnalyzer {
             },
             action: AnalysisAction::Log {
                 level: DiagnosticLevel::Warning,
-                message_template: "High error frequency detected: {count} errors in {time_window} seconds".to_string(),
+                message_template: "High error frequency detected: {count} errors in {time_window} \
+                                   seconds"
+                    .to_string(),
             },
         });
-        
+
         // Error correlation analysis
         self.add_rule(AnalysisRule {
             name: "Error Correlation".into(),
@@ -96,18 +101,20 @@ impl DiagnosticAnalyzer {
                 message_template: "Error correlation detected between {categories}".into(),
             },
         });
-        
+
         // Error trend analysis
         self.add_rule(AnalysisRule {
             name: "Error Trend".into(),
             description: "Analyze error trend patterns".into(),
             condition: AnalysisCondition::Trend {
                 time_window_seconds: 86400, // 24 hours
-                trend_threshold: 0.2, // 20% increase
+                trend_threshold: 0.2,       // 20% increase
             },
             action: AnalysisAction::Log {
                 level: DiagnosticLevel::Warning,
-                message_template: "Error trend detected: {trend}% increase in {time_window} seconds".into(),
+                message_template: "Error trend detected: {trend}% increase in {time_window} \
+                                   seconds"
+                    .into(),
             },
         });
     }
@@ -257,17 +264,17 @@ static GLOBAL_ANALYZER: spin::Once<Mutex<DiagnosticAnalyzer>> = spin::Once::new(
 
 /// Initialize the global diagnostic analyzer
 pub fn init_analyzer() -> Result<()> {
-    GLOBAL_ANALYZER.call_once(|| {
-        Mutex::new(DiagnosticAnalyzer::new())
-    });
-    
+    GLOBAL_ANALYZER.call_once(|| Mutex::new(DiagnosticAnalyzer::new()));
+
     // Initialize the analyzer
     GLOBAL_ANALYZER.get().unwrap().lock().init()
 }
 
 /// Get the global diagnostic analyzer
 pub fn get_analyzer() -> &'static Mutex<DiagnosticAnalyzer> {
-    GLOBAL_ANALYZER.get().expect("Diagnostic analyzer not initialized")
+    GLOBAL_ANALYZER
+        .get()
+        .expect("Diagnostic analyzer not initialized")
 }
 
 /// Internal function to get the global diagnostic analyzer
@@ -300,26 +307,23 @@ mod tests {
     #[test]
     fn test_diagnostic_analyzer() {
         let mut analyzer = DiagnosticAnalyzer::new();
-        
+
         // Add a test rule
         let rule = AnalysisRule {
             name: "Test Rule".into(),
             description: "Test analysis rule".into(),
-            condition: AnalysisCondition::Frequency {
-                threshold: 5,
-                time_window_seconds: 3600,
-            },
+            condition: AnalysisCondition::Frequency { threshold: 5, time_window_seconds: 3600 },
             action: AnalysisAction::Log {
                 level: DiagnosticLevel::Warning,
                 message_template: "Test warning".into(),
             },
         };
         analyzer.add_rule(rule);
-        
+
         // Analyze an error
         let error_record = crate::types::ErrorRecord::default();
         assert!(analyzer.analyze_error(&error_record).is_ok());
-        
+
         // Check statistics
         let stats = analyzer.get_stats();
         assert_eq!(stats.total_analyzed, 1);
@@ -340,7 +344,7 @@ mod tests {
         assert!(DiagnosticLevel::Info < DiagnosticLevel::Warning);
         assert!(DiagnosticLevel::Warning < DiagnosticLevel::Error);
         assert!(DiagnosticLevel::Error < DiagnosticLevel::Critical);
-        
+
         assert_eq!(DiagnosticLevel::default(), DiagnosticLevel::Info);
     }
 }

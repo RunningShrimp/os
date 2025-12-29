@@ -5,12 +5,16 @@
 //! from its implementation, helping to break circular dependencies
 //! between modules.
 
-use alloc::string::String;
-use alloc::vec::Vec;
-use crate::types::stubs::{pid_t, uid_t, gid_t};
-use crate::posix::mode_t;
-use crate::error::unified_framework::{FrameworkError, IntoFrameworkError, FrameworkResult};
-use crate::error::unified::UnifiedError;
+use alloc::{string::String, vec::Vec};
+
+use crate::{
+    error::{
+        unified::UnifiedError,
+        unified_framework::{FrameworkError, FrameworkResult, IntoFrameworkError},
+    },
+    posix::mode_t,
+    types::stubs::{gid_t, pid_t, uid_t},
+};
 
 /// Process manager trait
 ///
@@ -66,7 +70,13 @@ pub trait ProcessManager {
     /// # Returns
     /// * `Ok(())` - Success
     /// * `Err(ProcessError)` - Exec error
-    fn exec_process(&self, pid: pid_t, path: &str, args: &[&str], env: &[&str]) -> Result<(), ProcessError>;
+    fn exec_process(
+        &self,
+        pid: pid_t,
+        path: &str,
+        args: &[&str],
+        env: &[&str],
+    ) -> Result<(), ProcessError>;
 
     /// Exit a process
     ///
@@ -669,7 +679,9 @@ impl IntoFrameworkError for ProcessError {
             ProcessError::InvalidPid => UnifiedError::InvalidArgument.into_framework_error(),
             ProcessError::ProcessNotFound => UnifiedError::NotFound.into_framework_error(),
             ProcessError::PermissionDenied => UnifiedError::PermissionDenied.into_framework_error(),
-            ProcessError::ResourceUnavailable => UnifiedError::ResourceUnavailable.into_framework_error(),
+            ProcessError::ResourceUnavailable => {
+                UnifiedError::ResourceUnavailable.into_framework_error()
+            },
             ProcessError::InvalidArguments => UnifiedError::InvalidArgument.into_framework_error(),
             ProcessError::OutOfMemory => UnifiedError::OutOfMemory.into_framework_error(),
             ProcessError::NotSupported => UnifiedError::NotSupported.into_framework_error(),
@@ -682,19 +694,33 @@ impl IntoFrameworkError for ProcessError {
             ProcessError::Unknown => UnifiedError::Unknown.into_framework_error(),
         }
     }
-    
+
     fn with_context(self, context: &str, location: &str) -> FrameworkError {
         match self {
-            ProcessError::InvalidPid => UnifiedError::InvalidArgument.with_context(context, location),
+            ProcessError::InvalidPid => {
+                UnifiedError::InvalidArgument.with_context(context, location)
+            },
             ProcessError::ProcessNotFound => UnifiedError::NotFound.with_context(context, location),
-            ProcessError::PermissionDenied => UnifiedError::PermissionDenied.with_context(context, location),
-            ProcessError::ResourceUnavailable => UnifiedError::ResourceUnavailable.with_context(context, location),
-            ProcessError::InvalidArguments => UnifiedError::InvalidArgument.with_context(context, location),
+            ProcessError::PermissionDenied => {
+                UnifiedError::PermissionDenied.with_context(context, location)
+            },
+            ProcessError::ResourceUnavailable => {
+                UnifiedError::ResourceUnavailable.with_context(context, location)
+            },
+            ProcessError::InvalidArguments => {
+                UnifiedError::InvalidArgument.with_context(context, location)
+            },
             ProcessError::OutOfMemory => UnifiedError::OutOfMemory.with_context(context, location),
-            ProcessError::NotSupported => UnifiedError::NotSupported.with_context(context, location),
-            ProcessError::ProcessExists => UnifiedError::AlreadyExists.with_context(context, location),
+            ProcessError::NotSupported => {
+                UnifiedError::NotSupported.with_context(context, location)
+            },
+            ProcessError::ProcessExists => {
+                UnifiedError::AlreadyExists.with_context(context, location)
+            },
             ProcessError::NotChild => UnifiedError::InvalidArgument.with_context(context, location),
-            ProcessError::AlreadyRunning => UnifiedError::InvalidState.with_context(context, location),
+            ProcessError::AlreadyRunning => {
+                UnifiedError::InvalidState.with_context(context, location)
+            },
             ProcessError::NotRunning => UnifiedError::InvalidState.with_context(context, location),
             ProcessError::NotStopped => UnifiedError::InvalidState.with_context(context, location),
             ProcessError::NotZombie => UnifiedError::InvalidState.with_context(context, location),
@@ -709,7 +735,9 @@ impl IntoFrameworkError for ThreadError {
             ThreadError::InvalidTid => UnifiedError::InvalidArgument.into_framework_error(),
             ThreadError::ThreadNotFound => UnifiedError::NotFound.into_framework_error(),
             ThreadError::PermissionDenied => UnifiedError::PermissionDenied.into_framework_error(),
-            ThreadError::ResourceUnavailable => UnifiedError::ResourceUnavailable.into_framework_error(),
+            ThreadError::ResourceUnavailable => {
+                UnifiedError::ResourceUnavailable.into_framework_error()
+            },
             ThreadError::InvalidArguments => UnifiedError::InvalidArgument.into_framework_error(),
             ThreadError::OutOfMemory => UnifiedError::OutOfMemory.into_framework_error(),
             ThreadError::NotSupported => UnifiedError::NotSupported.into_framework_error(),
@@ -722,19 +750,31 @@ impl IntoFrameworkError for ThreadError {
             ThreadError::Unknown => UnifiedError::Unknown.into_framework_error(),
         }
     }
-    
+
     fn with_context(self, context: &str, location: &str) -> FrameworkError {
         match self {
-            ThreadError::InvalidTid => UnifiedError::InvalidArgument.with_context(context, location),
+            ThreadError::InvalidTid => {
+                UnifiedError::InvalidArgument.with_context(context, location)
+            },
             ThreadError::ThreadNotFound => UnifiedError::NotFound.with_context(context, location),
-            ThreadError::PermissionDenied => UnifiedError::PermissionDenied.with_context(context, location),
-            ThreadError::ResourceUnavailable => UnifiedError::ResourceUnavailable.with_context(context, location),
-            ThreadError::InvalidArguments => UnifiedError::InvalidArgument.with_context(context, location),
+            ThreadError::PermissionDenied => {
+                UnifiedError::PermissionDenied.with_context(context, location)
+            },
+            ThreadError::ResourceUnavailable => {
+                UnifiedError::ResourceUnavailable.with_context(context, location)
+            },
+            ThreadError::InvalidArguments => {
+                UnifiedError::InvalidArgument.with_context(context, location)
+            },
             ThreadError::OutOfMemory => UnifiedError::OutOfMemory.with_context(context, location),
             ThreadError::NotSupported => UnifiedError::NotSupported.with_context(context, location),
-            ThreadError::ThreadExists => UnifiedError::AlreadyExists.with_context(context, location),
+            ThreadError::ThreadExists => {
+                UnifiedError::AlreadyExists.with_context(context, location)
+            },
             ThreadError::NotChild => UnifiedError::InvalidArgument.with_context(context, location),
-            ThreadError::AlreadyRunning => UnifiedError::InvalidState.with_context(context, location),
+            ThreadError::AlreadyRunning => {
+                UnifiedError::InvalidState.with_context(context, location)
+            },
             ThreadError::NotRunning => UnifiedError::InvalidState.with_context(context, location),
             ThreadError::NotStopped => UnifiedError::InvalidState.with_context(context, location),
             ThreadError::NotZombie => UnifiedError::InvalidState.with_context(context, location),

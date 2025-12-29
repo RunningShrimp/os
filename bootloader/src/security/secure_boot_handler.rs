@@ -6,10 +6,8 @@
 //! - Boot variable validation
 //! - Platform Key (PK) verification
 
+use alloc::{format, string::String, vec::Vec};
 use core::fmt;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::format;
 
 /// Secure Boot status codes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,10 +38,10 @@ impl fmt::Display for SecureBootStatus {
 /// Certificate type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CertificateType {
-    PlatformKey,      // PK - Platform Key
-    KeyExchangeKey,   // KEK - Key Exchange Key
-    SignatureDB,      // db - Signature Database
-    ForbiddenDB,      // dbx - Forbidden Signature DB
+    PlatformKey,    // PK - Platform Key
+    KeyExchangeKey, // KEK - Key Exchange Key
+    SignatureDB,    // db - Signature Database
+    ForbiddenDB,    // dbx - Forbidden Signature DB
     Unknown,
 }
 
@@ -240,12 +238,7 @@ impl SecureBootHandler {
     }
 
     /// Verify signature (framework)
-    pub fn verify_signature(
-        &mut self,
-        data: &[u8],
-        signature: &[u8],
-        cert: &Certificate,
-    ) -> bool {
+    pub fn verify_signature(&mut self, data: &[u8], signature: &[u8], cert: &Certificate) -> bool {
         if data.is_empty() || signature.is_empty() {
             self.signatures_failed += 1;
             return false;
@@ -258,9 +251,8 @@ impl SecureBootHandler {
 
         // Framework - actual RSA/ECDSA verification would be implemented
         // For now, check that signature matches data hash pattern
-        let result = signature.len() == cert.signature_length as usize
-            && !data.is_empty()
-            && cert.is_valid;
+        let result =
+            signature.len() == cert.signature_length as usize && !data.is_empty() && cert.is_valid;
 
         if result {
             self.signatures_verified += 1;
@@ -331,10 +323,15 @@ impl SecureBootHandler {
     /// Get detailed status report
     pub fn status_report(&self) -> String {
         format!(
-            "SecureBootHandler {{ status: {}, mode: {}, pk: {}, certs: {}, vars: {}, verified: {}, failed: {} }}",
-            self.status, self.mode, self.pk_installed,
-            self.certificate_count(), self.variable_count(),
-            self.signatures_verified, self.signatures_failed
+            "SecureBootHandler {{ status: {}, mode: {}, pk: {}, certs: {}, vars: {}, verified: \
+             {}, failed: {} }}",
+            self.status,
+            self.mode,
+            self.pk_installed,
+            self.certificate_count(),
+            self.variable_count(),
+            self.signatures_verified,
+            self.signatures_failed
         )
     }
 
@@ -384,7 +381,7 @@ mod tests {
         let mut cert = Certificate::new(CertificateType::KeyExchangeKey);
         cert.not_before = 1000;
         cert.not_after = 2000;
-        
+
         assert!(!cert.is_expired(1500));
         assert!(cert.is_expired(500));
         assert!(cert.is_expired(2500));
@@ -406,7 +403,7 @@ mod tests {
         cert.not_before = 1000;
         cert.not_after = 5000;
         cert.signature_length = 256;
-        
+
         assert!(cert.validate());
         assert!(cert.is_valid);
     }
@@ -419,7 +416,7 @@ mod tests {
         cert.not_before = 5000;
         cert.not_after = 1000;
         cert.signature_length = 256;
-        
+
         assert!(!cert.validate());
     }
 
@@ -458,7 +455,7 @@ mod tests {
         let mut cert = Certificate::new(CertificateType::PlatformKey);
         cert.issuer = String::from("Test CA");
         cert.subject = String::from("Test PK");
-        
+
         assert!(handler.register_certificate(cert));
         assert_eq!(handler.certificate_count(), 1);
         assert!(handler.is_pk_installed());
@@ -468,7 +465,7 @@ mod tests {
     fn test_secure_boot_handler_register_variable() {
         let mut handler = SecureBootHandler::new();
         let var = SecureBootVariable::new("KEK", CertificateType::KeyExchangeKey);
-        
+
         assert!(handler.register_variable(var));
         assert_eq!(handler.variable_count(), 1);
     }
@@ -483,10 +480,10 @@ mod tests {
         cert.not_after = 5000;
         cert.signature_length = 256;
         cert.is_valid = true;
-        
+
         let data = [1u8; 32];
         let signature = [2u8; 256];
-        
+
         let result = handler.verify_signature(&data, &signature, &cert);
         assert!(result);
         assert_eq!(handler.get_stats().0, 1);
@@ -497,7 +494,7 @@ mod tests {
         let mut handler = SecureBootHandler::new();
         handler.status = SecureBootStatus::Enabled;
         assert!(handler.is_enabled());
-        
+
         handler.status = SecureBootStatus::Disabled;
         assert!(!handler.is_enabled());
     }
@@ -507,7 +504,7 @@ mod tests {
         let mut handler = SecureBootHandler::new();
         let cert = Certificate::new(CertificateType::PlatformKey);
         handler.register_certificate(cert);
-        
+
         assert!(handler.certificate_count() > 0);
         handler.reset();
         assert_eq!(handler.certificate_count(), 0);

@@ -51,7 +51,12 @@ impl CachedFdInfo {
     }
 
     #[inline]
-    pub fn update(&mut self, file_idx: usize, file_type: crate::fs::file::FileType, timestamp: u64) {
+    pub fn update(
+        &mut self,
+        file_idx: usize,
+        file_type: crate::fs::file::FileType,
+        timestamp: u64,
+    ) {
         self.file_idx = Some(file_idx);
         self.file_type = file_type;
         self.valid = true;
@@ -95,10 +100,10 @@ impl ExtendedFdCache {
     }
 
     /// 获取缓存的文件描述符信息（O(1)查找）
-    /// 
+    ///
     /// # 参数
     /// * `fd` - 文件描述符编号（0-15）
-    /// 
+    ///
     /// # 返回值
     /// * `Some(file_idx)` 如果文件描述符在缓存中且有效
     /// * `None` 如果文件描述符不在缓存中或无效
@@ -112,14 +117,14 @@ impl ExtendedFdCache {
                 return cached.file_idx;
             }
         }
-        
+
         // 原子性地增加未命中计数
         self.misses.fetch_add(1, Ordering::Relaxed);
         None
     }
 
     /// 更新文件描述符缓存
-    /// 
+    ///
     /// # 参数
     /// * `fd` - 文件描述符编号（0-15）
     /// * `file_idx` - 文件在全局文件表中的索引
@@ -134,7 +139,7 @@ impl ExtendedFdCache {
     }
 
     /// 使文件描述符缓存失效
-    /// 
+    ///
     /// # 参数
     /// * `fd` - 文件描述符编号（0-15）
     #[inline(always)]
@@ -156,7 +161,7 @@ impl ExtendedFdCache {
     /// 根据访问模式预加载常用的文件描述符
     pub fn warmup(&mut self, common_fds: &[(i32, usize, crate::fs::file::FileType)]) {
         let timestamp = self.timestamp_counter.load(Ordering::Relaxed);
-        
+
         for &(fd, file_idx, file_type) in common_fds {
             if fd >= 0 && fd < 16 {
                 self.cache[fd as usize].update(file_idx, file_type, timestamp);
@@ -187,7 +192,7 @@ impl ExtendedFdCache {
         let hits = self.hits.load(Ordering::Relaxed);
         let misses = self.misses.load(Ordering::Relaxed);
         let total = hits + misses;
-        
+
         if total == 0 {
             0.0
         } else {
@@ -199,7 +204,7 @@ impl ExtendedFdCache {
     pub fn get_lru_fd(&self) -> Option<i32> {
         let mut lru_fd = None;
         let mut min_timestamp = u64::MAX;
-        
+
         for (i, cached) in self.cache.iter().enumerate() {
             if cached.is_valid() {
                 if cached.last_access < min_timestamp {
@@ -208,7 +213,7 @@ impl ExtendedFdCache {
                 }
             }
         }
-        
+
         lru_fd
     }
 
@@ -216,7 +221,7 @@ impl ExtendedFdCache {
     pub fn get_lfu_fd(&self) -> Option<i32> {
         let mut lfu_fd = None;
         let mut min_count = u32::MAX;
-        
+
         for (i, cached) in self.cache.iter().enumerate() {
             if cached.is_valid() {
                 if cached.access_count < min_count {
@@ -225,7 +230,7 @@ impl ExtendedFdCache {
                 }
             }
         }
-        
+
         lfu_fd
     }
 }
@@ -306,15 +311,15 @@ mod tests {
     #[test]
     fn test_fd_cache_basic_operations() {
         let mut cache = ExtendedFdCache::new();
-        
+
         // 测试初始状态
         assert_eq!(cache.get(0), None);
         assert_eq!(cache.get(15), None);
-        
+
         // 测试更新和获取
         cache.update(0, 100, crate::fs::file::FileType::Vfs);
         assert_eq!(cache.get(0), Some(100));
-        
+
         // 测试失效
         cache.invalidate(0);
         assert_eq!(cache.get(0), None);
@@ -323,19 +328,19 @@ mod tests {
     #[test]
     fn test_fd_cache_stats() {
         let mut cache = ExtendedFdCache::new();
-        
+
         // 初始统计应该为0
         let stats = cache.get_stats();
         assert_eq!(stats.hits, 0);
         assert_eq!(stats.misses, 0);
         assert_eq!(stats.updates, 0);
         assert_eq!(stats.hit_rate, 0.0);
-        
+
         // 进行一些操作
         cache.update(0, 100, crate::fs::file::FileType::Vfs);
         let _ = cache.get(0); // 命中
         let _ = cache.get(1); // 未命中
-        
+
         // 检查统计
         let stats = cache.get_stats();
         assert_eq!(stats.hits, 1);
@@ -347,15 +352,15 @@ mod tests {
     #[test]
     fn test_fd_cache_warmup() {
         let mut cache = ExtendedFdCache::new();
-        
+
         let common_fds = [
             (0, 100, crate::fs::file::FileType::Vfs),
             (1, 101, crate::fs::file::FileType::Pipe),
             (2, 102, crate::fs::file::FileType::Socket),
         ];
-        
+
         cache.warmup(&common_fds);
-        
+
         assert_eq!(cache.get(0), Some(100));
         assert_eq!(cache.get(1), Some(101));
         assert_eq!(cache.get(2), Some(102));
@@ -364,16 +369,16 @@ mod tests {
     #[test]
     fn test_lru_replacement() {
         let mut cache = ExtendedFdCache::new();
-        
+
         // 添加多个缓存条目
         for i in 0..16 {
             cache.update(i, i * 10, crate::fs::file::FileType::Vfs);
         }
-        
+
         // 获取LRU文件描述符
         let lru_fd = cache.get_lru_fd();
         assert!(lru_fd.is_some());
-        
+
         // 验证LRU逻辑
         // 第一个添加的应该是LRU
         assert_eq!(lru_fd, Some(0));

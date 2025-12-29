@@ -13,11 +13,9 @@ extern crate hashbrown;
 
 use alloc::vec::Vec;
 use alloc::string::String;
-use alloc::{format, vec};
 use alloc::boxed::Box;
 use hashbrown::HashMap;
 use crate::compat::{*, DefaultHasherBuilder};
-
 /// Graphics translation engine
 pub struct GraphicsTranslator {
     /// Platform-specific graphics contexts

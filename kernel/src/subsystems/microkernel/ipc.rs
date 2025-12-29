@@ -10,11 +10,13 @@
 //! For high-performance IPC services, use `crate::services::ipc`.
 
 extern crate alloc;
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU64, AtomicUsize, AtomicBool, Ordering};
-use crate::subsystems::sync::Mutex;
-use crate::reliability::{EINVAL, ENOMEM, EAGAIN, EFAULT, EMSGSIZE, ENOENT};
+use alloc::{collections::BTreeMap, vec::Vec};
+use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+
+use crate::{
+    reliability::{EAGAIN, EFAULT, EINVAL, EMSGSIZE, ENOENT, ENOMEM},
+    subsystems::sync::Mutex,
+};
 
 /// IPC message structure
 #[derive(Debug, Clone)]
@@ -43,33 +45,32 @@ impl ZeroCopyRef {
     /// Returns the base virtual address if the shared memory is attached to the process
     pub fn get_virtual_address(&self, process_id: u64) -> Result<usize, i32> {
         let ipc_manager = get_ipc_manager().ok_or(EFAULT)?;
-        
+
         // Check if shared memory exists
-        let _shm = ipc_manager.get_shared_memory(self.shm_id)
-            .ok_or(ENOENT)?;
+        let _shm = ipc_manager.get_shared_memory(self.shm_id).ok_or(ENOENT)?;
 
         // Get process pagetable
         let pagetable = {
             let mut proc_table = crate::process::PROC_TABLE.lock();
-            let proc = proc_table.find(process_id as crate::process::Pid)
+            let proc = proc_table
+                .find(process_id as crate::process::Pid)
                 .ok_or(EFAULT)?;
             proc.pagetable
         };
         if pagetable.is_null() {
             return Err(EFAULT);
         }
-        
+
         // Try to find the virtual address by translating the physical address
         // This is a simplified implementation - in a real system, we would
         // track virtual address mappings for shared memory
-        let shm = ipc_manager.get_shared_memory(self.shm_id)
-            .ok_or(ENOENT)?;
-        
+        let shm = ipc_manager.get_shared_memory(self.shm_id).ok_or(ENOENT)?;
+
         // For now, return the physical address as virtual address
         // In a real implementation, we would maintain a mapping table
         Ok(shm.paddr.0 + self.offset)
     }
-    
+
     /// Get a pointer to the data in shared memory (unsafe)
     /// The caller must ensure:
     /// 1. The shared memory is attached to the current process
@@ -79,43 +80,43 @@ impl ZeroCopyRef {
         let va = self.get_virtual_address(process_id)?;
         Ok(va as *const u8)
     }
-    
+
     /// Get a mutable pointer to the data in shared memory (unsafe)
     /// Same safety requirements as get_data_ptr
     pub unsafe fn get_data_ptr_mut(&self, process_id: u64) -> Result<*mut u8, i32> {
         let va = self.get_virtual_address(process_id)?;
         Ok(va as *mut u8)
     }
-    
+
     /// Copy data from shared memory to a buffer
     /// This is a safe wrapper that copies the data
     pub fn copy_to_buffer(&self, process_id: u64, buffer: &mut [u8]) -> Result<usize, i32> {
         if buffer.len() < self.length {
             return Err(EMSGSIZE);
         }
-        
+
         unsafe {
             let src_ptr = self.get_data_ptr(process_id)?;
             let src_slice = core::slice::from_raw_parts(src_ptr, self.length);
             buffer[..self.length].copy_from_slice(src_slice);
         }
-        
+
         Ok(self.length)
     }
-    
+
     /// Copy data from a buffer to shared memory
     /// This is a safe wrapper that copies the data
     pub fn copy_from_buffer(&self, process_id: u64, buffer: &[u8]) -> Result<usize, i32> {
         if buffer.len() > self.length {
             return Err(EMSGSIZE);
         }
-        
+
         unsafe {
             let dst_ptr = self.get_data_ptr_mut(process_id)?;
             let dst_slice = core::slice::from_raw_parts_mut(dst_ptr, self.length);
             dst_slice[..buffer.len()].copy_from_slice(buffer);
         }
-        
+
         Ok(buffer.len())
     }
 }
@@ -155,11 +156,7 @@ impl IpcMessage {
             priority: 0,
             data: Vec::new(), // Empty for zero-copy messages
             timestamp: get_current_time(),
-            zero_copy_ref: Some(ZeroCopyRef {
-                shm_id,
-                offset,
-                length,
-            }),
+            zero_copy_ref: Some(ZeroCopyRef { shm_id, offset, length }),
         }
     }
 
@@ -244,14 +241,13 @@ impl MessageQueue {
         if let Some(ref zc_ref) = message.zero_copy_ref {
             // Verify shared memory region exists
             let ipc_manager = get_ipc_manager().ok_or(EFAULT)?;
-            let shm = ipc_manager.get_shared_memory(zc_ref.shm_id)
-                .ok_or(ENOENT)?;
-            
+            let shm = ipc_manager.get_shared_memory(zc_ref.shm_id).ok_or(ENOENT)?;
+
             // Verify offset and length are within shared memory bounds
             if zc_ref.offset + zc_ref.length > shm.size {
                 return Err(EMSGSIZE);
             }
-            
+
             // Verify message size constraint
             if zc_ref.length > self.max_message_size {
                 return Err(EMSGSIZE);
@@ -262,14 +258,18 @@ impl MessageQueue {
         let mut messages = self.messages.lock();
 
         // Find insertion point based on priority
-        let insert_pos = messages.iter().position(|m| m.priority < message.priority)
+        let insert_pos = messages
+            .iter()
+            .position(|m| m.priority < message.priority)
             .unwrap_or(messages.len());
 
         messages.insert(insert_pos, message);
         self.current_count.fetch_add(1, Ordering::SeqCst);
 
         // Update statistics
-        super::MICROKERNEL_STATS.ipc_messages.fetch_add(1, Ordering::SeqCst);
+        super::MICROKERNEL_STATS
+            .ipc_messages
+            .fetch_add(1, Ordering::SeqCst);
 
         Ok(())
     }
@@ -288,7 +288,8 @@ impl MessageQueue {
             return Err(EINVAL); // Zero-copy not enabled for this queue
         }
 
-        let message = IpcMessage::new_zero_copy(sender_id, receiver_id, message_type, shm_id, offset, length);
+        let message =
+            IpcMessage::new_zero_copy(sender_id, receiver_id, message_type, shm_id, offset, length);
         self.send(message)
     }
 
@@ -296,7 +297,9 @@ impl MessageQueue {
         let mut messages = self.messages.lock();
 
         // Find first message for this receiver
-        let pos = messages.iter().position(|m| m.receiver_id == receiver_id || m.receiver_id == 0);
+        let pos = messages
+            .iter()
+            .position(|m| m.receiver_id == receiver_id || m.receiver_id == 0);
 
         if let Some(index) = pos {
             let message = messages.remove(index);
@@ -310,7 +313,7 @@ impl MessageQueue {
     /// Receive a zero-copy message and get reference to shared memory
     pub fn receive_zero_copy(&self, receiver_id: u64) -> Result<ZeroCopyRef, i32> {
         let message = self.receive(receiver_id)?;
-        
+
         if let Some(zc_ref) = message.zero_copy_ref {
             Ok(zc_ref)
         } else {
@@ -321,7 +324,8 @@ impl MessageQueue {
     pub fn peek(&self, receiver_id: u64) -> Option<IpcMessage> {
         let messages = self.messages.lock();
 
-        messages.iter()
+        messages
+            .iter()
             .find(|m| m.receiver_id == receiver_id || m.receiver_id == 0)
             .cloned()
     }
@@ -364,7 +368,12 @@ impl Clone for SharedMemoryRegion {
 }
 
 impl SharedMemoryRegion {
-    pub fn new(id: u64, owner_id: u64, size: usize, paddr: crate::subsystems::mm::phys::PhysAddr) -> Self {
+    pub fn new(
+        id: u64,
+        owner_id: u64,
+        size: usize,
+        paddr: crate::subsystems::mm::phys::PhysAddr,
+    ) -> Self {
         Self {
             id,
             owner_id,
@@ -421,7 +430,7 @@ impl IpcSemaphore {
                     Ordering::Relaxed,
                 ) {
                     Ok(_) => return Ok(()), // Successfully acquired
-                    Err(_) => continue, // Value changed, retry
+                    Err(_) => continue,     // Value changed, retry
                 }
             } else {
                 // Add to waiting queue
@@ -504,12 +513,7 @@ impl EventChannel {
     }
 
     pub fn publish(&self, event_type: u32, source_id: u64, data: Vec<u8>) -> Result<(), i32> {
-        let event = IpcEvent {
-            event_type,
-            source_id,
-            data,
-            timestamp: get_current_time(),
-        };
+        let event = IpcEvent { event_type, source_id, data, timestamp: get_current_time() };
 
         let mut pending = self.pending_events.lock();
         pending.push(event);
@@ -563,7 +567,12 @@ impl IpcManager {
         }
     }
 
-    pub fn create_message_queue(&self, owner_id: u64, max_messages: usize, max_message_size: usize) -> Result<u64, i32> {
+    pub fn create_message_queue(
+        &self,
+        owner_id: u64,
+        max_messages: usize,
+        max_message_size: usize,
+    ) -> Result<u64, i32> {
         let id = self.next_queue_id.fetch_add(1, Ordering::SeqCst);
         let queue = MessageQueue::new(id, owner_id, max_messages, max_message_size);
 
@@ -585,7 +594,8 @@ impl IpcManager {
         let shm_id = self.create_shared_memory(owner_id, shm_size)?;
 
         let id = self.next_queue_id.fetch_add(1, Ordering::SeqCst);
-        let queue = MessageQueue::new_with_zero_copy(id, owner_id, max_messages, max_message_size, shm_id);
+        let queue =
+            MessageQueue::new_with_zero_copy(id, owner_id, max_messages, max_message_size, shm_id);
 
         let mut queues = self.message_queues.lock();
         queues.insert(id, queue);
@@ -632,7 +642,11 @@ impl IpcManager {
     }
 
     /// Receive a zero-copy message
-    pub fn receive_zero_copy_message(&self, queue_id: u64, receiver_id: u64) -> Result<ZeroCopyRef, i32> {
+    pub fn receive_zero_copy_message(
+        &self,
+        queue_id: u64,
+        receiver_id: u64,
+    ) -> Result<ZeroCopyRef, i32> {
         let queues = self.message_queues.lock();
         let queue = queues.get(&queue_id).ok_or(ENOENT)?;
         queue.receive_zero_copy(receiver_id)
@@ -665,8 +679,7 @@ impl IpcManager {
 
     pub fn create_shared_memory(&self, owner_id: u64, size: usize) -> Result<u64, i32> {
         // Allocate physical memory
-        let memory_manager = super::memory::get_memory_manager()
-            .ok_or(EFAULT)?;
+        let memory_manager = super::memory::get_memory_manager().ok_or(EFAULT)?;
 
         let paddr_usize = memory_manager.allocate_physical_page()?; // For simplicity, allocate one page
         let paddr = crate::subsystems::mm::phys::PhysAddr::new(paddr_usize);
@@ -708,40 +721,42 @@ impl IpcManager {
     ) -> Result<usize, i32> {
         let shared_mem = self.shared_memory.lock();
         let shm = shared_mem.get(&shm_id).ok_or(ENOENT)?;
-        
+
         // Increment reference count
         shm.inc_ref();
 
         // Get process pagetable
         let pagetable = {
             let mut proc_table = crate::process::PROC_TABLE.lock();
-            let proc = proc_table.find(process_id as crate::process::Pid)
+            let proc = proc_table
+                .find(process_id as crate::process::Pid)
                 .ok_or(EFAULT)?;
             proc.pagetable
         };
         if pagetable.is_null() {
             return Err(EFAULT);
         }
-        
+
         // Find virtual address (use provided or find free range)
         let va = match addr {
             Some(a) => a,
             None => {
                 // Find free virtual address range
-                crate::subsystems::mm::vm::find_free_range(shm.size)
-                    .ok_or(ENOMEM)?
-            }
+                crate::subsystems::mm::vm::find_free_range(shm.size).ok_or(ENOMEM)?
+            },
         };
-        
+
         // Map physical pages to virtual address space
         let paddr = shm.paddr.0;
-        let perm = crate::subsystems::mm::vm::flags::PTE_U | crate::subsystems::mm::vm::flags::PTE_R | crate::subsystems::mm::vm::flags::PTE_W;
-        
+        let perm = crate::subsystems::mm::vm::flags::PTE_U
+            | crate::subsystems::mm::vm::flags::PTE_R
+            | crate::subsystems::mm::vm::flags::PTE_W;
+
         unsafe {
             crate::subsystems::mm::vm::map_pages(pagetable, va, paddr, shm.size, perm)
                 .map_err(|_| EFAULT)?;
         }
-        
+
         Ok(va)
     }
 
@@ -758,38 +773,43 @@ impl IpcManager {
         // Get process pagetable
         let pagetable = {
             let mut proc_table = crate::process::PROC_TABLE.lock();
-            let proc = proc_table.find(process_id as crate::process::Pid)
+            let proc = proc_table
+                .find(process_id as crate::process::Pid)
                 .ok_or(EFAULT)?;
             proc.pagetable
         };
         if pagetable.is_null() {
             return Err(EFAULT);
         }
-        
+
         // Unmap pages
         unsafe {
             let mut current = addr;
             let end = addr + shm.size;
             while current < end {
-                crate::subsystems::mm::vm::unmap_page(pagetable, current)
-                    .map_err(|_| EFAULT)?;
+                crate::subsystems::mm::vm::unmap_page(pagetable, current).map_err(|_| EFAULT)?;
                 current += crate::subsystems::mm::PAGE_SIZE;
             }
         }
-        
+
         // Decrement reference count
         let ref_count = shm.dec_ref();
-        
+
         // If no more references and marked for removal, destroy it
         if ref_count == 0 {
             drop(shared_mem);
             let _ = self.destroy_shared_memory(shm_id);
         }
-        
+
         Ok(())
     }
 
-    pub fn create_semaphore(&self, owner_id: u64, initial_value: usize, max_value: usize) -> Result<u64, i32> {
+    pub fn create_semaphore(
+        &self,
+        owner_id: u64,
+        initial_value: usize,
+        max_value: usize,
+    ) -> Result<u64, i32> {
         let id = self.next_sem_id.fetch_add(1, Ordering::SeqCst);
         let semaphore = IpcSemaphore::new(id, owner_id, initial_value, max_value);
 
@@ -846,16 +866,12 @@ pub fn init() -> Result<(), i32> {
 
 /// Get global IPC manager
 pub fn get_ipc_manager() -> Option<&'static IpcManager> {
-    unsafe {
-        GLOBAL_IPC_MANAGER.as_ref()
-    }
+    unsafe { GLOBAL_IPC_MANAGER.as_ref() }
 }
 
 /// Get mutable global IPC manager
 pub fn get_ipc_manager_mut() -> Option<&'static mut IpcManager> {
-    unsafe {
-        GLOBAL_IPC_MANAGER.as_mut()
-    }
+    unsafe { GLOBAL_IPC_MANAGER.as_mut() }
 }
 
 /// Get current time in nanoseconds
@@ -870,8 +886,7 @@ mod tests {
     #[test]
     fn test_ipc_message() {
         let data = vec![1, 2, 3, 4];
-        let message = IpcMessage::new(1, 2, 100, data.clone())
-            .with_priority(5);
+        let message = IpcMessage::new(1, 2, 100, data.clone()).with_priority(5);
 
         assert_eq!(message.sender_id, 1);
         assert_eq!(message.receiver_id, 2);

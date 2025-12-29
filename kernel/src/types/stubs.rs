@@ -5,12 +5,11 @@
 
 extern crate alloc;
 use alloc::vec::Vec;
+
 use heapless::String as HeaplessString;
 
 // Microkernel IPC types - using real implementations
-pub use crate::microkernel::service_registry::{
-    ServiceId
-};
+pub use crate::microkernel::service_registry::ServiceId;
 pub use crate::subsystems::microkernel::ipc::IpcMessage as Message;
 
 /// Message type for IPC communication
@@ -23,11 +22,11 @@ impl MessageType {
     pub const RESPONSE: MessageType = MessageType(1);
     pub const EVENT: MessageType = MessageType(2);
     pub const NOTIFICATION: MessageType = MessageType(3);
-    
+
     pub fn new(msg_type: u32) -> Self {
         MessageType(msg_type)
     }
-    
+
     pub fn as_u32(&self) -> u32 {
         self.0
     }
@@ -39,17 +38,17 @@ impl Message {
         // Use a default sender/receiver ID (0 means system)
         crate::subsystems::microkernel::ipc::IpcMessage::new(0, 0, message_type.as_u32(), data)
     }
-    
+
     /// Create a new request message
     pub fn new_request(data: Vec<u8>) -> Self {
         Self::new_with_type(MessageType::REQUEST, data)
     }
-    
+
     /// Create a new response message
     pub fn new_response(data: Vec<u8>) -> Self {
         Self::new_with_type(MessageType::RESPONSE, data)
     }
-    
+
     /// Get the message type
     pub fn message_type(&self) -> MessageType {
         MessageType(self.message_type)
@@ -59,7 +58,7 @@ impl Message {
 // IPC function implementations using real IPC system
 pub fn send_message(service_id: ServiceId, message: Message) -> Result<(), ()> {
     use crate::subsystems::microkernel::ipc;
-    
+
     // Get the IPC manager instance
     let manager = match ipc::get_ipc_manager() {
         Some(m) => m,
@@ -67,9 +66,9 @@ pub fn send_message(service_id: ServiceId, message: Message) -> Result<(), ()> {
             // Initialize IPC if not already done
             let _ = ipc::init();
             ipc::get_ipc_manager().ok_or(())?
-        }
+        },
     };
-    
+
     // Find the message queue for the service
     // In a real implementation, we'd look up the queue_id from service_registry
     // For now, use service_id as queue_id (simplified)
@@ -81,7 +80,7 @@ pub fn send_message(service_id: ServiceId, message: Message) -> Result<(), ()> {
 
 pub fn receive_message() -> Result<Message, ()> {
     use crate::subsystems::microkernel::ipc;
-    
+
     // Get the IPC manager instance
     let manager = match ipc::get_ipc_manager() {
         Some(m) => m,
@@ -89,9 +88,9 @@ pub fn receive_message() -> Result<Message, ()> {
             // Initialize IPC if not already done
             let _ = ipc::init();
             ipc::get_ipc_manager().ok_or(())?
-        }
+        },
     };
-    
+
     // Receive from default queue (queue_id 0)
     // In a real implementation, we'd get the queue_id from the current service context
     match manager.receive_message(0, 0) {
@@ -103,7 +102,6 @@ pub fn receive_message() -> Result<Message, ()> {
 // POSIX type stubs - These should be moved to posix module
 // For now, re-export from posix module if available, otherwise keep as stubs
 #[allow(unused_imports)]
-use crate::posix::{Pid, Uid, Gid};
 
 // Re-export POSIX types (use posix module types if available)
 pub type PidT = crate::posix::Pid;
@@ -112,9 +110,9 @@ pub type GidT = crate::posix::Gid;
 
 // POSIX type aliases for compatibility with API layer
 // These are the standard POSIX type names used in system calls
-pub type pid_t = i32;  // Process ID
-pub type uid_t = u32;  // User ID
-pub type gid_t = u32;  // Group ID
+pub type pid_t = i32; // Process ID
+pub type uid_t = u32; // User ID
+pub type gid_t = u32; // Group ID
 pub type mode_t = u32; // File mode/permissions
 
 pub type AfUnix = i32;
@@ -123,7 +121,8 @@ pub const AF_UNIX_CONST: AfUnix = 1;
 
 // Service registry - using real implementation
 // TODO: Re-enable when service registry is fully implemented
-// pub use crate::subsystems::microkernel::service_registry::{ServiceRegistry, get_service_registry};
+// pub use crate::subsystems::microkernel::service_registry::{ServiceRegistry,
+// get_service_registry};
 
 // Process stubs - Use real Process type from process module when possible
 // For compatibility, keep a minimal stub but prefer using crate::process::Proc
@@ -195,11 +194,7 @@ impl RNG {
                 setne(success),
                 options(nostack, pure)
             );
-            if success {
-                Some(value as usize)
-            } else {
-                None
-            }
+            if success { Some(value as usize) } else { None }
         }
     }
 
@@ -214,11 +209,7 @@ impl RNG {
                 setne(success),
                 options(nostack, pure)
             );
-            if success {
-                Some(value as usize)
-            } else {
-                None
-            }
+            if success { Some(value as usize) } else { None }
         }
     }
 
@@ -232,17 +223,12 @@ impl RNG {
                 out(reg) value,
                 options(nostack, readonly)
             );
-            if success {
-                Some(value as usize)
-            } else {
-                None
-            }
+            if success { Some(value as usize) } else { None }
         }
     }
 
     fn get_fallback_random(&self) -> usize {
         use core::sync::atomic::{AtomicUsize, Ordering};
-        static SEED: AtomicUsize = AtomicUsize::new(12345);
         let seed = SEED.fetch_add(1103515245, Ordering::SeqCst);
         seed.wrapping_mul(1103515245).wrapping_add(12345)
     }
@@ -287,7 +273,6 @@ pub mod memory {
     }
 }
 
-
 // ServiceInfo::new and InterfaceVersion::new are available from the real implementation
 
 // MessageQueue stub
@@ -326,7 +311,6 @@ pub fn log_info(_msg: &str) {
 pub fn get_timestamp() -> u64 {
     use core::sync::atomic::{AtomicU64, Ordering};
     static TIMESTAMP: AtomicU64 = AtomicU64::new(1000000);
-    TIMESTAMP.fetch_add(1, Ordering::Relaxed)
 }
 
 pub fn kill_process(_pid: u64, _signal: i32) {

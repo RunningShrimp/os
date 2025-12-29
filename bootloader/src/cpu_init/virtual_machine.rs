@@ -263,7 +263,7 @@ impl VmConfig {
         let mut name = [0u8; 64];
         name[0] = b'V';
         name[1] = b'M';
-        
+
         VmConfig {
             name,
             vcpu_count,
@@ -313,8 +313,10 @@ impl VirtualMachine {
             id,
             state: VmState::Created,
             config,
-            vcpus: [None, None, None, None, None, None, None, None,
-                    None, None, None, None, None, None, None, None],
+            vcpus: [
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None,
+            ],
             vcpu_count: 0,
             guest_memory: [None; 16],
             execution_count: 0,
@@ -725,7 +727,7 @@ mod tests {
         let mut vm = VirtualMachine::new(1, cfg);
         vm.start();
         vm.run_quantum(100);
-        
+
         let vcpu = vm.get_vcpu(0).unwrap();
         assert!(vcpu.get_execution_cycles() > 0);
     }
@@ -742,13 +744,13 @@ mod tests {
     fn test_vcpu_multiple_states() {
         let mut vcpu = Vcpu::new(0);
         assert_eq!(vcpu.get_state(), VcpuState::Ready);
-        
+
         vcpu.start();
         assert_eq!(vcpu.get_state(), VcpuState::Running);
-        
+
         vcpu.pause();
         assert_eq!(vcpu.get_state(), VcpuState::Ready);
-        
+
         vcpu.start();
         assert_eq!(vcpu.get_state(), VcpuState::Running);
     }

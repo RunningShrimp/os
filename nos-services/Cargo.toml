@@ -25,12 +25,7 @@ log = ["dep:log"]
 debug_subsystems = []
 formal_verification = []
 security_audit = []
-
-# Feature flags for conditional compilation
-minimal = []
-embedded = []
-server = ["log"]
-desktop = ["log"]
+advanced_syscalls = []
 
 [lib]
 name = "nos_services"

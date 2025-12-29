@@ -7,31 +7,28 @@
 //! - Firmware integrity checks
 //! - System readiness assessment
 
+use alloc::{format, string::String, vec::Vec};
 use core::fmt;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::format;
-
 
 /// Hardware capability flag
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HardwareCapability {
-    PAE,              // Physical Address Extension
-    PSE,              // Page Size Extension
-    NX,               // No-Execute bit
-    SMEP,             // Supervisor Mode Execution Prevention
-    SMAP,             // Supervisor Mode Access Prevention
-    TSC,              // Time Stamp Counter
-    MSR,              // Model Specific Registers
-    APIC,             // Advanced Programmable Interrupt Controller
-    MMX,              // MMX Instructions
-    SSE,              // SSE Instructions
-    AVX,              // AVX Instructions
-    AES,              // AES Instructions
-    RDRAND,           // Random number generator
-    RDSEED,           // Seed for RNG
-    FSGS,             // Fast SYSENTER/SYSEXIT
-    PCID,             // Process Context Identifiers
+    PAE,    // Physical Address Extension
+    PSE,    // Page Size Extension
+    NX,     // No-Execute bit
+    SMEP,   // Supervisor Mode Execution Prevention
+    SMAP,   // Supervisor Mode Access Prevention
+    TSC,    // Time Stamp Counter
+    MSR,    // Model Specific Registers
+    APIC,   // Advanced Programmable Interrupt Controller
+    MMX,    // MMX Instructions
+    SSE,    // SSE Instructions
+    AVX,    // AVX Instructions
+    AES,    // AES Instructions
+    RDRAND, // Random number generator
+    RDSEED, // Seed for RNG
+    FSGS,   // Fast SYSENTER/SYSEXIT
+    PCID,   // Process Context Identifiers
 }
 
 impl fmt::Display for HardwareCapability {
@@ -128,7 +125,7 @@ impl Default for MemoryConfiguration {
 /// Firmware information
 #[derive(Debug, Clone)]
 pub struct FirmwareInfo {
-    pub firmware_type: String,    // BIOS, UEFI, etc.
+    pub firmware_type: String, // BIOS, UEFI, etc.
     pub version: String,
     pub manufacturer: String,
     pub checksum: u32,
@@ -159,10 +156,7 @@ impl FirmwareInfo {
 
     /// Validate firmware
     pub fn validate(&mut self) -> bool {
-        if self.firmware_type.is_empty()
-            || self.version.is_empty()
-            || self.checksum == 0
-        {
+        if self.firmware_type.is_empty() || self.version.is_empty() || self.checksum == 0 {
             return false;
         }
         self.verified = true;
@@ -270,10 +264,7 @@ impl SystemValidator {
             }
         }
 
-        let result = ValidationResult::new(
-            "CPU Capabilities",
-            all_present
-        );
+        let result = ValidationResult::new("CPU Capabilities", all_present);
         self.validation_results.push(result);
         all_present
     }
@@ -290,7 +281,7 @@ impl SystemValidator {
     pub fn validate_firmware(&mut self) -> bool {
         let mut firmware = self.firmware_info.clone();
         let valid = firmware.validate();
-        
+
         let mut result = ValidationResult::new("Firmware", valid);
         result.with_details(&format!("Type: {}", firmware.firmware_type));
         self.validation_results.push(result);
@@ -330,23 +321,25 @@ impl SystemValidator {
     /// Get detailed validation report
     pub fn validation_report(&self) -> String {
         let mut report = String::from("=== System Validation Report ===\n");
-        
-        report.push_str(&format!("Overall Status: {}\n", 
-            if self.overall_valid { "PASS" } else { "FAIL" }));
-        
+
+        report.push_str(&format!(
+            "Overall Status: {}\n",
+            if self.overall_valid { "PASS" } else { "FAIL" }
+        ));
+
         report.push_str(&format!("\nCPU Capabilities: {}\n", self.capability_count()));
         for cap in &self.capabilities {
             report.push_str(&format!("  - {}\n", cap));
         }
-        
+
         report.push_str(&format!("\n{}\n", self.memory_config));
         report.push_str(&format!("Firmware: {}\n", self.firmware_info));
-        
+
         report.push_str("\nValidation Results:\n");
         for result in &self.validation_results {
             report.push_str(&format!("  {}\n", result));
         }
-        
+
         report
     }
 
@@ -424,7 +417,7 @@ mod tests {
         fw.set_version("2.1");
         fw.set_manufacturer("AMI");
         fw.checksum = 0x12345678;
-        
+
         assert!(fw.validate());
         assert!(fw.verified);
     }
@@ -454,7 +447,7 @@ mod tests {
     fn test_system_validator_has_capability() {
         let mut validator = SystemValidator::new();
         assert!(!validator.has_capability(HardwareCapability::NX));
-        
+
         validator.add_capability(HardwareCapability::NX);
         assert!(validator.has_capability(HardwareCapability::NX));
     }
@@ -465,7 +458,7 @@ mod tests {
         validator.add_capability(HardwareCapability::PAE);
         validator.add_capability(HardwareCapability::MSR);
         validator.add_capability(HardwareCapability::TSC);
-        
+
         assert!(validator.validate_cpu_capabilities());
     }
 
@@ -476,7 +469,7 @@ mod tests {
         mem.total_pages = 1000;
         mem.available_pages = 800;
         mem.max_physical_address = 0xFFFFFFFF;
-        
+
         validator.set_memory_config(mem);
         assert!(validator.validate_memory());
     }
@@ -488,7 +481,7 @@ mod tests {
         fw.set_version("1.0");
         fw.set_manufacturer("Test");
         fw.checksum = 0x12345678;
-        
+
         validator.set_firmware_info(fw);
         assert!(validator.validate_firmware());
     }
@@ -496,26 +489,26 @@ mod tests {
     #[test]
     fn test_system_validator_complete_validation() {
         let mut validator = SystemValidator::new();
-        
+
         // Set up CPU
         validator.add_capability(HardwareCapability::PAE);
         validator.add_capability(HardwareCapability::MSR);
         validator.add_capability(HardwareCapability::TSC);
-        
+
         // Set up memory
         let mut mem = MemoryConfiguration::new();
         mem.total_pages = 1000;
         mem.available_pages = 800;
         mem.max_physical_address = 0xFFFFFFFF;
         validator.set_memory_config(mem);
-        
+
         // Set up firmware
         let mut fw = FirmwareInfo::new("BIOS");
         fw.set_version("1.0");
         fw.set_manufacturer("Test");
         fw.checksum = 0x12345678;
         validator.set_firmware_info(fw);
-        
+
         assert!(validator.validate_system());
         assert!(validator.is_ready_for_boot());
     }
@@ -524,7 +517,7 @@ mod tests {
     fn test_system_validator_failed_count() {
         let mut validator = SystemValidator::new();
         validator.validate_system();
-        
+
         assert!(validator.failed_count() > 0);
     }
 
@@ -532,7 +525,7 @@ mod tests {
     fn test_system_validator_report() {
         let mut validator = SystemValidator::new();
         validator.validate_system();
-        
+
         let report = validator.validation_report();
         assert!(report.contains("System Validation Report"));
         assert!(report.contains("Validation Results"));

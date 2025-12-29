@@ -94,9 +94,7 @@ pub type Result<T> = core::result::Result<T, RealModeError>;
 impl RealModeExecutor {
     /// Create new real mode executor
     pub fn new() -> Self {
-        Self {
-            initialized: false,
-        }
+        Self { initialized: false }
     }
 
     /// Initialize real mode executor
@@ -169,11 +167,11 @@ pub mod int15_e820 {
         // SAFETY: Caller must ensure buffer_addr points to valid low memory
         unsafe {
             let mut ctx = RealModeContext::new();
-            ctx.eax = 0xE820;           // Function: Get SMAP entry
-            ctx.edx = SMAP_SIGNATURE;   // Magic "SMAP"
-            ctx.ecx = 24;               // Entry size (bytes 0-23)
-            ctx.esi = buffer_addr;      // ES:DI = buffer address (in low 1MB)
-            ctx.ebx = continuation;     // Continuation value
+            ctx.eax = 0xE820; // Function: Get SMAP entry
+            ctx.edx = SMAP_SIGNATURE; // Magic "SMAP"
+            ctx.ecx = 24; // Entry size (bytes 0-23)
+            ctx.esi = buffer_addr; // ES:DI = buffer address (in low 1MB)
+            ctx.ebx = continuation; // Continuation value
 
             executor.execute_int(INT15_E820, &mut ctx)?;
 
@@ -210,7 +208,7 @@ pub mod int13_disk {
         // SAFETY: Caller must ensure buffer_addr points to valid memory
         unsafe {
             let mut ctx = RealModeContext::new();
-            ctx.eax = 0x0200 | (count as u32);  // AH=02, AL=count
+            ctx.eax = 0x0200 | (count as u32); // AH=02, AL=count
             ctx.ecx = (sector as u32) | (((cyl >> 8) as u32) << 6) | ((cyl as u32) << 8);
             ctx.edx = (head as u32) | ((drive as u32) << 8);
             ctx.ebx = buffer_addr;
@@ -223,14 +221,11 @@ pub mod int13_disk {
     }
 
     /// Get drive parameters using INT 0x13/AH=0x08
-    pub fn get_drive_params(
-        executor: &RealModeExecutor,
-        drive: u8,
-    ) -> Result<DriveParams> {
+    pub fn get_drive_params(executor: &RealModeExecutor, drive: u8) -> Result<DriveParams> {
         // SAFETY: Caller must ensure valid execution context
         unsafe {
             let mut ctx = RealModeContext::new();
-            ctx.eax = 0x0800;  // AH=08
+            ctx.eax = 0x0800; // AH=08
             ctx.edx = drive as u32;
 
             executor.execute_int(INT13_DISK, &mut ctx)?;
@@ -262,7 +257,7 @@ pub mod int10_video {
         // SAFETY: Video mode changes affect display only
         unsafe {
             let mut ctx = RealModeContext::new();
-            ctx.eax = 0x0000 | (mode as u32);  // AH=00, AL=mode
+            ctx.eax = 0x0000 | (mode as u32); // AH=00, AL=mode
 
             executor.execute_int(INT10_VIDEO, &mut ctx)?;
             Ok(())
@@ -274,9 +269,9 @@ pub mod int10_video {
         // SAFETY: Character writing affects display only
         unsafe {
             let mut ctx = RealModeContext::new();
-            ctx.eax = 0x0900 | (ch as u32);    // AH=09, AL=char
+            ctx.eax = 0x0900 | (ch as u32); // AH=09, AL=char
             ctx.ebx = (page as u32) | ((color as u32) << 8);
-            ctx.ecx = 1;                       // Repeat count
+            ctx.ecx = 1; // Repeat count
 
             executor.execute_int(INT10_VIDEO, &mut ctx)?;
             Ok(())
@@ -332,19 +327,12 @@ mod tests {
 
     #[test]
     fn test_error_messages() {
-        assert_eq!(
-            RealModeError::NotInitialized.as_str(),
-            "Real mode executor not initialized"
-        );
+        assert_eq!(RealModeError::NotInitialized.as_str(), "Real mode executor not initialized");
     }
 
     #[test]
     fn test_drive_params() {
-        let params = DriveParams {
-            max_cylinder: 1023,
-            max_head: 254,
-            max_sector: 63,
-        };
+        let params = DriveParams { max_cylinder: 1023, max_head: 254, max_sector: 63 };
         assert_eq!(params.max_cylinder, 1023);
         assert_eq!(params.max_head, 254);
         assert_eq!(params.max_sector, 63);

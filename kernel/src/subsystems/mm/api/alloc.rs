@@ -2,10 +2,12 @@
 //!
 //! 提供基本的内存分配和释放功能（作为 mm 的唯一对外入口，内部走每CPU快速路径 + 全局回退）。
 
-use super::AllocError;
-use core::alloc::Layout;
-use core::ptr::{self, null_mut};
+use core::{
+    alloc::Layout,
+    ptr::{self, null_mut},
+};
 
+use super::AllocError;
 use crate::subsystems::mm::percpu_allocator::current_cpu_allocator;
 
 /// Allocate memory block
@@ -70,7 +72,12 @@ pub fn deallocate(ptr: *mut u8, size: usize) -> Result<(), AllocError> {
 /// * Allocate new memory and copy data when expansion not possible
 /// * Original memory is automatically freed
 /// * Must handle zero size reallocation
-pub fn reallocate(ptr: *mut u8, old_size: usize, new_size: usize, align: usize) -> Result<*mut u8, AllocError> {
+pub fn reallocate(
+    ptr: *mut u8,
+    old_size: usize,
+    new_size: usize,
+    align: usize,
+) -> Result<*mut u8, AllocError> {
     // new_size == 0 等价于 free + 返回空指针
     if new_size == 0 {
         if !ptr.is_null() && old_size > 0 {
@@ -104,4 +111,3 @@ pub fn allocate_layout(layout: Layout) -> Result<*mut u8, AllocError> {
 pub fn deallocate_layout(ptr: *mut u8, layout: Layout) -> Result<(), AllocError> {
     deallocate(ptr, layout.size())
 }
-

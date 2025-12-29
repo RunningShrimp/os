@@ -115,9 +115,7 @@ impl PartitionEntry {
 
     /// Check if partition is valid
     pub fn is_valid(&self) -> bool {
-        self.partition_type != PartitionType::Empty
-            && self.start_lba != 0
-            && self.size_sectors != 0
+        self.partition_type != PartitionType::Empty && self.start_lba != 0 && self.size_sectors != 0
     }
 
     /// Get partition size in bytes

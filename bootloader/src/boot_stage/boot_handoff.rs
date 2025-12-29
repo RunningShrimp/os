@@ -58,13 +58,7 @@ impl BootHandoff {
         self.memory_map_size = size;
     }
 
-    pub fn set_framebuffer(
-        &mut self,
-        addr: u64,
-        width: u32,
-        height: u32,
-        pitch: u32,
-    ) {
+    pub fn set_framebuffer(&mut self, addr: u64, width: u32, height: u32, pitch: u32) {
         self.framebuffer_addr = addr;
         self.framebuffer_width = width;
         self.framebuffer_height = height;
@@ -103,10 +97,7 @@ pub fn get_handoff() -> Option<&'static mut BootHandoff> {
 }
 
 /// Prepare for kernel jump - setup all parameters
-pub fn prepare_kernel_jump(
-    entry: u64,
-    params: u64,
-) -> Option<BootHandoff> {
+pub fn prepare_kernel_jump(entry: u64, params: u64) -> Option<BootHandoff> {
     let mut handoff = BootHandoff::new();
     handoff.set_kernel_entry(entry);
     handoff.set_boot_params(params);

@@ -10,5 +10,3 @@ impl SecurityChecker {
         Self {}
     }
 }
-
-

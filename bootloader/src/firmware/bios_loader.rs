@@ -46,10 +46,7 @@ pub enum BootMode {
 }
 
 /// Parse BIOS/Multiboot boot information
-pub fn parse_bios_boot_info(
-    magic: u32,
-    info_addr: u32,
-) -> Option<BiosBootInfo> {
+pub fn parse_bios_boot_info(magic: u32, info_addr: u32) -> Option<BiosBootInfo> {
     let info = BiosBootInfo::new(magic, info_addr);
 
     if !info.is_valid() {

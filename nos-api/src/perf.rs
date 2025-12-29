@@ -37,22 +37,25 @@ impl PerformanceMetrics {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Update metrics with a new operation
     pub fn update(&mut self, duration: Duration, memory_usage: usize) {
         self.total_time += duration;
         self.operation_count += 1;
         if self.operation_count > 0 {
-            self.avg_time_per_operation = 
-                Duration::from_nanos((self.total_time.as_nanos() / self.operation_count as u128).try_into().unwrap());
+            self.avg_time_per_operation = Duration::from_nanos(
+                (self.total_time.as_nanos() / self.operation_count as u128)
+                    .try_into()
+                    .unwrap(),
+            );
         }
-        
+
         if memory_usage > self.peak_memory_usage {
             self.peak_memory_usage = memory_usage;
         }
         self.current_memory_usage = memory_usage;
     }
-    
+
     /// Reset metrics
     pub fn reset(&mut self) {
         *self = Self::default();
@@ -63,10 +66,10 @@ impl PerformanceMetrics {
 pub trait Profiler {
     /// Start profiling
     fn start(&mut self);
-    
+
     /// Stop profiling and return metrics
     fn stop(&mut self) -> PerformanceMetrics;
-    
+
     /// Get current metrics without stopping
     fn get_metrics(&self) -> &PerformanceMetrics;
 }
@@ -105,20 +108,21 @@ impl Profiler for SimpleProfiler {
             self.is_running = true;
         }
     }
-    
+
     fn stop(&mut self) -> PerformanceMetrics {
         if self.is_running {
             if let Some(_start) = self.start_time {
                 // In a real implementation, we would calculate the actual duration
                 let duration = Duration::from_nanos(1000); // Placeholder
-                self.metrics.update(duration, self.metrics.current_memory_usage);
+                self.metrics
+                    .update(duration, self.metrics.current_memory_usage);
             }
             self.start_time = None;
             self.is_running = false;
         }
         self.metrics.clone()
     }
-    
+
     fn get_metrics(&self) -> &PerformanceMetrics {
         &self.metrics
     }

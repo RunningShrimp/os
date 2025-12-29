@@ -13,7 +13,6 @@ pub use nos_api::*;
 extern crate alloc;
 use alloc::vec::Vec;
 use alloc::string::String;
-use alloc::string::ToString;
 
 // Core modules
 pub mod init;

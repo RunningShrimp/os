@@ -67,10 +67,7 @@ pub struct PagingSetup {
 
 impl PagingSetup {
     pub fn new(pml4_base: u64) -> Self {
-        Self {
-            pml4_base,
-            paging_enabled: false,
-        }
+        Self { pml4_base, paging_enabled: false }
     }
 
     pub fn enable_paging(&mut self) {

@@ -21,18 +21,20 @@ fn test_service_stats() {
 #[test]
 fn test_service_registry() {
     use crate::registry;
-    
+
     // Test service registry
     let mut registry = registry::ServiceRegistry::new();
-    
+
     // Register a test service
     let service = TestService::new("test_service");
-    let id = registry.register("test_service", Box::new(service)).unwrap();
-    
+    let id = registry
+        .register("test_service", Box::new(service))
+        .unwrap();
+
     // Get service
     let info = registry.get(id).unwrap();
     assert_eq!(info.name, "test_service");
-    
+
     // Get by name
     let info = registry.get_by_name("test_service").unwrap();
     assert_eq!(info.id, id);
@@ -41,10 +43,10 @@ fn test_service_registry() {
 #[test]
 fn test_service_discovery() {
     use crate::discovery;
-    
+
     // Test service discovery
     let mut discovery = discovery::ServiceDiscovery::new();
-    
+
     // Add a test service
     let descriptor = discovery::ServiceDescriptor {
         name: "test_service".to_string(),
@@ -55,11 +57,11 @@ fn test_service_discovery() {
         metadata: alloc::collections::BTreeMap::new(),
     };
     discovery.add_service(descriptor.clone());
-    
+
     // Get service
     let retrieved = discovery.get_service("test_service").unwrap();
     assert_eq!(retrieved.name, descriptor.name);
-    
+
     // List services
     let services = discovery.list_services();
     assert_eq!(services.len(), 1);
@@ -72,9 +74,7 @@ struct TestService {
 
 impl TestService {
     fn new(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-        }
+        Self { name: name.to_string() }
     }
 }
 
@@ -82,15 +82,15 @@ impl crate::core::Service for TestService {
     fn start(&self) -> nos_api::Result<()> {
         Ok(())
     }
-    
+
     fn stop(&self) -> nos_api::Result<()> {
         Ok(())
     }
-    
+
     fn name(&self) -> &str {
         &self.name
     }
-    
+
     fn service_type(&self) -> u32 {
         1
     }

@@ -5,9 +5,7 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
 /// 调试会话
 #[derive(Debug, Clone)]
@@ -263,4 +261,3 @@ impl Default for SessionConfig {
         }
     }
 }
-

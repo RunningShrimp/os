@@ -6,10 +6,8 @@
 //! - Resource management
 //! - Boot time optimization
 
+use alloc::{format, string::String, vec::Vec};
 use core::fmt;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::format;
 
 /// Module load status
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -116,7 +114,11 @@ impl fmt::Display for LazyModule {
         write!(
             f,
             "Module{}: {} [{}] ({}KB, accessed: {})",
-            self.module_id, self.name, self.status, self.size / 1024, self.access_count
+            self.module_id,
+            self.name,
+            self.status,
+            self.size / 1024,
+            self.access_count
         )
     }
 }
@@ -229,8 +231,7 @@ impl ModuleLoader {
         report.push_str(&format!("Modules Loaded: {}\n", self.total_loaded));
         report.push_str(&format!("Modules Not Loaded: {}\n", self.get_not_loaded_count()));
         report.push_str(&format!("Memory Loaded: {} KB\n", self.total_memory_loaded / 1024));
-        report.push_str(&format!("Memory Saved: {} KB\n", 
-            self.estimate_memory_saved() / 1024));
+        report.push_str(&format!("Memory Saved: {} KB\n", self.estimate_memory_saved() / 1024));
 
         report.push_str("\n--- Module List ---\n");
         for module in &self.modules {
@@ -299,7 +300,9 @@ impl BootLazyLoader {
 
     /// Calculate boot time saved
     pub fn calculate_time_saved(&self) -> u64 {
-        let deferred: u64 = self.loader.modules
+        let deferred: u64 = self
+            .loader
+            .modules
             .iter()
             .filter(|m| !m.is_loaded() && m.size > self.defer_threshold)
             .map(|m| m.size as u64)
@@ -308,13 +311,13 @@ impl BootLazyLoader {
         // Estimate 10 cycles per KB
         (deferred / 1024) * 10
     }
-    
+
     /// Update boot time saved value
     pub fn update_time_saved(&mut self) -> u64 {
         self.boot_time_saved = self.calculate_time_saved();
         self.boot_time_saved
     }
-    
+
     /// Get boot time saved
     pub fn get_boot_time_saved(&self) -> u64 {
         self.boot_time_saved
@@ -328,10 +331,8 @@ impl BootLazyLoader {
         report.push_str(&format!("Defer Threshold: {} KB\n", self.defer_threshold / 1024));
         report.push_str(&format!("\n{}\n", self.loader));
 
-        report.push_str(&format!("Estimated Boot Time Saved: {} ms\n", 
-            self.get_boot_time_saved()));
-        report.push_str(&format!("Current Boot Time Saved: {} ms\n", 
-            self.get_boot_time_saved())); // Duplicate to emphasize usage
+        report.push_str(&format!("Estimated Boot Time Saved: {} ms\n", self.get_boot_time_saved()));
+        report.push_str(&format!("Current Boot Time Saved: {} ms\n", self.get_boot_time_saved())); // Duplicate to emphasize usage
 
         report
     }

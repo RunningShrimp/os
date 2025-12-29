@@ -5,12 +5,13 @@
 //! discovered by other components.
 
 extern crate alloc;
-use alloc::collections::BTreeMap;
-use alloc::string::String;
-use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU64, AtomicUsize, AtomicBool, Ordering};
-use crate::subsystems::sync::Mutex;
-use crate::reliability::{EINVAL, ENOMEM, EEXIST, ENOENT, EPERM, EBUSY, ETIMEDOUT};
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+
+use crate::{
+    reliability::{EBUSY, EEXIST, EINVAL, ENOENT, ENOMEM, EPERM, ETIMEDOUT},
+    subsystems::sync::Mutex,
+};
 
 /// Service identifier
 pub type ServiceId = u64;
@@ -18,17 +19,17 @@ pub type ServiceId = u64;
 /// Service categories
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ServiceCategory {
-    System,         // Core system services
-    Memory,         // Memory management services
-    Process,        // Process management services
-    FileSystem,     // File system services
-    Network,        // Network services
-    Device,         // Device driver services
-    Security,       // Security services
-    Graphics,       // Graphics services
-    Audio,          // Audio services
-    Application,    // Application services
-    Custom(u32),    // Custom category
+    System,      // Core system services
+    Memory,      // Memory management services
+    Process,     // Process management services
+    FileSystem,  // File system services
+    Network,     // Network services
+    Device,      // Device driver services
+    Security,    // Security services
+    Graphics,    // Graphics services
+    Audio,       // Audio services
+    Application, // Application services
+    Custom(u32), // Custom category
 }
 
 impl ServiceCategory {
@@ -68,14 +69,14 @@ impl ServiceCategory {
 /// Service status
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ServiceStatus {
-    Uninitialized,  // Service created but not started
-    Starting,       // Service is starting up
-    Running,        // Service is running and healthy
-    Stopping,       // Service is shutting down
-    Stopped,        // Service is stopped
-    Error,          // Service encountered an error
-    Degraded,       // Service is running but unhealthy
-    Maintenance,    // Service is under maintenance
+    Uninitialized, // Service created but not started
+    Starting,      // Service is starting up
+    Running,       // Service is running and healthy
+    Stopping,      // Service is shutting down
+    Stopped,       // Service is stopped
+    Error,         // Service encountered an error
+    Degraded,      // Service is running but unhealthy
+    Maintenance,   // Service is under maintenance
 }
 
 /// Service priority levels
@@ -157,12 +158,24 @@ impl ServiceCapabilities {
 
     pub fn as_flags(&self) -> u32 {
         let mut flags = 0u32;
-        if self.read { flags |= 0x01; }
-        if self.write { flags |= 0x02; }
-        if self.execute { flags |= 0x04; }
-        if self.create { flags |= 0x08; }
-        if self.delete { flags |= 0x10; }
-        if self.admin { flags |= 0x20; }
+        if self.read {
+            flags |= 0x01;
+        }
+        if self.write {
+            flags |= 0x02;
+        }
+        if self.execute {
+            flags |= 0x04;
+        }
+        if self.create {
+            flags |= 0x08;
+        }
+        if self.delete {
+            flags |= 0x10;
+        }
+        if self.admin {
+            flags |= 0x20;
+        }
         flags
     }
 }
@@ -178,7 +191,7 @@ pub struct ServiceInfo {
     pub priority: ServicePriority,
     pub version: InterfaceVersion,
     pub capabilities: ServiceCapabilities,
-    pub owner_id: u64,          // Process that owns this service
+    pub owner_id: u64,               // Process that owns this service
     pub ipc_channel_id: Option<u64>, // IPC channel for communication
     pub creation_time: u64,
     pub start_time: Option<u64>,
@@ -188,8 +201,14 @@ pub struct ServiceInfo {
 }
 
 impl ServiceInfo {
-    pub fn new(id: ServiceId, name: String, description: String, category: ServiceCategory,
-               version: InterfaceVersion, owner_id: u64) -> Self {
+    pub fn new(
+        id: ServiceId,
+        name: String,
+        description: String,
+        category: ServiceCategory,
+        version: InterfaceVersion,
+        owner_id: u64,
+    ) -> Self {
         let current_time = get_current_time_ns();
 
         Self {
@@ -216,7 +235,7 @@ impl ServiceInfo {
             ServiceStatus::Running => {
                 let current_time = get_current_time_ns();
                 current_time - self.last_health_check <= self.health_check_interval * 2
-            }
+            },
             _ => false,
         }
     }
@@ -267,7 +286,8 @@ impl ServiceMetrics {
 
     pub fn record_request(&self, response_time_ns: u64, success: bool) {
         self.request_count.fetch_add(1, Ordering::SeqCst);
-        self.total_response_time.fetch_add(response_time_ns, Ordering::SeqCst);
+        self.total_response_time
+            .fetch_add(response_time_ns, Ordering::SeqCst);
 
         if success {
             self.success_count.fetch_add(1, Ordering::SeqCst);
@@ -359,7 +379,8 @@ impl ServiceRegistry {
         name_index.insert(service.name.clone(), service.id);
 
         // Add to category index
-        category_index.entry(service.category)
+        category_index
+            .entry(service.category)
             .or_insert_with(Vec::new)
             .push(service.id);
 
@@ -400,7 +421,8 @@ impl ServiceRegistry {
         let name_index = self.name_index.lock();
         let services = self.services.lock();
 
-        name_index.get(name)
+        name_index
+            .get(name)
             .and_then(|&id| services.get(&id).cloned())
     }
 
@@ -413,7 +435,8 @@ impl ServiceRegistry {
         let category_index = self.category_index.lock();
         let services = self.services.lock();
 
-        category_index.get(&category)
+        category_index
+            .get(&category)
             .map(|ids| {
                 ids.iter()
                     .filter_map(|&id| services.get(&id).cloned())
@@ -422,7 +445,11 @@ impl ServiceRegistry {
             .unwrap_or_default()
     }
 
-    pub fn update_service_status(&self, service_id: ServiceId, status: ServiceStatus) -> Result<(), i32> {
+    pub fn update_service_status(
+        &self,
+        service_id: ServiceId,
+        status: ServiceStatus,
+    ) -> Result<(), i32> {
         let mut services = self.services.lock();
         let service = services.get_mut(&service_id).ok_or(ENOENT)?;
 
@@ -433,32 +460,44 @@ impl ServiceRegistry {
         match (old_status, status) {
             (ServiceStatus::Running, _) => {
                 self.running_services.fetch_sub(1, Ordering::SeqCst);
-            }
+            },
             (_, ServiceStatus::Running) => {
                 service.start_time = Some(get_current_time_ns());
                 self.running_services.fetch_add(1, Ordering::SeqCst);
-            }
-            _ => {}
+            },
+            _ => {},
         }
 
         Ok(())
     }
 
-    pub fn set_service_priority(&self, service_id: ServiceId, priority: ServicePriority) -> Result<(), i32> {
+    pub fn set_service_priority(
+        &self,
+        service_id: ServiceId,
+        priority: ServicePriority,
+    ) -> Result<(), i32> {
         let mut services = self.services.lock();
         let service = services.get_mut(&service_id).ok_or(ENOENT)?;
         service.priority = priority;
         Ok(())
     }
 
-    pub fn set_service_ipc_channel(&self, service_id: ServiceId, channel_id: u64) -> Result<(), i32> {
+    pub fn set_service_ipc_channel(
+        &self,
+        service_id: ServiceId,
+        channel_id: u64,
+    ) -> Result<(), i32> {
         let mut services = self.services.lock();
         let service = services.get_mut(&service_id).ok_or(ENOENT)?;
         service.ipc_channel_id = Some(channel_id);
         Ok(())
     }
 
-    pub fn add_service_dependency(&self, service_id: ServiceId, dependency: ServiceDependency) -> Result<(), i32> {
+    pub fn add_service_dependency(
+        &self,
+        service_id: ServiceId,
+        dependency: ServiceDependency,
+    ) -> Result<(), i32> {
         let services = self.services.lock();
         let mut dependency_graph = self.dependency_graph.lock();
 
@@ -477,14 +516,19 @@ impl ServiceRegistry {
             return Err(EINVAL);
         }
 
-        dependency_graph.entry(service_id)
+        dependency_graph
+            .entry(service_id)
             .or_insert_with(Vec::new)
             .push(dependency);
 
         Ok(())
     }
 
-    pub fn remove_service_dependency(&self, service_id: ServiceId, dependency_id: ServiceId) -> Result<(), i32> {
+    pub fn remove_service_dependency(
+        &self,
+        service_id: ServiceId,
+        dependency_id: ServiceId,
+    ) -> Result<(), i32> {
         let mut dependency_graph = self.dependency_graph.lock();
 
         if let Some(dependencies) = dependency_graph.get_mut(&service_id) {
@@ -497,7 +541,10 @@ impl ServiceRegistry {
 
     pub fn get_service_dependencies(&self, service_id: ServiceId) -> Vec<ServiceDependency> {
         let dependency_graph = self.dependency_graph.lock();
-        dependency_graph.get(&service_id).cloned().unwrap_or_default()
+        dependency_graph
+            .get(&service_id)
+            .cloned()
+            .unwrap_or_default()
     }
 
     pub fn get_dependent_services(&self, service_id: ServiceId) -> Vec<ServiceId> {
@@ -513,13 +560,22 @@ impl ServiceRegistry {
         dependents
     }
 
-    fn would_create_circular_dependency(&self, service_id: ServiceId, new_dependency: &ServiceDependency) -> bool {
+    fn would_create_circular_dependency(
+        &self,
+        service_id: ServiceId,
+        new_dependency: &ServiceDependency,
+    ) -> bool {
         // Simple cycle detection using DFS
         let mut visited = alloc::collections::BTreeSet::new();
         self.has_cycle_recursive(new_dependency.service_id, service_id, &mut visited)
     }
 
-    fn has_cycle_recursive(&self, current: ServiceId, target: ServiceId, visited: &mut alloc::collections::BTreeSet<ServiceId>) -> bool {
+    fn has_cycle_recursive(
+        &self,
+        current: ServiceId,
+        target: ServiceId,
+        visited: &mut alloc::collections::BTreeSet<ServiceId>,
+    ) -> bool {
         if current == target {
             return true;
         }
@@ -544,7 +600,8 @@ impl ServiceRegistry {
 
     pub fn get_running_services(&self) -> Vec<ServiceInfo> {
         let services = self.services.lock();
-        services.values()
+        services
+            .values()
             .filter(|s| s.status == ServiceStatus::Running)
             .cloned()
             .collect()
@@ -552,7 +609,8 @@ impl ServiceRegistry {
 
     pub fn get_healthy_services(&self) -> Vec<ServiceInfo> {
         let services = self.services.lock();
-        services.values()
+        services
+            .values()
             .filter(|s| s.is_healthy())
             .cloned()
             .collect()
@@ -560,7 +618,8 @@ impl ServiceRegistry {
 
     pub fn get_services_by_priority(&self, priority: ServicePriority) -> Vec<ServiceInfo> {
         let services = self.services.lock();
-        services.values()
+        services
+            .values()
             .filter(|s| s.priority == priority)
             .cloned()
             .collect()
@@ -575,11 +634,12 @@ impl ServiceRegistry {
                 let healthy = service.is_healthy();
                 service.update_health(healthy);
                 results.push((*id, healthy));
-                
+
                 // Auto-mark as Error if unhealthy for too long
                 if !healthy {
                     let current_time = get_current_time_ns();
-                    if current_time - service.last_health_check > service.health_check_interval * 3 {
+                    if current_time - service.last_health_check > service.health_check_interval * 3
+                    {
                         service.status = ServiceStatus::Error;
                     }
                 }
@@ -593,11 +653,11 @@ impl ServiceRegistry {
     pub fn check_service_health(&self, service_id: ServiceId) -> Result<bool, i32> {
         let mut services = self.services.lock();
         let service = services.get_mut(&service_id).ok_or(ENOENT)?;
-        
+
         if service.status != ServiceStatus::Running {
             return Ok(false);
         }
-        
+
         let healthy = service.is_healthy();
         service.update_health(healthy);
         Ok(healthy)
@@ -633,8 +693,9 @@ impl ServiceRegistry {
     pub fn find_services_by_name_pattern(&self, pattern: &str) -> Vec<ServiceInfo> {
         let name_index = self.name_index.lock();
         let services = self.services.lock();
-        
-        name_index.iter()
+
+        name_index
+            .iter()
             .filter(|(name, _)| name.starts_with(pattern))
             .filter_map(|(_, &id)| services.get(&id).cloned())
             .collect()
@@ -643,7 +704,8 @@ impl ServiceRegistry {
     /// Find services by owner
     pub fn find_services_by_owner(&self, owner_id: u64) -> Vec<ServiceInfo> {
         let services = self.services.lock();
-        services.values()
+        services
+            .values()
             .filter(|s| s.owner_id == owner_id)
             .cloned()
             .collect()
@@ -653,18 +715,23 @@ impl ServiceRegistry {
     pub fn get_services_needing_health_check(&self) -> Vec<ServiceId> {
         let services = self.services.lock();
         let current_time = get_current_time_ns();
-        
-        services.iter()
+
+        services
+            .iter()
             .filter(|(_, s)| {
-                s.status == ServiceStatus::Running &&
-                (current_time - s.last_health_check) >= s.health_check_interval
+                s.status == ServiceStatus::Running
+                    && (current_time - s.last_health_check) >= s.health_check_interval
             })
             .map(|(&id, _)| id)
             .collect()
     }
 
     /// Set health check interval for a service
-    pub fn set_health_check_interval(&self, service_id: ServiceId, interval_ns: u64) -> Result<(), i32> {
+    pub fn set_health_check_interval(
+        &self,
+        service_id: ServiceId,
+        interval_ns: u64,
+    ) -> Result<(), i32> {
         let mut services = self.services.lock();
         let service = services.get_mut(&service_id).ok_or(ENOENT)?;
         service.health_check_interval = interval_ns;
@@ -675,15 +742,15 @@ impl ServiceRegistry {
     pub fn start_service(&self, service_id: ServiceId) -> Result<(), i32> {
         let services = self.services.lock();
         let service = services.get(&service_id).ok_or(ENOENT)?;
-        
+
         // Check current status
         match service.status {
             ServiceStatus::Running => return Ok(()), // Already running
             ServiceStatus::Starting => return Err(EBUSY), // Already starting
             ServiceStatus::Stopping => return Err(EBUSY), // Currently stopping
-            _ => {}
+            _ => {},
         }
-        
+
         // Check dependencies
         let dependencies = self.get_service_dependencies(service_id);
         for dep in dependencies {
@@ -698,19 +765,19 @@ impl ServiceRegistry {
                 }
             }
         }
-        
+
         drop(services);
         self.update_service_status(service_id, ServiceStatus::Starting)?;
-        
+
         // Try to start the service
         // Note: In a full implementation, we would look up the service implementation
         // and call its start() method. For now, we'll use a callback mechanism.
         // Services should register their lifecycle callbacks during registration.
-        
+
         // Simulate service startup (in real implementation, call service.start())
         // For now, mark as running after a brief delay simulation
         self.update_service_status(service_id, ServiceStatus::Running)?;
-        
+
         // Update health check timestamp
         {
             let mut services = self.services.lock();
@@ -718,7 +785,7 @@ impl ServiceRegistry {
                 service.last_health_check = get_current_time_ns();
             }
         }
-        
+
         Ok(())
     }
 
@@ -726,7 +793,7 @@ impl ServiceRegistry {
     pub fn stop_service(&self, service_id: ServiceId) -> Result<(), i32> {
         let services = self.services.lock();
         let service = services.get(&service_id).ok_or(ENOENT)?;
-        
+
         // Check current status
         match service.status {
             ServiceStatus::Stopped => return Ok(()), // Already stopped
@@ -734,14 +801,14 @@ impl ServiceRegistry {
             ServiceStatus::Uninitialized => {
                 drop(services);
                 return self.update_service_status(service_id, ServiceStatus::Stopped);
-            }
-            _ => {}
+            },
+            _ => {},
         }
-        
+
         // Check if any services depend on this one
         let dependents = self.get_dependent_services(service_id);
         drop(services);
-        
+
         if !dependents.is_empty() {
             // Check if any dependent services are running
             let services = self.services.lock();
@@ -754,27 +821,27 @@ impl ServiceRegistry {
             }
             drop(services);
         }
-        
+
         self.update_service_status(service_id, ServiceStatus::Stopping)?;
-        
+
         // Try to stop the service
         // Note: In a full implementation, we would look up the service implementation
         // and call its stop() method. For now, we'll simulate stopping.
-        
+
         // Wait for service to fully stop (with timeout)
         const STOP_TIMEOUT_NS: u64 = 5_000_000_000; // 5 seconds
         let start_time = get_current_time_ns();
-        
+
         loop {
             let services = self.services.lock();
             let service = services.get(&service_id).ok_or(ENOENT)?;
-            
+
             // Check if service has stopped
             if service.status == ServiceStatus::Stopped {
                 drop(services);
                 return Ok(());
             }
-            
+
             // Check timeout
             let elapsed = get_current_time_ns() - start_time;
             if elapsed > STOP_TIMEOUT_NS {
@@ -783,9 +850,9 @@ impl ServiceRegistry {
                 self.update_service_status(service_id, ServiceStatus::Stopped)?;
                 return Err(ETIMEDOUT);
             }
-            
+
             drop(services);
-            
+
             // Brief delay before checking again
             crate::subsystems::time::sleep_ms(10); // 10ms delay
         }
@@ -794,7 +861,7 @@ impl ServiceRegistry {
     /// Restart a service
     pub fn restart_service(&self, service_id: ServiceId) -> Result<(), i32> {
         self.stop_service(service_id)?;
-        
+
         // Ensure service is fully stopped before restarting
         let services = self.services.lock();
         let service = services.get(&service_id).ok_or(ENOENT)?;
@@ -803,47 +870,47 @@ impl ServiceRegistry {
             return Err(EBUSY); // Service didn't stop properly
         }
         drop(services);
-        
+
         self.start_service(service_id)
     }
-    
+
     /// Perform health check on a service
     pub fn perform_health_check(&self, service_id: ServiceId) -> Result<bool, i32> {
         let mut services = self.services.lock();
         let service = services.get_mut(&service_id).ok_or(ENOENT)?;
-        
+
         if service.status != ServiceStatus::Running {
             return Ok(false);
         }
-        
+
         // Update health check timestamp
         service.last_health_check = get_current_time_ns();
-        
+
         // In a full implementation, we would call service.health_check()
         // For now, we'll check if the service is still responsive
         // by checking if it's been updated recently
-        
+
         let is_healthy = service.is_healthy();
-        
+
         if !is_healthy {
             service.status = ServiceStatus::Degraded;
             self.running_services.fetch_sub(1, Ordering::SeqCst);
         }
-        
+
         Ok(is_healthy)
     }
-    
+
     /// Perform health checks on all services that need them
     pub fn perform_all_health_checks(&self) -> usize {
         let services_to_check = self.get_services_needing_health_check();
         let mut unhealthy_count = 0;
-        
+
         for service_id in services_to_check {
             if let Ok(false) = self.perform_health_check(service_id) {
                 unhealthy_count += 1;
             }
         }
-        
+
         unhealthy_count
     }
 
@@ -858,7 +925,8 @@ impl ServiceRegistry {
             running_services: self.running_services.load(Ordering::SeqCst),
             unhealthy_services: {
                 let services = self.services.lock();
-                services.values()
+                services
+                    .values()
                     .filter(|s| s.status == ServiceStatus::Running && !s.is_healthy())
                     .count()
             },
@@ -896,16 +964,12 @@ pub fn init() -> Result<(), i32> {
 
 /// Get global service registry
 pub fn get_service_registry() -> Option<&'static ServiceRegistry> {
-    unsafe {
-        GLOBAL_SERVICE_REGISTRY.as_ref()
-    }
+    unsafe { GLOBAL_SERVICE_REGISTRY.as_ref() }
 }
 
 /// Get mutable global service registry
 pub fn get_service_registry_mut() -> Option<&'static mut ServiceRegistry> {
-    unsafe {
-        GLOBAL_SERVICE_REGISTRY.as_mut()
-    }
+    unsafe { GLOBAL_SERVICE_REGISTRY.as_mut() }
 }
 
 /// Get current time in nanoseconds
@@ -954,7 +1018,7 @@ mod tests {
             "Test service".to_string(),
             ServiceCategory::System,
             version,
-            100
+            100,
         );
 
         assert_eq!(service.id, 1);
@@ -995,7 +1059,7 @@ mod tests {
             "Test service".to_string(),
             ServiceCategory::System,
             version,
-            100
+            100,
         );
 
         // Test registration
@@ -1039,7 +1103,7 @@ mod tests {
             "Service 1".to_string(),
             ServiceCategory::System,
             version,
-            100
+            100,
         );
 
         let service2 = ServiceInfo::new(
@@ -1048,18 +1112,15 @@ mod tests {
             "Service 2".to_string(),
             ServiceCategory::System,
             version,
-            101
+            101,
         );
 
         let id1 = registry.register_service(service1).unwrap();
         let id2 = registry.register_service(service2).unwrap();
 
         // Add dependency
-        let dependency = ServiceDependency {
-            service_id: id1,
-            required_version: version,
-            optional: false,
-        };
+        let dependency =
+            ServiceDependency { service_id: id1, required_version: version, optional: false };
 
         assert_eq!(registry.add_service_dependency(id2, dependency), Ok(()));
 

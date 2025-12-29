@@ -4,11 +4,14 @@
 
 extern crate alloc;
 
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+};
+
 use nos_api::Result;
+
 use crate::core::{Service, ServiceStatus};
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::boxed::Box;
 
 /// Network service
 pub struct NetworkService {
@@ -62,15 +65,15 @@ pub fn register_network_services() -> Result<()> {
     use crate::registry;
 
     let mut registry = registry::get_registry()?.lock();
-    
+
     // Register loopback network service
     let loopback_service = NetworkService::new("loopback", "lo");
     registry.register("loopback", Box::new(loopback_service))?;
-    
+
     // Register Ethernet network service
     let ethernet_service = NetworkService::new("ethernet", "eth0");
     registry.register("ethernet", Box::new(ethernet_service))?;
-    
+
     Ok(())
 }
 
@@ -81,7 +84,7 @@ mod tests {
     #[test]
     fn test_network_service() {
         let service = NetworkService::new("test_network", "eth0");
-        
+
         assert_eq!(service.name(), "test_network");
         assert_eq!(service.interface(), "eth0");
         assert_eq!(service.service_type(), crate::types::service_type::NETWORK);

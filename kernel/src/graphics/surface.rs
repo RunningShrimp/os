@@ -5,11 +5,13 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
-use crate::subsystems::sync::Mutex;
-use crate::reliability::{EINVAL, ENOMEM, ENOENT};
+
+use crate::{
+    reliability::{EINVAL, ENOENT, ENOMEM},
+    subsystems::sync::Mutex,
+};
 
 /// Surface ID type
 pub type SurfaceId = u32;
@@ -79,11 +81,11 @@ impl SurfaceBuffer {
         let bytes_per_pixel = format.bytes_per_pixel();
         let stride = (width as usize * bytes_per_pixel).next_multiple_of(64); // 64-byte alignment
         let size = stride * height as usize;
-        
+
         // Allocate shared memory for the buffer
         // In real implementation, this would use shared memory allocation
         let addr = crate::subsystems::mm::kalloc(size).ok_or(ENOMEM)?;
-        
+
         Ok(Self {
             addr,
             size,
@@ -94,12 +96,12 @@ impl SurfaceBuffer {
             ref_count: AtomicU32::new(1),
         })
     }
-    
+
     /// Increment reference count
     pub fn acquire(&self) {
         self.ref_count.fetch_add(1, Ordering::Relaxed);
     }
-    
+
     /// Decrement reference count and free if zero
     pub fn release(&self) -> bool {
         let count = self.ref_count.fetch_sub(1, Ordering::Acquire);
@@ -178,11 +180,17 @@ impl Default for SurfaceFlags {
 
 impl Surface {
     /// Create a new surface
-    pub fn new(id: SurfaceId, width: u32, height: u32, format: SurfaceFormat, owner_pid: u32) -> Result<Self, i32> {
+    pub fn new(
+        id: SurfaceId,
+        width: u32,
+        height: u32,
+        format: SurfaceFormat,
+        owner_pid: u32,
+    ) -> Result<Self, i32> {
         // Create front and back buffers
         let front_buffer = SurfaceBuffer::new(width, height, format)?;
         let back_buffer = SurfaceBuffer::new(width, height, format)?;
-        
+
         Ok(Self {
             id,
             state: SurfaceState::Ready,
@@ -199,32 +207,32 @@ impl Surface {
             flags: SurfaceFlags::default(),
         })
     }
-    
+
     /// Mark surface as dirty (needs compositing)
     pub fn mark_dirty(&mut self, rect: Option<DirtyRect>) {
         self.state = SurfaceState::Dirty;
         self.dirty_rect = rect;
     }
-    
+
     /// Swap front and back buffers (zero-copy)
     pub fn swap_buffers(&mut self) -> Result<(), i32> {
         if self.back_buffer.is_none() {
             return Err(EINVAL);
         }
-        
+
         // Zero-copy swap: just swap the pointers
         core::mem::swap(&mut self.front_buffer, &mut self.back_buffer);
         self.state = SurfaceState::Ready;
         self.dirty_rect = None;
-        
+
         Ok(())
     }
-    
+
     /// Get buffer address for rendering
     pub fn get_back_buffer_addr(&self) -> Option<usize> {
         self.back_buffer.as_ref().map(|b| b.addr)
     }
-    
+
     /// Get front buffer address for compositing
     pub fn get_front_buffer_addr(&self) -> Option<usize> {
         self.front_buffer.as_ref().map(|b| b.addr)
@@ -250,46 +258,58 @@ impl SurfaceManager {
             surfaces_by_pid: Mutex::new(alloc::collections::BTreeMap::new()),
         }
     }
-    
+
     /// Create a new surface
-    pub fn create_surface(&self, width: u32, height: u32, format: SurfaceFormat, owner_pid: u32) -> Result<SurfaceId, i32> {
+    pub fn create_surface(
+        &self,
+        width: u32,
+        height: u32,
+        format: SurfaceFormat,
+        owner_pid: u32,
+    ) -> Result<SurfaceId, i32> {
         let id = self.next_surface_id.fetch_add(1, Ordering::SeqCst);
-        
+
         let surface = Surface::new(id, width, height, format, owner_pid)?;
-        
+
         {
             let mut surfaces = self.surfaces.lock();
             surfaces.insert(id, surface);
         }
-        
+
         {
             let mut by_pid = self.surfaces_by_pid.lock();
             by_pid.entry(owner_pid).or_insert_with(Vec::new).push(id);
         }
-        
-        crate::println!("[graphics] Created surface {} ({}x{}, format: {:?})", id, width, height, format);
+
+        crate::println!(
+            "[graphics] Created surface {} ({}x{}, format: {:?})",
+            id,
+            width,
+            height,
+            format
+        );
         Ok(id)
     }
-    
+
     /// Get surface by ID (returns a reference - caller must handle locking)
     pub fn get_surface(&self, id: SurfaceId) -> Option<alloc::sync::Arc<Mutex<Surface>>> {
         // In real implementation, surfaces would be stored as Arc<Mutex<Surface>>
         // For now, return None as placeholder
         None
     }
-    
+
     /// Get mutable surface by ID
     pub fn get_surface_mut(&self, id: SurfaceId) -> Option<alloc::sync::Arc<Mutex<Surface>>> {
         // Return a reference that can be locked
         // In real implementation, we'd use Arc<Mutex<Surface>> for thread safety
         None // Placeholder
     }
-    
+
     /// Destroy a surface
     pub fn destroy_surface(&self, id: SurfaceId) -> Result<(), i32> {
         let mut surfaces = self.surfaces.lock();
         let surface = surfaces.remove(&id).ok_or(ENOENT)?;
-        
+
         // Release buffers
         if let Some(front) = surface.front_buffer {
             front.release();
@@ -297,7 +317,7 @@ impl SurfaceManager {
         if let Some(back) = surface.back_buffer {
             back.release();
         }
-        
+
         // Remove from PID index
         {
             let mut by_pid = self.surfaces_by_pid.lock();
@@ -308,17 +328,17 @@ impl SurfaceManager {
                 }
             }
         }
-        
+
         crate::println!("[graphics] Destroyed surface {}", id);
         Ok(())
     }
-    
+
     /// Get all surfaces (for compositor)
     pub fn get_all_surfaces(&self) -> Vec<SurfaceId> {
         let surfaces = self.surfaces.lock();
         surfaces.keys().copied().collect()
     }
-    
+
     /// Get surfaces by owner PID
     pub fn get_surfaces_by_pid(&self, pid: u32) -> Vec<SurfaceId> {
         let by_pid = self.surfaces_by_pid.lock();
@@ -348,10 +368,9 @@ pub fn get_surface_manager() -> &'static SurfaceManager {
             *manager = Some(SurfaceManager::new());
         }
     });
-    
+
     unsafe {
         // Safety: We've initialized it above
         &*(SURFACE_MANAGER.lock().as_ref().unwrap() as *const SurfaceManager)
     }
 }
-

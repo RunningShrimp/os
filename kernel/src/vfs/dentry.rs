@@ -1,14 +1,9 @@
 //! Directory entry cache for VFS
 extern crate alloc;
-use alloc::{string::String, sync::Arc, collections::BTreeMap};
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+use super::{fs::InodeOps, mount::Mount};
 use crate::subsystems::sync::Mutex;
-
-use super::{
-    fs::InodeOps,
-    mount::Mount,
-};
 
 /// Directory entry cache
 pub struct Dentry {

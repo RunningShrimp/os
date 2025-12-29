@@ -5,9 +5,7 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use core::sync::atomic::{AtomicU64, Ordering};
 
 /// 断点管理器
@@ -149,4 +147,3 @@ pub struct SourceLocation {
     /// 模块名
     pub module_name: Option<String>,
 }
-

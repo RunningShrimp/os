@@ -2,8 +2,9 @@
 //!
 //! 本模块提供进程管理相关的系统调用处理。
 
-use nos_api::{Result, interfaces::SyscallHandler};
 use alloc::sync::Arc;
+
+use nos_api::{Result, interfaces::SyscallHandler};
 
 /// 进程管理系统调用处理器
 pub struct ProcessSyscallHandler {
@@ -30,11 +31,11 @@ impl SyscallHandler for ProcessSyscallHandler {
             _ => -1,
         }
     }
-    
+
     fn name(&self) -> &str {
         "process_syscall_handler"
     }
-    
+
     fn syscall_number(&self) -> usize {
         200 // 进程管理系统调用范围
     }
@@ -46,31 +47,31 @@ impl ProcessSyscallHandler {
         // 占位符实现
         0
     }
-    
+
     /// 执行程序
     fn sys_exec(&self, _args: &[usize]) -> isize {
         // 占位符实现
         0
     }
-    
+
     /// 退出进程
     fn sys_exit(&self, _args: &[usize]) -> isize {
         // 占位符实现
         0
     }
-    
+
     /// 等待子进程
     fn sys_wait(&self, _args: &[usize]) -> isize {
         // 占位符实现
         0
     }
-    
+
     /// 终止进程
     fn sys_kill(&self, _args: &[usize]) -> isize {
         // 占位符实现
         0
     }
-    
+
     /// 获取进程ID
     fn sys_getpid(&self, _args: &[usize]) -> isize {
         // 占位符实现

@@ -1,12 +1,11 @@
 /// Boot Menu Framework - Multiboot2 Module Enumeration and Kernel Selection
-/// 
+///
 /// Supports:
 /// - Module enumeration from Multiboot2 info
 /// - Boot kernel selection
 /// - Parameter editing and passing
 /// - Boot option persistence
 /// - Menu UI rendering
-
 use core::fmt::Write;
 
 /// Multiboot2 Module Entry Structure
@@ -19,7 +18,7 @@ pub struct MultibootModule {
 }
 
 /// Kernel Boot Parameter
-/// 
+///
 /// Uses heap allocation for flexibility
 #[derive(Debug, Clone)]
 pub struct KernelBootParam {
@@ -45,7 +44,7 @@ impl KernelBootParam {
         if value.len() > 256 {
             return false;
         }
-        
+
         unsafe {
             // Allocate if needed
             if self.value_capacity < value.len() {
@@ -53,17 +52,13 @@ impl KernelBootParam {
                 // For now, use a simpler approach with fixed 256-byte allocation
                 self.value_capacity = 256;
             }
-            
+
             // Copy value
             if !self.value_ptr.is_null() {
-                core::ptr::copy_nonoverlapping(
-                    value.as_ptr(),
-                    self.value_ptr,
-                    value.len()
-                );
+                core::ptr::copy_nonoverlapping(value.as_ptr(), self.value_ptr, value.len());
             }
         }
-        
+
         self.value_len = value.len();
         true
     }
@@ -309,8 +304,7 @@ impl BootMenu {
 
     /// Get boot entry point from selected option
     pub fn get_boot_entry_point(&self) -> Option<u64> {
-        self.get_selected_option()
-            .map(|opt| opt.module_addr as u64)
+        self.get_selected_option().map(|opt| opt.module_addr as u64)
     }
 }
 
@@ -321,20 +315,10 @@ impl BootMenuUI {
     /// Display simple selection prompt
     pub fn show_selection_prompt(current: u32, max_options: u32) {
         let _ = write!(&mut ConsoleWriter, "\n");
-        let _ = write!(
-            &mut ConsoleWriter,
-            "Current selection: {} [1-{}]\n",
-            current + 1,
-            max_options
-        );
-        let _ = write!(
-            &mut ConsoleWriter,
-            "Use arrow keys or enter option number to select\n"
-        );
-        let _ = write!(
-            &mut ConsoleWriter,
-            "Press ENTER to boot selected option\n"
-        );
+        let _ =
+            write!(&mut ConsoleWriter, "Current selection: {} [1-{}]\n", current + 1, max_options);
+        let _ = write!(&mut ConsoleWriter, "Use arrow keys or enter option number to select\n");
+        let _ = write!(&mut ConsoleWriter, "Press ENTER to boot selected option\n");
     }
 
     /// Display parameter editor prompt
@@ -400,7 +384,7 @@ impl BootMenuManager {
     }
 
     /// Initialize menu from Multiboot2 info structure
-    /// 
+    ///
     /// This function would be called with actual Multiboot2 info pointer
     /// in production code. For now, it provides the framework.
     pub fn initialize_from_multiboot2(&mut self) -> Result<(), &'static str> {
@@ -409,7 +393,7 @@ impl BootMenuManager {
         // 2. Extract MODULE tags for kernel modules
         // 3. Extract BOOT_DEVICE, COMMAND_LINE info
         // 4. Populate menu structure
-        
+
         Ok(())
     }
 
@@ -435,7 +419,8 @@ impl BootMenuManager {
 
         // In interactive mode, would handle keyboard input
         // For now, return selected option
-        self.menu.get_boot_entry_point()
+        self.menu
+            .get_boot_entry_point()
             .ok_or("No valid boot option selected")
     }
 
@@ -452,10 +437,10 @@ impl BootMenuManager {
     /// Validate and prepare for boot
     pub fn validate_and_prepare_boot(&self) -> Result<(u64, u32), &'static str> {
         let option = self.menu.validate_selected_boot()?;
-        
+
         // Show boot confirmation
         BootMenuUI::show_boot_confirmation(option.module_addr, option.module_size);
-        
+
         Ok((option.module_addr as u64, option.module_size))
     }
 
@@ -467,7 +452,7 @@ impl BootMenuManager {
             name_ptr: 0,
             reserved: 0,
         };
-        
+
         let _ = self.menu.add_module(test_module);
         let _ = self.menu.create_boot_option_from_module(0);
     }

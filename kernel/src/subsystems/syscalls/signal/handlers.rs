@@ -1,17 +1,18 @@
 //! 信号处理程序模块
-//! 
+//!
 //! 本模块提供信号处理的具体实现，包括：
 //! - 信号发送
 //! - 信号处理程序执行
 //! - 信号掩码操作
 //! - 信号集操作
 
-use crate::error::UnifiedError;
-use crate::error::SyscallError;
-use crate::subsystems::process::ProcessId;
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
+use alloc::{collections::BTreeMap, vec::Vec};
 use core::sync::atomic::{AtomicU32, Ordering};
+
+use crate::{
+    error::{SyscallError, UnifiedError},
+    subsystems::process::ProcessId,
+};
 
 /// 信号编号类型
 pub type SignalNumber = u32;
@@ -122,16 +123,15 @@ impl SignalHandlerManager {
         sig: SignalNumber,
         action: SignalAction,
     ) -> Result<Option<SignalAction>, KernelError> {
-        let handlers = self.process_handlers.entry(pid).or_insert_with(BTreeMap::new);
+        let handlers = self
+            .process_handlers
+            .entry(pid)
+            .or_insert_with(BTreeMap::new);
         Ok(handlers.insert(sig, action))
     }
 
     /// 获取进程的信号处理程序
-    pub fn get_process_handler(
-        &self,
-        pid: ProcessId,
-        sig: SignalNumber,
-    ) -> Option<SignalAction> {
+    pub fn get_process_handler(&self, pid: ProcessId, sig: SignalNumber) -> Option<SignalAction> {
         self.process_handlers
             .get(&pid)
             .and_then(|handlers| handlers.get(&sig))
@@ -166,40 +166,40 @@ impl Default for SignalHandlerManager {
 }
 
 /// 信号发送函数
-/// 
+///
 /// 向指定进程发送信号
-/// 
+///
 /// # 参数
-/// 
+///
 /// * `pid` - 目标进程ID
 /// * `sig` - 信号编号
-/// 
+///
 /// # 返回值
-/// 
+///
 /// * `Ok(())` - 信号发送成功
 /// * `Err(KernelError)` - 信号发送失败
 pub fn send_signal(pid: ProcessId, sig: SignalNumber) -> Result<(), KernelError> {
     crate::log_debug!("Sending signal {} to process {}", sig, pid);
-    
+
     // TODO: 实现实际的信号发送逻辑
     // 这里需要与进程管理器交互，将信号添加到进程的信号队列中
-    
+
     Ok(())
 }
 
 /// 信号掩码操作函数
-/// 
+///
 /// 设置进程的信号掩码
-/// 
+///
 /// # 参数
-/// 
+///
 /// * `pid` - 目标进程ID
 /// * `how` - 操作类型 (SIG_BLOCK, SIG_UNBLOCK, SIG_SETMASK)
 /// * `new_mask` - 新的信号掩码
 /// * `old_mask` - 用于返回旧的信号掩码
-/// 
+///
 /// # 返回值
-/// 
+///
 /// * `Ok(())` - 信号掩码设置成功
 /// * `Err(KernelError)` - 信号掩码设置失败
 pub fn set_signal_mask(
@@ -209,25 +209,25 @@ pub fn set_signal_mask(
     old_mask: Option<&mut SignalSet>,
 ) -> Result<(), KernelError> {
     crate::log_debug!("Setting signal mask for process {} with operation {}", pid, how);
-    
+
     // TODO: 实现实际的信号掩码设置逻辑
     // 这里需要与进程管理器交互，设置进程的信号掩码
-    
+
     Ok(())
 }
 
 /// 信号集操作函数
-/// 
+///
 /// 执行信号集操作
-/// 
+///
 /// # 参数
-/// 
+///
 /// * `how` - 操作类型
 /// * `set` - 输入信号集
 /// * `old_set` - 用于返回旧的信号集
-/// 
+///
 /// # 返回值
-/// 
+///
 /// * `Ok(())` - 信号集操作成功
 /// * `Err(KernelError)` - 信号集操作失败
 pub fn signal_set_ops(
@@ -236,24 +236,24 @@ pub fn signal_set_ops(
     old_set: Option<&mut SignalSet>,
 ) -> Result<(), KernelError> {
     crate::log_debug!("Performing signal set operation {}", how);
-    
+
     // TODO: 实现实际的信号集操作逻辑
-    
+
     Ok(())
 }
 
 /// 信号处理程序执行函数
-/// 
+///
 /// 执行指定信号的信号处理程序
-/// 
+///
 /// # 参数
-/// 
+///
 /// * `pid` - 进程ID
 /// * `sig` - 信号编号
 /// * `handler_manager` - 信号处理程序管理器
-/// 
+///
 /// # 返回值
-/// 
+///
 /// * `Ok(())` - 信号处理程序执行成功
 /// * `Err(KernelError)` - 信号处理程序执行失败
 pub fn execute_signal_handler(
@@ -262,36 +262,37 @@ pub fn execute_signal_handler(
     handler_manager: &SignalHandlerManager,
 ) -> Result<(), KernelError> {
     crate::log_debug!("Executing signal handler for signal {} in process {}", sig, pid);
-    
-    let action = handler_manager.get_process_handler(pid, sig)
+
+    let action = handler_manager
+        .get_process_handler(pid, sig)
         .ok_or_else(|| KernelError::Syscall(SyscallError::EINVAL))?;
-    
+
     match action {
         SignalAction::Default => {
             // 执行默认处理
             execute_default_handler(sig)?;
-        }
+        },
         SignalAction::Ignore => {
             // 忽略信号
             crate::log_debug!("Ignoring signal {} in process {}", sig, pid);
-        }
+        },
         SignalAction::Handler(handler) => {
             // 执行自定义处理程序
             handler(sig);
-        }
+        },
     }
-    
+
     Ok(())
 }
 
 /// 执行默认信号处理程序
-/// 
+///
 /// # 参数
-/// 
+///
 /// * `sig` - 信号编号
-/// 
+///
 /// # 返回值
-/// 
+///
 /// * `Ok(())` - 默认处理程序执行成功
 /// * `Err(KernelError)` - 默认处理程序执行失败
 fn execute_default_handler(sig: SignalNumber) -> Result<(), KernelError> {
@@ -300,22 +301,22 @@ fn execute_default_handler(sig: SignalNumber) -> Result<(), KernelError> {
         2 | 3 | 6 | 9 | 15 => {
             // TODO: 终止进程
             crate::log_debug!("Terminating process due to signal {}", sig);
-        }
+        },
         // 停止信号
         17 | 19 | 23 => {
             // TODO: 停止进程
             crate::log_debug!("Stopping process due to signal {}", sig);
-        }
+        },
         // 继续信号
         18 => {
             // TODO: 继续进程
             crate::log_debug!("Continuing process due to signal {}", sig);
-        }
+        },
         _ => {
             crate::log_debug!("No default handler for signal {}", sig);
-        }
+        },
     }
-    
+
     Ok(())
 }
 
@@ -324,13 +325,16 @@ static mut GLOBAL_HANDLER_MANAGER: Option<SignalHandlerManager> = None;
 static HANDLER_MANAGER_INIT: AtomicU32 = AtomicU32::new(0);
 
 /// 获取全局信号处理程序管理器
-/// 
+///
 /// # 返回值
-/// 
+///
 /// * `&'static mut SignalHandlerManager` - 全局信号处理程序管理器
 pub fn get_global_handler_manager() -> &'static mut SignalHandlerManager {
     unsafe {
-        if HANDLER_MANAGER_INIT.compare_exchange(0, 1, Ordering::Acquire, Ordering::Relaxed).is_ok() {
+        if HANDLER_MANAGER_INIT
+            .compare_exchange(0, 1, Ordering::Acquire, Ordering::Relaxed)
+            .is_ok()
+        {
             GLOBAL_HANDLER_MANAGER = Some(SignalHandlerManager::new());
         }
         GLOBAL_HANDLER_MANAGER.as_mut().unwrap()
@@ -344,16 +348,16 @@ mod tests {
     #[test]
     fn test_signal_set_operations() {
         let mut set = SignalSet::empty();
-        
+
         // 测试添加信号
         set.add(1);
         assert!(set.contains(1));
         assert!(!set.contains(2));
-        
+
         // 测试移除信号
         set.remove(1);
         assert!(!set.contains(1));
-        
+
         // 测试清空信号集
         set.add(1);
         set.add(2);
@@ -366,17 +370,27 @@ mod tests {
     fn test_signal_handler_manager() {
         let mut manager = SignalHandlerManager::new();
         let pid = ProcessId::new(123);
-        
+
         // 测试设置和获取进程处理程序
         let action = SignalAction::Ignore;
-        assert!(manager.set_process_handler(pid, 1, action).unwrap().is_none());
+        assert!(
+            manager
+                .set_process_handler(pid, 1, action)
+                .unwrap()
+                .is_none()
+        );
         assert_eq!(manager.get_process_handler(pid, 1), Some(action));
-        
+
         // 测试设置和获取全局处理程序
         let global_action = SignalAction::Default;
-        assert!(manager.set_global_handler(2, global_action).unwrap().is_none());
+        assert!(
+            manager
+                .set_global_handler(2, global_action)
+                .unwrap()
+                .is_none()
+        );
         assert_eq!(manager.get_global_handler(2), Some(global_action));
-        
+
         // 测试移除进程处理程序
         manager.remove_process_handlers(pid);
         assert!(manager.get_process_handler(pid, 1).is_none());
@@ -386,7 +400,7 @@ mod tests {
     fn test_signal_send() {
         let pid = ProcessId::new(456);
         let sig = 9;
-        
+
         // 测试信号发送
         assert!(send_signal(pid, sig).is_ok());
     }

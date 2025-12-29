@@ -1,7 +1,6 @@
 // Boot logging system for diagnostics and debugging
 
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 
 pub enum LogLevel {
     Debug = 0,
@@ -17,10 +16,7 @@ pub struct BootLog {
 
 impl BootLog {
     pub fn new() -> Self {
-        Self {
-            entries: Vec::new(),
-            max_entries: 256,
-        }
+        Self { entries: Vec::new(), max_entries: 256 }
     }
 
     pub fn log(&mut self, message: &str) {
@@ -81,7 +77,7 @@ pub fn log_message(msg: &str) {
     unsafe {
         match &mut *(&raw mut BOOT_LOGGER) {
             Some(logger) => logger.log(msg),
-            None => {}
+            None => {},
         }
     }
 }
@@ -90,7 +86,7 @@ pub fn log_error(error: &str) {
     unsafe {
         match &mut *(&raw mut BOOT_LOGGER) {
             Some(logger) => logger.log_error(error),
-            None => {}
+            None => {},
         }
     }
 }
@@ -99,7 +95,7 @@ pub fn log_warn(warn: &str) {
     unsafe {
         match &mut *(&raw mut BOOT_LOGGER) {
             Some(logger) => logger.log_warn(warn),
-            None => {}
+            None => {},
         }
     }
 }
@@ -108,7 +104,7 @@ pub fn dump_log() {
     unsafe {
         match &*(&raw const BOOT_LOGGER) {
             Some(logger) => logger.print_all(),
-            None => {}
+            None => {},
         }
     }
 }

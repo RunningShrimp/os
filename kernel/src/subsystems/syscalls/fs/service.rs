@@ -3,13 +3,20 @@
 //! This module provides the filesystem service that manages all filesystem-related
 //! system calls through the new modular service architecture.
 
-use crate::error::UnifiedError;
-use super::handlers;
-use super::types::{FilesystemOperation, FilesystemError};
-use crate::subsystems::syscalls::services::{BaseService, ServiceStatus, SyscallService};
-use alloc::boxed::Box;
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
+
+use super::{
+    handlers,
+    types::{FilesystemError, FilesystemOperation},
+};
+use crate::{
+    error::UnifiedError,
+    subsystems::syscalls::services::{BaseService, ServiceStatus, SyscallService},
+};
 
 /// Filesystem system call service
 ///
@@ -54,46 +61,46 @@ impl FilesystemService {
         match operation {
             FilesystemOperation::Stat | FilesystemOperation::Lstat => {
                 self.stats.stat_calls += 1;
-            }
+            },
             FilesystemOperation::Access => {
                 self.stats.access_calls += 1;
-            }
+            },
             FilesystemOperation::ChangeDirectory => {
                 self.stats.chdir_calls += 1;
-            }
+            },
             FilesystemOperation::GetCurrentDirectory => {
                 self.stats.getcwd_calls += 1;
-            }
+            },
             FilesystemOperation::MakeDirectory => {
                 self.stats.mkdir_calls += 1;
-            }
+            },
             FilesystemOperation::RemoveDirectory => {
                 self.stats.rmdir_calls += 1;
-            }
+            },
             FilesystemOperation::Unlink => {
                 self.stats.unlink_calls += 1;
-            }
+            },
             FilesystemOperation::Rename => {
                 self.stats.rename_calls += 1;
-            }
+            },
             FilesystemOperation::Link => {
                 self.stats.link_calls += 1;
-            }
+            },
             FilesystemOperation::Symlink => {
                 self.stats.symlink_calls += 1;
-            }
+            },
             FilesystemOperation::Readlink => {
                 self.stats.readlink_calls += 1;
-            }
+            },
             FilesystemOperation::ChangeMode => {
                 self.stats.chmod_calls += 1;
-            }
+            },
             FilesystemOperation::ChangeOwner => {
                 self.stats.chown_calls += 1;
-            }
+            },
             FilesystemOperation::SetUmask => {
                 self.stats.umask_calls += 1;
-            }
+            },
             _ => self.stats.other_calls += 1,
         }
         self.stats.total_calls += 1;
@@ -108,7 +115,9 @@ impl FilesystemService {
     pub fn get_process_cwd(&self, pid: u32) -> Option<String> {
         // Access process table to get current working directory
         let proc_table = crate::process::manager::PROC_TABLE.lock();
-        proc_table.find_ref(pid as usize).and_then(|proc| proc.cwd_path.clone())
+        proc_table
+            .find_ref(pid as usize)
+            .and_then(|proc| proc.cwd_path.clone())
     }
 
     /// Validate filesystem path
@@ -118,7 +127,7 @@ impl FilesystemService {
         // Delegate to the new service implementation
         // For now, we keep the local implementation as a fallback until migration is complete
         // but mark it as deprecated in documentation
-        
+
         if path.is_empty() {
             return Err(FilesystemError::InvalidArgument);
         }
@@ -163,7 +172,7 @@ impl FilesystemService {
                     if !components.is_empty() {
                         components.pop();
                     }
-                }
+                },
                 _ => components.push(component),
             }
         }
@@ -201,7 +210,9 @@ impl BaseService for FilesystemService {
 
         // Initialize VFS if needed
         if !crate::vfs::is_root_mounted() {
-            crate::println!("[fs] Warning: Root filesystem not mounted during service initialization");
+            crate::println!(
+                "[fs] Warning: Root filesystem not mounted during service initialization"
+            );
         }
 
         self.status = ServiceStatus::Initialized;
@@ -297,7 +308,6 @@ impl SyscallService for FilesystemService {
     fn priority(&self) -> u32 {
         20 // Filesystem operations are moderately critical
     }
-
 }
 
 /// Filesystem operation counters for statistics

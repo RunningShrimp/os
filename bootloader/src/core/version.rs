@@ -14,4 +14,3 @@ pub fn print_build_info() {
     crate::drivers::console::write_str("Multi-arch bootloader\n");
     crate::drivers::console::write_str("Copyright (c) 2024 NOS Project\n");
 }
-

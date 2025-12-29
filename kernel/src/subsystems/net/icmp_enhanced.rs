@@ -5,11 +5,10 @@
 
 extern crate alloc;
 use alloc::vec::Vec;
-use crate::subsystems::sync::Mutex;
-use crate::error::UnifiedError;
 
 // Re-export existing ICMP functionality
 pub use super::icmp::*;
+use crate::{error::UnifiedError, subsystems::sync::Mutex};
 
 // ============================================================================
 // Enhanced ICMP Types
@@ -245,7 +244,7 @@ impl EnhancedIcmpPacket {
                 } else {
                     0
                 }
-            }
+            },
             IcmpMessageData::DestinationUnreachable(msg) => {
                 // Use first byte of original header as rest
                 if !msg.original_header.is_empty() {
@@ -253,7 +252,7 @@ impl EnhancedIcmpPacket {
                 } else {
                     0
                 }
-            }
+            },
             IcmpMessageData::TimeExceeded(msg) => {
                 // Use first byte of original header as rest
                 if !msg.original_header.is_empty() {
@@ -261,37 +260,31 @@ impl EnhancedIcmpPacket {
                 } else {
                     0
                 }
-            }
-            IcmpMessageData::ParameterProblem(msg) => {
-                (msg.pointer as u32) << 24
-            }
+            },
+            IcmpMessageData::ParameterProblem(msg) => (msg.pointer as u32) << 24,
             IcmpMessageData::Redirect(msg) => {
                 // Use gateway address as rest
                 let addr_bytes = msg.gateway_address.to_bytes();
                 u32::from_be_bytes([addr_bytes[0], addr_bytes[1], addr_bytes[2], addr_bytes[3]])
-            }
-            IcmpMessageData::Timestamp(msg) => {
-                msg.originate_timestamp
-            }
-            IcmpMessageData::AddressMask(msg) => {
-                msg.address_mask
-            }
+            },
+            IcmpMessageData::Timestamp(msg) => msg.originate_timestamp,
+            IcmpMessageData::AddressMask(msg) => msg.address_mask,
             IcmpMessageData::RouterAdvertisement(msg) => {
-                ((msg.lifetime as u32) << 16) | ((msg.address_count as u32) << 8) | (msg.address_entry_size as u32)
-            }
-            IcmpMessageData::RouterSolicitation => {
-                0
-            }
+                ((msg.lifetime as u32) << 16)
+                    | ((msg.address_count as u32) << 8)
+                    | (msg.address_entry_size as u32)
+            },
+            IcmpMessageData::RouterSolicitation => 0,
             IcmpMessageData::Traceroute(msg) => {
                 ((msg.outbound_packet_id as u32) << 16) | (msg.outbound_packet_sequence as u32)
-            }
+            },
             IcmpMessageData::Unknown(data) => {
                 if data.len() >= 4 {
                     u32::from_be_bytes([data[0], data[1], data[2], data[3]])
                 } else {
                     0
                 }
-            }
+            },
         };
 
         let header = IcmpHeader::new(
@@ -308,57 +301,45 @@ impl EnhancedIcmpPacket {
                 ExtendedIcmpType::InformationRequest => IcmpType::InformationRequest,
                 ExtendedIcmpType::InformationReply => IcmpType::InformationReply,
                 ExtendedIcmpType::AddressMaskRequest => IcmpType::InformationRequest, // Reuse
-                ExtendedIcmpType::AddressMaskReply => IcmpType::InformationReply, // Reuse
-                ExtendedIcmpType::RouterAdvertisement => IcmpType::SourceQuench, // Reuse
-                ExtendedIcmpType::RouterSolicitation => IcmpType::SourceQuench, // Reuse
-                ExtendedIcmpType::Traceroute => IcmpType::ParameterProblem, // Reuse
+                ExtendedIcmpType::AddressMaskReply => IcmpType::InformationReply,     // Reuse
+                ExtendedIcmpType::RouterAdvertisement => IcmpType::SourceQuench,      // Reuse
+                ExtendedIcmpType::RouterSolicitation => IcmpType::SourceQuench,       // Reuse
+                ExtendedIcmpType::Traceroute => IcmpType::ParameterProblem,           // Reuse
             },
             match message_type {
-                ExtendedIcmpType::DestinationUnreachable => {
-                    match code {
-                        0 => IcmpCode::NetUnreachable,
-                        1 => IcmpCode::HostUnreachable,
-                        2 => IcmpCode::ProtocolUnreachable,
-                        3 => IcmpCode::PortUnreachable,
-                        4 => IcmpCode::FragmentationNeeded,
-                        5 => IcmpCode::SourceRouteFailed,
-                        _ => IcmpCode::NetUnreachable,
-                    }
-                }
-                ExtendedIcmpType::TimeExceeded => {
-                    match code {
-                        0 => IcmpCode::TtlExceeded,
-                        1 => IcmpCode::FragmentReassemblyTimeExceeded,
-                        _ => IcmpCode::TtlExceeded,
-                    }
-                }
-                ExtendedIcmpType::ParameterProblem => {
-                    match code {
-                        0 => IcmpCode::PointerIndicatesError,
-                        1 => IcmpCode::MissingRequiredOption,
-                        2 => IcmpCode::BadLength,
-                        _ => IcmpCode::PointerIndicatesError,
-                    }
-                }
-                ExtendedIcmpType::Redirect => {
-                    match code {
-                        0 => IcmpCode::NetUnreachable,
-                        1 => IcmpCode::HostUnreachable,
-                        2 => IcmpCode::ProtocolUnreachable,
-                        3 => IcmpCode::PortUnreachable,
-                        _ => IcmpCode::NetUnreachable,
-                    }
-                }
+                ExtendedIcmpType::DestinationUnreachable => match code {
+                    0 => IcmpCode::NetUnreachable,
+                    1 => IcmpCode::HostUnreachable,
+                    2 => IcmpCode::ProtocolUnreachable,
+                    3 => IcmpCode::PortUnreachable,
+                    4 => IcmpCode::FragmentationNeeded,
+                    5 => IcmpCode::SourceRouteFailed,
+                    _ => IcmpCode::NetUnreachable,
+                },
+                ExtendedIcmpType::TimeExceeded => match code {
+                    0 => IcmpCode::TtlExceeded,
+                    1 => IcmpCode::FragmentReassemblyTimeExceeded,
+                    _ => IcmpCode::TtlExceeded,
+                },
+                ExtendedIcmpType::ParameterProblem => match code {
+                    0 => IcmpCode::PointerIndicatesError,
+                    1 => IcmpCode::MissingRequiredOption,
+                    2 => IcmpCode::BadLength,
+                    _ => IcmpCode::PointerIndicatesError,
+                },
+                ExtendedIcmpType::Redirect => match code {
+                    0 => IcmpCode::NetUnreachable,
+                    1 => IcmpCode::HostUnreachable,
+                    2 => IcmpCode::ProtocolUnreachable,
+                    3 => IcmpCode::PortUnreachable,
+                    _ => IcmpCode::NetUnreachable,
+                },
                 _ => IcmpCode::NetUnreachable, // Default
             },
             rest,
         );
 
-        Self {
-            header,
-            message_type,
-            message_data,
-        }
+        Self { header, message_type, message_data }
     }
 
     /// Create echo request packet
@@ -368,11 +349,7 @@ impl EnhancedIcmpPacket {
         echo_data.extend_from_slice(&sequence.to_be_bytes());
         echo_data.extend_from_slice(&data);
 
-        Self::new(
-            ExtendedIcmpType::EchoRequest,
-            0,
-            IcmpMessageData::Echo(echo_data),
-        )
+        Self::new(ExtendedIcmpType::EchoRequest, 0, IcmpMessageData::Echo(echo_data))
     }
 
     /// Create echo reply packet
@@ -382,11 +359,7 @@ impl EnhancedIcmpPacket {
         echo_data.extend_from_slice(&sequence.to_be_bytes());
         echo_data.extend_from_slice(&data);
 
-        Self::new(
-            ExtendedIcmpType::EchoReply,
-            0,
-            IcmpMessageData::Echo(echo_data),
-        )
+        Self::new(ExtendedIcmpType::EchoReply, 0, IcmpMessageData::Echo(echo_data))
     }
 
     /// Create destination unreachable packet
@@ -414,10 +387,7 @@ impl EnhancedIcmpPacket {
         Self::new(
             ExtendedIcmpType::TimeExceeded,
             code as u8,
-            IcmpMessageData::TimeExceeded(TimeExceededMessage {
-                original_header,
-                original_data,
-            }),
+            IcmpMessageData::TimeExceeded(TimeExceededMessage { original_header, original_data }),
         )
     }
 
@@ -427,7 +397,7 @@ impl EnhancedIcmpPacket {
             ExtendedIcmpType::TimestampRequest,
             0,
             IcmpMessageData::Timestamp(TimestampMessage {
-                originate_timestamp: originate_timestamp,
+                originate_timestamp,
                 receive_timestamp: 0,
                 transmit_timestamp: 0,
             }),
@@ -456,9 +426,7 @@ impl EnhancedIcmpPacket {
         Self::new(
             ExtendedIcmpType::AddressMaskRequest,
             0,
-            IcmpMessageData::AddressMask(AddressMaskMessage {
-                address_mask: 0,
-            }),
+            IcmpMessageData::AddressMask(AddressMaskMessage { address_mask: 0 }),
         )
     }
 
@@ -480,7 +448,7 @@ impl EnhancedIcmpPacket {
                 } else {
                     0
                 }
-            }
+            },
             _ => 0,
         }
     }
@@ -494,7 +462,7 @@ impl EnhancedIcmpPacket {
                 } else {
                     0
                 }
-            }
+            },
             _ => 0,
         }
     }
@@ -511,34 +479,34 @@ impl EnhancedIcmpPacket {
         match &self.message_data {
             IcmpMessageData::Echo(data) => {
                 bytes.extend_from_slice(data);
-            }
+            },
             IcmpMessageData::DestinationUnreachable(msg) => {
                 bytes.extend_from_slice(&msg.original_header);
                 bytes.extend_from_slice(&msg.original_data);
-            }
+            },
             IcmpMessageData::TimeExceeded(msg) => {
                 bytes.extend_from_slice(&msg.original_header);
                 bytes.extend_from_slice(&msg.original_data);
-            }
+            },
             IcmpMessageData::ParameterProblem(msg) => {
                 bytes.push(msg.pointer);
                 bytes.extend_from_slice(&msg.original_header);
                 bytes.extend_from_slice(&msg.original_data);
-            }
+            },
             IcmpMessageData::Redirect(msg) => {
                 let addr_bytes = msg.gateway_address.to_bytes();
                 bytes.extend_from_slice(&addr_bytes);
                 bytes.extend_from_slice(&msg.original_header);
                 bytes.extend_from_slice(&msg.original_data);
-            }
+            },
             IcmpMessageData::Timestamp(msg) => {
                 bytes.extend_from_slice(&msg.originate_timestamp.to_be_bytes());
                 bytes.extend_from_slice(&msg.receive_timestamp.to_be_bytes());
                 bytes.extend_from_slice(&msg.transmit_timestamp.to_be_bytes());
-            }
+            },
             IcmpMessageData::AddressMask(msg) => {
                 bytes.extend_from_slice(&msg.address_mask.to_be_bytes());
-            }
+            },
             IcmpMessageData::RouterAdvertisement(msg) => {
                 bytes.extend_from_slice(&msg.lifetime.to_be_bytes());
                 bytes.push(msg.address_count);
@@ -546,20 +514,20 @@ impl EnhancedIcmpPacket {
                 for addr in &msg.router_addresses {
                     bytes.extend_from_slice(&addr.to_bytes());
                 }
-            }
+            },
             IcmpMessageData::RouterSolicitation => {
                 // No additional data
-            }
+            },
             IcmpMessageData::Traceroute(msg) => {
                 bytes.extend_from_slice(&msg.outbound_packet_id.to_be_bytes());
                 bytes.extend_from_slice(&msg.outbound_packet_sequence.to_be_bytes());
                 for addr in &msg.gateway_addresses {
                     bytes.extend_from_slice(&addr.to_bytes());
                 }
-            }
+            },
             IcmpMessageData::Unknown(data) => {
                 bytes.extend_from_slice(data);
-            }
+            },
         }
 
         // Calculate and set checksum
@@ -605,7 +573,7 @@ impl EnhancedIcmpPacket {
         let message_data = match message_type {
             ExtendedIcmpType::EchoRequest | ExtendedIcmpType::EchoReply => {
                 IcmpMessageData::Echo(bytes[8..].to_vec())
-            }
+            },
             ExtendedIcmpType::DestinationUnreachable => {
                 if bytes.len() < 8 + 8 {
                     return Err(IcmpError::PacketTooSmall);
@@ -616,7 +584,7 @@ impl EnhancedIcmpPacket {
                     original_header,
                     original_data,
                 })
-            }
+            },
             ExtendedIcmpType::TimeExceeded => {
                 if bytes.len() < 8 + 8 {
                     return Err(IcmpError::PacketTooSmall);
@@ -627,7 +595,7 @@ impl EnhancedIcmpPacket {
                     original_header,
                     original_data,
                 })
-            }
+            },
             ExtendedIcmpType::ParameterProblem => {
                 if bytes.len() < 8 + 1 {
                     return Err(IcmpError::PacketTooSmall);
@@ -640,7 +608,7 @@ impl EnhancedIcmpPacket {
                     original_header,
                     original_data,
                 })
-            }
+            },
             ExtendedIcmpType::Redirect => {
                 if bytes.len() < 8 + 4 {
                     return Err(IcmpError::PacketTooSmall);
@@ -654,27 +622,30 @@ impl EnhancedIcmpPacket {
                     original_header,
                     original_data,
                 })
-            }
+            },
             ExtendedIcmpType::TimestampRequest | ExtendedIcmpType::TimestampReply => {
                 if bytes.len() < 8 + 12 {
                     return Err(IcmpError::PacketTooSmall);
                 }
-                let originate_timestamp = u32::from_be_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]);
-                let receive_timestamp = u32::from_be_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]);
-                let transmit_timestamp = u32::from_be_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]);
+                let originate_timestamp =
+                    u32::from_be_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]);
+                let receive_timestamp =
+                    u32::from_be_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]);
+                let transmit_timestamp =
+                    u32::from_be_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]);
                 IcmpMessageData::Timestamp(TimestampMessage {
                     originate_timestamp,
                     receive_timestamp,
                     transmit_timestamp,
                 })
-            }
+            },
             ExtendedIcmpType::AddressMaskRequest | ExtendedIcmpType::AddressMaskReply => {
                 if bytes.len() < 8 + 4 {
                     return Err(IcmpError::PacketTooSmall);
                 }
                 let address_mask = u32::from_be_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]);
                 IcmpMessageData::AddressMask(AddressMaskMessage { address_mask })
-            }
+            },
             ExtendedIcmpType::RouterAdvertisement => {
                 if bytes.len() < 8 + 4 {
                     return Err(IcmpError::PacketTooSmall);
@@ -682,48 +653,56 @@ impl EnhancedIcmpPacket {
                 let lifetime = u16::from_be_bytes([bytes[8], bytes[9]]);
                 let address_count = bytes[10];
                 let address_entry_size = bytes[11];
-                
+
                 let mut router_addresses = Vec::new();
                 let mut offset = 12;
                 for _ in 0..address_count {
                     if offset + 4 <= bytes.len() {
-                        let addr_bytes = [bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]];
+                        let addr_bytes = [
+                            bytes[offset],
+                            bytes[offset + 1],
+                            bytes[offset + 2],
+                            bytes[offset + 3],
+                        ];
                         router_addresses.push(super::ipv4::Ipv4Addr::from_bytes(addr_bytes));
                         offset += address_entry_size as usize;
                     }
                 }
-                
+
                 IcmpMessageData::RouterAdvertisement(RouterAdvertisementMessage {
                     address_count,
                     address_entry_size,
                     lifetime,
                     router_addresses,
                 })
-            }
-            ExtendedIcmpType::RouterSolicitation => {
-                IcmpMessageData::RouterSolicitation
-            }
+            },
+            ExtendedIcmpType::RouterSolicitation => IcmpMessageData::RouterSolicitation,
             ExtendedIcmpType::Traceroute => {
                 if bytes.len() < 8 + 4 {
                     return Err(IcmpError::PacketTooSmall);
                 }
                 let outbound_packet_id = u16::from_be_bytes([bytes[8], bytes[9]]);
                 let outbound_packet_sequence = u16::from_be_bytes([bytes[10], bytes[11]]);
-                
+
                 let mut gateway_addresses = Vec::new();
                 let mut offset = 12;
                 while offset + 4 <= bytes.len() {
-                    let addr_bytes = [bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]];
+                    let addr_bytes = [
+                        bytes[offset],
+                        bytes[offset + 1],
+                        bytes[offset + 2],
+                        bytes[offset + 3],
+                    ];
                     gateway_addresses.push(super::ipv4::Ipv4Addr::from_bytes(addr_bytes));
                     offset += 4;
                 }
-                
+
                 IcmpMessageData::Traceroute(TracerouteMessage {
                     outbound_packet_id,
                     outbound_packet_sequence,
                     gateway_addresses,
                 })
-            }
+            },
             _ => IcmpMessageData::Unknown(bytes[8..].to_vec()),
         };
 
@@ -742,47 +721,39 @@ impl EnhancedIcmpPacket {
                     ExtendedIcmpType::InformationRequest => IcmpType::InformationRequest,
                     ExtendedIcmpType::InformationReply => IcmpType::InformationReply,
                     ExtendedIcmpType::AddressMaskRequest => IcmpType::InformationRequest, // Reuse
-                    ExtendedIcmpType::AddressMaskReply => IcmpType::InformationReply, // Reuse
-                    ExtendedIcmpType::RouterAdvertisement => IcmpType::SourceQuench, // Reuse
-                    ExtendedIcmpType::RouterSolicitation => IcmpType::SourceQuench, // Reuse
-                    ExtendedIcmpType::Traceroute => IcmpType::ParameterProblem, // Reuse
+                    ExtendedIcmpType::AddressMaskReply => IcmpType::InformationReply,     // Reuse
+                    ExtendedIcmpType::RouterAdvertisement => IcmpType::SourceQuench,      // Reuse
+                    ExtendedIcmpType::RouterSolicitation => IcmpType::SourceQuench,       // Reuse
+                    ExtendedIcmpType::Traceroute => IcmpType::ParameterProblem,           // Reuse
                 },
                 code: match message_type {
-                    ExtendedIcmpType::DestinationUnreachable => {
-                        match code {
-                            0 => IcmpCode::NetUnreachable,
-                            1 => IcmpCode::HostUnreachable,
-                            2 => IcmpCode::ProtocolUnreachable,
-                            3 => IcmpCode::PortUnreachable,
-                            4 => IcmpCode::FragmentationNeeded,
-                            5 => IcmpCode::SourceRouteFailed,
-                            _ => IcmpCode::NetUnreachable,
-                        }
-                    }
-                    ExtendedIcmpType::TimeExceeded => {
-                        match code {
-                            0 => IcmpCode::TtlExceeded,
-                            1 => IcmpCode::FragmentReassemblyTimeExceeded,
-                            _ => IcmpCode::TtlExceeded,
-                        }
-                    }
-                    ExtendedIcmpType::ParameterProblem => {
-                        match code {
-                            0 => IcmpCode::PointerIndicatesError,
-                            1 => IcmpCode::MissingRequiredOption,
-                            2 => IcmpCode::BadLength,
-                            _ => IcmpCode::PointerIndicatesError,
-                        }
-                    }
-                    ExtendedIcmpType::Redirect => {
-                        match code {
-                            0 => IcmpCode::NetUnreachable,
-                            1 => IcmpCode::HostUnreachable,
-                            2 => IcmpCode::ProtocolUnreachable,
-                            3 => IcmpCode::PortUnreachable,
-                            _ => IcmpCode::NetUnreachable,
-                        }
-                    }
+                    ExtendedIcmpType::DestinationUnreachable => match code {
+                        0 => IcmpCode::NetUnreachable,
+                        1 => IcmpCode::HostUnreachable,
+                        2 => IcmpCode::ProtocolUnreachable,
+                        3 => IcmpCode::PortUnreachable,
+                        4 => IcmpCode::FragmentationNeeded,
+                        5 => IcmpCode::SourceRouteFailed,
+                        _ => IcmpCode::NetUnreachable,
+                    },
+                    ExtendedIcmpType::TimeExceeded => match code {
+                        0 => IcmpCode::TtlExceeded,
+                        1 => IcmpCode::FragmentReassemblyTimeExceeded,
+                        _ => IcmpCode::TtlExceeded,
+                    },
+                    ExtendedIcmpType::ParameterProblem => match code {
+                        0 => IcmpCode::PointerIndicatesError,
+                        1 => IcmpCode::MissingRequiredOption,
+                        2 => IcmpCode::BadLength,
+                        _ => IcmpCode::PointerIndicatesError,
+                    },
+                    ExtendedIcmpType::Redirect => match code {
+                        0 => IcmpCode::NetUnreachable,
+                        1 => IcmpCode::HostUnreachable,
+                        2 => IcmpCode::ProtocolUnreachable,
+                        3 => IcmpCode::PortUnreachable,
+                        _ => IcmpCode::NetUnreachable,
+                    },
                     _ => IcmpCode::NetUnreachable, // Default
                 },
                 checksum,
@@ -836,7 +807,7 @@ impl EnhancedIcmpPacket {
                 } else {
                     0
                 }
-            }
+            },
             _ => 0,
         }
     }
@@ -850,7 +821,7 @@ impl EnhancedIcmpPacket {
                 } else {
                     0
                 }
-            }
+            },
             _ => 0,
         }
     }
@@ -892,50 +863,50 @@ impl EnhancedIcmpPacket {
     /// Convert packet to bytes
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
-        
+
         // Add header
         bytes.push(self.header.type_field);
         bytes.push(self.header.code);
         bytes.extend_from_slice(&self.header.checksum.to_be_bytes());
         bytes.extend_from_slice(&self.header.rest.to_be_bytes());
-        
+
         // Add message data
         match &self.message_data {
             IcmpMessageData::Echo(data) => {
                 bytes.extend_from_slice(data);
-            }
+            },
             IcmpMessageData::DestinationUnreachable(msg) => {
                 bytes.push(msg.unused);
                 bytes.extend_from_slice(&msg.original_header.to_be_bytes());
                 bytes.extend_from_slice(&msg.original_data);
-            }
+            },
             IcmpMessageData::TimeExceeded(msg) => {
                 bytes.push(msg.unused);
                 bytes.extend_from_slice(&msg.original_header.to_be_bytes());
                 bytes.extend_from_slice(&msg.original_data);
-            }
+            },
             IcmpMessageData::ParameterProblem(msg) => {
                 bytes.push(msg.pointer);
                 bytes.extend_from_slice(&msg.original_header.to_be_bytes());
                 bytes.extend_from_slice(&msg.original_data);
-            }
+            },
             IcmpMessageData::Redirect(msg) => {
                 bytes.extend_from_slice(&msg.gateway_address.to_bytes());
                 bytes.extend_from_slice(&msg.original_header.to_be_bytes());
                 bytes.extend_from_slice(&msg.original_data);
-            }
+            },
             IcmpMessageData::Timestamp(msg) => {
                 bytes.extend_from_slice(&msg.identifier.to_be_bytes());
                 bytes.extend_from_slice(&msg.sequence_number.to_be_bytes());
                 bytes.extend_from_slice(&msg.originate_timestamp.to_be_bytes());
                 bytes.extend_from_slice(&msg.receive_timestamp.to_be_bytes());
                 bytes.extend_from_slice(&msg.transmit_timestamp.to_be_bytes());
-            }
+            },
             IcmpMessageData::AddressMask(msg) => {
                 bytes.extend_from_slice(&msg.identifier.to_be_bytes());
                 bytes.extend_from_slice(&msg.sequence_number.to_be_bytes());
                 bytes.extend_from_slice(&msg.address_mask.to_be_bytes());
-            }
+            },
             IcmpMessageData::RouterAdvertisement(msg) => {
                 bytes.push(msg.num_addresses);
                 bytes.push(msg.address_entry_size);
@@ -944,12 +915,12 @@ impl EnhancedIcmpPacket {
                     bytes.extend_from_slice(&addr.address.to_bytes());
                     bytes.extend_from_slice(&addr.preference_level.to_be_bytes());
                 }
-            }
+            },
             IcmpMessageData::RouterSolicitation(msg) => {
                 bytes.extend_from_slice(&msg.reserved.to_be_bytes());
-            }
+            },
         }
-        
+
         bytes
     }
 }
@@ -1042,25 +1013,125 @@ pub struct EnhancedIcmpProcessor {
     /// Configuration
     config: Mutex<IcmpConfig>,
     /// Echo request handlers
-    echo_handlers: Mutex<Vec<Box<dyn Fn(super::ipv4::Ipv4Addr, super::ipv4::Ipv4Addr, EnhancedIcmpPacket) -> Option<EnhancedIcmpPacket>>>>,
+    echo_handlers: Mutex<
+        Vec<
+            Box<
+                dyn Fn(
+                    super::ipv4::Ipv4Addr,
+                    super::ipv4::Ipv4Addr,
+                    EnhancedIcmpPacket,
+                ) -> Option<EnhancedIcmpPacket>,
+            >,
+        >,
+    >,
     /// Destination unreachable handlers
-    dest_unreachable_handlers: Mutex<Vec<Box<dyn Fn(super::ipv4::Ipv4Addr, super::ipv4::Ipv4Addr, EnhancedIcmpPacket) -> Option<EnhancedIcmpPacket>>>>,
+    dest_unreachable_handlers: Mutex<
+        Vec<
+            Box<
+                dyn Fn(
+                    super::ipv4::Ipv4Addr,
+                    super::ipv4::Ipv4Addr,
+                    EnhancedIcmpPacket,
+                ) -> Option<EnhancedIcmpPacket>,
+            >,
+        >,
+    >,
     /// Time exceeded handlers
-    time_exceeded_handlers: Mutex<Vec<Box<dyn Fn(super::ipv4::Ipv4Addr, super::ipv4::Ipv4Addr, EnhancedIcmpPacket) -> Option<EnhancedIcmpPacket>>>>,
+    time_exceeded_handlers: Mutex<
+        Vec<
+            Box<
+                dyn Fn(
+                    super::ipv4::Ipv4Addr,
+                    super::ipv4::Ipv4Addr,
+                    EnhancedIcmpPacket,
+                ) -> Option<EnhancedIcmpPacket>,
+            >,
+        >,
+    >,
     /// Parameter problem handlers
-    param_problem_handlers: Mutex<Vec<Box<dyn Fn(super::ipv4::Ipv4Addr, super::ipv4::Ipv4Addr, EnhancedIcmpPacket) -> Option<EnhancedIcmpPacket>>>>,
+    param_problem_handlers: Mutex<
+        Vec<
+            Box<
+                dyn Fn(
+                    super::ipv4::Ipv4Addr,
+                    super::ipv4::Ipv4Addr,
+                    EnhancedIcmpPacket,
+                ) -> Option<EnhancedIcmpPacket>,
+            >,
+        >,
+    >,
     /// Redirect handlers
-    redirect_handlers: Mutex<Vec<Box<dyn Fn(super::ipv4::Ipv4Addr, super::ipv4::Ipv4Addr, EnhancedIcmpPacket) -> Option<EnhancedIcmpPacket>>>>,
+    redirect_handlers: Mutex<
+        Vec<
+            Box<
+                dyn Fn(
+                    super::ipv4::Ipv4Addr,
+                    super::ipv4::Ipv4Addr,
+                    EnhancedIcmpPacket,
+                ) -> Option<EnhancedIcmpPacket>,
+            >,
+        >,
+    >,
     /// Timestamp handlers
-    timestamp_handlers: Mutex<Vec<Box<dyn Fn(super::ipv4::Ipv4Addr, super::ipv4::Ipv4Addr, EnhancedIcmpPacket) -> Option<EnhancedIcmpPacket>>>>,
+    timestamp_handlers: Mutex<
+        Vec<
+            Box<
+                dyn Fn(
+                    super::ipv4::Ipv4Addr,
+                    super::ipv4::Ipv4Addr,
+                    EnhancedIcmpPacket,
+                ) -> Option<EnhancedIcmpPacket>,
+            >,
+        >,
+    >,
     /// Address mask handlers
-    address_mask_handlers: Mutex<Vec<Box<dyn Fn(super::ipv4::Ipv4Addr, super::ipv4::Ipv4Addr, EnhancedIcmpPacket) -> Option<EnhancedIcmpPacket>>>>,
+    address_mask_handlers: Mutex<
+        Vec<
+            Box<
+                dyn Fn(
+                    super::ipv4::Ipv4Addr,
+                    super::ipv4::Ipv4Addr,
+                    EnhancedIcmpPacket,
+                ) -> Option<EnhancedIcmpPacket>,
+            >,
+        >,
+    >,
     /// Router advertisement handlers
-    router_advertisement_handlers: Mutex<Vec<Box<dyn Fn(super::ipv4::Ipv4Addr, super::ipv4::Ipv4Addr, EnhancedIcmpPacket) -> Option<EnhancedIcmpPacket>>>>,
+    router_advertisement_handlers: Mutex<
+        Vec<
+            Box<
+                dyn Fn(
+                    super::ipv4::Ipv4Addr,
+                    super::ipv4::Ipv4Addr,
+                    EnhancedIcmpPacket,
+                ) -> Option<EnhancedIcmpPacket>,
+            >,
+        >,
+    >,
     /// Router solicitation handlers
-    router_solicitation_handlers: Mutex<Vec<Box<dyn Fn(super::ipv4::Ipv4Addr, super::ipv4::Ipv4Addr, EnhancedIcmpPacket) -> Option<EnhancedIcmpPacket>>>>,
+    router_solicitation_handlers: Mutex<
+        Vec<
+            Box<
+                dyn Fn(
+                    super::ipv4::Ipv4Addr,
+                    super::ipv4::Ipv4Addr,
+                    EnhancedIcmpPacket,
+                ) -> Option<EnhancedIcmpPacket>,
+            >,
+        >,
+    >,
     /// Traceroute handlers
-    traceroute_handlers: Mutex<Vec<Box<dyn Fn(super::ipv4::Ipv4Addr, super::ipv4::Ipv4Addr, EnhancedIcmpPacket) -> Option<EnhancedIcmpPacket>>>>,
+    traceroute_handlers: Mutex<
+        Vec<
+            Box<
+                dyn Fn(
+                    super::ipv4::Ipv4Addr,
+                    super::ipv4::Ipv4Addr,
+                    EnhancedIcmpPacket,
+                ) -> Option<EnhancedIcmpPacket>,
+            >,
+        >,
+    >,
 }
 
 impl EnhancedIcmpProcessor {
@@ -1086,7 +1157,12 @@ impl EnhancedIcmpProcessor {
     /// Add echo request handler
     pub fn add_echo_handler<F>(&self, handler: F)
     where
-        F: Fn(super::ipv4::Ipv4Addr, super::ipv4::Ipv4Addr, EnhancedIcmpPacket) -> Option<EnhancedIcmpPacket> + 'static,
+        F: Fn(
+                super::ipv4::Ipv4Addr,
+                super::ipv4::Ipv4Addr,
+                EnhancedIcmpPacket,
+            ) -> Option<EnhancedIcmpPacket>
+            + 'static,
     {
         let mut handlers = self.echo_handlers.lock();
         handlers.push(Box::new(handler));
@@ -1095,7 +1171,12 @@ impl EnhancedIcmpProcessor {
     /// Add destination unreachable handler
     pub fn add_dest_unreachable_handler<F>(&self, handler: F)
     where
-        F: Fn(super::ipv4::Ipv4Addr, super::ipv4::Ipv4Addr, EnhancedIcmpPacket) -> Option<EnhancedIcmpPacket> + 'static,
+        F: Fn(
+                super::ipv4::Ipv4Addr,
+                super::ipv4::Ipv4Addr,
+                EnhancedIcmpPacket,
+            ) -> Option<EnhancedIcmpPacket>
+            + 'static,
     {
         let mut handlers = self.dest_unreachable_handlers.lock();
         handlers.push(Box::new(handler));
@@ -1104,7 +1185,12 @@ impl EnhancedIcmpProcessor {
     /// Add time exceeded handler
     pub fn add_time_exceeded_handler<F>(&self, handler: F)
     where
-        F: Fn(super::ipv4::Ipv4Addr, super::ipv4::Ipv4Addr, EnhancedIcmpPacket) -> Option<EnhancedIcmpPacket> + 'static,
+        F: Fn(
+                super::ipv4::Ipv4Addr,
+                super::ipv4::Ipv4Addr,
+                EnhancedIcmpPacket,
+            ) -> Option<EnhancedIcmpPacket>
+            + 'static,
     {
         let mut handlers = self.time_exceeded_handlers.lock();
         handlers.push(Box::new(handler));
@@ -1113,7 +1199,12 @@ impl EnhancedIcmpProcessor {
     /// Add parameter problem handler
     pub fn add_param_problem_handler<F>(&self, handler: F)
     where
-        F: Fn(super::ipv4::Ipv4Addr, super::ipv4::Ipv4Addr, EnhancedIcmpPacket) -> Option<EnhancedIcmpPacket> + 'static,
+        F: Fn(
+                super::ipv4::Ipv4Addr,
+                super::ipv4::Ipv4Addr,
+                EnhancedIcmpPacket,
+            ) -> Option<EnhancedIcmpPacket>
+            + 'static,
     {
         let mut handlers = self.param_problem_handlers.lock();
         handlers.push(Box::new(handler));
@@ -1122,7 +1213,12 @@ impl EnhancedIcmpProcessor {
     /// Add redirect handler
     pub fn add_redirect_handler<F>(&self, handler: F)
     where
-        F: Fn(super::ipv4::Ipv4Addr, super::ipv4::Ipv4Addr, EnhancedIcmpPacket) -> Option<EnhancedIcmpPacket> + 'static,
+        F: Fn(
+                super::ipv4::Ipv4Addr,
+                super::ipv4::Ipv4Addr,
+                EnhancedIcmpPacket,
+            ) -> Option<EnhancedIcmpPacket>
+            + 'static,
     {
         let mut handlers = self.redirect_handlers.lock();
         handlers.push(Box::new(handler));
@@ -1244,7 +1340,11 @@ impl EnhancedIcmpProcessor {
     }
 
     /// Send ICMP packet with custom options
-    pub fn send_packet_with_options(&self, packet: EnhancedIcmpPacket, options: &IcmpSendOptions) -> Result<(), IcmpError> {
+    pub fn send_packet_with_options(
+        &self,
+        packet: EnhancedIcmpPacket,
+        options: &IcmpSendOptions,
+    ) -> Result<(), IcmpError> {
         // Check rate limiting
         if self.is_rate_limited() {
             self.update_stats(|stats| {
@@ -1271,13 +1371,17 @@ impl EnhancedIcmpProcessor {
                     stats.total_packets_sent += 1;
                 });
                 Ok(())
-            }
+            },
             Err(e) => Err(e),
         }
     }
 
     /// Send ICMP packet to specific destination
-    pub fn send_to_destination(&self, packet: EnhancedIcmpPacket, destination: super::ipv4::Ipv4Addr) -> Result<(), IcmpError> {
+    pub fn send_to_destination(
+        &self,
+        packet: EnhancedIcmpPacket,
+        destination: super::ipv4::Ipv4Addr,
+    ) -> Result<(), IcmpError> {
         // Set destination in packet
         let mut packet = packet;
         packet.set_destination(destination);
@@ -1297,7 +1401,11 @@ impl EnhancedIcmpProcessor {
     }
 
     /// Multicast ICMP packet
-    pub fn multicast_packet(&self, packet: EnhancedIcmpPacket, group: super::ipv4::Ipv4Addr) -> Result<(), IcmpError> {
+    pub fn multicast_packet(
+        &self,
+        packet: EnhancedIcmpPacket,
+        group: super::ipv4::Ipv4Addr,
+    ) -> Result<(), IcmpError> {
         // Set multicast destination
         let mut packet = packet;
         packet.set_destination(group);
@@ -1307,7 +1415,11 @@ impl EnhancedIcmpProcessor {
     }
 
     /// Send ICMP packet with path MTU discovery
-    pub fn send_with_path_mtu_discovery(&self, packet: EnhancedIcmpPacket, initial_mtu: u16) -> Result<(), IcmpError> {
+    pub fn send_with_path_mtu_discovery(
+        &self,
+        packet: EnhancedIcmpPacket,
+        initial_mtu: u16,
+    ) -> Result<(), IcmpError> {
         let mut current_mtu = initial_mtu;
         let mut packet = packet;
 
@@ -1320,17 +1432,23 @@ impl EnhancedIcmpProcessor {
                 Err(IcmpError::PacketTooLarge) => {
                     // Reduce MTU and try again
                     current_mtu = current_mtu.saturating_sub(100);
-                    if current_mtu < 576 { // Minimum MTU for IPv4
+                    if current_mtu < 576 {
+                        // Minimum MTU for IPv4
                         return Err(IcmpError::PacketTooLarge);
                     }
-                }
+                },
                 Err(e) => return Err(e),
             }
         }
     }
 
     /// Perform ICMP traceroute
-    pub fn traceroute(&self, destination: super::ipv4::Ipv4Addr, max_hops: u8, timeout_ms: u64) -> Result<Vec<TracerouteHop>, IcmpError> {
+    pub fn traceroute(
+        &self,
+        destination: super::ipv4::Ipv4Addr,
+        max_hops: u8,
+        timeout_ms: u64,
+    ) -> Result<Vec<TracerouteHop>, IcmpError> {
         let mut hops = Vec::new();
         let mut ttl = 1;
 
@@ -1339,7 +1457,7 @@ impl EnhancedIcmpProcessor {
 
             // Create echo request with specific TTL
             let packet = EnhancedIcmpPacket::echo_request(
-                0, // identifier
+                0,          // identifier
                 ttl as u16, // sequence number
                 &[],
             );
@@ -1359,7 +1477,8 @@ impl EnhancedIcmpProcessor {
                         let hop = TracerouteHop {
                             ttl,
                             address: reply.get_source(),
-                            rtt_ms: (crate::subsystems::time::get_monotonic_time() - start_time) * 1000,
+                            rtt_ms: (crate::subsystems::time::get_monotonic_time() - start_time)
+                                * 1000,
                             hostname: None,
                         };
                         hops.push(hop);
@@ -1368,7 +1487,8 @@ impl EnhancedIcmpProcessor {
                         let hop = TracerouteHop {
                             ttl,
                             address: reply.get_source(),
-                            rtt_ms: (crate::subsystems::time::get_monotonic_time() - start_time) * 1000,
+                            rtt_ms: (crate::subsystems::time::get_monotonic_time() - start_time)
+                                * 1000,
                             hostname: None,
                         };
                         hops.push(hop);
@@ -1395,7 +1515,13 @@ impl EnhancedIcmpProcessor {
     }
 
     /// Perform ICMP ping
-    pub fn ping(&self, destination: super::ipv4::Ipv4Addr, count: u32, interval_ms: u64, timeout_ms: u64) -> Result<PingResult, IcmpError> {
+    pub fn ping(
+        &self,
+        destination: super::ipv4::Ipv4Addr,
+        count: u32,
+        interval_ms: u64,
+        timeout_ms: u64,
+    ) -> Result<PingResult, IcmpError> {
         let mut results = Vec::new();
         let mut sent = 0;
         let mut received = 0;
@@ -1408,7 +1534,7 @@ impl EnhancedIcmpProcessor {
 
             // Create echo request
             let packet = EnhancedIcmpPacket::echo_request(
-                0, // identifier
+                0,        // identifier
                 i as u16, // sequence number
                 &[],
             );
@@ -1425,10 +1551,12 @@ impl EnhancedIcmpProcessor {
 
             while timeout_remaining > 0 && !reply_received {
                 if let Some(reply) = self.receive_packet_with_timeout(100) {
-                    if reply.get_type() == IcmpType::EchoReply && 
-                       reply.get_identifier() == 0 && 
-                       reply.get_sequence_number() == i as u16 {
-                        let rtt = (crate::subsystems::time::get_monotonic_time() - start_time) * 1000;
+                    if reply.get_type() == IcmpType::EchoReply
+                        && reply.get_identifier() == 0
+                        && reply.get_sequence_number() == i as u16
+                    {
+                        let rtt =
+                            (crate::subsystems::time::get_monotonic_time() - start_time) * 1000;
                         results.push(PingReply {
                             sequence: i,
                             rtt_ms: rtt,
@@ -1445,11 +1573,7 @@ impl EnhancedIcmpProcessor {
             }
 
             if !reply_received {
-                results.push(PingReply {
-                    sequence: i,
-                    rtt_ms: timeout_ms,
-                    bytes: 0,
-                });
+                results.push(PingReply { sequence: i, rtt_ms: timeout_ms, bytes: 0 });
             }
 
             // Wait for interval before next ping
@@ -1458,8 +1582,16 @@ impl EnhancedIcmpProcessor {
             }
         }
 
-        let avg_rtt = if received > 0 { total_rtt / received } else { 0 };
-        let packet_loss = if sent > 0 { ((sent - received) * 100) / sent } else { 0 };
+        let avg_rtt = if received > 0 {
+            total_rtt / received
+        } else {
+            0
+        };
+        let packet_loss = if sent > 0 {
+            ((sent - received) * 100) / sent
+        } else {
+            0
+        };
 
         Ok(PingResult {
             destination,
@@ -1485,7 +1617,11 @@ impl EnhancedIcmpProcessor {
     fn send_packet(&self, packet: EnhancedIcmpPacket) -> Result<(), IcmpError> {
         // This would interface with the network stack to send packets
         // For now, return Ok as a placeholder
-        log::debug!("Sending ICMP packet: type={:?}, code={:?}", packet.get_type(), packet.get_code());
+        log::debug!(
+            "Sending ICMP packet: type={:?}, code={:?}",
+            packet.get_type(),
+            packet.get_code()
+        );
         Ok(())
     }
 
@@ -1507,16 +1643,17 @@ impl EnhancedIcmpProcessor {
 
         let mut stats = self.stats.lock();
         let current_time = crate::subsystems::time::get_monotonic_time();
-        
+
         // Simple rate limiting implementation
         // In a real implementation, this would use a token bucket or similar algorithm
-        if current_time - stats.last_activity_timestamp < 1.0 / config.max_packets_per_second as f64 {
+        if current_time - stats.last_activity_timestamp < 1.0 / config.max_packets_per_second as f64
+        {
             return true;
         }
-        
+
         // Update last activity timestamp
         stats.last_activity_timestamp = current_time;
-        
+
         false
     }
 }
@@ -1531,11 +1668,7 @@ pub struct IcmpSendOptions {
 
 impl Default for IcmpSendOptions {
     fn default() -> Self {
-        Self {
-            ttl: None,
-            dscp: None,
-            dont_fragment: None,
-        }
+        Self { ttl: None, dscp: None, dont_fragment: None }
     }
 }
 
@@ -1634,7 +1767,7 @@ pub struct IcmpComprehensiveStats {
 }
 
 /// Global ICMP processor instance
-static GLOBAL_ICMP_PROCESSOR: once_cell::sync::Lazy<EnhancedIcmpProcessor> = 
+static GLOBAL_ICMP_PROCESSOR: once_cell::sync::Lazy<EnhancedIcmpProcessor> =
     once_cell::sync::Lazy::new(|| EnhancedIcmpProcessor::new());
 
 /// Get global ICMP processor
@@ -1645,14 +1778,14 @@ pub fn get_global_icmp_processor() -> &'static EnhancedIcmpProcessor {
 /// Initialize enhanced ICMP subsystem
 pub fn init_enhanced_icmp() -> Result<(), IcmpError> {
     let processor = get_global_icmp_processor();
-    
+
     // Configure default settings
     processor.configure_rate_limiting(1000); // 1000 packets per second
     processor.set_rate_limiting_enabled(true);
-    
+
     // Initialize statistics
     processor.reset_stats();
-    
+
     log::info!("Enhanced ICMP subsystem initialized");
     Ok(())
 }
@@ -1664,22 +1797,22 @@ pub mod utils {
     /// Calculate ICMP checksum
     pub fn calculate_checksum(data: &[u8]) -> u16 {
         let mut sum = 0u32;
-        
+
         // Process 16-bit words
         for chunk in data.chunks_exact(2) {
             sum += u16::from_be_bytes([chunk[0], chunk[1]]) as u32;
         }
-        
+
         // Handle odd byte
         if data.len() % 2 == 1 {
             sum += (data[data.len() - 1] as u32) << 8;
         }
-        
+
         // Add carry
         while sum >> 16 != 0 {
             sum = (sum & 0xFFFF) + (sum >> 16);
         }
-        
+
         // One's complement
         !sum as u16
     }
@@ -1690,7 +1823,7 @@ pub mod utils {
         if packet.get_data().len() < 8 {
             return false;
         }
-        
+
         // Verify checksum
         let data = packet.to_bytes();
         let calculated_checksum = calculate_checksum(&data);

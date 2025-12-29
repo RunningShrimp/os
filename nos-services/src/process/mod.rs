@@ -4,11 +4,14 @@
 
 extern crate alloc;
 
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+};
+
 use nos_api::Result;
+
 use crate::core::{Service, ServiceStatus};
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::boxed::Box;
 
 /// Process service
 pub struct ProcessService {
@@ -19,10 +22,7 @@ pub struct ProcessService {
 impl ProcessService {
     /// Create a new process service
     pub fn new(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            status: ServiceStatus::Stopped,
-        }
+        Self { name: name.to_string(), status: ServiceStatus::Stopped }
     }
 }
 
@@ -55,15 +55,15 @@ pub fn register_process_services() -> Result<()> {
     use crate::registry;
 
     let mut registry = registry::get_registry()?.lock();
-    
+
     // Register init process service
     let init_service = ProcessService::new("init");
     registry.register("init", Box::new(init_service))?;
-    
+
     // Register scheduler service
     let scheduler_service = ProcessService::new("scheduler");
     registry.register("scheduler", Box::new(scheduler_service))?;
-    
+
     Ok(())
 }
 
@@ -74,7 +74,7 @@ mod tests {
     #[test]
     fn test_process_service() {
         let service = ProcessService::new("test_process");
-        
+
         assert_eq!(service.name(), "test_process");
         assert_eq!(service.service_type(), crate::types::service_type::PROCESS);
         assert_eq!(service.status(), ServiceStatus::Stopped);

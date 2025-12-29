@@ -1,9 +1,9 @@
 pub mod fs;
-pub mod net;
 pub mod ipc;
-pub mod process;
 pub mod microkernel;
+pub mod net;
 pub mod perf;
+pub mod process;
 pub mod syscalls;
 
 // Flattened modules from deep nesting

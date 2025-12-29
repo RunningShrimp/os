@@ -3,18 +3,25 @@
 //! This module implements the system call handlers for POSIX message queues.
 //! It provides the interface between user space and the kernel message queue implementation.
 
-use alloc::string::String;
-use alloc::vec::Vec;
-use crate::api::syscall::{SyscallHandler, SyscallError, SyscallResult, SyscallNumber, SyscallArgs};
-use crate::api::error::{KernelError, Result};
-use crate::subsystems::ipc::mqueue;
-use crate::subsystems::ipc::mqueue::{MqAttr, MqNotify, MqOpenFlags, MqNotifyType};
-use crate::subsystems::process::{get_current_process, get_process_by_pid};
-use crate::types::stubs::VfsNode;
+use alloc::{string::String, vec::Vec};
+use core::{ptr, slice};
+
 // use crate::subsystems::fs::Path;
-use crate::subsystems::time::{get_current_time, Timespec};
-use core::ptr;
-use core::slice;
+use crate::subsystems::time::{Timespec, get_current_time};
+use crate::{
+    api::{
+        error::{KernelError, Result},
+        syscall::{SyscallArgs, SyscallError, SyscallHandler, SyscallNumber, SyscallResult},
+    },
+    subsystems::{
+        ipc::{
+            mqueue,
+            mqueue::{MqAttr, MqNotify, MqNotifyType, MqOpenFlags},
+        },
+        process::{get_current_process, get_process_by_pid},
+    },
+    types::stubs::VfsNode,
+};
 
 /// Maximum message queue name length
 const MQ_NAME_MAX: usize = 255;
@@ -115,7 +122,9 @@ impl SyscallHandler for MqGetattrHandler {
 
         match mqueue::mq_getattr(mqd) {
             Ok(attr) => {
-                unsafe { ptr::write(attr_ptr, attr); }
+                unsafe {
+                    ptr::write(attr_ptr, attr);
+                }
                 Ok(SyscallResult::Success(0))
             },
             Err(e) => Ok(SyscallResult::Error(e.into())),
@@ -150,7 +159,9 @@ impl SyscallHandler for MqSetattrHandler {
         match mqueue::mq_setattr(mqd, &new_attr) {
             Ok(old_attr) => {
                 if !old_attr_ptr.is_null() {
-                    unsafe { ptr::write(old_attr_ptr, old_attr); }
+                    unsafe {
+                        ptr::write(old_attr_ptr, old_attr);
+                    }
                 }
                 Ok(SyscallResult::Success(0))
             },
@@ -238,12 +249,14 @@ impl SyscallHandler for MqTimedreceiveHandler {
                 unsafe {
                     ptr::copy_nonoverlapping(msg.as_ptr(), msg_ptr, copy_len);
                 }
-                
+
                 // Set priority if requested
                 if !msg_prio_ptr.is_null() {
-                    unsafe { ptr::write(msg_prio_ptr, prio); }
+                    unsafe {
+                        ptr::write(msg_prio_ptr, prio);
+                    }
                 }
-                
+
                 Ok(SyscallResult::Success(copy_len as isize))
             },
             Err(e) => Ok(SyscallResult::Error(e.into())),
@@ -308,7 +321,9 @@ impl SyscallHandler for MqGetsetattrHandler {
         match mqueue::mq_getsetattr(mqd, new_attr.as_ref()) {
             Ok(old_attr) => {
                 if !old_attr_ptr.is_null() {
-                    unsafe { ptr::write(old_attr_ptr, old_attr); }
+                    unsafe {
+                        ptr::write(old_attr_ptr, old_attr);
+                    }
                 }
                 Ok(SyscallResult::Success(0))
             },
@@ -339,23 +354,23 @@ impl CStringReader for MqOpenHandler {
 
         let mut buf = Vec::new();
         let mut offset = 0;
-        
+
         loop {
             let byte = unsafe { ptr.add(offset).read() };
-            
+
             if byte == 0 {
                 break;
             }
-            
+
             buf.push(byte);
             offset += 1;
-            
+
             // Prevent infinite loops
             if offset > MQ_NAME_MAX + 1 {
                 return Err(());
             }
         }
-        
+
         String::from_utf8(buf).map_err(|_| ())
     }
 }
@@ -365,7 +380,9 @@ impl CStringReader for MqOpenHandler {
 // Use TryFrom or explicit conversion instead
 
 /// Register all message queue system call handlers
-pub fn register_handlers(dispatcher: &mut dyn crate::api::syscall::SyscallDispatcher) -> Result<(), KernelError> {
+pub fn register_handlers(
+    dispatcher: &mut dyn crate::api::syscall::SyscallDispatcher,
+) -> Result<(), KernelError> {
     dispatcher.register_handler(101, Box::new(MqOpenHandler));
     dispatcher.register_handler(102, Box::new(MqCloseHandler));
     dispatcher.register_handler(103, Box::new(MqGetattrHandler));
@@ -374,6 +391,6 @@ pub fn register_handlers(dispatcher: &mut dyn crate::api::syscall::SyscallDispat
     dispatcher.register_handler(106, Box::new(MqTimedreceiveHandler));
     dispatcher.register_handler(107, Box::new(MqNotifyHandler));
     dispatcher.register_handler(108, Box::new(MqGetsetattrHandler));
-    
+
     Ok(())
 }

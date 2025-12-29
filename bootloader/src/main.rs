@@ -4,20 +4,20 @@
 
 extern crate alloc;
 
-use crate::alloc::string::ToString;
-
 use nos_bootloader::{
     application::BootApplicationService as BootOrchestrator,
-    core::boot_sequence::BootSequence,
     bios::{bios_calls::BIOSServices, bios_realmode::RealModeExecutor},
+    core::boot_sequence::BootSequence,
     cpu_init::realmode_switcher::RealmModeSwitcher,
     drivers::vga::VGAWriter,
     protocol::BootProtocolType,
     utils::error_recovery::{ErrorRecoveryManager, OutputMode, RecoveryStatus},
 };
 
+use crate::alloc::string::ToString;
+
 /// Bootloader entry point
-/// 
+///
 /// This is the main entry point for the bootloader.
 /// In a real bootloader, this would be called from the boot protocol
 /// (UEFI, Multiboot2, or BIOS).
@@ -36,35 +36,39 @@ fn main() {
 /// UEFI entry point
 #[cfg(feature = "uefi_support")]
 #[unsafe(no_mangle)]
-pub extern "efiapi" fn efi_main(image_handle: uefi::Handle, system_table: *const uefi_raw::table::system::SystemTable) -> uefi_raw::Status {
+pub extern "efiapi" fn efi_main(
+    image_handle: uefi::Handle,
+    system_table: *const uefi_raw::table::system::SystemTable,
+) -> uefi_raw::Status {
     use nos_bootloader::protocol::uefi::{self, UefiProtocol};
-    
+
     // Initialize UEFI protocol
     let mut protocol = UefiProtocol::new();
     protocol.initialize_with_system_table(system_table).unwrap();
     protocol.set_image_handle(image_handle);
-    
+
     // Set active protocol
     uefi::set_active_protocol(protocol);
-    
+
     // Call main bootloader logic
     bootloader_main();
 }
 
 /// Import unified error handling from utils
 use nos_bootloader::utils::error::{BootError, Result as BootResult};
-use nos_bootloader::drivers::vga::Color;
-use nos_bootloader::utils::error_recovery::ErrorSeverity;
+use nos_bootloader::{drivers::vga::Color, utils::error_recovery::ErrorSeverity};
 
 /// Initialize VGA output with error handling and recovery
 #[allow(dead_code)]
-fn init_vga_with_recovery(recovery_manager: &mut ErrorRecoveryManager) -> BootResult<(VGAWriter, OutputMode)> {
+fn init_vga_with_recovery(
+    recovery_manager: &mut ErrorRecoveryManager,
+) -> BootResult<(VGAWriter, OutputMode)> {
     // 尝试初始化VGA
     match init_vga() {
         Ok(vga) => {
             recovery_manager.recovery_status = RecoveryStatus::NoRecovery;
             Ok((vga, OutputMode::TextMode))
-        }
+        },
         Err(e) => {
             // VGA初始化失败，尝试恢复
             match recovery_manager.recover_from_error(&e) {
@@ -82,7 +86,7 @@ fn init_vga_with_recovery(recovery_manager: &mut ErrorRecoveryManager) -> BootRe
                             vga.write_str("=====================================\n");
                             vga.write_str("Starting boot sequence in recovery mode...\n\n");
                             Ok((vga, mode))
-                        }
+                        },
                         OutputMode::SerialConsole => {
                             // 尝试串行控制台
                             // 这里返回一个基本的VGA，但标记为串行模式
@@ -90,24 +94,24 @@ fn init_vga_with_recovery(recovery_manager: &mut ErrorRecoveryManager) -> BootRe
                             vga.clear();
                             vga.write_str("SERIAL CONSOLE MODE: VGA not available\n");
                             Ok((vga, mode))
-                        }
+                        },
                         OutputMode::Silent => {
                             // 静默模式，返回一个虚拟的VGA
                             let vga = VGAWriter::new();
                             Ok((vga, mode))
-                        }
+                        },
                         _ => {
                             // 其他模式暂时不支持，返回错误
                             Err(e)
-                        }
+                        },
                     }
-                }
+                },
                 Err(_) => {
                     // 恢复失败，返回原始错误
                     Err(e)
-                }
+                },
             }
-        }
+        },
     }
 }
 
@@ -126,7 +130,8 @@ fn init_vga() -> BootResult<VGAWriter> {
 #[allow(dead_code)]
 fn init_boot_sequence(vga: &mut VGAWriter) -> BootResult<BootSequence> {
     let mut boot_seq = BootSequence::new();
-    boot_seq.validate_memory()
+    boot_seq
+        .validate_memory()
         .map_err(|_| BootError::MemoryMapError)?;
     vga.write_str("[OK] Memory layout validated\n");
     Ok(boot_seq)
@@ -136,8 +141,9 @@ fn init_boot_sequence(vga: &mut VGAWriter) -> BootResult<BootSequence> {
 #[allow(dead_code)]
 fn init_bios_services(vga: &mut VGAWriter) -> BootResult<BIOSServices> {
     let mut bios_services = BIOSServices::new();
-    bios_services.init()
-        .map_err(|_e| BootError::ProtocolInitializationFailed("BIOS services initialization failed".to_string()))?;
+    bios_services.init().map_err(|_e| {
+        BootError::ProtocolInitializationFailed("BIOS services initialization failed".to_string())
+    })?;
     vga.write_str("[OK] BIOS services initialized\n");
     Ok(bios_services)
 }
@@ -146,8 +152,11 @@ fn init_bios_services(vga: &mut VGAWriter) -> BootResult<BIOSServices> {
 #[allow(dead_code)]
 fn init_real_mode_executor(vga: &mut VGAWriter) -> BootResult<RealModeExecutor> {
     let mut executor = RealModeExecutor::new();
-    executor.init()
-        .map_err(|_e| BootError::ProtocolInitializationFailed("Real mode executor initialization failed".to_string()))?;
+    executor.init().map_err(|_e| {
+        BootError::ProtocolInitializationFailed(
+            "Real mode executor initialization failed".to_string(),
+        )
+    })?;
     vga.write_str("[OK] Real mode executor initialized\n");
     Ok(executor)
 }
@@ -155,16 +164,19 @@ fn init_real_mode_executor(vga: &mut VGAWriter) -> BootResult<RealModeExecutor> 
 /// Load GDT and IDT with error handling
 #[allow(dead_code)]
 fn load_descriptors(boot_seq: &mut BootSequence, vga: &mut VGAWriter) -> BootResult<()> {
-    boot_seq.load_gdt()
+    boot_seq
+        .load_gdt()
         .map_err(|_e| BootError::ProtocolInitializationFailed("GDT load failed".to_string()))?;
     vga.write_str("[OK] GDT loaded\n");
 
-    boot_seq.load_idt()
+    boot_seq
+        .load_idt()
         .map_err(|_e| BootError::ProtocolInitializationFailed("IDT load failed".to_string()))?;
     vga.write_str("[OK] IDT loaded\n");
 
-    boot_seq.prepare_real_mode()
-        .map_err(|_e| BootError::ProtocolInitializationFailed("Real mode preparation failed".to_string()))?;
+    boot_seq.prepare_real_mode().map_err(|_e| {
+        BootError::ProtocolInitializationFailed("Real mode preparation failed".to_string())
+    })?;
     vga.write_str("[OK] Real mode environment ready\n");
 
     Ok(())
@@ -172,9 +184,7 @@ fn load_descriptors(boot_seq: &mut BootSequence, vga: &mut VGAWriter) -> BootRes
 
 /// Create and configure boot orchestrator
 #[allow(dead_code)]
-fn create_boot_orchestrator(
-    vga: &mut VGAWriter
-) -> BootResult<BootOrchestrator> {
+fn create_boot_orchestrator(vga: &mut VGAWriter) -> BootResult<BootOrchestrator> {
     vga.write_str("[OK] Boot configuration created\n");
 
     let orchestrator = BootOrchestrator::with_default_container(BootProtocolType::Bios)?;
@@ -187,7 +197,7 @@ fn create_boot_orchestrator(
 fn bootloader_main() -> ! {
     // Initialize error recovery manager
     let mut recovery_manager = ErrorRecoveryManager::new();
-    
+
     // Initialize all components with proper error handling and recovery
     let (mut vga, output_mode) = match init_vga_with_recovery(&mut recovery_manager) {
         Ok(result) => result,
@@ -196,53 +206,68 @@ fn bootloader_main() -> ! {
             emergency_recovery(&e);
             // 如果紧急恢复也失败，系统无法继续
             halt_system();
-        }
+        },
     };
-    
+
     // 记录当前输出模式
     match output_mode {
         OutputMode::TextMode => {
             vga.write_str("[INFO] Running in text mode\n");
-        }
+        },
         OutputMode::SerialConsole => {
             vga.write_str("[INFO] Running in serial console mode\n");
-        }
+        },
         OutputMode::Silent => {
             // 静默模式，不输出
-        }
+        },
         _ => {
             vga.write_str("[INFO] Running in graphics mode\n");
-        }
+        },
     }
 
     // Initialize boot sequence with error recovery
     let mut boot_seq = match init_boot_sequence_with_recovery(&mut vga, &mut recovery_manager) {
         Ok(seq) => seq,
         Err(e) => {
-            log_error_with_recovery(&mut vga, &mut recovery_manager, &e, "Boot sequence initialization");
+            log_error_with_recovery(
+                &mut vga,
+                &mut recovery_manager,
+                &e,
+                "Boot sequence initialization",
+            );
             // 尝试继续执行，即使初始化失败
             BootSequence::new()
-        }
+        },
     };
 
     // Initialize BIOS services with error recovery
     let _bios_services = match init_bios_services_with_recovery(&mut vga, &mut recovery_manager) {
         Ok(services) => services,
         Err(e) => {
-            log_error_with_recovery(&mut vga, &mut recovery_manager, &e, "BIOS services initialization");
+            log_error_with_recovery(
+                &mut vga,
+                &mut recovery_manager,
+                &e,
+                "BIOS services initialization",
+            );
             // 尝试继续执行，即使BIOS服务初始化失败
             BIOSServices::new()
-        }
+        },
     };
 
     // Initialize real mode executor with error recovery
     let executor = match init_real_mode_executor_with_recovery(&mut vga, &mut recovery_manager) {
         Ok(exec) => exec,
         Err(e) => {
-            log_error_with_recovery(&mut vga, &mut recovery_manager, &e, "Real mode executor initialization");
+            log_error_with_recovery(
+                &mut vga,
+                &mut recovery_manager,
+                &e,
+                "Real mode executor initialization",
+            );
             // 尝试继续执行，即使实模式执行器初始化失败
             RealModeExecutor::new()
-        }
+        },
     };
 
     // Initialize real mode switcher
@@ -256,15 +281,21 @@ fn bootloader_main() -> ! {
     }
 
     // Create boot orchestrator with error recovery
-    let mut orchestrator = match create_boot_orchestrator_with_recovery(&executor, &mut vga, &mut recovery_manager) {
-        Ok(orch) => orch,
-        Err(e) => {
-            log_error_with_recovery(&mut vga, &mut recovery_manager, &e, "Boot orchestrator creation");
-            // 尝试创建基本的引导协调器
-            BootOrchestrator::with_default_container(BootProtocolType::Bios)
-                .unwrap_or_else(|_| panic!("Failed to create boot orchestrator"))
-        }
-    };
+    let mut orchestrator =
+        match create_boot_orchestrator_with_recovery(&executor, &mut vga, &mut recovery_manager) {
+            Ok(orch) => orch,
+            Err(e) => {
+                log_error_with_recovery(
+                    &mut vga,
+                    &mut recovery_manager,
+                    &e,
+                    "Boot orchestrator creation",
+                );
+                // 尝试创建基本的引导协调器
+                BootOrchestrator::with_default_container(BootProtocolType::Bios)
+                    .unwrap_or_else(|_| panic!("Failed to create boot orchestrator"))
+            },
+        };
 
     // BIOS services initialization is handled internally by boot_system method
 
@@ -278,30 +309,30 @@ fn bootloader_main() -> ! {
             match recovery_manager.recovery_status() {
                 RecoveryStatus::NoRecovery => {
                     vga.write_str("[INFO] No recovery needed\n");
-                }
+                },
                 RecoveryStatus::RecoverySuccessful => {
                     vga.write_str("[INFO] Recovery successful\n");
-                }
+                },
                 RecoveryStatus::PartialRecovery => {
                     vga.write_str("[WARNING] Partial recovery - some features may be limited\n");
-                }
+                },
                 RecoveryStatus::RecoveryFailed => {
                     vga.write_str("[ERROR] Recovery failed - system may be unstable\n");
-                }
+                },
                 RecoveryStatus::RecoveryInProgress => {
                     vga.write_str("[INFO] Recovery was in progress\n");
-                }
+                },
             }
             // Boot sequence completed successfully
             // Kernel entry would happen here via KernelHandoff::execute()
             halt_system();
-        }
+        },
         Err(e) => {
             log_error_with_recovery(&mut vga, &mut recovery_manager, &e, "Boot sequence execution");
             // 尝试紧急恢复
             emergency_recovery(&e);
             halt_system();
-        }
+        },
     }
 }
 
@@ -313,16 +344,16 @@ fn execute_boot_sequence(
 ) -> BootResult<()> {
     // Run the complete boot system sequence
     vga.write_str("Starting boot sequence...\n");
-    
+
     // Use boot_system method which handles all boot phases
     let boot_info = orchestrator.boot_system(None)?;
-    
+
     // Display boot summary
     vga.write_str("\nBoot Summary:\n");
     vga.write_str("  Memory: OK\n");
     vga.write_str("  Kernel: OK\n");
     vga.write_str("  Boot Info: OK\n");
-    
+
     // Display graphics status
     if boot_info.graphics_info.is_some() {
         vga.write_str("  Graphics: Enabled\n");
@@ -341,7 +372,7 @@ fn execute_boot_sequence(
 #[allow(dead_code)]
 fn init_boot_sequence_with_recovery(
     vga: &mut VGAWriter,
-    recovery_manager: &mut ErrorRecoveryManager
+    recovery_manager: &mut ErrorRecoveryManager,
 ) -> BootResult<BootSequence> {
     match init_boot_sequence(vga) {
         Ok(seq) => Ok(seq),
@@ -354,10 +385,10 @@ fn init_boot_sequence_with_recovery(
                     vga.write_str("[RECOVERY] Creating minimal boot sequence\n");
                     vga.set_fg_color(Color::White);
                     Ok(BootSequence::new())
-                }
-                Err(_) => Err(e)
+                },
+                Err(_) => Err(e),
             }
-        }
+        },
     }
 }
 
@@ -365,7 +396,7 @@ fn init_boot_sequence_with_recovery(
 #[allow(dead_code)]
 fn init_bios_services_with_recovery(
     vga: &mut VGAWriter,
-    recovery_manager: &mut ErrorRecoveryManager
+    recovery_manager: &mut ErrorRecoveryManager,
 ) -> BootResult<BIOSServices> {
     match init_bios_services(vga) {
         Ok(services) => Ok(services),
@@ -378,10 +409,10 @@ fn init_bios_services_with_recovery(
                     vga.write_str("[RECOVERY] Creating minimal BIOS services\n");
                     vga.set_fg_color(Color::White);
                     Ok(BIOSServices::new())
-                }
-                Err(_) => Err(e)
+                },
+                Err(_) => Err(e),
             }
-        }
+        },
     }
 }
 
@@ -389,7 +420,7 @@ fn init_bios_services_with_recovery(
 #[allow(dead_code)]
 fn init_real_mode_executor_with_recovery(
     vga: &mut VGAWriter,
-    recovery_manager: &mut ErrorRecoveryManager
+    recovery_manager: &mut ErrorRecoveryManager,
 ) -> BootResult<RealModeExecutor> {
     match init_real_mode_executor(vga) {
         Ok(executor) => Ok(executor),
@@ -402,10 +433,10 @@ fn init_real_mode_executor_with_recovery(
                     vga.write_str("[RECOVERY] Creating minimal real mode executor\n");
                     vga.set_fg_color(Color::White);
                     Ok(RealModeExecutor::new())
-                }
-                Err(_) => Err(e)
+                },
+                Err(_) => Err(e),
             }
-        }
+        },
     }
 }
 
@@ -414,7 +445,7 @@ fn init_real_mode_executor_with_recovery(
 fn load_descriptors_with_recovery(
     boot_seq: &mut BootSequence,
     vga: &mut VGAWriter,
-    recovery_manager: &mut ErrorRecoveryManager
+    recovery_manager: &mut ErrorRecoveryManager,
 ) -> BootResult<()> {
     match load_descriptors(boot_seq, vga) {
         Ok(()) => Ok(()),
@@ -424,13 +455,15 @@ fn load_descriptors_with_recovery(
                 Ok(_) => {
                     // 恢复成功，但描述符可能未完全加载
                     vga.set_fg_color(Color::Yellow);
-                    vga.write_str("[RECOVERY] Descriptors partially loaded - system may be unstable\n");
+                    vga.write_str(
+                        "[RECOVERY] Descriptors partially loaded - system may be unstable\n",
+                    );
                     vga.set_fg_color(Color::White);
                     Ok(())
-                }
-                Err(_) => Err(e)
+                },
+                Err(_) => Err(e),
             }
-        }
+        },
     }
 }
 
@@ -439,7 +472,7 @@ fn load_descriptors_with_recovery(
 fn create_boot_orchestrator_with_recovery<'a>(
     _executor: &'a RealModeExecutor,
     vga: &mut VGAWriter,
-    recovery_manager: &mut ErrorRecoveryManager
+    recovery_manager: &mut ErrorRecoveryManager,
 ) -> BootResult<BootOrchestrator> {
     match create_boot_orchestrator(vga) {
         Ok(orchestrator) => Ok(orchestrator),
@@ -452,10 +485,10 @@ fn create_boot_orchestrator_with_recovery<'a>(
                     vga.write_str("[RECOVERY] Creating minimal boot orchestrator\n");
                     vga.set_fg_color(Color::White);
                     BootOrchestrator::with_default_container(BootProtocolType::Bios)
-                }
-                Err(_) => Err(e)
+                },
+                Err(_) => Err(e),
             }
-        }
+        },
     }
 }
 
@@ -464,7 +497,7 @@ fn create_boot_orchestrator_with_recovery<'a>(
 fn execute_boot_sequence_with_recovery(
     orchestrator: &mut BootOrchestrator,
     vga: &mut VGAWriter,
-    recovery_manager: &mut ErrorRecoveryManager
+    recovery_manager: &mut ErrorRecoveryManager,
 ) -> BootResult<()> {
     match execute_boot_sequence(orchestrator, vga) {
         Ok(()) => Ok(()),
@@ -474,13 +507,15 @@ fn execute_boot_sequence_with_recovery(
                 Ok(_) => {
                     // 恢复成功，但引导序列可能未完全执行
                     vga.set_fg_color(Color::Yellow);
-                    vga.write_str("[RECOVERY] Boot sequence partially executed - system may be unstable\n");
+                    vga.write_str(
+                        "[RECOVERY] Boot sequence partially executed - system may be unstable\n",
+                    );
                     vga.set_fg_color(Color::White);
                     Ok(())
-                }
-                Err(_) => Err(e)
+                },
+                Err(_) => Err(e),
             }
-        }
+        },
     }
 }
 
@@ -490,7 +525,7 @@ fn log_error_with_recovery(
     vga: &mut VGAWriter,
     recovery_manager: &mut ErrorRecoveryManager,
     error: &BootError,
-    context: &str
+    context: &str,
 ) {
     vga.set_fg_color(Color::Red);
     vga.write_str("[ERROR] ");
@@ -498,7 +533,7 @@ fn log_error_with_recovery(
     vga.write_str(" failed: ");
     vga.write_str(error.description());
     vga.write_str("\n");
-    
+
     // 记录错误严重程度
     let severity = recovery_manager.assess_error_severity(error);
     vga.set_fg_color(Color::Yellow);
@@ -506,19 +541,19 @@ fn log_error_with_recovery(
     match severity {
         ErrorSeverity::Low => {
             vga.write_str("Low");
-        }
+        },
         ErrorSeverity::Medium => {
             vga.write_str("Medium");
-        }
+        },
         ErrorSeverity::High => {
             vga.write_str("High");
-        }
+        },
         ErrorSeverity::Critical => {
             vga.write_str("Critical");
-        }
+        },
     }
     vga.write_str("\n");
-    
+
     vga.set_fg_color(Color::White);
 }
 
@@ -530,10 +565,10 @@ fn emergency_recovery(error: &BootError) {
     // 1. 尝试重置硬件
     // 2. 尝试进入安全模式
     // 3. 尝试保存错误信息到非易失性存储
-    
+
     // 目前只是一个占位符实现
     // 在实际系统中，这里会有更复杂的恢复逻辑
-    
+
     // 尝试通过串口输出错误信息
     let error_msg = error.description();
     for &_byte in error_msg.as_bytes() {
@@ -551,7 +586,7 @@ fn halt_system() -> ! {
     // 2. 等待用户输入
     // 3. 尝试重启
     // 4. 进入低功耗状态
-    
+
     loop {
         // 停止CPU执行
         #[cfg(target_arch = "x86_64")]

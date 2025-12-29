@@ -1,11 +1,13 @@
 /// Boot Loader Integration
 ///
 /// Integrates MBR, GPT, and disk I/O for complete bootable system.
-
 use alloc::vec::Vec;
-use crate::firmware::mbr_handler::MasterBootRecord;
-use crate::firmware::gpt_handler::GPTHandler;
-use crate::firmware::disk_reader::{DiskReader, DiskResult, DiskError};
+
+use crate::firmware::{
+    disk_reader::{DiskError, DiskReader, DiskResult},
+    gpt_handler::GPTHandler,
+    mbr_handler::MasterBootRecord,
+};
 
 /// Boot media type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,7 +114,7 @@ impl BootableSystemLoader {
                 self.kernel_sectors = Some(1); // Typically kernel loader is 1 sector
 
                 Ok((partition.start_lba, 1))
-            }
+            },
             BootMediaType::GPT => {
                 let gpt = self.gpt.as_ref().ok_or(DiskError::ReadFailed)?;
                 let partition = gpt
@@ -123,7 +125,7 @@ impl BootableSystemLoader {
                 self.kernel_sectors = Some(1);
 
                 Ok((partition.start_lba as u32, 1))
-            }
+            },
             BootMediaType::Unknown => Err(DiskError::ReadFailed),
         }
     }

@@ -3,8 +3,8 @@
 //! This module defines the error types used throughout the bootloader
 //! for consistent error reporting and handling.
 
-use core::fmt;
 use alloc::string::String;
+use core::fmt;
 
 /// Result type for bootloader operations
 pub type Result<T> = core::result::Result<T, BootError>;
@@ -92,13 +92,13 @@ pub enum BootError {
 
     /// Feature not enabled
     FeatureNotEnabled(&'static str),
-    
+
     /// Service resolution failed
     ServiceResolutionFailed(String),
-    
+
     /// Event error
     EventError(String),
-    
+
     /// Validation error
     ValidationError(String),
 }
@@ -210,12 +210,26 @@ impl BootError {
 
     /// Check if this error is recoverable
     pub fn is_recoverable(&self) -> bool {
-        matches!(self, BootError::Timeout | BootError::ConnectionFailed | BootError::DeviceNotFound | BootError::FileNotFound | BootError::UserRequestedRecovery)
+        matches!(
+            self,
+            BootError::Timeout
+                | BootError::ConnectionFailed
+                | BootError::DeviceNotFound
+                | BootError::FileNotFound
+                | BootError::UserRequestedRecovery
+        )
     }
 
     /// Check if this error should trigger recovery mode
     pub fn should_enter_recovery(&self) -> bool {
-        matches!(self, BootError::KernelLoadFailed | BootError::KernelNotFound | BootError::InvalidKernelFormat | BootError::CorruptionDetected | BootError::DeviceError(_))
+        matches!(
+            self,
+            BootError::KernelLoadFailed
+                | BootError::KernelNotFound
+                | BootError::InvalidKernelFormat
+                | BootError::CorruptionDetected
+                | BootError::DeviceError(_)
+        )
     }
 }
 

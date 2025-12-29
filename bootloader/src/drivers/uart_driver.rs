@@ -13,14 +13,14 @@ pub const COM3_BASE: u16 = 0x3E8;
 pub const COM4_BASE: u16 = 0x2E8;
 
 /// UART register offsets
-pub const UART_DATA: u16 = 0;        // TX/RX data
-pub const UART_IER: u16 = 1;         // Interrupt enable
-pub const UART_FCR: u16 = 2;         // FIFO control
-pub const UART_LCR: u16 = 3;         // Line control
-pub const UART_MCR: u16 = 4;         // Modem control
-pub const UART_LSR: u16 = 5;         // Line status
-pub const UART_MSR: u16 = 6;         // Modem status
-pub const UART_DLAB: u16 = 0x80;     // Divisor latch access bit
+pub const UART_DATA: u16 = 0; // TX/RX data
+pub const UART_IER: u16 = 1; // Interrupt enable
+pub const UART_FCR: u16 = 2; // FIFO control
+pub const UART_LCR: u16 = 3; // Line control
+pub const UART_MCR: u16 = 4; // Modem control
+pub const UART_LSR: u16 = 5; // Line status
+pub const UART_MSR: u16 = 6; // Modem status
+pub const UART_DLAB: u16 = 0x80; // Divisor latch access bit
 
 /// Standard baud rates
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -89,17 +89,8 @@ pub struct LineControl {
 
 impl LineControl {
     /// Create line control configuration
-    pub fn new(
-        data_bits: DataBits,
-        stop_bits: StopBits,
-        parity: Parity,
-    ) -> Self {
-        LineControl {
-            data_bits,
-            stop_bits,
-            parity,
-            break_enabled: false,
-        }
+    pub fn new(data_bits: DataBits, stop_bits: StopBits, parity: Parity) -> Self {
+        LineControl { data_bits, stop_bits, parity, break_enabled: false }
     }
 
     /// Encode to register value
@@ -193,7 +184,7 @@ impl UartDriver {
 
         // Enable DLAB to set baud rate
         self.write_register(UART_LCR, UART_DLAB as u8);
-        
+
         // Set baud rate divisor
         let divisor = baud as u16;
         self.write_register(UART_DATA, (divisor & 0xFF) as u8);
@@ -301,18 +292,18 @@ impl UartDriver {
         }
 
         self.baud_rate = baud;
-        
+
         // Enable DLAB
         self.write_register(UART_LCR, self.read_register(UART_LCR) | UART_DLAB as u8);
-        
+
         // Set divisor
         let divisor = baud as u16;
         self.write_register(UART_DATA, (divisor & 0xFF) as u8);
         self.write_register(UART_IER, ((divisor >> 8) & 0xFF) as u8);
-        
+
         // Disable DLAB
         self.write_register(UART_LCR, self.read_register(UART_LCR) & !(UART_DLAB as u8));
-        
+
         true
     }
 

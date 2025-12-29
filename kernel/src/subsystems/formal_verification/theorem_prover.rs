@@ -1,22 +1,23 @@
 // Theorem Prover Module
 
 extern crate alloc;
-//
 // 定理证明器模块
 // 实现自动化定理证明和交互式证明辅助功能
 
-use hashbrown::{HashMap, HashSet};
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::{format, vec};
+use alloc::{
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
 use core::sync::atomic::{AtomicU64, Ordering};
-use spin::Mutex;
-use crate::compat::DefaultHasherBuilder;
 
-use super::*;
-use super::model_checker::LogicExpression;
+use hashbrown::{HashMap, HashSet};
+use spin::Mutex;
+
+use super::{model_checker::LogicExpression, *};
+use crate::compat::DefaultHasherBuilder;
 
 /// 定理证明器
 pub struct TheoremProver {
@@ -672,7 +673,10 @@ impl TheoremProver {
     }
 
     /// 证明定理
-    pub fn prove_theorems(&mut self, properties: &[VerificationProperty]) -> Result<Vec<VerificationResult>, &'static str> {
+    pub fn prove_theorems(
+        &mut self,
+        properties: &[VerificationProperty],
+    ) -> Result<Vec<VerificationResult>, &'static str> {
         if !self.running.load(Ordering::SeqCst) {
             return Err("Theorem prover is not running");
         }
@@ -720,21 +724,15 @@ impl TheoremProver {
 
         // 执行证明
         let proof_result = match strategy {
-            ProofStrategyType::Resolution => {
-                self.resolution_proving(&mut session, theorem)
-            }
+            ProofStrategyType::Resolution => self.resolution_proving(&mut session, theorem),
             ProofStrategyType::NaturalDeduction => {
                 self.natural_deduction_proving(&mut session, theorem)
-            }
-            ProofStrategyType::Tableau => {
-                self.tableau_proving(&mut session, theorem)
-            }
-            ProofStrategyType::Induction => {
-                self.induction_proving(&mut session, theorem)
-            }
+            },
+            ProofStrategyType::Tableau => self.tableau_proving(&mut session, theorem),
+            ProofStrategyType::Induction => self.induction_proving(&mut session, theorem),
             _ => {
                 self.resolution_proving(&mut session, theorem) // 默认使用分解策略
-            }
+            },
         };
 
         // 更新会话状态
@@ -751,7 +749,11 @@ impl TheoremProver {
     }
 
     /// 分解证明
-    fn resolution_proving(&mut self, _session: &mut ProofSession, theorem: &Theorem) -> Result<ProofResult, &'static str> {
+    fn resolution_proving(
+        &mut self,
+        _session: &mut ProofSession,
+        theorem: &Theorem,
+    ) -> Result<ProofResult, &'static str> {
         // 简化的分解证明实现
         // 在实际实现中会使用完整的分解算法
 
@@ -821,18 +823,20 @@ impl TheoremProver {
     }
 
     /// 自然演绎证明
-    fn natural_deduction_proving(&mut self, _session: &mut ProofSession, theorem: &Theorem) -> Result<ProofResult, &'static str> {
+    fn natural_deduction_proving(
+        &mut self,
+        _session: &mut ProofSession,
+        theorem: &Theorem,
+    ) -> Result<ProofResult, &'static str> {
         // 简化的自然演绎证明实现
-        let proof_steps = vec![
-            ProofStep {
-                id: 1,
-                description: "Assume theorem statement for proof by contradiction".to_string(),
-                premises: vec![],
-                conclusion: format!("Assume: {:?}", theorem.statement),
-                inference_rule: "Assumption".to_string(),
-                annotation: None,
-            }
-        ];
+        let proof_steps = vec![ProofStep {
+            id: 1,
+            description: "Assume theorem statement for proof by contradiction".to_string(),
+            premises: vec![],
+            conclusion: format!("Assume: {:?}", theorem.statement),
+            inference_rule: "Assumption".to_string(),
+            annotation: None,
+        }];
 
         Ok(ProofResult {
             theorem_id: theorem.id,
@@ -858,7 +862,11 @@ impl TheoremProver {
     }
 
     /// 表格证明
-    fn tableau_proving(&mut self, _session: &mut ProofSession, theorem: &Theorem) -> Result<ProofResult, &'static str> {
+    fn tableau_proving(
+        &mut self,
+        _session: &mut ProofSession,
+        theorem: &Theorem,
+    ) -> Result<ProofResult, &'static str> {
         // 简化的表格证明实现
         Ok(ProofResult {
             theorem_id: theorem.id,
@@ -877,7 +885,11 @@ impl TheoremProver {
     }
 
     /// 归纳证明
-    fn induction_proving(&mut self, _session: &mut ProofSession, theorem: &Theorem) -> Result<ProofResult, &'static str> {
+    fn induction_proving(
+        &mut self,
+        _session: &mut ProofSession,
+        theorem: &Theorem,
+    ) -> Result<ProofResult, &'static str> {
         // 简化的归纳证明实现
         Ok(ProofResult {
             theorem_id: theorem.id,
@@ -898,9 +910,7 @@ impl TheoremProver {
     /// 将逻辑表达式转换为子句形式
     fn to_clauses(&self, _expression: &LogicExpression) -> Vec<LogicExpression> {
         // 简化的子句转换
-        vec![
-            LogicExpression::Atomic("sample_clause".to_string())
-        ]
+        vec![LogicExpression::Atomic("sample_clause".to_string())]
     }
 
     /// 检查矛盾
@@ -935,7 +945,10 @@ impl TheoremProver {
     }
 
     /// 将证明结果转换为验证结果
-    fn proof_result_to_verification_result(&self, proof_result: &ProofResult) -> VerificationResult {
+    fn proof_result_to_verification_result(
+        &self,
+        proof_result: &ProofResult,
+    ) -> VerificationResult {
         let status = match proof_result.proof_status {
             ProofStatus::Proved => VerificationStatus::Verified,
             ProofStatus::Unproved => VerificationStatus::Failed,
@@ -986,13 +999,13 @@ impl TheoremProver {
             self.stats.failed_proofs += 1;
         }
 
-        self.stats.avg_proof_time_ms =
-            (self.stats.avg_proof_time_ms + proof_result.proof_time) / 2;
-        self.stats.max_proof_time_ms =
-            self.stats.max_proof_time_ms.max(proof_result.proof_time);
+        self.stats.avg_proof_time_ms = (self.stats.avg_proof_time_ms + proof_result.proof_time) / 2;
+        self.stats.max_proof_time_ms = self.stats.max_proof_time_ms.max(proof_result.proof_time);
         self.stats.nodes_searched += proof_result.search_statistics.nodes_explored;
-        self.stats.max_search_depth =
-            self.stats.max_search_depth.max(proof_result.search_statistics.depth_reached as u32);
+        self.stats.max_search_depth = self
+            .stats
+            .max_search_depth
+            .max(proof_result.search_statistics.depth_reached as u32);
     }
 
     /// 初始化知识库

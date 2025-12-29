@@ -71,13 +71,11 @@ pub fn parse_tags(info_addr: usize) -> Option<TagIterator> {
     if info_addr == 0 {
         return None;
     }
-    
+
     // Read total size from the Multiboot2 information structure
     // The structure starts with: u32 total_size; u32 reserved;
-    let total_size = unsafe {
-        *(info_addr as *const u32)
-    };
-    
+    let total_size = unsafe { *(info_addr as *const u32) };
+
     Some(TagIterator {
         current: (info_addr + 8) as *const MultibootTag,
         end_addr: info_addr + total_size as usize,
@@ -98,7 +96,7 @@ impl Iterator for TagIterator {
             if (*self.current).tag_type == MULTIBOOT_TAG_TYPE_END {
                 return None;
             }
-            
+
             // Get current tag address as usize for boundary checking
             let current_addr = self.current as usize;
             if current_addr >= self.end_addr {
@@ -108,8 +106,7 @@ impl Iterator for TagIterator {
             let tag = self.current;
             let size = (*self.current).size as usize;
             let aligned_size = (size + 7) & !7;
-            self.current = (current_addr + aligned_size)
-                as *const MultibootTag;
+            self.current = (current_addr + aligned_size) as *const MultibootTag;
 
             Some(tag)
         }

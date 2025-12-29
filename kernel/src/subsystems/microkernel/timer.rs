@@ -4,36 +4,38 @@
 //! This includes periodic timers, one-shot timers, and timer callbacks.
 
 extern crate alloc;
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU64, AtomicUsize, AtomicBool, Ordering};
-use crate::subsystems::sync::Mutex;
-use crate::reliability::{EINVAL, ETIMEDOUT, EALREADY, ENOENT};
+use alloc::{collections::BTreeMap, vec::Vec};
+use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+
+use crate::{
+    reliability::{EALREADY, EINVAL, ENOENT, ETIMEDOUT},
+    subsystems::sync::Mutex,
+};
 
 /// Timer types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimerType {
-    OneShot,    // Fires once and is removed
-    Periodic,   // Fires repeatedly
-    Deadline,   // Fires at a specific time
+    OneShot,  // Fires once and is removed
+    Periodic, // Fires repeatedly
+    Deadline, // Fires at a specific time
 }
 
 /// Timer states
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimerState {
-    Idle,       // Timer not scheduled
-    Scheduled,  // Timer is scheduled to fire
-    Expired,    // Timer has fired
-    Cancelled,  // Timer was cancelled
+    Idle,      // Timer not scheduled
+    Scheduled, // Timer is scheduled to fire
+    Expired,   // Timer has fired
+    Cancelled, // Timer was cancelled
 }
 
 /// Clock sources
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ClockSource {
-    Realtime,   // Wall-clock time (may be adjusted)
-    Monotonic,  // Monotonically increasing clock
-    Boottime,   // Time since system boot
-    TAI,        // International Atomic Time
+    Realtime,  // Wall-clock time (may be adjusted)
+    Monotonic, // Monotonically increasing clock
+    Boottime,  // Time since system boot
+    TAI,       // International Atomic Time
 }
 
 /// Timer callback function type
@@ -46,8 +48,8 @@ pub struct HighResolutionTimer {
     pub timer_type: TimerType,
     pub clock_source: ClockSource,
     pub state: TimerState,
-    pub interval_ns: u64,      // Interval for periodic timers
-    pub expiry_time: u64,      // Time when timer should fire
+    pub interval_ns: u64, // Interval for periodic timers
+    pub expiry_time: u64, // Time when timer should fire
     pub callback: TimerCallback,
     pub callback_data: *mut u8,
     pub creation_time: u64,
@@ -74,8 +76,13 @@ impl Clone for HighResolutionTimer {
 }
 
 impl HighResolutionTimer {
-    pub fn new(id: u64, timer_type: TimerType, clock_source: ClockSource,
-               callback: TimerCallback, data: *mut u8) -> Self {
+    pub fn new(
+        id: u64,
+        timer_type: TimerType,
+        clock_source: ClockSource,
+        callback: TimerCallback,
+        data: *mut u8,
+    ) -> Self {
         let current_time = get_current_time_ns(clock_source);
 
         Self {
@@ -107,7 +114,11 @@ impl HighResolutionTimer {
         Ok(())
     }
 
-    pub fn set_periodic(&mut self, interval_ns: u64, initial_delay_ns: Option<u64>) -> Result<(), i32> {
+    pub fn set_periodic(
+        &mut self,
+        interval_ns: u64,
+        initial_delay_ns: Option<u64>,
+    ) -> Result<(), i32> {
         if interval_ns == 0 {
             return Err(EINVAL);
         }
@@ -158,17 +169,17 @@ impl HighResolutionTimer {
                 self.next_fire_time = Some(self.expiry_time);
                 self.state = TimerState::Scheduled;
                 Ok(())
-            }
+            },
             TimerType::Periodic => {
                 let current_time = get_current_time_ns(self.clock_source);
                 self.expiry_time = current_time + self.interval_ns;
                 self.next_fire_time = Some(self.expiry_time);
                 self.state = TimerState::Scheduled;
                 Ok(())
-            }
+            },
             TimerType::Deadline => {
                 Err(EINVAL) // Deadlines can't be reset
-            }
+            },
         }
     }
 
@@ -195,13 +206,13 @@ impl HighResolutionTimer {
                 self.state = TimerState::Expired;
                 self.next_fire_time = None;
                 false // Don't keep in active list
-            }
+            },
             TimerType::Periodic => {
                 // Schedule next fire
                 self.expiry_time += self.interval_ns;
                 self.next_fire_time = Some(self.expiry_time);
                 true // Keep in active list
-            }
+            },
         }
     }
 
@@ -239,8 +250,8 @@ unsafe impl Sync for HighResolutionTimer {}
 #[derive(Debug)]
 pub struct PeriodicTimer {
     pub id: u64,
-    pub interval_ticks: u32,   // Interval in system ticks
-    pub remaining_ticks: u32,  // Ticks until next fire
+    pub interval_ticks: u32,  // Interval in system ticks
+    pub remaining_ticks: u32, // Ticks until next fire
     pub callback: TimerCallback,
     pub callback_data: *mut u8,
     pub enabled: bool,
@@ -386,8 +397,13 @@ impl MicroTimerManager {
         }
     }
 
-    pub fn create_hrtimer(&self, timer_type: TimerType, clock_source: ClockSource,
-                         callback: TimerCallback, data: *mut u8) -> Result<u64, i32> {
+    pub fn create_hrtimer(
+        &self,
+        timer_type: TimerType,
+        clock_source: ClockSource,
+        callback: TimerCallback,
+        data: *mut u8,
+    ) -> Result<u64, i32> {
         let id = self.next_timer_id.fetch_add(1, Ordering::SeqCst);
         let timer = HighResolutionTimer::new(id, timer_type, clock_source, callback, data);
 
@@ -429,8 +445,12 @@ impl MicroTimerManager {
         Ok(())
     }
 
-    pub fn start_hrtimer_periodic(&self, timer_id: u64, interval_ns: u64,
-                                 initial_delay_ns: Option<u64>) -> Result<(), i32> {
+    pub fn start_hrtimer_periodic(
+        &self,
+        timer_id: u64,
+        interval_ns: u64,
+        initial_delay_ns: Option<u64>,
+    ) -> Result<(), i32> {
         let mut timers = self.hrtimers.lock();
 
         let timer = timers.get_mut(&timer_id).ok_or(ENOENT)?;
@@ -473,8 +493,12 @@ impl MicroTimerManager {
         }
     }
 
-    pub fn create_periodic_timer(&self, interval_ticks: u32,
-                                callback: TimerCallback, data: *mut u8) -> Result<u64, i32> {
+    pub fn create_periodic_timer(
+        &self,
+        interval_ticks: u32,
+        callback: TimerCallback,
+        data: *mut u8,
+    ) -> Result<u64, i32> {
         let id = self.next_timer_id.fetch_add(1, Ordering::SeqCst);
         let timer = PeriodicTimer::new(id, interval_ticks, callback, data);
 
@@ -567,7 +591,7 @@ impl MicroTimerManager {
                     match next_time {
                         None => next_time = Some(time_until),
                         Some(current) if time_until < current => next_time = Some(time_until),
-                        _ => {}
+                        _ => {},
                     }
                 }
             }
@@ -641,16 +665,12 @@ pub fn init() -> Result<(), i32> {
 
 /// Get global timer manager
 pub fn get_timer_manager() -> Option<&'static MicroTimerManager> {
-    unsafe {
-        GLOBAL_TIMER_MANAGER.as_ref()
-    }
+    unsafe { GLOBAL_TIMER_MANAGER.as_ref() }
 }
 
 /// Get mutable global timer manager
 pub fn get_timer_manager_mut() -> Option<&'static mut MicroTimerManager> {
-    unsafe {
-        GLOBAL_TIMER_MANAGER.as_mut()
-    }
+    unsafe { GLOBAL_TIMER_MANAGER.as_mut() }
 }
 
 /// Timer interrupt handler (called from interrupt system)
@@ -678,12 +698,14 @@ pub fn sleep_ns(duration_ns: u64) {
 
     if let Some(manager) = get_timer_manager() {
         // Create a one-shot timer
-        let timer_id = manager.create_hrtimer(
-            TimerType::OneShot,
-            ClockSource::Monotonic,
-            sleep_callback,
-            core::ptr::null_mut()
-        ).unwrap_or(0);
+        let timer_id = manager
+            .create_hrtimer(
+                TimerType::OneShot,
+                ClockSource::Monotonic,
+                sleep_callback,
+                core::ptr::null_mut(),
+            )
+            .unwrap_or(0);
 
         if timer_id != 0 {
             let _ = manager.start_hrtimer_one_shot(timer_id, duration_ns);
@@ -695,7 +717,7 @@ pub fn sleep_ns(duration_ns: u64) {
                         if timer.state != TimerState::Scheduled {
                             break;
                         }
-                    }
+                    },
                     _ => break,
                 }
             }
@@ -718,7 +740,7 @@ mod tests {
             TimerType::OneShot,
             ClockSource::Monotonic,
             test_callback,
-            core::ptr::null_mut()
+            core::ptr::null_mut(),
         );
 
         assert_eq!(timer.state, TimerState::Idle);
@@ -741,7 +763,7 @@ mod tests {
             1,
             10, // 10 ticks
             test_callback,
-            core::ptr::null_mut()
+            core::ptr::null_mut(),
         );
 
         assert!(!timer.enabled);
@@ -770,12 +792,14 @@ mod tests {
 
         extern "C" fn test_callback(_timer_id: u64, _data: *mut u8) {}
 
-        let timer_id = manager.create_hrtimer(
-            TimerType::OneShot,
-            ClockSource::Monotonic,
-            test_callback,
-            core::ptr::null_mut()
-        ).unwrap();
+        let timer_id = manager
+            .create_hrtimer(
+                TimerType::OneShot,
+                ClockSource::Monotonic,
+                test_callback,
+                core::ptr::null_mut(),
+            )
+            .unwrap();
 
         assert!(timer_id > 0);
 

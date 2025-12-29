@@ -1,5 +1,5 @@
 //! Dependency Injection System
-//! 
+//!
 //! This module provides a dependency injection framework for the NOS operating system.
 //! It allows for loose coupling between components and makes the system more testable
 //! and maintainable.
@@ -7,14 +7,13 @@
 extern crate alloc;
 
 use alloc::{
-    string::{String, ToString},
-    format,
+    boxed::Box,
     collections::BTreeMap,
+    format,
+    string::{String, ToString},
     sync::Arc,
     vec::Vec,
-    boxed::Box,
 };
-
 use core::any::{Any, TypeId};
 
 use spin::{Mutex, RwLock};
@@ -39,8 +38,6 @@ pub struct Container {
     /// Resolution stack for circular dependency detection
     resolution_stack: Mutex<Vec<TypeId>>,
 }
-
-
 
 /// Service metadata
 #[derive(Debug, Clone)]
@@ -74,10 +71,10 @@ pub enum ServiceScope {
 pub trait ServiceFactory: Send + Sync {
     /// Create a service instance
     fn create(&self, container: &Container) -> Result<Box<dyn Any + Send + Sync>>;
-    
+
     /// Get service type ID
     fn type_id(&self) -> TypeId;
-    
+
     /// Get service metadata
     fn metadata(&self) -> &ServiceMetadata;
 }
@@ -86,27 +83,25 @@ pub trait ServiceFactory: Send + Sync {
 pub trait ServiceResolver: Send + Sync {
     /// Resolve a service by type
     fn resolve<T: 'static + Send + Sync>(&self) -> Result<Arc<T>>;
-    
+
     /// Resolve a service by type ID
     fn resolve_by_id(&self, type_id: TypeId) -> Result<Arc<dyn Any + Send + Sync>>;
-    
+
     /// Check if a service is registered
     fn is_registered<T: 'static + Send + Sync>(&self) -> bool;
-    
+
     /// Get service metadata
     fn get_metadata<T: 'static + Send + Sync>(&self) -> Option<ServiceMetadata>;
 }
-
-
 
 /// Service lifetime manager
 pub trait ServiceLifetime: Send + Sync {
     /// Create a service instance
     fn create(&self, container: &Container) -> Result<Box<dyn Any + Send + Sync>>;
-    
+
     /// Dispose of a service instance
     fn dispose(&self, instance: Box<dyn Any + Send + Sync>) -> Result<()>;
-    
+
     /// Get service scope
     fn scope(&self) -> ServiceScope;
 }
@@ -149,47 +144,45 @@ pub struct ServiceRegistrationBuilder {
 impl ServiceRegistrationBuilder {
     /// Create a new service registration builder
     pub fn new() -> Self {
-        Self {
-            options: ServiceRegistrationOptions::default(),
-        }
+        Self { options: ServiceRegistrationOptions::default() }
     }
-    
+
     /// Set service name
     pub fn name(mut self, name: String) -> Self {
         self.options.name = name;
         self
     }
-    
+
     /// Set service version
     pub fn version(mut self, version: String) -> Self {
         self.options.version = version;
         self
     }
-    
+
     /// Set service description
     pub fn description(mut self, description: String) -> Self {
         self.options.description = description;
         self
     }
-    
+
     /// Add a dependency
     pub fn depends_on(mut self, dependency: String) -> Self {
         self.options.dependencies.push(dependency);
         self
     }
-    
+
     /// Set service scope
     pub fn scope(mut self, scope: ServiceScope) -> Self {
         self.options.scope = scope;
         self
     }
-    
+
     /// Set lazy initialization
     pub fn lazy(mut self, lazy: bool) -> Self {
         self.options.lazy = lazy;
         self
     }
-    
+
     /// Build service registration options
     pub fn build(self) -> ServiceRegistrationOptions {
         self.options
@@ -212,18 +205,18 @@ impl ServiceLocator {
     pub fn new(container: Arc<Container>) -> Self {
         Self { container }
     }
-    
+
     /// Get the underlying container
     pub fn container(&self) -> &Container {
         &self.container
     }
-    
+
     /// Resolve a service by type
     pub fn get<T: 'static + Send + Sync>(&self) -> Result<Arc<T>> {
         use crate::di::ServiceResolver;
         self.container.resolve()
     }
-    
+
     /// Try to resolve a service by type
     pub fn try_get<T: 'static + Send + Sync>(&self) -> Option<Arc<T>> {
         use crate::di::ServiceResolver;
@@ -256,7 +249,7 @@ macro_rules! injectable {
 /// Module for dependency injection
 pub mod module {
     use super::*;
-    
+
     /// Service registration
     #[derive(Clone)]
     pub struct ServiceRegistration {
@@ -267,7 +260,7 @@ pub mod module {
         /// Service metadata
         pub metadata: ServiceMetadata,
     }
-    
+
     /// Dependency injection module
     pub struct Module {
         /// Module name
@@ -277,17 +270,13 @@ pub mod module {
         /// Module dependencies
         pub dependencies: Vec<String>,
     }
-    
+
     impl Module {
         /// Create a new module
         pub fn new(name: String) -> Self {
-            Self {
-                name,
-                services: Vec::new(),
-                dependencies: Vec::new(),
-            }
+            Self { name, services: Vec::new(), dependencies: Vec::new() }
         }
-        
+
         /// Register a service
         pub fn register_service<T: 'static + Send + Sync>(
             mut self,
@@ -305,11 +294,11 @@ pub mod module {
                     lazy: false,
                 },
             };
-            
+
             self.services.push(registration);
             self
         }
-        
+
         /// Add a module dependency
         pub fn depends_on(mut self, dependency: String) -> Self {
             self.dependencies.push(dependency);
@@ -350,7 +339,7 @@ impl Container {
     pub fn new() -> Self {
         Self::with_config(DIConfig::default())
     }
-    
+
     /// Create a new container with custom configuration
     pub fn with_config(config: DIConfig) -> Self {
         Self {
@@ -362,14 +351,14 @@ impl Container {
             resolution_stack: Mutex::new(Vec::new()),
         }
     }
-    
+
     /// Register a service instance
     pub fn register_instance<T: 'static + Send + Sync>(&self, instance: Arc<T>) -> Result<()> {
         let type_id = TypeId::of::<T>();
         self.instances.write().insert(type_id, instance);
         Ok(())
     }
-    
+
     /// Register a service factory
     pub fn register_factory<T: 'static + Send + Sync>(
         &self,
@@ -379,7 +368,7 @@ impl Container {
         self.factories.write().insert(type_id, Arc::from(factory));
         Ok(())
     }
-    
+
     /// Register a service with options
     pub fn register_with_options<T: 'static + Send + Sync>(
         &self,
@@ -388,34 +377,36 @@ impl Container {
     ) -> Result<()> {
         let type_id = TypeId::of::<T>();
         self.factories.write().insert(type_id, Arc::from(factory));
-        self.metadata.write().insert(type_id, ServiceMetadata {
-            name: options.name,
-            version: options.version,
-            description: options.description,
-            dependencies: options.dependencies,
-            scope: options.scope,
-            lazy: options.lazy,
-        });
+        self.metadata.write().insert(
+            type_id,
+            ServiceMetadata {
+                name: options.name,
+                version: options.version,
+                description: options.description,
+                dependencies: options.dependencies,
+                scope: options.scope,
+                lazy: options.lazy,
+            },
+        );
         Ok(())
     }
 
-
-    
     /// Resolve a service by type
     pub fn resolve<T: 'static + Send + Sync>(&self) -> Result<Arc<T>> {
         let type_id = TypeId::of::<T>();
-        
+
         // Check for circular dependencies
         if self.config.enable_circular_dependency_detection {
             let mut stack = self.resolution_stack.lock();
             if stack.contains(&type_id) {
-                return Err(crate::error::Error::CircularDependency(
-                    format!("Circular dependency detected for type: {:?}", type_id)
-                ));
+                return Err(crate::error::Error::CircularDependency(format!(
+                    "Circular dependency detected for type: {:?}",
+                    type_id
+                )));
             }
             stack.push(type_id);
         }
-        
+
         // Check if we already have an instance (for singletons)
         // Note: we use read lock first to check
         if let Some(instance) = self.instances.read().get(&type_id) {
@@ -423,17 +414,16 @@ impl Container {
                 let mut stack = self.resolution_stack.lock();
                 stack.pop();
             }
-            return instance.clone().downcast::<T>()
-                .map_err(|_| crate::error::Error::ServiceError(
-                    "Failed to downcast service instance".to_string()
-                ));
+            return instance.clone().downcast::<T>().map_err(|_| {
+                crate::error::Error::ServiceError("Failed to downcast service instance".to_string())
+            });
         }
-        
+
         // Create a new instance using factory
         // Note: we might need write lock if we create singleton
         // But we first check factories with read lock
         let factory_opt = self.factories.read().get(&type_id).cloned();
-        
+
         if let Some(factory) = factory_opt {
             // Check scope
             let is_singleton = if let Some(metadata) = self.metadata.read().get(&type_id) {
@@ -442,67 +432,68 @@ impl Container {
                 false
             };
 
-            // We can't hold factory read lock while calling create() because create() might recursively call resolve() 
-            // which might need to access factories again. RwLock allows multiple readers, so this is fine for recursive reads.
-            // BUT if create() tries to register a new service (unlikely but possible), it would need write lock, causing deadlock.
-            // Assuming create() only resolves other services.
-            
+            // We can't hold factory read lock while calling create() because create() might
+            // recursively call resolve() which might need to access factories again.
+            // RwLock allows multiple readers, so this is fine for recursive reads.
+            // BUT if create() tries to register a new service (unlikely but possible), it would
+            // need write lock, causing deadlock. Assuming create() only resolves other
+            // services.
+
             let instance = factory.create(self)?;
             let arc_instance: Arc<dyn Any + Send + Sync> = instance.into();
-            
-            let typed_instance = arc_instance.clone().downcast::<T>()
-                .map_err(|_| crate::error::Error::ServiceError(
-                    "Failed to downcast service instance".to_string()
-                ))?;
-            
+
+            let typed_instance = arc_instance.clone().downcast::<T>().map_err(|_| {
+                crate::error::Error::ServiceError("Failed to downcast service instance".to_string())
+            })?;
+
             // Store instance if it's a singleton
             if is_singleton {
                 self.instances.write().insert(type_id, arc_instance);
             }
-            
-            if self.config.enable_circular_dependency_detection {
-                let mut stack = self.resolution_stack.lock();
-                stack.pop();
-            }
-            
-            Ok(typed_instance)
-        } else {
 
             if self.config.enable_circular_dependency_detection {
                 let mut stack = self.resolution_stack.lock();
                 stack.pop();
             }
-            Err(crate::error::Error::ServiceError(
-                format!("Service not registered for type: {:?}", type_id)
-            ))
+
+            Ok(typed_instance)
+        } else {
+            if self.config.enable_circular_dependency_detection {
+                let mut stack = self.resolution_stack.lock();
+                stack.pop();
+            }
+            Err(crate::error::Error::ServiceError(format!(
+                "Service not registered for type: {:?}",
+                type_id
+            )))
         }
     }
-    
+
     /// Get service metadata
     pub fn get_metadata<T: 'static + Send + Sync>(&self) -> Option<ServiceMetadata> {
         let type_id = TypeId::of::<T>();
         self.metadata.read().get(&type_id).cloned()
     }
-    
+
     /// Check if a service is registered
     pub fn is_registered<T: 'static + Send + Sync>(&self) -> bool {
         let type_id = TypeId::of::<T>();
         self.factories.read().contains_key(&type_id)
     }
-    
+
     /// Get all registered services
     pub fn get_registered_services(&self) -> Vec<ServiceMetadata> {
         self.metadata.read().values().cloned().collect()
     }
-    
+
     /// Validate all dependencies
     pub fn validate_dependencies(&self) -> Result<()> {
         if !self.config.enable_service_validation {
             return Ok(());
         }
-        
+
         let metadata_map = self.metadata.read();
-        
+
         for (_type_id, metadata) in metadata_map.iter() {
             for dependency in &metadata.dependencies {
                 let mut found = false;
@@ -512,19 +503,18 @@ impl Container {
                         break;
                     }
                 }
-                
+
                 if !found {
-                    return Err(crate::error::Error::ServiceError(
-                        format!("Dependency '{}' not found for service '{}'", 
-                                dependency, metadata.name)
-                    ));
+                    return Err(crate::error::Error::ServiceError(format!(
+                        "Dependency '{}' not found for service '{}'",
+                        dependency, metadata.name
+                    )));
                 }
             }
         }
-        
+
         Ok(())
     }
-
 }
 
 impl ServiceResolver for Arc<Container> {
@@ -533,13 +523,12 @@ impl ServiceResolver for Arc<Container> {
         (**self).resolve()
     }
 
-    
     fn resolve_by_id(&self, type_id: TypeId) -> Result<Arc<dyn Any + Send + Sync>> {
         // Check if we already have an instance
         if let Some(instance) = self.instances.read().get(&type_id) {
             return Ok(instance.clone());
         }
-        
+
         // Create a new instance using factory
         let factory_opt = self.factories.read().get(&type_id).cloned();
         if let Some(factory) = factory_opt {
@@ -547,17 +536,18 @@ impl ServiceResolver for Arc<Container> {
             let arc_instance: Arc<dyn Any + Send + Sync> = instance.into();
             Ok(arc_instance)
         } else {
-            Err(crate::error::Error::ServiceError(
-                format!("Service not registered for type: {:?}", type_id)
-            ))
+            Err(crate::error::Error::ServiceError(format!(
+                "Service not registered for type: {:?}",
+                type_id
+            )))
         }
     }
-    
+
     fn is_registered<T: 'static + Send + Sync>(&self) -> bool {
         let type_id = TypeId::of::<T>();
         self.factories.read().contains_key(&type_id)
     }
-    
+
     fn get_metadata<T: 'static + Send + Sync>(&self) -> Option<ServiceMetadata> {
         let type_id = TypeId::of::<T>();
         self.metadata.read().get(&type_id).cloned()

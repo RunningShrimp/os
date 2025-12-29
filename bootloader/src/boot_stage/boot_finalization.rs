@@ -6,21 +6,20 @@
 //! - Interrupt vector setup
 //! - Boot handoff to kernel
 
+use alloc::{format, string::String};
 use core::fmt;
-use alloc::string::String;
-use alloc::format;
 
 /// Finalization stage
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FinalizationStage {
-    ValidateMemory,           // Memory validation
-    CheckInterrupts,          // Interrupt system check
-    ValidatePeripherals,      // Peripheral validation
-    PrepareGDT,               // GDT preparation
-    PreparePaging,            // Paging setup verification
-    SetupIDT,                 // IDT preparation
-    ValidateBootInfo,         // Boot info validation
-    ReadyForTransfer,         // Ready for kernel transfer
+    ValidateMemory,      // Memory validation
+    CheckInterrupts,     // Interrupt system check
+    ValidatePeripherals, // Peripheral validation
+    PrepareGDT,          // GDT preparation
+    PreparePaging,       // Paging setup verification
+    SetupIDT,            // IDT preparation
+    ValidateBootInfo,    // Boot info validation
+    ReadyForTransfer,    // Ready for kernel transfer
 }
 
 impl fmt::Display for FinalizationStage {
@@ -148,12 +147,7 @@ pub struct GdtEntry {
 impl GdtEntry {
     /// Create new GDT entry
     pub fn new() -> Self {
-        GdtEntry {
-            base: 0,
-            limit: 0,
-            access: 0,
-            flags: 0,
-        }
+        GdtEntry { base: 0, limit: 0, access: 0, flags: 0 }
     }
 
     /// Create kernel code segment
@@ -161,8 +155,8 @@ impl GdtEntry {
         GdtEntry {
             base: 0,
             limit: 0xFFFFFFFF,
-            access: 0x9A,  // Code, execute/read
-            flags: 0xCF,   // Granularity: 4KB, 64-bit
+            access: 0x9A, // Code, execute/read
+            flags: 0xCF,  // Granularity: 4KB, 64-bit
         }
     }
 
@@ -171,8 +165,8 @@ impl GdtEntry {
         GdtEntry {
             base: 0,
             limit: 0xFFFFFFFF,
-            access: 0x92,  // Data, read/write
-            flags: 0xCF,   // Granularity: 4KB, 64-bit
+            access: 0x92, // Data, read/write
+            flags: 0xCF,  // Granularity: 4KB, 64-bit
         }
     }
 }
@@ -202,9 +196,9 @@ impl IdtEntry {
     pub fn new() -> Self {
         IdtEntry {
             offset_low: 0,
-            selector: 0x08,      // Kernel code selector
+            selector: 0x08, // Kernel code selector
             ist: 0,
-            type_attr: 0x8E,     // Interrupt gate
+            type_attr: 0x8E, // Interrupt gate
             offset_high: 0,
         }
     }
@@ -218,11 +212,7 @@ impl IdtEntry {
 
 impl fmt::Display for IdtEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "IDT {{ selector: 0x{:x}, type: 0x{:x} }}",
-            self.selector, self.type_attr
-        )
+        write!(f, "IDT {{ selector: 0x{:x}, type: 0x{:x} }}", self.selector, self.type_attr)
     }
 }
 
@@ -424,10 +414,10 @@ impl BootFinalization {
 
         report.push_str(&format!("Status: {}\n", self.status));
         report.push_str(&format!("Ready for Transfer: {}\n", self.status.is_ready));
-        
+
         report.push_str(&format!("\n{}\n", self.memory_val));
         report.push_str(&format!("{}\n", self.interrupt_status));
-        
+
         report.push_str(&format!("\nGDT Entries: {}\n", self.gdt_entries));
         report.push_str(&format!("IDT Entries: {}\n", self.idt_entries));
         report.push_str(&format!("Multiboot Prepared: {}\n", self.is_multiboot_prepared));
@@ -442,11 +432,7 @@ impl BootFinalization {
 
 impl fmt::Display for BootFinalization {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "BootFinalization {{ status: {}, ready: {} }}",
-            self.status, self.status.is_ready
-        )
+        write!(f, "BootFinalization {{ status: {}, ready: {} }}", self.status, self.status.is_ready)
     }
 }
 
@@ -591,7 +577,7 @@ mod tests {
         finalization.check_interrupt_system(true, false, true);
         finalization.set_gdt_entries(5);
         finalization.set_idt_entries(256);
-        
+
         assert!(finalization.finalize_boot());
         assert!(finalization.is_ready_for_kernel_transfer());
     }

@@ -3,16 +3,15 @@
 //! Provides an adapter layer that wraps the unified allocator
 //! for use by libc modules.
 
-use core::ffi::c_void;
-use core::alloc::Layout;
-use crate::subsystems::mm::traits::{UnifiedAllocator, CAllocator};
+use core::{alloc::Layout, ffi::c_void};
+
 use crate::subsystems::mm::allocator::HybridAllocator;
 
 /// libc memory allocator adapter
-/// 
+///
 /// This adapter wraps the unified HybridAllocator to provide
 /// C-compatible memory allocation functions for libc.
-/// 
+///
 /// # Safety
 /// This struct is safe to share between threads because HybridAllocator
 /// uses internal synchronization (Mutex).
@@ -58,12 +57,7 @@ unsafe impl UnifiedAllocator for LibcMemoryAdapter {
         unsafe { self.allocator.allocate_zeroed(layout) }
     }
 
-    unsafe fn reallocate(
-        &self,
-        ptr: *mut u8,
-        old_layout: Layout,
-        new_size: usize,
-    ) -> *mut u8 {
+    unsafe fn reallocate(&self, ptr: *mut u8, old_layout: Layout, new_size: usize) -> *mut u8 {
         unsafe { self.allocator.reallocate(ptr, old_layout, new_size) }
     }
 }
@@ -102,4 +96,3 @@ pub fn libc_calloc(nmemb: usize, size: usize) -> *mut c_void {
 pub fn libc_realloc(ptr: *mut c_void, size: usize) -> *mut c_void {
     get_libc_adapter().realloc(ptr, size)
 }
-

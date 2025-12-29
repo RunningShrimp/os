@@ -3,9 +3,11 @@
 //
 // SMP-safe implementation with proper memory barriers and interrupt handling.
 
-use core::cell::UnsafeCell;
-use core::ops::{Deref, DerefMut};
-use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use core::{
+    cell::UnsafeCell,
+    ops::{Deref, DerefMut},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+};
 
 // ============================================================================
 // Interrupt control for SMP safety
@@ -36,14 +38,14 @@ fn interrupts_enabled() -> bool {
         core::arch::asm!("csrr {}, sstatus", out(reg) sstatus);
         (sstatus & 0x2) != 0 // SIE bit
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     unsafe {
         let daif: u64;
         core::arch::asm!("mrs {}, daif", out(reg) daif);
         (daif & 0x80) == 0 // IRQ not masked
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     unsafe {
         let flags: u64;
@@ -59,12 +61,12 @@ fn disable_interrupts() {
     unsafe {
         core::arch::asm!("csrc sstatus, {}", in(reg) 0x2usize); // Clear SIE
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     unsafe {
         core::arch::asm!("msr daifset, #2"); // Mask IRQ
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     unsafe {
         core::arch::asm!("cli");
@@ -78,12 +80,12 @@ fn enable_interrupts() {
     unsafe {
         core::arch::asm!("csrs sstatus, {}", in(reg) 0x2usize); // Set SIE
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     unsafe {
         core::arch::asm!("msr daifclr, #2"); // Unmask IRQ
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     unsafe {
         core::arch::asm!("sti");
@@ -114,11 +116,11 @@ impl RawSpinLock {
             contended_count: AtomicU64::new(0),
         }
     }
-    
+
     pub fn lock(&self) {
         // Disable interrupts to prevent deadlock with ISR
         push_off();
-        
+
         // Spin until lock is acquired
         let mut contended = false;
         while self.locked.swap(true, Ordering::Acquire) {
@@ -130,24 +132,24 @@ impl RawSpinLock {
         if contended {
             self.contended_count.fetch_add(1, Ordering::Relaxed);
         }
-        
+
         // Record CPU holding the lock
         self.cpu_id.store(crate::cpu::cpuid(), Ordering::Relaxed);
     }
-    
+
     pub fn unlock(&self) {
         self.cpu_id.store(0, Ordering::Relaxed);
-        
+
         // Release lock
         self.locked.store(false, Ordering::Release);
-        
+
         // Restore interrupt state
         pop_off(false); // Argument ignored by pop_off implementation above? 
-                        // Wait, pop_off takes `was_enabled`. 
-                        // The implementation in sync.rs uses a thread-local (CPU-local) stack 
-                        // to track interrupt state.
+        // Wait, pop_off takes `was_enabled`.
+        // The implementation in sync.rs uses a thread-local (CPU-local) stack
+        // to track interrupt state.
     }
-    
+
     pub fn try_lock(&self) -> bool {
         if !self.locked.swap(true, Ordering::Acquire) {
             push_off();
@@ -156,22 +158,22 @@ impl RawSpinLock {
             false
         }
     }
-    
+
     /// Check if the lock is currently held
     pub fn is_locked(&self) -> bool {
         self.locked.load(Ordering::Acquire)
     }
-    
+
     /// Get total lock acquisitions (for diagnostics)
     pub fn acquire_count(&self) -> u64 {
         self.acquire_count.load(Ordering::Relaxed)
     }
-    
+
     /// Get total contended acquisitions (for diagnostics)
     pub fn contended_count(&self) -> u64 {
         self.contended_count.load(Ordering::Relaxed)
     }
-    
+
     /// Check if the current CPU is holding the lock
     pub fn holding(&self) -> bool {
         self.is_locked() && self.cpu_id.load(Ordering::Relaxed) == crate::cpu::cpuid()
@@ -191,7 +193,6 @@ pub mod tests;
 pub mod futex_tests;
 pub mod futex_validation;
 
-
 // Legacy compatibility alias
 pub type SpinLock = RawSpinLock;
 
@@ -207,42 +208,34 @@ pub struct SpinLockIrq {
 
 impl SpinLockIrq {
     pub const fn new() -> Self {
-        Self {
-            inner: RawSpinLock::new(),
-        }
+        Self { inner: RawSpinLock::new() }
     }
-    
+
     /// Acquire lock and disable interrupts
     /// Returns a guard that restores interrupt state on drop
     #[inline]
     pub fn lock(&self) -> SpinLockIrqGuard<'_> {
         let was_enabled = push_off();
         self.inner.lock();
-        SpinLockIrqGuard {
-            lock: self,
-            was_enabled,
-        }
+        SpinLockIrqGuard { lock: self, was_enabled }
     }
-    
+
     #[inline]
     pub fn try_lock(&self) -> Option<SpinLockIrqGuard<'_>> {
         let was_enabled = push_off();
         if self.inner.try_lock() {
-            Some(SpinLockIrqGuard {
-                lock: self,
-                was_enabled,
-            })
+            Some(SpinLockIrqGuard { lock: self, was_enabled })
         } else {
             pop_off(was_enabled);
             None
         }
     }
-    
+
     #[inline]
     pub fn is_locked(&self) -> bool {
         self.inner.is_locked()
     }
-    
+
     #[inline]
     pub fn holding(&self) -> bool {
         self.inner.holding()
@@ -279,10 +272,7 @@ unsafe impl<T: ?Sized + Send> Send for Mutex<T> {}
 impl<T> Mutex<T> {
     /// Creates a new mutex protecting the given data
     pub const fn new(data: T) -> Self {
-        Self {
-            lock: RawSpinLock::new(),
-            data: UnsafeCell::new(data),
-        }
+        Self { lock: RawSpinLock::new(), data: UnsafeCell::new(data) }
     }
 
     /// Consumes the mutex and returns the inner data
@@ -375,12 +365,9 @@ unsafe impl<T: ?Sized + Send> Send for MutexIrq<T> {}
 
 impl<T> MutexIrq<T> {
     pub const fn new(data: T) -> Self {
-        Self {
-            lock: SpinLockIrq::new(),
-            data: UnsafeCell::new(data),
-        }
+        Self { lock: SpinLockIrq::new(), data: UnsafeCell::new(data) }
     }
-    
+
     pub fn into_inner(self) -> T {
         self.data.into_inner()
     }
@@ -390,23 +377,19 @@ impl<T: ?Sized> MutexIrq<T> {
     /// Acquire the lock with interrupts disabled
     pub fn lock(&self) -> MutexIrqGuard<'_, T> {
         let guard = self.lock.lock();
-        MutexIrqGuard {
-            mutex: self,
-            _guard: guard,
-        }
+        MutexIrqGuard { mutex: self, _guard: guard }
     }
-    
+
     pub fn try_lock(&self) -> Option<MutexIrqGuard<'_, T>> {
-        self.lock.try_lock().map(|guard| MutexIrqGuard {
-            mutex: self,
-            _guard: guard,
-        })
+        self.lock
+            .try_lock()
+            .map(|guard| MutexIrqGuard { mutex: self, _guard: guard })
     }
-    
+
     pub fn get_mut(&mut self) -> &mut T {
         self.data.get_mut()
     }
-    
+
     pub fn is_locked(&self) -> bool {
         self.lock.is_locked()
     }
@@ -420,7 +403,7 @@ pub struct MutexIrqGuard<'a, T: ?Sized> {
 
 impl<T: ?Sized> Deref for MutexIrqGuard<'_, T> {
     type Target = T;
-    
+
     fn deref(&self) -> &T {
         unsafe { &*self.mutex.data.get() }
     }
@@ -447,9 +430,7 @@ pub struct Once {
 
 impl Once {
     pub const fn new() -> Self {
-        Self {
-            state: AtomicUsize::new(ONCE_INCOMPLETE),
-        }
+        Self { state: AtomicUsize::new(ONCE_INCOMPLETE) }
     }
 
     /// Returns true if `call_once` has completed successfully
@@ -479,14 +460,14 @@ impl Once {
                     f();
                     self.state.store(ONCE_COMPLETE, Ordering::Release);
                     return;
-                }
+                },
                 Err(ONCE_COMPLETE) => return,
                 Err(ONCE_RUNNING) => {
                     // Spin while another thread initializes
                     while self.state.load(Ordering::Acquire) == ONCE_RUNNING {
                         core::hint::spin_loop();
                     }
-                }
+                },
                 Err(_) => unreachable!(),
             }
         }
@@ -663,10 +644,7 @@ unsafe impl<T: ?Sized + Send + Sync> Sync for RwLock<T> {}
 
 impl<T> RwLock<T> {
     pub const fn new(data: T) -> Self {
-        Self {
-            state: AtomicUsize::new(0),
-            data: UnsafeCell::new(data),
-        }
+        Self { state: AtomicUsize::new(0), data: UnsafeCell::new(data) }
     }
 
     pub fn into_inner(self) -> T {
@@ -686,12 +664,7 @@ impl<T: ?Sized> RwLock<T> {
             // Try to increment reader count
             if self
                 .state
-                .compare_exchange_weak(
-                    state,
-                    state + 1,
-                    Ordering::Acquire,
-                    Ordering::Relaxed,
-                )
+                .compare_exchange_weak(state, state + 1, Ordering::Acquire, Ordering::Relaxed)
                 .is_ok()
             {
                 return RwLockReadGuard { lock: self };

@@ -46,12 +46,7 @@ mod fuzz_framework {
         pub panics: u64,
     }
 
-    static mut STATS: FuzzStats = FuzzStats {
-        total_tests: 0,
-        passed: 0,
-        failed: 0,
-        panics: 0,
-    };
+    static mut STATS: FuzzStats = FuzzStats { total_tests: 0, passed: 0, failed: 0, panics: 0 };
 
     /// Initialize the fuzz testing framework
     pub fn initialize() {
@@ -86,12 +81,7 @@ mod fuzz_framework {
     pub fn report_results() {
         let stats = get_stats();
         // In a real implementation, this would print detailed statistics
-        let _ = (
-            stats.total_tests,
-            stats.passed,
-            stats.failed,
-            stats.panics,
-        );
+        let _ = (stats.total_tests, stats.passed, stats.failed, stats.panics);
     }
 
     /// Get current statistics
@@ -179,24 +169,24 @@ mod harness {
 
         /// Get a value in a range
         pub fn get_in_range(&self, offset: usize, range: Range<usize>) -> Option<usize> {
-            self.get_u32(offset).map(|v| range.start + (v as usize % (range.end - range.start)))
+            self.get_u32(offset)
+                .map(|v| range.start + (v as usize % (range.end - range.start)))
         }
 
         /// Get a string slice
         pub fn get_str(&self, offset: usize, max_len: usize) -> Option<&str> {
             let actual_len = core::cmp::min(max_len, self.len.saturating_sub(offset));
             let bytes = &self.data[offset..offset + actual_len];
-            
+
             // Find null terminator or use max_len
             let end = bytes.iter().position(|&b| b == 0).unwrap_or(actual_len);
-            
+
             core::str::from_utf8(&bytes[..end]).ok()
         }
     }
 }
 
 mod fuzz_cases {
-    use super::{fuzz_framework, harness};
 
     /// Run all fuzz test cases
     pub fn run_all(iterations: u64, max_input_size: usize) {

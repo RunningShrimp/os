@@ -1,26 +1,27 @@
 //! 统一接口定义模块
-//! 
+//!
 //! 本模块提供系统调用和服务的抽象接口，用于解决循环依赖问题。
 //! 通过定义清晰的接口边界，实现模块间的解耦。
 
 use crate::error::Result;
 extern crate alloc;
-pub use alloc::boxed::Box;
-pub use alloc::vec::Vec;
-pub use alloc::string::String;
-pub use alloc::sync::Arc;
+pub use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
 
 /// 系统调用分发器接口
 pub trait InterfaceSyscallDispatcher: Send + Sync {
     /// 分发系统调用
     fn dispatch(&self, syscall_num: usize, args: &[usize]) -> isize;
-    
+
     /// 获取系统调用统计信息
     fn get_stats(&self) -> SyscallStats;
-    
+
     /// 注册系统调用处理器
-    fn register_handler(&mut self, syscall_num: usize, handler: Arc<dyn InterfaceSyscallHandler>) -> Result<()>;
-    
+    fn register_handler(
+        &mut self,
+        syscall_num: usize,
+        handler: Arc<dyn InterfaceSyscallHandler>,
+    ) -> Result<()>;
+
     /// 注销系统调用处理器
     fn unregister_handler(&mut self, syscall_num: usize) -> Result<()>;
 }
@@ -29,10 +30,10 @@ pub trait InterfaceSyscallDispatcher: Send + Sync {
 pub trait InterfaceSyscallHandler: Send + Sync {
     /// 处理系统调用
     fn handle(&self, args: &[usize]) -> isize;
-    
+
     /// 获取处理器名称
     fn name(&self) -> &str;
-    
+
     /// 获取系统调用号
     fn syscall_number(&self) -> usize;
 }
@@ -59,16 +60,16 @@ pub struct SyscallStats {
 pub trait InterfaceServiceManager: Send + Sync {
     /// 注册服务
     fn register_service(&mut self, service: Arc<dyn InterfaceService>) -> Result<()>;
-    
+
     /// 注销服务
     fn unregister_service(&mut self, service_id: &str) -> Result<()>;
-    
+
     /// 获取服务
     fn get_service(&self, service_id: &str) -> Option<Arc<dyn InterfaceService>>;
-    
+
     /// 列出所有服务
     fn list_services(&self) -> Vec<InterfaceServiceInfo>;
-    
+
     /// 获取服务统计信息
     fn get_stats(&self) -> InterfaceServiceStats;
 }
@@ -77,29 +78,29 @@ pub trait InterfaceServiceManager: Send + Sync {
 pub trait InterfaceService: Send + Sync {
     /// 获取服务ID
     fn service_id(&self) -> &str;
-    
+
     /// 获取服务名称
     fn name(&self) -> &str;
-    
+
     /// 获取服务版本
     fn version(&self) -> &str;
-    
+
     /// 初始化服务
     fn initialize(&self) -> Result<()>;
-    
+
     /// 启动服务
     fn start(&self) -> Result<()>;
-    
+
     /// 停止服务
     fn stop(&self) -> Result<()>;
-    
+
     /// 清理服务
     fn cleanup(&self) -> Result<()>;
 
-    
     /// 处理服务请求
-    fn handle_request(&self, request: &InterfaceServiceRequest) -> Result<InterfaceServiceResponse>;
-    
+    fn handle_request(&self, request: &InterfaceServiceRequest)
+    -> Result<InterfaceServiceResponse>;
+
     /// 获取服务状态
     fn status(&self) -> InterfaceServiceStatus;
 }
@@ -200,7 +201,7 @@ pub struct InterfaceServiceStats {
 pub trait InterfaceEventPublisher: Send + Sync {
     /// 发布事件
     fn publish(&self, event: Arc<crate::event::BasicEvent>) -> Result<()>;
-    
+
     /// 批量发布事件
     fn publish_batch(&self, events: Vec<Arc<crate::event::BasicEvent>>) -> Result<()>;
 }
@@ -208,7 +209,11 @@ pub trait InterfaceEventPublisher: Send + Sync {
 /// 事件订阅器接口
 pub trait InterfaceEventSubscriber: Send + Sync {
     /// 订阅事件
-    fn subscribe(&mut self, event_type: &str, handler: Arc<dyn crate::event::EventHandler>) -> Result<()>;
+    fn subscribe(
+        &mut self,
+        event_type: &str,
+        handler: Arc<dyn crate::event::EventHandler>,
+    ) -> Result<()>;
 
     /// 取消订阅
     fn unsubscribe(&mut self, event_type: &str, handler_id: &str) -> Result<()>;
@@ -218,16 +223,16 @@ pub trait InterfaceEventSubscriber: Send + Sync {
 pub trait InterfaceContextManager: Send + Sync {
     /// 创建上下文
     fn create_context(&self, context_id: &str) -> Result<InterfaceContext>;
-    
+
     /// 获取上下文
     fn get_context(&self, context_id: &str) -> Option<InterfaceContext>;
-    
+
     /// 更新上下文
     fn update_context(&self, context_id: &str, context: InterfaceContext) -> Result<()>;
-    
+
     /// 删除上下文
     fn delete_context(&self, context_id: &str) -> Result<()>;
-    
+
     /// 列出所有上下文
     fn list_contexts(&self) -> Vec<String>;
 }

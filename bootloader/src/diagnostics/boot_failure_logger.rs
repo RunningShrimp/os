@@ -137,7 +137,7 @@ impl BootFailureLogger {
                 ErrorCategory::Firmware => self.firmware_errors += 1,
                 ErrorCategory::Memory => self.memory_errors += 1,
                 ErrorCategory::Configuration => self.config_errors += 1,
-                _ => {}
+                _ => {},
             }
 
             // Check critical
@@ -199,19 +199,19 @@ impl BootFailureLogger {
             (ErrorCategory::Hardware, ErrorComponent::Memory) => {
                 // Memory error recovery
                 1
-            }
+            },
             (ErrorCategory::Hardware, ErrorComponent::Cpu) => {
                 // CPU error recovery
                 2
-            }
+            },
             (ErrorCategory::Firmware, _) => {
                 // Firmware error recovery
                 3
-            }
+            },
             (ErrorCategory::Configuration, _) => {
                 // Configuration error recovery
                 4
-            }
+            },
             _ => 0,
         }
     }
@@ -409,7 +409,7 @@ mod tests {
         error2.set_recoverable(false);
         logger.log_error(error1);
         logger.log_error(error2);
-        
+
         let critical = logger.get_most_critical_error();
         assert!(critical.is_some());
     }
@@ -499,7 +499,7 @@ mod tests {
         let error2 = BootError::new(2000, ErrorCategory::Hardware, ErrorComponent::Memory);
         logger.log_error(error1);
         logger.log_error(error2);
-        
+
         let first = logger.get_first_error().unwrap();
         let last = logger.get_last_error().unwrap();
         assert!(last.timestamp > first.timestamp);
@@ -523,7 +523,7 @@ mod tests {
         error2.set_recoverable(false);
         logger.log_error(error1);
         logger.log_error(error2);
-        
+
         assert_eq!(logger.get_recoverable_error_count(), 1);
     }
 
@@ -542,12 +542,12 @@ mod tests {
             ErrorCategory::Memory,
             ErrorCategory::Configuration,
         ];
-        
+
         for cat in categories {
             let error = BootError::new(0, cat, ErrorComponent::Unknown);
             logger.log_error(error);
         }
-        
+
         assert_eq!(logger.get_error_count(), 4);
     }
 }

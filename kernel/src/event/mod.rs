@@ -2,10 +2,8 @@
 //!
 //! Provides event bus and dispatcher functionality
 
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{collections::BTreeMap, string::String, sync::Arc, vec::Vec};
+
 use nos_api::Result;
 
 /// Event trait
@@ -40,12 +38,15 @@ impl EventBus {
     pub fn new() -> Self {
         Self { handlers: BTreeMap::new() }
     }
-    
+
     pub fn subscribe(&mut self, event_type: &str, handler: Arc<dyn EventHandler>) -> Result<()> {
-        self.handlers.entry(event_type.to_string()).or_insert_with(Vec::new).push(handler);
+        self.handlers
+            .entry(event_type.to_string())
+            .or_insert_with(Vec::new)
+            .push(handler);
         Ok(())
     }
-    
+
     pub fn publish(&self, event: &dyn Event) -> Result<()> {
         if let Some(handlers) = self.handlers.get(event.event_type()) {
             for handler in handlers {
@@ -67,9 +68,7 @@ pub fn init_event_bus() -> Result<()> {
 }
 
 pub fn get_event_bus() -> &'static mut EventBus {
-    unsafe {
-        EVENT_BUS.as_mut().expect("Event bus not initialized")
-    }
+    unsafe { EVENT_BUS.as_mut().expect("Event bus not initialized") }
 }
 
 pub fn subscribe(event_type: &str, handler: Arc<dyn EventHandler>) -> Result<()> {

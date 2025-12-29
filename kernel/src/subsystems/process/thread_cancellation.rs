@@ -1,16 +1,16 @@
 //! Enhanced Thread Cancellation Mechanism
-//! 
+//!
 //! This module provides POSIX-compliant thread cancellation with proper
 //! cancellation points, cleanup handlers, and deferred/asynchronous cancellation.
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
+use alloc::{collections::BTreeMap, vec::Vec};
 use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
 use spin::Mutex;
 
-use super::thread::{Tid, ThreadError, CancelState, CancelType};
+use super::thread::{CancelState, CancelType, ThreadError, Tid};
 
 /// Cancellation point types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -125,7 +125,11 @@ impl ThreadCancellationState {
     }
 
     /// Set cancellation state
-    pub fn set_cancel_state(&mut self, state: CancelState, old_state: &mut CancelState) -> Result<(), ThreadError> {
+    pub fn set_cancel_state(
+        &mut self,
+        state: CancelState,
+        old_state: &mut CancelState,
+    ) -> Result<(), ThreadError> {
         *old_state = self.cancel_state;
         self.cancel_state = state;
         Ok(())
@@ -193,12 +197,8 @@ impl ThreadCancellationState {
     /// Push a cleanup handler
     pub fn push_cleanup_handler(&self, handler: fn(*mut u8), arg: *mut u8) -> u64 {
         let handler_id = self.next_handler_id.fetch_add(1, Ordering::SeqCst);
-        let cleanup_handler = CancellationCleanupHandler {
-            handler,
-            arg,
-            handler_id,
-            thread_id: self.thread_id,
-        };
+        let cleanup_handler =
+            CancellationCleanupHandler { handler, arg, handler_id, thread_id: self.thread_id };
 
         self.cleanup_handlers.lock().push(cleanup_handler);
         handler_id
@@ -209,11 +209,11 @@ impl ThreadCancellationState {
         let mut handlers = self.cleanup_handlers.lock();
         if let Some(pos) = handlers.iter().position(|h| h.handler_id == handler_id) {
             let handler = handlers.remove(pos);
-            
+
             // Update statistics
             let mut stats = self.stats.lock();
             stats.total_cleanup_handlers += 1;
-            
+
             Some(handler)
         } else {
             None
@@ -221,7 +221,10 @@ impl ThreadCancellationState {
     }
 
     /// Request cancellation of this thread
-    pub fn request_cancellation(&mut self, request: CancellationRequest) -> Result<(), ThreadError> {
+    pub fn request_cancellation(
+        &mut self,
+        request: CancellationRequest,
+    ) -> Result<(), ThreadError> {
         if self.cancel_state == CancelState::Disabled {
             return Err(ThreadError::OperationNotPermitted);
         }
@@ -236,7 +239,9 @@ impl ThreadCancellationState {
         self.pending.store(true, Ordering::Relaxed);
 
         // Handle asynchronous cancellation immediately
-        if self.cancel_type == CancelType::Asynchronous && !self.in_unsafe_region.load(Ordering::Relaxed) {
+        if self.cancel_type == CancelType::Asynchronous
+            && !self.in_unsafe_region.load(Ordering::Relaxed)
+        {
             self.handle_cancellation();
         } else {
             // Update statistics for deferred cancellation
@@ -253,19 +258,21 @@ impl ThreadCancellationState {
         {
             let mut stats = self.stats.lock();
             stats.total_successful += 1;
-            
+
             if self.cancel_type == CancelType::Asynchronous {
                 stats.total_asynchronous += 1;
             }
-            
+
             // Update latency statistics
             if let Some(ref request) = self.cancellation_request {
                 let now = crate::subsystems::time::timestamp_nanos();
                 let latency_us = (now - request.timestamp) / 1000;
-                stats.avg_cancellation_latency_us = 
-                    (stats.avg_cancellation_latency_us * (stats.total_successful - 1) as f64 + latency_us as f64) 
+                stats.avg_cancellation_latency_us = (stats.avg_cancellation_latency_us
+                    * (stats.total_successful - 1) as f64
+                    + latency_us as f64)
                     / stats.total_successful as f64;
-                stats.max_cancellation_latency_us = stats.max_cancellation_latency_us.max(latency_us);
+                stats.max_cancellation_latency_us =
+                    stats.max_cancellation_latency_us.max(latency_us);
             }
         }
 
@@ -576,7 +583,10 @@ pub fn cancel_thread_with_type(
 }
 
 /// Set cancellation state for current thread
-pub fn set_cancel_state(state: CancelState, old_state: &mut CancelState) -> Result<(), ThreadError> {
+pub fn set_cancel_state(
+    state: CancelState,
+    old_state: &mut CancelState,
+) -> Result<(), ThreadError> {
     let thread_id = super::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
     let manager = get_cancellation_manager();
     manager.set_cancel_state(thread_id, state, old_state)
@@ -600,14 +610,14 @@ pub fn test_cancel() -> Result<bool, ThreadError> {
 pub fn test_cancel_exit() -> Result<(), ThreadError> {
     let thread_id = super::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
     let manager = get_cancellation_manager();
-    
+
     if manager.test_cancel(thread_id)? {
         // This will not return
         if let Some(state) = manager.get_state(thread_id) {
             state.handle_cancellation();
         }
     }
-    
+
     Ok(())
 }
 
@@ -647,7 +657,9 @@ pub fn push_cleanup_handler(handler: fn(*mut u8), arg: *mut u8) -> Result<u64, T
 }
 
 /// Pop cleanup handler for current thread
-pub fn pop_cleanup_handler(handler_id: u64) -> Result<Option<CancellationCleanupHandler>, ThreadError> {
+pub fn pop_cleanup_handler(
+    handler_id: u64,
+) -> Result<Option<CancellationCleanupHandler>, ThreadError> {
     let thread_id = super::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
     let manager = get_cancellation_manager();
     manager.pop_cleanup_handler(thread_id, handler_id)
@@ -677,13 +689,15 @@ pub fn reset_global_stats() {
 macro_rules! cancellation_point {
     () => {
         if let Err(_) = $crate::subsystems::process::thread_cancellation::enter_cancellation_point(
-            $crate::subsystems::process::thread_cancellation::CancellationPointType::UserDefined
+            $crate::subsystems::process::thread_cancellation::CancellationPointType::UserDefined,
         ) {
             // Handle error
         }
     };
     ($point_type:expr) => {
-        if let Err(_) = $crate::subsystems::process::thread_cancellation::enter_cancellation_point($point_type) {
+        if let Err(_) =
+            $crate::subsystems::process::thread_cancellation::enter_cancellation_point($point_type)
+        {
             // Handle error
         }
     };
@@ -708,7 +722,9 @@ macro_rules! cancellation_unsafe_region {
 #[macro_export]
 macro_rules! cleanup_handler {
     ($handler:expr, $arg:expr) => {
-        if let Ok(handler_id) = $crate::subsystems::process::thread_cancellation::push_cleanup_handler($handler, $arg) {
+        if let Ok(handler_id) =
+            $crate::subsystems::process::thread_cancellation::push_cleanup_handler($handler, $arg)
+        {
             // Use handler_id for later removal
             handler_id
         } else {

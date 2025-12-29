@@ -28,22 +28,22 @@ pub const BOOTLOADER_HEAP_BASE: u64 = 0x7FFE0000;
 pub unsafe fn init_memory_layout() -> Result<(), &'static str> {
     // Stack grows downward from BOOTLOADER_STACK_BASE
     // Heap grows upward from BOOTLOADER_HEAP_BASE
-    
+
     // In real implementation would:
     // 1. Set stack pointer (RSP) if not already done
     // 2. Clear BSS section
     // 3. Initialize heap allocator
-    
+
     Ok(())
 }
 
 /// Bootloader initialization stage enum
 #[derive(Debug, Clone, Copy)]
 pub enum InitStage {
-    PreStack,      // Before stack initialization
-    StackReady,    // Stack initialized
-    HeapReady,     // Heap initialized
-    Complete,      // All initialization complete
+    PreStack,   // Before stack initialization
+    StackReady, // Stack initialized
+    HeapReady,  // Heap initialized
+    Complete,   // All initialization complete
 }
 
 /// Bootloader initialization state tracker
@@ -54,9 +54,7 @@ pub struct InitState {
 impl InitState {
     /// Create new initialization state
     pub fn new() -> Self {
-        Self {
-            stage: InitStage::PreStack,
-        }
+        Self { stage: InitStage::PreStack }
     }
 
     /// Get current initialization stage
@@ -101,10 +99,10 @@ mod tests {
         let mut state = InitState::new();
         state.mark_stack_ready();
         assert!(matches!(state.stage(), InitStage::StackReady));
-        
+
         state.mark_heap_ready();
         assert!(matches!(state.stage(), InitStage::HeapReady));
-        
+
         state.mark_complete();
         assert!(state.is_complete());
     }

@@ -13,16 +13,12 @@
 //! - Blue-green deployment
 
 use spin::Mutex;
-use core::sync::atomic;
 use alloc::collections::BTreeMap;
 use core::sync::atomic;
-use alloc::string::String;
 use core::sync::atomic;
 use alloc::vec::Vec;
-use core::sync::atomic;
 use alloc::string::{String, ToString};
 use core::sync::atomic;
-use alloc::sync::Arc;
 use core::sync::atomic;
 
 // ============================================================================

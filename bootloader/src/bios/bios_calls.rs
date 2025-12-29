@@ -2,8 +2,8 @@
 ///
 /// High-level wrappers for common BIOS interrupt calls.
 /// Currently provides framework; actual execution happens after real mode switch.
-
 use core::fmt;
+
 use crate::bios::bios_realmode::RealModeExecutor;
 // RealModeContext在当前文件中未使用，暂时注释掉
 // use crate::bios::bios_realmode::RealModeContext;
@@ -142,7 +142,7 @@ impl DiskServices {
         if !self.initialized {
             return Err(BIOSCallError::NotInitialized);
         }
-        Ok(0)  // No error
+        Ok(0) // No error
     }
 }
 
@@ -166,7 +166,7 @@ impl SystemServices {
         if !self.initialized {
             return Err(BIOSCallError::NotInitialized);
         }
-        Ok(0)  // In KB
+        Ok(0) // In KB
     }
 
     /// E820 memory map (AX=E820, EDX=534D4150)
@@ -182,7 +182,7 @@ impl SystemServices {
         if !self.initialized {
             return Err(BIOSCallError::NotInitialized);
         }
-        Ok(0)  // 1/18 second ticks since midnight
+        Ok(0) // 1/18 second ticks since midnight
     }
 
     /// Wait for key press (AH=00)
@@ -190,7 +190,7 @@ impl SystemServices {
         if !self.initialized {
             return Err(BIOSCallError::NotInitialized);
         }
-        Ok(0)  // Key code
+        Ok(0) // Key code
     }
 }
 
@@ -214,7 +214,7 @@ impl RTCServices {
         if !self.initialized {
             return Err(BIOSCallError::NotInitialized);
         }
-        Ok((0, 0, 0))  // (day, month, year)
+        Ok((0, 0, 0)) // (day, month, year)
     }
 
     /// Get current time (AH=02)
@@ -222,7 +222,7 @@ impl RTCServices {
         if !self.initialized {
             return Err(BIOSCallError::NotInitialized);
         }
-        Ok((0, 0, 0))  // (hours, minutes, seconds)
+        Ok((0, 0, 0)) // (hours, minutes, seconds)
     }
 }
 
@@ -255,7 +255,7 @@ impl BIOSServices {
         if init_result.is_err() {
             return Err(BIOSCallError::NotInitialized);
         }
-        
+
         self.video.init()?;
         self.disk.init()?;
         self.system.init()?;

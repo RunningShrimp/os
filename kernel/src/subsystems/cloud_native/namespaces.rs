@@ -5,17 +5,22 @@
 
 extern crate alloc;
 
-use alloc::format;
-use crate::reliability::{EINVAL, ENOENT, ENOMEM, EIO, EPERM, EACCES};
-use crate::subsystems::cloud_native::oci::OciLinuxNamespaceType;
-use alloc::collections::BTreeMap;
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::sync::Arc;
-use spin::Mutex;
-use alloc::vec;
-use alloc::vec::Vec;
+use alloc::{
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+
+use spin::Mutex;
+
+use crate::{
+    reliability::{EACCES, EINVAL, EIO, ENOENT, ENOMEM, EPERM},
+    subsystems::cloud_native::oci::OciLinuxNamespaceType,
+};
 
 /// 命名空间类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -330,8 +335,11 @@ impl Namespace {
             // 设置域名
             crate::syscalls::process::set_domainname(&uts_params.domainname)?;
 
-            crate::println!("[namespaces] Set hostname: {}, domainname: {}",
-                uts_params.hostname, uts_params.domainname);
+            crate::println!(
+                "[namespaces] Set hostname: {}, domainname: {}",
+                uts_params.hostname,
+                uts_params.domainname
+            );
         }
 
         Ok(())
@@ -412,7 +420,11 @@ impl Namespace {
 
     /// 设置根文件系统
     fn setup_rootfs(&self, rootfs_path: &str, read_only: bool) -> Result<(), i32> {
-        crate::println!("[namespaces] Setting up rootfs: {} (readonly: {})", rootfs_path, read_only);
+        crate::println!(
+            "[namespaces] Setting up rootfs: {} (readonly: {})",
+            rootfs_path,
+            read_only
+        );
 
         // 挂载根文件系统
         let flags = if read_only { 0x1 } else { 0x0 }; // MS_RDONLY
@@ -423,8 +435,12 @@ impl Namespace {
 
     /// 设置挂载点
     fn setup_mount_point(&self, mount_point: &MountPoint) -> Result<(), i32> {
-        crate::println!("[namespaces] Setting up mount point: {} -> {} ({})",
-            mount_point.source, mount_point.target, mount_point.fs_type);
+        crate::println!(
+            "[namespaces] Setting up mount point: {} -> {} ({})",
+            mount_point.source,
+            mount_point.target,
+            mount_point.fs_type
+        );
 
         // 挂载文件系统
         let _options_str = mount_point.options.join(",");
@@ -433,7 +449,8 @@ impl Namespace {
             &mount_point.target,
             Some(&mount_point.source[..]),
             mount_point.flags as u32,
-        ).map_err(|_| -1)?;
+        )
+        .map_err(|_| -1)?;
 
         Ok(())
     }
@@ -441,9 +458,9 @@ impl Namespace {
     /// 设置挂载传播
     fn set_mount_propagation(&self, propagation: MountPropagation) -> Result<(), i32> {
         let mount_flag = match propagation {
-            MountPropagation::Private => 0x40000, // MS_PRIVATE
-            MountPropagation::Shared => 0x100000,  // MS_SHARED
-            MountPropagation::Slave => 0x80000,    // MS_SLAVE
+            MountPropagation::Private => 0x40000,     // MS_PRIVATE
+            MountPropagation::Shared => 0x100000,     // MS_SHARED
+            MountPropagation::Slave => 0x80000,       // MS_SLAVE
             MountPropagation::Unbindable => 0x200000, // MS_UNBINDABLE
         };
 
@@ -455,22 +472,29 @@ impl Namespace {
 
     /// 设置网络接口
     fn setup_network_interface(&self, interface: &NetworkInterface) -> Result<(), i32> {
-        crate::println!("[namespaces] Setting up network interface: {} ({:?})", interface.name, interface.if_type);
+        crate::println!(
+            "[namespaces] Setting up network interface: {} ({:?})",
+            interface.name,
+            interface.if_type
+        );
 
         // 根据接口类型进行配置
         match interface.if_type {
             InterfaceType::Loopback => {
                 self.setup_loopback_interface(interface)?;
-            }
+            },
             InterfaceType::Veth => {
                 self.setup_veth_interface(interface)?;
-            }
+            },
             InterfaceType::Bridge => {
                 self.setup_bridge_interface(interface)?;
-            }
+            },
             _ => {
-                crate::println!("[namespaces] Interface type {:?} not implemented", interface.if_type);
-            }
+                crate::println!(
+                    "[namespaces] Interface type {:?} not implemented",
+                    interface.if_type
+                );
+            },
         }
 
         Ok(())
@@ -534,27 +558,33 @@ impl Namespace {
 
     /// 设置路由
     fn setup_route(&self, route: &Route) -> Result<(), i32> {
-        crate::println!("[namespaces] Setting up route: {} via {} (dev: {})",
+        crate::println!(
+            "[namespaces] Setting up route: {} via {} (dev: {})",
             route.destination,
             route.gateway.as_deref().unwrap_or("direct"),
-            route.interface);
+            route.interface
+        );
 
         match route.route_type {
             RouteType::Default => {
                 if let Some(ref gateway) = route.gateway {
                     crate::syscalls::network::add_route("0.0.0.0/0", gateway, &route.interface)?;
                 }
-            }
+            },
             RouteType::Static => {
                 if let Some(ref gateway) = route.gateway {
-                    crate::syscalls::network::add_route(&route.destination, gateway, &route.interface)?;
+                    crate::syscalls::network::add_route(
+                        &route.destination,
+                        gateway,
+                        &route.interface,
+                    )?;
                 } else {
                     crate::syscalls::network::add_route(&route.destination, "", &route.interface)?;
                 }
-            }
+            },
             RouteType::Connected => {
                 crate::syscalls::network::add_route(&route.destination, "", &route.interface)?;
-            }
+            },
         }
 
         Ok(())
@@ -586,11 +616,16 @@ impl Namespace {
 
     /// 设置UID映射
     fn setup_uid_mapping(&self, uid_map: &IdMapping) -> Result<(), i32> {
-        crate::println!("[namespaces] Setting up UID mapping: {} -> {} (range: {})",
-            uid_map.container_id, uid_map.host_id, uid_map.range_size);
+        crate::println!(
+            "[namespaces] Setting up UID mapping: {} -> {} (range: {})",
+            uid_map.container_id,
+            uid_map.host_id,
+            uid_map.range_size
+        );
 
         // 在实际实现中，这里会写入/proc/[pid]/uid_map
-        let map_str = format!("{} {} {}", uid_map.container_id, uid_map.host_id, uid_map.range_size);
+        let map_str =
+            format!("{} {} {}", uid_map.container_id, uid_map.host_id, uid_map.range_size);
         crate::println!("[namespaces] UID map: {}", map_str);
 
         Ok(())
@@ -598,11 +633,16 @@ impl Namespace {
 
     /// 设置GID映射
     fn setup_gid_mapping(&self, gid_map: &IdMapping) -> Result<(), i32> {
-        crate::println!("[namespaces] Setting up GID mapping: {} -> {} (range: {})",
-            gid_map.container_id, gid_map.host_id, gid_map.range_size);
+        crate::println!(
+            "[namespaces] Setting up GID mapping: {} -> {} (range: {})",
+            gid_map.container_id,
+            gid_map.host_id,
+            gid_map.range_size
+        );
 
         // 在实际实现中，这里会写入/proc/[pid]/gid_map
-        let map_str = format!("{} {} {}", gid_map.container_id, gid_map.host_id, gid_map.range_size);
+        let map_str =
+            format!("{} {} {}", gid_map.container_id, gid_map.host_id, gid_map.range_size);
         crate::println!("[namespaces] GID map: {}", map_str);
 
         Ok(())
@@ -625,8 +665,12 @@ impl Namespace {
             }
         }
 
-        crate::println!("[namespaces] Added process {} to namespace {:?} (ID: {})",
-            pid, self.ns_type, self.ns_id);
+        crate::println!(
+            "[namespaces] Added process {} to namespace {:?} (ID: {})",
+            pid,
+            self.ns_type,
+            self.ns_id
+        );
         Ok(())
     }
 
@@ -641,8 +685,12 @@ impl Namespace {
             processes.retain(|&p| p != pid);
         }
 
-        crate::println!("[namespaces] Removed process {} from namespace {:?} (ID: {})",
-            pid, self.ns_type, self.ns_id);
+        crate::println!(
+            "[namespaces] Removed process {} from namespace {:?} (ID: {})",
+            pid,
+            self.ns_type,
+            self.ns_id
+        );
         Ok(())
     }
 
@@ -690,7 +738,7 @@ impl Namespace {
             _ => {
                 // 其他命名空间的清理
                 crate::println!("[namespaces] Cleaning up namespace {:?}", self.ns_type);
-            }
+            },
         }
         Ok(())
     }
@@ -744,7 +792,11 @@ impl NamespaceManager {
     }
 
     /// 创建命名空间
-    pub fn create_namespace(&mut self, ns_type: NamespaceType, config: NamespaceConfig) -> Result<u64, i32> {
+    pub fn create_namespace(
+        &mut self,
+        ns_type: NamespaceType,
+        config: NamespaceConfig,
+    ) -> Result<u64, i32> {
         let ns_id = self.next_namespace_id.fetch_add(1, Ordering::SeqCst);
         let mut namespace = Namespace::new(ns_id, ns_type, config);
 
@@ -771,7 +823,8 @@ impl NamespaceManager {
     /// 按类型获取命名空间
     pub fn get_namespaces_by_type(&self, ns_type: NamespaceType) -> Vec<Arc<Mutex<Namespace>>> {
         if let Some(ns_ids) = self.type_index.get(&ns_type) {
-            ns_ids.iter()
+            ns_ids
+                .iter()
                 .filter_map(|&ns_id| self.namespaces.get(&ns_id).cloned())
                 .collect()
         } else {
@@ -821,7 +874,8 @@ impl NamespaceManager {
 
     /// 列出所有命名空间
     pub fn list_namespaces(&self) -> Vec<(u64, NamespaceType, bool)> {
-        self.namespaces.values()
+        self.namespaces
+            .values()
             .map(|namespace| {
                 let ns = namespace.lock();
                 (ns.ns_id, ns.ns_type, ns.active)
@@ -834,7 +888,11 @@ impl NamespaceManager {
         let namespace_ids: Vec<u64> = self.namespaces.keys().copied().collect();
         for ns_id in namespace_ids {
             if let Err(e) = self.delete_namespace(ns_id) {
-                crate::println!("[namespaces] Warning: Failed to delete namespace {}: {}", ns_id, e);
+                crate::println!(
+                    "[namespaces] Warning: Failed to delete namespace {}: {}",
+                    ns_id,
+                    e
+                );
             }
         }
 
@@ -866,20 +924,19 @@ pub fn initialize_namespaces() -> Result<(), i32> {
 
 /// 获取命名空间管理器引用
 pub fn get_namespace_manager() -> Option<&'static NamespaceManager> {
-    unsafe {
-        NAMESPACE_MANAGER.as_ref()
-    }
+    unsafe { NAMESPACE_MANAGER.as_ref() }
 }
 
 /// 获取命名空间管理器可变引用
 pub fn get_namespace_manager_mut() -> Option<&'static mut NamespaceManager> {
-    unsafe {
-        NAMESPACE_MANAGER.as_mut()
-    }
+    unsafe { NAMESPACE_MANAGER.as_mut() }
 }
 
 /// 创建命名空间（便捷函数）
-pub fn create_namespace(ns_type: crate::subsystems::cloud_native::oci::OciLinuxNamespaceType, path: Option<String>) -> Result<(), i32> {
+pub fn create_namespace(
+    ns_type: crate::subsystems::cloud_native::oci::OciLinuxNamespaceType,
+    path: Option<String>,
+) -> Result<(), i32> {
     let manager = get_namespace_manager_mut().ok_or(EIO)?;
 
     let config = NamespaceConfig {
@@ -924,7 +981,12 @@ pub fn mount_rootfs(rootfs_path: &str, read_only: bool) -> Result<(), i32> {
 }
 
 /// 挂载设备
-pub fn mount_device(source: &str, target: &str, fs_type: &str, options: &[String]) -> Result<(), i32> {
+pub fn mount_device(
+    source: &str,
+    target: &str,
+    fs_type: &str,
+    options: &[String],
+) -> Result<(), i32> {
     let manager = get_namespace_manager_mut().ok_or(EIO)?;
 
     let mount_point = MountPoint {

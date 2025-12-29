@@ -1,13 +1,12 @@
 //! Service discovery
-//! 
+//!
 //! This module provides service discovery and enumeration functionality.
 
 extern crate alloc;
 
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
+
 use nos_api::Result;
-use alloc::collections::BTreeMap;
-use alloc::string::String;
-use alloc::vec::Vec;
 use spin::{Mutex, Once};
 
 /// Service discovery
@@ -21,9 +20,7 @@ pub struct ServiceDiscovery {
 impl ServiceDiscovery {
     /// Create a new service discovery
     pub fn new() -> Self {
-        Self {
-            services: BTreeMap::new(),
-        }
+        Self { services: BTreeMap::new() }
     }
 
     /// Discover services
@@ -54,8 +51,7 @@ impl ServiceDiscovery {
 }
 
 /// Service descriptor
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct ServiceDescriptor {
     /// Service name
     pub name: String,
@@ -70,7 +66,6 @@ pub struct ServiceDescriptor {
     /// Service metadata
     pub metadata: BTreeMap<String, String>,
 }
-
 
 /// Global service discovery
 static GLOBAL_DISCOVERY: Once<Mutex<ServiceDiscovery>> = Once::new();
@@ -119,7 +114,7 @@ mod tests {
     #[test]
     fn test_discovery() {
         let mut discovery = ServiceDiscovery::new();
-        
+
         // Add a test service
         let descriptor = ServiceDescriptor {
             name: "test_service".to_string(),
@@ -130,11 +125,11 @@ mod tests {
             metadata: BTreeMap::new(),
         };
         discovery.add_service(descriptor.clone());
-        
+
         // Get service
         let retrieved = discovery.get_service("test_service").unwrap();
         assert_eq!(retrieved.name, descriptor.name);
-        
+
         // List services
         let services = discovery.list_services();
         assert_eq!(services.len(), 1);

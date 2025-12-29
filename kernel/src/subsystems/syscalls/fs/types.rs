@@ -1,13 +1,12 @@
 //! 文件系统模块类型定义
-//! 
+//!
 //! 本模块定义了文件系统相关的类型、枚举和结构体，包括：
 //! - 文件类型和权限
 //! - 文件描述符和状态
 //! - 目录条目和路径
 //! - 文件系统操作参数
 
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 
 /// 文件系统操作类型枚举
 ///
@@ -70,7 +69,7 @@ pub enum FileType {
 }
 
 /// 文件权限位
-/// 
+///
 /// 定义文件的访问权限。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FilePermissions {
@@ -113,17 +112,35 @@ impl FilePermissions {
     /// 转换为八进制权限表示
     pub fn to_octal(&self) -> u16 {
         let mut mode = 0u16;
-        
-        if self.owner_read { mode |= 0o400; }
-        if self.owner_write { mode |= 0o200; }
-        if self.owner_execute { mode |= 0o100; }
-        if self.group_read { mode |= 0o040; }
-        if self.group_write { mode |= 0o020; }
-        if self.group_execute { mode |= 0o010; }
-        if self.other_read { mode |= 0o004; }
-        if self.other_write { mode |= 0o002; }
-        if self.other_execute { mode |= 0o001; }
-        
+
+        if self.owner_read {
+            mode |= 0o400;
+        }
+        if self.owner_write {
+            mode |= 0o200;
+        }
+        if self.owner_execute {
+            mode |= 0o100;
+        }
+        if self.group_read {
+            mode |= 0o040;
+        }
+        if self.group_write {
+            mode |= 0o020;
+        }
+        if self.group_execute {
+            mode |= 0o010;
+        }
+        if self.other_read {
+            mode |= 0o004;
+        }
+        if self.other_write {
+            mode |= 0o002;
+        }
+        if self.other_execute {
+            mode |= 0o001;
+        }
+
         mode
     }
 
@@ -150,7 +167,7 @@ impl Default for FilePermissions {
 }
 
 /// 文件状态信息
-/// 
+///
 /// 包含文件的详细属性信息。
 #[derive(Debug, Clone)]
 pub struct FileStatus {
@@ -181,7 +198,7 @@ pub struct FileStatus {
 }
 
 /// 文件描述符信息
-/// 
+///
 /// 包含文件描述符的状态和属性。
 #[derive(Debug, Clone)]
 pub struct FileDescriptor {
@@ -204,7 +221,7 @@ pub struct FileDescriptor {
 }
 
 /// 文件打开模式
-/// 
+///
 /// 定义文件的打开模式。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpenMode {
@@ -225,7 +242,7 @@ pub enum OpenMode {
 }
 
 /// 目录条目
-/// 
+///
 /// 表示目录中的一个条目。
 #[derive(Debug, Clone)]
 pub struct DirEntry {
@@ -238,7 +255,7 @@ pub struct DirEntry {
 }
 
 /// 文件系统操作标志
-/// 
+///
 /// 定义文件系统操作的标志位。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FsFlags {
@@ -255,7 +272,7 @@ pub enum FsFlags {
 }
 
 /// 文件系统统计信息
-/// 
+///
 /// 包含文件系统的使用统计。
 #[derive(Debug, Clone)]
 pub struct FsStats {
@@ -278,7 +295,7 @@ pub struct FsStats {
 }
 
 /// 文件操作参数
-/// 
+///
 /// 包含文件操作所需的参数。
 #[derive(Debug, Clone)]
 pub struct FileOperationParams {
@@ -307,7 +324,7 @@ impl Default for FileOperationParams {
 }
 
 /// 文件系统错误类型
-/// 
+///
 /// 定义文件系统模块特有的错误类型。
 #[derive(Debug, Clone)]
 pub enum FsError {
@@ -384,45 +401,45 @@ impl FsError {
 }
 
 /// 虚拟文件系统接口特征
-/// 
+///
 /// 定义虚拟文件系统的基本操作接口。
 pub trait VfsOperations: Send + Sync {
     /// 打开文件
     fn open(&self, path: &str, mode: OpenMode) -> Result<i32, FsError>;
-    
+
     /// 关闭文件
     fn close(&self, fd: i32) -> Result<(), FsError>;
-    
+
     /// 读取文件
     fn read(&self, fd: i32, buffer: &mut [u8]) -> Result<usize, FsError>;
-    
+
     /// 写入文件
     fn write(&self, fd: i32, buffer: &[u8]) -> Result<usize, FsError>;
-    
+
     /// 查询文件状态
     fn stat(&self, path: &str) -> Result<FileStatus, FsError>;
-    
+
     /// 创建目录
     fn mkdir(&self, path: &str, permissions: FilePermissions) -> Result<(), FsError>;
-    
+
     /// 删除目录
     fn rmdir(&self, path: &str) -> Result<(), FsError>;
-    
+
     /// 列出目录内容
     fn readdir(&self, path: &str) -> Result<Vec<DirEntry>, FsError>;
-    
+
     /// 创建符号链接
     fn symlink(&self, target: &str, link_path: &str) -> Result<(), FsError>;
-    
+
     /// 读取符号链接
     fn readlink(&self, path: &str) -> Result<String, FsError>;
-    
+
     /// 重命名文件
     fn rename(&self, old_path: &str, new_path: &str) -> Result<(), FsError>;
-    
+
     /// 删除文件
     fn unlink(&self, path: &str) -> Result<(), FsError>;
-    
+
     /// 获取文件系统统计
     fn statfs(&self, path: &str) -> Result<FsStats, FsError>;
 }

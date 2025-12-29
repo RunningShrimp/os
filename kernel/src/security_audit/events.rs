@@ -4,18 +4,20 @@
 
 extern crate alloc;
 
-use alloc::format;
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::vec;
-use alloc::string::String;
-use alloc::string::ToString;
+use alloc::{
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
 use core::sync::atomic::{AtomicU64, Ordering};
+
 use spin::Mutex;
 
+use super::{AuditAction, AuditCondition, AuditOperator, AuditRule, SecurityAuditConfig};
 use crate::security::audit::{AuditEvent, AuditEventType, AuditSeverity};
-use super::{SecurityAuditConfig, AuditRule, AuditAction, AuditCondition, AuditOperator};
 
 /// 事件处理器
 pub struct EventProcessor {
@@ -71,7 +73,10 @@ impl EventProcessor {
     pub fn init(&mut self, config: &SecurityAuditConfig) -> Result<(), &'static str> {
         self.rules = config.audit_rules.clone();
         self.running = true;
-        crate::println!("[EventProcessor] Event processor initialized with {} rules", self.rules.len());
+        crate::println!(
+            "[EventProcessor] Event processor initialized with {} rules",
+            self.rules.len()
+        );
         Ok(())
     }
 
@@ -131,19 +136,19 @@ impl EventProcessor {
         match rule.rule_type {
             super::AuditRuleType::EventMatch => {
                 self.event_match_conditions(&rule.conditions, event)
-            }
+            },
             super::AuditRuleType::BehaviorAnalysis => {
                 self.behavior_analysis_conditions(&rule.conditions, event)
-            }
+            },
             super::AuditRuleType::AnomalyDetection => {
                 self.anomaly_detection_conditions(&rule.conditions, event)
-            }
+            },
             super::AuditRuleType::ComplianceCheck => {
                 self.compliance_check_conditions(&rule.conditions, event)
-            }
+            },
             super::AuditRuleType::SecurityPolicy => {
                 self.security_policy_conditions(&rule.conditions, event)
-            }
+            },
         }
     }
 
@@ -158,27 +163,43 @@ impl EventProcessor {
     }
 
     /// 行为分析条件
-    fn behavior_analysis_conditions(&self, conditions: &[AuditCondition], event: &AuditEvent) -> bool {
+    fn behavior_analysis_conditions(
+        &self,
+        conditions: &[AuditCondition],
+        event: &AuditEvent,
+    ) -> bool {
         // 简化的行为分析逻辑
         // 实际实现会包含更复杂的行为模式识别
         self.event_match_conditions(conditions, event)
     }
 
     /// 异常检测条件
-    fn anomaly_detection_conditions(&self, conditions: &[AuditCondition], event: &AuditEvent) -> bool {
+    fn anomaly_detection_conditions(
+        &self,
+        conditions: &[AuditCondition],
+        event: &AuditEvent,
+    ) -> bool {
         // 简化的异常检测逻辑
         // 实际实现会使用机器学习算法
         self.event_match_conditions(conditions, event)
     }
 
     /// 合规检查条件
-    fn compliance_check_conditions(&self, conditions: &[AuditCondition], event: &AuditEvent) -> bool {
+    fn compliance_check_conditions(
+        &self,
+        conditions: &[AuditCondition],
+        event: &AuditEvent,
+    ) -> bool {
         // 简化的合规检查逻辑
         self.event_match_conditions(conditions, event)
     }
 
     /// 安全策略条件
-    fn security_policy_conditions(&self, conditions: &[AuditCondition], event: &AuditEvent) -> bool {
+    fn security_policy_conditions(
+        &self,
+        conditions: &[AuditCondition],
+        event: &AuditEvent,
+    ) -> bool {
         // 简化的安全策略检查逻辑
         self.event_match_conditions(conditions, event)
     }
@@ -198,29 +219,29 @@ impl EventProcessor {
                     (Ok(val1), Ok(val2)) => val1 > val2,
                     _ => field_value > condition.value,
                 }
-            }
+            },
             AuditOperator::GreaterThanOrEqual => {
                 match (field_value.parse::<u64>(), condition.value.parse::<u64>()) {
                     (Ok(val1), Ok(val2)) => val1 >= val2,
                     _ => field_value >= condition.value,
                 }
-            }
+            },
             AuditOperator::LessThan => {
                 match (field_value.parse::<u64>(), condition.value.parse::<u64>()) {
                     (Ok(val1), Ok(val2)) => val1 < val2,
                     _ => field_value < condition.value,
                 }
-            }
+            },
             AuditOperator::LessThanOrEqual => {
                 match (field_value.parse::<u64>(), condition.value.parse::<u64>()) {
                     (Ok(val1), Ok(val2)) => val1 <= val2,
                     _ => field_value <= condition.value,
                 }
-            }
+            },
             AuditOperator::Regex => {
                 // 简化的正则表达式匹配
                 field_value.contains(&condition.value)
-            }
+            },
         }
     }
 
@@ -239,32 +260,60 @@ impl EventProcessor {
             _ => {
                 // 检查数据字段
                 event.data.get(field).cloned().unwrap_or_default()
-            }
+            },
         }
     }
 
     /// 执行规则动作
-    fn execute_rule_actions(&self, rule: &AuditRule, event: &AuditEvent) -> Result<(), &'static str> {
+    fn execute_rule_actions(
+        &self,
+        rule: &AuditRule,
+        event: &AuditEvent,
+    ) -> Result<(), &'static str> {
         for action in &rule.actions {
             match action {
                 AuditAction::Log => {
-                    crate::println!("[EventProcessor] Rule '{}' triggered: {}", rule.name, event.message);
-                }
+                    crate::println!(
+                        "[EventProcessor] Rule '{}' triggered: {}",
+                        rule.name,
+                        event.message
+                    );
+                },
                 AuditAction::Alert => {
-                    crate::println!("[EventProcessor] ALERT: Rule '{}' triggered by event {}", rule.name, event.id);
-                }
+                    crate::println!(
+                        "[EventProcessor] ALERT: Rule '{}' triggered by event {}",
+                        rule.name,
+                        event.id
+                    );
+                },
                 AuditAction::Block => {
-                    crate::println!("[EventProcessor] BLOCKING: Rule '{}' blocking event {}", rule.name, event.id);
-                }
+                    crate::println!(
+                        "[EventProcessor] BLOCKING: Rule '{}' blocking event {}",
+                        rule.name,
+                        event.id
+                    );
+                },
                 AuditAction::Notify => {
-                    crate::println!("[EventProcessor] NOTIFY: Rule '{}' notification for event {}", rule.name, event.id);
-                }
+                    crate::println!(
+                        "[EventProcessor] NOTIFY: Rule '{}' notification for event {}",
+                        rule.name,
+                        event.id
+                    );
+                },
                 AuditAction::ExecuteScript(script) => {
-                    crate::println!("[EventProcessor] EXECUTE: Rule '{}' executing script: {}", rule.name, script);
-                }
+                    crate::println!(
+                        "[EventProcessor] EXECUTE: Rule '{}' executing script: {}",
+                        rule.name,
+                        script
+                    );
+                },
                 AuditAction::CallApi(api) => {
-                    crate::println!("[EventProcessor] API CALL: Rule '{}' calling API: {}", rule.name, api);
-                }
+                    crate::println!(
+                        "[EventProcessor] API CALL: Rule '{}' calling API: {}",
+                        rule.name,
+                        api
+                    );
+                },
             }
         }
         Ok(())
@@ -406,7 +455,8 @@ impl EventAggregator {
         let mut results = Vec::new();
 
         for rule in &self.aggregation_rules {
-            let filtered_events: Vec<&AuditEvent> = events.iter()
+            let filtered_events: Vec<&AuditEvent> = events
+                .iter()
                 .filter(|event| self.rule_matches(rule, event))
                 .collect();
 
@@ -414,7 +464,11 @@ impl EventAggregator {
                 continue;
             }
 
-            let aggregated_value = self.calculate_aggregation(&rule.aggregation_type, &filtered_events, &rule.aggregation_field);
+            let aggregated_value = self.calculate_aggregation(
+                &rule.aggregation_type,
+                &filtered_events,
+                &rule.aggregation_field,
+            );
 
             let aggregated_event = AggregatedEvent {
                 id: results.len() as u64 + 1,
@@ -422,8 +476,16 @@ impl EventAggregator {
                 aggregated_value,
                 event_count: filtered_events.len() as u64,
                 time_window: (
-                    filtered_events.iter().map(|e| e.timestamp).min().unwrap_or(0),
-                    filtered_events.iter().map(|e| e.timestamp).max().unwrap_or(0),
+                    filtered_events
+                        .iter()
+                        .map(|e| e.timestamp)
+                        .min()
+                        .unwrap_or(0),
+                    filtered_events
+                        .iter()
+                        .map(|e| e.timestamp)
+                        .max()
+                        .unwrap_or(0),
                 ),
                 generated_at: crate::subsystems::time::get_timestamp_nanos(),
                 triggered_rule: rule.id,
@@ -464,26 +526,29 @@ impl EventAggregator {
             "pid" => event.pid.to_string(),
             "uid" => event.uid.to_string(),
             "message" => event.message.clone(),
-            _ => {
-                event.data.get(field).cloned().unwrap_or_default()
-            }
+            _ => event.data.get(field).cloned().unwrap_or_default(),
         }
     }
 
     /// 计算聚合值
-    fn calculate_aggregation(&self, agg_type: &AggregationType, events: &[&AuditEvent], field: &str) -> f64 {
+    fn calculate_aggregation(
+        &self,
+        agg_type: &AggregationType,
+        events: &[&AuditEvent],
+        field: &str,
+    ) -> f64 {
         match agg_type {
             AggregationType::Count => events.len() as f64,
-            AggregationType::Sum => {
-                events.iter()
-                    .filter_map(|event| {
-                        let value = self.get_field_value(field, event);
-                        value.parse::<f64>().ok()
-                    })
-                    .sum()
-            }
+            AggregationType::Sum => events
+                .iter()
+                .filter_map(|event| {
+                    let value = self.get_field_value(field, event);
+                    value.parse::<f64>().ok()
+                })
+                .sum(),
             AggregationType::Average => {
-                let values: Vec<f64> = events.iter()
+                let values: Vec<f64> = events
+                    .iter()
                     .filter_map(|event| {
                         let value = self.get_field_value(field, event);
                         value.parse::<f64>().ok()
@@ -495,23 +560,21 @@ impl EventAggregator {
                 } else {
                     values.iter().sum::<f64>() / values.len() as f64
                 }
-            }
-            AggregationType::Max => {
-                events.iter()
-                    .filter_map(|event| {
-                        let value = self.get_field_value(field, event);
-                        value.parse::<f64>().ok()
-                    })
-                    .fold(0.0, f64::max)
-            }
-            AggregationType::Min => {
-                events.iter()
-                    .filter_map(|event| {
-                        let value = self.get_field_value(field, event);
-                        value.parse::<f64>().ok()
-                    })
-                    .fold(f64::INFINITY, f64::min)
-            }
+            },
+            AggregationType::Max => events
+                .iter()
+                .filter_map(|event| {
+                    let value = self.get_field_value(field, event);
+                    value.parse::<f64>().ok()
+                })
+                .fold(0.0, f64::max),
+            AggregationType::Min => events
+                .iter()
+                .filter_map(|event| {
+                    let value = self.get_field_value(field, event);
+                    value.parse::<f64>().ok()
+                })
+                .fold(f64::INFINITY, f64::min),
         }
     }
 }

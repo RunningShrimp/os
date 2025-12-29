@@ -20,11 +20,7 @@ pub struct BootStack {
 
 impl BootStack {
     pub fn new(base: u64, size: usize) -> Self {
-        Self {
-            base,
-            top: base + (size as u64),
-            size,
-        }
+        Self { base, top: base + (size as u64), size }
     }
 
     /// Get stack pointer (top)

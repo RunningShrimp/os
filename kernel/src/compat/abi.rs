@@ -10,18 +10,14 @@
 extern crate alloc;
 extern crate hashbrown;
 
-use core::ffi::{c_void, c_char, c_int, c_uint};
 use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::string::ToString;
-use alloc::{format, vec};
 use alloc::boxed::Box;
-use hashbrown::HashMap;
 use crate::compat::DefaultHasherBuilder;
 use spin::Mutex;
 
 use crate::compat::*;
-
 /// ABI converter for handling different calling conventions
 pub struct AbiConverter {
     /// Platform calling conventions

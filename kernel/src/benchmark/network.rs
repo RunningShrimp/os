@@ -4,9 +4,6 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
-use crate::subsystems::time::hrtime_nanos;
-
 /// Network benchmark results
 #[derive(Debug, Clone)]
 pub struct NetworkBenchmarkResult {
@@ -27,9 +24,12 @@ pub struct NetworkBenchmarkResult {
 }
 
 /// Benchmark network packet processing
-pub fn benchmark_packet_processing(packet_size: usize, num_packets: usize) -> NetworkBenchmarkResult {
+pub fn benchmark_packet_processing(
+    packet_size: usize,
+    num_packets: usize,
+) -> NetworkBenchmarkResult {
     let start_time = hrtime_nanos();
-    
+
     let mut processed = 0usize;
     for _ in 0..num_packets {
         // Simulate packet processing
@@ -39,13 +39,13 @@ pub fn benchmark_packet_processing(packet_size: usize, num_packets: usize) -> Ne
         let _ = packet.len();
         processed += 1;
     }
-    
+
     let end_time = hrtime_nanos();
     let total_time = end_time - start_time;
     let avg_latency = total_time / num_packets as u64;
     let total_bytes = (processed * packet_size) as u64;
     let throughput = (total_bytes as f64 * 8.0 * 1_000_000_000.0) / total_time as f64 / 1_000_000.0; // Mbps
-    
+
     NetworkBenchmarkResult {
         name: "packet_processing",
         packet_size,
@@ -60,19 +60,18 @@ pub fn benchmark_packet_processing(packet_size: usize, num_packets: usize) -> Ne
 /// Run all network benchmarks
 pub fn run_all_network_benchmarks() {
     crate::println!("[benchmark] Running network benchmarks...");
-    
+
     // Small packet benchmark
     let small_result = benchmark_packet_processing(64, 10000);
     crate::println!("[benchmark] Small packets (64B, 10000x):");
     crate::println!("  Average latency: {} ns", small_result.avg_latency_ns);
     crate::println!("  Throughput: {:.2} Mbps", small_result.throughput_mbps);
-    
+
     // Large packet benchmark
     let large_result = benchmark_packet_processing(1500, 1000);
     crate::println!("[benchmark] Large packets (1500B, 1000x):");
     crate::println!("  Average latency: {} ns", large_result.avg_latency_ns);
     crate::println!("  Throughput: {:.2} Mbps", large_result.throughput_mbps);
-    
+
     crate::println!("[benchmark] Network benchmarks completed");
 }
-

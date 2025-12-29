@@ -1,21 +1,18 @@
 /// Host Intrusion Detection System (HIDS)
-
 extern crate alloc;
 
 /// 主机入侵检测系统模块
 /// 负责检测主机系统中的恶意活动和攻击模式
-
 use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::{string::String, sync::Arc, vec::Vec};
+
 use spin::Mutex;
 
-use crate::security::audit::{AuditEvent, AuditEventType, AuditSeverity};
-use super::super::{
-    IntrusionDetection, ThreatLevel, HostIdsConfig
+use super::{
+    super::{HostIdsConfig, IntrusionDetection, ThreatLevel},
+    types::HostIdsStats,
 };
-use super::types::HostIdsStats;
+use crate::security::audit::{AuditEvent, AuditEventType, AuditSeverity};
 
 /// 主机入侵检测系统
 pub struct HostIds {
@@ -1510,7 +1507,9 @@ impl HostIds {
         self.config = config.clone();
 
         // 初始化各个监控器
-        self.syscall_monitor.lock().init(&config.monitored_syscalls)?;
+        self.syscall_monitor
+            .lock()
+            .init(&config.monitored_syscalls)?;
         self.file_monitor.lock().init(&config.monitored_paths)?;
         self.process_monitor.lock().init()?;
         self.registry_monitor.lock().init()?;
@@ -1524,7 +1523,10 @@ impl HostIds {
     }
 
     /// 分析系统调用
-    pub fn analyze_syscall(&mut self, event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
+    pub fn analyze_syscall(
+        &mut self,
+        event: &AuditEvent,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         let start_time = crate::subsystems::time::timestamp_nanos();
 
         let detections = self.syscall_monitor.lock().analyze_syscall(event)?;
@@ -1543,7 +1545,10 @@ impl HostIds {
     }
 
     /// 分析文件事件
-    pub fn analyze_file_event(&mut self, event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
+    pub fn analyze_file_event(
+        &mut self,
+        event: &AuditEvent,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         let start_time = crate::subsystems::time::timestamp_nanos();
 
         let detections = self.file_monitor.lock().analyze_file_event(event)?;
@@ -1562,7 +1567,10 @@ impl HostIds {
     }
 
     /// 分析进程事件
-    pub fn analyze_process_event(&mut self, event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
+    pub fn analyze_process_event(
+        &mut self,
+        event: &AuditEvent,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         let start_time = crate::subsystems::time::timestamp_nanos();
 
         let detections = self.process_monitor.lock().analyze_process_event(event)?;
@@ -1581,10 +1589,16 @@ impl HostIds {
     }
 
     /// 分析注册表变化
-    pub fn analyze_registry_change(&mut self, event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
+    pub fn analyze_registry_change(
+        &mut self,
+        event: &AuditEvent,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         let start_time = crate::subsystems::time::timestamp_nanos();
 
-        let detections = self.registry_monitor.lock().analyze_registry_change(event)?;
+        let detections = self
+            .registry_monitor
+            .lock()
+            .analyze_registry_change(event)?;
 
         // 更新统计
         {
@@ -1600,10 +1614,16 @@ impl HostIds {
     }
 
     /// 分析网络连接
-    pub fn analyze_network_connection(&mut self, event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
+    pub fn analyze_network_connection(
+        &mut self,
+        event: &AuditEvent,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         let start_time = crate::subsystems::time::timestamp_nanos();
 
-        let detections = self.network_monitor.lock().analyze_network_connection(event)?;
+        let detections = self
+            .network_monitor
+            .lock()
+            .analyze_network_connection(event)?;
 
         // 更新统计
         {
@@ -1619,7 +1639,10 @@ impl HostIds {
     }
 
     /// 分析用户活动
-    pub fn analyze_user_activity(&mut self, event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
+    pub fn analyze_user_activity(
+        &mut self,
+        event: &AuditEvent,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         let start_time = crate::subsystems::time::timestamp_nanos();
 
         let detections = self.user_monitor.lock().analyze_user_activity(event)?;
@@ -1639,14 +1662,20 @@ impl HostIds {
 
     /// Analyze a generic audit event and dispatch to the correct analyzer.
     /// This makes HostIds usable from higher-level callers that only have an AuditEvent.
-    pub fn analyze_event(&mut self, event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
+    pub fn analyze_event(
+        &mut self,
+        event: &AuditEvent,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         match event.event_type {
             AuditEventType::Syscall => self.analyze_syscall(event),
             AuditEventType::FileAccess => self.analyze_file_event(event),
             AuditEventType::Process => self.analyze_process_event(event),
             AuditEventType::Network => self.analyze_network_connection(event),
-            // Map less-common event types to either specific analyzers or fall back to user activity
-            AuditEventType::Authentication | AuditEventType::PermissionChange | AuditEventType::Configuration => self.analyze_user_activity(event),
+            // Map less-common event types to either specific analyzers or fall back to user
+            // activity
+            AuditEventType::Authentication
+            | AuditEventType::PermissionChange
+            | AuditEventType::Configuration => self.analyze_user_activity(event),
             _ => Ok(Vec::new()),
         }
     }
@@ -1711,13 +1740,16 @@ impl SyscallMonitor {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn init(&mut self, _monitored_syscalls: &[u32]) -> Result<(), &'static str> {
         // TODO: 实现初始化逻辑
         Ok(())
     }
-    
-    pub fn analyze_syscall(&mut self, _event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
+
+    pub fn analyze_syscall(
+        &mut self,
+        _event: &AuditEvent,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         // TODO: 实现系统调用分析逻辑
         Ok(Vec::new())
     }
@@ -1738,13 +1770,16 @@ impl FileMonitor {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn init(&mut self, _monitored_paths: &[String]) -> Result<(), &'static str> {
         // TODO: 实现初始化逻辑
         Ok(())
     }
-    
-    pub fn analyze_file_event(&mut self, _event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
+
+    pub fn analyze_file_event(
+        &mut self,
+        _event: &AuditEvent,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         // TODO: 实现文件事件分析逻辑
         Ok(Vec::new())
     }
@@ -1765,13 +1800,16 @@ impl ProcessMonitor {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn init(&mut self) -> Result<(), &'static str> {
         // TODO: 实现初始化逻辑
         Ok(())
     }
-    
-    pub fn analyze_process_event(&mut self, _event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
+
+    pub fn analyze_process_event(
+        &mut self,
+        _event: &AuditEvent,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         // TODO: 实现进程事件分析逻辑
         Ok(Vec::new())
     }
@@ -1792,13 +1830,16 @@ impl RegistryMonitor {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn init(&mut self) -> Result<(), &'static str> {
         // TODO: 实现初始化逻辑
         Ok(())
     }
-    
-    pub fn analyze_registry_change(&mut self, _event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
+
+    pub fn analyze_registry_change(
+        &mut self,
+        _event: &AuditEvent,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         // TODO: 实现注册表变化分析逻辑
         Ok(Vec::new())
     }
@@ -1818,13 +1859,16 @@ impl NetworkMonitor {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn init(&mut self, _monitor_network: bool) -> Result<(), &'static str> {
         // TODO: 实现初始化逻辑
         Ok(())
     }
-    
-    pub fn analyze_network_connection(&mut self, _event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
+
+    pub fn analyze_network_connection(
+        &mut self,
+        _event: &AuditEvent,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         // TODO: 实现网络连接分析逻辑
         Ok(Vec::new())
     }
@@ -1844,47 +1888,68 @@ impl UserMonitor {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn init(&mut self) -> Result<(), &'static str> {
         // TODO: 实现初始化逻辑
         Ok(())
     }
-    
-    pub fn analyze_user_activity(&mut self, _event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
+
+    pub fn analyze_user_activity(
+        &mut self,
+        _event: &AuditEvent,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         // TODO: 实现用户活动分析逻辑
         Ok(Vec::new())
     }
 
-    pub fn analyze_syscall(&mut self, _event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
+    pub fn analyze_syscall(
+        &mut self,
+        _event: &AuditEvent,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         // TODO: 实现系统调用分析逻辑
         Ok(Vec::new())
     }
 
-    pub fn analyze_file_event(&mut self, _event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
+    pub fn analyze_file_event(
+        &mut self,
+        _event: &AuditEvent,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         // TODO: 实现文件事件分析逻辑
         Ok(Vec::new())
     }
 
-    pub fn analyze_process_event(&mut self, _event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
+    pub fn analyze_process_event(
+        &mut self,
+        _event: &AuditEvent,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         // TODO: 实现进程事件分析逻辑
         Ok(Vec::new())
     }
 
-    pub fn analyze_network_connection(&mut self, _event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
+    pub fn analyze_network_connection(
+        &mut self,
+        _event: &AuditEvent,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         // TODO: 实现网络连接分析逻辑
         Ok(Vec::new())
     }
 
     /// Analyze a generic audit event and dispatch to the correct analyzer.
     /// This makes HostIds usable from higher-level callers that only have an AuditEvent.
-    pub fn analyze_event(&mut self, event: &AuditEvent) -> Result<Vec<IntrusionDetection>, &'static str> {
+    pub fn analyze_event(
+        &mut self,
+        event: &AuditEvent,
+    ) -> Result<Vec<IntrusionDetection>, &'static str> {
         match event.event_type {
             AuditEventType::Syscall => self.analyze_syscall(event),
             AuditEventType::FileAccess => self.analyze_file_event(event),
             AuditEventType::Process => self.analyze_process_event(event),
             AuditEventType::Network => self.analyze_network_connection(event),
-            // Map less-common event types to either specific analyzers or fall back to user activity
-            AuditEventType::Authentication | AuditEventType::PermissionChange | AuditEventType::Configuration => self.analyze_user_activity(event),
+            // Map less-common event types to either specific analyzers or fall back to user
+            // activity
+            AuditEventType::Authentication
+            | AuditEventType::PermissionChange
+            | AuditEventType::Configuration => self.analyze_user_activity(event),
             _ => Ok(Vec::new()),
         }
     }
@@ -1904,12 +1969,12 @@ impl IntegrityChecker {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn init(&mut self) -> Result<(), &'static str> {
         // TODO: 实现初始化逻辑
         Ok(())
     }
-    
+
     pub fn perform_integrity_check(&mut self) -> Result<Vec<IntrusionDetection>, &'static str> {
         // TODO: 实现完整性检查逻辑
         Ok(Vec::new())
@@ -1936,12 +2001,12 @@ impl MalwareScanner {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn init(&mut self) -> Result<(), &'static str> {
         // TODO: 实现初始化逻辑
         Ok(())
     }
-    
+
     pub fn perform_scan(&mut self) -> Result<Vec<IntrusionDetection>, &'static str> {
         // TODO: 实现恶意软件扫描逻辑
         Ok(Vec::new())
@@ -2074,10 +2139,7 @@ impl StartupMonitor {
 
 impl Default for StartupMonitor {
     fn default() -> Self {
-        Self {
-            monitored_items: Vec::new(),
-            startup_changes: Vec::new(),
-        }
+        Self { monitored_items: Vec::new(), startup_changes: Vec::new() }
     }
 }
 
@@ -2095,7 +2157,7 @@ impl Default for NetworkAnomalyDetector {
                 connection_frequency_threshold: 100.0,
                 unusual_port_threshold: 32768,
                 data_volume_threshold: 104857600, // 100MB
-                duration_threshold: 300, // 5 minutes
+                duration_threshold: 300,          // 5 minutes
             },
         }
     }
@@ -2136,7 +2198,7 @@ impl Default for CheckScheduler {
                 default_interval: 3600, // 1 hour
                 check_window: CheckWindow {
                     start_time: 0,
-                    end_time: 86399, // 23:59:59
+                    end_time: 86399,                         // 23:59:59
                     allowed_days: vec![0, 1, 2, 3, 4, 5, 6], // All days
                 },
             },
@@ -2171,10 +2233,7 @@ impl Default for HeuristicScoringSystem {
         mapping.insert(70u32, ThreatLevel::High);
         mapping.insert(90u32, ThreatLevel::Critical);
 
-        Self {
-            scoring_rules: BTreeMap::new(),
-            risk_level_mapping: mapping,
-        }
+        Self { scoring_rules: BTreeMap::new(), risk_level_mapping: mapping }
     }
 }
 
@@ -2404,7 +2463,9 @@ mod tests {
             file_path: String::from("/usr/bin/test"),
             md5_hash: String::from("d41d8cd98f00b204e98099ecf8427e"),
             sha1_hash: String::from("da39a3ee5e6b4b0d3255bfef95601890afd80709"),
-            sha256_hash: String::from("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+            sha256_hash: String::from(
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            ),
             computed_at: 1234567890,
             file_size: 1024,
             file_permissions: 755,

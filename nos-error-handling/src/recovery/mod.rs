@@ -1,17 +1,18 @@
 //! Error recovery
-//! 
+//!
 //! This module provides error recovery strategies and management.
 
-use crate::Result;
-use crate::Error;
 use nos_api::collections::BTreeMap;
 use spin::Mutex;
 
+use crate::{Error, Result};
+
 extern crate alloc;
 
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::format;
+use alloc::{
+    format,
+    string::{String, ToString},
+};
 
 /// Recovery manager
 #[derive(Default)]
@@ -37,7 +38,7 @@ impl RecoveryManager {
     pub fn execute_recovery_action(&self, action: &crate::types::RecoveryAction) -> Result<()> {
         // Get the strategy for this action type
         let strategy = self.strategies.get(&(action.action_type as u32));
-        
+
         if let Some(strategy) = strategy {
             // Execute the strategy
             self.execute_strategy(strategy, action)
@@ -48,10 +49,14 @@ impl RecoveryManager {
     }
 
     /// Apply a recovery strategy
-    pub fn apply_recovery_strategy(&self, strategy_id: &crate::types::RecoveryStrategy, error_record: &crate::types::ErrorRecord) -> Result<()> {
+    pub fn apply_recovery_strategy(
+        &self,
+        strategy_id: &crate::types::RecoveryStrategy,
+        error_record: &crate::types::ErrorRecord,
+    ) -> Result<()> {
         // Get the strategy
         let strategy = self.strategies.get(&(*strategy_id as u32));
-        
+
         if let Some(strategy) = strategy {
             // Apply the strategy
             self.apply_strategy(strategy, error_record)
@@ -66,40 +71,48 @@ impl RecoveryManager {
     }
 
     /// Execute a strategy
-    fn execute_strategy(&self, strategy: &RecoveryStrategy, action: &crate::types::RecoveryAction) -> Result<()> {
+    fn execute_strategy(
+        &self,
+        strategy: &RecoveryStrategy,
+        action: &crate::types::RecoveryAction,
+    ) -> Result<()> {
         // TODO: Implement actual strategy execution
         let mut stats = self.stats.lock();
         stats.total_actions += 1;
-        
+
         if action.success {
             stats.successful_actions += 1;
         } else {
             stats.failed_actions += 1;
         }
-        
+
         // Use strategy parameter by accessing its fields
         let _ = &strategy.name;
         let _ = strategy.max_attempts;
-        
+
         Ok(())
     }
 
     /// Apply a strategy
-    fn apply_strategy(&self, strategy: &RecoveryStrategy, error_record: &crate::types::ErrorRecord) -> Result<()> {
+    fn apply_strategy(
+        &self,
+        strategy: &RecoveryStrategy,
+        error_record: &crate::types::ErrorRecord,
+    ) -> Result<()> {
         // TODO: Implement actual strategy application
         let mut stats = self.stats.lock();
         stats.total_strategies_applied += 1;
-        
+
         if error_record.resolved {
             stats.successful_strategies += 1;
         } else {
             stats.failed_strategies += 1;
         }
-        
+
         // Use strategy parameter by accessing its fields
         let _ = &strategy.name;
         let _ = strategy.id;
-        
+
         Ok(())
     }
 
@@ -108,13 +121,13 @@ impl RecoveryManager {
         // TODO: Implement default recovery action
         let mut stats = self.stats.lock();
         stats.total_actions += 1;
-        
+
         if action.success {
             stats.successful_actions += 1;
         } else {
             stats.failed_actions += 1;
         }
-        
+
         Ok(())
     }
 
@@ -144,7 +157,7 @@ impl RecoveryManager {
             retry_delay_ms: 1000,
             backoff_multiplier: 2.0,
         });
-        
+
         // Restart strategy
         self.add_strategy(RecoveryStrategy {
             id: crate::types::RecoveryActionType::Restart as u32,
@@ -154,7 +167,7 @@ impl RecoveryManager {
             retry_delay_ms: 5000,
             backoff_multiplier: 1.5,
         });
-        
+
         // Degrade strategy (using Isolate as the closest available variant)
         self.add_strategy(RecoveryStrategy {
             id: crate::types::RecoveryActionType::Isolate as u32,
@@ -208,17 +221,17 @@ static GLOBAL_MANAGER: spin::Once<Mutex<RecoveryManager>> = spin::Once::new();
 
 /// Initialize the global recovery manager
 pub fn init_manager() -> Result<()> {
-    GLOBAL_MANAGER.call_once(|| {
-        Mutex::new(RecoveryManager::new())
-    });
-    
+    GLOBAL_MANAGER.call_once(|| Mutex::new(RecoveryManager::new()));
+
     // Initialize the manager
     GLOBAL_MANAGER.get().unwrap().lock().init()
 }
 
 /// Get the global recovery manager
 pub fn get_manager() -> &'static Mutex<RecoveryManager> {
-    GLOBAL_MANAGER.get().expect("Recovery manager not initialized")
+    GLOBAL_MANAGER
+        .get()
+        .expect("Recovery manager not initialized")
 }
 
 /// Internal function to get the global recovery manager
@@ -240,7 +253,10 @@ pub fn execute_recovery_action(action: &crate::types::RecoveryAction) -> Result<
 }
 
 /// Apply a recovery strategy
-pub fn apply_recovery_strategy(strategy_id: &crate::types::RecoveryStrategy, error_record: &crate::types::ErrorRecord) -> Result<()> {
+pub fn apply_recovery_strategy(
+    strategy_id: &crate::types::RecoveryStrategy,
+    error_record: &crate::types::ErrorRecord,
+) -> Result<()> {
     let manager = get_manager_internal().lock();
     manager.apply_recovery_strategy(strategy_id, error_record)
 }
@@ -252,13 +268,14 @@ pub fn recovery_get_stats() -> RecoveryStats {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use alloc::string::ToString;
+
+    use super::*;
 
     #[test]
     fn test_recovery_manager() {
         let mut manager = RecoveryManager::new();
-        
+
         // Add a test strategy
         let strategy = RecoveryStrategy {
             id: 100,
@@ -269,7 +286,7 @@ mod tests {
             backoff_multiplier: 2.0,
         };
         manager.add_strategy(strategy);
-        
+
         // Execute a recovery action
         let action = crate::types::RecoveryAction {
             id: 1,
@@ -281,9 +298,9 @@ mod tests {
             result_message: "Success".to_string(),
             parameters: alloc::collections::BTreeMap::new(),
         };
-        
+
         assert!(manager.execute_recovery_action(&action).is_ok());
-        
+
         // Check statistics
         let stats = manager.get_stats();
         assert_eq!(stats.total_actions, 1);

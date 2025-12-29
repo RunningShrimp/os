@@ -34,11 +34,11 @@ pub extern "C" fn sys_glib_object_instance_create(
                     return -22; // EINVAL
                 }
                 info.clone()
-            }
+            },
             None => {
                 crate::println!("[glib_object] 对象类型不存在: {}", type_id);
                 return -2; // ENOENT
-            }
+            },
         }
     };
 
@@ -73,8 +73,7 @@ pub extern "C" fn sys_glib_object_instance_create(
         }
     }
 
-    crate::println!("[glib_object] 成功创建对象实例: ID={}, Type={}",
-        instance_id, type_info.name);
+    crate::println!("[glib_object] 成功创建对象实例: ID={}, Type={}", instance_id, type_info.name);
     instance_id as SyscallResult
 }
 
@@ -100,18 +99,19 @@ pub extern "C" fn sys_glib_object_ref(instance_id: u64) -> SyscallResult {
     let new_ref_count = {
         let instances = OBJECT_INSTANCES.lock();
         match instances.get(&instance_id) {
-            Some(instance_info) => {
-                instance_info.ref_count.fetch_add(1, Ordering::SeqCst) + 1
-            }
+            Some(instance_info) => instance_info.ref_count.fetch_add(1, Ordering::SeqCst) + 1,
             None => {
                 crate::println!("[glib_object] 对象实例不存在: {}", instance_id);
                 return -2; // ENOENT
-            }
+            },
         }
     };
 
-    crate::println!("[glib_object] 引用计数增加: instance={}, new_count={}",
-        instance_id, new_ref_count);
+    crate::println!(
+        "[glib_object] 引用计数增加: instance={}, new_count={}",
+        instance_id,
+        new_ref_count
+    );
     new_ref_count as SyscallResult
 }
 
@@ -146,11 +146,11 @@ pub extern "C" fn sys_glib_object_unref(instance_id: u64) -> SyscallResult {
                 let new_count = old_count - 1;
                 instance_info.ref_count.store(new_count, Ordering::SeqCst);
                 (new_count, new_count == 0)
-            }
+            },
             None => {
                 crate::println!("[glib_object] 对象实例不存在: {}", instance_id);
                 return -2; // ENOENT
-            }
+            },
         }
     };
 
@@ -181,8 +181,11 @@ pub extern "C" fn sys_glib_object_unref(instance_id: u64) -> SyscallResult {
 
         crate::println!("[glib_object] 对象已销毁: instance={}", instance_id);
     } else {
-        crate::println!("[glib_object] 引用计数减少: instance={}, new_count={}",
-            instance_id, new_ref_count);
+        crate::println!(
+            "[glib_object] 引用计数减少: instance={}, new_count={}",
+            instance_id,
+            new_ref_count
+        );
     }
 
     new_ref_count as SyscallResult

@@ -2,23 +2,19 @@
 
 extern crate alloc;
 
-use alloc::sync::Arc;
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
+use alloc::{sync::Arc, vec::Vec};
 
-use crate::vfs_interface::{SuperBlock, Inode, FileSystemType, FileAttr as VfsInterfaceFileAttr};
-use crate::vfs_interface::FileType as VfsFileType;
-use crate::subsystems::fs::{
-    FileMode,
-    VfsError,
-    FilesystemStats,
+use crate::{
+    subsystems::fs::{
+        FileMode, FilesystemStats, VfsError,
+        api::{DirEntry, DirEntryType, types::FileAttr},
+    },
+    vfs::types::FsStats,
+    vfs_interface::{FileAttr as VfsInterfaceFileAttr, FileSystemType, Inode, SuperBlock},
 };
-use crate::subsystems::fs::api::{DirEntry, DirEntryType, types::FileAttr};
-use crate::vfs::types::FsStats;
-use crate::subsystems::sync::Mutex;
 
 /// ProcFS inode structure
-struct ProcFsInode {
+pub struct ProcFsInode {
     ino: u64,
     name: String,
     file_type: DirEntryType,
@@ -28,12 +24,7 @@ struct ProcFsInode {
 impl ProcFsInode {
     /// Create a new procfs inode
     pub fn new(ino: u64, name: &str, file_type: DirEntryType, mode: FileMode) -> Self {
-        Self {
-            ino,
-            name: name.to_string(),
-            file_type,
-            mode,
-        }
+        Self { ino, name: name.to_string(), file_type, mode }
     }
 }
 
@@ -43,7 +34,7 @@ impl Inode for ProcFsInode {
         Ok(VfsInterfaceFileAttr {
             inode: self.ino,
             file_type: self.file_type,
-            mode: self.mode.0,  // Extract u32 from FileMode
+            mode: self.mode.0, // Extract u32 from FileMode
             nlink: 1,
             uid: 0,
             gid: 0,
@@ -76,39 +67,44 @@ impl Inode for ProcFsInode {
     fn write(&self, _offset: u64, _buf: &[u8]) -> Result<usize, VfsError> {
         Err(VfsError::ReadOnly)
     }
-    
-    fn create(&self, _name: &str, _mode: FileMode, _file_type: VfsFileType) -> Result<Arc<dyn Inode>, VfsError> {
+
+    fn create(
+        &self,
+        _name: &str,
+        _mode: FileMode,
+        _file_type: VfsFileType,
+    ) -> Result<Arc<dyn Inode>, VfsError> {
         Err(VfsError::PermissionDenied)
     }
-    
+
     fn mkdir(&self, _name: &str, _mode: FileMode) -> Result<Arc<dyn Inode>, VfsError> {
         Err(VfsError::PermissionDenied)
     }
-    
+
     fn unlink(&self, _name: &str) -> Result<(), VfsError> {
         Err(VfsError::PermissionDenied)
     }
-    
+
     fn rmdir(&self, _name: &str) -> Result<(), VfsError> {
         Err(VfsError::PermissionDenied)
     }
-    
+
     fn is_empty(&self) -> Result<bool, VfsError> {
         Ok(true)
     }
-    
+
     fn link(&self, _name: &str, _inode: Arc<dyn Inode>) -> Result<(), VfsError> {
         Err(VfsError::IoError)
     }
-    
+
     fn symlink(&self, _name: &str, _target: &str) -> Result<Arc<dyn Inode>, VfsError> {
         Err(VfsError::IoError)
     }
-    
+
     fn readlink(&self) -> Result<String, VfsError> {
         Err(VfsError::IoError)
     }
-    
+
     fn file_type(&self) -> VfsFileType {
         match self.file_type {
             DirEntryType::File => VfsFileType::RegularFile,
@@ -120,35 +116,40 @@ impl Inode for ProcFsInode {
             DirEntryType::Socket => VfsFileType::Socket,
         }
     }
-    
+
     fn name(&self) -> String {
         self.name.clone()
     }
-    
+
     fn parent(&self) -> Option<Arc<dyn Inode>> {
         None
     }
-    
+
     fn symlink_target(&self) -> Option<String> {
         None
     }
-    
+
     fn sync(&self) -> Result<(), VfsError> {
         Ok(())
     }
-    
+
     fn truncate(&self, _size: u64) -> Result<(), VfsError> {
         Err(VfsError::IoError)
     }
-    
-    fn rename(&self, _old_name: &str, _new_dir: &dyn Inode, _new_name: &str) -> Result<(), VfsError> {
+
+    fn rename(
+        &self,
+        _old_name: &str,
+        _new_dir: &dyn Inode,
+        _new_name: &str,
+    ) -> Result<(), VfsError> {
         Err(VfsError::IoError)
     }
-    
+
     fn ino(&self) -> u64 {
         self.ino
     }
-    
+
     fn mode(&self) -> FileMode {
         self.mode
     }
@@ -162,12 +163,7 @@ struct ProcFsSuperBlock {
 impl ProcFsSuperBlock {
     fn new() -> Self {
         Self {
-            root: Arc::new(ProcFsInode::new(
-                1,
-                "/",
-                DirEntryType::Directory,
-                FileMode::new(0o555)
-            )),
+            root: Arc::new(ProcFsInode::new(1, "/", DirEntryType::Directory, FileMode::new(0o555))),
         }
     }
 }
@@ -176,15 +172,15 @@ impl SuperBlock for ProcFsSuperBlock {
     fn root(&self) -> Arc<dyn Inode> {
         self.root.clone()
     }
-    
+
     fn fs_type(&self) -> &str {
         "procfs"
     }
-    
+
     fn sync(&self) -> Result<(), VfsError> {
         Ok(())
     }
-    
+
     fn statfs(&self) -> Result<FilesystemStats, VfsError> {
         let stats = FsStats {
             bsize: 4096,
@@ -207,7 +203,7 @@ impl SuperBlock for ProcFsSuperBlock {
         };
         Ok(stats.into())
     }
-    
+
     fn unmount(&self) -> Result<(), VfsError> {
         Ok(())
     }
@@ -220,7 +216,7 @@ impl FileSystemType for ProcFsType {
     fn name(&self) -> &str {
         "procfs"
     }
-    
+
     fn mount(&self, _device: Option<&str>, _flags: u32) -> Result<Arc<dyn SuperBlock>, VfsError> {
         Ok(Arc::new(ProcFsSuperBlock::new()))
     }

@@ -40,11 +40,7 @@ pub struct BootSecurityValidator {
 
 impl BootSecurityValidator {
     pub fn new(level: SecurityLevel) -> Self {
-        Self {
-            level,
-            checks_passed: 0,
-            checks_total: 0,
-        }
+        Self { level, checks_passed: 0, checks_total: 0 }
     }
 
     /// Check if kernel image is in valid memory range
@@ -79,11 +75,7 @@ impl BootSecurityValidator {
     }
 
     /// Check if memory range is accessible
-    pub fn validate_memory_range(
-        &mut self,
-        start: u64,
-        size: u64,
-    ) -> bool {
+    pub fn validate_memory_range(&mut self, start: u64, size: u64) -> bool {
         self.checks_total += 1;
 
         if size == 0 || size > 1024 * 1024 * 1024 {
@@ -131,26 +123,19 @@ impl BootSecurityValidator {
         match self.level {
             SecurityLevel::None => crate::drivers::console::write_str("None"),
             SecurityLevel::Basic => crate::drivers::console::write_str("Basic"),
-            SecurityLevel::Standard => {
-                crate::drivers::console::write_str("Standard")
-            }
+            SecurityLevel::Standard => crate::drivers::console::write_str("Standard"),
             SecurityLevel::Strict => crate::drivers::console::write_str("Strict"),
         }
         crate::drivers::console::write_str("\n");
         crate::drivers::console::write_str("  Checks passed: ");
-        crate::drivers::console::write_str(
-            if self.checks_passed > 0 { "OK" } else { "0" },
-        );
+        crate::drivers::console::write_str(if self.checks_passed > 0 { "OK" } else { "0" });
         crate::drivers::console::write_str("/");
-        crate::drivers::console::write_str(
-            if self.checks_total > 0 { "OK" } else { "0" },
-        );
+        crate::drivers::console::write_str(if self.checks_total > 0 { "OK" } else { "0" });
         crate::drivers::console::write_str("\n");
     }
 
     pub fn all_passed(&self) -> bool {
-        self.checks_passed == self.checks_total
-            && self.checks_total > 0
+        self.checks_passed == self.checks_total && self.checks_total > 0
     }
 }
 
@@ -161,8 +146,7 @@ impl Default for BootSecurityValidator {
 }
 
 /// Global security validator
-pub static mut SECURITY_VALIDATOR: Option<BootSecurityValidator> =
-    None;
+pub static mut SECURITY_VALIDATOR: Option<BootSecurityValidator> = None;
 
 pub fn init_security_validator(level: SecurityLevel) {
     unsafe {

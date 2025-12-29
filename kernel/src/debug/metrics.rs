@@ -1,7 +1,6 @@
 // 指标收集模块
 
 extern crate alloc;
-//
 // 提供全面的指标收集功能，包括系统指标、应用指标、
 // 自定义指标和指标聚合分析。
 //
@@ -14,22 +13,25 @@ extern crate alloc;
 // - 性能监控集成
 // - 实时指标分析
 
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use alloc::vec;
-use alloc::vec::Vec;
-use alloc::boxed::Box;
-use alloc::string::String;
-use alloc::string::ToString;
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use core::time::Duration;
-use spin::Mutex;
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
+use core::{
+    sync::atomic::{AtomicU64, AtomicUsize, Ordering},
+    time::Duration,
+};
 
-use crate::time;
+use spin::Mutex;
 
 // Import println macro
 #[allow(unused_imports)]
 use crate::println;
+use crate::time;
 
 /// 指标类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -301,7 +303,9 @@ impl MetricRegistry {
         }
 
         definitions.insert(definition.name.clone(), definition.clone());
-        self.statistics.registered_metrics.store(definitions.len(), Ordering::SeqCst);
+        self.statistics
+            .registered_metrics
+            .store(definitions.len(), Ordering::SeqCst);
 
         // 初始化实例存储
         let mut instances = self.instances.lock();
@@ -314,15 +318,21 @@ impl MetricRegistry {
     }
 
     /// 记录指标值
-    pub fn record_metric(&self, metric_name: &str, label_values: Vec<String>, value: MetricValue) -> Result<(), MetricsError> {
+    pub fn record_metric(
+        &self,
+        metric_name: &str,
+        label_values: Vec<String>,
+        value: MetricValue,
+    ) -> Result<(), MetricsError> {
         let definitions = self.definitions.lock();
-        let definition = definitions.get(metric_name)
+        let definition = definitions
+            .get(metric_name)
             .ok_or(MetricsError::MetricNotFound(metric_name.to_string()))?;
 
         if label_values.len() != definition.label_keys.len() {
             return Err(MetricsError::LabelMismatch(
                 definition.label_keys.len(),
-                label_values.len()
+                label_values.len(),
             ));
         }
 
@@ -338,7 +348,10 @@ impl MetricRegistry {
         let metric_instances = instances.get_mut(metric_name).unwrap();
 
         // 查找是否已存在相同标签的实例
-        if let Some(existing) = metric_instances.iter_mut().find(|i| i.label_values == label_values) {
+        if let Some(existing) = metric_instances
+            .iter_mut()
+            .find(|i| i.label_values == label_values)
+        {
             existing.value = instance.value;
             existing.last_updated = instance.last_updated;
         } else {
@@ -349,9 +362,15 @@ impl MetricRegistry {
     }
 
     /// 递增计数器
-    pub fn increment_counter(&self, metric_name: &str, label_values: Vec<String>, value: u64) -> Result<(), MetricsError> {
+    pub fn increment_counter(
+        &self,
+        metric_name: &str,
+        label_values: Vec<String>,
+        value: u64,
+    ) -> Result<(), MetricsError> {
         let definitions = self.definitions.lock();
-        let definition = definitions.get(metric_name)
+        let definition = definitions
+            .get(metric_name)
             .ok_or(MetricsError::MetricNotFound(metric_name.to_string()))?;
 
         if definition.metric_type != MetricType::Counter {
@@ -362,7 +381,10 @@ impl MetricRegistry {
         let metric_instances = instances.get_mut(metric_name).unwrap();
 
         // 查找或创建实例
-        if let Some(existing) = metric_instances.iter_mut().find(|i| i.label_values == label_values) {
+        if let Some(existing) = metric_instances
+            .iter_mut()
+            .find(|i| i.label_values == label_values)
+        {
             if let MetricValue::Counter(current) = &mut existing.value {
                 *current += value;
                 existing.last_updated = time::timestamp_millis();
@@ -380,9 +402,15 @@ impl MetricRegistry {
     }
 
     /// 设置计量器值
-    pub fn set_gauge(&self, metric_name: &str, label_values: Vec<String>, value: f64) -> Result<(), MetricsError> {
+    pub fn set_gauge(
+        &self,
+        metric_name: &str,
+        label_values: Vec<String>,
+        value: f64,
+    ) -> Result<(), MetricsError> {
         let definitions = self.definitions.lock();
-        let definition = definitions.get(metric_name)
+        let definition = definitions
+            .get(metric_name)
             .ok_or(MetricsError::MetricNotFound(metric_name.to_string()))?;
 
         if definition.metric_type != MetricType::Gauge {
@@ -393,7 +421,10 @@ impl MetricRegistry {
         let metric_instances = instances.get_mut(metric_name).unwrap();
 
         // 查找或创建实例
-        if let Some(existing) = metric_instances.iter_mut().find(|i| i.label_values == label_values) {
+        if let Some(existing) = metric_instances
+            .iter_mut()
+            .find(|i| i.label_values == label_values)
+        {
             if let MetricValue::Gauge(_) = &mut existing.value {
                 existing.value = MetricValue::Gauge(value);
                 existing.last_updated = time::timestamp_millis();
@@ -411,9 +442,15 @@ impl MetricRegistry {
     }
 
     /// 观察直方图值
-    pub fn observe_histogram(&self, metric_name: &str, label_values: Vec<String>, value: f64) -> Result<(), MetricsError> {
+    pub fn observe_histogram(
+        &self,
+        metric_name: &str,
+        label_values: Vec<String>,
+        value: f64,
+    ) -> Result<(), MetricsError> {
         let definitions = self.definitions.lock();
-        let definition = definitions.get(metric_name)
+        let definition = definitions
+            .get(metric_name)
             .ok_or(MetricsError::MetricNotFound(metric_name.to_string()))?;
 
         if definition.metric_type != MetricType::Histogram {
@@ -424,7 +461,10 @@ impl MetricRegistry {
         let metric_instances = instances.get_mut(metric_name).unwrap();
 
         // 查找或创建实例
-        if let Some(existing) = metric_instances.iter_mut().find(|i| i.label_values == label_values) {
+        if let Some(existing) = metric_instances
+            .iter_mut()
+            .find(|i| i.label_values == label_values)
+        {
             if let MetricValue::Histogram(hist) = &mut existing.value {
                 hist.sample_count += 1;
                 hist.sample_sum += value;
@@ -439,7 +479,9 @@ impl MetricRegistry {
             }
         } else {
             // 创建新的直方图
-            let default_buckets = vec![0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0];
+            let default_buckets = vec![
+                0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
+            ];
             let bucket_counts = vec![0; default_buckets.len()];
 
             metric_instances.push(MetricInstance {
@@ -477,7 +519,10 @@ impl MetricRegistry {
     }
 
     /// 添加系统收集器
-    pub fn add_system_collector(&self, collector: Box<dyn SystemMetricsCollector>) -> Result<(), MetricsError> {
+    pub fn add_system_collector(
+        &self,
+        collector: Box<dyn SystemMetricsCollector>,
+    ) -> Result<(), MetricsError> {
         let mut collectors = self.system_collectors.lock();
         collectors.push(collector);
         crate::println!("[metrics] 添加系统收集器: {}", collectors.last().unwrap().name());
@@ -485,7 +530,11 @@ impl MetricRegistry {
     }
 
     /// 添加自定义收集器
-    pub fn add_custom_collector(&self, name: String, collector: Box<dyn MetricsCollector>) -> Result<(), MetricsError> {
+    pub fn add_custom_collector(
+        &self,
+        name: String,
+        collector: Box<dyn MetricsCollector>,
+    ) -> Result<(), MetricsError> {
         let mut collectors = self.custom_collectors.lock();
         collectors.insert(name.clone(), collector);
         crate::println!("[metrics] 添加自定义收集器: {}", name);
@@ -503,19 +552,22 @@ impl MetricRegistry {
             match collector.collect_metrics() {
                 Ok(mut metrics) => {
                     all_metrics.append(&mut metrics);
-                    self.statistics.total_samples_collected.fetch_add(
-                        metrics.len() as u64,
-                        Ordering::SeqCst
-                    );
-                }
+                    self.statistics
+                        .total_samples_collected
+                        .fetch_add(metrics.len() as u64, Ordering::SeqCst);
+                },
                 Err(e) => {
-                    self.statistics.collection_errors.fetch_add(1, Ordering::SeqCst);
+                    self.statistics
+                        .collection_errors
+                        .fetch_add(1, Ordering::SeqCst);
                     crate::println!("[metrics] 系统指标收集失败 {}: {:?}", collector.name(), e);
-                }
+                },
             }
 
             let collection_time = time::timestamp_nanos() - start_time;
-            self.statistics.collection_time_total.fetch_add(collection_time, Ordering::SeqCst);
+            self.statistics
+                .collection_time_total
+                .fetch_add(collection_time, Ordering::SeqCst);
         }
 
         Ok(all_metrics)
@@ -530,15 +582,16 @@ impl MetricRegistry {
             match collector.collect() {
                 Ok(mut metrics) => {
                     all_metrics.append(&mut metrics);
-                    self.statistics.total_samples_collected.fetch_add(
-                        metrics.len() as u64,
-                        Ordering::SeqCst
-                    );
-                }
+                    self.statistics
+                        .total_samples_collected
+                        .fetch_add(metrics.len() as u64, Ordering::SeqCst);
+                },
                 Err(e) => {
-                    self.statistics.collection_errors.fetch_add(1, Ordering::SeqCst);
+                    self.statistics
+                        .collection_errors
+                        .fetch_add(1, Ordering::SeqCst);
                     crate::println!("[metrics] 自定义指标收集失败 {}: {:?}", name, e);
-                }
+                },
             }
         }
 
@@ -549,22 +602,24 @@ impl MetricRegistry {
     pub fn get_statistics(&self) -> MetricsStatistics {
         MetricsStatistics {
             registered_metrics: AtomicUsize::new(
-                self.statistics.registered_metrics.load(Ordering::SeqCst)
+                self.statistics.registered_metrics.load(Ordering::SeqCst),
             ),
             total_samples_collected: AtomicU64::new(
-                self.statistics.total_samples_collected.load(Ordering::SeqCst)
+                self.statistics
+                    .total_samples_collected
+                    .load(Ordering::SeqCst),
             ),
             collection_errors: AtomicU64::new(
-                self.statistics.collection_errors.load(Ordering::SeqCst)
+                self.statistics.collection_errors.load(Ordering::SeqCst),
             ),
             aggregated_metrics: AtomicUsize::new(
-                self.statistics.aggregated_metrics.load(Ordering::SeqCst)
+                self.statistics.aggregated_metrics.load(Ordering::SeqCst),
             ),
             exported_metrics: AtomicU64::new(
-                self.statistics.exported_metrics.load(Ordering::SeqCst)
+                self.statistics.exported_metrics.load(Ordering::SeqCst),
             ),
             collection_time_total: AtomicU64::new(
-                self.statistics.collection_time_total.load(Ordering::SeqCst)
+                self.statistics.collection_time_total.load(Ordering::SeqCst),
             ),
         }
     }
@@ -679,9 +734,7 @@ impl SystemMetricsCollector for CpuMetricsCollector {
 impl MemoryMetricsCollector {
     /// 创建新的内存指标收集器
     pub fn new() -> Self {
-        Self {
-            last_collection: Arc::new(Mutex::new(0)),
-        }
+        Self { last_collection: Arc::new(Mutex::new(0)) }
     }
 }
 
@@ -692,7 +745,7 @@ impl SystemMetricsCollector for MemoryMetricsCollector {
 
         // 简单实现，实际应该从系统获取真实数据
         let total_memory = 1024 * 1024 * 1024; // 1GB
-        let free_memory = 512 * 1024 * 1024;   // 512MB
+        let free_memory = 512 * 1024 * 1024; // 512MB
         let used_memory = total_memory - free_memory;
         let available_memory = free_memory;
 
@@ -780,8 +833,8 @@ impl SystemMetricsCollector for NetworkMetricsCollector {
 
         // 简单实现，实际应该从系统获取真实数据
         let current_stats = NetworkStats {
-            rx_bytes: 1024 * 1024,    // 1MB
-            tx_bytes: 512 * 1024,     // 512KB
+            rx_bytes: 1024 * 1024, // 1MB
+            tx_bytes: 512 * 1024,  // 512KB
             rx_packets: 1000,
             tx_packets: 500,
         };
@@ -792,8 +845,10 @@ impl SystemMetricsCollector for NetworkMetricsCollector {
         if *last_collection > 0 {
             let time_diff = current_time - *last_collection;
             if time_diff > 0 {
-                let rx_rate = (current_stats.rx_bytes - last_stats.rx_bytes) as f64 / (time_diff as f64 / 1000.0);
-                let tx_rate = (current_stats.tx_bytes - last_stats.tx_bytes) as f64 / (time_diff as f64 / 1000.0);
+                let rx_rate = (current_stats.rx_bytes - last_stats.rx_bytes) as f64
+                    / (time_diff as f64 / 1000.0);
+                let tx_rate = (current_stats.tx_bytes - last_stats.tx_bytes) as f64
+                    / (time_diff as f64 / 1000.0);
 
                 // 接收速率
                 metrics.push(MetricInstance {
@@ -889,25 +944,25 @@ impl MetricsExporter for PrometheusExporter {
                     match &metric.value {
                         MetricValue::Counter(value) => {
                             crate::println!("{} {}", metric_name, value);
-                        }
+                        },
                         MetricValue::Gauge(value) => {
                             crate::println!("{} {}", metric_name, value);
-                        }
+                        },
                         MetricValue::Histogram(hist) => {
                             crate::println!("{}_count {}", metric_name, hist.sample_count);
                             crate::println!("{}_sum {}", metric_name, hist.sample_sum);
-                        }
+                        },
                         MetricValue::Summary(summary) => {
                             crate::println!("{}_count {}", metric_name, summary.sample_count);
                             crate::println!("{}_sum {}", metric_name, summary.sample_sum);
-                        }
+                        },
                     }
                 }
-            }
+            },
             PrometheusFormat::Protobuf => {
                 // 简化实现，实际应该使用Protocol Buffers格式
                 crate::println!("Protobuf format export not implemented");
-            }
+            },
         }
 
         Ok(())
@@ -942,7 +997,7 @@ impl core::fmt::Display for MetricsError {
             MetricsError::MetricNotFound(name) => write!(f, "指标不存在: {}", name),
             MetricsError::LabelMismatch(expected, actual) => {
                 write!(f, "标签数量不匹配，期望: {}，实际: {}", expected, actual)
-            }
+            },
             MetricsError::InvalidMetricType(t) => write!(f, "无效的指标类型: {}", t),
             MetricsError::CollectionError(msg) => write!(f, "收集错误: {}", msg),
             MetricsError::ExportError(msg) => write!(f, "导出错误: {}", msg),
@@ -973,7 +1028,8 @@ pub fn init() -> Result<(), MetricsError> {
 /// 获取全局指标注册表
 pub fn get_metric_registry() -> Result<Arc<MetricRegistry>, MetricsError> {
     let registry = METRIC_REGISTRY.lock();
-    registry.as_ref()
+    registry
+        .as_ref()
         .cloned()
         .ok_or(MetricsError::CollectionError("指标注册表未初始化".to_string()))
 }

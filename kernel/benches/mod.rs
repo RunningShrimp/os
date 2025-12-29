@@ -8,8 +8,7 @@
 //! - Statistical analysis
 
 extern crate alloc;
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use core::time::Duration;
 
 /// Benchmark result
@@ -84,9 +83,7 @@ pub struct BenchmarkRunner {
 
 impl BenchmarkRunner {
     pub fn new() -> Self {
-        Self {
-            config: BenchmarkConfig::default(),
-        }
+        Self { config: BenchmarkConfig::default() }
     }
 
     pub fn with_config(config: BenchmarkConfig) -> Self {
@@ -117,10 +114,7 @@ impl BenchmarkRunner {
 
     /// Run multiple benchmarks
     pub fn run_all(&self, benchmarks: &mut [&mut dyn Benchmark]) -> Vec<BenchmarkResult> {
-        benchmarks
-            .iter()
-            .map(|b| self.run(*b))
-            .collect()
+        benchmarks.iter().map(|b| self.run(*b)).collect()
     }
 }
 
@@ -149,9 +143,7 @@ pub struct Timer {
 
 impl Timer {
     pub fn new() -> Self {
-        Self {
-            start: Self::read_cycles(),
-        }
+        Self { start: Self::read_cycles() }
     }
 
     fn read_cycles() -> u64 {
@@ -187,10 +179,7 @@ pub struct RegressionDetector {
 
 impl RegressionDetector {
     pub fn new(tolerance: f64) -> Self {
-        Self {
-            baseline: Vec::new(),
-            tolerance,
-        }
+        Self { baseline: Vec::new(), tolerance }
     }
 
     pub fn set_baseline(&mut self, results: Vec<BenchmarkResult>) {

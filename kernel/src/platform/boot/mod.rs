@@ -6,11 +6,9 @@
 extern crate alloc;
 use core::ptr;
 
-
 // Re-export unified boot parameters from nos-api
 pub use nos_api::boot::{
-    BootParameters, BootProtocolType, MemoryType, 
-    MemoryMap, MemoryMapEntry, FramebufferInfo
+    BootParameters, BootProtocolType, FramebufferInfo, MemoryMap, MemoryMapEntry, MemoryType,
 };
 
 // Helper functions for compatibility
@@ -48,9 +46,7 @@ impl Iterator for MemoryMapIter {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.current < self.count {
-            let entry = unsafe { 
-                &*(self.entries as *const MemoryMapEntry).add(self.current) 
-            };
+            let entry = unsafe { &*(self.entries as *const MemoryMapEntry).add(self.current) };
             self.current += 1;
             Some(entry)
         } else {
@@ -68,10 +64,7 @@ impl MemoryMap {
     /// Get total usable memory size
     pub fn usable_memory(&self) -> u64 {
         self.entries()
-            .filter(|entry| {
-                entry.is_available != 0 && 
-                entry.mem_type == MemoryType::Usable as u32
-            })
+            .filter(|entry| entry.is_available != 0 && entry.mem_type == MemoryType::Usable as u32)
             .map(|entry| entry.size)
             .sum()
     }
@@ -91,27 +84,48 @@ pub fn init_from_boot_parameters(params: *const BootParameters) {
                 BOOT_PARAMETERS = Some(BootParameters::new());
             } else {
                 let params_ref = &*params;
-                
+
                 // Verify version compatibility
                 if !params_ref.is_version_compatible() {
-                    crate::println!("[boot] ERROR: Boot parameters version {} is not compatible with kernel (requires version {})", 
-                        params_ref.version, BootParameters::VERSION);
+                    crate::println!(
+                        "[boot] ERROR: Boot parameters version {} is not compatible with kernel \
+                         (requires version {})",
+                        params_ref.version,
+                        BootParameters::VERSION
+                    );
                     // In production, this should be fatal
                     #[cfg(feature = "strict_boot")]
                     {
                         crate::panic!("Incompatible boot parameters version");
                     }
                 }
-                
+
                 // Verify architecture match
                 if !params_ref.validate_architecture() {
-                    crate::println!("[boot] ERROR: Architecture mismatch - boot params: {}, kernel: {}", 
+                    crate::println!(
+                        "[boot] ERROR: Architecture mismatch - boot params: {}, kernel: {}",
                         params_ref.architecture_name(),
                         {
-                            #[cfg(target_arch = "x86_64")] { "x86_64" }
-                            #[cfg(target_arch = "aarch64")] { "aarch64" }
-                            #[cfg(target_arch = "riscv64")] { "riscv64" }
-                            #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))] { "unknown" }
+                            #[cfg(target_arch = "x86_64")]
+                            {
+                                "x86_64"
+                            }
+                            #[cfg(target_arch = "aarch64")]
+                            {
+                                "aarch64"
+                            }
+                            #[cfg(target_arch = "riscv64")]
+                            {
+                                "riscv64"
+                            }
+                            #[cfg(not(any(
+                                target_arch = "x86_64",
+                                target_arch = "aarch64",
+                                target_arch = "riscv64"
+                            )))]
+                            {
+                                "unknown"
+                            }
                         }
                     );
                     #[cfg(feature = "strict_boot")]
@@ -119,14 +133,13 @@ pub fn init_from_boot_parameters(params: *const BootParameters) {
                         crate::panic!("Architecture mismatch in boot parameters");
                     }
                 }
-                
-                
+
                 // Verify pointer validity for optional fields
                 if params_ref.has_command_line() {
                     // Would need to verify command_line pointer is valid
                     // For now, just check it's not null
                 }
-                
+
                 BOOT_PARAMETERS = Some(*params_ref);
             }
             BOOT_INITIALIZED = true;
@@ -151,7 +164,7 @@ pub fn get_memory_map() -> Option<&'static MemoryMap> {
 
 /// Get framebuffer information
 pub fn get_framebuffer_info() -> Option<FramebufferInfo> {
-    unsafe { 
+    unsafe {
         BOOT_PARAMETERS.as_ref().and_then(|params| {
             if params.has_framebuffer() {
                 Some(params.framebuffer)
@@ -164,7 +177,7 @@ pub fn get_framebuffer_info() -> Option<FramebufferInfo> {
 
 /// Get ACPI RSDP address
 pub fn get_acpi_rsdp() -> Option<u64> {
-    unsafe { 
+    unsafe {
         BOOT_PARAMETERS.as_ref().and_then(|params| {
             if params.has_acpi() {
                 Some(params.acpi_rsdp)
@@ -177,7 +190,7 @@ pub fn get_acpi_rsdp() -> Option<u64> {
 
 /// Get device tree blob address
 pub fn get_device_tree() -> Option<u64> {
-    unsafe { 
+    unsafe {
         BOOT_PARAMETERS.as_ref().and_then(|params| {
             if params.has_device_tree() {
                 Some(params.device_tree)
@@ -190,19 +203,17 @@ pub fn get_device_tree() -> Option<u64> {
 
 /// Get command line arguments
 pub fn get_command_line() -> Option<&'static str> {
-    unsafe { 
+    unsafe {
         BOOT_PARAMETERS.as_ref().and_then(|params| {
             if params.has_command_line() {
                 // Convert u64 pointer to &str
                 // Safety: caller must ensure pointer is valid
-                Some(core::str::from_utf8_unchecked(
-                    core::slice::from_raw_parts(
-                        params.command_line as *const u8,
-                        // Would need to find null terminator or use a length field
-                        // For now, this is unsafe and simplified
-                        256
-                    )
-                ))
+                Some(core::str::from_utf8_unchecked(core::slice::from_raw_parts(
+                    params.command_line as *const u8,
+                    // Would need to find null terminator or use a length field
+                    // For now, this is unsafe and simplified
+                    256,
+                )))
             } else {
                 None
             }
@@ -217,8 +228,9 @@ pub fn get_boot_timestamp() -> Option<u64> {
 
 /// Get ASLR offset from boot parameters
 pub fn get_aslr_offset() -> usize {
-    unsafe { 
-        BOOT_PARAMETERS.as_ref()
+    unsafe {
+        BOOT_PARAMETERS
+            .as_ref()
             .map(|params| params.aslr_offset_usize())
             .unwrap_or(0)
     }
@@ -226,8 +238,9 @@ pub fn get_aslr_offset() -> usize {
 
 /// Check if ASLR is enabled
 pub fn is_aslr_enabled() -> bool {
-    unsafe { 
-        BOOT_PARAMETERS.as_ref()
+    unsafe {
+        BOOT_PARAMETERS
+            .as_ref()
             .map(|params| params.has_aslr())
             .unwrap_or(false)
     }
@@ -241,19 +254,28 @@ pub fn init_direct_boot() {
         version: 1,
         architecture: {
             #[cfg(target_arch = "x86_64")]
-            { 1 }
+            {
+                1
+            }
             #[cfg(target_arch = "aarch64")]
-            { 2 }
+            {
+                2
+            }
             #[cfg(target_arch = "riscv64")]
-            { 3 }
-            #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
-            { 0 }
+            {
+                3
+            }
+            #[cfg(not(any(
+                target_arch = "x86_64",
+                target_arch = "aarch64",
+                target_arch = "riscv64"
+            )))]
+            {
+                0
+            }
         },
         boot_protocol: BootProtocolType::Direct as u32,
-        memory_map: MemoryMap {
-            entry_count: 0,
-            entries: 0,
-        },
+        memory_map: MemoryMap { entry_count: 0, entries: 0 },
         framebuffer: FramebufferInfo {
             address: 0,
             width: 0,
@@ -285,12 +307,20 @@ pub fn print_boot_info() {
 
         if let Some(memory_map) = get_memory_map() {
             crate::println!("[boot]   Memory map entries: {}", memory_map.entry_count);
-            crate::println!("[boot]   Usable memory: {} MB", memory_map.usable_memory() / (1024 * 1024));
+            crate::println!(
+                "[boot]   Usable memory: {} MB",
+                memory_map.usable_memory() / (1024 * 1024)
+            );
         }
 
         if params.has_framebuffer() {
             let fb = params.framebuffer.as_ref().unwrap();
-            crate::println!("[boot]   Framebuffer: {}x{}x{}", fb.width, fb.height, fb.bytes_per_pixel);
+            crate::println!(
+                "[boot]   Framebuffer: {}x{}x{}",
+                fb.width,
+                fb.height,
+                fb.bytes_per_pixel
+            );
         }
 
         if params.has_acpi() {
@@ -315,7 +345,7 @@ pub fn print_boot_info() {
         if let Some(timestamp) = get_boot_timestamp() {
             crate::println!("[boot]   Boot timestamp: {} ns", timestamp);
         }
-        
+
         if params.has_aslr() {
             crate::println!("[boot]   ASLR: enabled (offset: {:#x})", params.aslr_offset);
         } else {
@@ -331,13 +361,14 @@ pub fn init_memory_from_boot_info() {
     if let Some(params) = get_boot_parameters() {
         // Use params for validation/logging
         let _boot_params = &params; // Use params for validation
-        
+
         // Initialize memory management using bootloader-provided memory map
         if let Some(memory_map) = get_memory_map() {
             crate::println!("[boot] Initializing memory from bootloader memory map");
 
             // Count usable memory regions
-            let usable_regions = memory_map.entries()
+            let usable_regions = memory_map
+                .entries()
                 .filter(|entry| entry.is_available && entry.mem_type == MemoryType::Usable)
                 .count();
 
@@ -357,7 +388,11 @@ pub fn init_framebuffer_from_boot_info() {
         crate::println!("[boot] Initializing framebuffer from bootloader");
         crate::println!("[boot]   Address: {:#x}", fb_info.address);
         crate::println!("[boot]   Resolution: {}x{}", fb_info.width, fb_info.height);
-        crate::println!("[boot]   Format: {} BPP, stride: {}", fb_info.bytes_per_pixel, fb_info.stride);
+        crate::println!(
+            "[boot]   Format: {} BPP, stride: {}",
+            fb_info.bytes_per_pixel,
+            fb_info.stride
+        );
 
         // In a real implementation, we'd initialize the framebuffer driver here
     }

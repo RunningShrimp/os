@@ -59,12 +59,7 @@ pub struct EfiSignature {
 impl EfiSignature {
     /// Create EFI signature
     pub fn new(owner_guid: u64, cert_type: CertificateType) -> Self {
-        EfiSignature {
-            owner_guid,
-            data: [0u8; 256],
-            data_len: 0,
-            cert_type,
-        }
+        EfiSignature { owner_guid, data: [0u8; 256], data_len: 0, cert_type }
     }
 
     /// Set signature data
@@ -99,12 +94,7 @@ pub struct SecureBootVariable {
 impl SecureBootVariable {
     /// Create secure boot variable
     pub fn new(name_hash: u32) -> Self {
-        SecureBootVariable {
-            name_hash,
-            sig_count: 0,
-            timestamp: 0,
-            version: 1,
-        }
+        SecureBootVariable { name_hash, sig_count: 0, timestamp: 0, version: 1 }
     }
 }
 
@@ -503,7 +493,7 @@ mod tests {
         let mut framework = SecureBootFramework::new();
         let mut sig = EfiSignature::new(0x12345678, CertificateType::X509);
         sig.set_data(&[0xAAu8; 32]);
-        
+
         assert!(framework.load_platform_key(sig));
         assert_eq!(framework.get_pk_count(), 1);
     }
@@ -513,7 +503,7 @@ mod tests {
         let mut framework = SecureBootFramework::new();
         let mut sig = EfiSignature::new(0x87654321, CertificateType::X509);
         sig.set_data(&[0xBBu8; 32]);
-        
+
         assert!(framework.load_kek(sig));
         assert_eq!(framework.get_kek_count(), 1);
     }
@@ -523,7 +513,7 @@ mod tests {
         let mut framework = SecureBootFramework::new();
         let mut sig = EfiSignature::new(0xAABBCCDD, CertificateType::SHA256);
         sig.set_data(&[0xCCu8; 32]);
-        
+
         assert!(framework.load_authorized_signature(sig));
         assert_eq!(framework.get_db_count(), 1);
     }
@@ -533,7 +523,7 @@ mod tests {
         let mut framework = SecureBootFramework::new();
         let mut sig = EfiSignature::new(0xDDEEFF00, CertificateType::SHA256);
         sig.set_data(&[0xDDu8; 32]);
-        
+
         assert!(framework.load_forbidden_signature(sig));
         assert_eq!(framework.get_dbx_count(), 1);
     }
@@ -543,7 +533,7 @@ mod tests {
         let mut framework = SecureBootFramework::new();
         let data = [0xEEu8; 32];
         let sig = EfiSignature::new(0x12345678, CertificateType::X509);
-        
+
         assert!(framework.verify_signature(&data, &sig)); // Passes when disabled
     }
 
@@ -551,7 +541,7 @@ mod tests {
     fn test_verify_bootloader() {
         let mut framework = SecureBootFramework::new();
         let data = [0xFFu8; 32];
-        
+
         assert!(framework.verify_bootloader(&data));
     }
 
@@ -559,7 +549,7 @@ mod tests {
     fn test_verify_kernel() {
         let mut framework = SecureBootFramework::new();
         let data = [0x99u8; 64];
-        
+
         assert!(framework.verify_kernel(&data));
     }
 
@@ -567,7 +557,7 @@ mod tests {
     fn test_set_policy() {
         let mut framework = SecureBootFramework::new();
         framework.set_state(SecureBootState::SetupMode);
-        
+
         let new_policy = BootPolicy::permissive();
         assert!(framework.set_policy(new_policy));
     }
@@ -583,7 +573,7 @@ mod tests {
     fn test_secure_boot_report() {
         let mut framework = SecureBootFramework::new();
         framework.initialize();
-        
+
         let report = framework.secure_boot_report();
         assert_eq!(report.state, SecureBootState::Enabled);
         assert_eq!(report.signed_boots, 0);
@@ -593,7 +583,7 @@ mod tests {
     fn test_add_variable() {
         let mut framework = SecureBootFramework::new();
         let var = SecureBootVariable::new(0x1111);
-        
+
         assert!(framework.add_variable(var));
         assert_eq!(framework.get_variable_count(), 1);
     }
@@ -601,28 +591,28 @@ mod tests {
     #[test]
     fn test_multiple_variables() {
         let mut framework = SecureBootFramework::new();
-        
+
         for i in 0..8 {
             let var = SecureBootVariable::new(0x1000 + i);
             assert!(framework.add_variable(var));
         }
-        
+
         assert_eq!(framework.get_variable_count(), 8);
     }
 
     #[test]
     fn test_signature_databases() {
         let mut framework = SecureBootFramework::new();
-        
+
         let mut sig1 = EfiSignature::new(0x11111111, CertificateType::X509);
         sig1.set_data(&[0x11u8; 32]);
-        
+
         let mut sig2 = EfiSignature::new(0x22222222, CertificateType::SHA256);
         sig2.set_data(&[0x22u8; 32]);
-        
+
         framework.load_platform_key(sig1);
         framework.load_authorized_signature(sig2);
-        
+
         assert_eq!(framework.get_pk_count(), 1);
         assert_eq!(framework.get_db_count(), 1);
     }
@@ -631,10 +621,10 @@ mod tests {
     fn test_verification_tracking() {
         let mut framework = SecureBootFramework::new();
         framework.initialize();
-        
+
         let data = [0x99u8; 32];
         let sig = EfiSignature::new(0x99999999, CertificateType::X509);
-        
+
         framework.verify_signature(&data, &sig);
         assert!(framework.get_verification_failures() > 0);
     }
@@ -643,7 +633,7 @@ mod tests {
     fn test_signed_boot_tracking() {
         let mut framework = SecureBootFramework::new();
         framework.verify_bootloader(&[0xAAu8; 32]);
-        
+
         assert!(framework.get_signed_boots() > 0);
     }
 }

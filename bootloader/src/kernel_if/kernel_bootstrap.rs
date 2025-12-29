@@ -6,9 +6,8 @@
 //! - Register and memory state preparation
 //! - Kernel execution environment initialization
 
+use alloc::{format, string::String};
 use core::fmt;
-use alloc::string::String;
-use alloc::format;
 
 /// ELF header magic constant
 pub const ELF_MAGIC: u32 = 0x464C457F; // 0x7F 'E' 'L' 'F'
@@ -98,19 +97,19 @@ pub struct ElfHeader {
     pub version: u8,
     pub os_abi: u8,
     pub abi_version: u8,
-    pub e_type: u16,          // File type
-    pub e_machine: u16,       // Machine type
-    pub e_version: u32,       // Version
-    pub e_entry: u64,         // Entry point
-    pub e_phoff: u64,         // Program header offset
-    pub e_shoff: u64,         // Section header offset
-    pub e_flags: u32,         // Flags
-    pub e_ehsize: u16,        // ELF header size
-    pub e_phentsize: u16,     // Program header size
-    pub e_phnum: u16,         // Number of program headers
-    pub e_shentsize: u16,     // Section header size
-    pub e_shnum: u16,         // Number of section headers
-    pub e_shstrndx: u16,      // Section name string table index
+    pub e_type: u16,      // File type
+    pub e_machine: u16,   // Machine type
+    pub e_version: u32,   // Version
+    pub e_entry: u64,     // Entry point
+    pub e_phoff: u64,     // Program header offset
+    pub e_shoff: u64,     // Section header offset
+    pub e_flags: u32,     // Flags
+    pub e_ehsize: u16,    // ELF header size
+    pub e_phentsize: u16, // Program header size
+    pub e_phnum: u16,     // Number of program headers
+    pub e_shentsize: u16, // Section header size
+    pub e_shnum: u16,     // Number of section headers
+    pub e_shstrndx: u16,  // Section name string table index
 }
 
 impl ElfHeader {
@@ -147,9 +146,9 @@ impl ElfHeader {
     /// Get architecture
     pub fn get_architecture(&self) -> KernelArch {
         match self.e_machine {
-            0x3E => KernelArch::X86_64,    // x86-64
-            0xB7 => KernelArch::AArch64,   // ARM64
-            0xF3 => KernelArch::RiscV64,   // RISC-V
+            0x3E => KernelArch::X86_64,  // x86-64
+            0xB7 => KernelArch::AArch64, // ARM64
+            0xF3 => KernelArch::RiscV64, // RISC-V
             _ => KernelArch::Unknown,
         }
     }
@@ -165,7 +164,9 @@ impl fmt::Display for ElfHeader {
         write!(
             f,
             "ELF({}, {}, Entry: 0x{:x})",
-            self.elf_class, self.get_architecture(), self.e_entry
+            self.elf_class,
+            self.get_architecture(),
+            self.e_entry
         )
     }
 }
@@ -216,11 +217,11 @@ impl RegisterState {
             r13: 0,
             r14: 0,
             r15: 0,
-            rflags: 0x202,  // Interrupts enabled
+            rflags: 0x202, // Interrupts enabled
             rip: 0,
             cr0: 0x80000011, // PE + WP
             cr3: 0,
-            cr4: 0x20,      // PSE enabled
+            cr4: 0x20, // PSE enabled
         }
     }
 
@@ -270,14 +271,14 @@ impl fmt::Display for RegisterState {
 /// Boot arguments for kernel
 #[derive(Debug, Clone)]
 pub struct KernelBootArgs {
-    pub boot_loader_name: u32,     // Pointer to boot loader name
-    pub mmap_addr: u32,            // Memory map address
-    pub mmap_length: u32,          // Memory map length
-    pub drives_addr: u32,          // Drives address
-    pub drives_length: u32,        // Drives length
-    pub config_table: u32,         // Config table address
-    pub boot_loader_version: u32,  // Bootloader version
-    pub symbol_table: u32,         // Symbol table address
+    pub boot_loader_name: u32,    // Pointer to boot loader name
+    pub mmap_addr: u32,           // Memory map address
+    pub mmap_length: u32,         // Memory map length
+    pub drives_addr: u32,         // Drives address
+    pub drives_length: u32,       // Drives length
+    pub config_table: u32,        // Config table address
+    pub boot_loader_version: u32, // Bootloader version
+    pub symbol_table: u32,        // Symbol table address
     pub reserved1: u32,
 }
 

@@ -9,25 +9,29 @@
 //! - Uses concrete infrastructure components (BIOSServices, RealModeExecutor)
 //! - Hides implementation details from the application layer
 
-use crate::domain::hardware_detection::{
-    HardwareDetectionService, CpuInfo, CpuFeatures, DetectionCapabilities
-};
-use crate::domain::boot_services::{HardwareInfo, GraphicsCapabilities};
-use crate::bios::bios_calls::BIOSServices;
-use crate::bios::bios_realmode::RealModeExecutor;
 use alloc::boxed::Box;
+
+use crate::{
+    bios::{bios_calls::BIOSServices, bios_realmode::RealModeExecutor},
+    domain::{
+        boot_services::{GraphicsCapabilities, HardwareInfo},
+        hardware_detection::{
+            CpuFeatures, CpuInfo, DetectionCapabilities, HardwareDetectionService,
+        },
+    },
+};
 
 /// BIOS Hardware Detection Service
 ///
 /// Concrete implementation for BIOS-based hardware detection.
 /// This class implements the domain interface using BIOS services.
-/// 
+///
 /// # Responsibilities
 /// - Detect CPU information using CPUID instruction
 /// - Detect memory using BIOS E820 calls
 /// - Detect graphics capabilities using VBE BIOS calls
 /// - Provide hardware capability information
-/// 
+///
 /// # Architecture Notes
 /// This class belongs to the infrastructure layer and implements
 /// the domain interface defined in the domain layer.
@@ -57,7 +61,7 @@ impl BiosHardwareDetectionService {
             // In a real implementation, we would handle this error
             // For now, we just continue with an uninitialized executor
         }
-        
+
         Self {
             bios_services: None,
             executor,
@@ -103,40 +107,40 @@ impl BiosHardwareDetectionService {
         // In a real implementation, this would use CPUID instruction
         // For now, return mock features for a modern Intel CPU
         CpuFeatures {
-            fpu: true,      // Floating Point Unit
-            vme: true,      // Virtual Mode Extensions
-            de: true,       // Debugging Extensions
-            pse: true,      // Page Size Extension
-            tsc: true,      // Time Stamp Counter
-            msr: true,      // Model Specific Registers
-            pae: true,      // Physical Address Extension
-            mce: true,      // Machine Check Exception
-            cx8: true,      // CMPXCHG8B instruction
-            apic: true,     // Advanced Programmable Interrupt Controller
-            sep: true,      // SYSENTER/SYSEXIT instructions
-            mtrr: true,     // Memory Type Range Registers
-            pge: true,      // Page Global Enable
-            mca: true,      // Machine Check Architecture
-            cmov: true,     // CMOV instruction
-            pat: true,      // Page Attribute Table
-            pse36: true,    // 36-bit Page Size Extension
-            psn: false,     // Processor Serial Number (disabled for security)
-            clflush: true,   // CLFLUSH instruction
-            ds: false,       // Debug Store (not supported)
-            tm: false,       // Thermal Monitor (not supported)
-            pbe: false,      // Pending Break Enable (not supported)
-            sse: true,      // Streaming SIMD Extensions
-            sse2: true,     // Streaming SIMD Extensions 2
-            ss: true,       // Self-Snoop
-            htt: true,       // Hyper-Threading Technology
-            tm2: false,     // Thermal Monitor 2 (not supported)
-            ia64: false,     // IA-64 Architecture (not supported)
-            lm: true,       // Long Mode (64-bit support)
-            now: false,      // 3DNow! instructions (Intel CPU)
-            nowext: false,   // 3DNow! extensions (Intel CPU)
-            vmx: true,      // Intel Virtualization Technology
-            svm: false,      // AMD Virtualization Technology (Intel CPU)
-            nx: true,       // No-execute bit
+            fpu: true,     // Floating Point Unit
+            vme: true,     // Virtual Mode Extensions
+            de: true,      // Debugging Extensions
+            pse: true,     // Page Size Extension
+            tsc: true,     // Time Stamp Counter
+            msr: true,     // Model Specific Registers
+            pae: true,     // Physical Address Extension
+            mce: true,     // Machine Check Exception
+            cx8: true,     // CMPXCHG8B instruction
+            apic: true,    // Advanced Programmable Interrupt Controller
+            sep: true,     // SYSENTER/SYSEXIT instructions
+            mtrr: true,    // Memory Type Range Registers
+            pge: true,     // Page Global Enable
+            mca: true,     // Machine Check Architecture
+            cmov: true,    // CMOV instruction
+            pat: true,     // Page Attribute Table
+            pse36: true,   // 36-bit Page Size Extension
+            psn: false,    // Processor Serial Number (disabled for security)
+            clflush: true, // CLFLUSH instruction
+            ds: false,     // Debug Store (not supported)
+            tm: false,     // Thermal Monitor (not supported)
+            pbe: false,    // Pending Break Enable (not supported)
+            sse: true,     // Streaming SIMD Extensions
+            sse2: true,    // Streaming SIMD Extensions 2
+            ss: true,      // Self-Snoop
+            htt: true,     // Hyper-Threading Technology
+            tm2: false,    // Thermal Monitor 2 (not supported)
+            ia64: false,   // IA-64 Architecture (not supported)
+            lm: true,      // Long Mode (64-bit support)
+            now: false,    // 3DNow! instructions (Intel CPU)
+            nowext: false, // 3DNow! extensions (Intel CPU)
+            vmx: true,     // Intel Virtualization Technology
+            svm: false,    // AMD Virtualization Technology (Intel CPU)
+            nx: true,      // No-execute bit
         }
     }
 
@@ -157,14 +161,14 @@ impl BiosHardwareDetectionService {
     fn detect_memory_bios(&self) -> Result<(u64, u64), &'static str> {
         // Use the real mode executor to get memory map via INT 0x15/E820
         use crate::bios::bios_realmode::int15_e820;
-        
+
         // Example buffer address in low memory (0x5000 is a safe area)
         let buffer_addr = 0x5000;
         let continuation = 0;
-        
+
         // Use the encapsulated E820 call
         let result = int15_e820::call_e820(&self.executor, buffer_addr, continuation);
-        
+
         // Check if the call succeeded
         if result.is_err() {
             // If the call failed, fall back to mock values
@@ -172,7 +176,7 @@ impl BiosHardwareDetectionService {
             let available_memory = 512 * 1024 * 1024; // 512MB available
             return Ok((total_memory, available_memory));
         }
-        
+
         // For now, we still return mock values even though we used the executor
         // In a real implementation, we would parse the memory map returned by the BIOS
         let total_memory = 1024 * 1024 * 1024; // 1GB total
@@ -188,34 +192,31 @@ impl BiosHardwareDetectionService {
     fn detect_vbe_capabilities(&self) -> Result<GraphicsCapabilities, &'static str> {
         // Use the real mode executor to get VBE controller information
         use crate::bios::bios_realmode::int10_video;
-        
+
         // First, check if VBE is supported
         // We can use the int10_video module's capabilities indirectly
         // by testing if we can set a basic text mode
         let text_mode = 3; // 80x25 color text mode
         let mode_result = int10_video::set_video_mode(&self.executor, text_mode);
-        
+
         // Check if basic video mode change succeeded
         let basic_video_works = mode_result.is_ok();
-        
+
         // Additionally, check VBE support by executing INT 0x10/AH=0x4F00
         let mut ctx = crate::bios::bios_realmode::RealModeContext::new();
-        
+
         // Set up for VBE controller information call (INT 0x10/AH=0x4F00)
         ctx.eax = 0x4F00; // VBE function 00h: Get VBE controller information
         ctx.edi = 0x0000; // Pointer to VBE Controller Information structure
-                          // (in low 1MB, not used in this framework)
-        
+        // (in low 1MB, not used in this framework)
+
         // Execute the INT 0x10 call
-        let int_result = unsafe {
-            self.executor.execute_int(0x10, &mut ctx)
-        };
-        
+        let int_result = unsafe { self.executor.execute_int(0x10, &mut ctx) };
+
         // Check if VBE is supported
-        let vbe_supported = int_result.is_ok() && 
-                           !ctx.is_carry_set() && 
-                           ((ctx.eax & 0x00FF) == 0x00); // AL should be 00h for success
-        
+        let vbe_supported =
+            int_result.is_ok() && !ctx.is_carry_set() && ((ctx.eax & 0x00FF) == 0x00); // AL should be 00h for success
+
         // If VBE is not supported, return appropriate capabilities
         if !basic_video_works || !vbe_supported {
             return Ok(GraphicsCapabilities {
@@ -227,7 +228,7 @@ impl BiosHardwareDetectionService {
                 max_colors: 0,
             });
         }
-        
+
         // Even though we have VBE support, we still return mock values for now
         // In a real implementation, we would parse the VBE controller information
         // and query available modes to determine max_width, max_height, and max_colors
@@ -318,12 +319,7 @@ impl HardwareDetectionService for BiosHardwareDetectionService {
         let (family, model, stepping) = self.detect_cpu_family_model_stepping();
 
         let cpu_info = CpuInfo::new(
-            vendor,
-            family,
-            model,
-            stepping,
-            features,
-            48, // physical_address_bits
+            vendor, family, model, stepping, features, 48, // physical_address_bits
             48, // linear_address_bits
         );
 
@@ -368,13 +364,13 @@ impl HardwareDetectionService for BiosHardwareDetectionService {
 ///
 /// Concrete implementation for UEFI-based hardware detection.
 /// This class implements the domain interface using UEFI services.
-/// 
+///
 /// # Responsibilities
 /// - Detect CPU information using UEFI CPU services
 /// - Detect memory using UEFI memory map
 /// - Detect graphics capabilities using UEFI GOP
 /// - Provide hardware capability information
-/// 
+///
 /// # Architecture Notes
 /// This class belongs to the infrastructure layer and implements
 /// the domain interface defined in the domain layer.
@@ -394,10 +390,7 @@ impl UefiHardwareDetectionService {
     /// # Returns
     /// New instance of UEFI hardware detection service
     pub fn new() -> Self {
-        Self {
-            cached_hw_info: None,
-            cached_cpu_info: None,
-        }
+        Self { cached_hw_info: None, cached_cpu_info: None }
     }
 
     /// Detect CPU vendor using UEFI CPU services
@@ -503,12 +496,10 @@ impl HardwareDetectionService for UefiHardwareDetectionService {
         let features = self.detect_cpu_features();
 
         let cpu_info = CpuInfo::new(
-            vendor,
-            6,  // family
+            vendor, 6,  // family
             15, // model
             1,  // stepping
-            features,
-            48, // physical_address_bits
+            features, 48, // physical_address_bits
             48, // linear_address_bits
         );
 
@@ -550,11 +541,11 @@ pub fn create_hardware_detection_service(
         crate::protocol::BootProtocolType::Bios => {
             let executor = crate::bios::bios_realmode::RealModeExecutor::new();
             Ok(Box::new(BiosHardwareDetectionService::new(executor)))
-        }
+        },
         #[cfg(feature = "uefi_support")]
         crate::protocol::BootProtocolType::Uefi => {
             Ok(Box::new(UefiHardwareDetectionService::new()))
-        }
+        },
         crate::protocol::BootProtocolType::Multiboot2 => {
             // Use BIOS hardware detection for Multiboot2
             #[cfg(feature = "bios_support")]
@@ -566,15 +557,11 @@ pub fn create_hardware_detection_service(
             {
                 Err("No hardware detection service available for Multiboot2")
             }
-        }
+        },
         #[cfg(not(feature = "bios_support"))]
-        crate::protocol::BootProtocolType::Bios => {
-            Err("BIOS support not compiled")
-        }
+        crate::protocol::BootProtocolType::Bios => Err("BIOS support not compiled"),
         #[cfg(not(feature = "uefi_support"))]
-        crate::protocol::BootProtocolType::Uefi => {
-            Err("UEFI support not compiled")
-        }
+        crate::protocol::BootProtocolType::Uefi => Err("UEFI support not compiled"),
     }
 }
 
@@ -622,14 +609,14 @@ mod tests {
     fn test_graphics_mode_support() {
         let executor = crate::bios_realmode::RealModeExecutor::new();
         let service = BiosHardwareDetectionService::new(&executor);
-        
+
         // Supported modes
         assert!(service.supports_graphics_mode(1024, 768, 32));
         assert!(service.supports_graphics_mode(640, 480, 16));
-        
+
         // Unsupported modes
         assert!(!service.supports_graphics_mode(2560, 1440, 32)); // Too wide
-        assert!(!service.supports_graphics_mode(1024, 768, 8));  // Unsupported BPP
+        assert!(!service.supports_graphics_mode(1024, 768, 8)); // Unsupported BPP
     }
 
     #[test]
@@ -637,7 +624,7 @@ mod tests {
         let executor = crate::bios_realmode::RealModeExecutor::new();
         let service = BiosHardwareDetectionService::new(&executor);
         let caps = service.get_detection_capabilities();
-        
+
         assert!(caps.cpu_detection);
         assert!(caps.memory_detection);
         assert!(caps.graphics_detection);
@@ -650,13 +637,15 @@ mod tests {
     fn test_create_hardware_detection_service() {
         #[cfg(feature = "bios_support")]
         {
-            let service = create_hardware_detection_service(crate::protocol::BootProtocolType::Bios);
+            let service =
+                create_hardware_detection_service(crate::protocol::BootProtocolType::Bios);
             assert!(service.is_ok());
         }
-        
+
         #[cfg(feature = "uefi_support")]
         {
-            let service = create_hardware_detection_service(crate::protocol::BootProtocolType::Uefi);
+            let service =
+                create_hardware_detection_service(crate::protocol::BootProtocolType::Uefi);
             assert!(service.is_ok());
         }
     }
