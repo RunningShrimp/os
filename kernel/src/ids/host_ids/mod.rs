@@ -1,32 +1,48 @@
-#![allow(dead_code)]
 //! Host Intrusion Detection System (HIDS)
 //!
 //! 主机入侵检测系统模块
 //! 负责检测主机系统中的恶意活动和攻击模式
+//!
+//! # 架构
+//!
+//! 此模块提供了完整的主机入侵检测功能，包括：
+//! - 系统调用监控
+//! - 文件系统监控
+//! - 进程监控
+//! - 注册表监控
+//! - 网络连接监控
+//! - 用户活动监控
+//! - 完整性检查
+//! - 恶意软件扫描
+//!
+//! # 模块组织
+//!
+//! - [`types`] - 所有类型定义
+//! - [`detector`] - 各种监控器和检测器
+//! - [`stats`] - 统计信息
+//!
+//! # 使用示例
+//!
+//! ```rust,ignore
+//! use kernel::ids::host_ids::HostIds;
+//!
+//! let mut hids = HostIds::new();
+//! hids.init(&config)?;
+//!
+//! // 分析事件
+//! let detections = hids.analyze_event(&audit_event)?;
+//! ```
 
 extern crate alloc;
 
-// 重新导出所有子模块类型（临时，后续会移动到这里）
-// TODO: Create these submodules
-// pub use self::file::*;
-// pub use self::malware::*;
-// pub use self::network::*;
-// pub use self::process::*;
-// pub use self::registry::*;
-// pub use self::syscall::*;
-// pub use self::types::*;
-// pub use self::user::*;
-
-// 临时：保留原有文件作为过渡
-// TODO: 逐步拆分到各个子模块，将代码从host_ids.rs移动到对应的子模块
+// 导入所有子模块
+mod detector;
 mod host_ids;
+mod stats;
+mod types;
 
-// 重新导出主要类型
+// 重新导出公共API
+pub use detector::*;
 pub use host_ids::HostIds;
-
-// 注意：暂时注释掉未使用的重新导出以避免警告
-// TODO: 在实现完整的子模块后重新启用这些导出
-// pub use host_ids::{
-//     SyscallMonitor, FileMonitor, ProcessMonitor, RegistryMonitor,
-//     NetworkMonitor, UserMonitor, IntegrityChecker, MalwareScanner,
-// };
+pub use stats::*;
+pub use types::*;
