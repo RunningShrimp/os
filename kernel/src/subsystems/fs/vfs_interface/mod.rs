@@ -13,19 +13,19 @@ use alloc::string::String;
 // ============================================================================
 
 // Re-export FileMode from vfs::types
-pub use crate::vfs::types::FileMode;
+pub use crate::subsystems::fs::vfs::types::FileMode;
 
 // Re-export VfsError from vfs::error
-pub use crate::vfs::error::VfsError;
+pub use crate::subsystems::fs::vfs::error::VfsError;
 
 // Re-export FileAttr from vfs::types
-pub use crate::vfs::types::FileAttr;
+pub use crate::subsystems::fs::vfs::types::FileAttr;
 
 // Re-export DirEntry from vfs::dir
-pub use crate::vfs::dir::DirEntry;
+pub use crate::subsystems::fs::vfs::dir::DirEntry;
 
 // Re-export FileType from vfs::types to avoid conflicts
-pub use crate::vfs::types::FileType;
+pub use crate::subsystems::fs::vfs::types::FileType;
 
 // ============================================================================
 // VFS Interface uses vfs::types::FileType directly
@@ -38,12 +38,12 @@ pub use crate::vfs::types::FileType;
 /// 文件系统类型 trait - 所有文件系统实现都需要实现
 ///
 /// 这是一个类型别名，指向 vfs::core::FileSystemType
-pub use crate::vfs::core::FileSystemType;
+pub use crate::subsystems::fs::vfs::core::FileSystemType;
 
 /// 超级块 trait - 表示已挂载的文件系统实例
 ///
 /// 这是一个类型别名，指向 vfs::core::SuperBlock
-pub use crate::vfs::core::SuperBlock;
+pub use crate::subsystems::fs::vfs::core::SuperBlock;
 
 /// Inode trait - 表示文件系统中的文件/目录
 ///

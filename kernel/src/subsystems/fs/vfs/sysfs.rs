@@ -8,12 +8,12 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 
 use spin::Mutex;
 
-use crate::vfs_interface::{
+use crate::subsystems::fs::vfs_interface::{
     DirEntry, FileAttr, FileType as VfsFileType, FileMode as VfsFileMode, Inode, SuperBlock, VfsError,
 };
-use crate::vfs::InodeOps;
-use crate::vfs::core::FsStats;
-use crate::vfs::VfsResult;
+use crate::subsystems::fs::vfs::InodeOps;
+use crate::subsystems::fs::vfs::core::FsStats;
+use crate::subsystems::fs::vfs::VfsResult;
 
 /// SysFS file system type
 pub struct SysFsType;

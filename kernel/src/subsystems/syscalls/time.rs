@@ -94,7 +94,7 @@ fn sys_time(_args: &[u64]) -> SyscallResult<i64>{
 fn sys_gettimeofday(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyout;
-    use crate::posix::Timeval;
+    use crate::subsystems::posix::Timeval;
     use crate::libc::time_lib::Timezone;
     
     let args = extract_args(args, 2)?;
@@ -137,7 +137,7 @@ fn sys_gettimeofday(args: &[u64]) -> SyscallResult<i64>{
 fn sys_settimeofday(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyin;
-    use crate::posix::Timeval;
+    use crate::subsystems::posix::Timeval;
     
     let args = extract_args(args, 2)?;
     let tv_ptr = args[0] as usize;
@@ -184,7 +184,7 @@ fn sys_settimeofday(args: &[u64]) -> SyscallResult<i64>{
 fn sys_clock_gettime(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyout;
-    use crate::posix::Timespec;
+    use crate::subsystems::posix::Timespec;
     
     let args = extract_args(args, 2)?;
     let clockid = args[0] as i32;
@@ -246,7 +246,7 @@ fn sys_clock_gettime(args: &[u64]) -> SyscallResult<i64>{
 fn sys_clock_settime(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyin;
-    use crate::posix::Timespec;
+    use crate::subsystems::posix::Timespec;
     
     let args = extract_args(args, 2)?;
     let clockid = args[0] as i32;
@@ -299,7 +299,7 @@ fn sys_clock_settime(args: &[u64]) -> SyscallResult<i64>{
 fn sys_clock_getres(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyout;
-    use crate::posix::Timespec;
+    use crate::subsystems::posix::Timespec;
     
     let args = extract_args(args, 2)?;
     let clockid = args[0] as i32;
@@ -354,7 +354,7 @@ fn sys_clock_getres(args: &[u64]) -> SyscallResult<i64>{
 fn sys_nanosleep(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyout;
-    use crate::posix::Timespec;
+    use crate::subsystems::posix::Timespec;
     
     let args = extract_args(args, 2)?;
     let req_ptr = args[0] as *const Timespec;
@@ -437,7 +437,7 @@ fn sys_nanosleep(args: &[u64]) -> SyscallResult<i64>{
 fn sys_clock_nanosleep(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::{copyin, copyout};
-    use crate::posix::Timespec;
+    use crate::subsystems::posix::Timespec;
     
     let args = extract_args(args, 4)?;
     let clockid = args[0] as i32;
@@ -682,7 +682,7 @@ fn sys_getitimer(args: &[u64]) -> SyscallResult<i64>{
 fn sys_timer_create(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::{copyin, copyout};
-    use crate::posix::{SigEvent, SIGEV_SIGNAL};
+    use crate::subsystems::posix::{SigEvent, SIGEV_SIGNAL};
     
     let args = extract_args(args, 3)?;
     let clockid = args[0] as i32;
@@ -763,7 +763,7 @@ fn sys_timer_create(args: &[u64]) -> SyscallResult<i64>{
 fn sys_timer_settime(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::{copyin, copyout};
-    use crate::posix::{Itimerspec, TIMER_ABSTIME};
+    use crate::subsystems::posix::{Itimerspec, TIMER_ABSTIME};
     
     let args = extract_args(args, 4)?;
     let timerid = args[0] as i32;
@@ -835,7 +835,7 @@ fn sys_timer_settime(args: &[u64]) -> SyscallResult<i64>{
 fn sys_timer_gettime(args: &[u64]) -> SyscallResult<i64>{
     use super::common::extract_args;
     use crate::subsystems::mm::vm::copyout;
-    use crate::posix::Itimerspec;
+    use crate::subsystems::posix::Itimerspec;
     
     let args = extract_args(args, 2)?;
     let timerid = args[0] as i32;

@@ -5,7 +5,7 @@
 use alloc::sync::Arc;
 use alloc::string::String;
 use alloc::vec::Vec;
-use crate::vfs::{VfsError, VfsResult, SuperBlock};
+use crate::subsystems::fs::vfs::{VfsError, VfsResult, SuperBlock};
 /// Mount a filesystem
 ///
 /// # Arguments

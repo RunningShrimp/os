@@ -6,13 +6,13 @@ use crate::prelude::*;
 
 use alloc::{sync::Arc, vec::Vec};
 
-use crate::vfs::{
+use crate::subsystems::fs::vfs::{
     core::{FileSystemType, FsStats, SuperBlock as VfsSuperBlock},
     inode::InodeOps,
     types::FileMode,
     VfsResult,
 };
-use crate::vfs_interface::{
+use crate::subsystems::fs::vfs_interface::{
     DirEntry, FileAttr, FileType as VfsFileType, Inode, VfsError,
 };
 

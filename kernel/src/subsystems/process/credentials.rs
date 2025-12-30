@@ -16,7 +16,7 @@
 //! - 权限检查：非特权进程只能设置 SUID
 
 use crate::api::SyscallError;
-use crate::posix::{Uid, Gid};
+use crate::subsystems::posix::{Uid, Gid};
 
 /// setuid 系统调用 - 设置用户 ID
 ///

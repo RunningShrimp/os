@@ -12,7 +12,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use core::sync::atomic::{AtomicU64, Ordering};
 
-use crate::vfs::{FileMode};
+use crate::subsystems::fs::vfs::{FileMode};
 use crate::reliability::{EACCES, EPERM};
 /// ACL entry types
 pub enum AclType {

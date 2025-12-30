@@ -105,7 +105,7 @@ pub fn receive_message() -> Result<Message, ()> {
 // POSIX type stubs - These should be moved to posix module
 // For now, re-export from posix module if available, otherwise keep as stubs
 #[allow(unused_imports)]
-use crate::posix::{Pid, Uid, Gid};
+use crate::subsystems::posix::{Pid, Uid, Gid};
 
 // Re-export POSIX types (use posix module types if available)
 pub type PidT = crate::posix::Pid;
@@ -130,28 +130,9 @@ pub const AF_UNIX_CONST: AfUnix = 1;
 // TODO: Re-enable when service registry is fully implemented
 // pub use crate::subsystems::microkernel::service_registry::{ServiceRegistry, get_service_registry};
 
-// Process stubs - Use real Process type from process module when possible
-// For compatibility, keep a minimal stub but prefer using crate::process::Proc
-#[derive(Debug, Clone)]
-pub struct Process {
-    pub pid: u32,
-    pub name: HeaplessString<64>,
-}
-
-impl Process {
-    pub fn new(pid: u32, name: &str) -> Self {
-        Self {
-            pid,
-            name: HeaplessString::try_from(name).unwrap_or_else(|_| HeaplessString::new()),
-        }
-    }
-
-    pub fn pid(&self) -> u64 {
-        self.pid as u64
-    }
-}
-
-// TODO: Replace Process stub with crate::process::Proc when all usages are updated
+// Process types removed - Use crate::subsystems::process::{Process, Proc} instead
+// The real Process implementation is in subsystems/process/types.rs
+// The actual PCB is Proc in subsystems/process/manager.rs
 
 // Memory address type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

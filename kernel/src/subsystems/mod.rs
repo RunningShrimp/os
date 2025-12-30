@@ -4,6 +4,7 @@ pub mod ipc;
 pub mod microkernel;
 pub mod net;
 pub mod perf;
+pub mod posix;
 pub mod process;
 pub mod scheduler;
 pub mod services;

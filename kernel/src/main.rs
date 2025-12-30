@@ -161,7 +161,7 @@ fn run_tests() {
 
 #[cfg(feature = "kernel_tests")]
 fn test_pipe_fork_rw() {
-    use crate::posix::O_NONBLOCK;
+    use crate::subsystems::posix::O_NONBLOCK;
     print!("  pipe-fork: ");
     // Use sys_pipe to obtain process-level fds
     let mut pfds = [0i32; 2];

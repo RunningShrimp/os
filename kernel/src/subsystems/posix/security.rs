@@ -14,7 +14,7 @@ use alloc::{
     vec::Vec,
 };
 
-use crate::posix::types::{Gid, Mode, Pid, Uid};
+use crate::subsystems::posix::types::{Gid, Mode, Pid, Uid};
 use crate::subsystems::sync::Mutex;
 
 /// POSIX capability structure

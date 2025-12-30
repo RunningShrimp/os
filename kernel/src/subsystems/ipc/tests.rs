@@ -34,7 +34,7 @@ pub mod pipe_tests {
 
     /// Test pipe with non-blocking mode
     pub fn test_pipe_nonblock() -> TestResult {
-        use crate::posix::O_NONBLOCK;
+        use crate::subsystems::posix::O_NONBLOCK;
 
         if let Some((rfd_idx, wfd_idx)) = pipe::pipe_alloc() {
             {

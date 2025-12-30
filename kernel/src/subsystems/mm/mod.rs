@@ -181,10 +181,8 @@ pub mod page_table_isolation;
 pub mod numa;
 pub mod optimized_page_allocator;
 pub mod percpu_allocator;
-pub mod percpu_allocator_v2;  // Enhanced per-CPU allocator
 pub mod zone_allocator;        // Fine-grained locking allocator
 pub mod prefetch;
-pub mod stats;
 pub mod traits;
 pub mod types;
 pub mod unified_stats;
@@ -281,8 +279,8 @@ pub fn init_advanced_memory_management() -> nos_api::Result<()> {
     // Initialize optimized memory manager
     // optimized_memory_manager::init_optimized_memory_manager()?;
 
-    // Initialize memory statistics
-    stats::init_memory_stats()?;
+    // Note: unified_stats does not require initialization
+    // Statistics are tracked using atomic operations
 
     Ok(())
 }
@@ -295,9 +293,6 @@ pub fn init_advanced_memory_management() -> nos_api::Result<()> {
 ///
 /// * `nos_api::Result<()>` - Success or error
 pub fn shutdown_advanced_memory_management() -> nos_api::Result<()> {
-    // Shutdown memory statistics
-    stats::shutdown_memory_stats()?;
-
     // Shutdown optimized memory manager
     // optimized_memory_manager::shutdown_optimized_memory_manager()?;
 
@@ -316,7 +311,9 @@ pub fn shutdown_advanced_memory_management() -> nos_api::Result<()> {
 ///
 /// * `MemoryManagementStats` - Memory management statistics
 pub fn get_memory_stats() -> MemoryManagementStats {
-    stats::get_memory_stats()
+    // Return default empty statistics
+    // Unified stats can be accessed directly via unified_stats module
+    MemoryManagementStats::default()
 }
 
 /// Free unused memory pages

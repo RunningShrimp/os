@@ -259,11 +259,13 @@ macro_rules! log_error { ($($arg:tt)*) => { { let _ = ($($arg)*); } }; }
 // API layer - public interfaces for kernel subsystems
 pub mod api;
 
-// Virtual File System (VFS) - now accessed through subsystems
-pub mod vfs;  // Re-enabled: needed for proper type exports
+// Virtual File System (VFS) - moved to subsystems/fs/vfs
+// Re-export for backward compatibility
+pub use crate::subsystems::fs::vfs;
 
-// VFS interface layer - breaks circular dependency between VFS and FS
-pub mod vfs_interface;
+// VFS interface layer - moved to subsystems/fs/vfs_interface
+// Re-export for backward compatibility
+pub use crate::subsystems::fs::vfs_interface;
 
 // Core kernel functionality (from nos-kernel-core)
 pub mod core;
@@ -342,7 +344,9 @@ mod syscall_interface;
 // Legacy modules - now accessed through subsystems
 pub mod monitoring;  // Made public to match glob re-export
 pub mod perf;  // Made public to match glob re-export
-pub mod posix;
+// POSIX compatibility layer - moved to subsystems/posix
+// Re-export for backward compatibility
+pub use crate::subsystems::posix;
 mod procfs;
 pub mod sched;  // Made public to match potential glob re-export
 pub mod security;  // Made public to match glob re-export

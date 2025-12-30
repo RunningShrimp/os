@@ -25,7 +25,7 @@
 
 use crate::api::SyscallError;
 use crate::subsystems::process::PROC_TABLE;
-use crate::posix::Rlimit;
+use crate::subsystems::posix::Rlimit;
 
 /// RLIM_INFINITY - 表示无限限制
 pub const RLIM_INFINITY: u64 = u64::MAX;

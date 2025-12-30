@@ -18,9 +18,9 @@
 //! - pthread_spin_unlock() - Release spinlock
 //! - pthread_spin_destroy() - Destroy spinlock
 
-use crate::posix::advanced_thread::*;
-use crate::posix::{ClockId, Pid};
-use crate::posix::realtime::SchedParam;
+use crate::subsystems::posix::advanced_thread::*;
+use crate::subsystems::posix::{ClockId, Pid};
+use crate::subsystems::posix::realtime::SchedParam;
 use crate::subsystems::syscalls::common::{SyscallError, SyscallResult);
 use crate::process::myproc;
 

@@ -13,7 +13,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::{process::Pid as ProcessId, subsystems::microkernel::scheduler};
 use crate::sync::Mutex;
-use crate::posix::{Pid, Uid, SigVal, SigSet, Timespec};
+use crate::subsystems::posix::{Pid, Uid, SigVal, SigSet, Timespec};
 
 // SigSet helper methods
 impl SigSet {

@@ -29,7 +29,7 @@ use super::common::{SyscallResult, extract_args};
 use crate::api::SyscallError;
 use crate::fs::file::FILE_TABLE;
 use crate::process::{myproc, NOFILE};
-use crate::posix::{aiocb, AIO_CANCELED, AIO_NOTCANCELED, AIO_ALLDONE, LIO_READ, LIO_WRITE, SIGEV_SIGNAL};
+use crate::subsystems::posix::{aiocb, AIO_CANCELED, AIO_NOTCANCELED, AIO_ALLDONE, LIO_READ, LIO_WRITE, SIGEV_SIGNAL};
 use crate::subsystems::sync::Mutex;
 
 // ============================================================================

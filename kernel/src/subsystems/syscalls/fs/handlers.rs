@@ -9,7 +9,7 @@ use crate::prelude::*;
 use alloc::string::ToString;
 
 use crate::error::{KernelError, KernelResult};
-use crate::vfs::FileMode;
+use crate::subsystems::fs::vfs::FileMode;
 use crate::subsystems::fs::file::FileType;
 
 /// Handle chdir system call - change current working directory

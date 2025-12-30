@@ -4,7 +4,7 @@ extern crate alloc;
 
 use crate::prelude::*;
 use crate::subsystems::sync::Mutex;
-use crate::vfs::{
+use crate::subsystems::fs::vfs::{
     error::*,
     types::*,
     fs::InodeOps,

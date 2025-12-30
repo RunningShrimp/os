@@ -14,10 +14,10 @@ use crate::prelude::*;
 use alloc::sync::Arc;
 
 // Import from vfs_interface to avoid type conflicts
-use crate::vfs_interface::{FileAttr, FileMode, VfsError, DirEntry};
+use crate::subsystems::fs::vfs_interface::{FileAttr, FileMode, VfsError, DirEntry};
 
 // Import VfsResult type alias from vfs module
-use crate::vfs::VfsResult;
+use crate::subsystems::fs::vfs::VfsResult;
 
 /// Inode 操作 trait
 ///

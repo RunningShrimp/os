@@ -114,7 +114,11 @@ use alloc::{collections::BTreeMap, string::String, string::ToString, sync::Arc};
 use spin::Once;
 
 use crate::subsystems::sync::Mutex;
-use crate::vfs::Mount;
+use crate::subsystems::fs::vfs::Mount;
+
+// VFS modules (moved from kernel/src/)
+pub mod vfs;
+pub mod vfs_interface;
 
 pub mod api;
 pub mod epoll;

@@ -982,7 +982,7 @@ pub fn handle_shmget(args: &[u64]) -> KernelResult<u64> {
     let shmflg = args[2] as i32;
 
     // Use POSIX shmget implementation
-    use crate::posix::shm::shmget;
+    use crate::subsystems::posix::shm::shmget;
     let shmid = unsafe { shmget(key, size, shmflg) };
 
     if shmid < 0 {
@@ -1011,7 +1011,7 @@ pub fn handle_shmat(args: &[u64]) -> KernelResult<u64> {
     let shmflg = args[2] as i32;
 
     // Use POSIX shmat implementation
-    use crate::posix::shm::shmat;
+    use crate::subsystems::posix::shm::shmat;
     let addr = unsafe { shmat(shmid, shmaddr, shmflg) };
 
     if addr.is_null() {
@@ -1038,7 +1038,7 @@ pub fn handle_shmdt(args: &[u64]) -> KernelResult<u64> {
     let shmaddr = args[0] as *mut u8;
 
     // Use POSIX shmdt implementation
-    use crate::posix::shm::shmdt;
+    use crate::subsystems::posix::shm::shmdt;
     let result = unsafe { shmdt(shmaddr) };
 
     if result < 0 {
@@ -1067,7 +1067,7 @@ pub fn handle_shmctl(args: &[u64]) -> KernelResult<u64> {
     let buf = args[2] as *mut crate::posix::ShmidDs;
 
     // Use POSIX shmctl implementation
-    use crate::posix::shm::shmctl;
+    use crate::subsystems::posix::shm::shmctl;
     let result = unsafe { shmctl(shmid, cmd, buf) };
 
     if result < 0 {

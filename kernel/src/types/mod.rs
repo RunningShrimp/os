@@ -41,7 +41,6 @@ pub use stubs::{
 
     // Type stubs (not in prelude)
     VirtAddr,
-    Process,
     VfsNode,
     FileMode,
     FileType,

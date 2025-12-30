@@ -17,7 +17,7 @@ use super::{
 use crate::subsystems::sync::Mutex;
 
 // Re-export types from vfs_interface to match InodeOps trait signature
-use crate::vfs_interface::{
+use crate::subsystems::fs::vfs_interface::{
     DirEntry as DirEntry,
     FileAttr as FileAttr,
     FileMode as FileMode,

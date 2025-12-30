@@ -7,7 +7,7 @@ extern crate alloc;
 use crate::prelude::*;
 use alloc::sync::Arc;
 
-use crate::vfs::{
+use crate::subsystems::fs::vfs::{
     inode::InodeOps,
     VfsResult,
 };

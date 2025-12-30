@@ -9,11 +9,11 @@
 //! - Advanced thread features
 //! - Security and permission mechanisms
 
-use crate::posix::*;
-use crate::posix::advanced_signal::*;
-use crate::posix::realtime::*;
-use crate::posix::advanced_thread::*;
-use crate::posix::security::*;
+use crate::subsystems::posix::*;
+use crate::subsystems::posix::advanced_signal::*;
+use crate::subsystems::posix::realtime::*;
+use crate::subsystems::posix::advanced_thread::*;
+use crate::subsystems::posix::security::*;
 use alloc::string::String;
 use alloc::vec::Vec;
 

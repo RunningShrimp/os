@@ -80,7 +80,7 @@ pub fn test_timer_functions(results: &mut PosixTestResults) {
 
 mod time_tests {
     use super::*;
-    use crate::posix::{Timespec, ClockId};
+    use crate::subsystems::posix::{Timespec, ClockId};
 
     pub fn test_time() -> PosixTestResult {
         // 测试time系统调用 - 获取当前时间

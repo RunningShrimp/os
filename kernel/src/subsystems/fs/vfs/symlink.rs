@@ -41,8 +41,8 @@ use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use crate::subsystems::sync::Mutex;
-use crate::vfs::error::{VfsError, VfsResult};
-use crate::vfs::Path;
+use crate::subsystems::fs::vfs::error::{VfsError, VfsResult};
+use crate::subsystems::fs::vfs::Path;
 
 /// 符号链接缓存条目
 #[derive(Debug, Clone)]

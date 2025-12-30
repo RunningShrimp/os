@@ -4,7 +4,7 @@
 
 #[cfg(feature = "kernel_tests")]
 pub mod vfs_tests {
-    use crate::vfs::{FileMode, vfs};
+    use crate::subsystems::fs::vfs::{FileMode, vfs};
     /// Test VFS create and write
     pub fn test_vfs_create_write() -> TestResult {
         let path = "/test_create";

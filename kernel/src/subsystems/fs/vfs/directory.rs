@@ -9,7 +9,7 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use crate::error::UnifiedError;
-use crate::vfs_interface::FileType;
+use crate::subsystems::fs::vfs_interface::FileType;
 
 /// Directory entry for directory operations
 #[derive(Debug, Clone)]

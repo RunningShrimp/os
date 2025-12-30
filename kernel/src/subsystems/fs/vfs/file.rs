@@ -10,7 +10,7 @@ use alloc::sync::Arc;
 use super::{VfsResult, InodeOps};
 
 // Import FileAttr from vfs_interface to break circular dependency
-use crate::vfs_interface::FileAttr;
+use crate::subsystems::fs::vfs_interface::FileAttr;
 
 /// Open file handle
 pub struct VfsFile {

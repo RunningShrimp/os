@@ -134,7 +134,7 @@ pub mod types;
 
 // Re-export from vfs_interface to break circular dependency
 // These are the core VFS types used throughout the kernel
-pub use crate::vfs_interface::{FileMode, VfsError, FileSystemType, SuperBlock, Inode, FileAttr, FileType, DirEntry};
+pub use crate::subsystems::fs::vfs_interface::{FileMode, VfsError, FileSystemType, SuperBlock, Inode, FileAttr, FileType, DirEntry};
 
 // Import Mount from mount.rs (the concrete Mount struct)
 pub use mount::Mount;

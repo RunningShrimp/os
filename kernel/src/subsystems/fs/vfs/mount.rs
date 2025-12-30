@@ -4,7 +4,7 @@ extern crate alloc;
 use crate::prelude::*;
 
 use super::SuperBlock;
-use crate::vfs_interface::{Mount as MountTrait, FileSystemType};
+use crate::subsystems::fs::vfs_interface::{Mount as MountTrait, FileSystemType};
 
 /// Mount point information
 pub struct Mount {

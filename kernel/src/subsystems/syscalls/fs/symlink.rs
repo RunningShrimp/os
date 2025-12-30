@@ -5,7 +5,7 @@
 extern crate alloc;
 use alloc::string::ToString;
 
-use crate::vfs::{symlink, Path, error::VfsError};
+use crate::subsystems::fs::vfs::{symlink, Path, error::VfsError};
 
 /// symlink 系统调用
 ///
@@ -128,7 +128,7 @@ pub fn sys_readlink(path: &str, buf: &mut [u8]) -> isize {
 
 /// 将 VfsError 转换为 errno
 fn error_to_errno(err: crate::vfs::error::VfsError) -> isize {
-    use crate::vfs::error::VfsError;
+    use crate::subsystems::fs::vfs::error::VfsError;
 
     match err {
         VfsError::NotFound => -2,           // ENOENT

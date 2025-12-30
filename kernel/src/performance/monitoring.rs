@@ -13,7 +13,7 @@ use alloc::{string::String, vec::Vec, collections::BTreeMap};
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use crate::subsystems::sync::{Mutex, SpinLock};
 use crate::subsystems::mm::optimized_memory_manager::MemoryStats;
-use crate::vfs::optimized_filesystem::FileSystemStatsSnapshot;
+use crate::subsystems::fs::vfs::optimized_filesystem::FileSystemStatsSnapshot;
 use crate::io::optimized_io_manager::IoPerformanceStatsSnapshot;
 
 /// 性能指标类型

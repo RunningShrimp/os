@@ -10,7 +10,7 @@
 
 use super::common::{SyscallError, SyscallResult};
 use crate::subsystems::mm::vm::{copyout, copyin};
-use crate::posix::{stat, Timespec, Timeval, SigAction, SigSet, Itimerspec, SigEvent, O_CREAT, O_WRONLY};
+use crate::subsystems::posix::{stat, Timespec, Timeval, SigAction, SigSet, Itimerspec, SigEvent, O_CREAT, O_WRONLY};
 use alloc::vec::Vec;
 
 /// Test result type

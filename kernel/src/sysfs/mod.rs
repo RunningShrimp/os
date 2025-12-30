@@ -32,7 +32,7 @@ impl Fs for SysFs {
     /// Get filesystem root
     fn root(&self) -> Arc<dyn crate::vfs::InodeOps> {
         // Return sysfs root inode
-        use crate::vfs::dir::DirInode;
+        use crate::subsystems::fs::vfs::dir::DirInode;
         Arc::new(DirInode::new(1, FileType::Directory, 0o555))
     }
 

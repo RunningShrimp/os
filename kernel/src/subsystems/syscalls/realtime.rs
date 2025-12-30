@@ -11,7 +11,7 @@
 //! - sched_setaffinity() - Set CPU affinity
 //! - sched_getaffinity() - Get CPU affinity
 
-use crate::posix::realtime::*;
+use crate::subsystems::posix::realtime::*;
 use crate::subsystems::syscalls::common::{SyscallError, SyscallResult);
 use crate::process::myproc;
 

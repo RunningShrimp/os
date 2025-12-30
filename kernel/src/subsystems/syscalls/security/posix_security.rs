@@ -8,8 +8,8 @@
 //! - seteuid() / setegid() - Set effective user/group ID
 //! - setreuid() / setregid() - Set real/effective user/group ID
 
-use crate::posix::security::*;
-use crate::posix::{Uid, Gid, Pid, Mode};
+use crate::subsystems::posix::security::*;
+use crate::subsystems::posix::{Uid, Gid, Pid, Mode};
 use crate::subsystems::syscalls::common::{SyscallError, SyscallResult);
 use crate::process::myproc;
 use crate::security::{check_permission, get_current_security_context, Object, PermissionBits, SecurityContext};
