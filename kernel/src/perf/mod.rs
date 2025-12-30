@@ -1,11 +1,20 @@
-//! 性能监控模块
+//! Performance Monitoring Module
 //!
-//! 本模块提供性能监控功能，合并自nos-perf。
+//! This module provides comprehensive performance monitoring capabilities including:
+//! - Hardware performance counters (CPU, cache, branch prediction, TLB)
+//! - Software performance counters (syscalls, context switches, interrupts)
+//! - Unified counter management and export interfaces
 
 use alloc::string::ToString;
 
 pub mod core;
 pub mod monitoring;
+pub mod hardware;
+pub mod software;
+pub mod counter_manager;
+
+#[cfg(test)]
+pub mod examples;
 
 use crate::prelude::*;
 
@@ -13,6 +22,43 @@ use crate::prelude::*;
 pub use core::{SyscallStatsSnapshot, UnifiedSyscallStats};
 
 pub use monitoring::get_perf_stats;
+
+// Re-export performance counter types and functions
+pub use hardware::{
+    HardwareCounterManager, HardwareCounterType, HardwareCounterValue, PerCpuHardwareCounters,
+    init_hardware_counters, get_hw_counter_manager, increment_hw_counter, read_tsc,
+};
+
+pub use software::{
+    SoftwareCounterManager, SoftwareCounterType, PerCpuSoftwareCounters,
+    init_software_counters, get_sw_counter_manager, increment_sw_counter,
+};
+
+pub use counter_manager::{
+    PerformanceCounterManager, Counter, CounterCategory, SimpleCounter,
+    CounterSnapshot, PerCpuCounterSnapshot, CounterId,
+    init_counter_manager, get_counter_manager,
+    create_snapshot, export_counters, get_counters_summary,
+};
+
+/// Initialize all performance monitoring subsystems
+pub fn init_all() {
+    log::info!("Initializing performance monitoring subsystems...");
+
+    // Initialize hardware counters
+    init_hardware_counters();
+
+    // Initialize software counters
+    init_software_counters();
+
+    // Initialize counter manager
+    init_counter_manager();
+
+    // Initialize syscall stats
+    core::init_syscall_stats();
+
+    log::info!("Performance monitoring subsystems initialized successfully");
+}
 
 /// 性能监控器
 pub struct PerformanceMonitor {

@@ -18,6 +18,11 @@ pub mod pci_device_manager;
 pub mod usb_device_manager;
 pub mod gpu_driver_framework;
 
+// Block device driver framework (Track R - Stage 3-1)
+pub mod block;
+pub mod block_request;
+pub mod block_examples;
+
 // 新增驱动框架模块
 pub mod framework;
 pub mod base;
@@ -55,4 +60,23 @@ pub use examples::{
     VirtualDriver, CharDeviceDriver, CharDeviceType,
     create_virtual_driver, create_null_driver, create_zero_driver,
     create_random_driver, create_tty_driver
+};
+
+// Re-export block device framework (Track R - Stage 3-1)
+pub use block::{
+    BlockDevice, Bio, BlockOp, BioFlags, BioStatus,
+    BlockDeviceStats, RequestQueue, BlockDeviceManager,
+    DEFAULT_SECTOR_SIZE, init_block_device_manager, get_block_manager, register_block_device,
+};
+pub use block_request::{
+    BlockRequest, RequestFlags, SectorManager, BufferCache,
+    IoScheduler, IoSchedulerImpl, BufferStrategy, ReadaheadPolicy,
+    RequestOptimizer, DEFAULT_READAHEAD_SECTORS, MAX_READAHEAD_SECTORS,
+};
+pub use block_examples::{
+    RamDisk, RamDiskConfig, RamDiskStats,
+    VirtualBlockDevice, VirtualBlockConfig,
+    PerfTest, PerfTestConfig, PerfTestResults,
+    init_example_devices, demonstrate_basic_operations,
+    mount_block_device, create_device_node,
 };

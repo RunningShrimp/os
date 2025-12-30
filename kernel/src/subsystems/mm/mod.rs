@@ -174,7 +174,9 @@ pub mod vm;
 
 // Advanced memory management extensions
 pub mod api;
-pub mod compress;
+pub mod compression;
+pub mod page_compression;
+pub mod swap_compression;
 pub mod hugepage;
 pub mod memory_isolation;
 pub mod page_table_isolation;

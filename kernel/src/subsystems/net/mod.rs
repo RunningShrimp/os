@@ -24,6 +24,9 @@ pub mod route;
 pub mod socket;
 pub mod tcp;
 pub mod udp;
+pub mod udp_fast_path;
+pub mod udp_optimization;
+pub mod udp_multicast;
 pub mod zero_copy; // POSIX-compatible network API (required for socket syscalls)
 
 // Test modules
@@ -401,6 +404,9 @@ pub use self::{
         },
     },
     udp::{UdpHeader, UdpPacket, UdpSocket},
+    udp_fast_path::{UdpFastPath, PacketBuffer as UdpPacketBuffer, RingBuffer},
+    udp_optimization::{UdpOffload, BatchedPacketProcessor, JumboFrameSupport, UdpOffloadConfig},
+    udp_multicast::{UdpMulticast, MulticastGroup, IgmpVersion, IgmpType},
 };
 use crate::subsystems::sync::Once;
 

@@ -182,7 +182,7 @@ impl FreeListAllocator {
 
             // Trigger memory compression for inactive pages
             // This compresses pages that haven't been accessed recently to free up more memory
-            if crate::subsystems::mm::compress::is_compression_enabled() {
+            if crate::subsystems::mm::compression::is_compression_enabled() {
                 let compressed_count = self.compress_inactive_pages();
                 if compressed_count > 0 {
                     crate::println!(
@@ -200,8 +200,8 @@ impl FreeListAllocator {
             let compressed_data = compressed.compressed_data.clone();
 
             // Decompress the page
-            if let Some(decompressed) =
-                unsafe { crate::subsystems::mm::compress::decompress_page(&compressed_data) }
+            if let Ok(decompressed) =
+                crate::subsystems::mm::compression::decompress(&compressed_data, PAGE_SIZE)
             {
                 if decompressed.len() == PAGE_SIZE {
                     // Remove from compressed pages
@@ -244,7 +244,7 @@ impl FreeListAllocator {
     /// Compress inactive pages when under memory pressure
     /// Returns the number of pages compressed
     fn compress_inactive_pages(&mut self) -> usize {
-        if !crate::subsystems::mm::compress::is_compression_enabled() {
+        if !crate::subsystems::mm::compression::is_compression_enabled() {
             return 0;
         }
 
@@ -269,8 +269,10 @@ impl FreeListAllocator {
             let page_addr = page_ptr as usize;
 
             // Compress the page
-            if let Some(compressed_data) =
-                unsafe { crate::subsystems::mm::compress::compress_page(page_ptr, PAGE_SIZE) }
+            if let Ok(compressed_data) =
+                crate::subsystems::mm::compression::compress(unsafe {
+                    core::slice::from_raw_parts(page_ptr, PAGE_SIZE)
+                })
             {
                 // Check if compression actually saved space
                 if compressed_data.len() < PAGE_SIZE {
@@ -359,7 +361,7 @@ pub fn init() {
     // Compression is enabled by default for systems with < 64MB RAM
     let total_memory_mb = total_size / (1024 * 1024);
     if total_memory_mb < 64 {
-        crate::subsystems::mm::compress::enable_compression();
+        crate::subsystems::mm::compression::enable_compression();
         crate::println!("[mm] Memory compression enabled (total RAM: {} MB)", total_memory_mb);
     }
 
