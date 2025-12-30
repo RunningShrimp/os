@@ -4,8 +4,9 @@
 //! POSIX socket API and the underlying TCP/IP implementation.
 
 extern crate alloc;
-use alloc::{sync::Arc, vec::Vec};
+use alloc::{sync::Arc, vec::Vec, string::String};
 use core::sync::atomic::{AtomicBool, Ordering};
+use crate::subsystems::sync::Mutex;
 
 use super::{
     ipv4::Ipv4Addr,
@@ -368,6 +369,8 @@ pub enum Socket {
     Udp(UdpSocketWrapper),
     /// Raw socket
     Raw(RawSocketWrapper),
+    /// Unix domain socket
+    Unix(UnixSocketWrapper),
 }
 
 /// TCP socket wrapper
@@ -815,6 +818,61 @@ impl RawSocketWrapper {
     }
 }
 
+/// Unix domain socket wrapper
+#[derive(Debug, Clone)]
+pub struct UnixSocketWrapper {
+    /// Socket state
+    state: bool,
+    /// Socket options
+    options: SocketOptions,
+    /// Non-blocking mode
+    nonblocking: Arc<AtomicBool>,
+    /// Socket path (for filesystem sockets)
+    path: Option<String>,
+}
+
+impl UnixSocketWrapper {
+    /// Create a new Unix domain socket
+    pub fn new(options: SocketOptions) -> Self {
+        Self {
+            state: false,
+            options,
+            nonblocking: Arc::new(AtomicBool::new(false)),
+            path: None,
+        }
+    }
+
+    /// Close socket
+    pub fn close(&mut self) -> Result<(), SocketError> {
+        self.state = false;
+        Ok(())
+    }
+
+    /// Set non-blocking mode
+    pub fn set_nonblocking(&self, nonblocking: bool) {
+        self.nonblocking.store(nonblocking, Ordering::Relaxed);
+    }
+
+    /// Check if non-blocking
+    pub fn is_nonblocking(&self) -> bool {
+        self.nonblocking.load(Ordering::Relaxed)
+    }
+
+    /// Bind to filesystem path
+    pub fn bind(&mut self, path: String) -> Result<(), SocketError> {
+        self.path = Some(path);
+        self.state = true;
+        Ok(())
+    }
+
+    /// Connect to peer
+    pub fn connect(&mut self, path: String) -> Result<(), SocketError> {
+        self.path = Some(path);
+        self.state = true;
+        Ok(())
+    }
+}
+
 /// Socket errors
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SocketError {
@@ -847,7 +905,7 @@ pub enum SocketError {
 }
 
 /// Socket entry for socket management
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct SocketEntry {
     /// Socket ID
     pub id: u32,
@@ -863,11 +921,19 @@ pub struct SocketEntry {
     pub remote_addr: Option<SocketAddr>,
     /// Socket options
     pub options: SocketOptions,
+    /// Socket implementation
+    pub socket: Mutex<Option<Socket>>,
+    /// Protocol number
+    pub protocol: i32,
+    /// Connection ID (for TCP sockets)
+    pub connection_id: Option<super::tcp::manager::ConnectionId>,
 }
 
 /// Socket state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SocketState {
+    /// Socket is uninitialized
+    Uninitialized,
     /// Socket is unbound
     Unbound,
     /// Socket is bound to local address
@@ -895,6 +961,9 @@ impl SocketEntry {
             local_addr: None,
             remote_addr: None,
             options: SocketOptions::new(),
+            socket: Mutex::new(None),
+            protocol: 0,
+            connection_id: None,
         }
     }
 

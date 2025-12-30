@@ -5,10 +5,10 @@
 
 extern crate alloc;
 
-use alloc::{boxed::Box, collections::VecDeque, vec::Vec};
+use alloc::collections::VecDeque;
 use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-
-use spin::Mutex;
+use crate::prelude::{String, Vec, Box};
+use crate::subsystems::sync::Mutex;
 
 use crate::subsystems::{
     ipc::signal::{SIGEV_NONE, SIGEV_SIGNAL},
@@ -417,7 +417,7 @@ impl MessageQueue {
         for &pid in waiting_receivers.iter() {
             // Wake up process
             let mut proc_table = crate::process::manager::PROC_TABLE.lock();
-            if let Some(proc) = proc_table.find_mut(pid) {
+            if let Some(proc) = proc_table.find(pid) {
                 if proc.state == crate::process::ProcState::Sleeping {
                     proc.state = crate::process::ProcState::Runnable;
                 }
@@ -434,7 +434,7 @@ impl MessageQueue {
         for &pid in waiting_senders.iter() {
             // Wake up process
             let mut proc_table = crate::process::manager::PROC_TABLE.lock();
-            if let Some(proc) = proc_table.find_mut(pid) {
+            if let Some(proc) = proc_table.find(pid) {
                 if proc.state == crate::process::ProcState::Sleeping {
                     proc.state = crate::process::ProcState::Runnable;
                 }
@@ -462,7 +462,7 @@ impl MessageQueue {
                     .find_ref(notify.pid)
                 {
                     if let Some(ref signals) = proc.signals {
-                        let _ = signals.send_signal(notify.signal as u32);
+                        let _ = signals.add_pending(notify.signal as u32);
                     }
                 }
 

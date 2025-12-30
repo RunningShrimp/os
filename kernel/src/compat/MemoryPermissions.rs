@@ -1,10 +1,14 @@
 //! Memory permissions for cross-platform compatibility
 
 use core::fmt;
+use alloc::string::String;
+
+/// Re-export the struct at module level for easier access
+pub use self::MemoryPermissionsStruct as MemoryPermissions;
 
 /// Memory protection permissions
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MemoryPermissions {
+pub struct MemoryPermissionsStruct {
     /// Read permission
     pub read: bool,
     /// Write permission
@@ -13,7 +17,7 @@ pub struct MemoryPermissions {
     pub execute: bool,
 }
 
-impl MemoryPermissions {
+impl MemoryPermissionsStruct {
     /// Create new memory permissions
     pub fn new(read: bool, write: bool, execute: bool) -> Self {
         Self {
@@ -59,7 +63,7 @@ impl MemoryPermissions {
     }
 }
 
-impl fmt::Display for MemoryPermissions {
+impl fmt::Display for MemoryPermissionsStruct {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let perms = [
             if self.read { 'r' } else { '-' },
@@ -70,7 +74,7 @@ impl fmt::Display for MemoryPermissions {
     }
 }
 
-impl Default for MemoryPermissions {
+impl Default for MemoryPermissionsStruct {
     fn default() -> Self {
         Self::readwrite()
     }

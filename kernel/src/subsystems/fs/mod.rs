@@ -109,12 +109,12 @@
 //! - [`crate::subsystems::mm`]: 页缓存和内存映射
 
 extern crate alloc;
-use alloc::{collections::BTreeMap, string::String, sync::Arc};
+use alloc::{collections::BTreeMap, string::String, string::ToString, sync::Arc};
 
 use spin::Once;
 
 use crate::subsystems::sync::Mutex;
-use crate::{subsystems::fs::api::error::FsError, vfs::Mount};
+use crate::vfs::Mount;
 
 pub mod api;
 pub mod epoll;
@@ -126,6 +126,7 @@ pub mod file_locking;
 pub mod file_permissions;
 pub mod fs_cache;
 pub mod fs_impl;
+pub mod fs_types;
 pub mod journaling_fs;
 pub mod journaling_wrapper;
 pub mod recovery;
@@ -276,7 +277,7 @@ impl VfsManager {
             let root_mounted = self.root_mounted.lock();
             if let Some(mount) = root_mounted.as_ref() {
                 let root_inode = mount.superblock.root();
-                return root_inode.getattr();
+                return root_inode.getattr().map_err(|e| FsError::from(e));
             }
         }
 
@@ -286,8 +287,8 @@ impl VfsManager {
     /// Create a new directory
     pub fn mkdir(
         &self,
-        path: &str,
-        mode: crate::vfs::types::FileMode,
+        _path: &str,
+        _mode: crate::vfs::types::FileMode,
     ) -> Result<(), FsError> {
         // TODO: Implement directory creation
         // For now, return error as this requires path resolution
@@ -297,8 +298,8 @@ impl VfsManager {
     /// Create a new file
     pub fn create(
         &self,
-        path: &str,
-        mode: crate::vfs::types::FileMode,
+        _path: &str,
+        _mode: crate::vfs::types::FileMode,
     ) -> Result<(), FsError> {
         // TODO: Implement file creation
         // For now, return error as this requires path resolution
@@ -308,9 +309,9 @@ impl VfsManager {
     /// Write to a file
     pub fn write(
         &self,
-        path: &str,
-        data: &[u8],
-        offset: u64,
+        _path: &str,
+        _data: &[u8],
+        _offset: u64,
     ) -> Result<usize, FsError> {
         // TODO: Implement file writing
         // For now, return error as this requires path resolution
@@ -318,7 +319,7 @@ impl VfsManager {
     }
 
     /// Delete a file or directory
-    pub fn unlink(&self, path: &str) -> Result<(), FsError> {
+    pub fn unlink(&self, _path: &str) -> Result<(), FsError> {
         // TODO: Implement file/directory deletion
         // For now, return error as this requires path resolution
         Err(FsError::NotSupported)
@@ -406,5 +407,4 @@ pub fn shutdown() -> nos_api::Result<()> {
     crate::println!("[fs] File system subsystem shutdown");
     Ok(())
 }
-pub mod fs_types;
-pub use fs_types::*;
+// fs_types is implemented as a file, not a module

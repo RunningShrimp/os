@@ -8,9 +8,14 @@
 //! - 安全字符串操作：strlcpy, strlcat等
 //! - 高性能算法优化
 
+#![allow(non_upper_case_globals)]
+
+use core::ffi::{c_char, c_double, c_int, c_long, c_ulong, c_void};
+
 // SizeT and size_t are defined in interface.rs
 use crate::{
     libc::error::{errno::EINVAL, set_errno},
+    libc::interface::size_t,
     reliability::ERANGE,
 };
 
@@ -264,9 +269,9 @@ impl EnhancedStringLib {
 
         if !str.is_null() && unsafe { *str != 0 } {
             unsafe { *str = 0 };
-            unsafe { *saveptr = str.add(1) };
+            *saveptr = unsafe { str.add(1) };
         } else {
-            unsafe { *saveptr = core::ptr::null_mut() };
+            *saveptr = core::ptr::null_mut();
         }
 
         token

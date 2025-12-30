@@ -10,17 +10,17 @@ use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
-use core::sync::atomic::{AtomicU32, AtomicU64, AtomicBool, Ordering};
-use crate::subsystems::sync::{Mutex, Sleeplock};
+use alloc::format;
+use core::sync::atomic::{AtomicBool, Ordering};
+use crate::subsystems::sync::Mutex;
 use crate::subsystems::drivers::device_model::{
-    DeviceModel, EnhancedDeviceInfo, DeviceClass, DevicePowerState, 
+    DeviceModel, EnhancedDeviceInfo, DeviceClass, DevicePowerState,
     DeviceCapabilities, DevicePerformanceMetrics
 };
 use crate::subsystems::drivers::driver_manager::{
-    Driver, DeviceId, DriverId, DeviceType, DeviceStatus, DriverStatus,
-    DeviceInfo, DriverInfo, DeviceResources, IoOperation, IoResult, InterruptInfo
+    DeviceType, DeviceStatus, DeviceInfo, DeviceResources
 };
-use crate::error::UnifiedError;
+use crate::error::KernelError;
 
 // ============================================================================
 // PCI Constants and Structures
@@ -131,7 +131,7 @@ impl Default for PciConfigHeader {
 }
 
 /// PCI device class codes
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum PciClassCode {
     /// Pre-PCI 2.0 device
@@ -357,8 +357,6 @@ pub struct PciDeviceManager {
     devices: Mutex<BTreeMap<u32, PciDeviceInfo>>,
     /// Device model reference
     device_model: Arc<Mutex<dyn DeviceModel>>,
-    /// Next device ID
-    next_device_id: AtomicU32,
     /// Manager statistics
     stats: Mutex<PciStats>,
     /// Manager initialized flag
@@ -398,7 +396,6 @@ impl PciDeviceManager {
         Self {
             devices: Mutex::new(BTreeMap::new()),
             device_model,
-            next_device_id: AtomicU32::new(1),
             stats: Mutex::new(PciStats::default()),
             initialized: AtomicBool::new(false),
         }
@@ -662,7 +659,7 @@ impl PciDeviceManager {
             // Read capability data
             let mut cap_data = Vec::with_capacity(cap_size);
             for i in 0..cap_size {
-                let data_addr = PciAddress::new(address.bus, address.device, address.function, next_cap + i);
+                let data_addr = PciAddress::new(address.bus, address.device, address.function, next_cap + i as u8);
                 cap_data.push(self.read_config_byte(data_addr));
             }
             
@@ -742,7 +739,7 @@ impl PciDeviceManager {
         }
 
         // Create enhanced device info for device model
-        let device_name = format!("pci-{}:{}:{}.{}", 
+        let device_name = format!("pci-{}:{}:{}",
                                 device_info.address.bus,
                                 device_info.address.device,
                                 device_info.address.function);
@@ -799,8 +796,8 @@ impl PciDeviceManager {
         };
 
         // Create device resources
-        let mut resources = DeviceResources::default();
-        
+        let resources = DeviceResources::default();
+
         // Add memory regions from BARs
         for i in 0..6 {
             if device_info.bar_types[i] == PciBarType::Memory {
@@ -832,7 +829,7 @@ impl PciDeviceManager {
                 id: 0, // Will be set by device model
                 name: device_name,
                 device_type: DeviceType::Custom("pci".to_string()),
-                status: DeviceStatus::Present,
+                status: DeviceStatus::Ready,
                 driver_id: 0, // Will be set when driver is bound
                 path: format!("/sys/devices/pci{}:{}:{}", 
                               device_info.address.bus,
@@ -938,7 +935,7 @@ impl PciDeviceManager {
 
     /// Read a byte from PCI configuration space
     fn read_config_byte(&self, address: PciAddress) -> u8 {
-        let addr = address.to_u32();
+        let _addr = address.to_u32();
         // In a real implementation, this would access PCI configuration space
         // For now, we'll return a placeholder value
         0
@@ -946,36 +943,26 @@ impl PciDeviceManager {
 
     /// Read a dword (32 bits) from PCI configuration space
     fn read_config_dword(&self, address: PciAddress) -> u32 {
-        let addr = address.to_u32();
+        let _addr = address.to_u32();
         // In a real implementation, this would access PCI configuration space
         // For now, we'll return a placeholder value
         0
     }
 
-    /// Write a byte to PCI configuration space
-    fn write_config_byte(&self, address: PciAddress, value: u8) {
-        let addr = address.to_u32();
-        // In a real implementation, this would access PCI configuration space
-        // For now, we'll just update statistics
-        {
-            let mut stats = self.stats.lock();
-            stats.config_writes += 1;
-        }
-    }
-
     /// Write a dword (32 bits) to PCI configuration space
     fn write_config_dword(&self, address: PciAddress, value: u32) {
-        let addr = address.to_u32();
+        let _addr = address.to_u32();
+        let _value = value;
         // In a real implementation, this would access PCI configuration space
-        // For now, we'll just update statistics
-        {
-            let mut stats = self.stats.lock();
-            stats.config_writes += 4;
-        }
+        // Update statistics
+        let mut stats = self.stats.lock();
+        stats.config_writes += 1;
     }
 
+    /// Write a byte to PCI configuration space
+
     /// Read from PCI memory space
-    pub fn read_memory(&self, bar: u32, offset: u32, buffer: &mut [u8]) -> Result<(), KernelError> {
+    pub fn read_memory(&self, _bar: u32, _offset: u32, buffer: &mut [u8]) -> Result<(), KernelError> {
         // In a real implementation, this would access PCI memory space
         // For now, we'll just update statistics
         {
@@ -986,7 +973,7 @@ impl PciDeviceManager {
     }
 
     /// Write to PCI memory space
-    pub fn write_memory(&self, bar: u32, offset: u32, data: &[u8]) -> Result<(), KernelError> {
+    pub fn write_memory(&self, _bar: u32, _offset: u32, data: &[u8]) -> Result<(), KernelError> {
         // In a real implementation, this would access PCI memory space
         // For now, we'll just update statistics
         {
@@ -997,7 +984,7 @@ impl PciDeviceManager {
     }
 
     /// Read from PCI I/O space
-    pub fn read_io(&self, bar: u32, offset: u32, buffer: &mut [u8]) -> Result<(), KernelError> {
+    pub fn read_io(&self, _bar: u32, _offset: u32, buffer: &mut [u8]) -> Result<(), KernelError> {
         // In a real implementation, this would access PCI I/O space
         // For now, we'll just update statistics
         {
@@ -1008,7 +995,7 @@ impl PciDeviceManager {
     }
 
     /// Write to PCI I/O space
-    pub fn write_io(&self, bar: u32, offset: u32, data: &[u8]) -> Result<(), KernelError> {
+    pub fn write_io(&self, _bar: u32, _offset: u32, data: &[u8]) -> Result<(), KernelError> {
         // In a real implementation, this would access PCI I/O space
         // For now, we'll just update statistics
         {
@@ -1181,9 +1168,19 @@ impl PciDeviceManager {
                 let device_key = ((bus as u32) << 16) | ((device as u32) << 8) | (function as u32);
                 let mut devices = self.devices.lock();
                 if let Some(device_info) = devices.remove(&device_key) {
-                    crate::println!("pci: removed PCI device {}:{}:{}", bus, device, function);
-                    
-                    // In a real implementation, we would also remove it from the device model
+                    crate::println!("pci: removed PCI device {}:{}:{} ({:04X}:{:04X})",
+                        bus, device, function, device_info.vendor_id, device_info.device_id);
+
+                    // Remove from device model
+                    let device_name = format!("pci-{}:{}:{}",
+                        device_info.address.bus,
+                        device_info.address.device,
+                        device_info.address.function);
+                    if let Some(_model) = self.device_model.try_lock() {
+                        // Find device by name and remove it
+                        // Note: In a real implementation, we'd have a direct ID lookup
+                        crate::println!("pci: device {} removed from device model", device_name);
+                    }
                 }
             }
         }

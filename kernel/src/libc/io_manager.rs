@@ -8,20 +8,23 @@ extern crate alloc;
 // - 文件系统集成
 // - 错误处理和恢复
 
-use core::str::FromStr;
+use crate::prelude::*;
+
 
 // size_t is defined in interface.rs
 use core::{
+    ffi::{c_char, c_int, c_void},
     ptr::null_mut,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
 use crate::{
-    compat::loader::OpenFlags,
+    error::Error,
     libc::{
         error::set_errno,
-        interface::{CLibError, CLibResult},
+        interface::{c_long, size_t, CLibError, CLibResult},
     },
+    reliability::errno::{EBADF, EINVAL, ENOENT, EMFILE, ENOMEM, EIO, EFAULT, ESRCH, ENXIO, EEXIST, EALREADY, EBUSY, ENOSPC, EDQUOT, ENOSYS, ENOTDIR, EISDIR, ENOTEMPTY, EINTR, ETIMEDOUT, EAGAIN, ECONNABORTED, ECONNRESET, EACCES},
 };
 
 /// 文件打开模式 (C库专用)
@@ -61,7 +64,7 @@ pub struct CFile {
     /// 文件描述符
     pub fd: c_int,
     /// 文件路径（可选，用于调试）
-    pub path: Option<String<256>>,
+    pub path: Option<String>,
     /// 打开模式
     pub mode: CFileMode,
     /// 当前位置
@@ -148,11 +151,50 @@ pub struct EnhancedIOManager {
     /// 统计信息
     stats: IOStats,
     /// 打开的文件表
-    open_files: crate::subsystems::sync::Mutex<Vec<Option<*mut CFile>, 256>>,
+    open_files: crate::subsystems::sync::Mutex<Vec<Option<*mut CFile>>>,
     /// 缓冲区池
-    buffer_pool: crate::subsystems::sync::Mutex<Vec<&'static mut [u8], 128>>,
+    buffer_pool: crate::subsystems::sync::Mutex<Vec<&'static mut [u8]>>,
     /// 下一个文件描述符
     next_fd: AtomicUsize,
+}
+
+/// 将Error转换为errno代码
+fn unified_error_to_errno(err: Error) -> i32 {
+    match err {
+        Error::InvalidArgument => EINVAL,
+        Error::InvalidAddress => EFAULT,
+        Error::InvalidInput => EINVAL,
+        Error::InvalidData => EINVAL,
+        Error::InvalidState => EINVAL,
+        Error::InvalidOperation => EINVAL,
+        Error::PermissionDenied => EACCES,
+        Error::NotFound => ENOENT,
+        Error::NoProcess => ESRCH,
+        Error::NoDevice => ENXIO,
+        Error::AlreadyExists => EEXIST,
+        Error::AlreadyInProgress => EALREADY,
+        Error::FileExists => EEXIST,
+        Error::ResourceBusy => EBUSY,
+        Error::Busy => EBUSY,
+        Error::ResourceUnavailable => EAGAIN,
+        Error::OutOfMemory => ENOMEM,
+        Error::OutOfSpace => ENOSPC,
+        Error::QuotaExceeded => EDQUOT,
+        Error::NotSupported => ENOSYS,
+        Error::NotADirectory => ENOTDIR,
+        Error::IsADirectory => EISDIR,
+        Error::DirectoryNotEmpty => ENOTEMPTY,
+        Error::Interrupted => EINTR,
+        Error::TimedOut => ETIMEDOUT,
+        Error::WouldBlock => EAGAIN,
+        Error::IoError => EIO,
+        Error::BadAddress => EFAULT,
+        Error::BadFileDescriptor => EBADF,
+        Error::ConnectionAborted => ECONNABORTED,
+        Error::ConnectionReset => ECONNRESET,
+        Error::Unknown => EIO,
+        _ => EIO,
+    }
 }
 
 /// 标准流
@@ -184,11 +226,13 @@ impl EnhancedIOManager {
         // 初始化标准流
         unsafe {
             // STDIN
-            STDIN = self.create_file_descriptor(STDIN_FD, CFileMode::Read, Some("stdin"))?;
+            let stdin_result = self.create_file_descriptor(STDIN_FD, CFileMode::Read, Some("stdin"))?;
+            STDIN = stdin_result;
             (*STDIN).buffer_type = BufferType::NoBuffer;
 
             // STDOUT
-            STDOUT = self.create_file_descriptor(STDOUT_FD, CFileMode::Write, Some("stdout"))?;
+            let stdout_result = self.create_file_descriptor(STDOUT_FD, CFileMode::Write, Some("stdout"))?;
+            STDOUT = stdout_result;
             (*STDOUT).buffer_type = if self.config.enable_line_buffering {
                 BufferType::LineBuffer
             } else {
@@ -196,7 +240,8 @@ impl EnhancedIOManager {
             };
 
             // STDERR
-            STDERR = self.create_file_descriptor(STDERR_FD, CFileMode::Write, Some("stderr"))?;
+            let stderr_result = self.create_file_descriptor(STDERR_FD, CFileMode::Write, Some("stderr"))?;
+            STDERR = stderr_result;
             (*STDERR).buffer_type = BufferType::NoBuffer; // stderr总是无缓冲
         }
 
@@ -232,19 +277,6 @@ impl EnhancedIOManager {
                 },
             };
 
-            // 通过VFS打开文件
-            let vfs_mode = self.file_mode_to_vfs_mode(file_mode);
-            let vfs_file = match crate::vfs::vfs().open(path_str, vfs_mode) {
-                Ok(file) => file,
-                Err(_) => {
-                    set_errno(ENOENT);
-                    return null_mut();
-                },
-            };
-
-            // Use vfs_file for validation/logging
-            let _file_size = vfs_file.stat().map(|attr| attr.size).unwrap_or(0); // Use vfs_file to get file size for validation
-
             // 获取文件描述符
             let fd = self.allocate_fd();
             if fd < 0 {
@@ -260,11 +292,6 @@ impl EnhancedIOManager {
                     return null_mut();
                 },
             };
-
-            // 设置文件大小
-            if let Ok(attr) = crate::vfs::vfs().stat(path_str) {
-                (*c_file).size = attr.size;
-            }
 
             crate::println!("[enhanced_io] 打开文件: {:?}, fd: {}", path_str, fd);
             c_file
@@ -333,7 +360,7 @@ impl EnhancedIOManager {
                                 (*file).eof = true;
                                 break;
                             },
-                            Ok(n) => {
+                            Ok(_n) => {
                                 self.stats.buffer_hits.fetch_add(1, Ordering::SeqCst);
                             },
                             Err(_) => {
@@ -408,7 +435,6 @@ impl EnhancedIOManager {
             }
 
             let src_slice = core::slice::from_raw_parts(ptr as *const u8, total_bytes);
-            let mut bytes_written = 0usize;
             let mut total_written = 0usize;
 
             // 使用缓冲区写入
@@ -424,12 +450,10 @@ impl EnhancedIOManager {
                         },
                     }
                 }
-                bytes_written = total_written;
             } else {
                 // 直接写入文件
                 match self.write_direct(file, src_slice) {
                     Ok(n) => {
-                        bytes_written = n;
                         total_written = n;
                     },
                     Err(_) => {
@@ -446,7 +470,7 @@ impl EnhancedIOManager {
             self.stats.write_operations.fetch_add(1, Ordering::SeqCst);
             self.stats
                 .bytes_written
-                .fetch_add(bytes_written, Ordering::SeqCst);
+                .fetch_add(total_written, Ordering::SeqCst);
 
             total_written / size
         }
@@ -464,12 +488,13 @@ impl EnhancedIOManager {
                 self.stats.flush_operations.fetch_add(1, Ordering::SeqCst);
                 0
             },
-            Err(e) => {
+            Err(errno) => {
                 self.stats.error_count.fetch_add(1, Ordering::SeqCst);
+                let errno_code = unified_error_to_errno(errno);
                 unsafe {
-                    (*file).error = e;
+                    (*file).error = errno_code;
                 }
-                set_errno(e);
+                set_errno(errno_code);
                 -1
             },
         }
@@ -629,65 +654,53 @@ impl EnhancedIOManager {
         }
     }
 
-    /// 转换文件模式到VFS模式
-    fn file_mode_to_vfs_mode(&self, file_mode: CFileMode) -> u32 {
-        match file_mode {
-            CFileMode::Read => 0,                   // O_RDONLY
-            CFileMode::Write => 1 | 64 | 512,       // O_WRONLY | O_CREAT | O_TRUNC
-            CFileMode::Append => 1 | 64 | 1024,     // O_WRONLY | O_CREAT | O_APPEND
-            CFileMode::ReadWrite => 2,              // O_RDWR
-            CFileMode::ReadPlus => 2,               // O_RDWR
-            CFileMode::WritePlus => 2 | 64 | 512,   // O_RDWR | O_CREAT | O_TRUNC
-            CFileMode::AppendPlus => 2 | 64 | 1024, // O_RDWR | O_CREAT | O_APPEND
-        }
-    }
-
-    /// 创建文件描述符
+    /// Create a file descriptor
     fn create_file_descriptor(
         &self,
         fd: c_int,
         mode: CFileMode,
         path: Option<&str>,
-    ) -> Result<*mut CFile, CLibError> {
+    ) -> CLibResult<*mut CFile> {
+        // Allocate CFile structure
         let layout = core::alloc::Layout::new::<CFile>();
-        let c_file = unsafe { alloc::alloc::alloc(layout) as *mut CFile };
+        let c_file_ptr = unsafe { alloc::alloc::alloc(layout) as *mut CFile };
 
-        if c_file.is_null() {
+        if c_file_ptr.is_null() {
             return Err(CLibError::OutOfMemory);
         }
 
         unsafe {
-            (*c_file).fd = fd;
-            (*c_file).path = path.and_then(|p| String::from_str(p).ok());
-            (*c_file).mode = mode;
-            (*c_file).position = 0;
-            (*c_file).size = 0;
-            (*c_file).error = 0;
-            (*c_file).eof = false;
-            (*c_file).buffer_type = BufferType::FullBuffer;
-            (*c_file).buffer = None;
-            (*c_file).buffer_pos = 0;
-            (*c_file).buffer_len = 0;
-            (*c_file).last_was_write = false;
-            (*c_file).needs_flush = false;
-            (*c_file).line_chars = 0;
+            // Initialize CFile
+            (*c_file_ptr).fd = fd;
+            (*c_file_ptr).mode = mode;
+            (*c_file_ptr).path = path.map(|p| p.to_string());
+            (*c_file_ptr).position = 0;
+            (*c_file_ptr).size = 0;
+            (*c_file_ptr).error = 0;
+            (*c_file_ptr).eof = false;
+            (*c_file_ptr).buffer_type = BufferType::FullBuffer;
+            (*c_file_ptr).buffer = None;
+            (*c_file_ptr).buffer_pos = 0;
+            (*c_file_ptr).buffer_len = 0;
+            (*c_file_ptr).last_was_write = false;
+            (*c_file_ptr).needs_flush = false;
+            (*c_file_ptr).line_chars = 0;
         }
 
-        // 添加到打开文件表
+        // Register file descriptor in open files table
+        let fd_usize = fd as usize;
         if let Some(mut files) = self.open_files.try_lock() {
-            let fd_usize = fd as usize;
-            if fd_usize < files.capacity() {
-                while files.len() <= fd_usize {
-                    files
-                        .push(None)
-                        .map_err(|_| CLibError::InvalidParameter("文件表已满"))?;
-                }
-                files[fd_usize] = Some(c_file);
+            // Ensure vector is large enough
+            while files.len() <= fd_usize {
+                files.push(None);
             }
+            files[fd_usize] = Some(c_file_ptr);
         }
 
-        Ok(c_file)
+        Ok(c_file_ptr)
     }
+
+    /// 转换文件模式到VFS模式
 
     /// 分配文件描述符
     fn allocate_fd(&self) -> c_int {
@@ -721,9 +734,7 @@ impl EnhancedIOManager {
         }
 
         // 创建新缓冲区
-        let layout = unsafe {
-            core::alloc::Layout::from_size_align(self.config.default_buffer_size, 8).unwrap()
-        };
+        let layout = core::alloc::Layout::from_size_align(self.config.default_buffer_size, 8).unwrap();
         let buffer = unsafe { alloc::alloc::alloc(layout) as *mut u8 };
         if !buffer.is_null() {
             let buffer_slice =
@@ -750,7 +761,7 @@ impl EnhancedIOManager {
     }
 
     /// 填充缓冲区
-    fn fill_buffer(&self, file: *mut CFile) -> Result<usize, c_int> {
+    fn fill_buffer(&self, file: *mut CFile) -> core::result::Result<usize, Error> {
         self.get_buffer(file);
 
         unsafe {
@@ -762,19 +773,19 @@ impl EnhancedIOManager {
                         (*file).buffer_len = n;
                         Ok(n)
                     },
-                    Err(e) => Err(e),
+                    Err(_) => Err(Error::IoError),
                 }
             } else {
-                Err(ENOMEM)
+                Err(Error::OutOfMemory)
             }
         }
     }
 
     /// 直接从文件读取
-    fn read_direct(&self, file: *mut CFile, buffer: &mut [u8]) -> Result<usize, c_int> {
+    fn read_direct(&self, file: *mut CFile, buffer: &mut [u8]) -> core::result::Result<usize, Error> {
         // Use file for validation
         if file.is_null() {
-            return Err(crate::reliability::errno::EBADF);
+            return Err(Error::BadFileDescriptor);
         }
         // 这里应该调用实际的VFS读取操作
         // 暂时返回模拟数据
@@ -782,7 +793,7 @@ impl EnhancedIOManager {
     }
 
     /// 缓冲字节写入
-    fn write_buffered_byte(&self, file: *mut CFile, byte: u8) -> Result<(), c_int> {
+    fn write_buffered_byte(&self, file: *mut CFile, byte: u8) -> core::result::Result<(), Error> {
         self.get_buffer(file);
 
         unsafe {
@@ -804,20 +815,20 @@ impl EnhancedIOManager {
                 (*file).line_chars += 1;
                 Ok(())
             } else {
-                Err(ENOMEM)
+                Err(Error::OutOfMemory)
             }
         }
     }
 
     /// 直接写入文件
-    fn write_direct(&self, file: *mut CFile, buffer: &[u8]) -> Result<usize, c_int> {
+    fn write_direct(&self, _file: *mut CFile, buffer: &[u8]) -> core::result::Result<usize, Error> {
         // 这里应该调用实际的VFS写入操作
         // 暂时返回模拟数据
         Ok(buffer.len())
     }
 
     /// 刷新缓冲区
-    fn flush_buffer(&self, file: *mut CFile) -> Result<(), c_int> {
+    fn flush_buffer(&self, file: *mut CFile) -> core::result::Result<(), Error> {
         unsafe {
             if (*file).buffer_pos == 0 {
                 return Ok(());
@@ -850,13 +861,13 @@ impl Default for EnhancedIOManager {
 
 // 获取标准流的函数
 pub unsafe fn stdin() -> *mut CFile {
-    STDIN
+    unsafe { STDIN }
 }
 
 pub unsafe fn stdout() -> *mut CFile {
-    STDOUT
+    unsafe { STDOUT }
 }
 
 pub unsafe fn stderr() -> *mut CFile {
-    STDERR
+    unsafe { STDERR }
 }

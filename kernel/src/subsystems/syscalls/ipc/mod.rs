@@ -3,11 +3,9 @@
 //! 本模块提供IPC相关的系统调用处理。
 
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
-use crate::subsystems::syscalls::interface::{SyscallHandler};
-use crate::subsystems::syscalls::interface::{SyscallNumber};
-use crate::subsystems::syscalls::common::SyscallArgs;
-use crate::error::Result;
+use crate::subsystems::syscalls::interface::{SyscallHandler, SyscallNumber, SyscallResult, SyscallError};
 
 pub mod enhanced_handlers;
 
@@ -24,12 +22,12 @@ impl IpcSyscallHandler {
 }
 
 impl SyscallHandler for IpcSyscallHandler {
-    fn handle(&self, args: &[u64]) -> SyscallResult<i64> {
+    fn handle(&self, _args: &[u64]) -> SyscallResult<()> {
         // For IPC syscalls, we need to dispatch based on syscall number
         // But the trait interface doesn't provide the syscall number
         // This suggests we need a different approach - possibly multiple handlers
-        // For now, return invalid syscall since we can't determine which one was called
-        Err(SyscallError::InvalidSyscall(self.get_syscall_number()))
+        // For now, return error since we can't determine which one was called
+        Err(SyscallError::NotSupported)
     }
 
     fn get_syscall_number(&self) -> SyscallNumber {

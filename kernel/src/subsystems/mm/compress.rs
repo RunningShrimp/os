@@ -10,9 +10,26 @@
 extern crate alloc;
 
 use alloc::{collections::BTreeMap, vec::Vec};
+use core::mem::size_of;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use crate::subsystems::sync::Mutex;
+use crate::subsystems::time;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/// Calculate base-2 logarithm of a float (no_std compatible)
+fn log2(x: f32) -> f32 {
+    if x <= 0.0 {
+        return 0.0; // Undefined for non-positive values
+    }
+
+    // Use libm for natural log, then convert to base-2
+    let ln_2 = 0.693147181; // ln(2)
+    libm::logf(x) / ln_2
+}
 
 // ============================================================================
 // Constants
@@ -28,7 +45,7 @@ pub const MAX_COMPRESSION_LEVEL: u8 = 12;
 pub const DEFAULT_COMPRESSION_LEVEL: u8 = 6;
 
 /// Compression algorithms
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CompressionAlgorithm {
     /// Fast LZ4-style compression
     FastLZ4,
@@ -65,6 +82,19 @@ pub struct AlgorithmStats {
     pub compression_ratio: AtomicUsize, // Average compression ratio * 100
     pub avg_compress_time_us: AtomicUsize, // Average compression time in microseconds
     pub avg_decompress_time_us: AtomicUsize, // Average decompression time in microseconds
+}
+
+impl Clone for AlgorithmStats {
+    fn clone(&self) -> Self {
+        Self {
+            pages_compressed: AtomicUsize::new(self.pages_compressed.load(Ordering::Relaxed)),
+            pages_decompressed: AtomicUsize::new(self.pages_decompressed.load(Ordering::Relaxed)),
+            bytes_saved: AtomicUsize::new(self.bytes_saved.load(Ordering::Relaxed)),
+            compression_ratio: AtomicUsize::new(self.compression_ratio.load(Ordering::Relaxed)),
+            avg_compress_time_us: AtomicUsize::new(self.avg_compress_time_us.load(Ordering::Relaxed)),
+            avg_decompress_time_us: AtomicUsize::new(self.avg_decompress_time_us.load(Ordering::Relaxed)),
+        }
+    }
 }
 
 /// Per-CPU compression cache
@@ -438,7 +468,7 @@ pub fn reset_stats() {
 }
 
 /// Fast LZ4-style compression
-fn compress_lz4_fast(src: &[u8], level: u8) -> Vec<u8> {
+fn compress_lz4_fast(src: &[u8], _level: u8) -> Vec<u8> {
     let mut dst = Vec::with_capacity(src.len());
 
     // Simple run-length encoding for demonstration
@@ -472,7 +502,7 @@ fn compress_lz4_fast(src: &[u8], level: u8) -> Vec<u8> {
 }
 
 /// Balanced compression (better ratio than fast)
-fn compress_balanced(src: &[u8], level: u8) -> Vec<u8> {
+fn compress_balanced(src: &[u8], _level: u8) -> Vec<u8> {
     // For demonstration, we'll use a slightly more sophisticated RLE
     // with a small dictionary for common patterns
     let mut dst = Vec::with_capacity(src.len());
@@ -526,7 +556,7 @@ fn compress_balanced(src: &[u8], level: u8) -> Vec<u8> {
 }
 
 /// High-ratio compression (slower but better compression)
-fn compress_high_ratio(src: &[u8], level: u8) -> Vec<u8> {
+fn compress_high_ratio(src: &[u8], _level: u8) -> Vec<u8> {
     // For demonstration, we'll use a more sophisticated approach
     // with Huffman coding for common bytes
 
@@ -608,7 +638,7 @@ fn compress_adaptive(src: &[u8], level: u8) -> Vec<u8> {
     for &count in &freq {
         if count > 0 {
             let p = count as f32 / src.len() as f32;
-            entropy -= p * p.log2();
+            entropy -= p * log2(p);
         }
     }
 
@@ -638,7 +668,7 @@ pub fn compress(src: &[u8]) -> Vec<u8> {
     let algorithm = get_current_algorithm();
     let level = get_current_level();
 
-    let start_time = crate::subsystems::time::get_ticks();
+    let start_time = time::get_ticks();
 
     let compressed = match algorithm {
         CompressionAlgorithm::FastLZ4 => compress_lz4_fast(src, level),
@@ -647,8 +677,8 @@ pub fn compress(src: &[u8]) -> Vec<u8> {
         CompressionAlgorithm::Adaptive => compress_adaptive(src, level),
     };
 
-    let end_time = crate::subsystems::time::get_ticks();
-    let compress_time_us = (end_time - start_time) * 1000000 / crate::subsystems::time::TICK_HZ;
+    let end_time = time::get_ticks();
+    let compress_time_us = (end_time - start_time) * 1000000 / time::TIMER_FREQ as u64;
 
     // Update statistics
     update_compression_stats(algorithm, src.len(), compressed.len(), compress_time_us);
@@ -665,7 +695,7 @@ pub fn compress(src: &[u8]) -> Vec<u8> {
 }
 
 /// Fast LZ4-style decompression
-fn decompress_lz4_fast(src: &[u8]) -> Vec<u8> {
+fn decompress_lz4_fast(src: &[u8]) -> Result<Vec<u8>, &'static str> {
     let mut dst = Vec::with_capacity(src.len() * 2);
     let mut i = 0;
 
@@ -685,11 +715,11 @@ fn decompress_lz4_fast(src: &[u8]) -> Vec<u8> {
         }
     }
 
-    dst
+    Ok(dst)
 }
 
 /// Balanced decompression
-fn decompress_balanced(src: &[u8]) -> Vec<u8> {
+fn decompress_balanced(src: &[u8]) -> Result<Vec<u8>, &'static str> {
     let mut dst = Vec::with_capacity(src.len() * 2);
     let mut i = 0;
 
@@ -709,7 +739,7 @@ fn decompress_balanced(src: &[u8]) -> Vec<u8> {
         // Check dictionary codes
         for (code, pattern) in &dictionary {
             if src[i] == *code {
-                dst.extend_from_slice(pattern);
+                dst.extend_from_slice(*pattern);
                 i += 1;
                 found = true;
                 break;
@@ -733,11 +763,11 @@ fn decompress_balanced(src: &[u8]) -> Vec<u8> {
         }
     }
 
-    dst
+    Ok(dst)
 }
 
 /// High-ratio decompression (Huffman)
-fn decompress_high_ratio(src: &[u8]) -> Vec<u8> {
+fn decompress_high_ratio(src: &[u8]) -> Result<Vec<u8>, &'static str> {
     let mut dst = Vec::with_capacity(src.len() * 2);
     let mut bit_buffer = 0u32;
     let mut bits_in_buffer = 0u8;
@@ -767,7 +797,7 @@ fn decompress_high_ratio(src: &[u8]) -> Vec<u8> {
     }
 
     // Create reverse lookup table (simplified)
-    let mut reverse_lookup = alloc::collections::BTreeMap::new();
+    let mut reverse_lookup = BTreeMap::new();
     for byte in 0..=255 {
         reverse_lookup.insert(codes[byte as usize], byte);
     }
@@ -820,17 +850,17 @@ fn decompress_high_ratio(src: &[u8]) -> Vec<u8> {
         }
     }
 
-    dst
+    Ok(dst)
 }
 
 /// Advanced decompression with algorithm detection
-pub fn decompress(src: &[u8]) -> Vec<u8> {
+pub fn decompress(src: &[u8]) -> Result<Vec<u8>, &'static str> {
     // Check if compression is enabled
     if !is_compression_enabled() {
         // Return data as-is
         let mut dst = Vec::with_capacity(src.len());
         dst.extend_from_slice(src);
-        return dst;
+        return Ok(dst);
     }
 
     // Try to detect algorithm from header
@@ -852,32 +882,28 @@ pub fn decompress(src: &[u8]) -> Vec<u8> {
 
     let compressed_data = &src[size_of::<CompressHeader>()..];
 
-    let start_time = crate::subsystems::time::get_ticks();
+    let start_time = time::get_ticks();
 
     let decompressed = match algorithm {
-        CompressionAlgorithm::FastLZ4 => decompress_lz4_fast(compressed_data),
-        CompressionAlgorithm::Balanced => decompress_balanced(compressed_data),
-        CompressionAlgorithm::HighRatio => decompress_high_ratio(compressed_data),
+        CompressionAlgorithm::FastLZ4 => decompress_lz4_fast(compressed_data)?,
+        CompressionAlgorithm::Balanced => decompress_balanced(compressed_data)?,
+        CompressionAlgorithm::HighRatio => decompress_high_ratio(compressed_data)?,
         CompressionAlgorithm::Adaptive => {
             // For adaptive, we need to try each algorithm
             // In a real implementation, we would store the actual algorithm used
-            if let Ok(result) = decompress_lz4_fast(compressed_data) {
-                result
-            } else if let Ok(result) = decompress_balanced(compressed_data) {
-                result
-            } else {
-                decompress_high_ratio(compressed_data)
-            }
+            decompress_lz4_fast(compressed_data)
+                .or_else(|_| decompress_balanced(compressed_data))
+                .or_else(|_| decompress_high_ratio(compressed_data))?
         },
     };
 
-    let end_time = crate::subsystems::time::get_ticks();
-    let decompress_time_us = (end_time - start_time) * 1000000 / crate::subsystems::time::TICK_HZ;
+    let end_time = time::get_ticks();
+    let decompress_time_us = (end_time - start_time) * 1000000 / time::TIMER_FREQ as u64;
 
     // Update statistics
     update_decompression_stats(algorithm, decompress_time_us);
 
-    decompressed
+    Ok(decompressed)
 }
 
 /// Compress a memory block
@@ -887,7 +913,7 @@ pub unsafe fn compress_memory(ptr: *const u8, size: usize) -> Option<Vec<u8>> {
     }
 
     // Read the source data
-    let src_slice = core::slice::from_raw_parts(ptr, size);
+    let src_slice = unsafe { core::slice::from_raw_parts(ptr, size) };
 
     // Compress it
     let compressed_data = compress(src_slice);
@@ -895,11 +921,22 @@ pub unsafe fn compress_memory(ptr: *const u8, size: usize) -> Option<Vec<u8>> {
     // Prepend header
     let mut result = Vec::with_capacity(size_of::<CompressHeader>() + compressed_data.len());
 
-    let header = CompressHeader { original_size: size, compressed_size: compressed_data.len() };
+    let header = CompressHeader {
+        original_size: size,
+        compressed_size: compressed_data.len(),
+        algorithm: match get_current_algorithm() {
+            CompressionAlgorithm::FastLZ4 => 0,
+            CompressionAlgorithm::Balanced => 1,
+            CompressionAlgorithm::HighRatio => 2,
+            CompressionAlgorithm::Adaptive => 3,
+        },
+        level: get_current_level(),
+        checksum: 0, // TODO: Calculate actual checksum
+    };
 
     // Write header
     let header_ptr = &header as *const CompressHeader as *const u8;
-    let header_slice = core::slice::from_raw_parts(header_ptr, size_of::<CompressHeader>());
+    let header_slice = unsafe { core::slice::from_raw_parts(header_ptr, size_of::<CompressHeader>()) };
     result.extend_from_slice(header_slice);
 
     // Write compressed data
@@ -916,22 +953,24 @@ pub unsafe fn decompress_memory(ptr: *const u8) -> Option<Vec<u8>> {
 
     // Read header
     let header_ptr = ptr as *const CompressHeader;
-    let header = *header_ptr;
+    let header = unsafe { *header_ptr };
 
     // Read compressed data
-    let compressed_data_ptr = ptr.add(size_of::<CompressHeader>());
-    let compressed_data_slice =
-        core::slice::from_raw_parts(compressed_data_ptr, header.compressed_size);
+    let compressed_data_ptr = unsafe { ptr.add(size_of::<CompressHeader>()) };
+    let compressed_data_slice = unsafe {
+        core::slice::from_raw_parts(compressed_data_ptr, header.compressed_size)
+    };
 
     // Decompress it
-    Some(decompress(compressed_data_slice))
+    decompress(compressed_data_slice).ok()
 }
 
 /// Compress a memory page
 pub unsafe fn compress_page(page_ptr: *const u8, page_size: usize) -> Option<Vec<u8>> {
-    let result = compress_memory(page_ptr, page_size);
+    let result = unsafe { compress_memory(page_ptr, page_size) };
     if result.is_some() {
         COMPRESSION_STATS
+            .lock()
             .pages_compressed
             .fetch_add(1, Ordering::Relaxed);
     }
@@ -941,14 +980,13 @@ pub unsafe fn compress_page(page_ptr: *const u8, page_size: usize) -> Option<Vec
 /// Decompress a memory page
 pub unsafe fn decompress_page(compressed_data: &[u8]) -> Option<Vec<u8>> {
     let result = decompress(&compressed_data[size_of::<CompressHeader>()..]);
-    if !result.is_empty() {
+    if result.is_ok() {
         COMPRESSION_STATS
+            .lock()
             .pages_decompressed
             .fetch_add(1, Ordering::Relaxed);
-        Some(result)
-    } else {
-        None
     }
+    result.ok()
 }
 
 /// Check if memory pressure is high (free memory < threshold)

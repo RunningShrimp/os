@@ -206,8 +206,8 @@ mod process_parent_child_tests {
         use hashbrown::HashMap;
 
         use crate::compat::DefaultHasherBuilder;
-        table.pid_to_index = Some(HashMap::with_hasher(DefaultHasherBuilder));
-        table.parent_to_children = Some(HashMap::with_hasher(DefaultHasherBuilder));
+        table.pid_to_index = Some(HashMap::new());
+        table.parent_to_children = Some(HashMap::new());
 
         // Allocate parent process
         let parent = table.alloc().expect("Failed to allocate parent");
@@ -239,8 +239,8 @@ mod process_parent_child_tests {
         use hashbrown::HashMap;
 
         use crate::compat::DefaultHasherBuilder;
-        table.pid_to_index = Some(HashMap::with_hasher(DefaultHasherBuilder));
-        table.parent_to_children = Some(HashMap::with_hasher(DefaultHasherBuilder));
+        table.pid_to_index = Some(HashMap::new());
+        table.parent_to_children = Some(HashMap::new());
 
         // Allocate parent
         let parent = table.alloc().expect("Failed to allocate parent");
@@ -272,8 +272,8 @@ mod process_parent_child_tests {
         use hashbrown::HashMap;
 
         use crate::compat::DefaultHasherBuilder;
-        table.pid_to_index = Some(HashMap::with_hasher(DefaultHasherBuilder));
-        table.parent_to_children = Some(HashMap::with_hasher(DefaultHasherBuilder));
+        table.pid_to_index = Some(HashMap::new());
+        table.parent_to_children = Some(HashMap::new());
 
         // Allocate parent and child
         let parent = table.alloc().expect("Failed to allocate parent");

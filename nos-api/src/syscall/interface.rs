@@ -8,7 +8,11 @@ use crate::{
 };
 
 /// Trait for handling system calls
-pub trait SyscallHandler {
+///
+/// # Safety
+/// Implementations must be thread-safe (Send + Sync) since handlers
+/// can be invoked from multiple threads concurrently.
+pub trait SyscallHandler: Send + Sync {
     /// Handles a system call
     fn handle(&mut self, number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult>;
 

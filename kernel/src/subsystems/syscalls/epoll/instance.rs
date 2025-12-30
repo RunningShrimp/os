@@ -1,15 +1,136 @@
 //! Core epoll instance management functions
 
-use super::*;
-use crate::subsystems::fs::epoll::EpollEventInfo;
+extern crate alloc;
+
+use alloc::collections::BTreeMap;
+use alloc::sync::Arc;
+use alloc::string::ToString;
+use alloc::vec::Vec;
+use core::ffi::c_int;
+use core::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
+
+use crate::prelude::*;
+use crate::subsystems::sync::Mutex;
+use crate::subsystems::time;
+
+// Import parent module types
+use super::{GLIB_EPOLL_INSTANCES, GLibEpollInstance, NEXT_EPOLL_ID};
+
+// Include sys_close from file_io module
+#[path = "../fs/file_io.rs"]
+mod file_io;
+use file_io::sys_close;
+
+/// Raw epoll event structure (C-compatible)
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct EpollEvent {
+    pub events: u32,
+    pub data: u64,
+}
+
+/// Epoll event info with raw u32 events (compatible with Linux API)
+#[derive(Debug, Clone)]
+pub struct EpollEventInfo {
+    /// Event type bitmask (EPOLLIN, EPOLLOUT, etc.)
+    pub events: u32,
+    /// User data
+    pub data: u64,
+}
+
+/// Epoll instance
+struct EpollInstance {
+    /// File descriptors being monitored
+    fds: BTreeMap<c_int, EpollEventInfo>,
+    /// Event queue
+    events: Vec<EpollEvent>,
+}
+
+impl EpollInstance {
+    fn new() -> Self {
+        Self {
+            fds: BTreeMap::new(),
+            events: Vec::new(),
+        }
+    }
+}
+
+/// Global epoll manager
+struct EpollManager {
+    instances: BTreeMap<c_int, Arc<Mutex<EpollInstance>>>,
+    next_id: AtomicI32,
+}
+
+impl EpollManager {
+    fn new() -> Self {
+        Self {
+            instances: BTreeMap::new(),
+            next_id: AtomicI32::new(0),
+        }
+    }
+
+    fn create() -> Result<c_int> {
+        let mut manager = EPOLL_MANAGER.lock();
+        let id = manager.next_id.fetch_add(1, Ordering::SeqCst);
+        manager.instances.insert(id, Arc::new(Mutex::new(EpollInstance::new())));
+        Ok(id)
+    }
+
+    fn add(epfd: c_int, fd: c_int, event: &EpollEventInfo) -> Result<UnifiedError> {
+        let manager = EPOLL_MANAGER.lock();
+        if let Some(instance) = manager.instances.get(&epfd) {
+            let mut inst = instance.lock();
+            inst.fds.insert(fd, event.clone());
+            Ok(UnifiedError::Other("Success".to_string()))
+        } else {
+            Err(UnifiedError::NotFound)
+        }
+    }
+
+    fn modify(epfd: c_int, fd: c_int, event: &EpollEventInfo) -> Result<UnifiedError> {
+        let manager = EPOLL_MANAGER.lock();
+        if let Some(instance) = manager.instances.get(&epfd) {
+            let mut inst = instance.lock();
+            inst.fds.insert(fd, event.clone());
+            Ok(UnifiedError::Other("Success".to_string()))
+        } else {
+            Err(UnifiedError::NotFound)
+        }
+    }
+
+    fn remove(epfd: c_int, fd: c_int) -> Result<UnifiedError> {
+        let manager = EPOLL_MANAGER.lock();
+        if let Some(instance) = manager.instances.get(&epfd) {
+            let mut inst = instance.lock();
+            inst.fds.remove(&fd);
+            Ok(UnifiedError::Other("Success".to_string()))
+        } else {
+            Err(UnifiedError::NotFound)
+        }
+    }
+
+    fn wait(epfd: c_int, _events: &mut [EpollEvent], _timeout: i32) -> i32 {
+        let manager = EPOLL_MANAGER.lock();
+        if let Some(_instance) = manager.instances.get(&epfd) {
+            // For now, just return 0 events (stub implementation)
+            // In a real implementation, this would block and wait for events
+            0
+        } else {
+            -1
+        }
+    }
+}
+
+/// Global epoll manager instance
+static EPOLL_MANAGER: Lazy<Mutex<EpollManager>> = Lazy::new(|| Mutex::new(EpollManager::new()));
 
 /// 创建GLib专用epoll实例
 ///
 /// # 返回值
 /// * 成功时返回epoll文件描述符
 /// * 失败时返回EpollError
-#[no_mangle]
-pub extern "C" fn sys_glib_epoll_create() -> EpollResult<c_int> {
+#[unsafe(no_mangle)]
+pub extern "C" fn sys_glib_epoll_create() -> c_int {
     crate::println!("[glib_epoll] 创建GLib专用epoll实例");
 
     // 创建epoll文件描述符
@@ -17,13 +138,13 @@ pub extern "C" fn sys_glib_epoll_create() -> EpollResult<c_int> {
         Ok(fd) => fd,
         Err(_) => {
             crate::println!("[glib_epoll] 创建epoll失败");
-            return Err(EpollError::DeviceError);
+            return -19; // ENODEV
         },
     };
 
     if epfd < 0 {
         crate::println!("[glib_epoll] epoll文件描述符无效: {}", epfd);
-        return Err(EpollError::DeviceError);
+        return -19; // ENODEV
     }
 
     // 创建实例信息
@@ -31,7 +152,7 @@ pub extern "C" fn sys_glib_epoll_create() -> EpollResult<c_int> {
         epfd,
         source_count: AtomicUsize::new(0),
         max_sources: 1024, // 默认最大1024个事件源
-        created_timestamp: crate::subsystems::time::get_timestamp() as u64,
+        created_timestamp: time::get_timestamp() as u64,
         total_waits: AtomicUsize::new(0),
         total_events: AtomicUsize::new(0),
     };
@@ -42,14 +163,14 @@ pub extern "C" fn sys_glib_epoll_create() -> EpollResult<c_int> {
         if instances.contains_key(&epfd) {
             crate::println!("[glib_epoll] epoll实例已存在: {}", epfd);
             // 关闭重复的epoll
-            crate::syscalls::close(epfd);
-            return Err(EpollError::AlreadyExists);
+            let _ = sys_close(epfd);
+            return -17; // EEXIST
         }
         instances.insert(epfd, instance);
     }
 
     crate::println!("[glib_epoll] 成功创建GLib epoll实例: epfd={}", epfd);
-    Ok(epfd)
+    epfd
 }
 
 /// 添加事件源到GLib epoll实例
@@ -62,8 +183,8 @@ pub extern "C" fn sys_glib_epoll_create() -> EpollResult<c_int> {
 /// # 返回值
 /// * 成功时返回0
 /// * 失败时返回负数错误码
-#[no_mangle]
-pub extern "C" fn sys_glib_epoll_add_source(epfd: c_int, fd: c_int, events: u32) -> SyscallResult<i32> {
+#[unsafe(no_mangle)]
+pub extern "C" fn sys_glib_epoll_add_source(epfd: c_int, fd: c_int, events: u32) -> i32 {
     crate::println!("[glib_epoll] 添加事件源: epfd={}, fd={}, events=0x{:x}", epfd, fd, events);
 
     // 验证参数
@@ -101,7 +222,7 @@ pub extern "C" fn sys_glib_epoll_add_source(epfd: c_int, fd: c_int, events: u32)
 
     if current_sources >= max_sources {
         crate::println!("[glib_epoll] 事件源数量超过限制: {}/{}", current_sources, max_sources);
-        return -28; // ENOSPC
+        return -38; // ENOSYS
     }
 
     // 创建epoll事件
@@ -112,10 +233,10 @@ pub extern "C" fn sys_glib_epoll_add_source(epfd: c_int, fd: c_int, events: u32)
 
     // 添加到epoll
     match EpollManager::add(epfd, fd, &epoll_event) {
-        Ok(()) => {
+        Ok(_) => {
             // 更新实例统计
             {
-                let instances = GLIB_EPOLL_INSTANCES.lock();
+                let mut instances = GLIB_EPOLL_INSTANCES.lock();
                 if let Some(instance) = instances.get_mut(&epfd) {
                     instance.source_count.fetch_add(1, Ordering::SeqCst);
                 }
@@ -131,7 +252,7 @@ pub extern "C" fn sys_glib_epoll_add_source(epfd: c_int, fd: c_int, events: u32)
         },
         Err(e) => {
             crate::println!("[glib_epoll] 添加事件源失败: epfd={}, fd={}, error={:?}", epfd, fd, e);
-            -1
+            -5 // EIO
         },
     }
 }
@@ -145,8 +266,8 @@ pub extern "C" fn sys_glib_epoll_add_source(epfd: c_int, fd: c_int, events: u32)
 /// # 返回值
 /// * 成功时返回0
 /// * 失败时返回负数错误码
-#[no_mangle]
-pub extern "C" fn sys_glib_epoll_remove_source(epfd: c_int, fd: c_int) -> SyscallResult<i32> {
+#[unsafe(no_mangle)]
+pub extern "C" fn sys_glib_epoll_remove_source(epfd: c_int, fd: c_int) -> i32 {
     crate::println!("[glib_epoll] 移除事件源: epfd={}, fd={}", epfd, fd);
 
     // 验证参数
@@ -166,10 +287,10 @@ pub extern "C" fn sys_glib_epoll_remove_source(epfd: c_int, fd: c_int) -> Syscal
 
     // 从epoll移除
     match EpollManager::remove(epfd, fd) {
-        Ok(()) => {
+        Ok(_) => {
             // 更新实例统计
             {
-                let instances = GLIB_EPOLL_INSTANCES.lock();
+                let mut instances = GLIB_EPOLL_INSTANCES.lock();
                 if let Some(instance) = instances.get_mut(&epfd) {
                     instance.source_count.fetch_sub(1, Ordering::SeqCst);
                 }
@@ -180,7 +301,7 @@ pub extern "C" fn sys_glib_epoll_remove_source(epfd: c_int, fd: c_int) -> Syscal
         },
         Err(e) => {
             crate::println!("[glib_epoll] 移除事件源失败: epfd={}, fd={}, error={:?}", epfd, fd, e);
-            -1
+            -5 // EIO
         },
     }
 }
@@ -196,13 +317,13 @@ pub extern "C" fn sys_glib_epoll_remove_source(epfd: c_int, fd: c_int) -> Syscal
 /// # 返回值
 /// * 成功时返回实际获取的事件数量
 /// * 失败时返回负数错误码
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sys_glib_epoll_wait(
     epfd: c_int,
     events: *mut EpollEvent,
     maxevents: c_int,
     timeout: c_int,
-) -> SyscallResult<i32> {
+) -> i32 {
     crate::println!(
         "[glib_epoll] 等待事件: epfd={}, maxevents={}, timeout={}",
         epfd,
@@ -234,13 +355,13 @@ pub extern "C" fn sys_glib_epoll_wait(
     let event_slice = unsafe { core::slice::from_raw_parts_mut(events, maxevents as usize) };
 
     // 等待事件
-    let start_time = crate::subsystems::time::get_timestamp();
+    let start_time = time::get_timestamp();
     let result = EpollManager::wait(epfd, event_slice, timeout as i32);
-    let wait_time = crate::subsystems::time::get_timestamp() - start_time;
+    let wait_time = time::get_timestamp() - start_time;
 
     // 更新统计信息
     {
-        let instances = GLIB_EPOLL_INSTANCES.lock();
+        let mut instances = GLIB_EPOLL_INSTANCES.lock();
         if let Some(instance) = instances.get_mut(&epfd) {
             instance.total_waits.fetch_add(1, Ordering::SeqCst);
             if result > 0 {
@@ -284,13 +405,13 @@ pub extern "C" fn sys_glib_epoll_wait(
 /// # 返回值
 /// * 成功时返回0
 /// * 失败时返回负数错误码
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sys_glib_epoll_mod_source(
     epfd: c_int,
     fd: c_int,
     events: u32,
     op: c_int,
-) -> SyscallResult<i32> {
+) -> i32 {
     crate::println!(
         "[glib_epoll] 修改事件源: epfd={}, fd={}, events=0x{:x}, op={}",
         epfd,
@@ -318,14 +439,14 @@ pub extern "C" fn sys_glib_epoll_mod_source(
     let epoll_event = EpollEventInfo { events, data: fd as u64 };
 
     // 执行操作
-    let result = match op {
+    match op {
         1 => {
             // 添加事件源
             match EpollManager::add(epfd, fd, &epoll_event) {
-                Ok(()) => {
+                Ok(_) => {
                     // 更新实例统计
                     {
-                        let instances = GLIB_EPOLL_INSTANCES.lock();
+                        let mut instances = GLIB_EPOLL_INSTANCES.lock();
                         if let Some(instance) = instances.get_mut(&epfd) {
                             instance.source_count.fetch_add(1, Ordering::SeqCst);
                         }
@@ -335,14 +456,14 @@ pub extern "C" fn sys_glib_epoll_mod_source(
                 },
                 Err(e) => {
                     crate::println!("[glib_epoll] 添加事件源失败: {:?}", e);
-                    -1
+                    return -5; // EIO
                 },
             }
         },
         2 => {
             // 修改事件源
             match EpollManager::modify(epfd, fd, &epoll_event) {
-                Ok(()) => {
+                Ok(_) => {
                     crate::println!(
                         "[glib_epoll] 修改操作: 修改事件源 epfd={}, fd={}, events=0x{:x}",
                         epfd,
@@ -353,17 +474,17 @@ pub extern "C" fn sys_glib_epoll_mod_source(
                 },
                 Err(e) => {
                     crate::println!("[glib_epoll] 修改事件源失败: {:?}", e);
-                    -1
+                    return -5; // EIO
                 },
             }
         },
         3 => {
             // 删除事件源
             match EpollManager::remove(epfd, fd) {
-                Ok(()) => {
+                Ok(_) => {
                     // 更新实例统计
                     {
-                        let instances = GLIB_EPOLL_INSTANCES.lock();
+                        let mut instances = GLIB_EPOLL_INSTANCES.lock();
                         if let Some(instance) = instances.get_mut(&epfd) {
                             instance.source_count.fetch_sub(1, Ordering::SeqCst);
                         }
@@ -373,17 +494,15 @@ pub extern "C" fn sys_glib_epoll_mod_source(
                 },
                 Err(e) => {
                     crate::println!("[glib_epoll] 删除事件源失败: {:?}", e);
-                    -1
+                    return -5; // EIO
                 },
             }
         },
         _ => {
             crate::println!("[glib_epoll] 无效的操作类型: {}", op);
-            -22; // EINVAL
-        },
-    };
-
-    result
+            return -22; // EINVAL
+        }
+    }
 }
 
 /// 关闭GLib epoll实例
@@ -394,8 +513,8 @@ pub extern "C" fn sys_glib_epoll_mod_source(
 /// # 返回值
 /// * 成功时返回0
 /// * 失败时返回负数错误码
-#[no_mangle]
-pub extern "C" fn sys_glib_epoll_close(epfd: c_int) -> SyscallResult<i32> {
+#[unsafe(no_mangle)]
+pub extern "C" fn sys_glib_epoll_close(epfd: c_int) -> i32 {
     crate::println!("[glib_epoll] 关闭epoll实例: {}", epfd);
 
     // 验证参数
@@ -420,7 +539,7 @@ pub extern "C" fn sys_glib_epoll_close(epfd: c_int) -> SyscallResult<i32> {
         }
     };
 
-    let uptime = crate::subsystems::time::get_timestamp() as u64 - created_timestamp;
+    let uptime = time::get_timestamp() as u64 - created_timestamp;
 
     crate::println!(
         "[glib_epoll] 实例统计: 总等待={}, 总事件={}, 运行时间={}ms",
@@ -430,15 +549,13 @@ pub extern "C" fn sys_glib_epoll_close(epfd: c_int) -> SyscallResult<i32> {
     );
 
     // 关闭epoll文件描述符
-    match crate::syscalls::close(epfd) {
-        0 => {
-            crate::println!("[glib_epoll] 成功关闭epoll实例: {}", epfd);
-            0
-        },
-        err => {
-            crate::println!("[glib_epoll] 关闭epoll失败: epfd={}, error={}", epfd, err);
-            err
-        },
+    let close_result = sys_close(epfd);
+    if close_result == 0 {
+        crate::println!("[glib_epoll] 成功关闭epoll实例: {}", epfd);
+        0
+    } else {
+        crate::println!("[glib_epoll] 关闭epoll失败: epfd={}, error={}", epfd, close_result);
+        -5 // EIO
     }
 }
 
@@ -451,7 +568,7 @@ pub extern "C" fn sys_glib_epoll_close(epfd: c_int) -> SyscallResult<i32> {
 /// # 返回值
 /// * 成功时返回0
 /// * 失败时返回负数错误码
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sys_glib_epoll_stats(epfd: c_int, stats: *mut GLibEpollInstance) -> c_int {
     crate::println!("[glib_epoll] 获取epoll实例 {} 统计", epfd);
 
@@ -488,7 +605,7 @@ pub extern "C" fn sys_glib_epoll_stats(epfd: c_int, stats: *mut GLibEpollInstanc
 }
 
 /// 清空所有GLib epoll实例（用于调试）
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sys_glib_epoll_cleanup() -> c_int {
     crate::println!("[glib_epoll] 清理所有GLib epoll实例");
 
@@ -509,7 +626,7 @@ pub extern "C" fn sys_glib_epoll_cleanup() -> c_int {
             instances.remove(&epfd);
 
             // 关闭epoll文件描述符
-            crate::syscalls::close(epfd);
+            let _ = sys_close(epfd);
         }
     }
 

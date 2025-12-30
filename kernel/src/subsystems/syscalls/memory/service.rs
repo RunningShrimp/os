@@ -2,8 +2,8 @@
 //!
 //! This module provides memory service implementation for system call handling.
 
-use alloc::{collections::BTreeMap, string::String, sync::Arc};
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use crate::prelude::*;
+use core::sync::atomic::{AtomicU64, Ordering};
 
 /// Memory service statistics
 #[derive(Debug, Default)]
@@ -71,19 +71,19 @@ impl crate::subsystems::syscalls::dispatch::traits::Service for MemoryService {
         "Memory management service"
     }
 
-    fn initialize(&mut self) -> crate::subsystems::syscalls::dispatch::traits::Result<()> {
+    fn initialize(&mut self) -> Result<()> {
         Ok(())
     }
 
-    fn start(&mut self) -> crate::subsystems::syscalls::dispatch::traits::Result<()> {
+    fn start(&mut self) -> Result<()> {
         Ok(())
     }
 
-    fn stop(&mut self) -> crate::subsystems::syscalls::dispatch::traits::Result<()> {
+    fn stop(&mut self) -> Result<()> {
         Ok(())
     }
 
-    fn destroy(&mut self) -> crate::subsystems::syscalls::dispatch::traits::Result<()> {
+    fn destroy(&mut self) -> Result<()> {
         Ok(())
     }
 
@@ -114,19 +114,19 @@ impl crate::subsystems::syscalls::services::traits::Service for MemoryService {
         "Memory management service"
     }
 
-    fn initialize(&mut self) -> crate::subsystems::syscalls::services::traits::Result<()> {
+    fn initialize(&mut self) -> Result<()> {
         Ok(())
     }
 
-    fn start(&mut self) -> crate::subsystems::syscalls::services::traits::Result<()> {
+    fn start(&mut self) -> Result<()> {
         Ok(())
     }
 
-    fn stop(&mut self) -> crate::subsystems::syscalls::services::traits::Result<()> {
+    fn stop(&mut self) -> Result<()> {
         Ok(())
     }
 
-    fn destroy(&mut self) -> crate::subsystems::syscalls::services::traits::Result<()> {
+    fn destroy(&mut self) -> Result<()> {
         Ok(())
     }
 

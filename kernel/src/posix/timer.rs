@@ -9,8 +9,12 @@ use alloc::{collections::BTreeMap, sync::Arc};
 
 use crate::{
     posix::{ClockId, Itimerspec, Pid, SigEvent, TimerT, Timespec},
+    reliability::{EAGAIN, EOK, EINVAL, ENOENT, EPERM},
     subsystems::sync::Mutex,
 };
+
+// Signal constants for timer notifications
+const SIGALRM: i32 = 14;
 /// Timer state
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum TimerState {
@@ -25,7 +29,7 @@ mod tests {
 
     #[test]
     fn test_get_remaining_positive() {
-        let mut timer = Timer::new(1, crate::posix::CLOCK_MONOTONIC, SigEvent::default(), 1, None);
+        let mut timer = Timer::new(1, crate::posix::CLOCK_MONOTONIC, SigEvent::default(), 0, None);
 
         // Set expiry a short time in the future
         let now_ns = crate::subsystems::time::timestamp_nanos();
@@ -103,38 +107,26 @@ impl Timer {
         Ok(())
     }
 
-    fn disarm(&mut self) {
-        self.state = TimerState::Disarmed;
-        self.overrun_count = 0;
-    }
-
+    /// Get remaining time until timer expiration
     fn get_remaining(&self) -> Timespec {
         if self.state != TimerState::Armed {
             return Timespec::zero();
         }
 
-        // Calculate remaining time (expiry_time - now)
-        // Use the system time source (ns) and convert to Timespec
-        let now_ns = crate::subsystems::time::timestamp_nanos();
-        let now = Timespec {
-            tv_sec: (now_ns / 1_000_000_000) as i64,
-            tv_nsec: (now_ns % 1_000_000_000) as i64,
-        };
+        // Get current time
+        let current_ns = crate::subsystems::time::timestamp_nanos();
+        let expiry_ns = (self.expiry_time.tv_sec as u64 * 1_000_000_000) + (self.expiry_time.tv_nsec as u64);
 
-        // Convert expiry_time and now into nanoseconds (i128 to avoid overflow)
-        let expiry_ns = (self.expiry_time.tv_sec as i128) * 1_000_000_000i128
-            + (self.expiry_time.tv_nsec as i128);
-        let now_ns_i = (now.tv_sec as i128) * 1_000_000_000i128 + (now.tv_nsec as i128);
+        if current_ns >= expiry_ns {
+            // Timer has expired
+            return Timespec::zero();
+        }
 
-        if now_ns_i >= expiry_ns {
-            // Already expired
-            Timespec::zero()
-        } else {
-            let rem_ns = (expiry_ns - now_ns_i) as u128; // safely positive
-            Timespec {
-                tv_sec: (rem_ns / 1_000_000_000u128) as i64,
-                tv_nsec: (rem_ns % 1_000_000_000u128) as i64,
-            }
+        // Calculate remaining time
+        let remaining_ns = expiry_ns - current_ns;
+        Timespec {
+            tv_sec: (remaining_ns / 1_000_000_000) as i64,
+            tv_nsec: (remaining_ns % 1_000_000_000) as i64,
         }
     }
 
@@ -184,8 +176,8 @@ impl Timer {
         match self.sigevent.sigev_notify {
             crate::posix::SIGEV_SIGNAL => {
                 // Send signal to process
-                let _ = crate::ipc::signal::kill(
-                    self.owner_pid as usize,
+                let _ = crate::subsystems::process::manager::kill_proc(
+                    self.owner_pid as i32,
                     self.sigevent.sigev_signo as u32,
                 );
             },
@@ -253,19 +245,20 @@ pub unsafe extern "C" fn timer_create(
     let sigevent = if sevp.is_null() {
         SigEvent {
             sigev_notify: crate::posix::SIGEV_SIGNAL,
-            sigev_signo: crate::posix::SIGALRM,
+            sigev_signo: SIGALRM,
             sigev_value: crate::posix::SigVal { sival_int: 0 },
             sigev_notify_function: 0,
             sigev_notify_attributes: 0,
         }
     } else {
-        *sevp
+        unsafe { *sevp }
     };
 
     // Get current process
-    let current_pid = crate::process::getpid() as i32;
+    let current_pid = crate::subsystems::process::manager::getpid() as i32;
     let current_tid = if clock_id == crate::posix::CLOCK_THREAD_CPUTIME_ID {
-        crate::process::thread::current_thread()
+        // TODO: Get current thread ID
+        None
     } else {
         None
     };
@@ -274,7 +267,7 @@ pub unsafe extern "C" fn timer_create(
     let id = NEXT_TIMER_ID.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
 
     // Create timer
-    let timer = Timer::new(id, clock_id, sigevent, current_pid.try_into().unwrap(), current_tid);
+    let timer = Timer::new(id, clock_id, sigevent, current_pid as Pid, current_tid);
     let timer = Arc::new(Mutex::new(timer));
 
     // Register timer
@@ -293,7 +286,7 @@ pub unsafe extern "C" fn timer_create(
     registry.insert(id, timer);
 
     // Return timer ID as opaque pointer
-    *timer_id = id as TimerT;
+    unsafe { *timer_id = id as TimerT; };
     EOK
 }
 
@@ -305,7 +298,7 @@ pub unsafe extern "C" fn timer_create(
 /// # Returns
 /// * 0 on success, error code on failure
 pub unsafe extern "C" fn timer_delete(timer_id: TimerT) -> i32 {
-    if timer_id.is_null() {
+    if timer_id <= 0 {
         return EINVAL;
     }
 
@@ -334,7 +327,7 @@ pub unsafe extern "C" fn timer_settime(
     new_value: *const Itimerspec,
     old_value: *mut Itimerspec,
 ) -> i32 {
-    if timer_id.is_null() || new_value.is_null() {
+    if timer_id <= 0 || new_value.is_null() {
         return EINVAL;
     }
 
@@ -352,13 +345,15 @@ pub unsafe extern "C" fn timer_settime(
 
     // Store old value if requested
     if !old_value.is_null() {
-        *old_value = Itimerspec {
-            it_interval: timer_guard.get_interval(),
-            it_value: timer_guard.get_remaining(),
-        };
+        unsafe {
+            *old_value = Itimerspec {
+                it_interval: timer_guard.get_interval(),
+                it_value: timer_guard.get_remaining(),
+            };
+        }
     }
 
-    let new_spec = &*new_value;
+    let new_spec = unsafe { &*new_value };
 
     // Handle TIMER_ABSTIME flag
     let expiry = if (flags & crate::posix::TIMER_ABSTIME) != 0 {
@@ -385,7 +380,7 @@ pub unsafe extern "C" fn timer_settime(
 /// # Returns
 /// * 0 on success, error code on failure
 pub unsafe extern "C" fn timer_gettime(timer_id: TimerT, curr_value: *mut Itimerspec) -> i32 {
-    if timer_id.is_null() || curr_value.is_null() {
+    if timer_id <= 0 || curr_value.is_null() {
         return EINVAL;
     }
 
@@ -401,10 +396,12 @@ pub unsafe extern "C" fn timer_gettime(timer_id: TimerT, curr_value: *mut Itimer
 
     let timer_guard = timer.lock();
 
-    *curr_value = Itimerspec {
-        it_interval: timer_guard.get_interval(),
-        it_value: timer_guard.get_remaining(),
-    };
+    unsafe {
+        *curr_value = Itimerspec {
+            it_interval: timer_guard.get_interval(),
+            it_value: timer_guard.get_remaining(),
+        };
+    }
 
     EOK
 }
@@ -417,7 +414,7 @@ pub unsafe extern "C" fn timer_gettime(timer_id: TimerT, curr_value: *mut Itimer
 /// # Returns
 /// * Overrun count on success, -1 on failure
 pub unsafe extern "C" fn timer_getoverrun(timer_id: TimerT) -> i32 {
-    if timer_id.is_null() {
+    if timer_id <= 0 {
         return -1;
     }
 
@@ -468,7 +465,7 @@ pub unsafe extern "C" fn clock_gettime(clock_id: ClockId, tp: *mut Timespec) -> 
         _ => return EINVAL,
     };
 
-    *tp = current_time;
+    unsafe { *tp = current_time; };
     EOK
 }
 
@@ -518,7 +515,7 @@ pub unsafe extern "C" fn clock_getres(clock_id: ClockId, res: *mut Timespec) -> 
         _ => return EINVAL,
     };
 
-    *res = resolution;
+    unsafe { *res = resolution; };
     EOK
 }
 
@@ -533,16 +530,16 @@ pub unsafe extern "C" fn clock_getres(clock_id: ClockId, res: *mut Timespec) -> 
 /// # Returns
 /// * 0 on success, error code on failure
 pub unsafe extern "C" fn clock_nanosleep(
-    clock_id: ClockId,
+    _clock_id: ClockId,
     flags: i32,
     request: *const Timespec,
-    remain: *mut Timespec,
+    _remain: *mut Timespec,
 ) -> i32 {
     if request.is_null() {
         return EINVAL;
     }
 
-    let wake_time = &*request;
+    let wake_time = unsafe { &*request };
 
     // Validate time
     if wake_time.tv_sec < 0 || wake_time.tv_nsec < 0 || wake_time.tv_nsec >= 1_000_000_000 {

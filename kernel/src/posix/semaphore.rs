@@ -6,8 +6,15 @@
 extern crate alloc;
 
 use alloc::{boxed::Box, collections::BTreeMap, sync::Arc};
+use core::ffi::CStr;
+use core::sync::atomic::{AtomicUsize, Ordering};
 
-use crate::{posix::SemT, subsystems::sync::Mutex};
+use crate::{
+    posix::{SemT, sem_from_ptr},
+    reliability::{EAGAIN, EINVAL, ENOENT, EOK, ETIMEDOUT},
+    subsystems::process::{getpid, getuid},
+    subsystems::sync::Mutex,
+};
 
 /// Semaphore descriptor
 struct SemaphoreDescriptor {
@@ -16,7 +23,7 @@ struct SemaphoreDescriptor {
     /// Internal semaphore implementation
     internal: Arc<crate::subsystems::sync::primitives::Semaphore>,
     /// Reference count
-    ref_count: core::sync::atomic::AtomicUsize,
+    ref_count: AtomicUsize,
     /// Process permissions
     mode: u32,
     /// Owner UID
@@ -29,7 +36,7 @@ impl core::fmt::Debug for SemaphoreDescriptor {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("SemaphoreDescriptor")
             .field("name", &self.name)
-            .field("ref_count", &self.ref_count.load(core::sync::atomic::Ordering::Relaxed))
+            .field("ref_count", &self.ref_count.load(Ordering::Relaxed))
             .field("mode", &self.mode)
             .field("uid", &self.uid)
             .field("creator_pid", &self.creator_pid)
@@ -61,6 +68,8 @@ const SEM_NAME_MAX: usize = 251;
 /// # Returns
 /// * 0 on success, error code on failure
 pub unsafe extern "C" fn sem_init(sem: *mut SemT, pshared: i32, value: u32) -> i32 {
+    // TODO: Implement pshared support for process-shared semaphores
+    let _ = pshared;
     if sem.is_null() {
         return EINVAL;
     }
@@ -70,13 +79,13 @@ pub unsafe extern "C" fn sem_init(sem: *mut SemT, pshared: i32, value: u32) -> i
     let semaphore = Box::into_raw(Box::new(SemaphoreDescriptor {
         name: None,
         internal: Arc::new(internal),
-        ref_count: core::sync::atomic::AtomicUsize::new(1),
+        ref_count: AtomicUsize::new(1),
         mode: 0,
-        uid: crate::process::getuid(),
-        creator_pid: crate::process::getpid() as crate::posix::Pid,
+        uid: getuid(),
+        creator_pid: getpid() as crate::posix::Pid,
     }));
 
-    *sem = SemT { sem_internal: semaphore as *mut u8 };
+    unsafe { *sem = sem_from_ptr(semaphore as *mut core::ffi::c_void) };
     EOK
 }
 
@@ -92,20 +101,20 @@ pub unsafe extern "C" fn sem_destroy(sem: *mut SemT) -> i32 {
         return EINVAL;
     }
 
-    let semaphore = (*sem).sem_internal as *mut SemaphoreDescriptor;
+    let semaphore = unsafe { (*sem).sem_internal } as *mut SemaphoreDescriptor;
     if semaphore.is_null() {
         return EINVAL;
     }
 
     // Check if it's a named semaphore (can't destroy named semaphores with sem_destroy)
-    let sem_ref = &*semaphore;
+    let sem_ref = unsafe { &*semaphore };
     if sem_ref.name.is_some() {
         return EINVAL;
     }
 
     // Free the semaphore
-    drop(Box::from_raw(semaphore));
-    *sem = SemT { sem_internal: core::ptr::null_mut() };
+    drop(unsafe { Box::from_raw(semaphore) });
+    unsafe { *sem = SemT::null() };
 
     EOK
 }
@@ -127,7 +136,7 @@ pub unsafe extern "C" fn sem_wait(sem: SemT) -> i32 {
         return EINVAL;
     }
 
-    let sem_ref = &*semaphore;
+    let sem_ref = unsafe { &*semaphore };
     sem_ref.internal.wait();
 
     EOK
@@ -150,7 +159,7 @@ pub unsafe extern "C" fn sem_trywait(sem: SemT) -> i32 {
         return EINVAL;
     }
 
-    let sem_ref = &*semaphore;
+    let sem_ref = unsafe { &*semaphore };
     if sem_ref.internal.try_wait() {
         EOK
     } else {
@@ -174,7 +183,7 @@ pub unsafe extern "C" fn sem_timedwait(
         return EINVAL;
     }
 
-    let timeout = &*abs_timeout;
+    let timeout = unsafe { &*abs_timeout };
     let duration_ns = timeout.tv_sec as u64 * 1_000_000_000 + timeout.tv_nsec as u64;
 
     let semaphore = sem.sem_internal as *const SemaphoreDescriptor;
@@ -182,11 +191,11 @@ pub unsafe extern "C" fn sem_timedwait(
         return EINVAL;
     }
 
-    let sem_ref = &*semaphore;
+    let sem_ref = unsafe { &*semaphore };
     if sem_ref.internal.wait_timeout(duration_ns) {
         EOK
     } else {
-        crate::reliability::errno::ETIMEDOUT
+        ETIMEDOUT
     }
 }
 
@@ -207,7 +216,7 @@ pub unsafe extern "C" fn sem_post(sem: SemT) -> i32 {
         return EINVAL;
     }
 
-    let sem_ref = &*semaphore;
+    let sem_ref = unsafe { &*semaphore };
     sem_ref.internal.post();
 
     EOK
@@ -231,8 +240,8 @@ pub unsafe extern "C" fn sem_getvalue(sem: SemT, sval: *mut i32) -> i32 {
         return EINVAL;
     }
 
-    let sem_ref = &*semaphore;
-    *sval = sem_ref.internal.value() as i32;
+    let sem_ref = unsafe { &*semaphore };
+    unsafe { *sval = sem_ref.internal.value() as i32 };
 
     EOK
 }
@@ -253,24 +262,30 @@ pub unsafe extern "C" fn sem_getvalue(sem: SemT, sval: *mut i32) -> i32 {
 /// * Pointer to semaphore on success, SEM_FAILED on failure
 pub unsafe extern "C" fn sem_open(name: *const i8, oflag: i32, mode: u32, value: u32) -> SemT {
     if name.is_null() {
-        return SemT { sem_internal: core::ptr::null_mut() };
+        return SEM_FAILED;
     }
 
     // Convert name to string
-    let name_len = crate::libc::strlen(name);
+    let name_len = unsafe {
+        CStr::from_ptr(name)
+            .to_bytes()
+            .len()
+    };
     if name_len == 0 || name_len >= SEM_NAME_MAX {
-        return SemT { sem_internal: core::ptr::null_mut() };
+        return SEM_FAILED;
     }
 
-    let name_str = alloc::string::String::from_utf8_lossy(core::slice::from_raw_parts(
-        name as *const u8,
-        name_len,
-    ))
-    .into_owned();
+    let name_str = unsafe {
+        alloc::string::String::from_utf8_lossy(core::slice::from_raw_parts(
+            name as *const u8,
+            name_len,
+        ))
+        .into_owned()
+    };
 
     // Check for invalid name characters
     if name_str.starts_with('/') {
-        return SemT { sem_internal: core::ptr::null_mut() };
+        return SEM_FAILED;
     }
 
     let is_creating = (oflag & crate::posix::O_CREAT) != 0;
@@ -281,35 +296,35 @@ pub unsafe extern "C" fn sem_open(name: *const i8, oflag: i32, mode: u32, value:
     if let Some(existing) = registry.get(&name_str) {
         // Semaphore already exists
         if is_creating && is_exclusive {
-            return SemT { sem_internal: core::ptr::null_mut() };
+            return SEM_FAILED;
         }
 
         // Increment reference count and return existing semaphore
         existing
             .ref_count
-            .fetch_add(1, core::sync::atomic::Ordering::SeqCst);
-        SemT { sem_internal: Arc::into_raw(existing.clone()) as *mut u8 }
+            .fetch_add(1, Ordering::SeqCst);
+        sem_from_ptr(Arc::into_raw(existing.clone()) as *mut core::ffi::c_void)
     } else if is_creating {
         // Create new semaphore
         if registry.len() >= MAX_NAMED_SEMAPHORES {
-            return SemT { sem_internal: core::ptr::null_mut() };
+            return SEM_FAILED;
         }
 
         let internal = crate::subsystems::sync::primitives::Semaphore::new(value);
         let semaphore = Arc::new(SemaphoreDescriptor {
             name: Some(name_str.clone()),
             internal: Arc::new(internal),
-            ref_count: core::sync::atomic::AtomicUsize::new(1),
+            ref_count: AtomicUsize::new(1),
             mode: mode & 0o777,
-            uid: crate::process::getuid(),
-            creator_pid: crate::process::getpid() as crate::posix::Pid,
+            uid: getuid(),
+            creator_pid: getpid() as crate::posix::Pid,
         });
 
         registry.insert(name_str, semaphore.clone());
-        SemT { sem_internal: Arc::into_raw(semaphore) as *mut u8 }
+        sem_from_ptr(Arc::into_raw(semaphore) as *mut core::ffi::c_void)
     } else {
         // Semaphore doesn't exist and O_CREAT not specified
-        SemT { sem_internal: core::ptr::null_mut() }
+        SEM_FAILED
     }
 }
 
@@ -330,7 +345,7 @@ pub unsafe extern "C" fn sem_close(sem: SemT) -> i32 {
         return EINVAL;
     }
 
-    let sem_ref = &*semaphore;
+    let sem_ref = unsafe { &*semaphore };
 
     // Only named semaphores can be closed with sem_close
     if sem_ref.name.is_none() {
@@ -340,7 +355,7 @@ pub unsafe extern "C" fn sem_close(sem: SemT) -> i32 {
     // Decrement reference count
     let old_count = sem_ref
         .ref_count
-        .fetch_sub(1, core::sync::atomic::Ordering::SeqCst);
+        .fetch_sub(1, Ordering::SeqCst);
     if old_count <= 1 {
         // This was the last reference, remove from registry
         if let Some(name) = &sem_ref.name {
@@ -350,7 +365,7 @@ pub unsafe extern "C" fn sem_close(sem: SemT) -> i32 {
     }
 
     // Release the Arc reference
-    drop(Arc::from_raw(semaphore));
+    drop(unsafe { Arc::from_raw(semaphore) });
 
     EOK
 }
@@ -368,16 +383,22 @@ pub unsafe extern "C" fn sem_unlink(name: *const i8) -> i32 {
     }
 
     // Convert name to string
-    let name_len = crate::libc::strlen(name);
+    let name_len = unsafe {
+        CStr::from_ptr(name)
+            .to_bytes()
+            .len()
+    };
     if name_len == 0 || name_len >= SEM_NAME_MAX {
         return EINVAL;
     }
 
-    let name_str = alloc::string::String::from_utf8_lossy(core::slice::from_raw_parts(
-        name as *const u8,
-        name_len,
-    ))
-    .into_owned();
+    let name_str = unsafe {
+        alloc::string::String::from_utf8_lossy(core::slice::from_raw_parts(
+            name as *const u8,
+            name_len,
+        ))
+        .into_owned()
+    };
 
     let mut registry = NAMED_SEMAPHORES.lock();
     match registry.remove(&name_str) {
@@ -387,4 +408,4 @@ pub unsafe extern "C" fn sem_unlink(name: *const i8) -> i32 {
 }
 
 /// Failed semaphore return value
-pub const SEM_FAILED: SemT = SemT { sem_internal: core::ptr::null_mut() };
+pub const SEM_FAILED: SemT = SemT::null();

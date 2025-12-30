@@ -3,7 +3,7 @@
 //! This document defines the interface specification for all kernel modules.
 //! It provides guidelines for implementing clear, consistent module boundaries.
 
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::{boxed::Box, string::String, string::ToString, vec::Vec};
 
 /// Module interface trait
 ///
@@ -552,10 +552,11 @@ impl ModuleRegistry {
     /// # Returns
     /// * `Result<(), ModuleError>` - Success or error
     pub fn register(&mut self, module: Box<dyn ModuleInterface>) -> Result<(), ModuleError> {
-        let name = module.get_name();
+        // Clone the name before moving the module to avoid borrow issues
+        let name = module.get_name().to_string();
 
         // Check if module is already registered
-        if self.modules.iter().any(|m| m.get_name() == name) {
+        if self.modules.iter().any(|m| m.get_name() == name.as_str()) {
             return Err(ModuleError::InitializationFailed);
         }
 
@@ -567,7 +568,7 @@ impl ModuleRegistry {
         }
 
         self.modules.push(module);
-        self.init_order.push(name.to_string());
+        self.init_order.push(name);
 
         Ok(())
     }

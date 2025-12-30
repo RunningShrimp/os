@@ -1,73 +1,112 @@
 //! GLib epoll manager trait and implementation
 
 use super::*;
+use crate::syscalls::common::SyscallError;
+
+/// Helper function to convert errno to SyscallError
+fn errno_to_syscall_error(errno: i32) -> SyscallError {
+    match errno {
+        1 => SyscallError::InvalidArgument,
+        2 => SyscallError::BadFileDescriptor,
+        9 => SyscallError::BadFileDescriptor,
+        11 => SyscallError::WouldBlock,
+        12 => SyscallError::WouldBlock,
+        13 => SyscallError::PermissionDenied,
+        14 => SyscallError::InvalidArgument,
+        16 => SyscallError::WouldBlock,
+        22 => SyscallError::InvalidArgument,
+        32 => SyscallError::WouldBlock,
+        110 => SyscallError::WouldBlock,
+        _ => SyscallError::NotImplemented,
+    }
+}
 
 /// GLib事件循环管理器特征
 pub trait GLibEpollManager {
     /// 创建新的epoll实例
-    fn create_epoll_instance(&mut self) -> Result<c_int, c_int>;
+    fn create_epoll_instance(&mut self) -> Result<c_int, EpollError>;
 
     /// 添加事件源
-    fn add_event_source(&mut self, epfd: c_int, fd: c_int, events: u32) -> Result<(), c_int>;
+    fn add_event_source(&mut self, epfd: c_int, fd: c_int, events: u32) -> Result<(), SyscallError>;
 
     /// 移除事件源
-    fn remove_event_source(&mut self, epfd: c_int, fd: c_int) -> Result<(), c_int>;
+    fn remove_event_source(&mut self, epfd: c_int, fd: c_int) -> Result<(), SyscallError>;
 
     /// 等待事件
     fn wait_events(
         &mut self,
         epfd: c_int,
-        events: &mut [EpollEvent],
+        events: &mut [instance::EpollEvent],
         timeout: c_int,
-    ) -> Result<usize, c_int>;
+    ) -> Result<usize, SyscallError>;
 
     /// 关闭epoll实例
-    fn close_epoll_instance(&mut self, epfd: c_int) -> Result<(), c_int>;
+    fn close_epoll_instance(&mut self, epfd: c_int) -> Result<(), SyscallError>;
 
     /// 获取实例统计
-    fn get_instance_stats(&self, epfd: c_int) -> Result<GLibEpollInstance, ()>;
+    fn get_instance_stats(&self, epfd: c_int) -> Result<GLibEpollInstance, c_int>;
 }
 
 // Note: GLibEpollManager is a trait, not a concrete type, so Default is not implemented
 
 impl GLibEpollManager for () {
-    fn create_epoll_instance(&mut self) -> Result<c_int, c_int> {
+    fn create_epoll_instance(&mut self) -> Result<c_int, EpollError> {
         let result = super::instance::sys_glib_epoll_create();
-        if result >= 0 { Ok(result) } else { Err(result) }
+        if result > 0 {
+            Ok(result)
+        } else {
+            Err(EpollError::DeviceError)
+        }
     }
 
-    fn add_event_source(&mut self, epfd: c_int, fd: c_int, events: u32) -> Result<(), c_int> {
+    fn add_event_source(&mut self, epfd: c_int, fd: c_int, events: u32) -> Result<(), SyscallError> {
         let result = super::instance::sys_glib_epoll_add_source(epfd, fd, events);
-        if result == 0 { Ok(()) } else { Err(result) }
+        if result == 0 {
+            Ok(())
+        } else {
+            Err(errno_to_syscall_error(result))
+        }
     }
 
-    fn remove_event_source(&mut self, epfd: c_int, fd: c_int) -> Result<(), c_int> {
+    fn remove_event_source(&mut self, epfd: c_int, fd: c_int) -> Result<(), SyscallError> {
         let result = super::instance::sys_glib_epoll_remove_source(epfd, fd);
-        if result == 0 { Ok(()) } else { Err(result) }
+        if result == 0 {
+            Ok(())
+        } else {
+            Err(errno_to_syscall_error(result))
+        }
     }
 
     fn wait_events(
         &mut self,
         epfd: c_int,
-        events: &mut [EpollEvent],
+        events: &mut [instance::EpollEvent],
         timeout: c_int,
-    ) -> Result<usize, c_int> {
+    ) -> Result<usize, SyscallError> {
         let maxevents = events.len() as c_int;
-        let result =
-            super::instance::sys_glib_epoll_wait(epfd, events.as_mut_ptr(), maxevents, timeout);
+        let result = super::instance::sys_glib_epoll_wait(
+            epfd,
+            events.as_mut_ptr(),
+            maxevents,
+            timeout,
+        );
         if result >= 0 {
             Ok(result as usize)
         } else {
-            Err(result)
+            Err(errno_to_syscall_error(result))
         }
     }
 
-    fn close_epoll_instance(&mut self, epfd: c_int) -> Result<(), c_int> {
+    fn close_epoll_instance(&mut self, epfd: c_int) -> Result<(), SyscallError> {
         let result = super::instance::sys_glib_epoll_close(epfd);
-        if result == 0 { Ok(()) } else { Err(result) }
+        if result == 0 {
+            Ok(())
+        } else {
+            Err(errno_to_syscall_error(result))
+        }
     }
 
-    fn get_instance_stats(&self, epfd: c_int) -> Result<GLibEpollInstance, ()> {
+    fn get_instance_stats(&self, epfd: c_int) -> Result<GLibEpollInstance, c_int> {
         let mut instance = GLibEpollInstance {
             epfd: 0,
             source_count: AtomicUsize::new(0),
@@ -77,9 +116,16 @@ impl GLibEpollManager for () {
             total_events: AtomicUsize::new(0),
         };
 
-        let result =
-            super::instance::sys_glib_epoll_stats(epfd, &mut instance as *mut GLibEpollInstance);
-        if result == 0 { Ok(instance) } else { Err(()) }
+        let result = super::instance::sys_glib_epoll_stats(
+            epfd,
+            &mut instance as *mut GLibEpollInstance,
+        );
+
+        if result == 0 {
+            Ok(instance)
+        } else {
+            Err(result)
+        }
     }
 }
 

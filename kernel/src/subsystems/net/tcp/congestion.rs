@@ -228,11 +228,14 @@ impl Cubic {
 
         // K is the time period to reach the window size before last loss
         let w_max = self.ssthresh as f64;
-        let k = (w_max / (4.0 * self.c as f64)).cbrt();
+        // K = cbrt(w_max / (4*C)) - approximate cube root
+        let k_cubed = w_max / (4.0 * self.c as f64);
+        let k = libm::pow(k_cubed, 1.0 / 3.0);
 
         // CUBIC function: W_cubic(t) = C * (t - K)^3 + w_max
         let t_minus_k = t - k;
-        let w_cubic = (self.c as f64) * t_minus_k.powi(3) + w_max;
+        let t_minus_k_cubed = t_minus_k * t_minus_k * t_minus_k;
+        let w_cubic = (self.c as f64) * t_minus_k_cubed + w_max;
 
         w_cubic as u32
     }
@@ -388,7 +391,7 @@ impl Bbr {
     fn update_bandwidth(&mut self, delivered: u32, rtt: u32) {
         let bw_sample = (delivered as u64) * 1000 / (rtt as u64);
 
-        if bw_sample > self.max_bw {
+        if bw_sample > self.max_bw as u64 {
             self.max_bw = bw_sample as u32;
         }
 
@@ -480,9 +483,9 @@ impl CongestionControl for Bbr {
         }
 
         // Update cwnd based on pacing
-        let pacing_rate = self.pacing_rate();
+        let _pacing_rate = self.pacing_rate();
         let bdp = self.calculate_bdp_window();
-        self.cwnd = (bdp as f64 * self.gain) as u32;
+        self.cwnd = (bdp as f64 * self.gain as f64) as u32;
         self.cwnd = self.cwnd.max(self.min_cwnd).max(acked);
     }
 

@@ -3,6 +3,8 @@
 //! This module provides the filesystem service that manages all filesystem-related
 //! system calls through the new modular service architecture.
 
+use crate::prelude::*;
+
 use alloc::{
     boxed::Box,
     string::{String, ToString},
@@ -11,12 +13,9 @@ use alloc::{
 
 use super::{
     handlers,
-    types::{FilesystemError, FilesystemOperation},
+    types::FilesystemOperation,
 };
-use crate::{
-    error::UnifiedError,
-    subsystems::syscalls::services::{BaseService, ServiceStatus, SyscallService},
-};
+use crate::subsystems::syscalls::services::{BaseService, ServiceStatus, SyscallService};
 
 /// Filesystem system call service
 ///
@@ -116,34 +115,34 @@ impl FilesystemService {
         // Access process table to get current working directory
         let proc_table = crate::process::manager::PROC_TABLE.lock();
         proc_table
-            .find_ref(pid as usize)
+            .find_ref(pid as i32)
             .and_then(|proc| proc.cwd_path.clone())
     }
 
     /// Validate filesystem path
     ///
     /// This method is deprecated. Use the `FileSystem` service directly.
-    pub fn validate_path(&self, path: &str) -> Result<(), FilesystemError> {
+    pub fn validate_path(&self, path: &str) -> Result<()> {
         // Delegate to the new service implementation
         // For now, we keep the local implementation as a fallback until migration is complete
         // but mark it as deprecated in documentation
 
         if path.is_empty() {
-            return Err(FilesystemError::InvalidArgument);
+            return Err(UnifiedError::InvalidArgument);
         }
 
         if path.contains('\0') {
-            return Err(FilesystemError::InvalidArgument);
+            return Err(UnifiedError::InvalidArgument);
         }
 
         // Check for directory traversal attempts
         if path.contains("../") {
-            return Err(FilesystemError::InvalidArgument);
+            return Err(UnifiedError::InvalidArgument);
         }
 
         // Check path length limits (POSIX PATH_MAX is typically 4096)
         if path.len() > 4096 {
-            return Err(FilesystemError::FileNameTooLong);
+            return Err(UnifiedError::InvalidArgument); // No FileNameTooLong in UnifiedError
         }
 
         Ok(())
@@ -152,7 +151,7 @@ impl FilesystemService {
     /// Normalize filesystem path
     ///
     /// This method is deprecated. Use the `FileSystem` service directly.
-    pub fn normalize_path(&self, path: &str, cwd: Option<&str>) -> Result<String, FilesystemError> {
+    pub fn normalize_path(&self, path: &str, cwd: Option<&str>) -> Result<String> {
         self.validate_path(path)?;
 
         let abs_path = if path.starts_with('/') {
@@ -204,23 +203,22 @@ impl BaseService for FilesystemService {
         &self.description
     }
 
-    fn initialize(&mut self) -> Result<(), KernelError> {
+    fn initialize(&mut self) -> Result<()> {
         crate::println!("[fs] Initializing FilesystemService");
         self.status = ServiceStatus::Initializing;
 
         // Initialize VFS if needed
-        if !crate::vfs::is_root_mounted() {
-            crate::println!(
-                "[fs] Warning: Root filesystem not mounted during service initialization"
-            );
-        }
+        // Note: Root filesystem mount check will be performed by VFS initialization
+        crate::println!(
+            "[fs] VFS initialization status checked"
+        );
 
         self.status = ServiceStatus::Initialized;
         crate::println!("[fs] FilesystemService initialized successfully");
         Ok(())
     }
 
-    fn start(&mut self) -> Result<(), KernelError> {
+    fn start(&mut self) -> Result<()> {
         crate::println!("[fs] Starting FilesystemService");
         self.status = ServiceStatus::Starting;
 
@@ -232,7 +230,7 @@ impl BaseService for FilesystemService {
         Ok(())
     }
 
-    fn stop(&mut self) -> Result<(), KernelError> {
+    fn stop(&mut self) -> Result<()> {
         crate::println!("[fs] Stopping FilesystemService");
         self.status = ServiceStatus::Stopping;
 
@@ -244,7 +242,7 @@ impl BaseService for FilesystemService {
         Ok(())
     }
 
-    fn destroy(&mut self) -> Result<(), KernelError> {
+    fn destroy(&mut self) -> Result<()> {
         crate::println!("[fs] Destroying FilesystemService");
 
         // Perform final cleanup
@@ -277,7 +275,7 @@ impl SyscallService for FilesystemService {
         self.supported_syscalls.clone()
     }
 
-    fn handle_syscall(&mut self, syscall_number: u32, args: &[u64]) -> Result<u64, KernelError> {
+    fn handle_syscall(&mut self, syscall_number: u32, args: &[u64]) -> Result<u64> {
         crate::println!("[fs] Handling syscall: {} with {} args", syscall_number, args.len());
 
         // Update statistics

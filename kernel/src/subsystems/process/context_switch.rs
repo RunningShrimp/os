@@ -5,7 +5,7 @@
 
 use core::arch::asm;
 
-use crate::subsystems::process::{Context, Thread};
+use crate::process::Context;
 
 /// Context switch error types
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -100,17 +100,17 @@ pub unsafe fn context_switch(
     // Perform architecture-specific context switch
     #[cfg(target_arch = "x86_64")]
     {
-        x86_64_context_switch(current, next)?;
+        unsafe { x86_64_context_switch(current, next)?; }
     }
 
     #[cfg(target_arch = "riscv64")]
     {
-        riscv64_context_switch(current, next)?;
+        unsafe { riscv64_context_switch(current, next)?; }
     }
 
     #[cfg(target_arch = "aarch64")]
     {
-        aarch64_context_switch(current, next)?;
+        unsafe { aarch64_context_switch(current, next)?; }
     }
 
     // Record statistics
@@ -150,17 +150,17 @@ pub unsafe fn fast_context_switch(
     // Perform optimized context switch
     #[cfg(target_arch = "x86_64")]
     {
-        x86_64_fast_context_switch(current, next, same_process)?;
+        unsafe { x86_64_fast_context_switch(current, next, same_process)?; }
     }
 
     #[cfg(target_arch = "riscv64")]
     {
-        riscv64_fast_context_switch(current, next, same_process)?;
+        unsafe { riscv64_fast_context_switch(current, next, same_process)?; }
     }
 
     #[cfg(target_arch = "aarch64")]
     {
-        aarch64_fast_context_switch(current, next, same_process)?;
+        unsafe { aarch64_fast_context_switch(current, next, same_process)?; }
     }
 
     // Record statistics
@@ -183,8 +183,8 @@ pub fn init_context(
     context: &mut Context,
     stack_top: usize,
     entry_point: usize,
-    arg: usize,
-    is_user: bool,
+    _arg: usize,
+    _is_user: bool,
 ) {
     #[cfg(target_arch = "x86_64")]
     {
@@ -407,7 +407,8 @@ unsafe fn aarch64_context_switch(
     }
 
     // Save current context and restore next context
-    asm!(
+    unsafe {
+        asm!(
         // Save current registers to current context
         "stp x19, x20, [x0, #0]",   // Save X19, X20
         "stp x21, x22, [x0, #16]",  // Save X21, X22
@@ -416,7 +417,8 @@ unsafe fn aarch64_context_switch(
         "stp x27, x28, [x0, #64]",  // Save X27, X28
         "stp x29, x30, [x0, #80]",  // Save FP (X29), LR (X30)
         "str xzr, [x0, #96]",       // Clear padding
-        "str sp, [x0, #104]",       // Save SP
+        "mov x8, sp",               // Move SP to temporary register
+        "str x8, [x0, #104]",       // Save SP via temporary
 
         // Restore registers from next context
         "ldp x19, x20, [x1, #0]",   // Restore X19, X20
@@ -425,15 +427,20 @@ unsafe fn aarch64_context_switch(
         "ldp x25, x26, [x1, #48]",  // Restore X25, X26
         "ldp x27, x28, [x1, #64]",  // Restore X27, X28
         "ldp x29, x30, [x1, #80]",  // Restore FP (X29), LR (X30)
-        "ldr sp, [x1, #104]",       // Restore SP
+        "ldr x8, [x1, #104]",       // Load SP to temporary register
+        "mov sp, x8",               // Restore SP from temporary
 
         // Input/output operands
         in("x0") current as *mut Context,
         in("x1") next as *const Context,
 
         // Clobbers
+        clobber_abi("system"),
+
+        // Options
         options(nostack, preserves_flags)
     );
+    }
 
     Ok(())
 }
@@ -442,7 +449,7 @@ unsafe fn aarch64_context_switch(
 unsafe fn aarch64_fast_context_switch(
     current: &mut Context,
     next: &Context,
-    same_process: bool,
+    _same_process: bool,
 ) -> Result<(), ContextSwitchError> {
     // Validate stack pointers
     if current.sp == 0 || next.sp == 0 {
@@ -450,14 +457,17 @@ unsafe fn aarch64_fast_context_switch(
     }
 
     // Optimized context switch with fewer instructions
-    asm!(
+    unsafe {
+        asm!(
         // Save only essential registers
         "stp x29, x30, [x0, #80]",  // Save FP (X29), LR (X30)
-        "str sp, [x0, #104]",       // Save SP
+        "mov x8, sp",               // Move SP to temporary register
+        "str x8, [x0, #104]",       // Save SP via temporary
 
         // Restore essential registers
         "ldp x29, x30, [x1, #80]",  // Restore FP (X29), LR (X30)
-        "ldr sp, [x1, #104]",       // Restore SP
+        "ldr x8, [x1, #104]",       // Load SP to temporary register
+        "mov sp, x8",               // Restore SP from temporary
 
         // Jump to next context
         "ret x30",                  // Return to LR
@@ -467,8 +477,12 @@ unsafe fn aarch64_fast_context_switch(
         in("x1") next as *const Context,
 
         // Clobbers
+        clobber_abi("system"),
+
+        // Options
         options(nostack, preserves_flags, noreturn)
     );
+    }
 }
 
 /// Get the current context pointer
@@ -497,72 +511,82 @@ pub fn get_current_context() -> Option<&'static mut Context> {
 pub unsafe fn save_current_context(context: &mut Context) -> Result<(), ContextSwitchError> {
     #[cfg(target_arch = "x86_64")]
     {
-        asm!(
-            // Save current registers to context
-            "mov [rdi + 0x00], rbx",    // Save RBX
-            "mov [rdi + 0x08], rbp",    // Save RBP
-            "mov [rdi + 0x10], r12",    // Save R12
-            "mov [rdi + 0x18], r13",    // Save R13
-            "mov [rdi + 0x20], r14",    // Save R14
-            "mov [rdi + 0x28], r15",    // Save R15
-            "mov [rdi + 0x30], rsp",    // Save RSP
-            "lea rax, [rip + 1]",       // Get RIP
-            "mov [rdi + 0x38], rax",    // Save RIP
+        unsafe {
+            asm!(
+                // Save current registers to context
+                "mov [rdi + 0x00], rbx",    // Save RBX
+                "mov [rdi + 0x08], rbp",    // Save RBP
+                "mov [rdi + 0x10], r12",    // Save R12
+                "mov [rdi + 0x18], r13",    // Save R13
+                "mov [rdi + 0x20], r14",    // Save R14
+                "mov [rdi + 0x28], r15",    // Save R15
+                "mov [rdi + 0x30], rsp",    // Save RSP
+                "lea rax, [rip + 1]",       // Get RIP
+                "mov [rdi + 0x38], rax",    // Save RIP
 
-            // Input/output operands
-            in("rdi") context as *mut Context,
+                // Input/output operands
+                in("rdi") context as *mut Context,
 
-            // Clobbers
-            options(nostack, preserves_flags)
-        );
+                // Clobbers
+                options(nostack, preserves_flags)
+            );
+        }
     }
 
     #[cfg(target_arch = "riscv64")]
     {
-        asm!(
-            // Save current registers to context
-            "sd ra, 0(a0)",     // Save RA
-            "sd sp, 8(a0)",     // Save SP
-            "sd s0, 16(a0)",    // Save S0
-            "sd s1, 24(a0)",    // Save S1
-            "sd s2, 32(a0)",    // Save S2
-            "sd s3, 40(a0)",    // Save S3
-            "sd s4, 48(a0)",    // Save S4
-            "sd s5, 56(a0)",    // Save S5
-            "sd s6, 64(a0)",    // Save S6
-            "sd s7, 72(a0)",    // Save S7
-            "sd s8, 80(a0)",    // Save S8
-            "sd s9, 88(a0)",    // Save S9
-            "sd s10, 96(a0)",   // Save S10
-            "sd s11, 104(a0)",  // Save S11
+        unsafe {
+            asm!(
+                // Save current registers to context
+                "sd ra, 0(a0)",     // Save RA
+                "sd sp, 8(a0)",     // Save SP
+                "sd s0, 16(a0)",    // Save S0
+                "sd s1, 24(a0)",    // Save S1
+                "sd s2, 32(a0)",    // Save S2
+                "sd s3, 40(a0)",    // Save S3
+                "sd s4, 48(a0)",    // Save S4
+                "sd s5, 56(a0)",    // Save S5
+                "sd s6, 64(a0)",    // Save S6
+                "sd s7, 72(a0)",    // Save S7
+                "sd s8, 80(a0)",    // Save S8
+                "sd s9, 88(a0)",    // Save S9
+                "sd s10, 96(a0)",   // Save S10
+                "sd s11, 104(a0)",  // Save S11
 
-            // Input/output operands
-            in("a0") context as *mut Context,
+                // Input/output operands
+                in("a0") context as *mut Context,
 
-            // Clobbers
-            options(nostack, preserves_flags)
-        );
+                // Clobbers
+                options(nostack, preserves_flags)
+            );
+        }
     }
 
     #[cfg(target_arch = "aarch64")]
     {
-        asm!(
-            // Save current registers to context
-            "stp x19, x20, [x0, #0]",   // Save X19, X20
-            "stp x21, x22, [x0, #16]",  // Save X21, X22
-            "stp x23, x24, [x0, #32]",  // Save X23, X24
-            "stp x25, x26, [x0, #48]",  // Save X25, X26
-            "stp x27, x28, [x0, #64]",  // Save X27, X28
-            "stp x29, x30, [x0, #80]",  // Save FP (X29), LR (X30)
-            "str xzr, [x0, #96]",       // Clear padding
-            "str sp, [x0, #104]",       // Save SP
+        unsafe {
+            asm!(
+                // Save current registers to context
+                "stp x19, x20, [x0, #0]",   // Save X19, X20
+                "stp x21, x22, [x0, #16]",  // Save X21, X22
+                "stp x23, x24, [x0, #32]",  // Save X23, X24
+                "stp x25, x26, [x0, #48]",  // Save X25, X26
+                "stp x27, x28, [x0, #64]",  // Save X27, X28
+                "stp x29, x30, [x0, #80]",  // Save FP (X29), LR (X30)
+                "str xzr, [x0, #96]",       // Clear padding
+                "mov x8, sp",               // Move SP to temporary register
+                "str x8, [x0, #104]",       // Save SP via temporary
 
-            // Input/output operands
-            in("x0") context as *mut Context,
+                // Input/output operands
+                in("x0") context as *mut Context,
 
-            // Clobbers
-            options(nostack, preserves_flags)
-        );
+                // Clobbers
+                clobber_abi("system"),
+
+                // Options
+                options(nostack, preserves_flags)
+            );
+        }
     }
 
     Ok(())
@@ -581,77 +605,90 @@ pub unsafe fn save_current_context(context: &mut Context) -> Result<(), ContextS
 pub unsafe fn restore_context(context: &Context) -> ! {
     #[cfg(target_arch = "x86_64")]
     {
-        asm!(
-            // Restore registers from context
-            "mov rbx, [rdi + 0x00]",    // Restore RBX
-            "mov rbp, [rdi + 0x08]",    // Restore RBP
-            "mov r12, [rdi + 0x10]",    // Restore R12
-            "mov r13, [rdi + 0x18]",    // Restore R13
-            "mov r14, [rdi + 0x20]",    // Restore R14
-            "mov r15, [rdi + 0x28]",    // Restore R15
-            "mov rsp, [rdi + 0x30]",    // Restore RSP
-            "mov rax, [rdi + 0x38]",    // Get RIP
-            "jmp rax",                  // Jump to RIP
+        unsafe {
+            asm!(
+                // Restore registers from context
+                "mov rbx, [rdi + 0x00]",    // Restore RBX
+                "mov rbp, [rdi + 0x08]",    // Restore RBP
+                "mov r12, [rdi + 0x10]",    // Restore R12
+                "mov r13, [rdi + 0x18]",    // Restore R13
+                "mov r14, [rdi + 0x20]",    // Restore R14
+                "mov r15, [rdi + 0x28]",    // Restore R15
+                "mov rsp, [rdi + 0x30]",    // Restore RSP
+                "mov rax, [rdi + 0x38]",    // Get RIP
+                "jmp rax",                  // Jump to RIP
 
-            // Input/output operands
-            in("rdi") context as *const Context,
+                // Input/output operands
+                in("rdi") context as *const Context,
 
-            // Clobbers
-            options(nostack, preserves_flags, noreturn)
-        );
+                // Clobbers
+                options(nostack, preserves_flags, noreturn)
+            );
+        }
     }
 
     #[cfg(target_arch = "riscv64")]
     {
-        asm!(
-            // Restore registers from context
-            "ld ra, 0(a0)",     // Restore RA
-            "ld sp, 8(a0)",     // Restore SP
-            "ld s0, 16(a0)",    // Restore S0
-            "ld s1, 24(a0)",    // Restore S1
-            "ld s2, 32(a0)",    // Restore S2
-            "ld s3, 40(a0)",    // Restore S3
-            "ld s4, 48(a0)",    // Restore S4
-            "ld s5, 56(a0)",    // Restore S5
-            "ld s6, 64(a0)",    // Restore S6
-            "ld s7, 72(a0)",    // Restore S7
-            "ld s8, 80(a0)",    // Restore S8
-            "ld s9, 88(a0)",    // Restore S9
-            "ld s10, 96(a0)",   // Restore S10
-            "ld s11, 104(a0)",  // Restore S11
+        unsafe {
+            asm!(
+                // Restore registers from context
+                "ld ra, 0(a0)",     // Restore RA
+                "ld sp, 8(a0)",     // Restore SP
+                "ld s0, 16(a0)",    // Restore S0
+                "ld s1, 24(a0)",    // Restore S1
+                "ld s2, 32(a0)",    // Restore S2
+                "ld s3, 40(a0)",    // Restore S3
+                "ld s4, 48(a0)",    // Restore S4
+                "ld s5, 56(a0)",    // Restore S5
+                "ld s6, 64(a0)",    // Restore S6
+                "ld s7, 72(a0)",    // Restore S7
+                "ld s8, 80(a0)",    // Restore S8
+                "ld s9, 88(a0)",    // Restore S9
+                "ld s10, 96(a0)",   // Restore S10
+                "ld s11, 104(a0)",  // Restore S11
 
-            // Jump to restored context
-            "ret",              // Return to RA
+                // Jump to restored context
+                "ret",              // Return to RA
 
-            // Input/output operands
-            in("a0") context as *const Context,
+                // Input/output operands
+                in("a0") context as *const Context,
 
-            // Clobbers
-            options(nostack, preserves_flags, noreturn)
-        );
+                // Clobbers
+                options(nostack, preserves_flags, noreturn)
+            );
+        }
     }
 
     #[cfg(target_arch = "aarch64")]
     {
-        asm!(
-            // Restore registers from context
-            "ldp x19, x20, [x0, #0]",   // Restore X19, X20
-            "ldp x21, x22, [x0, #16]",  // Restore X21, X22
-            "ldp x23, x24, [x0, #32]",  // Restore X23, X24
-            "ldp x25, x26, [x0, #48]",  // Restore X25, X26
-            "ldp x27, x28, [x0, #64]",  // Restore X27, X28
-            "ldp x29, x30, [x0, #80]",  // Restore FP (X29), LR (X30)
-            "ldr sp, [x0, #104]",       // Restore SP
+        unsafe {
+            asm!(
+                // Restore registers from context
+                "ldp x19, x20, [x0, #0]",   // Restore X19, X20
+                "ldp x21, x22, [x0, #16]",  // Restore X21, X22
+                "ldp x23, x24, [x0, #32]",  // Restore X23, X24
+                "ldp x25, x26, [x0, #48]",  // Restore X25, X26
+                "ldp x27, x28, [x0, #64]",  // Restore X27, X28
+                "ldp x29, x30, [x0, #80]",  // Restore FP (X29), LR (X30)
+                "ldr x8, [x0, #104]",       // Load SP to temporary register
+                "mov sp, x8",               // Restore SP from temporary
 
-            // Jump to restored context
-            "ret x30",                  // Return to LR
+                // Jump to restored context
+                "ret x30",                  // Return to LR
 
-            // Input/output operands
-            in("x0") context as *const Context,
+                // Input/output operands
+                in("x0") context as *const Context,
 
-            // Clobbers
-            options(nostack, preserves_flags, noreturn)
-        );
+                // Clobbers
+                options(nostack, preserves_flags, noreturn)
+            );
+        }
+    }
+
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "riscv64", target_arch = "aarch64")))]
+    {
+        // Fallback for unsupported architectures
+        core::intrinsics::unreachable();
     }
 }
 

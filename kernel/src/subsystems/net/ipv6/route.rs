@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 use crate::subsystems::net::ipv6::Ipv6Addr;
 
 /// IPv6 prefix (network address and prefix length)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Ipv6Prefix {
     /// Network address
     pub network: Ipv6Addr,
@@ -156,18 +156,30 @@ impl Ipv6RouteEntry {
 }
 
 /// IPv6 routing table statistics
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct Ipv6RoutingTableStats {
     /// Total number of routes
     pub total_routes: usize,
     /// Number of active routes
     pub active_routes: usize,
     /// Number of route lookups
-    pub lookups: u64,
+    pub lookups: core::sync::atomic::AtomicU64,
     /// Number of cache hits
-    pub cache_hits: u64,
+    pub cache_hits: core::sync::atomic::AtomicU64,
     /// Number of cache misses
-    pub cache_misses: u64,
+    pub cache_misses: core::sync::atomic::AtomicU64,
+}
+
+impl Clone for Ipv6RoutingTableStats {
+    fn clone(&self) -> Self {
+        Self {
+            total_routes: self.total_routes,
+            active_routes: self.active_routes,
+            lookups: core::sync::atomic::AtomicU64::new(self.lookups.load(core::sync::atomic::Ordering::Relaxed)),
+            cache_hits: core::sync::atomic::AtomicU64::new(self.cache_hits.load(core::sync::atomic::Ordering::Relaxed)),
+            cache_misses: core::sync::atomic::AtomicU64::new(self.cache_misses.load(core::sync::atomic::Ordering::Relaxed)),
+        }
+    }
 }
 
 /// IPv6 routing table
@@ -210,8 +222,9 @@ impl Ipv6RoutingTable {
     }
 
     /// Find the best route for a destination address
-    pub fn lookup(&mut self, dest: Ipv6Addr) -> Option<&Ipv6RouteEntry> {
-        self.stats.lookups += 1;
+    pub fn lookup(&self, dest: Ipv6Addr) -> Option<&Ipv6RouteEntry> {
+        // Update lookup counter using atomic operation
+        self.stats.lookups.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
 
         // Find the longest prefix match
         let mut best_match: Option<&Ipv6RouteEntry> = None;
@@ -231,10 +244,11 @@ impl Ipv6RoutingTable {
             }
         }
 
+        // Update hit/miss counters using atomic operations
         if best_match.is_some() {
-            self.stats.cache_hits += 1;
+            self.stats.cache_hits.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
         } else {
-            self.stats.cache_misses += 1;
+            self.stats.cache_misses.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
         }
 
         best_match
@@ -271,7 +285,13 @@ impl Ipv6RoutingTable {
 
     /// Get statistics
     pub fn stats(&self) -> Ipv6RoutingTableStats {
-        self.stats.clone()
+        Ipv6RoutingTableStats {
+            total_routes: self.stats.total_routes,
+            active_routes: self.stats.active_routes,
+            lookups: core::sync::atomic::AtomicU64::new(self.stats.lookups.load(core::sync::atomic::Ordering::Relaxed)),
+            cache_hits: core::sync::atomic::AtomicU64::new(self.stats.cache_hits.load(core::sync::atomic::Ordering::Relaxed)),
+            cache_misses: core::sync::atomic::AtomicU64::new(self.stats.cache_misses.load(core::sync::atomic::Ordering::Relaxed)),
+        }
     }
 
     /// Update route metrics
@@ -394,16 +414,19 @@ impl Ipv6RouteManager {
         }
 
         // Perform full lookup
-        let result = self.table.lookup(dest);
+        let route = self.table.lookup(dest);
 
-        // Update cache
-        if let Some(route) = result {
-            if let Some(index) = self.table.routes().iter().position(|r| r as *const _ == route as *const _) {
+        // Update cache if we found a route
+        if route.is_some() {
+            // Find the index of the route to cache it
+            let route_ref = route.unwrap();
+            let routes = self.table.routes();
+            if let Some(index) = routes.iter().position(|r| core::ptr::eq(r, route_ref)) {
                 self.cache = Some((dest, index));
             }
         }
 
-        result
+        route
     }
 
     /// Invalidate the route cache

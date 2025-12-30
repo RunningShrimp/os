@@ -1,6 +1,8 @@
 //! File mode and permission bits
 extern crate alloc;
 
+use crate::prelude::*;
+
 use alloc::fmt;
 
 /// File mode bits

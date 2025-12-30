@@ -2,13 +2,10 @@
 //!
 //! 提供mprotect等内存保护相关的系统调用实现
 
-extern crate alloc;
+use crate::prelude::*;
 
-use alloc::vec::Vec;
-
-use crate::subsystems::sync::Mutex;
-use crate::subsystems::mm::types::*;
-use crate::subsystems::mm::vm::{VmSpace, VmError};
+use crate::types::MapFlags;
+use crate::error::SyscallError;
 use crate::subsystems::syscalls::common::SyscallResult;
 
 /// 更改内存保护属性
@@ -24,23 +21,23 @@ pub fn sys_mprotect(addr: usize, length: usize, flags: MapFlags) -> SyscallResul
     // 获取当前地址空间
     let vm_space = crate::subsystems::mm::vm::vm_manager().lock()
         .current_space()
-        .map_err(|_| SyscallError::EINVAL)?;
+        .map_err(|_| SyscallError::InvalidArgument)?;
 
     // 对齐地址和长度到页边界
     let aligned_addr = addr / PAGE_SIZE * PAGE_SIZE;
     let aligned_length = (length + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
 
     // 检查地址范围
-    let region = vm_space.find_region(aligned_addr).ok_or(SyscallError::EINVAL)?;
+    let region = vm_space.find_region(aligned_addr).ok_or(SyscallError::InvalidArgument)?;
 
     // 检查长度是否超出区域
     if aligned_addr + aligned_length > region.end {
-        return Err(SyscallError::EINVAL);
+        return Err(SyscallError::InvalidArgument);
     }
 
     // 更改保护属性
     vm_space.protect(aligned_addr, aligned_length, flags)
-        .map_err(|_| SyscallError::ENOMEM)?;
+        .map_err(|_| SyscallError::OutOfMemory)?;
 
     Ok(0)
 }
@@ -57,18 +54,18 @@ pub fn sys_mlock(addr: usize, length: usize) -> SyscallResult<i64> {
     // 获取当前地址空间
     let vm_space = crate::subsystems::mm::vm::vm_manager().lock()
         .current_space()
-        .map_err(|_| SyscallError::EINVAL)?;
+        .map_err(|_| SyscallError::InvalidArgument)?;
 
     // 对齐地址和长度到页边界
     let aligned_addr = addr / PAGE_SIZE * PAGE_SIZE;
     let aligned_length = (length + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
 
     // 检查地址范围
-    let region = vm_space.find_region(aligned_addr).ok_or(SyscallError::EINVAL)?;
+    let region = vm_space.find_region(aligned_addr).ok_or(SyscallError::InvalidArgument)?;
 
     // 检查长度是否超出区域
     if aligned_addr + aligned_length > region.end {
-        return Err(SyscallError::EINVAL);
+        return Err(SyscallError::InvalidArgument);
     }
 
     // TODO: 实现真正的内存锁定
@@ -90,18 +87,18 @@ pub fn sys_munlock(addr: usize, length: usize) -> SyscallResult<i64> {
     // 获取当前地址空间
     let vm_space = crate::subsystems::mm::vm::vm_manager().lock()
         .current_space()
-        .map_err(|_| SyscallError::EINVAL)?;
+        .map_err(|_| SyscallError::InvalidArgument)?;
 
     // 对齐地址和长度到页边界
     let aligned_addr = addr / PAGE_SIZE * PAGE_SIZE;
     let aligned_length = (length + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
 
     // 检查地址范围
-    let region = vm_space.find_region(aligned_addr).ok_or(SyscallError::EINVAL)?;
+    let region = vm_space.find_region(aligned_addr).ok_or(SyscallError::InvalidArgument)?;
 
     // 检查长度是否超出区域
     if aligned_addr + aligned_length > region.end {
-        return Err(SyscallError::EINVAL);
+        return Err(SyscallError::InvalidArgument);
     }
 
     // TODO: 实现真正的内存解锁
@@ -119,9 +116,9 @@ pub fn sys_munlock(addr: usize, length: usize) -> SyscallResult<i64> {
 /// 成功时返回0，失败时返回错误
 pub fn sys_mlockall(flags: MlockAllFlags) -> SyscallResult<i64> {
     // 获取当前地址空间
-    let vm_space = crate::subsystems::mm::vm::vm_manager().lock()
+    let _vm_space = crate::subsystems::mm::vm::vm_manager().lock()
         .current_space()
-        .map_err(|_| SyscallError::EINVAL)?;
+        .map_err(|_| SyscallError::InvalidArgument)?;
 
     // TODO: 实现真正的地址空间锁定
     crate::println!("mlockall: locked address space with flags {:?}", flags);
@@ -135,9 +132,9 @@ pub fn sys_mlockall(flags: MlockAllFlags) -> SyscallResult<i64> {
 /// 成功时返回0，失败时返回错误
 pub fn sys_munlockall() -> SyscallResult<i64> {
     // 获取当前地址空间
-    let vm_space = crate::subsystems::mm::vm::vm_manager().lock()
+    let _vm_space = crate::subsystems::mm::vm::vm_manager().lock()
         .current_space()
-        .map_err(|_| SyscallError::EINVAL)?;
+        .map_err(|_| SyscallError::InvalidArgument)?;
 
     // TODO: 实现真正的地址空间解锁
     crate::println!("munlockall: unlocked address space");

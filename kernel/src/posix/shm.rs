@@ -11,6 +11,9 @@ use crate::{
     subsystems::sync::Mutex,
 };
 
+// Error constants
+use crate::reliability::errno::{EINVAL, EOK};
+
 // Re-export vm module functions from microkernel memory
 use crate::subsystems::microkernel::memory as vm;
 
@@ -253,15 +256,13 @@ pub unsafe extern "C" fn shmat(shmid: i32, shmaddr: *mut u8, shmflg: i32) -> *mu
         let vaddr = virt_addr + (i * vm::PAGE_SIZE);
         let perm = vm::flags::PTE_R | vm::flags::PTE_W | vm::flags::PTE_U;
 
-        unsafe {
-            if vm::map_page(pagetable, vaddr, page.addr, perm).is_err() {
-                // Rollback mappings on failure
-                for j in 0..i {
-                    let rollback_vaddr = virt_addr + (j * vm::PAGE_SIZE);
-                    let _ = vm::unmap_page(pagetable, rollback_vaddr);
-                }
-                return core::ptr::null_mut();
+        if vm::map_page(pagetable, vaddr, page.addr, perm).is_err() {
+            // Rollback mappings on failure
+            for j in 0..i {
+                let rollback_vaddr = virt_addr + (j * vm::PAGE_SIZE);
+                let _ = vm::unmap_page(pagetable, rollback_vaddr);
             }
+            return core::ptr::null_mut();
         }
     }
 
@@ -372,7 +373,7 @@ pub unsafe extern "C" fn shmdt(shmaddr: *mut u8) -> i32 {
 ///
 /// # Returns
 /// * 0 on success, -1 on failure
-pub unsafe extern "C" fn shmctl(shmid: i32, cmd: i32, buf: *mut ShmidDs) -> i32 {
+pub unsafe extern "C" fn shmctl(shmid: i32, cmd: i32, buf: *mut ShmidDs) -> i32 { unsafe {
     if shmid <= 0 {
         return EINVAL;
     }
@@ -445,7 +446,7 @@ pub unsafe extern "C" fn shmctl(shmid: i32, cmd: i32, buf: *mut ShmidDs) -> i32 
 
         _ => EINVAL,
     }
-}
+}}
 
 /// Check if the calling process has required permissions for the IPC object
 fn check_permissions(perm: &IpcPerm, required_mode: Mode) -> bool {

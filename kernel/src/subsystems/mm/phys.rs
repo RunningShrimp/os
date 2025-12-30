@@ -35,10 +35,7 @@ pub fn page_round_up(addr: usize) -> usize {
     (addr + PAGE_SIZE - 1) & !(PAGE_SIZE - 1)
 }
 
-use crate::{
-    println,
-    subsystems::{mm::buddy::OptimizedBuddyAllocator, sync::Mutex},
-};
+use crate::subsystems::{mm::buddy::OptimizedBuddyAllocator, sync::Mutex};
 
 static BUDDY: Mutex<OptimizedBuddyAllocator> = Mutex::new(OptimizedBuddyAllocator::new());
 use core::sync::atomic::{AtomicUsize, Ordering};
@@ -52,8 +49,6 @@ unsafe extern "C" {
     static _heap_start: u8;
     static _heap_end: u8;
     static _stack_top: u8;
-    #[cfg(feature = "link_phys_end")]
-    static _phys_end: u8;
 }
 
 /// Get heap start address
@@ -69,15 +64,8 @@ pub fn heap_end() -> usize {
 static PHYS_END_OVERRIDE: AtomicUsize = AtomicUsize::new(0);
 
 pub fn phys_end() -> usize {
-    #[cfg(feature = "link_phys_end")]
-    unsafe {
-        &_phys_end as *const u8 as usize
-    }
-    #[cfg(not(feature = "link_phys_end"))]
-    {
-        let v = PHYS_END_OVERRIDE.load(Ordering::SeqCst);
-        if v != 0 { v } else { heap_end() }
-    }
+    let v = PHYS_END_OVERRIDE.load(Ordering::SeqCst);
+    if v != 0 { v } else { heap_end() }
 }
 
 pub fn set_phys_end(end: usize) {
@@ -162,7 +150,7 @@ impl FreeListAllocator {
         // Add all pages to free list
         let mut addr = start;
         while addr + PAGE_SIZE <= end {
-            self.free_page(addr as *mut u8);
+            unsafe { self.free_page(addr as *mut u8); }
             addr += PAGE_SIZE;
         }
     }
@@ -240,11 +228,15 @@ impl FreeListAllocator {
         }
 
         // Zero the page for security
-        ptr::write_bytes(page, 0, PAGE_SIZE);
+        unsafe {
+            ptr::write_bytes(page, 0, PAGE_SIZE);
+        }
 
         // Add to front of free list
         let node = page as *mut FreeNode;
-        (*node).next = self.free_list;
+        unsafe {
+            (*node).next = self.free_list;
+        }
         self.free_list = node;
         self.free_count += 1;
     }
@@ -422,7 +414,7 @@ pub fn kalloc_pages(count: usize) -> *mut u8 {
     }
     use core::alloc::Layout;
     let layout = Layout::from_size_align(count * PAGE_SIZE, PAGE_SIZE).unwrap();
-    let addr = BUDDY.lock().alloc(layout);
+    let addr = unsafe { BUDDY.lock().alloc(layout) };
     if !addr.is_null() {
         unsafe {
             ptr::write_bytes(addr as *mut u8, 0, count * PAGE_SIZE);

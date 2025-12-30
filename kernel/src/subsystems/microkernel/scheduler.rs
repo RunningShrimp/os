@@ -158,11 +158,21 @@ impl CpuScheduler {
 
     pub fn update_load_average(&mut self) {
         let current_time = get_current_time();
-        let time_delta = (current_time - self.last_switch_time) as f64 / 1_000_000_000.0; // Convert to seconds
+        let time_delta_ns = current_time - self.last_switch_time;
         self.last_switch_time = current_time;
 
-        // Exponential moving average with alpha = 0.1
-        let alpha = 0.1;
+        // Calculate exponential moving average of ready queue length
+        // Weight by time delta to give more importance to longer intervals
+        let time_delta_sec = time_delta_ns as f64 / 1_000_000_000.0;
+
+        // Dynamic alpha based on time elapsed (clamped to reasonable range)
+        // Longer intervals -> higher weight, shorter intervals -> lower weight
+        let alpha = if time_delta_sec > 0.0 {
+            (time_delta_sec / (time_delta_sec + 1.0)).min(0.5)
+        } else {
+            0.1
+        };
+
         let current_load = self.ready_queue.len() as f64;
         self.load_average = alpha * current_load + (1.0 - alpha) * self.load_average;
     }

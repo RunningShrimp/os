@@ -1,9 +1,9 @@
 //! Common types and utilities for system calls
 
-pub use crate::{api::SyscallError, error::Result};
+pub use crate::error::{Result, SyscallError};
 
 /// Result type for system calls
-pub type SyscallResult<T> = Result<T, SyscallError>;
+pub type SyscallResult<T> = core::result::Result<T, SyscallError>;
 
 /// System call arguments
 pub type SyscallArgs = [u64; 6];

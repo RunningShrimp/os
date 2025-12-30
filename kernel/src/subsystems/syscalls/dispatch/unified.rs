@@ -10,6 +10,7 @@
 //! - Adaptive optimization based on call frequency
 
 use core::sync::atomic::{AtomicU64, AtomicUsize, AtomicPtr, Ordering};
+use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -17,9 +18,73 @@ use crate::subsystems::sync::Mutex;
 use crate::subsystems::sync::rcu;
 use crate::cpu;
 
-use nos_api::syscall::interface::{SyscallDispatcher, SyscallHandler};
-use nos_api::syscall::types::{SyscallNumber, SyscallArgs, SyscallResult);
-use nos_api::error::Result;
+use crate::subsystems::syscalls::interface::{
+    SyscallDispatcher, SyscallHandler, SyscallContext, SyscallArgs, SyscallNumber,
+    SyscallResult, InterfaceSyscallError, SyscallStats
+};
+
+/// Sendable wrapper for raw pointers to boxed types
+///
+/// # Safety
+/// This wrapper is safe to send across threads because T is Send + Sync
+struct SendableBoxPtr<T>(*mut T);
+
+// SAFETY: SendableBoxPtr wraps a raw pointer to a Send type
+// It's only used in RCU context with proper synchronization
+unsafe impl<T: Send> Send for SendableBoxPtr<T> {}
+
+impl<T> SendableBoxPtr<T> {
+    /// Consume this wrapper and drop the boxed value
+    ///
+    /// # Safety
+    /// This must be called exactly once per SendableBoxPtr instance
+    unsafe fn drop_box(self) {
+        let Self(ptr) = self;
+        unsafe {
+            drop(Box::from_raw(ptr));
+        }
+        core::mem::forget(self); // Prevent double-drop
+    }
+}
+
+/// Batch system call result
+#[derive(Debug)]
+pub struct SyscallBatchResult {
+    /// Individual results for each syscall
+    pub results: Vec<Result<u64, InterfaceSyscallError>>,
+    /// Total execution time in nanoseconds
+    pub total_time_ns: u64,
+}
+
+impl SyscallBatchResult {
+    /// Create a new batch result
+    pub fn new(results: Vec<Result<u64, InterfaceSyscallError>>, total_time_ns: u64) -> Self {
+        Self {
+            results,
+            total_time_ns,
+        }
+    }
+
+    /// Get the number of results
+    pub fn len(&self) -> usize {
+        self.results.len()
+    }
+
+    /// Check if the batch is empty
+    pub fn is_empty(&self) -> bool {
+        self.results.is_empty()
+    }
+
+    /// Get the number of successful syscalls
+    pub fn success_count(&self) -> usize {
+        self.results.iter().filter(|r| r.is_ok()).count()
+    }
+
+    /// Get the number of failed syscalls
+    pub fn failure_count(&self) -> usize {
+        self.results.iter().filter(|r| r.is_err()).count()
+    }
+}
 
 /// Maximum number of CPUs supported
 const MAX_CPUS: usize = 256;
@@ -28,7 +93,7 @@ const MAX_CPUS: usize = 256;
 const MAX_FAST_PATH_SYSCALLS: usize = 256;
 
 /// Fast-path handler function type
-pub type FastPathHandler = fn(u32, &[u64]) -> Result<u64>;
+pub type FastPathHandler = fn(u32, &[u64]) -> Result<u64, InterfaceSyscallError>;
 
 /// Per-CPU syscall cache
 #[derive(Debug)]
@@ -49,11 +114,11 @@ impl PerCpuCache {
         Self {
             recent_syscalls: Vec::with_capacity(16),
             frequency_table: BTreeMap::new(),
-            cache_hits: AtomicUsize::new(0),
-            cache_misses: AtomicUsize::new(0),
+            cache_hits: AtomicUsize::new(0usize),
+            cache_misses: AtomicUsize::new(0usize),
         }
     }
-    
+
     /// Add a syscall to the recent list and update frequency
     fn record_syscall(&mut self, syscall_num: u32) {
         // Add to recent list
@@ -65,38 +130,32 @@ impl PerCpuCache {
         // Update frequency table
         *self.frequency_table.entry(syscall_num).or_insert(0) += 1;
     }
-    
-    /// Get the most frequent syscalls
-    fn get_most_frequent(&self, count: usize) -> Vec<u32> {
-        let mut syscalls: Vec<(u64, u32)> = self.frequency_table.iter()
-            .map(|(&num, &freq)| (freq, num))
-            .collect();
-        
-        syscalls.sort_by(|a, b| b.0.cmp(&a.0));
-        syscalls.into_iter()
-            .take(count)
-            .map(|(_, num)| num)
-            .collect()
-    }
-    
+
     /// Record a cache hit
     fn record_hit(&self) {
         self.cache_hits.fetch_add(1, Ordering::Relaxed);
     }
-    
+
     /// Record a cache miss
     fn record_miss(&self) {
         self.cache_misses.fetch_add(1, Ordering::Relaxed);
     }
-    
-    /// Get cache hit ratio
-    fn hit_ratio(&self) -> f32 {
-        let hits = self.cache_hits.load(Ordering::Relaxed);
-        let misses = self.cache_misses.load(Ordering::Relaxed);
-        if hits + misses == 0 {
-            return 0.0;
-        }
-        hits as f32 / (hits + misses) as f32
+
+    /// Get the most frequent syscalls from the frequency table
+    fn get_most_frequent(&self, limit: usize) -> Vec<u32> {
+        let mut entries: Vec<(u32, u64)> = self.frequency_table
+            .iter()
+            .map(|(&syscall, &count)| (syscall, count))
+            .collect();
+
+        // Sort by frequency (descending)
+        entries.sort_by(|a, b| b.1.cmp(&a.1));
+
+        // Take the top `limit` syscalls
+        entries.into_iter()
+            .take(limit)
+            .map(|(syscall, _)| syscall)
+            .collect()
     }
 }
 
@@ -231,16 +290,20 @@ impl UnifiedSyscallDispatcher {
     pub fn with_context(config: UnifiedDispatcherConfig, context: Arc<dyn SyscallContext>) -> Self {
         // Initialize per-CPU caches
         let per_cpu_caches = [(); MAX_CPUS].map(|_| Mutex::new(PerCpuCache::new()));
-        
+
         // Initialize fast-path array (RCU-protected)
-        let fast_path_array = Box::into_raw(Box::new([None; MAX_FAST_PATH_SYSCALLS]));
-        
+        let fast_path_array: Box<FastPathArray> = Box::new([None; MAX_FAST_PATH_SYSCALLS]);
+
         // Initialize handlers map (RCU-protected)
-        let handlers_map = Box::into_raw(Box::new(BTreeMap::new()));
-        
+        let handlers_map: Box<HandlersMap> = Box::new(BTreeMap::new());
+
+        // Store them as raw pointers for AtomicPtr
+        let fast_path_ptr = Box::into_raw(fast_path_array);
+        let handlers_ptr = Box::into_raw(handlers_map);
+
         Self {
-            fast_path: AtomicPtr::new(fast_path_array),
-            handlers: AtomicPtr::new(handlers_map),
+            fast_path: AtomicPtr::new(fast_path_ptr),
+            handlers: AtomicPtr::new(handlers_ptr),
             fast_path_write_lock: Mutex::new(()),
             handlers_write_lock: Mutex::new(()),
             per_cpu_caches,
@@ -253,87 +316,89 @@ impl UnifiedSyscallDispatcher {
     
     /// Get fast-path array (lock-free read)
     #[inline]
-    unsafe fn get_fast_path(&self) -> &'static FastPathArray {
+    unsafe fn get_fast_path(&self) -> &FastPathArray {
         // Load atomic pointer (no lock needed for reads)
-        let ptr = self.fast_path.load(Ordering::Acquire);
-        &*ptr
+        let outer_ptr = self.fast_path.load(Ordering::Acquire);
+        unsafe { &*outer_ptr }
     }
-    
+
     /// Get handlers map (lock-free read)
     #[inline]
-    unsafe fn get_handlers(&self) -> &'static HandlersMap {
+    unsafe fn get_handlers(&self) -> &HandlersMap {
         // Load atomic pointer (no lock needed for reads)
-        let ptr = self.handlers.load(Ordering::Acquire);
-        &*ptr
+        let outer_ptr = self.handlers.load(Ordering::Acquire);
+        unsafe { &*outer_ptr }
     }
-    
+
     /// Register a system call handler (RCU update)
-    pub fn register_handler(&self, syscall_num: u32, handler: Arc<dyn SyscallHandler>) -> Result<(), SyscallError> {
+    pub fn register_handler(&self, syscall_num: u32, handler: Arc<dyn SyscallHandler>) -> Result<(), InterfaceSyscallError> {
         // Acquire write lock (only needed during updates)
         let _guard = self.handlers_write_lock.lock();
-        
+
         // Load current map
-        let old_ptr = self.handlers.load(Ordering::Acquire);
-        let old_map = unsafe { &*old_ptr };
-        
+        let old_outer_ptr = self.handlers.load(Ordering::Acquire);
+        let old_map: &HandlersMap = unsafe { &*old_outer_ptr };
+
         // Create new map with updated handler
         let mut new_map = old_map.clone();
         new_map.insert(syscall_num, handler);
-        
+
         // Allocate new map
-        let new_ptr = Box::into_raw(Box::new(new_map));
-        
+        let new_map_box = Box::new(new_map);
+        let new_outer_ptr = Box::into_raw(new_map_box);
+
         // Atomically update pointer (RCU-style)
-        let prev_ptr = self.handlers.swap(new_ptr, Ordering::Release);
-        
+        let prev_outer_ptr = self.handlers.swap(new_outer_ptr, Ordering::Release);
+
         // Memory barrier to ensure all readers see the new pointer
         core::sync::atomic::fence(Ordering::SeqCst);
-        
-        // Wait for grace period and free old map
-        let old_ptr = prev_ptr;
-        rcu::call_rcu(Box::new(move || {
-            unsafe {
-                let _ = Box::from_raw(old_ptr);
-            }
-        }));
-        
+
+        // Schedule old map for deletion after grace period
+        let sendable = SendableBoxPtr(prev_outer_ptr);
+        unsafe {
+            rcu::call_rcu(Box::new(move || {
+                sendable.drop_box();
+            }));
+        }
+
         Ok(())
     }
-    
+
     /// Register a fast-path handler (RCU update)
-    pub fn register_fast_path(&self, syscall_num: u32, handler: FastPathHandler) -> Result<(), SyscallError> {
+    pub fn register_fast_path(&self, syscall_num: u32, handler: FastPathHandler) -> Result<(), InterfaceSyscallError> {
         if syscall_num as usize >= MAX_FAST_PATH_SYSCALLS {
-            return Err(SyscallError::InvalidArguments);
+            return Err(InterfaceSyscallError::InvalidArgument);
         }
-        
+
         // Acquire write lock (only needed during updates)
         let _guard = self.fast_path_write_lock.lock();
-        
+
         // Load current array
-        let old_ptr = self.fast_path.load(Ordering::Acquire);
-        let old_array = unsafe { &*old_ptr };
-        
+        let old_outer_ptr = self.fast_path.load(Ordering::Acquire);
+        let old_array: &FastPathArray = unsafe { &*old_outer_ptr };
+
         // Create new array with updated handler
-        let mut new_array = *old_array;
+        let mut new_array = old_array.clone();
         new_array[syscall_num as usize] = Some(handler);
-        
+
         // Allocate new array
-        let new_ptr = Box::into_raw(Box::new(new_array));
-        
+        let new_array_box = Box::new(new_array);
+        let new_outer_ptr = Box::into_raw(new_array_box);
+
         // Atomically update pointer (RCU-style)
-        let prev_ptr = self.fast_path.swap(new_ptr, Ordering::Release);
-        
+        let prev_outer_ptr = self.fast_path.swap(new_outer_ptr, Ordering::Release);
+
         // Memory barrier to ensure all readers see the new pointer
         core::sync::atomic::fence(Ordering::SeqCst);
-        
-        // Wait for grace period and free old array
-        let old_ptr = prev_ptr;
-        rcu::call_rcu(Box::new(move || {
-            unsafe {
-                let _ = Box::from_raw(old_ptr);
-            }
-        }));
-        
+
+        // Schedule old array for deletion after grace period
+        let sendable = SendableBoxPtr(prev_outer_ptr);
+        unsafe {
+            rcu::call_rcu(Box::new(move || {
+                sendable.drop_box();
+            }));
+        }
+
         Ok(())
     }
     
@@ -353,16 +418,28 @@ impl UnifiedSyscallDispatcher {
         if !self.config.enable_adaptive_optimization {
             return;
         }
-        
+
         let cpu_id = self.current_cpu_id();
-        let mut cache = self.per_cpu_caches[cpu_id].lock();
-        let frequent_syscalls = cache.get_most_frequent(MAX_FAST_PATH_SYSCALLS);
-        
+        let cache = self.per_cpu_caches[cpu_id].lock();
+        let _frequent_syscalls = cache.get_most_frequent(MAX_FAST_PATH_SYSCALLS);
+
         // In a real implementation, we would update the fast_path array here
         // For now, this is a placeholder
         drop(cache);
     }
     
+    /// Convert &[u64] to SyscallArgs
+    fn args_from_slice(args: &[u64]) -> SyscallArgs {
+        [
+            args.get(0).copied().unwrap_or(0),
+            args.get(1).copied().unwrap_or(0),
+            args.get(2).copied().unwrap_or(0),
+            args.get(3).copied().unwrap_or(0),
+            args.get(4).copied().unwrap_or(0),
+            args.get(5).copied().unwrap_or(0),
+        ]
+    }
+
     /// Read Time-Stamp Counter (for performance measurement)
     #[inline(always)]
     fn rdtsc() -> u64 {
@@ -420,19 +497,7 @@ impl UnifiedSyscallDispatcher {
 }
 
 impl SyscallDispatcher for UnifiedSyscallDispatcher {
-    fn register_handler(&mut self, number: SyscallNumber, handler: Box<dyn SyscallHandler>) {
-        // Store the handler for the given syscall number
-        // This is a simplified implementation - a real implementation would need
-        // to manage the handlers more efficiently
-        println!("Registered handler for syscall {} with name {}", number, handler.name());
-    }
-
-    fn unregister_handler(&mut self, number: SyscallNumber) {
-        // Remove the handler for the given syscall number
-        println!("Unregistered handler for syscall {}", number);
-    }
-
-    fn dispatch(&mut self, number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult<i64> {
+    fn dispatch(&self, number: SyscallNumber, args: &[u64]) -> SyscallResult<()> {
         let start_time = if self.config.enable_monitoring {
             Self::rdtsc()
         } else {
@@ -442,10 +507,10 @@ impl SyscallDispatcher for UnifiedSyscallDispatcher {
         // Try fast-path first if enabled (lock-free read)
         if self.config.enable_fast_path {
             let fast_path = unsafe { self.get_fast_path() };
-            if (number as usize) < MAX_FAST_PATH_SYSCALLS {
+            if number < MAX_FAST_PATH_SYSCALLS as u32 {
                 if let Some(handler) = fast_path[number as usize] {
                     // No lock needed - direct handler call
-                    let result = handler(number, args.into());
+                    let result = handler(number, args);
 
                     // Update per-CPU cache as a fast-path hit
                     if self.config.enable_per_cpu_cache {
@@ -463,7 +528,7 @@ impl SyscallDispatcher for UnifiedSyscallDispatcher {
                     self.stats.record_dispatch(result.is_ok(), true, time_ns);
 
                     // Convert the result to match the trait
-                    return Ok(SyscallResult<i64>:success(result.unwrap_or(0) as isize));
+                    return result.map(|_| ());
                 }
             }
         }
@@ -478,48 +543,63 @@ impl SyscallDispatcher for UnifiedSyscallDispatcher {
         // Get handler from regular handlers (lock-free read)
         let handlers = unsafe { self.get_handlers() };
         if let Some(handler) = handlers.get(&number) {
-            let handler_name = handler.name();
-            let supports = handler.supports(number);
+            let _handler_name = handler.get_name();
 
-            if !supports {
-                return Err(nos_api::syscall::types::SyscallError::InvalidSyscall(number));
-            }
+            // Call the handler with the arguments
+            let result = handler.handle(args);
 
-            // For now, we can't call handler.handle because we need &mut self
-            // This needs to be redesigned to work with the Arc<dyn SyscallHandler> pattern
+            // Update statistics
             let end_time = if self.config.enable_monitoring {
                 Self::rdtsc()
             } else {
                 0
             };
             let time_ns = end_time.saturating_sub(start_time);
-            self.stats.record_dispatch(false, false, time_ns);
+            self.stats.record_dispatch(result.is_ok(), false, time_ns);
 
-            return Ok(SyscallResult<i64>:success(0));
+            return result;
         }
 
-        Err(nos_api::syscall::types::SyscallError::InvalidSyscall(number))
+        // Handler not found
+        let end_time = if self.config.enable_monitoring {
+            Self::rdtsc()
+        } else {
+            0
+        };
+        let time_ns = end_time.saturating_sub(start_time);
+        self.stats.record_dispatch(false, false, time_ns);
+
+        Err(InterfaceSyscallError::InterfaceNotFound)
     }
 
-    fn handler_count(&self) -> usize {
-        let handlers = unsafe { self.get_handlers() };
-        handlers.len()
-    }
-
-    fn get_stats(&self) -> nos_api::syscall::interface::SyscallStats {
-        nos_api::syscall::interface::SyscallStats {
-            total_calls: self.stats.total_calls,
-            successful_calls: self.stats.successful_calls,
-            failed_calls: self.stats.failed_calls,
-            avg_execution_time_ns: self.stats.avg_execution_time_ns,
+    fn get_stats(&self) -> SyscallStats {
+        SyscallStats {
+            total_calls: self.stats.total_dispatches.load(core::sync::atomic::Ordering::Relaxed),
+            successful_calls: self.stats.successful_dispatches.load(core::sync::atomic::Ordering::Relaxed),
+            failed_calls: self.stats.failed_dispatches.load(core::sync::atomic::Ordering::Relaxed),
+            avg_execution_time_ns: self.stats.avg_time_ns(),
         }
     }
 
     fn list_handlers(&self) -> Vec<(usize, &str)> {
         let handlers = unsafe { self.get_handlers() };
         handlers.iter()
-            .map(|(&num, handler)| (num as usize, handler.name()))
-            .collect()
+            .map(|(&num, handler)| (num as usize, handler.get_name()))
+            .collect::<Vec<_>>()
+    }
+
+    fn is_supported(&self, num: SyscallNumber) -> bool {
+        let handlers = unsafe { self.get_handlers() };
+        handlers.contains_key(&num)
+    }
+
+    fn get_name(&self, num: SyscallNumber) -> Option<&'static str> {
+        let handlers = unsafe { self.get_handlers() };
+        handlers.get(&num).map(|handler| handler.get_name())
+    }
+
+    fn get_context(&self) -> &dyn SyscallContext {
+        self.context.as_ref()
     }
 }
 
@@ -529,7 +609,7 @@ impl UnifiedSyscallDispatcher {
     /// This is a lightweight batching mechanism on top of `dispatch` that
     /// preserves existing semantics while reducing per-call overhead when
     /// the caller already has a group of syscalls to execute.
-    pub fn batch_dispatch(&self, calls: &[(u32, &[u64])]) -> SyscallBatchResult {
+    pub fn batch_dispatch(&mut self, calls: &[(SyscallNumber, &[u64])]) -> SyscallBatchResult {
         let start_time = if self.config.enable_monitoring {
             Self::rdtsc()
         } else {
@@ -539,7 +619,9 @@ impl UnifiedSyscallDispatcher {
         let mut results = alloc::vec::Vec::with_capacity(calls.len());
         for (num, args) in calls.iter() {
             let res = self.dispatch(*num, args);
-            results.push(res);
+            // Convert SyscallResult (Result<()>) to Result<u64>
+            let converted_result = res.map(|_| 0u64);
+            results.push(converted_result);
         }
 
         let end_time = if self.config.enable_monitoring {
@@ -557,22 +639,22 @@ impl UnifiedSyscallDispatcher {
 struct DefaultContext;
 
 impl SyscallContext for DefaultContext {
-    fn get_pid(&self) -> pid_t {
+    fn get_pid(&self) -> u32 {
         0
     }
-    
-    fn get_uid(&self) -> uid_t {
+
+    fn get_uid(&self) -> u32 {
         0
     }
-    
-    fn get_gid(&self) -> gid_t {
+
+    fn get_gid(&self) -> u32 {
         0
     }
-    
+
     fn has_permission(&self, _operation: &str) -> bool {
         true
     }
-    
+
     fn get_cwd(&self) -> &str {
         "/"
     }
@@ -593,84 +675,99 @@ pub fn get_unified_dispatcher() -> Option<&'static Mutex<Option<UnifiedSyscallDi
 }
 
 /// Convenience helper for batch-dispatch using the global dispatcher.
-pub fn unified_batch_dispatch(calls: &[(u32, &[u64])]) -> Option<SyscallBatchResult> {
+pub fn unified_batch_dispatch(calls: &[(SyscallNumber, &[u64])]) -> Option<SyscallBatchResult> {
     get_unified_dispatcher().and_then(|mutex| {
-        let guard = mutex.lock();
-        guard.as_ref().map(|disp| disp.batch_dispatch(calls))
+        let mut guard = mutex.lock();
+        guard.as_mut().map(|disp| disp.batch_dispatch(calls))
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::subsystems::syscalls::interface::SyscallError;
-    
+
     struct TestHandler {
         name: &'static str,
-        result: u64,
     }
 
     impl SyscallHandler for TestHandler {
-        fn handle(&mut self, number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult<i64> {
-            Ok(SyscallResult<i64>:success(self.result as isize))
+        fn handle(&self, _args: &[u64]) -> SyscallResult<()> {
+            Ok(())
         }
 
-        fn name(&self) -> &str {
+        fn get_name(&self) -> &'static str {
             self.name
         }
 
-        fn supports(&self, number: SyscallNumber) -> bool {
-            number == 0x1000
+        fn get_syscall_number(&self) -> SyscallNumber {
+            0x1000
         }
     }
-    
+
     #[test]
     fn test_unified_dispatcher_creation() {
         let config = UnifiedDispatcherConfig::default();
         let dispatcher = UnifiedSyscallDispatcher::new(config);
-        // Note: is_supported is not part of the nos-api SyscallDispatcher trait
-        // assert!(!dispatcher.is_supported(0x1000));
+        // Test that dispatcher was created successfully
+        assert!(!dispatcher.is_supported(0x1000));
     }
-    
+
     #[test]
     fn test_handler_registration() {
         let config = UnifiedDispatcherConfig::default();
         let dispatcher = UnifiedSyscallDispatcher::new(config);
-        let handler = Box::new(TestHandler {
+        let handler = Arc::new(TestHandler {
             name: "test",
-            result: 42,
         });
 
-        dispatcher.register_handler(0x1000, handler);
-        // Note: is_supported is not part of the nos-api SyscallDispatcher trait
-        // assert!(dispatcher.is_supported(0x1000));
+        // Test registering a handler
+        let result = dispatcher.register_handler(0x1000, handler);
+        assert!(result.is_ok());
+        // Note: is_supported is part of the nos-api SyscallDispatcher trait
+        assert!(dispatcher.is_supported(0x1000));
     }
 
     #[test]
     fn test_dispatch() {
         let config = UnifiedDispatcherConfig::default();
-        let mut dispatcher = UnifiedSyscallDispatcher::new(config);
-        let handler = Box::new(TestHandler {
+        let dispatcher = UnifiedSyscallDispatcher::new(config);
+        let handler = Arc::new(TestHandler {
             name: "test",
-            result: 42,
         });
 
         dispatcher.register_handler(0x1000, handler);
-        let result = dispatcher.dispatch(0x1000, &SyscallArgs::empty());
+        let result = dispatcher.dispatch(0x1000, &[]);
         assert!(result.is_ok());
-        if let Ok(syscall_result) = result {
-            assert_eq!(syscall_result.success_value(), Some(42));
-        }
     }
-    
+
     #[test]
-    fn test_unified_dispatch_function() {
+    fn test_fast_path_registration() {
         let config = UnifiedDispatcherConfig::default();
-        init_unified_dispatcher(config);
-        
-        // Test that unified_dispatch works
-        let result = unified_dispatch(0x9999, &[]);
-        assert!(result.is_err()); // Should fail for unsupported syscall
+        let dispatcher = UnifiedSyscallDispatcher::new(config);
+
+        // Test registering a fast-path handler
+        let fast_handler: FastPathHandler = |_num, _args| Ok(42);
+        let result = dispatcher.register_fast_path(0x100, fast_handler);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_batch_dispatch() {
+        let config = UnifiedDispatcherConfig::default();
+        let mut dispatcher = UnifiedSyscallDispatcher::new(config);
+        let handler = Arc::new(TestHandler {
+            name: "test",
+        });
+
+        dispatcher.register_handler(0x1000, handler.clone());
+        dispatcher.register_handler(0x1001, handler);
+
+        let calls = [(0x1000, &[][..]), (0x1001, &[][..])];
+        let result = dispatcher.batch_dispatch(&calls);
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result.success_count(), 2);
+        assert_eq!(result.failure_count(), 0);
     }
 }
 

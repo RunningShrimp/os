@@ -503,13 +503,21 @@ pub fn sched_setaffinity(pid: Pid, cpusetsize: usize, affinity: &CpuSet) -> Resu
     }
 
     // Validate CPU set size
+    if cpusetsize == 0 || affinity.count() == 0 {
+        return Err(SchedError::InvalidAffinity);
+    }
+
+    // Ensure affinity doesn't exceed available CPUs
     let cpu_count = {
         let registry = SCHED_REGISTRY.lock();
         registry.cpu_count
     };
 
-    if cpusetsize == 0 || affinity.count() == 0 {
-        return Err(SchedError::InvalidAffinity);
+    // Check if any CPU in the affinity set is beyond available CPUs
+    for cpu in 0..1024 {
+        if affinity.is_set(cpu) && cpu >= cpu_count {
+            return Err(SchedError::InvalidAffinity);
+        }
     }
 
     // Update affinity

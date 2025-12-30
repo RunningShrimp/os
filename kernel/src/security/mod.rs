@@ -201,3 +201,9 @@ pub enum SecurityError {
     /// Memory security error
     MemorySecurityError(memory_security::SecurityError),
 }
+
+impl From<memory_security::SecurityError> for SecurityError {
+    fn from(err: memory_security::SecurityError) -> Self {
+        SecurityError::MemorySecurityError(err)
+    }
+}

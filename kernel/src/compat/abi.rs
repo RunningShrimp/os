@@ -14,30 +14,57 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::boxed::Box;
-use crate::compat::DefaultHasherBuilder;
-use spin::Mutex;
+use alloc::format;
 
-use crate::compat::*;
+use crate::compat::{Result, CompatibilityError, TargetPlatform};
+use crate::collections::HashMap;
+
+/// CPU architecture types
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Architecture {
+    /// x86-64 (AMD64/Intel 64)
+    X86_64,
+    /// AArch64 (ARM 64-bit)
+    AArch64,
+    /// RISC-V 64-bit
+    RiscV64,
+}
+
+/// Calling convention specifications
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CallingConvention {
+    /// Microsoft x64 calling convention (Windows)
+    MicrosoftX64,
+    /// System V AMD64 ABI (Linux/macOS)
+    SystemVAMD64,
+    /// ARM AArch64 AAPCS (ARM64)
+    AArch64AAPCS,
+    /// ARM AArch32 AAPCS (ARM32)
+    AArch32AAPCS,
+    /// RISC-V calling convention
+    RiscV,
+}
+
 /// ABI converter for handling different calling conventions
 pub struct AbiConverter {
     /// Platform calling conventions
-    calling_conventions: HashMap<TargetPlatform, CallingConvention, DefaultHasherBuilder>,
+    calling_conventions: HashMap<TargetPlatform, CallingConvention>,
     /// Argument conversion tables
-    arg_converters: HashMap<(TargetPlatform, CallingConvention), Box<dyn ArgumentConverter>, DefaultHasherBuilder>,
+    arg_converters: HashMap<(TargetPlatform, CallingConvention), Box<dyn ArgumentConverter>>,
     /// Register mappings for different architectures
-    register_mappings: HashMap<Architecture, RegisterMapping, DefaultHasherBuilder>,
+    register_mappings: HashMap<Architecture, RegisterMapping>,
     /// Stack layout specifications
-    stack_layouts: HashMap<CallingConvention, StackLayout, DefaultHasherBuilder>,
+    stack_layouts: HashMap<CallingConvention, StackLayout>,
 }
 
 impl AbiConverter {
     /// Create a new ABI converter
     pub fn new() -> Self {
         let mut converter = Self {
-            calling_conventions: HashMap::with_hasher(DefaultHasherBuilder),
-            arg_converters: HashMap::with_hasher(DefaultHasherBuilder),
-            register_mappings: HashMap::with_hasher(DefaultHasherBuilder),
-            stack_layouts: HashMap::with_hasher(DefaultHasherBuilder),
+            calling_conventions: HashMap::new(),
+            arg_converters: HashMap::new(),
+            register_mappings: HashMap::new(),
+            stack_layouts: HashMap::new(),
         };
 
         // Initialize calling conventions for each platform
@@ -140,7 +167,7 @@ impl AbiConverter {
     }
 
     /// Convert return value from foreign ABI to NOS ABI
-    pub fn convert_return_value(&self, from_platform: TargetPlatform, to_platform: TargetPlatform,
+    pub fn convert_return_value(&self, _from_platform: TargetPlatform, _to_platform: TargetPlatform,
                               value: usize) -> usize {
         // For most simple return values, no conversion is needed
         // In a real implementation, this would handle struct returns, etc.
@@ -409,7 +436,7 @@ pub struct StackLayout {
 #[derive(Debug, Clone)]
 pub struct CallFrame {
     /// Register values
-    pub registers: HashMap<String, usize, DefaultHasherBuilder>,
+    pub registers: HashMap<String, usize>,
     /// Stack contents (bottom to top)
     pub stack: Vec<usize>,
     /// Stack pointer value
@@ -424,7 +451,7 @@ impl CallFrame {
     /// Create a new call frame
     pub fn new() -> Self {
         Self {
-            registers: HashMap::with_hasher(DefaultHasherBuilder),
+            registers: HashMap::new(),
             stack: Vec::new(),
             sp: 0,
             ip: 0,
@@ -462,7 +489,7 @@ impl CallFrame {
     /// Pop value from stack
     pub fn pop_stack(&mut self) -> Option<usize> {
         let value = self.stack.pop();
-        if let Some(layout) = &self.stack_layout {
+        if let Some(_layout) = &self.stack_layout {
             self.sp = self.sp.wrapping_add(core::mem::size_of::<usize>());
         }
         value

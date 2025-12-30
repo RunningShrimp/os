@@ -6,7 +6,7 @@
 
 #![allow(dead_code)]
 
-use core::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
 /// Maximum number of CPUs supported
 const MAX_CPUS: usize = 256;
@@ -17,7 +17,7 @@ const AP_STARTUP_TIMEOUT_NS: u64 = 10_000_000_000;
 /// CPU startup state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
-enum CpuStartupState {
+pub enum CpuStartupState {
     /// CPU has not started
     NotStarted = 0,
     /// CPU is initializing
@@ -88,7 +88,7 @@ impl ApStartupBarrier {
         }
 
         // Record start timestamp
-        self.start_timestamp.store(Self::get_timestamp(), Ordering::SeqCst);
+        self.start_timestamp.store(ApStartupBarrier::get_timestamp(), Ordering::SeqCst);
 
         true
     }
@@ -156,7 +156,7 @@ impl ApStartupBarrier {
     /// `ApStartupResult` indicating success, timeout, or failure
     pub fn wait_for_all(&self) -> ApStartupResult {
         let expected = self.expected_cpus.load(Ordering::Acquire) as usize;
-        let start = self.get_timestamp();
+        let start = ApStartupBarrier::get_timestamp();
 
         loop {
             let ready = self.ready_cpus.load(Ordering::Acquire) as usize;
@@ -175,7 +175,7 @@ impl ApStartupBarrier {
             }
 
             // Check for timeout
-            let elapsed = self.get_timestamp().saturating_sub(start);
+            let elapsed = ApStartupBarrier::get_timestamp().saturating_sub(start);
             if elapsed > AP_STARTUP_TIMEOUT_NS {
                 return ApStartupResult::Timeout {
                     ready_cpus: ready,

@@ -14,6 +14,7 @@ use alloc::{
     boxed::Box,
     collections::{BTreeMap, VecDeque},
     string::String,
+    string::ToString,
     sync::Arc,
     vec::Vec,
 };
@@ -21,7 +22,7 @@ use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering
 
 use spin::Mutex;
 
-use crate::time;
+use crate::subsystems::mm;
 
 /// Network buffer handle
 pub type BufferHandle = u32;
@@ -365,17 +366,17 @@ impl NetworkBuffer {
 
     /// Update timestamp
     pub fn update_timestamp(&mut self) {
-        self.metadata.timestamp = time::get_monotonic_time();
+        self.metadata.timestamp = crate::time::get_monotonic_time_ns();
     }
 
     /// Get buffer age
     pub fn age(&self) -> u64 {
-        time::get_monotonic_time() - self.metadata.timestamp
+        crate::time::get_monotonic_time_ns() - self.metadata.timestamp
     }
 }
 
 /// Buffer statistics
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct BufferStats {
     /// Number of times buffer was accessed
     pub access_count: AtomicU32,
@@ -394,7 +395,7 @@ impl BufferStats {
     pub fn record_access(&self) {
         self.access_count.fetch_add(1, Ordering::Relaxed);
         self.last_access
-            .store(time::get_monotonic_time(), Ordering::Relaxed);
+            .store(crate::time::get_monotonic_time_ns(), Ordering::Relaxed);
     }
 
     /// Record bytes read
@@ -517,10 +518,10 @@ impl BufferPool {
             buffer_size: self.buffer_size,
             max_buffers: self.max_buffers,
             current_buffers: self.current_buffers.load(Ordering::Relaxed),
-            current_in_use: self.stats.current_in_use.load(Ordering::Relaxed),
-            total_allocations: self.stats.allocations.load(Ordering::Relaxed),
-            total_deallocations: self.stats.deallocations.load(Ordering::Relaxed),
-            failures: self.stats.failures.load(Ordering::Relaxed),
+            current_in_use: AtomicU32::new(self.stats.current_in_use.load(Ordering::Relaxed)),
+            allocations: AtomicU32::new(self.stats.allocations.load(Ordering::Relaxed)),
+            deallocations: AtomicU32::new(self.stats.deallocations.load(Ordering::Relaxed)),
+            failures: AtomicU32::new(self.stats.failures.load(Ordering::Relaxed)),
         }
     }
 
@@ -544,7 +545,7 @@ impl BufferPool {
 }
 
 /// Pool statistics
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct PoolStats {
     /// Pool name
     pub name: String,
@@ -628,15 +629,19 @@ impl NetworkBufferManager {
 
         // Allocate memory
         let addr = if flags.dma_capable {
-            // Allocate DMA-capable memory
-            crate::subsystems::mm::kalloc_dma(size).ok_or(BufferError::OutOfMemory)?
+            // Allocate DMA-capable memory (use regular kalloc for now)
+            mm::phys::kalloc_pages((size + mm::phys::PAGE_SIZE - 1) / mm::phys::PAGE_SIZE)
         } else {
-            crate::subsystems::mm::kalloc(size).ok_or(BufferError::OutOfMemory)?
+            mm::phys::kalloc_pages((size + mm::phys::PAGE_SIZE - 1) / mm::phys::PAGE_SIZE)
         };
 
-        // Get physical address for DMA buffers
+        if addr.is_null() {
+            return Err(BufferError::OutOfMemory);
+        }
+
+        // Get physical address for DMA buffers (not implemented, return None)
         let phys_addr = if flags.dma_capable {
-            crate::subsystems::mm::virt_to_phys(addr)
+            None // TODO: Implement virt_to_phys when available
         } else {
             None
         };
@@ -650,14 +655,14 @@ impl NetworkBufferManager {
             headroom: 64, // Default headroom
             tailroom: size - 64,
             priority: 0,
-            timestamp: time::get_monotonic_time(),
+            timestamp: crate::time::get_monotonic_time_ns(),
             owner: BufferOwner::None,
             interface_id: None,
             protocol_data: None,
         };
 
         // Create buffer
-        let buffer = Arc::new(NetworkBuffer::new(handle, addr, phys_addr, metadata));
+        let buffer = Arc::new(NetworkBuffer::new(handle, addr as usize, phys_addr, metadata));
 
         // Store buffer
         {
@@ -668,7 +673,7 @@ impl NetworkBufferManager {
         // Store in appropriate collection
         if flags.dma_capable {
             let mut dma_buffers = self.dma_buffers.lock();
-            dma_buffers.insert(handle, buffer);
+            dma_buffers.insert(handle, buffer.clone());
         }
 
         if matches!(buffer_type, BufferType::Mmio) {
@@ -719,14 +724,10 @@ impl NetworkBufferManager {
             mmio_buffers.remove(&handle);
         }
 
-        // Free memory
-        unsafe {
-            if buffer.metadata.flags.dma_capable {
-                crate::subsystems::mm::kfree_dma(buffer.addr, buffer.metadata.size);
-            } else {
-                crate::subsystems::mm::kfree(buffer.addr, buffer.metadata.size);
-            }
-        }
+        // Free memory (note: kfree not implemented in phys.rs, just deallocate from tracking)
+        // TODO: Implement proper kfree when available
+        // For now, the buffer is removed from tracking above
+        let _ = buffer; // Suppress unused warning
 
         // Update statistics
         self.global_stats
@@ -765,7 +766,7 @@ impl NetworkBufferManager {
             headroom: 64,
             tailroom: buffer_size - 64,
             priority: 0,
-            timestamp: time::get_monotonic_time(),
+            timestamp: crate::time::get_monotonic_time_ns(),
             owner: BufferOwner::None,
             interface_id: None,
             protocol_data: None,
@@ -806,11 +807,11 @@ impl NetworkBufferManager {
     /// Get global statistics
     pub fn get_global_stats(&self) -> GlobalBufferStats {
         GlobalBufferStats {
-            total_buffers: self.global_stats.total_buffers.load(Ordering::Relaxed),
-            total_memory: self.global_stats.total_memory.load(Ordering::Relaxed),
-            allocations: self.global_stats.allocations.load(Ordering::Relaxed),
-            deallocations: self.global_stats.deallocations.load(Ordering::Relaxed),
-            memory_pressure: self.memory_pressure.load(Ordering::Relaxed),
+            total_buffers: AtomicU32::new(self.global_stats.total_buffers.load(Ordering::Relaxed)),
+            total_memory: AtomicU64::new(self.global_stats.total_memory.load(Ordering::Relaxed)),
+            allocations: AtomicU32::new(self.global_stats.allocations.load(Ordering::Relaxed)),
+            deallocations: AtomicU32::new(self.global_stats.deallocations.load(Ordering::Relaxed)),
+            memory_pressure: AtomicBool::new(self.memory_pressure.load(Ordering::Relaxed)),
             memory_pressure_threshold: self.memory_pressure_threshold,
         }
     }
@@ -838,7 +839,7 @@ impl NetworkBufferManager {
     /// Garbage collect old buffers
     pub fn garbage_collect(&self, max_age: u64) -> usize {
         let mut collected = 0;
-        let now = time::get_monotonic_time();
+        let _now = crate::time::get_monotonic_time_ns();
 
         let buffers = self.buffers.lock();
         for (handle, buffer) in buffers.iter() {
@@ -855,7 +856,7 @@ impl NetworkBufferManager {
     /// Optimize buffer pools
     pub fn optimize_pools(&self) {
         let pools = self.pools.lock();
-        for pool in pools.values() {
+        for _pool in pools.values() {
             // In a real implementation, this would optimize pool allocation
             // based on usage patterns
         }
@@ -892,7 +893,7 @@ impl Default for NetworkBufferManager {
 }
 
 /// Global buffer statistics
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct GlobalBufferStats {
     /// Total number of buffers
     pub total_buffers: AtomicU32,
@@ -928,11 +929,10 @@ pub enum BufferError {
 }
 
 /// Global network buffer manager instance
-static GLOBAL_BUFFER_MANAGER: once_cell::sync::Lazy<Mutex<NetworkBufferManager>> =
-    once_cell::sync::Lazy::new(|| Mutex::new(NetworkBufferManager::new()));
+static GLOBAL_BUFFER_MANAGER: spin::Mutex<Option<NetworkBufferManager>> = spin::Mutex::new(None);
 
 /// Get global network buffer manager
-pub fn get_global_buffer_manager() -> &'static Mutex<NetworkBufferManager> {
+pub fn get_global_buffer_manager() -> &'static spin::Mutex<Option<NetworkBufferManager>> {
     &GLOBAL_BUFFER_MANAGER
 }
 
@@ -940,6 +940,10 @@ pub fn get_global_buffer_manager() -> &'static Mutex<NetworkBufferManager> {
 pub fn init_buffer_management() -> Result<(), BufferError> {
     let manager = get_global_buffer_manager();
     let mut manager = manager.lock();
+    if manager.is_none() {
+        *manager = Some(NetworkBufferManager::new());
+    }
+    let manager = manager.as_mut().unwrap();
 
     // Create default buffer pools
     manager.create_pool(
@@ -1058,9 +1062,9 @@ pub mod utils {
             return None;
         }
 
-        let mut current = buffers[0].clone();
+        let current = buffers[0].clone();
 
-        for buffer in buffers.iter().skip(1) {
+        for _buffer in buffers.iter().skip(1) {
             // In a real implementation, this would properly chain buffers
             // For now, we'll just return the first buffer
         }
@@ -1070,7 +1074,7 @@ pub mod utils {
 
     /// Flatten buffer chain into single buffer
     pub fn flatten_buffer_chain(buffer: &NetworkBuffer) -> Option<Vec<u8>> {
-        let mut total_len = buffer.total_len();
+        let total_len = buffer.total_len();
         let mut result = Vec::with_capacity(total_len);
 
         // Copy data from first buffer

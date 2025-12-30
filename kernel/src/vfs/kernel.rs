@@ -1,8 +1,10 @@
 //! Kernel information in /sys/kernel
 
 extern crate alloc;
+
+use crate::prelude::*;
 use super::fs::SysFsInode;
-use crate::vfs::{error::*, fs::InodeOps, types::*};
+use crate::vfs::{error::*, inode::InodeOps};
 
 /// Create /sys/kernel root
 pub fn create_root() -> VfsResult<Arc<dyn InodeOps>> {

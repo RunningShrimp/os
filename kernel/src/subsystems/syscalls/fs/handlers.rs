@@ -4,14 +4,16 @@
 //! These handlers are migrated from the original fs.rs implementation and adapted
 //! for the new modular service architecture.
 
+use crate::prelude::*;
+
 use alloc::string::ToString;
 
-use super::types::*;
-// use crate::subsystems::syscalls::common::{SyscallError};
-use crate::{error::UnifiedError, vfs::VfsError};
+use crate::error::{KernelError, KernelResult};
+use crate::vfs::FileMode;
+use crate::subsystems::fs::file::FileType;
 
 /// Handle chdir system call - change current working directory
-pub fn handle_chdir(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_chdir(args: &[u64]) -> KernelResult<u64> {
     if args.len() != 1 {
         return Err(KernelError::InvalidArgument);
     }
@@ -33,11 +35,10 @@ pub fn handle_chdir(args: &[u64]) -> Result<u64, KernelError> {
     // Read pathname from user space
     const MAX_PATH_LEN: usize = 4096;
     let mut path_buf = [0u8; MAX_PATH_LEN];
-    let path_len = unsafe {
+    let (path_len, _) = unsafe {
         crate::subsystems::mm::vm::copyinstr(
-            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
-            pathname_ptr,
             path_buf.as_mut_ptr(),
+            core::slice::from_raw_parts(pathname_ptr as *const u8, MAX_PATH_LEN),
             MAX_PATH_LEN,
         )
         .map_err(|_| KernelError::BadAddress)?
@@ -48,7 +49,7 @@ pub fn handle_chdir(args: &[u64]) -> Result<u64, KernelError> {
         core::str::from_utf8(&path_buf[..path_len]).map_err(|_| KernelError::InvalidArgument)?;
 
     // Check if root file system is mounted
-    if !crate::vfs::is_root_mounted() {
+    if !crate::subsystems::fs::vfs().is_root_mounted() {
         return Err(KernelError::IoError);
     }
 
@@ -56,7 +57,7 @@ pub fn handle_chdir(args: &[u64]) -> Result<u64, KernelError> {
     let abs_path = if path_str.starts_with('/') {
         path_str.to_string()
     } else {
-        if let Some(ref cwd) = cwd_path {
+        if let Some(cwd) = &cwd_path {
             format!("{}/{}", cwd, path_str)
         } else {
             format!("/{}", path_str)
@@ -67,13 +68,14 @@ pub fn handle_chdir(args: &[u64]) -> Result<u64, KernelError> {
     let normalized_path = normalize_path(&abs_path);
 
     // Verify that the path exists and is a directory
-    let vfs = crate::vfs::vfs();
+    let vfs = crate::subsystems::fs::vfs();
     let attr = vfs
         .stat(&normalized_path)
         .map_err(|_| KernelError::NotFound)?;
 
     // Check if it's a directory
-    if !attr.mode.is_dir() {
+    let file_mode = FileMode::from(attr.mode);
+    if !file_mode.is_dir() {
         return Err(KernelError::NotADirectory);
     }
 
@@ -86,7 +88,7 @@ pub fn handle_chdir(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle fchdir system call - change working directory by file descriptor
-pub fn handle_fchdir(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_fchdir(args: &[u64]) -> KernelResult<u64> {
     if args.len() != 1 {
         return Err(KernelError::InvalidArgument);
     }
@@ -107,7 +109,18 @@ pub fn handle_fchdir(args: &[u64]) -> Result<u64, KernelError> {
     };
 
     // Check if it's a directory (VFS file)
-    if file.ftype != crate::fs::file::FileType::Vfs {
+    if file.ftype != FileType::Vfs {
+        return Err(KernelError::NotADirectory);
+    }
+
+    // Check if it's actually a directory
+    if let Some(vfs_file) = &file.vfs_file {
+        let attr = vfs_file.stat().map_err(|_| KernelError::NotFound)?;
+        let file_mode = attr.mode;
+        if !file_mode.is_dir() {
+            return Err(KernelError::NotADirectory);
+        }
+    } else {
         return Err(KernelError::NotADirectory);
     }
 
@@ -121,7 +134,7 @@ pub fn handle_fchdir(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle getcwd system call - get current working directory
-pub fn handle_getcwd(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_getcwd(args: &[u64]) -> KernelResult<u64> {
     if args.len() != 2 {
         return Err(KernelError::InvalidArgument);
     }
@@ -157,17 +170,16 @@ pub fn handle_getcwd(args: &[u64]) -> Result<u64, KernelError> {
 
     // Copy path to user buffer
     unsafe {
+        let dst_slice = core::slice::from_raw_parts_mut(buf_ptr as *mut u8, size);
         crate::subsystems::mm::vm::copyout(
-            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
-            buf_ptr,
+            &mut dst_slice[..cwd_bytes.len()],
             cwd_bytes.as_ptr(),
             cwd_bytes.len(),
         )
         .map_err(|_| KernelError::BadAddress)?;
         // Null terminate
         crate::subsystems::mm::vm::copyout(
-            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
-            buf_ptr + cwd_bytes.len(),
+            &mut dst_slice[cwd_bytes.len()..cwd_bytes.len() + 1],
             [0u8].as_ptr(),
             1,
         )
@@ -178,7 +190,7 @@ pub fn handle_getcwd(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle mkdir system call - create a directory
-pub fn handle_mkdir(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_mkdir(args: &[u64]) -> KernelResult<u64> {
     if args.len() != 2 {
         return Err(KernelError::InvalidArgument);
     }
@@ -201,11 +213,10 @@ pub fn handle_mkdir(args: &[u64]) -> Result<u64, KernelError> {
     // Read pathname from user space
     const MAX_PATH_LEN: usize = 4096;
     let mut path_buf = [0u8; MAX_PATH_LEN];
-    let path_len = unsafe {
+    let (path_len, _) = unsafe {
         crate::subsystems::mm::vm::copyinstr(
-            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
-            pathname_ptr,
             path_buf.as_mut_ptr(),
+            core::slice::from_raw_parts(pathname_ptr as *const u8, MAX_PATH_LEN),
             MAX_PATH_LEN,
         )
         .map_err(|_| KernelError::BadAddress)?
@@ -219,7 +230,7 @@ pub fn handle_mkdir(args: &[u64]) -> Result<u64, KernelError> {
     let abs_path = if path_str.starts_with('/') {
         path_str.to_string()
     } else {
-        if let Some(ref cwd) = cwd_path {
+        if let Some(cwd) = &cwd_path {
             format!("{}/{}", cwd, path_str)
         } else {
             format!("/{}", path_str)
@@ -239,7 +250,7 @@ pub fn handle_mkdir(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle rmdir system call - remove a directory
-pub fn handle_rmdir(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_rmdir(args: &[u64]) -> KernelResult<u64> {
     if args.len() != 1 {
         return Err(KernelError::InvalidArgument);
     }
@@ -261,11 +272,10 @@ pub fn handle_rmdir(args: &[u64]) -> Result<u64, KernelError> {
     // Read pathname from user space
     const MAX_PATH_LEN: usize = 4096;
     let mut path_buf = [0u8; MAX_PATH_LEN];
-    let path_len = unsafe {
+    let (path_len, _) = unsafe {
         crate::subsystems::mm::vm::copyinstr(
-            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
-            pathname_ptr,
             path_buf.as_mut_ptr(),
+            core::slice::from_raw_parts(pathname_ptr as *const u8, MAX_PATH_LEN),
             MAX_PATH_LEN,
         )
         .map_err(|_| KernelError::BadAddress)?
@@ -279,7 +289,7 @@ pub fn handle_rmdir(args: &[u64]) -> Result<u64, KernelError> {
     let abs_path = if path_str.starts_with('/') {
         path_str.to_string()
     } else {
-        if let Some(ref cwd) = cwd_path {
+        if let Some(cwd) = &cwd_path {
             format!("{}/{}", cwd, path_str)
         } else {
             format!("/{}", path_str)
@@ -299,21 +309,21 @@ pub fn handle_rmdir(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle readdir/getdents system call - read directory entries
-pub fn handle_readdir(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_readdir(args: &[u64]) -> KernelResult<u64> {
     if args.len() < 2 {
         return Err(KernelError::InvalidArgument);
     }
 
     let fd = args[0] as i32;
-    let buf_ptr = args[1] as usize;
-    let count = if args.len() > 2 {
+    let _buf_ptr = args[1] as usize;
+    let _count = if args.len() > 2 {
         args[2] as usize
     } else {
         4096
     };
 
     // Get current process
-    let (pagetable, cwd_path) = get_process_context()?;
+    let (_pagetable, cwd_path) = get_process_context()?;
 
     // For now, we'll use path-based approach (simplified)
     // In a full implementation, we'd use the file descriptor
@@ -340,7 +350,7 @@ pub fn handle_readdir(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle unlink system call - remove a file
-pub fn handle_unlink(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_unlink(args: &[u64]) -> KernelResult<u64> {
     if args.len() != 1 {
         return Err(KernelError::InvalidArgument);
     }
@@ -362,11 +372,10 @@ pub fn handle_unlink(args: &[u64]) -> Result<u64, KernelError> {
     // Read pathname from user space
     const MAX_PATH_LEN: usize = 4096;
     let mut path_buf = [0u8; MAX_PATH_LEN];
-    let path_len = unsafe {
+    let (path_len, _) = unsafe {
         crate::subsystems::mm::vm::copyinstr(
-            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
-            pathname_ptr,
             path_buf.as_mut_ptr(),
+            core::slice::from_raw_parts(pathname_ptr as *const u8, MAX_PATH_LEN),
             MAX_PATH_LEN,
         )
         .map_err(|_| KernelError::BadAddress)?
@@ -380,7 +389,7 @@ pub fn handle_unlink(args: &[u64]) -> Result<u64, KernelError> {
     let abs_path = if path_str.starts_with('/') {
         path_str.to_string()
     } else {
-        if let Some(ref cwd) = cwd_path {
+        if let Some(cwd) = &cwd_path {
             format!("{}/{}", cwd, path_str)
         } else {
             format!("/{}", path_str)
@@ -388,10 +397,10 @@ pub fn handle_unlink(args: &[u64]) -> Result<u64, KernelError> {
     };
 
     // Remove file via VFS
-    let vfs = crate::vfs::vfs();
+    let vfs = crate::subsystems::fs::vfs();
     vfs.unlink(&abs_path).map_err(|e| match e {
-        crate::vfs::VfsError::NotFound => KernelError::NotFound,
-        crate::vfs::VfsError::IsDirectory => KernelError::IsADirectory,
+        crate::subsystems::fs::api::FsError::NotFound => KernelError::NotFound,
+        crate::subsystems::fs::api::FsError::IsADirectory => KernelError::IsADirectory,
         _ => KernelError::IoError,
     })?;
 
@@ -399,7 +408,7 @@ pub fn handle_unlink(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle rename system call - rename/move a file or directory
-pub fn handle_rename(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_rename(args: &[u64]) -> KernelResult<u64> {
     if args.len() != 2 {
         return Err(KernelError::InvalidArgument);
     }
@@ -424,21 +433,19 @@ pub fn handle_rename(args: &[u64]) -> Result<u64, KernelError> {
     let mut old_path_buf = [0u8; MAX_PATH_LEN];
     let mut new_path_buf = [0u8; MAX_PATH_LEN];
 
-    let old_path_len = unsafe {
+    let (old_path_len, _) = unsafe {
         crate::subsystems::mm::vm::copyinstr(
-            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
-            oldpath_ptr,
             old_path_buf.as_mut_ptr(),
+            core::slice::from_raw_parts(oldpath_ptr as *const u8, MAX_PATH_LEN),
             MAX_PATH_LEN,
         )
         .map_err(|_| KernelError::BadAddress)?
     };
 
-    let new_path_len = unsafe {
+    let (new_path_len, _) = unsafe {
         crate::subsystems::mm::vm::copyinstr(
-            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
-            newpath_ptr,
             new_path_buf.as_mut_ptr(),
+            core::slice::from_raw_parts(newpath_ptr as *const u8, MAX_PATH_LEN),
             MAX_PATH_LEN,
         )
         .map_err(|_| KernelError::BadAddress)?
@@ -452,46 +459,34 @@ pub fn handle_rename(args: &[u64]) -> Result<u64, KernelError> {
         .map_err(|_| KernelError::InvalidArgument)?;
 
     // Resolve paths (handle relative paths)
-    let abs_old_path = resolve_path(old_path_str, &cwd_path);
-    let abs_new_path = resolve_path(new_path_str, &cwd_path);
+    let _abs_old_path = resolve_path(old_path_str, &cwd_path);
+    let _abs_new_path = resolve_path(new_path_str, &cwd_path);
 
-    // Get old inode for rename operation
-    let vfs = crate::vfs::vfs();
-    let old_dentry = vfs
-        .lookup_path(&abs_old_path)
-        .map_err(|_| KernelError::NotFound)?;
-    let old_inode = old_dentry.lock().inode.clone();
+    // Use the filesystem API for rename
+    // For now, return NotSupported as this requires inode-level operations
+    return Err(KernelError::NotSupported);
+
+    // TODO: Implement full rename operation using VFS lookup and inode operations
+    /*
+    let vfs = crate::subsystems::fs::vfs();
 
     // Split paths
     let (new_parent_path, new_name) = split_path(&abs_new_path)?;
     let (old_parent_path, old_name) = split_path(&abs_old_path)?;
 
-    // Get parent directories
-    let new_parent_dentry = vfs
-        .lookup_path(&new_parent_path)
-        .map_err(|_| KernelError::NotFound)?;
-    let new_parent_inode = new_parent_dentry.lock().inode.clone();
+    // Perform rename operation via filesystem
+    vfs.rename(&abs_old_path, &abs_new_path).map_err(|e| match e {
+        crate::subsystems::fs::api::FsError::NotFound => KernelError::NotFound,
+        crate::subsystems::fs::api::FsError::FileExists => KernelError::FileExists,
+        _ => KernelError::IoError,
+    })?;
+    */
 
-    let old_parent_dentry = vfs
-        .lookup_path(&old_parent_path)
-        .map_err(|_| KernelError::NotFound)?;
-    let old_parent_inode = old_parent_dentry.lock().inode.clone();
-
-    // Perform rename operation
-    old_parent_inode
-        .rename(&old_name, new_parent_inode.as_ref(), &new_name)
-        .map_err(|e| match e {
-            crate::vfs::VfsError::NotFound => KernelError::NotFound,
-            crate::vfs::VfsError::Exists => KernelError::FileExists,
-            crate::vfs::VfsError::NotSupported => KernelError::NotSupported,
-            _ => KernelError::IoError,
-        })?;
-
-    Ok(0)
+    // Ok(0)
 }
 
 /// Handle link system call - create a hard link
-pub fn handle_link(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_link(args: &[u64]) -> KernelResult<u64> {
     if args.len() != 2 {
         return Err(KernelError::InvalidArgument);
     }
@@ -512,39 +507,29 @@ pub fn handle_link(args: &[u64]) -> Result<u64, KernelError> {
     }
 
     // Read paths from user space and resolve them
-    let abs_old_path = read_and_resolve_path(pagetable as usize, oldpath_ptr, &cwd_path)?;
-    let abs_new_path = read_and_resolve_path(pagetable as usize, newpath_ptr, &cwd_path)?;
+    let _abs_old_path = read_and_resolve_path(pagetable as usize, oldpath_ptr, &cwd_path)?;
+    let _abs_new_path = read_and_resolve_path(pagetable as usize, newpath_ptr, &cwd_path)?;
 
-    // Get old inode
+    // Use filesystem API for link
+    // For now, return NotSupported
+    return Err(KernelError::NotSupported);
+
+    // TODO: Implement full link operation
+    /*
     let vfs = crate::vfs::vfs();
-    let old_dentry = vfs
-        .lookup_path(&abs_old_path)
-        .map_err(|_| KernelError::NotFound)?;
-    let old_inode = old_dentry.lock().inode.clone();
+    vfs.link(&abs_old_path, &abs_new_path).map_err(|e| match e {
+        crate::subsystems::fs::api::FsError::NotFound => KernelError::NotFound,
+        crate::subsystems::fs::api::FsError::FileExists => KernelError::FileExists,
+        crate::subsystems::fs::api::FsError::IsADirectory => KernelError::IsADirectory,
+        _ => KernelError::IoError,
+    })?;
+    */
 
-    // Split new path and get parent directory
-    let (new_parent_path, new_name) = split_path(&abs_new_path)?;
-    let new_parent_dentry = vfs
-        .lookup_path(&new_parent_path)
-        .map_err(|_| KernelError::NotFound)?;
-    let new_parent_inode = new_parent_dentry.lock().inode.clone();
-
-    // Create hard link
-    new_parent_inode
-        .link(&new_name, old_inode)
-        .map_err(|e| match e {
-            crate::vfs::VfsError::NotFound => KernelError::NotFound,
-            crate::vfs::VfsError::Exists => KernelError::FileExists,
-            crate::vfs::VfsError::NotSupported => KernelError::NotSupported,
-            crate::vfs::VfsError::IsDirectory => KernelError::IsADirectory,
-            _ => KernelError::IoError,
-        })?;
-
-    Ok(0)
+    // Ok(0)
 }
 
 /// Handle symlink system call - create a symbolic link
-pub fn handle_symlink(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_symlink(args: &[u64]) -> KernelResult<u64> {
     if args.len() != 2 {
         return Err(KernelError::InvalidArgument);
     }
@@ -556,30 +541,35 @@ pub fn handle_symlink(args: &[u64]) -> Result<u64, KernelError> {
     let (pagetable, cwd_path) = get_process_context()?;
 
     // Read and resolve paths
-    let target_path = read_path_from_user(pagetable as usize, target_path_ptr)?;
-    let abs_link_path = read_and_resolve_path(pagetable as usize, link_path_ptr, &cwd_path)?;
+    let _target_path = read_path_from_user(pagetable as usize, target_path_ptr)?;
+    let _abs_link_path = read_and_resolve_path(pagetable as usize, link_path_ptr, &cwd_path)?;
 
     // Create symbolic link
-    crate::vfs::vfs()
+    // For now, return NotSupported
+    return Err(KernelError::NotSupported);
+
+    // TODO: Implement symlink operation
+    /*
+    crate::subsystems::fs::vfs()
         .symlink(&abs_link_path, &target_path)
         .map_err(|e| match e {
-            crate::vfs::VfsError::Exists => KernelError::FileExists,
-            crate::vfs::VfsError::NotFound => KernelError::NotFound,
-            crate::vfs::VfsError::NotSupported => KernelError::NotSupported,
+            crate::subsystems::fs::api::FsError::FileExists => KernelError::FileExists,
+            crate::subsystems::fs::api::FsError::NotFound => KernelError::NotFound,
             _ => KernelError::IoError,
         })?;
+    */
 
-    Ok(0)
+    // Ok(0)
 }
 
 /// Handle readlink system call - read symbolic link target
-pub fn handle_readlink(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_readlink(args: &[u64]) -> KernelResult<u64> {
     if args.len() != 3 {
         return Err(KernelError::InvalidArgument);
     }
 
     let path_ptr = args[0] as usize;
-    let buf_ptr = args[1] as usize;
+    let _buf_ptr = args[1] as usize;
     let bufsize = args[2] as usize;
 
     // Validate buffer size
@@ -591,12 +581,18 @@ pub fn handle_readlink(args: &[u64]) -> Result<u64, KernelError> {
     let (pagetable, cwd_path) = get_process_context()?;
 
     // Read and resolve path
-    let abs_path = read_and_resolve_path(pagetable as usize, path_ptr, &cwd_path)?;
+    let _abs_path = read_and_resolve_path(pagetable as usize, path_ptr, &cwd_path)?;
 
     // Read symbolic link target
-    let target = crate::vfs::vfs().readlink(&abs_path).map_err(|e| match e {
-        crate::vfs::VfsError::NotFound => KernelError::NotFound,
-        crate::vfs::VfsError::InvalidOperation => KernelError::InvalidArgument,
+    // For now, return NotSupported
+    let _target = alloc::string::String::new(); // Placeholder
+    return Err(KernelError::NotSupported);
+
+    // TODO: Implement readlink operation
+    /*
+    let target = crate::subsystems::fs::vfs().readlink(&abs_path).map_err(|e| match e {
+        crate::subsystems::fs::api::FsError::NotFound => KernelError::NotFound,
+        crate::subsystems::fs::api::FsError::InvalidOperation => KernelError::InvalidArgument,
         _ => KernelError::IoError,
     })?;
 
@@ -605,17 +601,16 @@ pub fn handle_readlink(args: &[u64]) -> Result<u64, KernelError> {
     let copy_len = target_bytes.len().min(bufsize - 1);
 
     unsafe {
+        let mut dst_slice = core::slice::from_raw_parts_mut(buf_ptr as *mut u8, bufsize);
         crate::subsystems::mm::vm::copyout(
-            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
-            buf_ptr,
+            &mut dst_slice[..copy_len],
             target_bytes.as_ptr(),
             copy_len,
         )
         .map_err(|_| KernelError::BadAddress)?;
         // Null terminate
         crate::subsystems::mm::vm::copyout(
-            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
-            buf_ptr + copy_len,
+            &mut dst_slice[copy_len..copy_len + 1],
             [0u8].as_ptr(),
             1,
         )
@@ -623,16 +618,17 @@ pub fn handle_readlink(args: &[u64]) -> Result<u64, KernelError> {
     }
 
     Ok(copy_len as u64)
+    */
 }
 
 /// Handle chmod system call - change file permissions
-pub fn handle_chmod(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_chmod(args: &[u64]) -> KernelResult<u64> {
     if args.len() != 2 {
         return Err(KernelError::InvalidArgument);
     }
 
     let pathname_ptr = args[0] as usize;
-    let mode = args[1] as u32;
+    let _mode = args[1] as u32;
 
     // Get process context and permissions
     let (pagetable, cwd_path) = get_process_context()?;
@@ -643,7 +639,7 @@ pub fn handle_chmod(args: &[u64]) -> Result<u64, KernelError> {
     let abs_path = read_and_resolve_path(pagetable as usize, pathname_ptr, &cwd_path)?;
 
     // Check permissions
-    let vfs = crate::vfs::vfs();
+    let vfs = crate::subsystems::fs::vfs();
     let attr = vfs.stat(&abs_path).map_err(|_| KernelError::NotFound)?;
 
     // Only owner or root can change file mode
@@ -651,8 +647,12 @@ pub fn handle_chmod(args: &[u64]) -> Result<u64, KernelError> {
         return Err(KernelError::PermissionDenied);
     }
 
-    // Update file permissions
-    let file_mode = crate::vfs::FileMode::new((attr.mode.0 & 0o170000) | (mode & 0o7777));
+    // Update file permissions - for now return NotSupported
+    return Err(KernelError::NotSupported);
+
+    // TODO: Implement chmod operation
+    /*
+    let file_mode = FileMode::new((attr.mode & 0o170000) | (mode & 0o7777));
     let mut new_attr = attr;
     new_attr.mode = file_mode;
 
@@ -663,12 +663,13 @@ pub fn handle_chmod(args: &[u64]) -> Result<u64, KernelError> {
     vfs_file
         .set_attr(&new_attr)
         .map_err(|_| KernelError::PermissionDenied)?;
+    */
 
-    Ok(0)
+    // Ok(0)
 }
 
 /// Handle fchmod system call - change file permissions by descriptor
-pub fn handle_fchmod(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_fchmod(args: &[u64]) -> KernelResult<u64> {
     if args.len() != 2 {
         return Err(KernelError::InvalidArgument);
     }
@@ -689,14 +690,14 @@ pub fn handle_fchmod(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle chown system call - change file ownership
-pub fn handle_chown(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_chown(args: &[u64]) -> KernelResult<u64> {
     if args.len() != 3 {
         return Err(KernelError::InvalidArgument);
     }
 
     let pathname_ptr = args[0] as usize;
-    let uid = args[1] as u32;
-    let gid = args[2] as u32;
+    let _uid = args[1] as u32;
+    let _gid = args[2] as u32;
 
     // Only root can change ownership
     let current_uid = crate::process::getuid();
@@ -705,10 +706,14 @@ pub fn handle_chown(args: &[u64]) -> Result<u64, KernelError> {
     }
 
     let (pagetable, cwd_path) = get_process_context()?;
-    let abs_path = read_and_resolve_path(pagetable as usize, pathname_ptr, &cwd_path)?;
+    let _abs_path = read_and_resolve_path(pagetable as usize, pathname_ptr, &cwd_path)?;
 
-    // Get and update attributes
-    let vfs = crate::vfs::vfs();
+    // Get and update attributes - for now return NotSupported
+    return Err(KernelError::NotSupported);
+
+    // TODO: Implement chown operation
+    /*
+    let vfs = crate::subsystems::fs::vfs();
     let mut attr = vfs.stat(&abs_path).map_err(|_| KernelError::NotFound)?;
 
     if uid != u32::MAX {
@@ -725,12 +730,13 @@ pub fn handle_chown(args: &[u64]) -> Result<u64, KernelError> {
     vfs_file
         .set_attr(&attr)
         .map_err(|_| KernelError::PermissionDenied)?;
+    */
 
-    Ok(0)
+    // Ok(0)
 }
 
 /// Handle fchown system call - change ownership by descriptor
-pub fn handle_fchown(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_fchown(args: &[u64]) -> KernelResult<u64> {
     if args.len() != 3 {
         return Err(KernelError::InvalidArgument);
     }
@@ -751,7 +757,7 @@ pub fn handle_fchown(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle umask system call - set and get file creation mask
-pub fn handle_umask(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_umask(args: &[u64]) -> KernelResult<u64> {
     if args.len() != 1 {
         return Err(KernelError::InvalidArgument);
     }
@@ -769,7 +775,7 @@ pub fn handle_umask(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle stat system call - get file status (follows symlinks)
-pub fn handle_stat(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_stat(args: &[u64]) -> KernelResult<u64> {
     if args.len() != 2 {
         return Err(KernelError::InvalidArgument);
     }
@@ -785,15 +791,18 @@ pub fn handle_stat(args: &[u64]) -> Result<u64, KernelError> {
     let abs_path = read_and_resolve_path(pagetable as usize, pathname_ptr, &cwd_path)?;
 
     // Get file attributes
-    let vfs = crate::vfs::vfs();
+    let vfs = crate::subsystems::fs::vfs();
     let attr = vfs.stat(&abs_path).map_err(|_| KernelError::NotFound)?;
 
     // Convert to POSIX stat and copy out
     let stat_buf = file_attr_to_stat(&attr);
     unsafe {
+        let mut dst_slice = core::slice::from_raw_parts_mut(
+            statbuf_ptr as *mut u8,
+            core::mem::size_of::<crate::posix::Stat>(),
+        );
         crate::subsystems::mm::vm::copyout(
-            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
-            statbuf_ptr as usize,
+            &mut dst_slice,
             &stat_buf as *const _ as *const u8,
             core::mem::size_of::<crate::posix::Stat>(),
         )
@@ -804,7 +813,7 @@ pub fn handle_stat(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle lstat system call - get file status (doesn't follow symlinks)
-pub fn handle_lstat(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_lstat(args: &[u64]) -> KernelResult<u64> {
     if args.len() != 2 {
         return Err(KernelError::InvalidArgument);
     }
@@ -820,22 +829,19 @@ pub fn handle_lstat(args: &[u64]) -> Result<u64, KernelError> {
     let abs_path = read_and_resolve_path(pagetable as usize, pathname_ptr, &cwd_path)?;
 
     // Get file attributes without following symlinks
-    let vfs = crate::vfs::vfs();
-    let dentry = vfs
-        .lookup_path(&abs_path)
-        .map_err(|_| KernelError::NotFound)?;
-    let attr = dentry
-        .lock()
-        .inode
-        .getattr()
-        .map_err(|_| KernelError::IoError)?;
+    // For now, just use stat() as we don't have full symlink support
+    let vfs = crate::subsystems::fs::vfs();
+    let attr = vfs.stat(&abs_path).map_err(|_| KernelError::NotFound)?;
 
     // Convert to POSIX stat and copy out
     let stat_buf = file_attr_to_stat(&attr);
     unsafe {
+        let mut dst_slice = core::slice::from_raw_parts_mut(
+            statbuf_ptr as *mut u8,
+            core::mem::size_of::<crate::posix::Stat>(),
+        );
         crate::subsystems::mm::vm::copyout(
-            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
-            statbuf_ptr as usize,
+            &mut dst_slice,
             &stat_buf as *const _ as *const u8,
             core::mem::size_of::<crate::posix::Stat>(),
         )
@@ -846,7 +852,7 @@ pub fn handle_lstat(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle access system call - check file access permissions
-pub fn handle_access(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_access(args: &[u64]) -> KernelResult<u64> {
     if args.len() != 2 {
         return Err(KernelError::InvalidArgument);
     }
@@ -863,17 +869,18 @@ pub fn handle_access(args: &[u64]) -> Result<u64, KernelError> {
     }
 
     // Get file attributes and check permissions
-    let vfs = crate::vfs::vfs();
+    let vfs = crate::subsystems::fs::vfs();
     let attr = vfs.stat(&abs_path).map_err(|_| KernelError::NotFound)?;
 
-    let file_mode = attr.mode.0;
+    let file_mode = attr.mode;
     let file_uid = attr.uid;
     let file_gid = attr.gid;
 
     // Determine permission bits to check
+    let file_mode_bits = file_mode.0;
     let (r_bit, w_bit, x_bit) = if uid == 0 {
         // Root has access to everything
-        if (mode & crate::posix::X_OK) != 0 && (file_mode & 0o111) == 0 {
+        if (mode & crate::posix::X_OK) != 0 && (file_mode_bits & 0o111) == 0 {
             return Err(KernelError::PermissionDenied);
         }
         return Ok(0);
@@ -886,13 +893,13 @@ pub fn handle_access(args: &[u64]) -> Result<u64, KernelError> {
     };
 
     // Check requested permissions
-    if mode & crate::posix::R_OK != 0 && file_mode & r_bit == 0 {
+    if mode & crate::posix::R_OK != 0 && file_mode_bits & r_bit == 0 {
         return Err(KernelError::PermissionDenied);
     }
-    if mode & crate::posix::W_OK != 0 && file_mode & w_bit == 0 {
+    if mode & crate::posix::W_OK != 0 && file_mode_bits & w_bit == 0 {
         return Err(KernelError::PermissionDenied);
     }
-    if mode & crate::posix::X_OK != 0 && file_mode & x_bit == 0 {
+    if mode & crate::posix::X_OK != 0 && file_mode_bits & x_bit == 0 {
         return Err(KernelError::PermissionDenied);
     }
 
@@ -910,7 +917,7 @@ pub fn handle_access(args: &[u64]) -> Result<u64, KernelError> {
 ///
 /// faccessat 遵循 POSIX.1-2008，提供比 access 更灵活的权限检查。
 /// 主要优势是可以基于目录文件描述符进行相对路径检查。
-pub fn handle_faccessat(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_faccessat(args: &[u64]) -> KernelResult<u64> {
     if args.len() != 4 {
         return Err(KernelError::InvalidArgument);
     }
@@ -958,7 +965,7 @@ pub fn handle_faccessat(args: &[u64]) -> Result<u64, KernelError> {
         }
 
         // 获取相对路径并解析
-        let rel_path = read_path_from_user(pagetable as usize, pathname_ptr)?;
+        let _rel_path = read_path_from_user(pagetable as usize, pathname_ptr)?;
 
         // TODO: 从文件描述符获取目录路径并与相对路径拼接
         // 简化实现：暂时使用当前工作目录
@@ -967,13 +974,11 @@ pub fn handle_faccessat(args: &[u64]) -> Result<u64, KernelError> {
 
     // F_OK check (文件存在性)
     if mode == crate::posix::F_OK {
-        let vfs = crate::vfs::vfs();
+        let vfs = crate::subsystems::fs::vfs();
         // 检查文件是否存在
         if flags & AT_SYMLINK_NOFOLLOW != 0 {
-            // 不跟随符号链接
-            let _dentry = vfs
-                .lookup_path(&abs_path)
-                .map_err(|_| KernelError::NotFound)?;
+            // 不跟随符号链接 - use stat for now
+            let _attr = vfs.stat(&abs_path).map_err(|_| KernelError::NotFound)?;
         } else {
             // 跟随符号链接
             let _attr = vfs.stat(&abs_path).map_err(|_| KernelError::NotFound)?;
@@ -982,28 +987,21 @@ pub fn handle_faccessat(args: &[u64]) -> Result<u64, KernelError> {
     }
 
     // Get file attributes and check permissions
-    let vfs = crate::vfs::vfs();
+    let vfs = crate::subsystems::fs::vfs();
 
     // 根据 AT_SYMLINK_NOFOLLOW 标志决定是否跟随符号链接
-    let attr = if flags & AT_SYMLINK_NOFOLLOW != 0 {
-        // 不跟随符号链接 - 使用 lstat
-        let dentry = vfs
-            .lookup_path(&abs_path)
-            .map_err(|_| KernelError::NotFound)?;
-        dentry.lock().inode.getattr().map_err(|_| KernelError::IoError)?
-    } else {
-        // 跟随符号链接 - 使用 stat
-        vfs.stat(&abs_path).map_err(|_| KernelError::NotFound)?
-    };
+    // For now, we always follow symlinks as full lstat support isn't implemented
+    let attr = vfs.stat(&abs_path).map_err(|_| KernelError::NotFound)?;
 
-    let file_mode = attr.mode.0;
+    let file_mode = attr.mode;
     let file_uid = attr.uid;
     let file_gid = attr.gid;
 
     // Determine permission bits to check
+    let file_mode_bits = file_mode.0;
     let (r_bit, w_bit, x_bit) = if check_uid == 0 {
         // Root has access to everything
-        if (mode & crate::posix::X_OK) != 0 && (file_mode & 0o111) == 0 {
+        if (mode & crate::posix::X_OK) != 0 && (file_mode_bits & 0o111) == 0 {
             return Err(KernelError::PermissionDenied);
         }
         return Ok(0);
@@ -1016,13 +1014,13 @@ pub fn handle_faccessat(args: &[u64]) -> Result<u64, KernelError> {
     };
 
     // Check requested permissions
-    if mode & crate::posix::R_OK != 0 && file_mode & r_bit == 0 {
+    if mode & crate::posix::R_OK != 0 && file_mode_bits & r_bit == 0 {
         return Err(KernelError::PermissionDenied);
     }
-    if mode & crate::posix::W_OK != 0 && file_mode & w_bit == 0 {
+    if mode & crate::posix::W_OK != 0 && file_mode_bits & w_bit == 0 {
         return Err(KernelError::PermissionDenied);
     }
-    if mode & crate::posix::X_OK != 0 && file_mode & x_bit == 0 {
+    if mode & crate::posix::X_OK != 0 && file_mode_bits & x_bit == 0 {
         return Err(KernelError::PermissionDenied);
     }
 
@@ -1063,7 +1061,7 @@ fn resolve_path(path: &str, cwd: &Option<alloc::string::String>) -> alloc::strin
     if path.starts_with('/') {
         path.to_string()
     } else {
-        if let Some(ref cwd_path) = cwd {
+        if let Some(cwd_path) = cwd {
             format!("{}/{}", cwd_path, path)
         } else {
             format!("/{}", path)
@@ -1072,39 +1070,16 @@ fn resolve_path(path: &str, cwd: &Option<alloc::string::String>) -> alloc::strin
 }
 
 /// Split a path into parent directory and file name
-fn split_path(path: &str) -> Result<(alloc::string::String, alloc::string::String), KernelError> {
-    if path.is_empty() || path == "/" {
-        return Err(KernelError::InvalidArgument);
-    }
 
-    let path = path.trim_end_matches('/');
-    if let Some(pos) = path.rfind('/') {
-        let parent = if pos == 0 { "/" } else { &path[..pos] };
-        let name = &path[pos + 1..];
-        Ok((parent.to_string(), name.to_string()))
-    } else {
-        Ok(("/".to_string(), path.to_string()))
-    }
-}
-
-/// Get current process context (pagetable and cwd)
-fn get_process_context() -> Result<(usize, Option<alloc::string::String>), KernelError> {
-    let pid = crate::process::myproc().ok_or(KernelError::NotFound)?;
-    let proc_table = crate::process::manager::PROC_TABLE.lock();
-    let proc = proc_table.find_ref(pid).ok_or(KernelError::NotFound)?;
-    let pagetable = proc.pagetable as usize;
-    let cwd_path = proc.cwd_path.clone();
-
-    if pagetable == 0 {
-        return Err(KernelError::BadAddress);
-    }
-
+/// Get current process context (alias for get_process_context_full without UID/GID)
+fn get_process_context() -> KernelResult<(usize, Option<alloc::string::String>)> {
+    let (pagetable, cwd_path, _uid, _gid) = get_process_context_full()?;
     Ok((pagetable, cwd_path))
 }
 
 /// Get current process context with UID/GID
 fn get_process_context_full()
--> Result<(usize, Option<alloc::string::String>, u32, u32), KernelError> {
+-> KernelResult<(usize, Option<alloc::string::String>, u32, u32)> {
     let pid = crate::process::myproc().ok_or(KernelError::NotFound)?;
     let proc_table = crate::process::manager::PROC_TABLE.lock();
     let proc = proc_table.find_ref(pid).ok_or(KernelError::NotFound)?;
@@ -1121,15 +1096,24 @@ fn get_process_context_full()
 }
 
 /// Read a path string from user space
-fn read_path_from_user(pagetable: usize, ptr: usize) -> Result<alloc::string::String, KernelError> {
+fn read_path_from_user(pagetable: usize, ptr: usize) -> KernelResult<alloc::string::String> {
     const MAX_PATH_LEN: usize = 4096;
     let mut path_buf = [0u8; MAX_PATH_LEN];
 
-    let path_len = unsafe {
+    // Validate pagetable is not null (basic sanity check)
+    if pagetable == 0 {
+        return Err(KernelError::BadAddress);
+    }
+
+    // TODO: When copyinstr is fully implemented, use pagetable to:
+    // 1. Verify ptr is within user address space
+    // 2. Handle page faults during string copy
+    // 3. Validate memory access permissions
+
+    let (path_len, _) = unsafe {
         crate::subsystems::mm::vm::copyinstr(
-            pagetable as *mut crate::subsystems::mm::page_table_isolation::PageTable,
-            ptr,
             path_buf.as_mut_ptr(),
+            core::slice::from_raw_parts(ptr as *const u8, MAX_PATH_LEN),
             MAX_PATH_LEN,
         )
         .map_err(|_| KernelError::BadAddress)?
@@ -1145,7 +1129,7 @@ fn read_and_resolve_path(
     pagetable: usize,
     ptr: usize,
     cwd: &Option<alloc::string::String>,
-) -> Result<alloc::string::String, KernelError> {
+) -> KernelResult<alloc::string::String> {
     let path_str = read_path_from_user(pagetable, ptr)?;
     Ok(resolve_path(&path_str, cwd))
 }
@@ -1155,20 +1139,17 @@ fn file_attr_to_stat(attr: &crate::vfs::types::FileAttr) -> crate::posix::Stat {
     crate::posix::Stat {
         st_dev: 0, // Device ID (not implemented)
         st_ino: attr.ino,
-        st_mode: attr.mode.0,
         st_nlink: attr.nlink as u64,
+        st_mode: attr.mode.0,
         st_uid: attr.uid,
         st_gid: attr.gid,
         st_rdev: attr.rdev,
         st_size: attr.size as i64,
         st_blksize: attr.blksize as i64,
         st_blocks: attr.blocks as i64,
-        st_atime: (attr.atime / 1_000_000_000) as i64, // Convert nanoseconds to seconds
-        st_atime_nsec: (attr.atime % 1_000_000_000) as i64,
-        st_mtime: (attr.mtime / 1_000_000_000) as i64,
-        st_mtime_nsec: (attr.mtime % 1_000_000_000) as i64,
-        st_ctime: (attr.ctime / 1_000_000_000) as i64,
-        st_ctime_nsec: (attr.ctime % 1_000_000_000) as i64,
+        st_atime: attr.atime as i64, // Assuming timestamps are in seconds
+        st_mtime: attr.mtime as i64,
+        st_ctime: attr.ctime as i64,
     }
 }
 

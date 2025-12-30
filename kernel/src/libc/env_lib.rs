@@ -10,11 +10,12 @@
 extern crate alloc;
 
 use alloc::format;
-use core::str::FromStr;
+use core::ffi::{c_char, c_int};
+
+use heapless::{String, Vec};
 
 use crate::{
-    libc::error::set_errno,
-    reliability::{EAGAIN, EPERM},
+    libc::error::{errno, set_errno},
     subsystems::sync::Mutex,
 };
 /// 环境变量条目
@@ -115,7 +116,7 @@ impl EnhancedEnvManager {
     /// 获取环境变量值
     pub fn getenv(&self, name: *const c_char) -> *const c_char {
         if name.is_null() {
-            set_errno(EINVAL);
+            set_errno(errno::EINVAL);
             return core::ptr::null();
         }
 
@@ -129,7 +130,7 @@ impl EnhancedEnvManager {
             }
         };
 
-        if let Some(mut table) = self.env_table.try_lock() {
+        if let Some(table) = self.env_table.try_lock() {
             for entry in table.iter() {
                 if entry.name == name_str {
                     self.stats.lock().query_hits += 1;
@@ -145,7 +146,7 @@ impl EnhancedEnvManager {
     /// 设置或添加环境变量
     pub fn setenv(&self, name: *const c_char, value: *const c_char, overwrite: c_int) -> c_int {
         if name.is_null() || value.is_null() {
-            set_errno(EINVAL);
+            set_errno(errno::EINVAL);
             return -1;
         }
 
@@ -153,7 +154,7 @@ impl EnhancedEnvManager {
             match core::ffi::CStr::from_ptr(name).to_str() {
                 Ok(s) => s,
                 Err(_) => {
-                    set_errno(EINVAL);
+                    set_errno(errno::EINVAL);
                     return -1;
                 },
             }
@@ -163,7 +164,7 @@ impl EnhancedEnvManager {
             match core::ffi::CStr::from_ptr(value).to_str() {
                 Ok(s) => s,
                 Err(_) => {
-                    set_errno(EINVAL);
+                    set_errno(errno::EINVAL);
                     return -1;
                 },
             }
@@ -173,20 +174,20 @@ impl EnhancedEnvManager {
         if name_str.len() > self.config.max_name_length
             || value_str.len() > self.config.max_value_length
         {
-            set_errno(ENOMEM);
+            set_errno(errno::ENOMEM);
             return -1;
         }
 
         // 安全检查
         if self.config.enable_security_checks && self.is_name_dangerous(name_str) {
-            set_errno(EINVAL);
+            set_errno(errno::EINVAL);
             return -1;
         }
 
         // 检查系统变量修改权限
         if !self.config.allow_sys_modification && self.is_system_variable(name_str) {
             crate::println!("[env_lib] 警告：尝试修改系统环境变量: {}", name_str);
-            set_errno(EPERM);
+            set_errno(errno::EPERM);
             return -1;
         }
 
@@ -213,9 +214,14 @@ impl EnhancedEnvManager {
 
             // 添加新条目
             if table.len() < self.config.max_entries {
-                let mut entry = EnvEntry {
-                    name: String::from_str(name_str).unwrap_or_else(|_| String::new()),
-                    value: String::from_str(value_str).unwrap_or_else(|_| String::new()),
+                let mut name = String::<256>::new();
+                let mut value = String::<1024>::new();
+                let _ = name.push_str(name_str);
+                let _ = value.push_str(value_str);
+
+                let entry = EnvEntry {
+                    name,
+                    value,
                     modified: true,
                     original_value: None,
                 };
@@ -223,7 +229,7 @@ impl EnhancedEnvManager {
                 match table.push(entry) {
                     Ok(_) => {},
                     Err(_) => {
-                        set_errno(ENOMEM);
+                        set_errno(errno::ENOMEM);
                         return -1;
                     },
                 }
@@ -232,19 +238,19 @@ impl EnhancedEnvManager {
                 self.stats.lock().total_additions += 1;
                 return 0;
             } else {
-                set_errno(ENOMEM);
+                set_errno(errno::ENOMEM);
                 return -1;
             }
         }
 
-        set_errno(EAGAIN);
+        set_errno(errno::EAGAIN);
         -1
     }
 
     /// 删除环境变量
     pub fn unsetenv(&self, name: *const c_char) -> c_int {
         if name.is_null() {
-            set_errno(EINVAL);
+            set_errno(errno::EINVAL);
             return -1;
         }
 
@@ -252,7 +258,7 @@ impl EnhancedEnvManager {
             match core::ffi::CStr::from_ptr(name).to_str() {
                 Ok(s) => s,
                 Err(_) => {
-                    set_errno(EINVAL);
+                    set_errno(errno::EINVAL);
                     return -1;
                 },
             }
@@ -261,7 +267,7 @@ impl EnhancedEnvManager {
         // 检查系统变量删除权限
         if !self.config.allow_sys_modification && self.is_system_variable(name_str) {
             crate::println!("[env_lib] 警告：尝试删除系统环境变量: {}", name_str);
-            set_errno(EPERM);
+            set_errno(errno::EPERM);
             return -1;
         }
 
@@ -290,7 +296,7 @@ impl EnhancedEnvManager {
             crate::println!("[env_lib] 清空了{}个环境变量", count);
             0
         } else {
-            set_errno(EAGAIN);
+            set_errno(errno::EAGAIN);
             -1
         }
     }
@@ -346,8 +352,10 @@ impl EnhancedEnvManager {
 
         if let Some(table) = self.env_table.try_lock() {
             for entry in table.iter() {
-                let name = String::<256>::from_str(&entry.name).unwrap_or_default();
-                let value = String::<256>::from_str(&entry.value).unwrap_or_default();
+                let mut name = String::<256>::new();
+                let mut value = String::<256>::new();
+                let _ = name.push_str(&entry.name);
+                let _ = value.push_str(&entry.value);
                 if result.push((name, value)).is_err() {
                     break;
                 }
@@ -386,26 +394,22 @@ impl EnhancedEnvManager {
             }
 
             // 分配environ数组
-            let array_layout = unsafe {
-                core::alloc::Layout::from_size_align(
-                    (count + 1) * core::mem::size_of::<*mut c_char>(),
-                    core::mem::align_of::<*mut c_char>(),
-                )
-                .unwrap()
-            };
+            let array_layout = core::alloc::Layout::from_size_align(
+                (count + 1) * core::mem::size_of::<*mut c_char>(),
+                core::mem::align_of::<*mut c_char>(),
+            )
+            .unwrap();
             let array_ptr = unsafe { alloc::alloc::alloc(array_layout) as *mut *mut c_char };
 
             if array_ptr.is_null() {
-                set_errno(ENOMEM);
+                set_errno(errno::ENOMEM);
                 return Err(-1);
             }
 
             // 分配每个环境变量字符串
             for (i, entry) in table.iter().enumerate() {
                 let env_string = format!("{}={}", entry.name, entry.value);
-                let string_layout = unsafe {
-                    core::alloc::Layout::from_size_align(env_string.len() + 1, 1).unwrap()
-                };
+                let string_layout = core::alloc::Layout::from_size_align(env_string.len() + 1, 1).unwrap();
                 let string_ptr = unsafe { alloc::alloc::alloc(string_layout) as *mut c_char };
 
                 if !string_ptr.is_null() {
@@ -424,7 +428,8 @@ impl EnhancedEnvManager {
                 } else {
                     // 清理已分配的内存
                     for j in 0..i {
-                        if let ptr = unsafe { *array_ptr.add(j) } {
+                        let ptr = unsafe { *array_ptr.add(j) };
+                        if !ptr.is_null() {
                             unsafe {
                                 let layout =
                                     core::alloc::Layout::from_size_align(self.strlen(ptr) + 1, 1)
@@ -447,7 +452,7 @@ impl EnhancedEnvManager {
 
             Ok(array_ptr)
         } else {
-            set_errno(EAGAIN);
+            set_errno(errno::EAGAIN);
             Err(-1)
         }
     }
@@ -551,20 +556,20 @@ pub fn get_env_manager() -> &'static mut EnhancedEnvManager {
 // 便捷的环境变量函数包装器
 #[inline]
 pub fn getenv(name: *const c_char) -> *const c_char {
-    unsafe { get_env_manager().getenv(name) }
+    get_env_manager().getenv(name)
 }
 
 #[inline]
 pub fn setenv(name: *const c_char, value: *const c_char, overwrite: c_int) -> c_int {
-    unsafe { get_env_manager().setenv(name, value, overwrite) }
+    get_env_manager().setenv(name, value, overwrite)
 }
 
 #[inline]
 pub fn unsetenv(name: *const c_char) -> c_int {
-    unsafe { get_env_manager().unsetenv(name) }
+    get_env_manager().unsetenv(name)
 }
 
 #[inline]
 pub fn clearenv() -> c_int {
-    unsafe { get_env_manager().clearenv() }
+    get_env_manager().clearenv()
 }

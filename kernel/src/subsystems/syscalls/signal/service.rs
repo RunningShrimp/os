@@ -8,20 +8,85 @@
 
 use alloc::{
     boxed::Box,
-    string::{String, ToString},
+    string::String,
     vec::Vec,
 };
 
 use crate::{
-    error::UnifiedError,
+    error::{KernelError, SyscallError},
     subsystems::{
         process::ProcessId,
         syscalls::{
             services::{BaseService, ServiceStatus, SyscallService},
-            signal::handlers::*,
+            signal::{handlers, types::*},
         },
     },
 };
+
+// Import handler types with explicit prefix to avoid conflicts
+use crate::subsystems::syscalls::signal::handlers::{
+    SignalAction as HandlerSignalAction, SignalSet as HandlerSignalSet,
+    SignalNumber as HandlerSignalNumber,
+};
+
+// Re-export the handler functions for convenience
+use crate::subsystems::syscalls::signal::handlers::{
+    get_global_handler_manager, send_signal as handlers_send_signal,
+    set_signal_mask as handlers_set_signal_mask,
+};
+
+// Conversion functions between types and handler types
+
+/// Convert SignalNumber (i32) to HandlerSignalNumber (u32)
+fn convert_signal_number(sig: SignalNumber) -> HandlerSignalNumber {
+    sig as u32
+}
+
+/// Convert HandlerSignalNumber (u32) to SignalNumber (i32)
+
+/// Convert SignalSet (types) to HandlerSignalSet (handlers)
+fn convert_signal_set_to_handler(set: &SignalSet) -> HandlerSignalSet {
+    HandlerSignalSet::from_bits(set.bits())
+}
+
+/// Convert HandlerSignalSet (handlers) to SignalSet (types)
+fn convert_signal_set_from_handler(set: &HandlerSignalSet) -> SignalSet {
+    SignalSet::from_bits(set.bits())
+}
+
+/// Convert SignalAction (types) to HandlerSignalAction (handlers)
+fn convert_signal_action_to_handler(action: &SignalAction) -> HandlerSignalAction {
+    match action {
+        SignalAction::Default => HandlerSignalAction::Default,
+        SignalAction::Ignore => HandlerSignalAction::Ignore,
+        SignalAction::Handler { handler, .. } => {
+            // Convert usize handler address to function pointer
+            // Safety: This assumes the address is a valid signal handler function
+            let handler_fn = unsafe {
+                core::mem::transmute::<usize, handlers::SignalHandler>(*handler)
+            };
+            HandlerSignalAction::Handler(handler_fn)
+        },
+    }
+}
+
+/// Convert HandlerSignalAction (handlers) to SignalAction (types)
+fn convert_signal_action_from_handler(action: &HandlerSignalAction) -> SignalAction {
+    match action {
+        HandlerSignalAction::Default => SignalAction::Default,
+        HandlerSignalAction::Ignore => SignalAction::Ignore,
+        HandlerSignalAction::Handler(handler) => {
+            // Convert function pointer to usize address
+            let handler_addr = *handler as usize;
+            // Create a SignalAction with the handler address
+            SignalAction::handler_with_mask_and_flags(
+                handler_addr,
+                SignalSet::default(),
+                SignalFlags::default(),
+            )
+        },
+    }
+}
 
 /// 信号系统调用服务
 ///
@@ -99,8 +164,9 @@ impl SignalService {
         // 更新统计
         self.update_stats(SignalOperation::Kill);
 
-        // 调用处理程序
-        send_signal(pid, sig)
+        // 转换信号编号并调用处理程序
+        let handler_sig = convert_signal_number(sig);
+        handlers_send_signal(pid, handler_sig)
     }
 
     /// 设置信号处理程序
@@ -115,9 +181,16 @@ impl SignalService {
         // 更新统计
         self.update_stats(SignalOperation::SigAction);
 
+        // 转换信号编号和处理程序
+        let handler_sig = convert_signal_number(sig);
+        let handler_action = convert_signal_action_to_handler(&action);
+
         // 获取全局处理程序管理器
         let handler_manager = get_global_handler_manager();
-        handler_manager.set_process_handler(pid, sig, action)
+        let old_action = handler_manager.set_process_handler(pid, handler_sig, handler_action)?;
+
+        // 转换回types::SignalAction
+        Ok(old_action.map(|action| convert_signal_action_from_handler(&action)))
     }
 
     /// 设置进程信号掩码
@@ -133,8 +206,19 @@ impl SignalService {
         // 更新统计
         self.update_stats(SignalOperation::SigProcMask);
 
-        // 调用处理程序
-        set_signal_mask(pid, how, new_mask, old_mask)
+        // 转换信号集
+        let handler_new_mask = convert_signal_set_to_handler(&new_mask);
+
+        // 调用处理程序 (需要适配返回类型)
+        if let Some(old_mask_ref) = old_mask {
+            let mut handler_old_mask = HandlerSignalSet::empty();
+            handlers_set_signal_mask(pid, how, handler_new_mask, Some(&mut handler_old_mask))?;
+            *old_mask_ref = convert_signal_set_from_handler(&handler_old_mask);
+        } else {
+            handlers_set_signal_mask(pid, how, handler_new_mask, None)?;
+        }
+
+        Ok(())
     }
 
     /// 获取进程挂起的信号
@@ -156,7 +240,8 @@ impl SignalService {
         self.update_stats(SignalOperation::SigSuspend);
 
         // 调用处理程序
-        handlers::sigsuspend(pid, SignalSet::empty())
+        let empty_mask = HandlerSignalSet::empty();
+        handlers::sigsuspend(pid, empty_mask)
     }
 }
 
@@ -264,14 +349,14 @@ impl SyscallService for SignalService {
         match syscall_number {
             0x2000 => {
                 // kill
-                let pid = ProcessId::new(args.get(0).copied().unwrap_or(0) as u32);
+                let pid: ProcessId = args.get(0).copied().unwrap_or(0) as u32 as ProcessId;
                 let sig = args.get(1).copied().unwrap_or(0) as SignalNumber;
                 self.kill_process(pid, sig)?;
                 Ok(0)
             },
             0x2001 => {
                 // sigaction
-                let pid = ProcessId::new(args.get(0).copied().unwrap_or(0) as u32);
+                let pid: ProcessId = args.get(0).copied().unwrap_or(0) as u32 as ProcessId;
                 let sig = args.get(1).copied().unwrap_or(0) as SignalNumber;
                 let action_ptr = args.get(2).copied().unwrap_or(0) as *const SignalAction;
                 let old_action_ptr = args.get(3).copied().unwrap_or(0) as *mut SignalAction;
@@ -289,13 +374,19 @@ impl SyscallService for SignalService {
             },
             0x2002 => {
                 // sigprocmask
-                let pid = ProcessId::new(args.get(0).copied().unwrap_or(0) as u32);
+                let pid: ProcessId = args.get(0).copied().unwrap_or(0) as u32 as ProcessId;
                 let how = args.get(1).copied().unwrap_or(0) as u32;
                 let new_mask_ptr = args.get(2).copied().unwrap_or(0) as *const SignalSet;
                 let old_mask_ptr = args.get(3).copied().unwrap_or(0) as *mut SignalSet;
 
                 // TODO: 安全地从用户空间读取信号集
-                let new_mask = unsafe { new_mask_ptr.read() };
+                let new_mask = unsafe {
+                    if new_mask_ptr.is_null() {
+                        SignalSet::empty()
+                    } else {
+                        new_mask_ptr.read()
+                    }
+                };
                 let mut old_mask = SignalSet::empty();
 
                 self.set_process_sigmask(pid, how, new_mask, Some(&mut old_mask))?;
@@ -309,7 +400,7 @@ impl SyscallService for SignalService {
             },
             0x2003 => {
                 // sigpending
-                let pid = ProcessId::new(args.get(0).copied().unwrap_or(0) as u32);
+                let pid: ProcessId = args.get(0).copied().unwrap_or(0) as u32 as ProcessId;
                 let set_ptr = args.get(1).copied().unwrap_or(0) as *mut SignalSet;
 
                 let pending = self.get_pending_signals(pid)?;
@@ -323,7 +414,7 @@ impl SyscallService for SignalService {
             },
             0x2004 => {
                 // sigsuspend
-                let pid = ProcessId::new(args.get(0).copied().unwrap_or(0) as u32);
+                let pid: ProcessId = args.get(0).copied().unwrap_or(0) as u32 as ProcessId;
                 let mask_ptr = args.get(1).copied().unwrap_or(0) as *const SignalSet;
 
                 // 安全地从用户空间读取信号集
@@ -335,11 +426,14 @@ impl SyscallService for SignalService {
                     }
                 };
 
+                // 转换为handlers的SignalSet
+                let handler_mask = convert_signal_set_to_handler(&mask);
+
                 // 原子地设置新的信号掩码并挂起进程
                 // 注意：sigsuspend会原子地替换掩码并等待信号
-                match handlers::sigsuspend(pid, mask) {
+                match handlers::sigsuspend(pid, handler_mask) {
                     Ok(()) => Ok(0),  // 不应该到达这里
-                    Err(KernelError::Syscall(SyscallError::Interrupted)) => {
+                    Err(KernelError::SyscallError(SyscallError::Interrupted)) => {
                         // sigsuspend总是返回EINTR表示被信号中断
                         Ok((-1i32) as u64)  // 返回-1表示错误
                     },
@@ -350,11 +444,11 @@ impl SyscallService for SignalService {
                 // sigreturn
                 // TODO: 实现信号返回处理
                 crate::log_warn!("sigreturn syscall not implemented yet");
-                Err(KernelError::Syscall(crate::syscalls::types::SyscallError::ENOSYS))
+                Err(KernelError::SyscallError(SyscallError::InvalidSyscall))
             },
             _ => {
                 crate::log_warn!("Unsupported signal syscall: {}", syscall_number);
-                Err(KernelError::Syscall(crate::syscalls::types::SyscallError::ENOSYS))
+                Err(KernelError::SyscallError(SyscallError::InvalidSyscall))
             },
         }
     }
@@ -430,10 +524,29 @@ pub fn kill_process(pid: u64, sig: i32) -> Result<(), crate::error::UnifiedError
 
     // Get the global signal service
     let service = get_global_signal_service();
-    let process_id = ProcessId::new(pid as u32);
+    let process_id: ProcessId = pid as ProcessId;
     let signal_number = sig as i32;
 
     service.kill_process(process_id, signal_number)
+}
+
+/// Get the global signal service instance
+///
+/// This function provides access to a global signal service instance
+/// for use outside of the service framework.
+pub fn get_global_signal_service() -> &'static mut SignalService {
+    use core::sync::atomic::{AtomicBool, Ordering};
+
+    static mut GLOBAL_SERVICE: Option<SignalService> = None;
+    static SERVICE_INIT: AtomicBool = AtomicBool::new(false);
+
+    unsafe {
+        if !SERVICE_INIT.load(Ordering::Acquire) {
+            GLOBAL_SERVICE = Some(SignalService::new());
+            SERVICE_INIT.store(true, Ordering::Release);
+        }
+        GLOBAL_SERVICE.as_mut().unwrap()
+    }
 }
 
 #[cfg(test)]

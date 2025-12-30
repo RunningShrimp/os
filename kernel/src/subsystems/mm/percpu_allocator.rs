@@ -1,6 +1,6 @@
 extern crate alloc;
 
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 use core::{
     alloc::{GlobalAlloc, Layout},
     ptr::NonNull,
@@ -98,7 +98,7 @@ impl PerCpuAllocator {
     pub unsafe fn alloc_on(&self, cpu_id: usize, layout: Layout) -> *mut u8 {
         let target = cpu_id.min(self.max_cpus - 1);
         if let Some(allocator) = self.slots[target].get() {
-            allocator.alloc(layout)
+            unsafe { allocator.alloc(layout) }
         } else {
             core::ptr::null_mut()
         }
@@ -107,7 +107,7 @@ impl PerCpuAllocator {
     pub unsafe fn dealloc_on(&self, cpu_id: usize, ptr: *mut u8, layout: Layout) {
         let target = cpu_id.min(self.max_cpus - 1);
         if let Some(allocator) = self.slots[target].get() {
-            allocator.dealloc(ptr, layout);
+            unsafe { allocator.dealloc(ptr, layout) };
         }
     }
 
@@ -121,8 +121,8 @@ impl PerCpuAllocator {
         page_size: usize,
     ) {
         self.init_cpu(cpu_id, || {
-            let mut alloc = HybridAllocator::new();
-            alloc.init(slab_start, slab_size, buddy_start, buddy_size, page_size);
+            let alloc = HybridAllocator::new();
+            unsafe { alloc.init(slab_start, slab_size, buddy_start, buddy_size, page_size) };
             alloc
         });
     }
@@ -151,12 +151,12 @@ where
 }
 
 pub unsafe fn percpu_alloc(cpu_id: usize, layout: Layout) -> Option<*mut u8> {
-    with_global(|alloc| alloc.alloc_on(cpu_id, layout))
+    with_global(|alloc| unsafe { alloc.alloc_on(cpu_id, layout) })
 }
 
 pub unsafe fn percpu_dealloc(cpu_id: usize, ptr: *mut u8, layout: Layout) {
     with_global(|alloc| {
-        alloc.dealloc_on(cpu_id, ptr, layout);
+        unsafe { alloc.dealloc_on(cpu_id, ptr, layout) };
     });
 }
 
@@ -174,7 +174,7 @@ pub struct PerCpuLocalAllocator {
     cache_hits: AtomicUsize,
     cache_misses: AtomicUsize,
     cache_evictions: AtomicUsize,
-    _padding: [u8; CACHE_LINE_SIZE - 80],
+    _padding: [u8; 8],
 }
 
 impl PerCpuLocalAllocator {
@@ -187,7 +187,7 @@ impl PerCpuLocalAllocator {
             cache_hits: AtomicUsize::new(0),
             cache_misses: AtomicUsize::new(0),
             cache_evictions: AtomicUsize::new(0),
-            _padding: [0; CACHE_LINE_SIZE - 80],
+            _padding: [0; 8],
         }
     }
 
@@ -196,15 +196,15 @@ impl PerCpuLocalAllocator {
         if let Some(block) = self.try_alloc_from_freelist(size) {
             return block.as_ptr() as *mut u8;
         }
-        self.alloc_from_global(layout)
+        unsafe { self.alloc_from_global(layout) }
     }
 
     pub unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         let size = layout.size().max(layout.align());
         if size <= 4096 {
-            self.add_to_freelist(ptr, size);
+            unsafe { self.add_to_freelist(ptr, size) };
         } else {
-            crate::subsystems::mm::allocator::get_global_allocator().dealloc(ptr, layout);
+            unsafe { crate::subsystems::mm::allocator::get_global_allocator().dealloc(ptr, layout) };
         }
     }
 
@@ -238,7 +238,7 @@ impl PerCpuLocalAllocator {
     }
 
     pub unsafe fn alloc_from_global(&self, layout: Layout) -> *mut u8 {
-        let ptr = crate::subsystems::mm::allocator::get_global_allocator().alloc(layout);
+        let ptr = unsafe { crate::subsystems::mm::allocator::get_global_allocator().alloc(layout) };
         if !ptr.is_null() {
             self.allocated_count.fetch_add(1, Ordering::Relaxed);
         }
@@ -313,11 +313,11 @@ pub struct PerCpuGlobalAllocator;
 
 unsafe impl GlobalAlloc for PerCpuGlobalAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        current_cpu_allocator().alloc(layout)
+        unsafe { current_cpu_allocator().alloc(layout) }
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        current_cpu_allocator().dealloc(ptr, layout)
+        unsafe { current_cpu_allocator().dealloc(ptr, layout) }
     }
 }
 
@@ -326,7 +326,7 @@ pub fn flush_all_caches() {
         if let Some(ref allocators) = PER_CPU_ALLOCATORS {
             for i in 0..allocators.len() {
                 let allocator = &allocators[i];
-                let (allocated, freelist_len) = allocator.stats();
+                let (_allocated, freelist_len) = allocator.stats();
                 if freelist_len > 0 {}
             }
         }
@@ -368,4 +368,12 @@ pub fn warmup_caches(cpu_id: usize, count: usize) {
             }
         }
     }
+}
+
+/// Shutdown per-CPU allocators
+pub fn shutdown_percpu_allocators() -> nos_api::Result<()> {
+    unsafe {
+        PER_CPU_ALLOCATORS = None;
+    }
+    Ok(())
 }

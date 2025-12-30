@@ -4,6 +4,8 @@
 
 use alloc::{string::String, vec::Vec};
 
+use crate::error::SyscallResult;
+
 /// 系统调用信息
 #[derive(Debug, Clone)]
 pub struct SyscallInfo {
@@ -194,12 +196,12 @@ pub trait SyscallFilter: Send + Sync {
 /// 系统调用拦截器
 pub trait SyscallInterceptor: Send + Sync {
     /// 在系统调用执行前拦截
-    fn before_syscall(&self, context: &SyscallContext) -> Option<isize> {
+    fn before_syscall(&self, _context: &SyscallContext) -> Option<isize> {
         None
     }
 
     /// 在系统调用执行后拦截
-    fn after_syscall(&self, context: &SyscallContext, result: &mut SyscallResult<i64> {
+    fn after_syscall(&self, _context: &SyscallContext, _result: &mut SyscallResult<i64>) {
         // 默认实现：不做任何操作
     }
 

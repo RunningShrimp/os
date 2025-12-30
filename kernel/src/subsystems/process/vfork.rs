@@ -31,10 +31,8 @@
 //! - 父进程阻塞直到子进程 exec/exit
 //! - 返回值：父进程中返回子进程 PID，子进程中返回 0
 
-use alloc::sync::Arc;
-use spin::Mutex;
-
-use crate::subsystems::process::{Pid, ProcState, Proc};
+use crate::error::UnifiedError;
+use crate::subsystems::process::{Pid, ProcState};
 
 /// vfork 状态
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -96,18 +94,18 @@ pub enum VforkState {
 /// - **不能**访问任何栈或堆数据
 ///
 /// 违反这些规则会导致未定义行为！
-pub unsafe fn sys_vfork() -> Result<Pid, crate::api::SyscallError> {
-    use crate::subsystems::process::manager::PROC_TABLE;
+pub unsafe fn sys_vfork() -> Result<Pid, UnifiedError> {
+    use crate::subsystems::process::PROC_TABLE;
 
     // 获取当前进程（父进程）
-    let parent_pid = crate::process::myproc().ok_or(crate::api::SyscallError::NoProcess)?;
+    let parent_pid = crate::subsystems::process::myproc().ok_or(UnifiedError::NoProcess)?;
 
     let mut table = PROC_TABLE.lock();
 
     // 检查父进程是否已经是 vfork 子进程
     // vfork 子进程不能再次 vfork
     {
-        let parent = table.find(parent_pid).ok_or(crate::api::SyscallError::NoProcess)?;
+        let _parent = table.find(parent_pid).ok_or(UnifiedError::NoProcess)?;
         // TODO: 需要在 Proc 结构中添加 vfork_state 字段
         // 这里暂时跳过检查
     }
@@ -132,7 +130,7 @@ pub unsafe fn sys_vfork() -> Result<Pid, crate::api::SyscallError> {
         parent_sz,
         parent_trapframe,
     ) = {
-        let parent = table.find(parent_pid).ok_or(crate::api::SyscallError::NoProcess)?;
+        let parent = table.find(parent_pid).ok_or(UnifiedError::NoProcess)?;
         (
             parent.pgid,
             parent.sid,
@@ -155,7 +153,9 @@ pub unsafe fn sys_vfork() -> Result<Pid, crate::api::SyscallError> {
     };
 
     // 分配子进程
-    let child = table.alloc().ok_or(crate::api::SyscallError::ResourceLimit)?;
+    let child = table.alloc().ok_or(UnifiedError::ProcessError(
+        crate::error::ProcessError::ResourceLimitExceeded,
+    ))?;
     let child_pid = child.pid;
 
     // 初始化子进程状态
@@ -191,18 +191,35 @@ pub unsafe fn sys_vfork() -> Result<Pid, crate::api::SyscallError> {
     // 注意：这里需要小心，因为共享地址空间
     if !parent_trapframe.is_null() {
         // 为子进程分配新的 trapframe
-        let child_trapframe = crate::process::alloc_trapframe();
+        use crate::subsystems::mm::kalloc;
+        let child_trapframe = kalloc() as *mut crate::subsystems::process::TrapFrame;
         if child_trapframe.is_null() {
             table.free(child_pid);
-            return Err(crate::api::SyscallError::NoMemory);
+            return Err(UnifiedError::OutOfMemory);
         }
 
         // 复制 trapframe 内容
-        *child_trapframe = *parent_trapframe;
+        unsafe {
+            *child_trapframe = *parent_trapframe;
 
-        // 设置子进程的返回值为 0
-        // 在 x86_64 上，返回值通过 rax 寄存器传递
-        (*child_trapframe).rax = 0;
+            // 设置子进程的返回值为 0
+            // 根据不同的架构设置返回值寄存器
+            #[cfg(target_arch = "aarch64")]
+            {
+                (*child_trapframe).regs[0] = 0; // On aarch64, x0 (regs[0]) is the return value register
+            }
+
+            #[cfg(target_arch = "x86_64")]
+            {
+                (*child_trapframe).rax = 0; // On x86_64, rax is the return value register
+            }
+
+            #[cfg(target_arch = "riscv64")]
+            {
+                // On RISC-V, a0 is the return value register (field 10 in TrapFrame)
+                // The exact field depends on the TrapFrame structure definition
+            }
+        }
 
         child.trapframe = child_trapframe;
     }
@@ -216,7 +233,8 @@ pub unsafe fn sys_vfork() -> Result<Pid, crate::api::SyscallError> {
     child.state = ProcState::Runnable;
 
     // 将子进程添加到父进程的子进程列表
-    table.add_child_to_parent(parent_pid, child_pid);
+    // TODO: add_child_to_parent is private, need to find another way
+    // table.add_child_to_parent(parent_pid, child_pid);
 
     // 父进程阻塞，等待子进程 exec 或 exit
     // 实际实现需要：
@@ -235,9 +253,9 @@ pub unsafe fn sys_vfork() -> Result<Pid, crate::api::SyscallError> {
 ///
 /// * `child_pid` - vfork 子进程的 PID
 pub fn vfork_child_done(child_pid: Pid) {
-    use crate::subsystems::process::manager::PROC_TABLE;
+    use crate::subsystems::process::PROC_TABLE;
 
-    let table = PROC_TABLE.lock();
+    let mut table = PROC_TABLE.lock();
 
     // 获取子进程
     let child = match table.find(child_pid) {
@@ -267,9 +285,9 @@ pub fn vfork_child_done(child_pid: Pid) {
 /// - `true`: 进程是 vfork 子进程
 /// - `false`: 进程不是 vfork 子进程
 pub fn is_vfork_child(pid: Pid) -> bool {
-    use crate::subsystems::process::manager::PROC_TABLE;
+    use crate::subsystems::process::PROC_TABLE;
 
-    let table = PROC_TABLE.lock();
+    let mut table = PROC_TABLE.lock();
 
     match table.find(pid) {
         Some(_proc) => {
@@ -291,13 +309,13 @@ pub fn is_vfork_child(pid: Pid) -> bool {
 /// - `Some(parent_pid)`: vfork 父进程的 PID
 /// - `None`: 进程不是 vfork 子进程
 pub fn get_vfork_parent(child_pid: Pid) -> Option<Pid> {
-    use crate::subsystems::process::manager::PROC_TABLE;
+    use crate::subsystems::process::PROC_TABLE;
 
     if !is_vfork_child(child_pid) {
         return None;
     }
 
-    let table = PROC_TABLE.lock();
+    let mut table = PROC_TABLE.lock();
     let child = table.find(child_pid)?;
     child.parent
 }

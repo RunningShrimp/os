@@ -4,49 +4,62 @@
 // 提供系统调试、性能分析、内存分析等调试功能
 
 // 现有子模块
-pub mod fault_diagnosis;
 pub mod log;
+pub mod tracing;
+pub mod profiling;
 pub mod metrics;
 pub mod monitoring;
-pub mod profiling;
 pub mod symbols;
-pub mod tracing;
 pub mod visualization;
+pub mod fault_diagnosis;
 
 // 新拆分的子模块
-pub mod analyzer;
-pub mod boot_log;
-pub mod breakpoint;
-pub mod manager;
-pub mod plugin;
 pub mod session;
+pub mod breakpoint;
+pub mod analyzer;
+pub mod plugin;
 pub mod types;
+pub mod manager;
 
 // 重新导出公共类型和函数
-pub use analyzer::{
-    AllocationRecord, AllocationType, AnalysisImportance, AnalysisResult, AnalysisResultType,
-    CPUInfo, CallFrame, CounterType, DeallocationRecord, DeallocationType, HotspotAnalysis,
-    HotspotAnalysisConfig, HotspotFunction, HotspotLine, HotspotModule, ImplementationDifficulty,
-    InterfaceState, InterfaceStatus, InterfaceType, LeakDetectionStats, LeakDetector,
-    MappingStatus, MappingType, MemoryAnalyzer, MemoryInfo, MemoryMapping, MemoryPermissions,
-    MemoryRegion, MemoryRegionType, MemorySnapshot, MemoryUsageStatistics, NetworkInfo,
-    PerformanceAnalysisConfig, PerformanceAnalyzer, PerformanceCounter, PerformanceReport,
-    PerformanceSample, PerformanceSnapshot, PerformanceSummary, Recommendation,
-    RecommendationPriority, RecommendationType, ReportType, StackAnalyzer, StackFrame,
-    StackOverflowDetector, StackTrace, StackTraceType, SystemState, TimeRange, VariableInfo,
-};
-pub use breakpoint::{
-    Breakpoint, BreakpointCondition, BreakpointManager, BreakpointStatus, BreakpointType,
-    ConditionType, SourceLocation,
-};
-pub use manager::{DebugManager, create_debug_manager};
 pub use session::{
-    DebugEvent, DebugEventType, DebugLevel, DebugSession, DebugSessionStatus, DebugSessionType,
-    ProcessInfo, ProcessMemoryUsage, ProcessState, SessionConfig, ThreadInfo, ThreadState,
+    DebugSession, DebugSessionType, DebugSessionStatus,
+    ProcessInfo, ProcessState, ProcessMemoryUsage,
+    DebugEvent, DebugEventType, DebugLevel,
+    ThreadInfo, ThreadState, SessionConfig,
 };
+
+pub use breakpoint::{
+    BreakpointManager, Breakpoint, BreakpointType, BreakpointStatus,
+    BreakpointCondition, ConditionType, SourceLocation,
+};
+
+pub use analyzer::{
+    MemoryAnalyzer, MemorySnapshot, MemoryRegion, MemoryRegionType, MemoryPermissions,
+    LeakDetector, AllocationRecord, DeallocationRecord, AllocationType, DeallocationType,
+    LeakDetectionStats, MemoryUsageStatistics, MemoryMapping, MappingType, MappingStatus,
+    StackAnalyzer, StackTrace, StackTraceType, StackOverflowDetector,
+    StackFrame, CallFrame, VariableInfo,
+    PerformanceAnalyzer, PerformanceCounter, CounterType, PerformanceSample,
+    HotspotAnalysis, HotspotFunction, HotspotLine, HotspotModule,
+    PerformanceReport, ReportType, TimeRange, PerformanceSummary,
+    AnalysisResult, AnalysisResultType, AnalysisImportance,
+    Recommendation, RecommendationType, RecommendationPriority, ImplementationDifficulty,
+    PerformanceAnalysisConfig, SystemState, CPUInfo, MemoryInfo, NetworkInfo,
+    InterfaceStatus, InterfaceState, InterfaceType, PerformanceSnapshot,
+    HotspotAnalysisConfig,
+};
+
+
+
 pub use types::{
-    DebugConfig, DebugFeature, DebugFormat, DebugInfo, DebugStats, LineMapping, SourceMapping,
-    Symbol, SymbolManager, SymbolScope, SymbolTable, SymbolTableStats, SymbolTableType, SymbolType,
+    SymbolManager, SymbolTable, SymbolTableType, Symbol, SymbolType, SymbolScope,
+    SymbolTableStats, DebugInfo, DebugFormat, DebugFeature,
+    SourceMapping, LineMapping, DebugConfig, DebugStats,
+};
+
+pub use manager::{
+    DebugManager, create_debug_manager,
 };
 
 /// Initialize debug module (module-level function)
@@ -55,19 +68,19 @@ pub fn init() -> Result<(), &'static str> {
     if let Err(_) = metrics::init() {
         return Err("Failed to initialize metrics subsystem");
     }
-
+    
     if let Err(_) = profiling::init() {
         return Err("Failed to initialize profiling subsystem");
     }
-
+    
     if let Err(_) = monitoring::init() {
         return Err("Failed to initialize monitoring subsystem");
     }
-
+    
     if let Err(_) = visualization::init() {
         return Err("Failed to initialize visualization subsystem");
     }
-
+    
     Ok(())
 }
 
@@ -86,9 +99,7 @@ mod tests {
     #[test]
     fn test_debug_session_creation() {
         let mut manager = DebugManager::new();
-        let session_id = manager
-            .start_debug_session("test_session", DebugSessionType::ProcessDebug, None)
-            .unwrap();
+        let session_id = manager.start_debug_session("test_session", DebugSessionType::ProcessDebug, None).unwrap();
         assert_eq!(manager.active_sessions.len(), 1);
 
         let session = manager.get_active_sessions().get(&session_id).unwrap();
@@ -101,9 +112,7 @@ mod tests {
         let mut manager = DebugManager::new();
         manager.init().unwrap();
 
-        let breakpoint_id = manager
-            .set_breakpoint(0x400100, BreakpointType::Software, Some("Test breakpoint"))
-            .unwrap();
+        let breakpoint_id = manager.set_breakpoint(0x400100, BreakpointType::Software, Some("Test breakpoint")).unwrap();
         assert_eq!(manager.breakpoint_manager.breakpoints.len(), 1);
         assert_eq!(breakpoint_id, 1);
 

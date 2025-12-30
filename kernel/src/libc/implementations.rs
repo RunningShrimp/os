@@ -16,6 +16,9 @@ extern crate alloc;
 use alloc::boxed::Box;
 use core::ffi::{c_char, c_double, c_int, c_uint, c_void};
 
+// 导入C类型
+use crate::libc::{c_long, size_t, CLibResult, CLibStats};
+
 // 导入增强库模块
 use crate::libc::string_lib::EnhancedStringLib;
 use crate::libc::{
@@ -304,7 +307,7 @@ impl CLibInterface for UnifiedCLib {
             let src_ptr = src as *const u8;
 
             // 检查是否有重叠
-            if dest_ptr < src_ptr as *mut u8 || dest_ptr >= unsafe { src_ptr.add(n) as *mut u8 } {
+            if dest_ptr < src_ptr as *mut u8 || dest_ptr >= src_ptr.add(n) as *mut u8 {
                 // 没有重叠，使用 memcpy
                 core::ptr::copy_nonoverlapping(src_ptr, dest_ptr, n);
             } else {
@@ -372,7 +375,7 @@ impl CLibInterface for UnifiedCLib {
         10 // 模拟换行符
     }
 
-    fn fopen(&self, filename: *const c_char, _mode: *const c_char) -> *mut c_void {
+    fn fopen(&self, _filename: *const c_char, _mode: *const c_char) -> *mut c_void {
         crate::println!("[unified] fopen called");
         core::ptr::null_mut()
     }
@@ -384,9 +387,9 @@ impl CLibInterface for UnifiedCLib {
 
     fn fread(
         &self,
-        ptr: *mut c_void,
+        _ptr: *mut c_void,
         _size: size_t,
-        nmemb: size_t,
+        _nmemb: size_t,
         _stream: *mut c_void,
     ) -> size_t {
         0
@@ -394,15 +397,15 @@ impl CLibInterface for UnifiedCLib {
 
     fn fwrite(
         &self,
-        ptr: *const c_void,
+        _ptr: *const c_void,
         _size: size_t,
-        nmemb: size_t,
+        _nmemb: size_t,
         _stream: *mut c_void,
     ) -> size_t {
         0
     }
 
-    fn fseek(&self, _stream: *mut c_void, offset: c_long, whence: c_int) -> c_int {
+    fn fseek(&self, _stream: *mut c_void, _offset: c_long, _whence: c_int) -> c_int {
         -1
     }
 
@@ -426,7 +429,7 @@ impl CLibInterface for UnifiedCLib {
 
     // 字符串转换函数 - 使用增强字符串库
     fn strtol(&self, nptr: *const c_char, endptr: *mut *mut c_char, base: c_int) -> c_long {
-        self.string_lib.strtol(nptr, endptr, base)
+        self.string_lib.strtol(nptr, endptr, base) as c_long
     }
 
     fn atof(&self, nptr: *const c_char) -> c_double {

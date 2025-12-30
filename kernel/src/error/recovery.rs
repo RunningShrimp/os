@@ -207,7 +207,7 @@ impl RecoveryManager {
             {
                 let mut stats = self.stats.lock();
                 stats.total_attempts += 1;
-                *stats.attempts_by_error_type.entry(error_type).or_insert(0) += 1;
+                *stats.attempts_by_error_type.entry(error_type.clone()).or_insert(0) += 1;
             }
 
             if config.log_recovery {
@@ -370,8 +370,13 @@ impl RecoveryManager {
 
     /// Record recovery failure
     pub fn record_recovery_failure(&self, error: &UnifiedError) {
+        let error_type = format!("{:?}", error);
         let mut stats = self.stats.lock();
         stats.failed_recoveries += 1;
+
+        // Track which error types are failing to help with adaptive recovery
+        let mut error_counts = self.error_counts.lock();
+        *error_counts.entry(error_type).or_insert(0) += 1;
     }
 
     /// Get recovery statistics

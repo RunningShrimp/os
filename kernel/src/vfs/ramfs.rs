@@ -7,17 +7,19 @@
 //! - 扩展属性
 
 extern crate alloc;
+
+use crate::prelude::*;
 use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use super::{
     core::{FileSystemType, FsStats, SuperBlock},
-    dir::DirEntry,
-    error::*,
     inode::{FileLock, InodeOps},
-    types::*,
+    // Import re-exported types from vfs module (these come from vfs_interface)
+    FileAttr, FileMode, VfsError, VfsResult, DirEntry,
 };
+
 use crate::subsystems::sync::Mutex;
 
 /// RamFS file system type
@@ -45,10 +47,6 @@ impl RamFsSuperBlock {
             root: Arc::new(RamFsInode::new_dir(1)),
             next_ino: AtomicUsize::new(2),
         }
-    }
-
-    fn alloc_ino(&self) -> u64 {
-        self.next_ino.fetch_add(1, Ordering::Relaxed) as u64
     }
 }
 
@@ -461,6 +459,9 @@ impl InodeOps for RamFsInode {
         Ok(offset)
     }
 }
+
+// Implement vfs_interface::Inode for RamFsInode
+crate::impl_inode!(RamFsInode);
 
 /// Initialize and register RamFS
 pub fn init() {

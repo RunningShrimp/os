@@ -7,8 +7,12 @@
 
 extern crate alloc;
 
-// Import kernel prelude for common types
-use crate::prelude::*;
+// Import kernel library with macros
+// Note: In binary targets, we need to use the library crate explicitly
+#[macro_use]
+extern crate kernel;
+
+use ::core::sync::atomic::{AtomicBool, Ordering};
 
 // A minimal Unix-like kernel supporting RISC-V, AArch64, and x86_64
 
@@ -18,52 +22,8 @@ use crate::prelude::*;
 // Bootloader-based startup: Architecture-specific assembly is handled by bootloader
 // Kernel entry points are defined below and called by the bootloader
 
-// Kernel modules
-mod platform;
-mod services_unified; // Unified services module
-mod subsystems;
-mod vfs; // VFS module
-
-// Re-exports for compatibility with existing code in main.rs
-
-// Use nos-syscalls crate when feature is enabled
-#[cfg(feature = "syscalls")]
-use nos_syscalls as syscalls;
-#[cfg(feature = "networking")]
-use subsystems::net;
-
-mod cpu; // cpu was missed in previous edit
-
-// Synchronization primitives
-pub mod sync;
-
-mod compat;
-#[cfg(feature = "security")]
-mod security_audit;
-// Use nos-error-handling crate when feature is enabled
-#[cfg(feature = "error_handling")]
-use nos_error_handling as error_handling;
-mod benchmark;
-mod collections;
-#[cfg(feature = "debug")]
-mod debug;
-#[cfg(feature = "graphics_subsystem")]
-mod graphics;
-mod libc;
-#[cfg(feature = "observability")]
-mod monitoring;
-pub mod reliability;
-mod types;
-#[cfg(feature = "web_engine")]
-mod web;
-
-// Legacy infrastructure modules
-
-// Memory, sync, and time modules have been migrated to subsystems/
-// Access them via crate::subsystems::mm, crate::subsystems::sync, crate::subsystems::time
-
-#[cfg(feature = "kernel_tests")]
-mod tests;
+// Import from library crate - cpu must be made public in lib.rs
+use kernel::{boot, core, cpu, drivers, process, time, trap};
 
 // Architecture name for logging
 #[cfg(target_arch = "riscv64")]
@@ -124,19 +84,19 @@ pub fn lazy_init_services() {
     #[cfg(feature = "networking")]
     {
         net::init();
-        crate::println!("[lazy] network stack initialized");
+        println!("[lazy] network stack initialized");
         monitoring::timeline::record("lazy_net_init");
     }
     #[cfg(feature = "graphics_subsystem")]
     {
         graphics::init();
-        crate::println!("[lazy] graphics subsystem initialized");
+        println!("[lazy] graphics subsystem initialized");
         monitoring::timeline::record("lazy_graphics_init");
     }
     #[cfg(feature = "web_engine")]
     {
         web::init();
-        crate::println!("[lazy] web engine subsystem initialized");
+        println!("[lazy] web engine subsystem initialized");
         monitoring::timeline::record("lazy_web_init");
     }
     monitoring::timeline::record("lazy_init_complete");
@@ -150,7 +110,7 @@ pub unsafe extern "C" fn rust_main_ap() -> ! {
     cpu::init_ap();
 
     // Initialize trap handling for this CPU
-    trap::init();
+    trap::initialize();
 
     // Initialize timer for this CPU
     time::init();
@@ -160,7 +120,7 @@ pub unsafe extern "C" fn rust_main_ap() -> ! {
     }
 
     let id = cpu::cpuid();
-    crate::println!("[cpu{}] AP ready, entering scheduler", id);
+    println!("[cpu{}] AP ready, entering scheduler", id);
 
     // Enter scheduler loop
     process::scheduler();
@@ -173,13 +133,13 @@ fn run_tests() {
     let (passed, failed, _skipped) = tests::run_all_tests();
 
     if failed > 0 {
-        crate::println!();
-        crate::println!("!!! {} TEST(S) FAILED !!!", failed);
-        crate::println!();
+        println!();
+        println!("!!! {} TEST(S) FAILED !!!", failed);
+        println!();
     } else {
-        crate::println!();
-        crate::println!("All {} tests passed!", passed);
-        crate::println!();
+        println!();
+        println!("All {} tests passed!", passed);
+        println!();
     }
 
     // Print test coverage report
@@ -187,12 +147,12 @@ fn run_tests() {
     coverage.print_summary();
 
     // Also run the legacy tests that need fork/exec
-    crate::println!("Running legacy integration tests...");
+    println!("Running legacy integration tests...");
     test_pipe_fork_rw();
     test_exec_negative();
     test_exec_positive_minimal();
     test_paths_relative();
-    crate::println!("Legacy tests completed.");
+    println!("Legacy tests completed.");
 }
 
 // ============================================================================
@@ -210,7 +170,7 @@ fn test_pipe_fork_rw() {
         &[pfds.as_mut_ptr() as usize, 0, 0, 0, 0, 0],
     );
     if ret != 0 {
-        crate::println!("skipped");
+        println!("skipped");
         return;
     }
     let pid =
@@ -264,7 +224,7 @@ fn test_pipe_fork_rw() {
             crate::syscalls::SysNum::Close as usize,
             &[pfds[1] as usize, 0, 0, 0, 0, 0],
         );
-        crate::println!("ok");
+        println!("ok");
     }
 }
 
@@ -278,7 +238,7 @@ fn test_exec_negative() {
         &[path.as_ptr() as usize, args.as_ptr() as usize, 0, 0, 0, 0],
     );
     assert_eq!(ret, crate::reliability::errno::ENOENT as isize);
-    crate::println!("ok");
+    println!("ok");
 }
 
 #[cfg(feature = "kernel_tests")]
@@ -355,7 +315,7 @@ fn test_exec_positive_minimal() {
         &[path.as_ptr() as usize, args.as_ptr() as usize, 0, 0, 0, 0],
     );
     assert_eq!(ret, 0);
-    crate::println!("ok");
+    println!("ok");
 }
 
 #[cfg(feature = "kernel_tests")]
@@ -413,11 +373,11 @@ fn test_paths_relative() {
         ["/tmp/bar\0".as_ptr() as usize, O_RDWR as usize, 0, 0, 0, 0].as_ref(),
     );
     assert!(fd2 >= 0);
-    crate::println!("ok");
+    println!("ok");
 }
 
 #[panic_handler]
-fn panic(info: &core::panic::PanicInfo) -> ! {
+fn panic(info: &::core::panic::PanicInfo) -> ! {
     // Use enhanced panic handler
-    crate::error::panic_handler::enhanced_panic_handler(info)
+    kernel::error::panic_handler::enhanced_panic_handler(info)
 }

@@ -5,143 +5,50 @@
 
 extern crate alloc;
 
-use alloc::{string::String, sync::Arc, vec::Vec};
+use alloc::sync::Arc;
+use alloc::string::String;
 
 // ============================================================================
-// VFS Core Types
+// Re-export VFS Core Types to break circular dependency
 // ============================================================================
 
-/// File mode/permission bits
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct FileMode(pub u32);
+// Re-export FileMode from vfs::types
+pub use crate::vfs::types::FileMode;
 
-impl FileMode {
-    pub const fn empty() -> Self {
-        FileMode(0)
-    }
-    pub const fn from_bits(bits: u32) -> Self {
-        FileMode(bits)
-    }
-    pub const fn bits(&self) -> u32 {
-        self.0
-    }
-}
+// Re-export VfsError from vfs::error
+pub use crate::vfs::error::VfsError;
 
-/// File type enumeration
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FileType {
-    RegularFile,
-    Directory,
-    CharacterDevice,
-    BlockDevice,
-    NamedPipe,
-    SymbolicLink,
-    Socket,
-    Unknown,
-}
+// Re-export FileAttr from vfs::types
+pub use crate::vfs::types::FileAttr;
 
-/// VFS Error type
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum VfsError {
-    NoEntry,
-    NotADirectory,
-    IsADirectory,
-    PermissionDenied,
-    IoError,
-    NotSupported,
-    InvalidInput,
-    NotFound,
-}
+// Re-export DirEntry from vfs::dir
+pub use crate::vfs::dir::DirEntry;
 
-/// File attributes
-#[derive(Debug, Clone)]
-pub struct FileAttr {
-    pub file_type: FileType,
-    pub mode: FileMode,
-    pub size: u64,
-    pub blocks: u64,
-    pub atime: u64,
-    pub mtime: u64,
-    pub ctime: u64,
-    pub uid: u32,
-    pub gid: u32,
-}
+// Re-export FileType from vfs::types to avoid conflicts
+pub use crate::vfs::types::FileType;
 
-/// Directory entry
-#[derive(Debug, Clone)]
-pub struct DirEntry {
-    pub ino: u64,
-    pub name: String,
-    pub file_type: FileType,
-}
+// ============================================================================
+// VFS Interface uses vfs::types::FileType directly
+// ============================================================================
 
-use crate::subsystems::syscalls::fs::service::FilesystemStats;
+// ============================================================================
+// VFS Interface Traits
+// ============================================================================
 
 /// 文件系统类型 trait - 所有文件系统实现都需要实现
-pub trait FileSystemType: Send + Sync {
-    /// 获取文件系统名称
-    fn name(&self) -> &str;
-
-    /// 挂载文件系统
-    fn mount(&self, device: Option<&str>, flags: u32) -> Result<Arc<dyn SuperBlock>, VfsError>;
-}
+///
+/// 这是一个类型别名，指向 vfs::core::FileSystemType
+pub use crate::vfs::core::FileSystemType;
 
 /// 超级块 trait - 表示已挂载的文件系统实例
-pub trait SuperBlock: Send + Sync {
-    /// 获取根 inode
-    fn root(&self) -> Arc<dyn Inode>;
-
-    /// 卸载文件系统
-    fn unmount(&self) -> Result<(), VfsError>;
-
-    /// 获取文件系统统计信息
-    fn statfs(&self) -> Result<FilesystemStats, VfsError>;
-
-    /// 获取文件系统类型
-    fn fs_type(&self) -> &dyn FileSystemType {
-        todo!()
-    }
-
-    /// 同步文件系统
-    fn sync(&self) -> Result<(), VfsError> {
-        Ok(())
-    }
-}
+///
+/// 这是一个类型别名，指向 vfs::core::SuperBlock
+pub use crate::vfs::core::SuperBlock;
 
 /// Inode trait - 表示文件系统中的文件/目录
-pub trait Inode: Send + Sync {
-    /// 获取文件属性
-    fn getattr(&self) -> Result<FileAttr, VfsError>;
-
-    /// 读取数据
-    fn read(&self, offset: u64, buf: &mut [u8]) -> Result<usize, VfsError>;
-
-    /// 写入数据
-    fn write(&self, offset: u64, buf: &[u8]) -> Result<usize, VfsError>;
-
-    /// 获取目录项
-    fn readdir(&self) -> Result<Vec<DirEntry>, VfsError>;
-
-    /// 查找子节点
-    fn lookup(&self, name: &str) -> Result<Arc<dyn Inode>, VfsError>;
-
-    /// 创建子节点
-    fn create(
-        &self,
-        name: &str,
-        mode: FileMode,
-        file_type: FileType,
-    ) -> Result<Arc<dyn Inode>, VfsError>;
-
-    /// 删除节点
-    fn unlink(&self, name: &str) -> Result<(), VfsError>;
-
-    /// 创建目录
-    fn mkdir(&self, name: &str, mode: FileMode) -> Result<Arc<dyn Inode>, VfsError>;
-
-    /// 删除目录
-    fn rmdir(&self, name: &str) -> Result<(), VfsError>;
-
+///
+/// 扩展 InodeOps trait，添加额外的辅助方法
+pub trait Inode: crate::vfs::inode::InodeOps {
     /// 获取文件类型
     fn file_type(&self) -> FileType;
 
@@ -154,43 +61,8 @@ pub trait Inode: Send + Sync {
     /// 软链接目标
     fn symlink_target(&self) -> Option<String>;
 
-    // Additional methods to match InodeOps trait
-    /// 设置文件属性
-    fn setattr(&self, attr: &FileAttr) -> Result<(), VfsError> {
-        let _ = attr;
-        Err(VfsError::NotSupported)
-    }
-
-    /// 检查目录是否为空
-    fn is_empty(&self) -> Result<bool, VfsError> {
-        Ok(true)
-    }
-
-    /// 创建硬链接
-    fn link(&self, name: &str, inode: Arc<dyn Inode>) -> Result<(), VfsError> {
-        let _ = (name, inode);
-        Err(VfsError::NotSupported)
-    }
-
-    /// 创建符号链接
-    fn symlink(&self, name: &str, target: &str) -> Result<Arc<dyn Inode>, VfsError> {
-        let _ = (name, target);
-        Err(VfsError::NotSupported)
-    }
-
-    /// 读取符号链接目标
-    fn readlink(&self) -> Result<String, VfsError> {
-        Err(VfsError::NotASymlink)
-    }
-
     /// 同步文件
     fn sync(&self) -> Result<(), VfsError> {
-        Err(VfsError::NotSupported)
-    }
-
-    /// 截断文件
-    fn truncate(&self, size: u64) -> Result<(), VfsError> {
-        let _ = size;
         Err(VfsError::NotSupported)
     }
 
@@ -225,3 +97,58 @@ pub trait Mount: Send + Sync {
     /// 检查是否为根挂载
     fn is_root(&self) -> bool;
 }
+
+// ============================================================================
+// Helper macro for implementing Inode trait
+// ============================================================================
+
+/// Macro to implement vfs_interface::Inode for types that implement InodeOps
+#[macro_export]
+macro_rules! impl_inode {
+    ($type:ty) => {
+        impl $crate::vfs_interface::Inode for $type {
+            fn file_type(&self) -> $crate::vfs_interface::FileType {
+                self.getattr()
+                    .map(|attr| {
+                        // Convert vfs::types::FileType to vfs_interface::FileType using From trait
+                        $crate::vfs_interface::FileType::from(attr.mode.file_type())
+                    })
+                    .unwrap_or($crate::vfs_interface::FileType::Regular)
+            }
+
+            fn name(&self) -> String {
+                // Try to get name from getattr, return empty string if not available
+                self.getattr()
+                    .ok()
+                    .and_then(|_| {
+                        // FileAttr doesn't have a name field, so return a default
+                        None
+                    })
+                    .unwrap_or_else(|| String::new())
+            }
+
+            fn parent(&self) -> Option<alloc::sync::Arc<dyn $crate::vfs_interface::Inode>> {
+                // Default implementation - most filesystems don't track parent
+                None
+            }
+
+            fn symlink_target(&self) -> Option<String> {
+                // Try to read symlink target
+                self.readlink().ok()
+            }
+
+            fn ino(&self) -> u64 {
+                self.getattr()
+                    .map(|attr| attr.ino)
+                    .unwrap_or(0)
+            }
+
+            fn mode(&self) -> $crate::vfs_interface::FileMode {
+                self.getattr()
+                    .map(|attr| attr.mode)
+                    .unwrap_or($crate::vfs_interface::FileMode(0))
+            }
+        }
+    };
+}
+

@@ -21,7 +21,7 @@ use spin::Mutex;
 
 use crate::{
     net::Packet as NetworkPacket,
-    security::audit::{AuditEvent, AuditEventType, AuditSeverity},
+    security::audit::{AuditEvent},
 };
 
 /// 入侵检测系统状态

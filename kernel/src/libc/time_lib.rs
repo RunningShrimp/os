@@ -9,15 +9,14 @@ extern crate alloc;
 // - 高精度时间支持
 
 use alloc::format;
+use core::ffi::{c_char, c_int};
 
-use crate::libc::interface::{c_long, size_t, time_t};
-#[allow(non_camel_case_types)]
-pub type suseconds_t = SusecondsT;
+use crate::libc::interface::{c_long, size_t, suseconds_t, time_t};
 use crate::libc::error::{errno::EINVAL, set_errno};
 
 /// 时间常量
 pub mod time_constants {
-    use crate::libc::interface::{c_long, c_longlong, time_t};
+    use crate::libc::interface::{c_longlong, time_t};
     /// 每秒的微秒数
     /// 每秒的纳秒数
     pub const NSEC_PER_SEC: c_longlong = 1_000_000_000;
@@ -249,8 +248,7 @@ impl EnhancedTimeLib {
         let formatted = self.format_asc_time(tm);
 
         // 分配内存并复制字符串
-        let layout =
-            unsafe { core::alloc::Layout::from_size_align(formatted.len() + 1, 1).unwrap() };
+        let layout = core::alloc::Layout::from_size_align(formatted.len() + 1, 1).unwrap();
         let str_ptr = unsafe { alloc::alloc::alloc(layout) as *mut c_char };
 
         if !str_ptr.is_null() {

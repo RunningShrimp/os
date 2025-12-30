@@ -10,7 +10,8 @@ extern crate alloc;
 use alloc::collections::VecDeque;
 use core::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
-use crate::{subsystems::sync::SpinLock};
+use crate::prelude::*;
+use crate::{subsystems::sync::spinlock::SpinLock, platform::arch::cpuid};
 
 /// 默认时间片（单位：ticks）
 pub const DEFAULT_TIMESLICE: u32 = 4;
@@ -111,28 +112,22 @@ pub struct StatsSnapshot {
 
 /// 系统调用侧快速接口
 pub mod syscall {
+    use nos_api::core::types::KernelError;
     use nos_api::syscall::SyscallResult;
 
-    use super::O1Scheduler;
-    use crate::{
-        error::SyscallError, process::thread::Tid, subsystems::time::get_time_ns,
-    };
+    use super::{O1Scheduler, MAX_PRIORITY, MAX_CPUS, StatsSnapshot};
+    use crate::{process::thread::Tid, subsystems::time::get_time_ns};
 
     /// 用户态 hint 调度：tid, prio, cpu_hint
     pub const SYS_SCHED_ENQUEUE_HINT: u32 = 0xE011;
     /// 轻量 sched_yield（不做上下文切换，只记录意愿）
     pub const SYS_SCHED_YIELD_FAST: u32 = 0xE010;
 
-    pub fn sched_yield_fast() -> SyscallResult {
-        // 记录自愿让出CPU
-        let stats = O1Scheduler::get_detailed_stats();
-        stats.record_tick(false);
-        Ok(0)
-    }
+    /// Convert SyscallError to KernelError
 
     pub fn sched_enqueue_hint(args: &[u64]) -> SyscallResult {
         if args.len() < 3 {
-            return Err(SyscallError::InvalidArgument);
+            return SyscallResult::error(KernelError::InvalidArgument);
         }
         let tid = args[0] as usize;
         let prio = args[1] as usize;
@@ -140,7 +135,7 @@ pub mod syscall {
 
         // 检查优先级是否有效
         if prio >= MAX_PRIORITY {
-            return Err(SyscallError::InvalidArgument);
+            return SyscallResult::error(KernelError::InvalidArgument);
         }
 
         // 记录开始时间
@@ -154,7 +149,7 @@ pub mod syscall {
         let stats = O1Scheduler::get_cpu_scheduler(cpu).detailed_stats();
         stats.record_latency(end.saturating_sub(start));
 
-        Ok(0)
+        SyscallResult::success(0)
     }
 
     pub fn sched_pick_next(cpu_id: usize) -> Option<Tid> {
@@ -162,9 +157,9 @@ pub mod syscall {
     }
 
     /// 获取调度器统计信息
-    pub fn sched_get_stats(cpu_id: usize) -> Result<StatsSnapshot, SyscallError> {
+    pub fn sched_get_stats(cpu_id: usize) -> Result<StatsSnapshot, crate::error::SyscallError> {
         if cpu_id >= MAX_CPUS {
-            return Err(SyscallError::InvalidArgument);
+            return Err(crate::error::SyscallError::InvalidArgument);
         }
 
         let scheduler = O1Scheduler::get_cpu_scheduler(cpu_id);
@@ -176,7 +171,7 @@ pub mod syscall {
 
 // 每CPU调度器状态
 #[repr(align(64))]
-struct PerCpuScheduler {
+pub struct PerCpuScheduler {
     // 优先级位图：每个位表示对应优先级是否有就绪任务
     priority_bitmap: AtomicU32,
     // 就绪队列数组：每个优先级一个队列
@@ -187,8 +182,6 @@ struct PerCpuScheduler {
     task_count: AtomicUsize,
     // 统计信息
     stats: SchedulerStats,
-    // 填充到缓存行
-    _padding: [u8; 64 - (28 + core::mem::size_of::<SchedulerStats>())],
 }
 
 impl PerCpuScheduler {
@@ -199,7 +192,6 @@ impl PerCpuScheduler {
             current_task: AtomicU32::new(0),
             task_count: AtomicUsize::new(0),
             stats: SchedulerStats::new(),
-            _padding: [0; 64 - (28 + core::mem::size_of::<SchedulerStats>())],
         }
     }
 
@@ -298,7 +290,7 @@ impl PerCpuScheduler {
     /// 获取调度器统计
     fn stats(&self) -> (usize, usize, u32) {
         let count = self.task_count.load(Ordering::Relaxed);
-        let current = self.current_task.load(Ordering::Relaxed);
+        let _current = self.current_task.load(Ordering::Relaxed);
         let bitmap = self.priority_bitmap.load(Ordering::Relaxed);
 
         // 计算非空队列数量
@@ -314,7 +306,7 @@ impl PerCpuScheduler {
     }
 
     /// 获取详细统计信息
-    fn detailed_stats(&self) -> &SchedulerStats {
+    pub fn detailed_stats(&self) -> &SchedulerStats {
         &self.stats
     }
 }
@@ -336,7 +328,7 @@ impl O1Scheduler {
     /// 初始化调度器
     pub fn init() {
         // 初始化每个CPU的调度器
-        for scheduler in &PER_CPU_SCHEDULERS {
+        for _scheduler in &PER_CPU_SCHEDULERS {
             // 确保内存屏障
             core::sync::atomic::fence(Ordering::SeqCst);
         }
@@ -432,7 +424,7 @@ impl O1Scheduler {
     fn migrate_tasks(num_tasks: usize) {
         // 简化的任务迁移实现
         // 实际实现需要考虑任务亲和性等
-        info!("Migrating {} tasks for load balancing", num_tasks);
+        log_info!("Migrating {} tasks for load balancing", num_tasks);
     }
 
     /// 工作窃取：从其他CPU窃取任务
@@ -494,7 +486,7 @@ impl O1Scheduler {
         let timestamp = get_ticks();
         let cpu_id = cpuid() as u64;
         let combined = timestamp.wrapping_mul(31).wrapping_add(cpu_id);
-        (combined as u32)
+        combined as u32
     }
 }
 pub mod unified;
@@ -502,10 +494,6 @@ pub mod unified;
 // Concurrent performance optimizations
 pub mod sharded_table;
 pub mod rcu_table;
-
-// Re-export optimized tables
-pub use sharded_table::{ShardedProcTable, get_sharded_table, Pid as ProcPid, ProcEntry as ShardedProcEntry};
-pub use rcu_table::{RcuProcTable, get_rcu_table, rcu_read_lock, RcuReadGuard};
 
 /// Run function with global scheduler
 pub fn with_global<F, R>(f: F) -> R

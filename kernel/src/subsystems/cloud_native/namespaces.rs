@@ -18,13 +18,9 @@ use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use spin::Mutex;
 
 use crate::{
-    reliability::{EACCES, EINVAL, EIO, ENOENT, ENOMEM, EPERM},
-    subsystems::{
-        cloud_native::oci::OciLinuxNamespaceType,
-        syscalls::network::interface::{
-            set_interface_mtu, create_bridge, interface_up, add_interface_address,
-        },
-    },
+    error::unified_mapping::fast_unified_error_to_errno,
+    reliability::{EINVAL, EIO, ENOENT},
+    subsystems::cloud_native::oci::OciLinuxNamespaceType,
 };
 
 /// 命名空间类型
@@ -335,10 +331,12 @@ impl Namespace {
     fn create_uts_namespace(&self) -> Result<(), i32> {
         if let Some(ref uts_params) = self.config.parameters.uts_params {
             // 设置主机名
-            crate::syscalls::process::set_hostname(&uts_params.hostname)?;
+            crate::syscalls::process::set_hostname(&uts_params.hostname)
+                .map_err(nos_api_error_to_i32)?;
 
             // 设置域名
-            crate::syscalls::process::set_domainname(&uts_params.domainname)?;
+            crate::syscalls::process::set_domainname(&uts_params.domainname)
+                .map_err(nos_api_error_to_i32)?;
 
             crate::println!(
                 "[namespaces] Set hostname: {}, domainname: {}",
@@ -375,10 +373,12 @@ impl Namespace {
 
             // 设置主机名和域名
             if let Some(ref hostname) = network_params.hostname {
-                crate::syscalls::process::set_hostname(hostname)?;
+                crate::syscalls::process::set_hostname(hostname)
+                    .map_err(nos_api_error_to_i32)?;
             }
             if let Some(ref domainname) = network_params.domainname {
-                crate::syscalls::process::set_domainname(domainname)?;
+                crate::syscalls::process::set_domainname(domainname)
+                    .map_err(nos_api_error_to_i32)?;
             }
         }
 
@@ -508,11 +508,13 @@ impl Namespace {
     /// 设置环回接口
     fn setup_loopback_interface(&self, interface: &NetworkInterface) -> Result<(), i32> {
         // 启用环回接口
-        interface_up(&interface.name)?;
+        crate::syscalls::network::interface_up(&interface.name)
+            .map_err(unified_error_to_i32)?;
 
         // 设置IP地址
         for ip in &interface.ip_addresses {
-            crate::syscalls::network::add_interface_address(&interface.name, ip, "127.0.0.1")?;
+            crate::syscalls::network::add_interface_address(&interface.name, ip, "127.0.0.1")
+                .map_err(unified_error_to_i32)?;
         }
 
         Ok(())
@@ -522,19 +524,23 @@ impl Namespace {
     fn setup_veth_interface(&self, interface: &NetworkInterface) -> Result<(), i32> {
         // 创建veth对
         let peer_name = format!("{}-peer", interface.name);
-        crate::syscalls::network::create_veth_pair(&interface.name, &peer_name)?;
+        crate::syscalls::network::create_veth_pair(&interface.name, &peer_name)
+            .map_err(unified_error_to_i32)?;
 
         // 启用接口
-        interface_up(&interface.name)?;
+        crate::syscalls::network::interface_up(&interface.name)
+            .map_err(unified_error_to_i32)?;
 
         // 设置IP地址
         for ip in &interface.ip_addresses {
-            add_interface_address(&interface.name, ip, "")?;
+            crate::syscalls::network::add_interface_address(&interface.name, ip, "")
+                .map_err(unified_error_to_i32)?;
         }
 
         // 设置MTU
         if let Some(mtu) = interface.mtu {
-            set_interface_mtu(&interface.name, mtu)?;
+            crate::syscalls::network::set_interface_mtu(&interface.name, mtu)
+                .map_err(unified_error_to_i32)?;
         }
 
         Ok(())
@@ -543,19 +549,23 @@ impl Namespace {
     /// 设置网桥接口
     fn setup_bridge_interface(&self, interface: &NetworkInterface) -> Result<(), i32> {
         // 创建网桥
-        create_bridge(&interface.name)?;
+        crate::syscalls::network::create_bridge(&interface.name)
+            .map_err(unified_error_to_i32)?;
 
         // 启用网桥
-        interface_up(&interface.name)?;
+        crate::syscalls::network::interface_up(&interface.name)
+            .map_err(unified_error_to_i32)?;
 
         // 设置IP地址
         for ip in &interface.ip_addresses {
-            add_interface_address(&interface.name, ip, "")?;
+            crate::syscalls::network::add_interface_address(&interface.name, ip, "")
+                .map_err(unified_error_to_i32)?;
         }
 
         // 设置MTU
         if let Some(mtu) = interface.mtu {
-            set_interface_mtu(&interface.name, mtu)?;
+            crate::syscalls::network::set_interface_mtu(&interface.name, mtu)
+                .map_err(unified_error_to_i32)?;
         }
 
         Ok(())
@@ -573,7 +583,8 @@ impl Namespace {
         match route.route_type {
             RouteType::Default => {
                 if let Some(ref gateway) = route.gateway {
-                    crate::syscalls::network::add_route("0.0.0.0/0", gateway, &route.interface)?;
+                    crate::syscalls::network::add_route("0.0.0.0/0", gateway, &route.interface)
+                        .map_err(unified_error_to_i32)?;
                 }
             },
             RouteType::Static => {
@@ -582,13 +593,16 @@ impl Namespace {
                         &route.destination,
                         gateway,
                         &route.interface,
-                    )?;
+                    )
+                    .map_err(unified_error_to_i32)?;
                 } else {
-                    crate::syscalls::network::add_route(&route.destination, "", &route.interface)?;
+                    crate::syscalls::network::add_route(&route.destination, "", &route.interface)
+                        .map_err(unified_error_to_i32)?;
                 }
             },
             RouteType::Connected => {
-                crate::syscalls::network::add_route(&route.destination, "", &route.interface)?;
+                crate::syscalls::network::add_route(&route.destination, "", &route.interface)
+                    .map_err(unified_error_to_i32)?;
             },
         }
 
@@ -598,7 +612,7 @@ impl Namespace {
     /// 设置DNS
     fn setup_dns(&self, dns_config: &DNSConfig) -> Result<(), i32> {
         // 写入resolv.conf
-        let resolv_conf_path = "/etc/resolv.conf";
+        let _resolv_conf_path = "/etc/resolv.conf";
         let mut content = String::new();
 
         for server in &dns_config.servers {
@@ -1045,7 +1059,18 @@ pub fn cleanup_namespaces(container_name: &str) -> Result<(), i32> {
     Ok(())
 }
 
+/// 将 UnifiedError 转换为 i32
+fn unified_error_to_i32(error: crate::error::unified::UnifiedError) -> i32 {
+    fast_unified_error_to_errno(&error) as i32
+}
+
+/// 将 nos_api::Error 转换为 i32
+fn nos_api_error_to_i32(_error: nos_api::Error) -> i32 {
+    // 简化的实现 - 将所有错误映射为 -EIO
+    -EIO
+}
+
 /// 获取当前进程ID
 fn get_current_pid() -> u32 {
-    crate::process::getpid() as u32
+    crate::syscalls::process::getpid() as u32
 }

@@ -22,7 +22,6 @@ use super::{
     static_analyzer::{PrimitiveType, Scope, SourceLocation},
     *,
 };
-use crate::compat::DefaultHasherBuilder;
 
 /// 类型检查器
 pub struct TypeChecker {
@@ -110,15 +109,15 @@ pub enum TypeVariableNaming {
 #[derive(Debug, Clone)]
 pub struct TypeEnvironment {
     /// 类型绑定
-    pub type_bindings: HashMap<String, Type, DefaultHasherBuilder>,
+    pub type_bindings: HashMap<String, Type>,
     /// 类型变量绑定
-    pub type_variable_bindings: HashMap<String, TypeVariable, DefaultHasherBuilder>,
+    pub type_variable_bindings: HashMap<String, TypeVariable>,
     /// 作用域栈
     pub scope_stack: Vec<Scope>,
     /// 当前作用域
     pub current_scope: Option<u64>,
     /// 类型别名
-    pub type_aliases: HashMap<String, TypeAlias, DefaultHasherBuilder>,
+    pub type_aliases: HashMap<String, TypeAlias>,
     /// 隐式转换规则
     pub implicit_conversions: Vec<ImplicitConversion>,
 }
@@ -382,7 +381,7 @@ pub struct TypeInferencer {
     /// 类型约束集合
     pub constraints: Vec<TypeConstraint>,
     /// 类型变量映射
-    pub type_variables: HashMap<String, TypeVariable, DefaultHasherBuilder>,
+    pub type_variables: HashMap<String, TypeVariable>,
     /// 推导上下文
     pub context: InferenceContext,
     /// 推导统计
@@ -395,11 +394,11 @@ pub struct InferenceContext {
     /// 当前作用域
     pub current_scope: u64,
     /// 局部变量类型
-    pub local_variable_types: HashMap<String, Type, DefaultHasherBuilder>,
+    pub local_variable_types: HashMap<String, Type>,
     /// 函数签名
-    pub function_signatures: HashMap<String, FunctionType, DefaultHasherBuilder>,
+    pub function_signatures: HashMap<String, FunctionType>,
     /// 泛型实例化
-    pub generic_instantiations: HashMap<String, Type, DefaultHasherBuilder>,
+    pub generic_instantiations: HashMap<String, Type>,
 }
 
 impl Clone for InferenceContext {
@@ -436,7 +435,7 @@ pub struct ConstraintSolver {
     /// 求解算法
     pub algorithm: ConstraintSolvingAlgorithm,
     /// 求解结果
-    pub solutions: HashMap<TypeVariable, Type, DefaultHasherBuilder>,
+    pub solutions: HashMap<TypeVariable, Type>,
     /// 求解统计
     pub statistics: SolverStatistics,
 }
@@ -494,7 +493,7 @@ pub struct TypeCheckingResult {
     /// 类型警告
     pub type_warnings: Vec<TypeWarning>,
     /// 推导的类型
-    pub inferred_types: HashMap<String, Type, DefaultHasherBuilder>,
+    pub inferred_types: HashMap<String, Type>,
     /// 检查统计
     pub statistics: TypeCheckingStatistics,
     /// 检查时间（毫秒）
@@ -519,7 +518,7 @@ pub struct TypeError {
     /// 修复建议
     pub suggestion: Option<String>,
     /// 上下文信息
-    pub context: HashMap<String, String, DefaultHasherBuilder>,
+    pub context: HashMap<String, String>,
 }
 
 /// 类型错误类型
@@ -629,14 +628,14 @@ impl TypeChecker {
             type_inferencer: TypeInferencer {
                 id: 1,
                 constraints: Vec::new(),
-                type_variables: HashMap::with_hasher(DefaultHasherBuilder),
+                type_variables: HashMap::new(),
                 context: InferenceContext::new(),
                 statistics: InferenceStatistics::default(),
             },
             constraint_solver: ConstraintSolver {
                 id: 1,
                 algorithm: ConstraintSolvingAlgorithm::HindleyMilner,
-                solutions: HashMap::with_hasher(DefaultHasherBuilder),
+                solutions: HashMap::new(),
                 statistics: SolverStatistics::default(),
             },
             results: Vec::new(),
@@ -686,7 +685,7 @@ impl TypeChecker {
         // 模拟类型检查过程
         let mut type_errors = Vec::new();
         let mut type_warnings = Vec::new();
-        let mut inferred_types = HashMap::with_hasher(DefaultHasherBuilder);
+        let mut inferred_types = HashMap::new();
 
         // 根据目标类型执行不同的检查
         match target.target_type {
@@ -807,7 +806,7 @@ impl TypeChecker {
         target: &VerificationTarget,
         errors: &mut Vec<TypeError>,
         warnings: &mut Vec<TypeWarning>,
-        inferred: &mut HashMap<String, Type, DefaultHasherBuilder>,
+        inferred: &mut HashMap<String, Type>,
     ) -> Result<(), &'static str> {
         // 模拟函数类型检查
         inferred.insert("return".to_string(), Type::Primitive(PrimitiveType::I32));
@@ -832,7 +831,7 @@ impl TypeChecker {
         target: &VerificationTarget,
         errors: &mut Vec<TypeError>,
         warnings: &mut Vec<TypeWarning>,
-        inferred: &mut HashMap<String, Type, DefaultHasherBuilder>,
+        inferred: &mut HashMap<String, Type>,
     ) -> Result<(), &'static str> {
         // 模拟结构体类型检查
         let struct_type = Type::Struct(StructType {
@@ -871,7 +870,7 @@ impl TypeChecker {
             actual_type: Some(Type::Primitive(PrimitiveType::F64)),
             message: "Field access type mismatch".to_string(),
             suggestion: Some("Check field type or use explicit conversion".to_string()),
-            context: HashMap::with_hasher(DefaultHasherBuilder),
+            context: HashMap::new(),
         });
 
         Ok(())
@@ -883,7 +882,7 @@ impl TypeChecker {
         target: &VerificationTarget,
         errors: &mut Vec<TypeError>,
         warnings: &mut Vec<TypeWarning>,
-        inferred: &mut HashMap<String, Type, DefaultHasherBuilder>,
+        inferred: &mut HashMap<String, Type>,
     ) -> Result<(), &'static str> {
         // 模拟模块类型检查
         inferred.insert("module_type".to_string(), Type::Primitive(PrimitiveType::Void));
@@ -906,7 +905,7 @@ impl TypeChecker {
         target: &VerificationTarget,
         errors: &mut Vec<TypeError>,
         warnings: &mut Vec<TypeWarning>,
-        inferred: &mut HashMap<String, Type, DefaultHasherBuilder>,
+        inferred: &mut HashMap<String, Type>,
     ) -> Result<(), &'static str> {
         // 模拟通用类型检查
         inferred.insert(
@@ -1023,11 +1022,11 @@ impl TypeEnvironment {
     /// 创建新的类型环境
     pub fn new() -> Self {
         Self {
-            type_bindings: HashMap::with_hasher(DefaultHasherBuilder),
-            type_variable_bindings: HashMap::with_hasher(DefaultHasherBuilder),
+            type_bindings: HashMap::new(),
+            type_variable_bindings: HashMap::new(),
             scope_stack: Vec::new(),
             current_scope: None,
-            type_aliases: HashMap::with_hasher(DefaultHasherBuilder),
+            type_aliases: HashMap::new(),
             implicit_conversions: Vec::new(),
         }
     }
@@ -1038,9 +1037,9 @@ impl InferenceContext {
     pub fn new() -> Self {
         Self {
             current_scope: 0,
-            local_variable_types: HashMap::with_hasher(DefaultHasherBuilder),
-            function_signatures: HashMap::with_hasher(DefaultHasherBuilder),
-            generic_instantiations: HashMap::with_hasher(DefaultHasherBuilder),
+            local_variable_types: HashMap::new(),
+            function_signatures: HashMap::new(),
+            generic_instantiations: HashMap::new(),
         }
     }
 }

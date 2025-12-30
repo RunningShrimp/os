@@ -38,7 +38,7 @@ pub enum ProcState {
 }
 
 /// Process entry
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ProcEntry {
     pub pid: Pid,
     pub state: ProcState,
@@ -157,7 +157,6 @@ impl ShardedProcTable {
             const { Mutex::new(ProcShard::new()) },
             const { Mutex::new(ProcShard::new()) },
             const { Mutex::new(ProcShard::new()) },
-            const { Mutex::new(ProcShard::new()) },
         ];
 
         Self {
@@ -184,7 +183,12 @@ impl ShardedProcTable {
     /// Uses round-robin shard selection for load balancing
     pub fn alloc(&self, parent_pid: Option<Pid>, name: &str) -> Option<Pid> {
         // Use current CPU for shard selection (load balancing)
-        let cpu_id = crate::arch::cpuid() as usize;
+        #[cfg(target_arch = "x86_64")]
+        let cpu_id = crate::arch::cpuid::cpuid() as usize;
+
+        #[cfg(not(target_arch = "x86_64"))]
+        let cpu_id = 0; // Default to CPU 0 for non-x86 architectures
+
         let shard_idx = cpu_id % NUM_SHARDS;
         let shard = &self.shards[shard_idx];
 
@@ -282,7 +286,22 @@ impl ShardedProcTable {
             })
             .sum();
 
-        (variance / NUM_SHARDS as f64).sqrt()
+        // Manual square root implementation using Newton's method
+        let var = variance / NUM_SHARDS as f64;
+        if var == 0.0 {
+            return 0.0;
+        }
+
+        // Newton's method for sqrt: x_{n+1} = (x_n + a/x_n) / 2
+        let mut x = var;
+        for _ in 0..20 {
+            let prev = x;
+            x = 0.5 * (x + var / x);
+            if (x - prev).abs() < 1e-10 {
+                break;
+            }
+        }
+        x
     }
 }
 

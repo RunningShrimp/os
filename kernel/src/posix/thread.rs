@@ -7,11 +7,14 @@ extern crate alloc;
 
 use alloc::sync::Arc;
 use core::ptr::null_mut;
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::{
-    reliability::{EAGAIN, EBUSY, EDEADLK, EINVAL, ESRCH},
+    reliability::errno::{EAGAIN, EBUSY, EDEADLK, EINVAL, ENOMEM, ESRCH, ETIMEDOUT},
     subsystems::{
         mm::PAGE_SIZE,
+        process::manager::getpid,
+        process::thread::ThreadError,
         sync::{
             Mutex,
             primitives::{CondVar, MutexEnhanced},
@@ -248,7 +251,7 @@ pub unsafe extern "C" fn pthread_create(
     attr: *const PthreadAttrT,
     start_routine: unsafe extern "C" fn(*mut u8) -> *mut u8,
     arg: *mut u8,
-) -> i32 {
+) -> i32 { unsafe {
     // Validate arguments
     if thread.is_null() {
         return EINVAL;
@@ -290,13 +293,15 @@ pub unsafe extern "C" fn pthread_create(
             *thread = handle;
             0
         },
+        Err(ThreadError::OutOfMemory) => ENOMEM,
+        Err(ThreadError::NoSlotsAvailable) => EAGAIN,
         Err(_) => EAGAIN,
     }
-}
+}}
 
 /// Exit a thread
 pub unsafe extern "C" fn pthread_exit(retval: *mut u8) {
-    let current_handle = pthread_self();
+    let current_handle = unsafe { pthread_self() };
 
     // Find thread control block
     if let Some(pcb) = THREAD_REGISTRY.lock().get(&current_handle) {
@@ -308,7 +313,7 @@ pub unsafe extern "C" fn pthread_exit(retval: *mut u8) {
         // Run cleanup handler
         if let Some(handler) = pcb.cleanup_handler.take() {
             if let Some(routine) = handler.routine {
-                routine(handler.arg);
+                unsafe { routine(handler.arg); }
             }
         }
 
@@ -373,7 +378,7 @@ pub unsafe extern "C" fn pthread_join(thread: PthreadT, retval: *mut *mut u8) ->
         Some(thread_retval) => {
             // Return value if requested
             if !retval.is_null() {
-                *retval = thread_retval;
+                unsafe { *retval = thread_retval; }
             }
 
             // Remove from registry
@@ -479,7 +484,7 @@ pub unsafe extern "C" fn pthread_cancel(thread: PthreadT) -> i32 {
             && pcb_guard.cancel_type == PTHREAD_CANCEL_ASYNCHRONOUS
         {
             if pcb_guard.thread_id != 0 {
-                crate::process::thread::thread_cancel(pcb_guard.thread_id);
+                let _ = crate::process::thread::thread_cancel(pcb_guard.thread_id);
             }
         }
     }
@@ -489,7 +494,7 @@ pub unsafe extern "C" fn pthread_cancel(thread: PthreadT) -> i32 {
 
 /// Set thread cancellation state
 pub unsafe extern "C" fn pthread_setcancelstate(state: i32, oldstate: *mut i32) -> i32 {
-    let current_handle = pthread_self();
+    let current_handle = unsafe { pthread_self() };
 
     // Find current thread control block
     let pcb = {
@@ -508,7 +513,7 @@ pub unsafe extern "C" fn pthread_setcancelstate(state: i32, oldstate: *mut i32) 
 
         // Return old state if requested
         if !oldstate.is_null() {
-            *oldstate = pcb_guard.cancel_state;
+            unsafe { *oldstate = pcb_guard.cancel_state; }
         }
 
         // Validate new state
@@ -520,7 +525,7 @@ pub unsafe extern "C" fn pthread_setcancelstate(state: i32, oldstate: *mut i32) 
                 if state == PTHREAD_CANCEL_ENABLE && pcb_guard.cancel_pending {
                     if pcb_guard.cancel_type == PTHREAD_CANCEL_ASYNCHRONOUS {
                         if pcb_guard.thread_id != 0 {
-                            crate::process::thread::thread_cancel(pcb_guard.thread_id);
+                            let _ = crate::process::thread::thread_cancel(pcb_guard.thread_id);
                         }
                     }
                 }
@@ -534,7 +539,7 @@ pub unsafe extern "C" fn pthread_setcancelstate(state: i32, oldstate: *mut i32) 
 
 /// Set thread cancellation type
 pub unsafe extern "C" fn pthread_setcanceltype(type_: i32, oldtype: *mut i32) -> i32 {
-    let current_handle = pthread_self();
+    let current_handle = unsafe { pthread_self() };
 
     // Find current thread control block
     let pcb = {
@@ -553,7 +558,7 @@ pub unsafe extern "C" fn pthread_setcanceltype(type_: i32, oldtype: *mut i32) ->
 
         // Return old type if requested
         if !oldtype.is_null() {
-            *oldtype = pcb_guard.cancel_type;
+            unsafe { *oldtype = pcb_guard.cancel_type; }
         }
 
         // Validate new type
@@ -567,7 +572,7 @@ pub unsafe extern "C" fn pthread_setcanceltype(type_: i32, oldtype: *mut i32) ->
                     && pcb_guard.cancel_state == PTHREAD_CANCEL_ENABLE
                 {
                     if pcb_guard.thread_id != 0 {
-                        crate::process::thread::thread_cancel(pcb_guard.thread_id);
+                        let _ = crate::process::thread::thread_cancel(pcb_guard.thread_id);
                     }
                 }
 
@@ -580,7 +585,7 @@ pub unsafe extern "C" fn pthread_setcanceltype(type_: i32, oldtype: *mut i32) ->
 
 /// Test for cancellation
 pub unsafe extern "C" fn pthread_testcancel() {
-    let current_handle = pthread_self();
+    let current_handle = unsafe { pthread_self() };
 
     // Find current thread control block
     let pcb = {
@@ -594,7 +599,7 @@ pub unsafe extern "C" fn pthread_testcancel() {
         // Check if cancellation is pending and enabled
         if pcb_guard.cancel_pending && pcb_guard.cancel_state == PTHREAD_CANCEL_ENABLE {
             if pcb_guard.thread_id != 0 {
-                crate::process::thread::thread_cancel(pcb_guard.thread_id);
+                let _ = crate::process::thread::thread_cancel(pcb_guard.thread_id);
             }
         }
     }
@@ -605,7 +610,7 @@ pub unsafe extern "C" fn pthread_cleanup_push(
     routine: unsafe extern "C" fn(*mut u8),
     arg: *mut u8,
 ) {
-    let current_handle = pthread_self();
+    let current_handle = unsafe { pthread_self() };
 
     // Find current thread control block
     if let Some(pcb) = THREAD_REGISTRY.lock().get(&current_handle) {
@@ -621,7 +626,7 @@ pub unsafe extern "C" fn pthread_cleanup_push(
 
 /// Pop a cleanup handler without executing
 pub unsafe extern "C" fn pthread_cleanup_pop(execute: i32) {
-    let current_handle = pthread_self();
+    let current_handle = unsafe { pthread_self() };
 
     // Find current thread control block
     if let Some(pcb) = THREAD_REGISTRY.lock().get(&current_handle) {
@@ -630,7 +635,7 @@ pub unsafe extern "C" fn pthread_cleanup_pop(execute: i32) {
         if let Some(handler) = pcb_guard.cleanup_handler.take() {
             if execute != 0 {
                 if let Some(routine) = handler.routine {
-                    routine(handler.arg);
+                    unsafe { routine(handler.arg); }
                 }
             }
             // No next handler to restore in simplified implementation
@@ -700,7 +705,7 @@ impl Default for PthreadMutexattrT {
 pub unsafe extern "C" fn pthread_mutex_init(
     mutex: *mut PthreadMutexT,
     attr: *const PthreadMutexattrT,
-) -> i32 {
+) -> i32 { unsafe {
     if mutex.is_null() {
         return EINVAL;
     }
@@ -724,7 +729,7 @@ pub unsafe extern "C" fn pthread_mutex_init(
 
     *mutex = mutex_obj;
     0
-}
+}}
 
 /// Lock a mutex
 pub unsafe extern "C" fn pthread_mutex_lock(mutex: *mut PthreadMutexT) -> i32 {
@@ -732,7 +737,7 @@ pub unsafe extern "C" fn pthread_mutex_lock(mutex: *mut PthreadMutexT) -> i32 {
         return EINVAL;
     }
 
-    let mutex_ref = &mut *mutex;
+    let mutex_ref = unsafe { &mut *mutex };
     let current_tid = crate::process::thread::current_thread();
 
     // Error checking mutex: detect deadlock
@@ -764,7 +769,7 @@ pub unsafe extern "C" fn pthread_mutex_trylock(mutex: *mut PthreadMutexT) -> i32
         return EINVAL;
     }
 
-    let mutex_ref = &mut *mutex;
+    let mutex_ref = unsafe { &mut *mutex };
     let current_tid = crate::process::thread::current_thread();
 
     // Error checking mutex: detect deadlock
@@ -823,11 +828,18 @@ impl Default for PthreadCondT {
 }
 
 /// Initialize a condition variable
-pub unsafe extern "C" fn pthread_cond_init(cond: *mut PthreadCondT, attr: *const u8) -> i32 {
+pub unsafe extern "C" fn pthread_cond_init(
+    cond: *mut PthreadCondT,
+    _attr: *const u8,
+) -> i32 {
     if cond.is_null() {
         return 1;
     }
-    *cond = PthreadCondT::default();
+    // Note: attr parameter is reserved for future use (POSIX extension)
+    // Currently, we don't support condition variable attributes
+    unsafe {
+        *cond = PthreadCondT::default();
+    }
     0
 }
 
@@ -840,12 +852,12 @@ pub unsafe extern "C" fn pthread_cond_wait(
         return EINVAL;
     }
 
-    let cond_ref = &*cond;
+    let cond_ref = unsafe { &*cond };
     if !cond_ref.initialized {
         return EINVAL;
     }
 
-    let mutex_ref = &mut *mutex;
+    let mutex_ref = unsafe { &mut *mutex };
 
     // Wait on condition variable (this will unlock mutex, wait, then re-lock)
     cond_ref.cond.wait(&mutex_ref.lock);
@@ -859,7 +871,7 @@ pub unsafe extern "C" fn pthread_cond_signal(cond: *mut PthreadCondT) -> i32 {
         return EINVAL;
     }
 
-    let cond_ref = &*cond;
+    let cond_ref = unsafe { &*cond };
     if !cond_ref.initialized {
         return EINVAL;
     }
@@ -874,7 +886,7 @@ pub unsafe extern "C" fn pthread_cond_broadcast(cond: *mut PthreadCondT) -> i32 
         return EINVAL;
     }
 
-    let cond_ref = &*cond;
+    let cond_ref = unsafe { &*cond };
     if !cond_ref.initialized {
         return EINVAL;
     }
@@ -907,7 +919,7 @@ pub unsafe extern "C" fn pthread_attr_init(attr: *mut PthreadAttrT) -> i32 {
     if attr.is_null() {
         return EINVAL;
     }
-    *attr = PthreadAttrT::default();
+    unsafe { *attr = PthreadAttrT::default(); }
     0
 }
 
@@ -925,7 +937,7 @@ pub unsafe extern "C" fn pthread_attr_getdetachstate(
     if attr.is_null() || detachstate.is_null() {
         return EINVAL;
     }
-    *detachstate = (*attr).detachstate;
+    unsafe { *detachstate = (*attr).detachstate; }
     0
 }
 
@@ -939,7 +951,7 @@ pub unsafe extern "C" fn pthread_attr_setdetachstate(
     }
     match detachstate {
         PTHREAD_CREATE_JOINABLE | PTHREAD_CREATE_DETACHED => {
-            (*attr).detachstate = detachstate;
+            unsafe { (*attr).detachstate = detachstate; }
             0
         },
         _ => EINVAL,
@@ -954,7 +966,7 @@ pub unsafe extern "C" fn pthread_attr_getstacksize(
     if attr.is_null() || stacksize.is_null() {
         return EINVAL;
     }
-    *stacksize = (*attr).stack_size;
+    unsafe { *stacksize = (*attr).stack_size; }
     0
 }
 
@@ -969,7 +981,7 @@ pub unsafe extern "C" fn pthread_attr_setstacksize(
     if stacksize < PTHREAD_STACK_MIN {
         return EINVAL;
     }
-    (*attr).stack_size = stacksize;
+    unsafe { (*attr).stack_size = stacksize; }
     0
 }
 
@@ -982,8 +994,10 @@ pub unsafe extern "C" fn pthread_attr_getstack(
     if attr.is_null() || stackaddr.is_null() || stacksize.is_null() {
         return EINVAL;
     }
-    *stackaddr = (*attr).stack_addr;
-    *stacksize = (*attr).stack_size;
+    unsafe {
+        *stackaddr = (*attr).stack_addr;
+        *stacksize = (*attr).stack_size;
+    }
     0
 }
 
@@ -999,8 +1013,10 @@ pub unsafe extern "C" fn pthread_attr_setstack(
     if stacksize < PTHREAD_STACK_MIN {
         return EINVAL;
     }
-    (*attr).stack_addr = stackaddr;
-    (*attr).stack_size = stacksize;
+    unsafe {
+        (*attr).stack_addr = stackaddr;
+        (*attr).stack_size = stacksize;
+    }
     0
 }
 
@@ -1012,7 +1028,7 @@ pub unsafe extern "C" fn pthread_attr_getguardsize(
     if attr.is_null() || guardsize.is_null() {
         return EINVAL;
     }
-    *guardsize = (*attr).guardsize;
+    unsafe { *guardsize = (*attr).guardsize; }
     0
 }
 
@@ -1024,7 +1040,7 @@ pub unsafe extern "C" fn pthread_attr_setguardsize(
     if attr.is_null() {
         return EINVAL;
     }
-    (*attr).guardsize = guardsize;
+    unsafe { (*attr).guardsize = guardsize; }
     0
 }
 
@@ -1036,7 +1052,7 @@ pub unsafe extern "C" fn pthread_attr_getscope(
     if attr.is_null() || contentionscope.is_null() {
         return EINVAL;
     }
-    *contentionscope = (*attr).scope;
+    unsafe { *contentionscope = (*attr).scope; }
     0
 }
 
@@ -1050,7 +1066,7 @@ pub unsafe extern "C" fn pthread_attr_setscope(
     }
     match contentionscope {
         PTHREAD_SCOPE_SYSTEM | PTHREAD_SCOPE_PROCESS => {
-            (*attr).scope = contentionscope;
+            unsafe { (*attr).scope = contentionscope; }
             0
         },
         _ => EINVAL,
@@ -1065,7 +1081,7 @@ pub unsafe extern "C" fn pthread_attr_getschedpolicy(
     if attr.is_null() || policy.is_null() {
         return EINVAL;
     }
-    *policy = (*attr).schedpolicy;
+    unsafe { *policy = (*attr).schedpolicy; }
     0
 }
 
@@ -1076,7 +1092,7 @@ pub unsafe extern "C" fn pthread_attr_setschedpolicy(attr: *mut PthreadAttrT, po
     }
     match policy {
         SCHED_OTHER | SCHED_FIFO | SCHED_RR | SCHED_BATCH | SCHED_IDLE => {
-            (*attr).schedpolicy = policy;
+            unsafe { (*attr).schedpolicy = policy; }
             0
         },
         _ => EINVAL,
@@ -1091,7 +1107,7 @@ pub unsafe extern "C" fn pthread_attr_getschedparam(
     if attr.is_null() || param.is_null() {
         return EINVAL;
     }
-    *param = (*attr).schedparam;
+    unsafe { *param = (*attr).schedparam; }
     0
 }
 
@@ -1103,7 +1119,7 @@ pub unsafe extern "C" fn pthread_attr_setschedparam(
     if attr.is_null() || param.is_null() {
         return EINVAL;
     }
-    (*attr).schedparam = *param;
+    unsafe { (*attr).schedparam = *param; }
     0
 }
 
@@ -1115,7 +1131,7 @@ pub unsafe extern "C" fn pthread_attr_getinheritsched(
     if attr.is_null() || inheritsched.is_null() {
         return EINVAL;
     }
-    *inheritsched = (*attr).inheritsched;
+    unsafe { *inheritsched = (*attr).inheritsched; }
     0
 }
 
@@ -1129,7 +1145,7 @@ pub unsafe extern "C" fn pthread_attr_setinheritsched(
     }
     match inheritsched {
         PTHREAD_INHERIT_SCHED | PTHREAD_EXPLICIT_SCHED => {
-            (*attr).inheritsched = inheritsched;
+            unsafe { (*attr).inheritsched = inheritsched; }
             0
         },
         _ => EINVAL,
@@ -1160,7 +1176,7 @@ pub unsafe extern "C" fn pthread_key_create(
     let key_id = NEXT_KEY_ID.fetch_add(1, Ordering::SeqCst) as u32;
     KEY_REGISTRY.lock().insert(key_id, destructor);
 
-    *key = PthreadKeyT { key: key_id, destructor };
+    unsafe { *key = PthreadKeyT { key: key_id, destructor }; }
 
     0
 }
@@ -1173,7 +1189,7 @@ pub unsafe extern "C" fn pthread_key_delete(key: PthreadKeyT) -> i32 {
 
 /// Get thread-specific data
 pub unsafe extern "C" fn pthread_getspecific(key: PthreadKeyT) -> *mut u8 {
-    let current_handle = pthread_self();
+    let current_handle = unsafe { pthread_self() };
 
     // Find current thread control block
     if let Some(pcb) = THREAD_REGISTRY.lock().get(&current_handle) {
@@ -1189,7 +1205,7 @@ pub unsafe extern "C" fn pthread_getspecific(key: PthreadKeyT) -> *mut u8 {
 
 /// Set thread-specific data
 pub unsafe extern "C" fn pthread_setspecific(key: PthreadKeyT, value: *const u8) -> i32 {
-    let current_handle = pthread_self();
+    let current_handle = unsafe { pthread_self() };
 
     // Find current thread control block
     if let Some(pcb) = THREAD_REGISTRY.lock().get(&current_handle) {
@@ -1230,7 +1246,7 @@ pub unsafe extern "C" fn pthread_once(
         return EINVAL;
     }
 
-    let once = &mut *once_control;
+    let once = unsafe { &mut *once_control };
 
     // Check if already initialized
     if once.done.load(Ordering::Acquire) != 0 {
@@ -1244,7 +1260,7 @@ pub unsafe extern "C" fn pthread_once(
         .is_ok()
     {
         // Execute initialization routine
-        init_routine();
+        unsafe { init_routine(); }
 
         // Mark as done
         once.done.store(2, Ordering::Release);
@@ -1272,13 +1288,13 @@ pub unsafe extern "C" fn pthread_cond_timedwait(
         return EINVAL;
     }
 
-    let cond_ref = &*cond;
+    let cond_ref = unsafe { &*cond };
     if !cond_ref.initialized {
         return EINVAL;
     }
 
     // Get timeout time
-    let timeout = &*abstime;
+    let timeout = unsafe { &*abstime };
     let now_ns = crate::subsystems::time::get_time_ns();
     let timeout_ns = (timeout.tv_sec as u64) * 1_000_000_000 + (timeout.tv_nsec as u64);
 
@@ -1286,7 +1302,7 @@ pub unsafe extern "C" fn pthread_cond_timedwait(
         return crate::reliability::errno::ETIMEDOUT;
     }
 
-    let mutex_ref = &mut *mutex;
+    let mutex_ref = unsafe { &mut *mutex };
     let duration_ns = timeout_ns - now_ns;
 
     // Wait on condition variable with timeout
@@ -1298,6 +1314,6 @@ pub unsafe extern "C" fn pthread_cond_timedwait(
     if wait_result {
         0
     } else {
-        crate::reliability::errno::ETIMEDOUT
+        ETIMEDOUT
     }
 }

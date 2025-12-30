@@ -2,29 +2,28 @@
 //!
 //! 本模块提供工厂模式创建和管理内核内部模块，减少lib.rs的直接依赖。
 
+use crate::prelude::*;
 use alloc::{sync::Arc, vec::Vec};
 use spin::Mutex;
 use nos_api::{di::Container, Result};
-use nos_services::core::{Service as ServiceTrait, ServiceInfo as ServiceInfoTrait, ServiceStats as ServiceStatsTrait};
+
+// Import syscall interface
+use crate::syscall_interface::{SyscallDispatcher, ServiceManager, Service as ServiceTrait};
 
 // Import API adapter types for cleaner interfaces
 use crate::api::adapter::{
-    SyscallHandler, EventPublisher,
+    EventPublisher, BasicEvent,
 };
 
 /// Simple service locator
 pub struct ServiceLocator {
-    container: Arc<Container>,
 }
 
 impl ServiceLocator {
-    pub fn new(container: Arc<Container>) -> Self {
-        Self { container }
+    pub fn new(_container: Arc<Container>) -> Self {
+        Self { }
     }
 }
-
-use crate::subsystems::syscalls::interface::{SyscallDispatcher, SyscallNumber, SyscallArgs, SyscallResult};
-use crate::syscall_interface::ServiceManager;
 
 /// 内核工厂，负责创建和管理内核组件
 pub struct KernelFactory {
@@ -149,37 +148,14 @@ impl PlaceholderSyscallDispatcher {
 }
 
 impl SyscallDispatcher for PlaceholderSyscallDispatcher {
-    fn dispatch(&mut self, _syscall_num: SyscallNumber, _args: &SyscallArgs) -> Result<SyscallResult> {
+    fn dispatch(&self, _syscall_num: usize, _args: &[usize]) -> isize {
         // 占位符实现
-        Ok(SyscallResult::success(-1))
+        -1
     }
 
-    fn get_stats(&self) -> crate::subsystems::syscalls::interface::SyscallStats {
+    fn get_stats(&self) -> crate::syscall_interface::SyscallStats {
         // 占位符实现
-        crate::subsystems::syscalls::interface::SyscallStats {
-            total_calls: 0,
-            successful_calls: 0,
-            failed_calls: 0,
-            avg_execution_time_ns: 0,
-        }
-    }
-
-    fn register_handler(
-        &mut self,
-        _syscall_num: SyscallNumber,
-        _handler: Box<dyn SyscallHandler>,
-    ) -> Result<()> {
-        // 占位符实现
-        Ok(())
-    }
-
-    fn unregister_handler(&mut self, _syscall_num: SyscallNumber) {
-        // 占位符实现
-    }
-
-    fn handler_count(&self) -> usize {
-        // 占位符实现
-        0
+        crate::syscall_interface::SyscallStats::default()
     }
 
     fn list_handlers(&self) -> Vec<(usize, &str)> {
@@ -199,49 +175,30 @@ impl PlaceholderServiceManager {
     }
 }
 
-impl nos_services::core::ServiceManager for PlaceholderServiceManager {
-    fn register_service(
-        &mut self,
-        _name: &str,
-        _service: Box<dyn ServiceTrait>,
-    ) -> Result<u32> {
-        // 占位符实现
-        Ok(0)
-    }
-
-    fn unregister_service(&mut self, _id: u32) -> Result<()> {
+impl ServiceManager for PlaceholderServiceManager {
+    fn register_service(&mut self, _service: Arc<dyn ServiceTrait>) -> Result<()> {
         // 占位符实现
         Ok(())
     }
 
-    fn start_service(&mut self, _id: u32) -> Result<()> {
-        // 占位符实现
-        Ok(())
-    }
-
-    fn stop_service(&mut self, _id: u32) -> Result<()> {
-        // 占位符实现
-        Ok(())
-    }
-
-    fn get_service(&self, _id: u32) -> Option<&dyn ServiceTrait> {
+    fn get_service(&self, _name: &str) -> Option<Arc<dyn ServiceTrait>> {
         // 占位符实现
         None
     }
 
-    fn get_service_by_name(&self, _name: &str) -> Option<&dyn ServiceTrait> {
-        // 占位符实现
-        None
-    }
-
-    fn list_services(&self) -> Vec<ServiceInfoTrait> {
+    fn list_services(&self) -> Vec<&str> {
         // 占位符实现
         Vec::new()
     }
 
-    fn get_stats(&self) -> ServiceStatsTrait {
+    fn unregister_service(&mut self, _name: &str) -> Result<()> {
         // 占位符实现
-        ServiceStatsTrait::default()
+        Ok(())
+    }
+
+    fn get_stats(&self) -> crate::syscall_interface::ServiceStats {
+        // 占位符实现
+        crate::syscall_interface::ServiceStats::default()
     }
 }
 

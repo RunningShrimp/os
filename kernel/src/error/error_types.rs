@@ -3,9 +3,6 @@
 //! This module defines error types for the NOS kernel,
 //! providing compatibility with the deprecated nos-error-handling crate.
 
-use alloc::vec::Vec;
-use nos_error_handling::kernel_integration::ErrorType as NosErrorType;
-
 /// Error types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ErrorType {

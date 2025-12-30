@@ -269,27 +269,77 @@ pub const PAGE_SIZE: usize = 4096;
 
 /// Get kernel base address for current architecture
 pub const fn kernel_base() -> usize {
-    MemoryLayout::current().kernel_base
+    #[cfg(target_arch = "x86_64")]
+    { return X86_64_LAYOUT.kernel_base; }
+
+    #[cfg(target_arch = "aarch64")]
+    { return AARCH64_LAYOUT.kernel_base; }
+
+    #[cfg(target_arch = "riscv64")]
+    { return RISCV64_LAYOUT.kernel_base; }
+
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
+    compile_error!("Unsupported architecture");
 }
 
 /// Get user base address for current architecture
 pub const fn user_base() -> usize {
-    MemoryLayout::current().user_base
+    #[cfg(target_arch = "x86_64")]
+    { return X86_64_LAYOUT.user_base; }
+
+    #[cfg(target_arch = "aarch64")]
+    { return AARCH64_LAYOUT.user_base; }
+
+    #[cfg(target_arch = "riscv64")]
+    { return RISCV64_LAYOUT.user_base; }
+
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
+    compile_error!("Unsupported architecture");
 }
 
 /// Get user stack top address for current architecture
 pub const fn user_stack_top() -> usize {
-    MemoryLayout::current().user_stack_top
+    #[cfg(target_arch = "x86_64")]
+    { return X86_64_LAYOUT.user_stack_top; }
+
+    #[cfg(target_arch = "aarch64")]
+    { return AARCH64_LAYOUT.user_stack_top; }
+
+    #[cfg(target_arch = "riscv64")]
+    { return RISCV64_LAYOUT.user_stack_top; }
+
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
+    compile_error!("Unsupported architecture");
 }
 
 /// Get maximum user address for current architecture
 pub const fn user_max() -> usize {
-    MemoryLayout::current().user_max
+    #[cfg(target_arch = "x86_64")]
+    { return X86_64_LAYOUT.user_max; }
+
+    #[cfg(target_arch = "aarch64")]
+    { return AARCH64_LAYOUT.user_max; }
+
+    #[cfg(target_arch = "riscv64")]
+    { return RISCV64_LAYOUT.user_max; }
+
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
+    compile_error!("Unsupported architecture");
 }
 
 /// Get page size for current architecture
 pub const fn page_size() -> usize {
-    MemoryLayout::current().page_size
+    #[cfg(target_arch = "x86_64")]
+    { return X86_64_LAYOUT.page_size; }
+
+    #[cfg(target_arch = "aarch64")]
+    { return AARCH64_LAYOUT.page_size; }
+
+    #[cfg(target_arch = "riscv64")]
+    { return RISCV64_LAYOUT.page_size; }
+
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
+    compile_error!("Unsupported architecture");
 }
 
 /// Check if address is in kernel space

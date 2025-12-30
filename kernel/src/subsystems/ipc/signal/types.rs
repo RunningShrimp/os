@@ -7,8 +7,6 @@ pub struct SignalState {
     pending: u64,
     /// Blocked signals
     blocked: u64,
-    /// Current signal mask
-    mask: u64,
     /// Signal disposition
     disposition: [u8; 64], // One disposition per signal (0-63)
 }
@@ -19,7 +17,6 @@ impl SignalState {
         Self {
             pending: 0,
             blocked: 0,
-            mask: 0,
             disposition: [0; 64],
         }
     }

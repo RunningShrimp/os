@@ -9,6 +9,8 @@
 
 extern crate alloc;
 
+use crate::compat::{PlatformModule, Result};
+
 /// iOS compatibility module
 pub struct IOSModule {
     uikit_framework: UIKitFramework,
@@ -43,11 +45,11 @@ impl PlatformModule for IOSModule {
         true
     }
 
-    fn initialize(&mut self) -> Result<(), &'static str> {
+    fn initialize(&mut self) -> Result<()> {
         Ok(())
     }
 
-    fn shutdown(&mut self) -> Result<(), &'static str> {
+    fn shutdown(&mut self) -> Result<()> {
         Ok(())
     }
 }

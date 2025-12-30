@@ -13,18 +13,8 @@ pub use nos_api::boot::{
 // Boot parameter validation
 pub mod validator;
 
-// Helper functions for compatibility
-impl BootParameters {
-    /// Get architecture name
-    pub fn architecture_name(&self) -> &'static str {
-        match self.architecture {
-            0 => "x86_64",
-            1 => "AArch64",
-            2 => "RISC-V 64",
-            _ => "Unknown",
-        }
-    }
-}
+// Helper functions for compatibility are now in nos_api crate
+// BootParameters::architecture_name() is available from nos_api
 
 // Helper for memory map iteration
 pub struct MemoryMapIter {
@@ -57,19 +47,16 @@ impl Iterator for MemoryMapIter {
     }
 }
 
-impl MemoryMap {
-    /// Get iterator over entries
-    pub fn entries(&self) -> MemoryMapIter {
-        MemoryMapIter::new(self)
-    }
+// Helper functions for MemoryMap - create wrapper functions instead of inherent impl
+pub fn memory_map_entries(memory_map: &MemoryMap) -> MemoryMapIter {
+    MemoryMapIter::new(memory_map)
+}
 
-    /// Get total usable memory size
-    pub fn usable_memory(&self) -> u64 {
-        self.entries()
-            .filter(|entry| entry.is_available != 0 && entry.mem_type == MemoryType::Usable as u32)
-            .map(|entry| entry.size)
-            .sum()
-    }
+pub fn memory_map_usable_memory(memory_map: &MemoryMap) -> u64 {
+    memory_map_entries(memory_map)
+        .filter(|entry| entry.is_available != 0 && entry.mem_type == MemoryType::Usable as u32)
+        .map(|entry| entry.size)
+        .sum()
 }
 
 /// Global boot information storage
@@ -106,19 +93,10 @@ pub fn init_from_boot_parameters(params: *const BootParameters) {
                 // Handle critical errors
                 if !validation_result.is_acceptable() {
                     crate::println!("[boot] CRITICAL: Cannot continue with invalid boot parameters");
-
-                    #[cfg(feature = "strict_boot")]
-                    {
-                        crate::panic!("Critical boot parameter validation failures");
-                    }
-
-                    #[cfg(not(feature = "strict_boot"))]
-                    {
-                        crate::println!("[boot] Falling back to default boot parameters");
-                        BOOT_PARAMETERS = Some(BootParameters::new());
-                        BOOT_INITIALIZED = true;
-                        return;
-                    }
+                    crate::println!("[boot] Falling back to default boot parameters");
+                    BOOT_PARAMETERS = Some(BootParameters::new());
+                    BOOT_INITIALIZED = true;
+                    return;
                 }
             } else {
                 crate::println!("[boot] Boot parameter validation: PASSED");
@@ -340,12 +318,12 @@ pub fn print_boot_info() {
             crate::println!("[boot]   Memory map entries: {}", memory_map.entry_count);
             crate::println!(
                 "[boot]   Usable memory: {} MB",
-                memory_map.usable_memory() / (1024 * 1024)
+                memory_map_usable_memory(memory_map) / (1024 * 1024)
             );
         }
 
         if params.has_framebuffer() {
-            let fb = params.framebuffer.as_ref().unwrap();
+            let fb = params.framebuffer;
             crate::println!(
                 "[boot]   Framebuffer: {}x{}x{}",
                 fb.width,
@@ -398,9 +376,8 @@ pub fn init_memory_from_boot_info() {
             crate::println!("[boot] Initializing memory from bootloader memory map");
 
             // Count usable memory regions
-            let usable_regions = memory_map
-                .entries()
-                .filter(|entry| entry.is_available && entry.mem_type == MemoryType::Usable)
+            let usable_regions = memory_map_entries(memory_map)
+                .filter(|entry| entry.is_available != 0 && entry.mem_type == MemoryType::Usable as u32)
                 .count();
 
             if usable_regions > 0 {

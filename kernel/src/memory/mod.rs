@@ -172,7 +172,13 @@ pub fn init() {
 pub fn get_manager() -> Result<Arc<MemoryManager>> {
     GLOBAL_MEMORY_MANAGER.lock()
         .as_ref()
-        .map(|m| Arc::new(m.clone()))
+        .map(|m| {
+            // Clone the inner Arc fields from the reference
+            Arc::new(MemoryManager {
+                regions: m.regions.clone(),
+                total_allocated: m.total_allocated.clone(),
+            })
+        })
         .ok_or(MemoryError::OutOfMemory)
 }
 
@@ -208,19 +214,13 @@ pub struct AllocationStats {
     pub peak_usage: usize,
 }
 
-impl AllocationStats {
-    pub fn new() -> Self {
+impl Default for AllocationStats {
+    fn default() -> Self {
         Self {
             total_allocated: 0,
             total_freed: 0,
             current_usage: 0,
             peak_usage: 0,
         }
-    }
-}
-
-impl Default for AllocationStats {
-    fn default() -> Self {
-        Self::new()
     }
 }

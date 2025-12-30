@@ -16,6 +16,8 @@ pub mod types;
 pub use service::SignalService;
 pub use types::*;
 
+use alloc::boxed::Box;
+
 use crate::subsystems::syscalls::services::SyscallService;
 
 /// 获取信号系统调用服务实例

@@ -13,16 +13,8 @@ pub fn _print(args: fmt::Arguments) {
     let _ = Console.write_fmt(args);
 }
 
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => { $crate::drivers::console::_print(format_args!($($arg)*)) };
-}
-
-#[macro_export]
-macro_rules! println {
-    () => { $crate::print!("\n") };
-    ($($arg:tt)*) => { $crate::print!("{}\n", format_args!($($arg)*)) };
-}
+// Note: The print! and println! macros are now defined in lib.rs
+// to avoid duplicate definitions and ensure they're available at crate root
 
 // Public convenience functions - don't conflict with macro names
 pub fn print_fmt(_args: core::fmt::Arguments) {

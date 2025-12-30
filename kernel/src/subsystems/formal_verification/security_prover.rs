@@ -11,7 +11,6 @@ use hashbrown::{HashMap, HashSet};
 use spin::Mutex;
 
 use super::*;
-use crate::compat::DefaultHasherBuilder;
 
 /// 安全证明器
 pub struct SecurityProver {

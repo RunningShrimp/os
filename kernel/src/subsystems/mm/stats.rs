@@ -5,6 +5,9 @@
 use nos_api::Result;
 use spin::Mutex;
 
+// Import necessary types from parent module
+use super::{AllocationStats, MemoryManagementStats, MemoryType};
+
 /// Memory statistics collector
 pub struct MemoryStatsCollector {
     /// Memory statistics
@@ -42,7 +45,7 @@ impl MemoryStatsCollector {
     }
 
     /// Record allocation
-    pub fn record_allocation(&self, mem_type: super::MemoryType, size: usize) {
+    pub fn record_allocation(&self, mem_type: MemoryType, size: usize) {
         let mut stats = self.stats.lock();
 
         // Update allocation statistics
@@ -68,7 +71,7 @@ impl MemoryStatsCollector {
     }
 
     /// Record deallocation
-    pub fn record_deallocation(&self, mem_type: super::MemoryType, size: usize) {
+    pub fn record_deallocation(&self, mem_type: MemoryType, size: usize) {
         let mut stats = self.stats.lock();
 
         // Update allocation statistics
@@ -76,6 +79,16 @@ impl MemoryStatsCollector {
         stats.allocation_stats.current_allocations -= 1;
         stats.allocation_stats.total_deallocated_bytes += size as u64;
         stats.allocation_stats.current_allocated_bytes -= size as u64;
+
+        // Update memory usage by type - decrease the counter for this memory type
+        // This ensures accurate tracking of memory usage per type
+        let entry = stats.memory_usage_by_type.entry(mem_type).or_insert(0);
+        if *entry >= size as u64 {
+            *entry -= size as u64;
+        } else {
+            // Handle potential underflow (can happen if stats are inconsistent)
+            *entry = 0;
+        }
     }
 
     /// Record allocation failure
@@ -94,11 +107,17 @@ impl MemoryStatsCollector {
             stats
                 .numa_stats
                 .allocation_stats_per_node
-                .push(super::AllocationStats::default());
+                .push(AllocationStats::default());
         }
 
         // Update NUMA node memory
         stats.numa_stats.memory_per_node[node_id as usize] = total_memory;
+
+        // TODO: Track available memory per NUMA node
+        // The available_memory parameter represents the amount of free memory in this node.
+        // This should be stored separately from total_memory to track memory pressure.
+        // For now, we acknowledge receipt but don't store it (future enhancement).
+        let _available = available_memory;
 
         // Update number of nodes
         stats.numa_stats.num_nodes = stats.numa_stats.memory_per_node.len() as u32;
@@ -113,7 +132,7 @@ impl MemoryStatsCollector {
             stats
                 .numa_stats
                 .allocation_stats_per_node
-                .push(super::AllocationStats::default());
+                .push(AllocationStats::default());
         }
 
         // Update NUMA allocation statistics
@@ -142,7 +161,7 @@ impl MemoryStatsCollector {
             stats
                 .numa_stats
                 .allocation_stats_per_node
-                .push(super::AllocationStats::default());
+                .push(AllocationStats::default());
         }
 
         // Update NUMA allocation statistics
@@ -154,14 +173,14 @@ impl MemoryStatsCollector {
     }
 
     /// Get memory statistics
-    pub fn get_stats(&self) -> super::MemoryManagementStats {
+    pub fn get_stats(&self) -> MemoryManagementStats {
         self.stats.lock().clone()
     }
 
     /// Reset statistics
     pub fn reset_stats(&self) {
         let mut stats = self.stats.lock();
-        *stats = super::MemoryManagementStats::default();
+        *stats = MemoryManagementStats::default();
     }
 }
 
@@ -191,7 +210,7 @@ pub fn shutdown_memory_stats() -> Result<()> {
 }
 
 /// Get memory statistics
-pub fn get_memory_stats() -> super::MemoryManagementStats {
+pub fn get_memory_stats() -> MemoryManagementStats {
     get_stats_collector().get_stats()
 }
 
@@ -216,12 +235,12 @@ pub fn update_available_virtual_memory(size: u64) {
 }
 
 /// Record allocation
-pub fn record_allocation(mem_type: super::MemoryType, size: usize) {
+pub fn record_allocation(mem_type: MemoryType, size: usize) {
     get_stats_collector().record_allocation(mem_type, size);
 }
 
 /// Record deallocation
-pub fn record_deallocation(mem_type: super::MemoryType, size: usize) {
+pub fn record_deallocation(mem_type: MemoryType, size: usize) {
     get_stats_collector().record_deallocation(mem_type, size);
 }
 

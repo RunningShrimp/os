@@ -24,33 +24,8 @@
 //! 实现 POSIX.1-2008 规范的 getrlimit/setrlimit/prlimit。
 
 use crate::api::SyscallError;
-use crate::subsystems::process::manager::PROC_TABLE;
-
-/// 资源限制值
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct RLimit {
-    /// 软限制（当前限制）
-    pub rlim_cur: u64,
-    /// 硬限制（上限）
-    pub rlim_max: u64,
-}
-
-impl RLimit {
-    /// 创建新的资源限制
-    pub const fn new(cur: u64, max: u64) -> Self {
-        Self { rlim_cur: cur, rlim_max: max }
-    }
-
-    /// 无限限制
-    pub const fn infinite() -> Self {
-        Self { rlim_cur: RLIM_INFINITY, rlim_max: RLIM_INFINITY }
-    }
-
-    /// 验证限制值是否有效
-    pub fn is_valid(&self) -> bool {
-        self.rlim_cur <= self.rlim_max || self.rlim_max == RLIM_INFINITY
-    }
-}
+use crate::subsystems::process::PROC_TABLE;
+use crate::posix::Rlimit;
 
 /// RLIM_INFINITY - 表示无限限制
 pub const RLIM_INFINITY: u64 = u64::MAX;
@@ -58,7 +33,7 @@ pub const RLIM_INFINITY: u64 = u64::MAX;
 /// 资源类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
-pub enum RLimitResource {
+pub enum RlimitResource {
     /// 地址空间大小（字节）
     AS = 9,
 
@@ -102,45 +77,45 @@ pub enum RLimitResource {
     RTTIME = 15,
 }
 
-impl RLimitResource {
+impl RlimitResource {
     /// 从 u32 创建资源类型
     pub fn from_u32(value: u32) -> Option<Self> {
         match value {
-            0 => Some(RLimitResource::CPU),
-            1 => Some(RLimitResource::FSIZE),
-            2 => Some(RLimitResource::DATA),
-            3 => Some(RLimitResource::STACK),
-            4 => Some(RLimitResource::CORE),
-            6 => Some(RLimitResource::NPROC),
-            7 => Some(RLimitResource::NOFILE),
-            8 => Some(RLimitResource::MEMLOCK),
-            9 => Some(RLimitResource::AS),
-            10 => Some(RLimitResource::SIGPENDING),
-            12 => Some(RLimitResource::MSGQUEUE),
-            13 => Some(RLimitResource::NICE),
-            14 => Some(RLimitResource::RTPRIO),
-            15 => Some(RLimitResource::RTTIME),
+            0 => Some(RlimitResource::CPU),
+            1 => Some(RlimitResource::FSIZE),
+            2 => Some(RlimitResource::DATA),
+            3 => Some(RlimitResource::STACK),
+            4 => Some(RlimitResource::CORE),
+            6 => Some(RlimitResource::NPROC),
+            7 => Some(RlimitResource::NOFILE),
+            8 => Some(RlimitResource::MEMLOCK),
+            9 => Some(RlimitResource::AS),
+            10 => Some(RlimitResource::SIGPENDING),
+            12 => Some(RlimitResource::MSGQUEUE),
+            13 => Some(RlimitResource::NICE),
+            14 => Some(RlimitResource::RTPRIO),
+            15 => Some(RlimitResource::RTTIME),
             _ => None,
         }
     }
 
     /// 获取资源的默认限制
-    pub fn default_limit(&self) -> RLimit {
+    pub fn default_limit(&self) -> Rlimit {
         match self {
-            RLimitResource::AS => RLimit::new(u64::MAX, u64::MAX),
-            RLimitResource::CORE => RLimit::new(0, u64::MAX),
-            RLimitResource::CPU => RLimit::new(u64::MAX, u64::MAX),
-            RLimitResource::DATA => RLimit::new(u64::MAX, u64::MAX),
-            RLimitResource::FSIZE => RLimit::new(u64::MAX, u64::MAX),
-            RLimitResource::NOFILE => RLimit::new(1024, 4096),
-            RLimitResource::NPROC => RLimit::new(0, 0),
-            RLimitResource::STACK => RLimit::new(8 * 1024 * 1024, u64::MAX),
-            RLimitResource::MEMLOCK => RLimit::new(64 * 1024 * 1024, 64 * 1024 * 1024),
-            RLimitResource::SIGPENDING => RLimit::new(0, 0),
-            RLimitResource::MSGQUEUE => RLimit::new(819200, 819200),
-            RLimitResource::NICE => RLimit::new(0, 0),
-            RLimitResource::RTPRIO => RLimit::new(0, 0),
-            RLimitResource::RTTIME => RLimit::new(0, 0),
+            RlimitResource::AS => Rlimit::new(u64::MAX, u64::MAX),
+            RlimitResource::CORE => Rlimit::new(0, u64::MAX),
+            RlimitResource::CPU => Rlimit::new(u64::MAX, u64::MAX),
+            RlimitResource::DATA => Rlimit::new(u64::MAX, u64::MAX),
+            RlimitResource::FSIZE => Rlimit::new(u64::MAX, u64::MAX),
+            RlimitResource::NOFILE => Rlimit::new(1024, 4096),
+            RlimitResource::NPROC => Rlimit::new(0, 0),
+            RlimitResource::STACK => Rlimit::new(8 * 1024 * 1024, u64::MAX),
+            RlimitResource::MEMLOCK => Rlimit::new(64 * 1024 * 1024, 64 * 1024 * 1024),
+            RlimitResource::SIGPENDING => Rlimit::new(0, 0),
+            RlimitResource::MSGQUEUE => Rlimit::new(819200, 819200),
+            RlimitResource::NICE => Rlimit::new(0, 0),
+            RlimitResource::RTPRIO => Rlimit::new(0, 0),
+            RlimitResource::RTTIME => Rlimit::new(0, 0),
         }
     }
 }
@@ -164,11 +139,11 @@ impl RLimitResource {
 /// # 错误
 ///
 /// - `EINVAL`: 无效的资源类型
-pub fn sys_getrlimit(resource: u32, rlim: &mut RLimit) -> Result<(), SyscallError> {
-    let resource_type = RLimitResource::from_u32(resource).ok_or(SyscallError::InvalidArgument)?;
+pub fn sys_getrlimit(resource: u32, rlim: &mut Rlimit) -> Result<(), SyscallError> {
+    let resource_type = RlimitResource::from_u32(resource).ok_or(SyscallError::InvalidArgument)?;
 
     let pid = crate::process::myproc().ok_or(SyscallError::NoProcess)?;
-    let table = PROC_TABLE.lock();
+    let mut table = PROC_TABLE.lock();
     let proc = table.find(pid).ok_or(SyscallError::NoProcess)?;
 
     // 从进程的 rlimits 数组获取限制
@@ -208,8 +183,8 @@ pub fn sys_getrlimit(resource: u32, rlim: &mut RLimit) -> Result<(), SyscallErro
 ///
 /// - `EINVAL`: 无效的资源类型或限制值
 /// - `EPERM`: 权限不足
-pub fn sys_setrlimit(resource: u32, rlim: &RLimit) -> Result<(), SyscallError> {
-    let resource_type = RLimitResource::from_u32(resource).ok_or(SyscallError::InvalidArgument)?;
+pub fn sys_setrlimit(resource: u32, rlim: &Rlimit) -> Result<(), SyscallError> {
+    let resource_type = RlimitResource::from_u32(resource).ok_or(SyscallError::InvalidArgument)?;
 
     // 验证限制值
     if !rlim.is_valid() {
@@ -288,28 +263,33 @@ pub fn sys_setrlimit(resource: u32, rlim: &RLimit) -> Result<(), SyscallError> {
 pub fn sys_prlimit(
     pid: i32,
     resource: u32,
-    new_limit: Option<&RLimit>,
-    old_limit: &mut RLimit,
+    new_limit: Option<&Rlimit>,
+    old_limit: &mut Rlimit,
 ) -> Result<(), SyscallError> {
-    let resource_type = RLimitResource::from_u32(resource).ok_or(SyscallError::InvalidArgument)?;
+    let resource_type = RlimitResource::from_u32(resource).ok_or(SyscallError::InvalidArgument)?;
 
     // 确定目标进程
     let target_pid = if pid == 0 {
         crate::process::myproc().ok_or(SyscallError::NoProcess)?
     } else {
-        pid as u64
+        pid
     };
 
     let mut table = PROC_TABLE.lock();
-    let proc = table.find(target_pid).ok_or(SyscallError::NoProcess)?;
 
     // 检查权限
     let current_pid = crate::process::myproc().ok_or(SyscallError::NoProcess)?;
     let current_proc = table.find(current_pid).ok_or(SyscallError::NoProcess)?;
 
-    if target_pid != current_pid && current_proc.euid != 0 {
+    // 从 current_proc 提取所需数据
+    let is_privileged = current_proc.euid == 0;
+
+    if target_pid != current_pid && !is_privileged {
         return Err(SyscallError::OperationNotPermitted);
     }
+
+    // current_proc 借用结束，现在可以借用目标进程
+    let proc = table.find(target_pid).ok_or(SyscallError::NoProcess)?;
 
     // 获取当前限制
     let index = resource as usize;
@@ -328,8 +308,6 @@ pub fn sys_prlimit(
         if !new_rlimit.is_valid() {
             return Err(SyscallError::InvalidArgument);
         }
-
-        let is_privileged = current_proc.euid == 0;
 
         if !is_privileged && target_pid != current_pid {
             return Err(SyscallError::OperationNotPermitted);
@@ -362,7 +340,7 @@ mod tests {
 
     #[test]
     fn test_rlimit_creation() {
-        let rlim = RLimit::new(1024, 4096);
+        let rlim = Rlimit::new(1024, 4096);
         assert_eq!(rlim.rlim_cur, 1024);
         assert_eq!(rlim.rlim_max, 4096);
         assert!(rlim.is_valid());
@@ -370,14 +348,14 @@ mod tests {
 
     #[test]
     fn test_rlimit_infinity() {
-        let rlim = RLimit::infinite();
+        let rlim = Rlimit::infinite();
         assert_eq!(rlim.rlim_cur, RLIM_INFINITY);
         assert_eq!(rlim.rlim_max, RLIM_INFINITY);
     }
 
     #[test]
     fn test_rlimit_invalid() {
-        let rlim = RLimit::new(4096, 1024);
+        let rlim = Rlimit::new(4096, 1024);
         assert!(!rlim.is_valid());
     }
 }

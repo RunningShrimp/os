@@ -2,8 +2,11 @@
 //!
 //! Standard primitive types for POSIX compliance
 
+// Allow POSIX-style type names (snake_case with _t suffix) which are standard in POSIX
+#![allow(non_camel_case_types)]
+
 /// Process ID type
-pub type Pid = usize;
+pub type Pid = i32;
 
 /// User ID type
 pub type Uid = u32;

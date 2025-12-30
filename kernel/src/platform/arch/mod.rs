@@ -1,21 +1,22 @@
 // Architecture abstraction layer
 // Provides a unified interface for architecture-specific operations
 
-use crate::prelude::*;
 use core::arch::asm;
 
 /// x86_64 specific functions
+#[cfg(target_arch = "x86_64")]
 pub mod x86_64 {
+    use core::arch::asm;
+
     /// Read Time-Stamp Counter
     #[inline]
     pub unsafe fn rdtsc() -> u64 {
-        let low: u32;
-        let high: u32;
+        let (high, low): (u32, u32);
         asm!(
             "rdtsc",
-            out("eax") low,
             out("edx") high,
-            options(nostack, nomem)
+            out("eax") low,
+            options(nostack, nomem, pure)
         );
         ((high as u64) << 32) | (low as u64)
     }
@@ -268,21 +269,27 @@ pub unsafe fn retpoline_jump_thunk(target: *const u8) -> ! {
 #[inline]
 #[cfg(target_arch = "x86_64")]
 pub unsafe fn speculation_barrier() {
-    asm!("lfence", options(nostack, preserves_flags));
+    unsafe {
+        asm!("lfence", options(nostack, preserves_flags));
+    }
 }
 
 /// Speculation barrier using DSB/ISB (AArch64)
 #[inline]
 #[cfg(target_arch = "aarch64")]
 pub unsafe fn speculation_barrier() {
-    asm!("dsb sy", "isb", options(nostack));
+    unsafe {
+        asm!("dsb sy", "isb", options(nostack));
+    }
 }
 
 /// Speculation barrier using FENCE (RISC-V)
 #[inline]
 #[cfg(target_arch = "riscv64")]
 pub unsafe fn speculation_barrier() {
-    asm!("fence", options(nostack));
+    unsafe {
+        asm!("fence", options(nostack));
+    }
 }
 
 /// Flush Return Stack Buffer (RSB) on context switch

@@ -16,7 +16,7 @@ use alloc::{
 
 use spin::Mutex;
 
-use crate::reliability::{EACCES, EINVAL, EIO, ENOENT, ENOMEM};
+use crate::reliability::{EINVAL, EIO, ENOENT};
 
 /// cgroup版本
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1076,7 +1076,7 @@ pub fn remove_process_from_cgroup(cgroup_name: &str, pid: u32) -> Result<(), i32
 pub fn get_process_cpu_limits(pid: u32) -> Option<(i64, u64)> {
     let manager = get_v1_cgroup_manager()?;
     let table = crate::subsystems::process::manager::PROC_TABLE.lock();
-    let proc = table.find_ref(pid as usize)?;
+    let proc = table.find_ref(pid as i32)?;
     let cgroup_name = proc.cgroup.as_ref()?;
     let cgroup = manager.get_cgroup(cgroup_name)?;
     let cg = cgroup.lock();
@@ -1094,7 +1094,7 @@ pub fn get_process_cpu_limits(pid: u32) -> Option<(i64, u64)> {
 pub fn get_process_memory_limit(pid: u32) -> Option<u64> {
     let manager = get_v1_cgroup_manager()?;
     let table = crate::subsystems::process::manager::PROC_TABLE.lock();
-    let proc = table.find_ref(pid as usize)?;
+    let proc = table.find_ref(pid as i32)?;
     let cgroup_name = proc.cgroup.as_ref()?;
     let cgroup = manager.get_cgroup(cgroup_name)?;
     let cg = cgroup.lock();

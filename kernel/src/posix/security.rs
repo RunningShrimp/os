@@ -11,8 +11,10 @@
 use alloc::{
     collections::BTreeMap,
     string::{String, ToString},
+    vec::Vec,
 };
 
+use crate::posix::types::{Gid, Mode, Pid, Uid};
 use crate::subsystems::sync::Mutex;
 
 /// POSIX capability structure
@@ -429,7 +431,7 @@ pub struct SecurityStats {
 
 /// Get process capabilities
 pub fn capget(pid: Pid, header: &mut CapHeader, data: &mut CapData) -> Result<(), SecurityError> {
-    let mut registry = SECURITY_REGISTRY.lock();
+    let registry = SECURITY_REGISTRY.lock();
 
     // Get process credentials
     let creds = registry
@@ -447,7 +449,7 @@ pub fn capget(pid: Pid, header: &mut CapHeader, data: &mut CapData) -> Result<()
 }
 
 /// Set process capabilities
-pub fn capset(pid: Pid, header: &CapHeader, data: &CapData) -> Result<(), SecurityError> {
+pub fn capset(pid: Pid, _header: &CapHeader, data: &CapData) -> Result<(), SecurityError> {
     let mut registry = SECURITY_REGISTRY.lock();
 
     // Check permissions

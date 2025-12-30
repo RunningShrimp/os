@@ -8,17 +8,20 @@
 //! - Extended attributes
 
 extern crate alloc;
+
+use crate::prelude::*;
 use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use super::{
     core::{FileSystemType, FsStats, SuperBlock},
-    dir::DirEntry,
-    error::*,
     inode::{FileLock, InodeOps},
-    types::*,
 };
+
+// Import VFS types - these are re-exports from vfs_interface
+use super::{FileAttr, FileMode, VfsError, VfsResult, DirEntry};
+
 use crate::subsystems::sync::Mutex;
 
 /// TmpFS file system type
@@ -39,7 +42,6 @@ struct TmpFsSuperBlock {
     root: Arc<TmpFsInode>,
     next_ino: AtomicUsize,
     total_bytes: AtomicUsize,
-    max_bytes: AtomicUsize,
 }
 
 impl TmpFsSuperBlock {
@@ -48,7 +50,6 @@ impl TmpFsSuperBlock {
             root: Arc::new(TmpFsInode::new_dir(1, None)),
             next_ino: AtomicUsize::new(2),
             total_bytes: AtomicUsize::new(0),
-            max_bytes: AtomicUsize::new(100 * 1024 * 1024), // 100MB default
         }
     }
 
@@ -510,6 +511,9 @@ impl InodeOps for TmpFsInode {
         Ok(offset)
     }
 }
+
+// Implement vfs_interface::Inode for TmpFsInode
+crate::impl_inode!(TmpFsInode);
 
 /// Initialize and register TmpFS
 pub fn init() {

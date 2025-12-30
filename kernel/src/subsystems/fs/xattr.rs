@@ -10,7 +10,7 @@
 //! - **批量操作**: 支持列表、获取、设置、删除操作
 
 extern crate alloc;
-use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use alloc::{collections::BTreeMap, string::String, string::ToString, vec::Vec};
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicU64, Ordering};
 
@@ -98,22 +98,18 @@ impl XattrEntry {
 }
 
 /// 文件的扩展属性集合
-#[derive(Debug)]
 pub struct XattrSet {
     /// 属性映射: name -> entry
     attrs: Mutex<BTreeMap<String, XattrEntry>>,
-    /// inode 编号（用于标识文件）
-    inode: u32,
     /// 总大小限制
     max_size: usize,
 }
 
 impl XattrSet {
     /// 创建新的扩展属性集合
-    pub fn new(inode: u32) -> Self {
+    pub fn new(_inode: u32) -> Self {
         Self {
             attrs: Mutex::new(BTreeMap::new()),
-            inode,
             max_size: XATTR_SIZE_MAX,
         }
     }
@@ -344,7 +340,13 @@ impl XattrManager {
 
     /// 获取统计信息
     pub fn get_stats(&self) -> XattrStats {
-        self.stats.lock().clone()
+        let stats = self.stats.lock();
+        XattrStats {
+            total_sets: stats.total_sets,
+            total_gets: stats.total_gets,
+            total_removes: stats.total_removes,
+            total_lists: stats.total_lists,
+        }
     }
 
     /// 删除文件的所有扩展属性

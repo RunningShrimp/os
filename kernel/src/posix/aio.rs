@@ -1,5 +1,7 @@
 //! POSIX AIO Types (aio.h)
 
+use crate::posix::types::{off_t, size_t, aio_reqprio_t};
+
 /// AIO operation codes
 pub const LIO_READ: i32 = 0;
 pub const LIO_WRITE: i32 = 1;

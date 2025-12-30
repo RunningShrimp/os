@@ -6,6 +6,17 @@ pub const AF_UNIX: i32 = 1;
 pub const AF_INET: i32 = 2;
 pub const AF_INET6: i32 = 10;
 
+/// Socket type constants
+pub const SOCK_STREAM: i32 = 1;
+pub const SOCK_DGRAM: i32 = 2;
+pub const SOCK_RAW: i32 = 3;
+pub const SOCK_SEQPACKET: i32 = 5;
+
+/// Shutdown constants
+pub const SHUT_RD: i32 = 0;
+pub const SHUT_WR: i32 = 1;
+pub const SHUT_RDWR: i32 = 2;
+
 /// Socket address structure (generic)
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

@@ -8,11 +8,8 @@ use alloc::{string::String, sync::Arc, vec::Vec};
 
 use spin::Mutex;
 
-use super::{
-    super::{HostIdsConfig, IntrusionDetection, ThreatLevel},
-    types::HostIdsStats,
-};
-use crate::security::audit::{AuditEvent, AuditEventType, AuditSeverity};
+use super::super::{Evidence, HostIdsConfig, IntrusionDetection, ThreatLevel};
+use crate::security::audit::{AuditEvent, AuditEventType};
 
 /// 主机入侵检测系统
 pub struct HostIds {
@@ -124,6 +121,31 @@ pub struct MalwareScanner {
     heuristic_engine: HeuristicEngine,
     /// 行为分析器
     behavior_analyzer: MalwareBehaviorAnalyzer,
+}
+
+/// 主机入侵检测统计
+#[derive(Debug, Clone, Default)]
+pub struct HostIdsStats {
+    /// 总监控事件数
+    pub total_monitored_events: u64,
+    /// 系统调用分析数
+    pub syscalls_analyzed: u64,
+    /// 文件事件数
+    pub file_events: u64,
+    /// 进程监控数
+    pub processes_monitored: u64,
+    /// 注册表变化数
+    pub registry_changes: u64,
+    /// 网络连接监控数
+    pub network_connections_monitored: u64,
+    /// 用户活动监控数
+    pub user_activities_monitored: u64,
+    /// 完整性检查数
+    pub integrity_checks: u64,
+    /// 恶意软件检测数
+    pub malware_detected: u64,
+    /// 平均处理时间（微秒）
+    pub avg_processing_time_us: u64,
 }
 
 /// 系统调用统计

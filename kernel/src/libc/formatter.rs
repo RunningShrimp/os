@@ -8,6 +8,8 @@
 //! - 自定义格式化支持
 //! - 性能优化的格式化算法
 
+use core::ffi::{c_char, c_int, c_void};
+
 use crate::libc::io_manager::CFile;
 
 // 模拟 va_list 类型
@@ -264,7 +266,7 @@ impl EnhancedFormatter {
     fn parse_format_specifier(
         &mut self,
         format_ptr: &mut *const c_char,
-        args: &mut va_list,
+        _args: &mut va_list,
     ) -> FormatContext {
         let mut flags = FormatFlags::default();
         let mut width: Option<c_int> = None;
@@ -299,7 +301,9 @@ impl EnhancedFormatter {
             // 解析宽度
             if **format_ptr as u8 == b'*' {
                 // 从参数获取宽度
-                let w: c_int = 0;
+                // TODO: Implement proper va_list argument fetching
+                // For now, use default width as placeholder
+                let w: c_int = 0; // This would come from args.arg::<c_int>()
                 width = if w < 0 {
                     flags.left_align = true;
                     Some(-w)
@@ -324,7 +328,9 @@ impl EnhancedFormatter {
                 *format_ptr = format_ptr.add(1);
                 if **format_ptr as u8 == b'*' {
                     // 从参数获取精度
-                    let p: c_int = 0;
+                    // TODO: Implement proper va_list argument fetching
+                    // For now, use default precision as placeholder
+                    let p: c_int = 0; // This would come from args.arg::<c_int>()
                     precision = if p < 0 { None } else { Some(p) };
                     *format_ptr = format_ptr.add(1);
                 } else {
@@ -706,18 +712,16 @@ impl EnhancedFormatter {
     /// 刷新缓冲区到文件
     fn flush_to_file(&mut self, file: *mut CFile) {
         if !file.is_null() && !self.output_buffer.is_empty() {
-            unsafe {
-                let written = crate::libc::io_manager::EnhancedIOManager::new(Default::default())
-                    .fwrite(
-                        self.output_buffer.as_ptr() as *const c_void,
-                        1,
-                        self.output_buffer.len(),
-                        file,
-                    );
+            let written = crate::libc::io_manager::EnhancedIOManager::new(Default::default())
+                .fwrite(
+                    self.output_buffer.as_ptr() as *const c_void,
+                    1,
+                    self.output_buffer.len(),
+                    file,
+                );
 
-                if written != self.output_buffer.len() {
-                    self.set_error(crate::libc::error::errno::EIO);
-                }
+            if written != self.output_buffer.len() {
+                self.set_error(crate::libc::error::errno::EIO);
             }
 
             self.output_buffer.clear();

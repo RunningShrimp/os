@@ -165,6 +165,14 @@ pub use crate::libc::interface::size_t;
 pub use crate::libc::ssize_t;
 
 // ============================================================================
+// Poll Constants (re-exported from fs module)
+// ============================================================================
+pub use crate::subsystems::fs::file::{POLLIN, POLLOUT, POLLERR, POLLHUP};
+
+/// Poll priority (exceptional condition)
+pub const POLLPRI: i16 = 0x002;
+
+// ============================================================================
 // Memory Protection Constants
 // ============================================================================
 pub const PROT_READ: i32 = 0x1;
@@ -183,7 +191,57 @@ pub const MAP_FIXED: i32 = 0x10;
 // ============================================================================
 // Semaphore Types
 // ============================================================================
-pub type SemT = *mut core::ffi::c_void;
+#[repr(C)]
+pub struct SemT {
+    /// Internal pointer to semaphore descriptor
+    pub sem_internal: *mut core::ffi::c_void,
+}
+
+impl SemT {
+    /// Create a new null semaphore
+    pub const fn null() -> Self {
+        Self { sem_internal: core::ptr::null_mut() }
+    }
+
+    /// Check if semaphore is null
+    pub fn is_null(&self) -> bool {
+        self.sem_internal.is_null()
+    }
+}
+
+impl Default for SemT {
+    fn default() -> Self {
+        Self::null()
+    }
+}
+
+/// Create a semaphore from a raw pointer
+pub const fn sem_from_ptr(ptr: *mut core::ffi::c_void) -> SemT {
+    SemT { sem_internal: ptr }
+}
+
+// ============================================================================
+// IPC Constants
+// ============================================================================
+
+/// IPC create flag
+pub const IPC_CREAT: i32 = 0o1000;
+
+/// IPC exclusive create flag
+pub const IPC_EXCL: i32 = 0o2000;
+
+/// IPC control commands
+pub const IPC_STAT: i32 = 2;
+pub const IPC_SET: i32 = 1;
+pub const IPC_RMID: i32 = 0;
+
+/// IPC private key
+pub const IPC_PRIVATE: i32 = 0;
+
+/// Shared memory attach flags
+pub const SHM_RDONLY: i32 = 0o10000;  // Read-only attach
+pub const SHM_RND: i32 = 0o20000;      // Round attach address to SHMLBA
+pub const SHM_REMAP: i32 = 0o40000;    // Remap segment
 
 // ============================================================================
 // Shared Memory Types
@@ -201,6 +259,7 @@ pub struct ShmidDs {
 }
 
 #[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct IpcPerm {
     pub key: i32,
     pub uid: u32,

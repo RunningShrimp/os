@@ -1,6 +1,4 @@
-// Import kernel prelude for common types
-use crate::prelude::*;
-
+pub mod drivers;
 pub mod fs;
 pub mod ipc;
 pub mod microkernel;
@@ -23,6 +21,3 @@ pub mod cloud_native;
 
 #[cfg(feature = "formal_verification")]
 pub mod formal_verification;
-
-// Re-exports for convenience
-pub use self::fs as vfs; // vfs alias if needed

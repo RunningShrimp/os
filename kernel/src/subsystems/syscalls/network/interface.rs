@@ -5,7 +5,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use crate::subsystems::sync::Mutex;
 
-use crate::subsystems::syscalls::common::{SyscallError, SyscallResult);
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
 
 // ============================================================================
 // Network Interface State
@@ -83,40 +83,33 @@ pub fn sys_ifconfig(args: &[u64]) -> SyscallResult<i64> {
 pub fn sys_ifinfo(args: &[u64]) -> SyscallResult<i64> {
     use crate::subsystems::syscalls::common::extract_args;
     use crate::subsystems::mm::vm::copyout;
-    
-    let args = extract_args(args, 2)?;
+
+    let args = extract_args(args, 0, 2);
     let if_index = args[0] as u32;
     let info_ptr = args[1] as usize;
-    
+
     if info_ptr == 0 {
         return Err(SyscallError::BadAddress);
     }
-    
+
     let interfaces = INTERFACES.lock();
-    
+
     // Find interface by index
     for iface in interfaces.iter() {
         if iface.index == if_index {
             // Return interface information
             // In a real implementation, we would copy the full ifreq structure
-            let my_pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
-            let table = crate::process::manager::PROC_TABLE.lock();
-            let proc = table.find_ref(my_pid).ok_or(SyscallError::NotFound)?;
-            let pagetable = proc.pagetable;
-            drop(table);
-            
-            if !pagetable.is_null() {
-                let mtu = iface.mtu;
-                unsafe {
-                    copyout(pagetable, info_ptr, &mtu as *const _ as *const u8, 4)
-                        .map_err(|_| SyscallError::BadAddress)?;
-                }
+            let mtu = iface.mtu;
+            unsafe {
+                let dst_slice = core::slice::from_raw_parts_mut(info_ptr as *mut u8, 4);
+                copyout(&mut dst_slice[..4], &mtu as *const _ as *const u8, 4)
+                    .map_err(|_| SyscallError::BadAddress)?;
             }
-            
+
             return Ok(0);
         }
     }
-    
+
     Err(SyscallError::NotFound)
 }
 
@@ -124,45 +117,36 @@ pub fn sys_ifinfo(args: &[u64]) -> SyscallResult<i64> {
 pub fn sys_iflist(args: &[u64]) -> SyscallResult<i64> {
     use crate::subsystems::syscalls::common::extract_args;
     use crate::subsystems::mm::vm::copyout;
-    
-    let args = extract_args(args, 2)?;
+
+    let args = extract_args(args, 0, 2);
     let buf_ptr = args[0] as usize;
     let buf_len = args[1] as usize;
-    
+
     let interfaces = INTERFACES.lock();
     let count = interfaces.len();
-    
+
     // If buf_ptr is 0, just return the count
     if buf_ptr == 0 {
-        return Ok(count as u64);
+        return Ok(count as i64);
     }
-    
-    let my_pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
-    let table = crate::process::manager::PROC_TABLE.lock();
-    let proc = table.find_ref(my_pid).ok_or(SyscallError::NotFound)?;
-    let pagetable = proc.pagetable;
-    drop(table);
-    
-    if pagetable.is_null() {
-        return Err(SyscallError::BadAddress);
-    }
-    
+
     // Copy interface indices to buffer
     let mut offset = 0;
     for iface in interfaces.iter() {
         if offset + 4 > buf_len {
             break;
         }
-        
+
         let idx = iface.index;
         unsafe {
-            copyout(pagetable, buf_ptr + offset, &idx as *const _ as *const u8, 4)
+            let dst_slice = core::slice::from_raw_parts_mut(buf_ptr as *mut u8, buf_len);
+            copyout(&mut dst_slice[offset..offset + 4], &idx as *const _ as *const u8, 4)
                 .map_err(|_| SyscallError::BadAddress)?;
         }
         offset += 4;
     }
-    
-    Ok(count as u64)
+
+    Ok(count as i64)
 }
 
 /// Add a route to the routing table

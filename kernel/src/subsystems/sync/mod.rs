@@ -3,14 +3,13 @@
 //
 // SMP-safe implementation with proper memory barriers and interrupt handling.
 
-// Import kernel prelude for common types
-use crate::prelude::*;
-
 use core::{
     cell::UnsafeCell,
-    ops::{Deref, DerefMut},
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    ops::Deref,
+    sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
 };
+
+use crate::cpu;
 
 // Declare submodules
 pub mod mutex;
@@ -23,6 +22,7 @@ pub mod priority_mutex;
 pub mod realtime;
 pub mod rcu;
 pub mod interrupts;
+pub mod lazy;
 
 // ============================================================================
 // Interrupt control for SMP safety
@@ -149,7 +149,7 @@ impl RawSpinLock {
         }
 
         // Record CPU holding the lock
-        self.cpu_id.store(crate::cpu::cpuid(), Ordering::Relaxed);
+        self.cpu_id.store(cpu::cpuid(), Ordering::Relaxed);
     }
 
     pub fn unlock(&self) {
@@ -191,7 +191,7 @@ impl RawSpinLock {
 
     /// Check if the current CPU is holding the lock
     pub fn holding(&self) -> bool {
-        self.is_locked() && self.cpu_id.load(Ordering::Relaxed) == crate::cpu::cpuid()
+        self.is_locked() && self.cpu_id.load(Ordering::Relaxed) == cpu::cpuid()
     }
 }
 
@@ -265,10 +265,10 @@ impl Drop for SpinLockIrqGuard<'_> {
 }
 
 // ============================================================================
-// Re-export Mutex types from mutex submodule
+// Re-export Mutex types from main sync module
 // ============================================================================
 
-pub use mutex::{Mutex, MutexGuard, MutexIrq, MutexIrqGuard};
+pub use crate::sync::{Mutex, MutexGuard, MutexIrq, MutexIrqGuard};
 
 // ============================================================================
 // Once - One-time initialization primitive

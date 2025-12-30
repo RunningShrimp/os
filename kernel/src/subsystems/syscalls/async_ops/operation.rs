@@ -1,5 +1,9 @@
 //! Async operation management functions
 
+use crate::prelude::*;
+use core::ffi::{c_int, c_void};
+use core::sync::atomic::Ordering;
+
 use super::*;
 
 /// 提交异步读操作
@@ -17,7 +21,7 @@ use super::*;
 /// # 返回值
 /// * 成功时返回操作ID
 /// * 失败时返回负数错误码
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sys_glib_async_read(
     context_id: u64,
     fd: c_int,
@@ -27,7 +31,7 @@ pub extern "C" fn sys_glib_async_read(
     callback: *mut c_void,
     user_data: *mut c_void,
     timeout: u32,
-) -> SyscallResult<i64> {
+) -> i64 {
     crate::println!(
         "[glib_async] 提交异步读: context={}, fd={}, size={}, offset={}, timeout={}",
         context_id,
@@ -50,7 +54,7 @@ pub extern "C" fn sys_glib_async_read(
     }
 
     // 检查上下文是否存在
-    let max_operations = {
+    {
         let contexts = ASYNC_CONTEXTS.lock();
         match contexts.get(&context_id) {
             Some(context) => {
@@ -63,7 +67,6 @@ pub extern "C" fn sys_glib_async_read(
                     );
                     return -28; // ENOSPC
                 }
-                context.max_operations
             },
             None => {
                 crate::println!("[glib_async] 异步上下文不存在: {}", context_id);
@@ -117,7 +120,7 @@ pub extern "C" fn sys_glib_async_read(
         fd,
         size
     );
-    operation_id as SyscallResult
+    operation_id as i64
 }
 
 /// 提交异步写操作
@@ -135,7 +138,7 @@ pub extern "C" fn sys_glib_async_read(
 /// # 返回值
 /// * 成功时返回操作ID
 /// * 失败时返回负数错误码
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sys_glib_async_write(
     context_id: u64,
     fd: c_int,
@@ -145,7 +148,7 @@ pub extern "C" fn sys_glib_async_write(
     callback: *mut c_void,
     user_data: *mut c_void,
     timeout: u32,
-) -> SyscallResult<i64> {
+) -> i64 {
     crate::println!(
         "[glib_async] 提交异步写: context={}, fd={}, size={}, offset={}, timeout={}",
         context_id,
@@ -229,7 +232,7 @@ pub extern "C" fn sys_glib_async_write(
         fd,
         size
     );
-    operation_id as SyscallResult
+    operation_id as i64
 }
 
 /// 取消异步操作
@@ -240,8 +243,8 @@ pub extern "C" fn sys_glib_async_write(
 /// # 返回值
 /// * 成功时返回0
 /// * 失败时返回负数错误码
-#[no_mangle]
-pub extern "C" fn sys_glib_async_cancel(operation_id: u64) -> SyscallResult<i32> {
+#[unsafe(no_mangle)]
+pub extern "C" fn sys_glib_async_cancel(operation_id: u64) -> i32 {
     crate::println!("[glib_async] 取消异步操作: {}", operation_id);
 
     // 验证参数
@@ -300,13 +303,13 @@ pub extern "C" fn sys_glib_async_cancel(operation_id: u64) -> SyscallResult<i32>
 /// # 返回值
 /// * 成功时返回0
 /// * 失败时返回负数错误码
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sys_glib_async_query(
     operation_id: u64,
     status: *mut AsyncOperationStatus,
     bytes_completed: *mut usize,
     error_code: *mut c_int,
-) -> SyscallResult<i32> {
+) -> i32 {
     crate::println!("[glib_async] 查询操作状态: {}", operation_id);
 
     // 验证参数
@@ -321,11 +324,15 @@ pub extern "C" fn sys_glib_async_query(
         return -22; // EINVAL
     }
 
-    // 获取操作信息
-    let operation_info = {
+    // 获取操作信息并提取所需数据
+    let (op_status, op_bytes_completed, op_error_code) = {
         let operations = ASYNC_OPERATIONS.lock();
         match operations.get(&operation_id) {
-            Some(info) => info.clone(),
+            Some(info) => (
+                info.status,
+                info.bytes_completed.load(Ordering::SeqCst),
+                info.error_code,
+            ),
             None => {
                 crate::println!("[glib_async] 异步操作不存在: {}", operation_id);
                 return -2; // ENOENT
@@ -335,17 +342,17 @@ pub extern "C" fn sys_glib_async_query(
 
     // 填充返回信息
     unsafe {
-        *status = operation_info.status;
-        *bytes_completed = operation_info.bytes_completed.load(Ordering::SeqCst);
-        *error_code = operation_info.error_code;
+        *status = op_status;
+        *bytes_completed = op_bytes_completed;
+        *error_code = op_error_code;
     }
 
     crate::println!(
         "[glib_async] 操作状态查询完成: ID={}, status={:?}, bytes={}, error={}",
         operation_id,
-        operation_info.status,
-        operation_info.bytes_completed.load(Ordering::SeqCst),
-        operation_info.error_code
+        op_status,
+        op_bytes_completed,
+        op_error_code
     );
     0
 }
@@ -360,12 +367,12 @@ pub extern "C" fn sys_glib_async_query(
 /// # 返回值
 /// * 成功时返回0
 /// * 失败时返回负数错误码
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sys_glib_async_complete(
     operation_id: u64,
     bytes_transferred: usize,
     error_code: c_int,
-) -> SyscallResult<i32> {
+) -> i32 {
     crate::println!(
         "[glib_async] 完成异步操作: ID={}, bytes={}, error={}",
         operation_id,
@@ -437,8 +444,8 @@ pub extern "C" fn sys_glib_async_complete(
 /// * 成功时返回0
 /// * 超时时返回-62 (ETIMEDOUT)
 /// * 失败时返回负数错误码
-#[no_mangle]
-pub extern "C" fn sys_glib_async_wait(operation_id: u64, timeout: u32) -> SyscallResult<i32> {
+#[unsafe(no_mangle)]
+pub extern "C" fn sys_glib_async_wait(operation_id: u64, timeout: u32) -> i32 {
     crate::println!("[glib_async] 等待异步操作完成: ID={}, timeout={}", operation_id, timeout);
 
     // 验证参数
@@ -477,29 +484,33 @@ pub extern "C" fn sys_glib_async_wait(operation_id: u64, timeout: u32) -> Syscal
 
         if is_completed {
             crate::println!("[glib_async] 操作已完成: ID={}", operation_id);
-            return error_code;
+            if error_code == 0 {
+                return 0;
+            } else {
+                return -5; // EIO
+            }
         }
 
         // 检查超时
         let elapsed = crate::subsystems::time::get_timestamp() - start_time;
         if elapsed >= timeout_ms {
             crate::println!("[glib_async] 等待超时: ID={}, elapsed={}ms", operation_id, elapsed);
-            return -62; // ETIMEDOUT
+            return -110; // ETIMEDOUT
         }
 
         // 简单的等待实现（实际应该使用更高效的等待机制）
         // 这里可以使用epoll或其他事件机制来改进
-        crate::subsystems::time::sleep(core::time::Duration::from_millis(10));
+        crate::subsystems::time::sleep_ms(10);
     }
 }
 
 /// 清理所有异步操作（用于调试）
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sys_glib_async_cleanup() -> c_int {
     crate::println!("[glib_async] 清理所有GLib异步I/O");
 
-    let mut total_operations = 0;
-    let mut total_contexts = 0;
+    let total_operations;
+    let total_contexts;
     let mut leaked_operations = 0;
 
     {

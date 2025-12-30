@@ -1,21 +1,30 @@
 //! VFS file handle
 extern crate alloc;
+
+use crate::prelude::*;
+use crate::error::UnifiedError;
+use crate::error::FileSystemError;
 use alloc::sync::Arc;
+
+// Import VFS-specific types that are not in the prelude
+use super::{VfsResult, InodeOps};
+
+// Import FileAttr from vfs_interface to break circular dependency
+use crate::vfs_interface::FileAttr;
 
 /// Open file handle
 pub struct VfsFile {
     pub inode: Arc<dyn InodeOps>,
     pub offset: u64,
-    flags: u32,
 }
 
 impl VfsFile {
-    pub fn new(inode: Arc<dyn InodeOps>, flags: u32) -> Self {
-        Self { inode, offset: 0, flags }
+    pub fn new(inode: Arc<dyn InodeOps>, _flags: u32) -> Self {
+        Self { inode, offset: 0 }
     }
 
     /// Read from file
-    pub fn read(&mut self, addr: usize, len: usize) -> Result<usize, ()> {
+    pub fn read(&mut self, addr: usize, len: usize) -> Result<usize> {
         // Create a buffer from the address and length
         let buf = unsafe { core::slice::from_raw_parts_mut(addr as *mut u8, len) };
 
@@ -24,12 +33,12 @@ impl VfsFile {
                 self.offset += n as u64;
                 Ok(n)
             },
-            Err(_) => Err(()),
+            Err(_) => Err(UnifiedError::FileSystemError(FileSystemError::IoError)),
         }
     }
 
     /// Write to file
-    pub fn write(&mut self, addr: usize, len: usize) -> Result<usize, ()> {
+    pub fn write(&mut self, addr: usize, len: usize) -> Result<usize> {
         // Create a buffer from the address and length
         let buf = unsafe { core::slice::from_raw_parts(addr as *const u8, len) };
 
@@ -38,7 +47,7 @@ impl VfsFile {
                 self.offset += n as u64;
                 Ok(n)
             },
-            Err(_) => Err(()),
+            Err(_) => Err(UnifiedError::FileSystemError(FileSystemError::IoError)),
         }
     }
 

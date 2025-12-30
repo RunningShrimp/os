@@ -9,6 +9,8 @@
 
 extern crate alloc;
 
+use crate::compat::{PlatformModule, Result};
+
 /// Android compatibility module
 pub struct AndroidModule {
     bionic_runtime: BionicRuntime,
@@ -41,11 +43,11 @@ impl PlatformModule for AndroidModule {
         true
     }
 
-    fn initialize(&mut self) -> Result<(), &'static str> {
+    fn initialize(&mut self) -> Result<()> {
         Ok(())
     }
 
-    fn shutdown(&mut self) -> Result<(), &'static str> {
+    fn shutdown(&mut self) -> Result<()> {
         Ok(())
     }
 }

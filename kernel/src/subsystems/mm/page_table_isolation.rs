@@ -16,8 +16,8 @@
 //! - ASLR implementation
 
 use spin::Mutex;
-use core::sync::atomic;
-use alloc::{collections::BTreeMap, string::String, sync::Arc, vec::Vec};
+use core::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
+use alloc::{collections::BTreeMap, string::String, sync::Arc};
 
 // ============================================================================
 // Page Table Constants
@@ -440,7 +440,7 @@ impl AddressSpace {
     }
     
     /// Check if virtual address is mapped
-    pub fn is_mapped(&self, va: usize) -> bool {
+    pub fn is_mapped(&self, _va: usize) -> bool {
         // In real implementation, would check page table
         true
     }
@@ -463,7 +463,8 @@ impl AddressSpace {
         if self.guard_page_top {
             // Check against top guard (implementation-specific)
             let max_va = self.aslr_base + self.aslr_range;
-            if va >= max_va && va < max_va + PAGE_SIZE {
+            let va_u64 = va as u64;
+            if va_u64 >= max_va && va_u64 < max_va + (PAGE_SIZE as u64) {
                 crate::println!("[pt_isolation] Guard page violation at VA {:#x}", va);
                 return true;
             }
@@ -548,10 +549,10 @@ impl AddressSpaceManager {
     /// Destroy address space
     pub fn destroy_address_space(&self, asid: Asid) {
         let mut spaces = self.address_spaces.lock();
-        
-        if let Some(addr_space) = spaces.remove(&asid.value()) {
+
+        if let Some(_addr_space) = spaces.remove(&asid.value()) {
             crate::println!("[pt_isolation] Destroyed address space ASID {}", asid.value());
-            
+
             // In real implementation, would free all page tables
             self.total_spaces.fetch_sub(1, Ordering::Relaxed);
         }

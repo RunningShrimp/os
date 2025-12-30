@@ -2,6 +2,8 @@
 
 use core::ffi::c_char;
 
+use crate::prelude::*;
+
 use super::*;
 
 /// 创建异步I/O上下文
@@ -13,11 +15,11 @@ use super::*;
 /// # 返回值
 /// * 成功时返回上下文ID
 /// * 失败时返回负数错误码
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sys_glib_async_context_create(
     name: *const c_char,
     max_operations: usize,
-) -> SyscallResult<i32> {
+) -> i32 {
     crate::println!("[glib_async] 创建异步I/O上下文: max_ops={}", max_operations);
 
     // 验证参数
@@ -76,7 +78,7 @@ pub extern "C" fn sys_glib_async_context_create(
     }
 
     crate::println!("[glib_async] 成功创建异步I/O上下文: {} (ID={})", context_name, context_id);
-    context_id as SyscallResult
+    context_id as i32
 }
 
 /// 获取异步上下文统计信息
@@ -91,14 +93,14 @@ pub extern "C" fn sys_glib_async_context_create(
 /// # 返回值
 /// * 成功时返回0
 /// * 失败时返回负数错误码
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sys_glib_async_context_stats(
     context_id: u64,
     total_ops: *mut usize,
     active_ops: *mut usize,
     successful_ops: *mut usize,
     failed_ops: *mut usize,
-) -> SyscallResult<i32> {
+) -> i32 {
     crate::println!("[glib_async] 获取上下文统计: {}", context_id);
 
     // 验证参数
@@ -112,11 +114,16 @@ pub extern "C" fn sys_glib_async_context_stats(
         return -22; // EINVAL
     }
 
-    // 获取上下文统计
-    let context_info = {
+    // 获取上下文统计并提取所需数据
+    let (stats_total, stats_active, stats_successful, stats_failed) = {
         let contexts = ASYNC_CONTEXTS.lock();
         match contexts.get(&context_id) {
-            Some(info) => info.clone(),
+            Some(info) => (
+                info.total_operations.load(Ordering::SeqCst),
+                info.active_operations.load(Ordering::SeqCst),
+                info.successful_operations.load(Ordering::SeqCst),
+                info.failed_operations.load(Ordering::SeqCst),
+            ),
             None => {
                 crate::println!("[glib_async] 异步上下文不存在: {}", context_id);
                 return -2; // ENOENT
@@ -126,19 +133,19 @@ pub extern "C" fn sys_glib_async_context_stats(
 
     // 填充统计信息
     unsafe {
-        *total_ops = context_info.total_operations.load(Ordering::SeqCst);
-        *active_ops = context_info.active_operations.load(Ordering::SeqCst);
-        *successful_ops = context_info.successful_operations.load(Ordering::SeqCst);
-        *failed_ops = context_info.failed_operations.load(Ordering::SeqCst);
+        *total_ops = stats_total;
+        *active_ops = stats_active;
+        *successful_ops = stats_successful;
+        *failed_ops = stats_failed;
     }
 
     crate::println!(
         "[glib_async] 上下文统计: ID={}, total={}, active={}, success={}, failed={}",
         context_id,
-        context_info.total_operations.load(Ordering::SeqCst),
-        context_info.active_operations.load(Ordering::SeqCst),
-        context_info.successful_operations.load(Ordering::SeqCst),
-        context_info.failed_operations.load(Ordering::SeqCst)
+        stats_total,
+        stats_active,
+        stats_successful,
+        stats_failed
     );
     0
 }
@@ -151,8 +158,8 @@ pub extern "C" fn sys_glib_async_context_stats(
 /// # 返回值
 /// * 成功时返回0
 /// * 失败时返回负数错误码
-#[no_mangle]
-pub extern "C" fn sys_glib_async_context_destroy(context_id: u64) -> SyscallResult<i32> {
+#[unsafe(no_mangle)]
+pub extern "C" fn sys_glib_async_context_destroy(context_id: u64) -> i32 {
     crate::println!("[glib_async] 销毁异步上下文: {}", context_id);
 
     // 验证参数

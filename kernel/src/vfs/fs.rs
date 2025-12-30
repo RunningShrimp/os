@@ -1,22 +1,26 @@
 //! SysFS file system type and superblock
 
 extern crate alloc;
+
+use crate::prelude::*;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use super::{devices, kernel};
 use crate::{
     subsystems::sync::Mutex,
     vfs::{
-        dir::DirEntry,
-        error::*,
-        types::{FileType, *},
+        // Use vfs_interface types via vfs module re-exports
+        VfsResult, VfsError, FileAttr, FileMode, DirEntry, FileType,
+        // Import VFS core traits from vfs module
+        InodeOps,
+        core::{FileSystemType, SuperBlock, FsStats},
     },
 };
 
 /// SysFS file system type
 pub struct SysFsType;
 
-impl super::fs::FileSystemType for SysFsType {
+impl FileSystemType for SysFsType {
     fn name(&self) -> &str {
         "sysfs"
     }
@@ -25,7 +29,7 @@ impl super::fs::FileSystemType for SysFsType {
         &self,
         _device: Option<&str>,
         _flags: u32,
-    ) -> VfsResult<Arc<dyn super::fs::SuperBlock>> {
+    ) -> VfsResult<Arc<dyn SuperBlock>> {
         Ok(Arc::new(SysFsSuperBlock::new()))
     }
 }
@@ -42,13 +46,9 @@ impl SysFsSuperBlock {
 
         Self { root, next_ino: AtomicUsize::new(2) }
     }
-
-    fn alloc_ino(&self) -> u64 {
-        self.next_ino.fetch_add(1, Ordering::Relaxed) as u64
-    }
 }
 
-impl super::fs::SuperBlock for SysFsSuperBlock {
+impl SuperBlock for SysFsSuperBlock {
     fn root(&self) -> Arc<dyn InodeOps> {
         self.root.clone()
     }
@@ -61,7 +61,7 @@ impl super::fs::SuperBlock for SysFsSuperBlock {
         Ok(()) // SysFS doesn't need sync
     }
 
-    fn statfs(&self) -> VfsResult<super::fs::FsStats> {
+    fn statfs(&self) -> VfsResult<FsStats> {
         Ok(FsStats {
             bsize: 4096,
             blocks: 0,
@@ -85,15 +85,6 @@ pub struct SysFsInode {
     children: Mutex<BTreeMap<String, Arc<dyn InodeOps>>>,
     // For regular files - content generator
     content_gen: Mutex<Option<Box<dyn Fn() -> String + Send + Sync>>>,
-    // Inode type
-    inode_type: SysFsInodeType,
-}
-
-#[derive(Clone, Copy)]
-enum SysFsInodeType {
-    Directory,
-    RegularFile,
-    Symlink,
 }
 
 impl SysFsInode {
@@ -108,7 +99,6 @@ impl SysFsInode {
             }),
             children: Mutex::new(BTreeMap::new()),
             content_gen: Mutex::new(None),
-            inode_type: SysFsInodeType::Directory,
         }
     }
 
@@ -124,7 +114,6 @@ impl SysFsInode {
             }),
             children: Mutex::new(BTreeMap::new()),
             content_gen: Mutex::new(Some(content_gen)),
-            inode_type: SysFsInodeType::RegularFile,
         }
     }
 
@@ -151,12 +140,11 @@ impl SysFsInode {
             }),
             children: Mutex::new(BTreeMap::new()),
             content_gen: Mutex::new(Some(Box::new(move || target_clone.clone()))),
-            inode_type: SysFsInodeType::Symlink,
         }
     }
 }
 
-impl super::fs::InodeOps for SysFsInode {
+impl InodeOps for SysFsInode {
     fn getattr(&self) -> VfsResult<FileAttr> {
         Ok(self.attr.lock().clone())
     }
@@ -298,10 +286,13 @@ impl super::fs::InodeOps for SysFsInode {
     }
 }
 
+// Implement vfs_interface::Inode for SysFsInode
+crate::impl_inode!(SysFsInode);
+
 /// Initialize and register SysFS
 pub fn init() {
     let sysfs = Arc::new(SysFsType);
-    if let Err(e) = super::super::vfs().register_fs(sysfs) {
+    if let Err(e) = crate::subsystems::fs::vfs().register_fs(sysfs) {
         crate::println!("[sysfs] Failed to register sysfs: {:?}", e);
     } else {
         crate::println!("[sysfs] Registered sysfs filesystem");

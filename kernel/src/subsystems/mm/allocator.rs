@@ -18,20 +18,14 @@ use core::{
 // pub mod buddy;
 // pub mod slab;
 // pub mod compress;
-use crate::subsystems::mm::buddy;
 use crate::{
-    perf::{
-        core::{SyscallStatsSnapshot, UnifiedSyscallStats},
-        monitoring::get_perf_stats,
-    },
     subsystems::{
         mm::{
             buddy::{AllocatorStats as BuddyStats, OptimizedBuddyAllocator},
             hugepage,
             hugepage::HugePageAllocator,
-            slab,
             slab::{AllocatorStats as SlabStats, OptimizedSlabAllocator},
-            traits::{AllocatorStats, AllocatorWithStats, UnifiedAllocator},
+            traits::{AllocatorWithStats, UnifiedAllocator},
         },
         sync::Mutex,
     },
@@ -76,11 +70,15 @@ impl HybridAllocator {
     ) {
         // 使用 SpinLock 替代 Mutex 初始化分配器
         let mut slab = self.slab.lock();
-        slab.init(slab_start as *mut u8, slab_size);
+        unsafe {
+            slab.init(slab_start as *mut u8, slab_size);
+        }
         drop(slab);
 
         let mut buddy = self.buddy.lock();
-        buddy.init(buddy_start, buddy_start + buddy_size, page_size);
+        unsafe {
+            buddy.init(buddy_start, buddy_start + buddy_size, page_size);
+        }
         drop(buddy);
 
         // Initialize huge page allocator with a portion of the buddy region
@@ -88,7 +86,9 @@ impl HybridAllocator {
         let hugepage_start = buddy_start + (buddy_size * 9 / 10);
         let _hugepage_size = buddy_size / 10;
         let mut hugepage = self.hugepage.lock();
-        hugepage.init(hugepage_start, buddy_start + buddy_size);
+        unsafe {
+            hugepage.init(hugepage_start, buddy_start + buddy_size);
+        }
     }
 
     fn alloc(&self, layout: Layout) -> *mut u8 {
@@ -110,7 +110,7 @@ impl HybridAllocator {
         if size <= 2048 {
             // Matches SLAB_SIZES defined in slab.rs
             let mut slab = self.slab.lock(); // SpinLock for faster access
-            let ptr = slab.alloc(layout);
+            let ptr = unsafe { slab.alloc(layout) };
             if !ptr.is_null() {
                 self.allocation_count.fetch_add(1, Ordering::Relaxed);
                 self.track_allocation(size);
@@ -120,7 +120,7 @@ impl HybridAllocator {
 
         // Fallback to buddy allocator (SpinLock for faster access)
         let mut buddy = self.buddy.lock();
-        let ptr = buddy.alloc(layout);
+        let ptr = unsafe { buddy.alloc(layout) };
         if !ptr.is_null() {
             self.allocation_count.fetch_add(1, Ordering::Relaxed);
             self.track_allocation(size);
@@ -184,7 +184,9 @@ impl HybridAllocator {
 
         // Fallback to buddy allocator (SpinLock for faster access)
         let mut buddy = self.buddy.lock();
-        buddy.dealloc(ptr, layout);
+        unsafe {
+            buddy.dealloc(ptr, layout);
+        }
         self.allocation_count.fetch_sub(1, Ordering::Relaxed);
     }
 
@@ -212,9 +214,11 @@ unsafe impl UnifiedAllocator for HybridAllocator {
     }
 
     unsafe fn allocate_zeroed(&self, layout: Layout) -> *mut u8 {
-        let ptr = self.allocate(layout);
+        let ptr = unsafe { self.allocate(layout) };
         if !ptr.is_null() {
-            core::ptr::write_bytes(ptr, 0, layout.size());
+            unsafe {
+                core::ptr::write_bytes(ptr, 0, layout.size());
+            }
         }
         ptr
     }
@@ -225,14 +229,16 @@ unsafe impl UnifiedAllocator for HybridAllocator {
             Err(_) => return null_mut(),
         };
 
-        let new_ptr = self.allocate(new_layout);
+        let new_ptr = unsafe { self.allocate(new_layout) };
         if new_ptr.is_null() {
             return null_mut();
         }
 
         let copy_size = old_layout.size().min(new_size);
-        core::ptr::copy_nonoverlapping(ptr, new_ptr, copy_size);
-        self.deallocate(ptr, old_layout);
+        unsafe {
+            core::ptr::copy_nonoverlapping(ptr, new_ptr, copy_size);
+            self.deallocate(ptr, old_layout);
+        }
 
         new_ptr
     }
@@ -276,7 +282,9 @@ unsafe impl GlobalAlloc for HybridAllocator {
     unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
         let ptr = self.alloc(layout);
         if !ptr.is_null() {
-            core::ptr::write_bytes(ptr, 0, layout.size());
+            unsafe {
+                core::ptr::write_bytes(ptr, 0, layout.size());
+            }
         }
         ptr
     }
@@ -290,8 +298,10 @@ unsafe impl GlobalAlloc for HybridAllocator {
         let new_ptr = self.alloc(new_layout);
         if !new_ptr.is_null() {
             let copy_size = layout.size().min(new_size);
-            core::ptr::copy_nonoverlapping(ptr, new_ptr, copy_size);
-            self.dealloc(ptr, layout);
+            unsafe {
+                core::ptr::copy_nonoverlapping(ptr, new_ptr, copy_size);
+                self.dealloc(ptr, layout);
+            }
         }
         new_ptr
     }
@@ -334,7 +344,11 @@ pub fn calculate_memory_pressure() -> u64 {
         return 10000; // Maximum pressure
     }
 
-    (current * 10000) / total
+    // Convert to u64 for calculation to avoid overflow
+    let current_u64 = current as u64;
+    let total_u64 = total as u64;
+
+    (current_u64 * 10000) / total_u64
 }
 
 /// Expose memory metrics for monitoring
@@ -361,7 +375,9 @@ pub unsafe fn init(
     buddy_size: usize,
     page_size: usize,
 ) {
-    ALLOCATOR.init(slab_start, slab_size, buddy_start, buddy_size, page_size);
+    unsafe {
+        ALLOCATOR.init(slab_start, slab_size, buddy_start, buddy_size, page_size);
+    }
 }
 
 /// Get heap statistics
@@ -372,10 +388,6 @@ pub fn heap_stats() -> (BuddyStats, SlabStats) {
 }
 
 /// Align up to the given alignment
-const fn align_up(addr: usize, align: usize) -> usize {
-    (addr + align - 1) & !(align - 1)
-}
-
 // Implement Send/Sync for the allocator types since they are thread-safe
 unsafe impl Send for HybridAllocator {}
 unsafe impl Sync for HybridAllocator {}

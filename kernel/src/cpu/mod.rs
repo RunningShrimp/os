@@ -1,7 +1,7 @@
 // SMP (Symmetric Multi-Processing) Support
 // Per-CPU data structures and multi-core management
 
-use core::{cell::UnsafeCell, sync::atomic::{AtomicBool, AtomicUsize}};
+use core::{cell::UnsafeCell, sync::atomic::{AtomicBool, AtomicUsize, Ordering}};
 
 use crate::process::{Context, Pid};
 
@@ -205,10 +205,10 @@ pub fn cpu(id: usize) -> &'static CpuInfo {
 /// Get mutable reference to a specific CPU's data
 /// # Safety  
 /// Caller must ensure exclusive access
-pub unsafe fn cpu_mut(id: usize) -> &'static mut CpuInfo {
+pub unsafe fn cpu_mut(id: usize) -> &'static mut CpuInfo { unsafe {
     debug_assert!(id < NCPU, "CPU ID out of range");
     &mut *CPUS.cpus[id].get()
-}
+}}
 
 // ============================================================================
 // Interrupt Control with Nesting

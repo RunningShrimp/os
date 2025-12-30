@@ -9,7 +9,7 @@ use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use crate::{
-    reliability::{EBUSY, EEXIST, EINVAL, ENOENT, ENOMEM, EPERM, ETIMEDOUT},
+    reliability::{EBUSY, EEXIST, EINVAL, ENOENT, ETIMEDOUT},
     subsystems::sync::Mutex,
 };
 

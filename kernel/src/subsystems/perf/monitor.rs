@@ -1,4 +1,4 @@
-use alloc::{collections::BTreeMap, string::String, sync::Arc, vec::Vec};
+use alloc::{collections::BTreeMap, string::String, string::ToString, vec::Vec};
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use spin::Mutex;
@@ -453,7 +453,51 @@ impl Default for PerformanceMonitor {
     }
 }
 
-pub static PERFORMANCE_MONITOR: PerformanceMonitor = PerformanceMonitor::new();
+impl PerformanceMonitor {
+    /// Const constructor for static initialization
+    pub const fn const_new() -> Self {
+        Self {
+            history: Mutex::new(Vec::new()),
+            max_history_size: 1000,
+            last_snapshot: Mutex::new(None),
+
+            cpu_total_cycles: AtomicU64::new(0),
+            cpu_idle_cycles: AtomicU64::new(0),
+            cpu_user_cycles: AtomicU64::new(0),
+            cpu_kernel_cycles: AtomicU64::new(0),
+            cpu_context_switches: AtomicU64::new(0),
+            cpu_interrupts: AtomicU64::new(0),
+
+            mem_page_faults: AtomicU64::new(0),
+            mem_page_allocations: AtomicU64::new(0),
+            mem_page_deallocations: AtomicU64::new(0),
+
+            io_bytes_read: AtomicU64::new(0),
+            io_bytes_written: AtomicU64::new(0),
+            io_read_operations: AtomicU64::new(0),
+            io_write_operations: AtomicU64::new(0),
+            io_active_requests: AtomicUsize::new(0),
+
+            net_bytes_received: AtomicU64::new(0),
+            net_bytes_sent: AtomicU64::new(0),
+            net_packets_received: AtomicU64::new(0),
+            net_packets_sent: AtomicU64::new(0),
+            net_total_connections: AtomicU64::new(0),
+
+            scheduler_total_tasks: AtomicU64::new(0),
+            scheduler_running_tasks: AtomicU64::new(0),
+            scheduler_runnable_tasks: AtomicU64::new(0),
+            scheduler_blocked_tasks: AtomicU64::new(0),
+        }
+    }
+}
+
+pub static PERFORMANCE_MONITOR: PerformanceMonitor = PerformanceMonitor::const_new();
+
+/// Get performance monitor
+pub fn get_performance_monitor() -> &'static PerformanceMonitor {
+    &PERFORMANCE_MONITOR
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum CycleType {

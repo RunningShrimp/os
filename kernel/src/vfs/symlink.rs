@@ -33,14 +33,16 @@
 //! - 相对路径解析: 基于符号链接所在目录
 
 extern crate alloc;
-use alloc::string::{String, ToString};
+
+use crate::prelude::*;
+use alloc::string::String;
 use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use crate::subsystems::sync::Mutex;
-use crate::vfs::error::VfsError;
-use crate::vfs::{Path, FileSystem};
+use crate::vfs::error::{VfsError, VfsResult};
+use crate::vfs::Path;
 
 /// 符号链接缓存条目
 #[derive(Debug, Clone)]
@@ -99,11 +101,11 @@ impl SymlinkCache {
     pub fn lookup(&self, link_path: &str) -> Option<String> {
         let cache = self.cache.lock();
         if let Some(entry) = cache.get(link_path) {
-            let mut hits = self.hits.lock();
+            let hits = self.hits.lock();
             hits.fetch_add(1, Ordering::Relaxed);
             Some(entry.target_path.clone())
         } else {
-            let mut misses = self.misses.lock();
+            let misses = self.misses.lock();
             misses.fetch_add(1, Ordering::Relaxed);
             None
         }
@@ -121,7 +123,7 @@ impl SymlinkCache {
             }
         }
 
-        cache.insert(link_path, SymlinkCacheEntry::new(link_path.clone(), target_path));
+        cache.insert(link_path.clone(), SymlinkCacheEntry::new(link_path, target_path));
     }
 
     /// 移除缓存条目
@@ -221,7 +223,7 @@ impl Default for ResolveOptions {
 /// // 解析符号链接（最多跟随 8 层）
 /// let resolved = resolve_symlink("/tmp/mylink", 8)?;
 /// ```
-pub fn resolve_symlink(path: &Path, max_follows: u8) -> Result<Path, VfsError> {
+pub fn resolve_symlink(path: &Path, max_follows: u8) -> VfsResult<Path> {
     resolve_symlink_with_options(path, ResolveOptions {
         max_follows,
         ..Default::default()
@@ -229,7 +231,7 @@ pub fn resolve_symlink(path: &Path, max_follows: u8) -> Result<Path, VfsError> {
 }
 
 /// 使用选项解析符号链接
-pub fn resolve_symlink_with_options(path: &Path, options: ResolveOptions) -> Result<Path, VfsError> {
+pub fn resolve_symlink_with_options(path: &Path, options: ResolveOptions) -> VfsResult<Path> {
     let mut current_path = path.clone();
     let mut followed = 0u8;
     let mut visited_paths = Vec::new();
@@ -278,7 +280,7 @@ pub fn resolve_symlink_with_options(path: &Path, options: ResolveOptions) -> Res
 }
 
 /// 解析符号链接目标路径（处理相对/绝对路径）
-fn resolve_link_target(link_path: &Path, target: &Path) -> Result<Path, VfsError> {
+fn resolve_link_target(link_path: &Path, target: &Path) -> VfsResult<Path> {
     // 如果目标是绝对路径，直接返回
     if target.is_absolute() {
         return Ok(target.clone());
@@ -318,7 +320,7 @@ fn resolve_link_target(link_path: &Path, target: &Path) -> Result<Path, VfsError
 /// // 读取符号链接目标
 /// let target = readlink("/tmp/mylink")?;
 /// ```
-pub fn readlink(path: &Path) -> Result<Path, VfsError> {
+pub fn readlink(path: &Path) -> VfsResult<Path> {
     // 首先检查缓存
     if let Some(cache) = get_cache() {
         if let Some(cached_target) = cache.lookup(path.as_str()) {
@@ -362,7 +364,7 @@ pub fn readlink(path: &Path) -> Result<Path, VfsError> {
 /// // 创建符号链接 /tmp/mylink -> /etc/hostname
 /// symlink("/etc/hostname", "/tmp/mylink")?;
 /// ```
-pub fn symlink(oldpath: &Path, newpath: &Path) -> Result<(), VfsError> {
+pub fn symlink(oldpath: &Path, newpath: &Path) -> VfsResult<()> {
     // 验证目标路径
     if oldpath.as_str().is_empty() {
         return Err(VfsError::InvalidInput);
@@ -427,7 +429,7 @@ pub struct SymlinkInfo {
 }
 
 /// 获取符号链接信息
-pub fn get_symlink_info(path: &Path) -> Result<SymlinkInfo, VfsError> {
+pub fn get_symlink_info(path: &Path) -> VfsResult<SymlinkInfo> {
     let target = readlink(path)?;
     let is_absolute = target.is_absolute();
 
@@ -468,7 +470,14 @@ pub struct SymlinkStats {
 }
 
 /// 全局统计信息
-static STATS: Mutex<SymlinkStats> = Mutex::new(SymlinkStats::default());
+static STATS: Mutex<SymlinkStats> = Mutex::new(SymlinkStats {
+    total_resolutions: 0,
+    successful_resolutions: 0,
+    loop_detections: 0,
+    max_depth_exceeded: 0,
+    cache_hits: 0,
+    cache_misses: 0,
+});
 
 /// 获取符号链接统计信息
 pub fn get_stats() -> SymlinkStats {

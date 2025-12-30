@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 /// Network Intrusion Detection System (NIDS)
 extern crate alloc;
 
@@ -13,7 +14,7 @@ use super::{
     AttackInfo, DetectionSource, DetectionType, Evidence, IntrusionDetection, NetworkIdsConfig,
     ResponseAction, TargetInfo, ThreatLevel,
 };
-use crate::{net::Packet as NetworkPacket, security::audit::AuditSeverity};
+use crate::net::Packet as NetworkPacket;
 
 /// 网络入侵检测系统
 pub struct NetworkIds {
@@ -545,6 +546,7 @@ pub struct DetectionEngineStats {
     pub memory_usage_bytes: usize,
 }
 
+#[allow(dead_code)]
 impl NetworkIds {
     /// 创建新的网络入侵检测系统
     pub fn new() -> Self {
@@ -645,6 +647,31 @@ impl NetworkIds {
     fn update_traffic_stats(&mut self, packet: &NetworkPacket) {
         let mut stats = self.stats.lock();
         stats.total_packets_processed += 1;
+
+        // Parse protocol from packet string
+        let protocol = match packet.protocol.as_str() {
+            "TCP" => ProtocolType::TCP,
+            "UDP" => ProtocolType::UDP,
+            "ICMP" => ProtocolType::ICMP,
+            "HTTP" => ProtocolType::HTTP,
+            "HTTPS" => ProtocolType::HTTPS,
+            "DNS" => ProtocolType::DNS,
+            _ => ProtocolType::TCP, // Default to TCP for unknown protocols
+        };
+
+        *stats.detections_by_protocol.entry(protocol).or_insert(0) += 1;
+
+        // Log significant traffic for debugging
+        if packet.size > 1500 {
+            crate::println!(
+                "[NetworkIds] Large packet detected: {} bytes from {}:{} to {}:{}",
+                packet.size,
+                packet.src_ip,
+                packet.src_port,
+                packet.dst_ip,
+                packet.dst_port
+            );
+        }
     }
 
     /// 创建异常检测结果
@@ -996,9 +1023,9 @@ impl DetectionEngine {
     /// 确定威胁级别
     fn determine_threat_level(&self, priority: u8) -> ThreatLevel {
         match priority {
-            1..=8 => ThreatLevel::Critical,
-            6..=7 => ThreatLevel::High,
-            4..=5 => ThreatLevel::Medium,
+            6..=8 => ThreatLevel::Critical,
+            4..=5 => ThreatLevel::High,
+            2..=3 => ThreatLevel::Medium,
             _ => ThreatLevel::Low,
         }
     }
@@ -1204,8 +1231,32 @@ impl StateTracker {
 
     /// 解析IP地址
     fn parse_ip(&self, ip_str: &str) -> u32 {
-        // 简化的IP解析，实际应该使用proper IP解析
-        0
+        // Parse IPv4 address string "a.b.c.d" to u32
+        let octets: Vec<&str> = ip_str.split('.').collect();
+        if octets.len() != 4 {
+            // Invalid IP format, return 0 for error
+            crate::println!("[NetworkIds] Invalid IP address format: {}", ip_str);
+            return 0;
+        }
+
+        let mut result: u32 = 0;
+        for (i, octet_str) in octets.iter().enumerate() {
+            match octet_str.parse::<u8>() {
+                Ok(octet) => {
+                    result |= (octet as u32) << (8 * (3 - i));
+                },
+                Err(_) => {
+                    crate::println!(
+                        "[NetworkIds] Failed to parse IP octet '{}' in address {}",
+                        octet_str,
+                        ip_str
+                    );
+                    return 0;
+                },
+            }
+        }
+
+        result
     }
 
     /// 解析协议
@@ -1234,6 +1285,13 @@ pub struct HttpAnalyzer {
 }
 
 impl HttpAnalyzer {
+    /// Create a new HTTP analyzer
+    ///
+    /// # Note
+    /// This analyzer is provided for protocol detection and analysis.
+    /// Marked as allowed for dead code as it may be used dynamically
+    /// in protocol identification scenarios.
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             info: ProtocolInfo {
@@ -1266,6 +1324,13 @@ pub struct DnsAnalyzer {
 }
 
 impl DnsAnalyzer {
+    /// Create a new DNS analyzer
+    ///
+    /// # Note
+    /// This analyzer is provided for protocol detection and analysis.
+    /// Marked as allowed for dead code as it may be used dynamically
+    /// in protocol identification scenarios.
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             info: ProtocolInfo {
@@ -1298,6 +1363,13 @@ pub struct SmtpAnalyzer {
 }
 
 impl SmtpAnalyzer {
+    /// Create a new SMTP analyzer
+    ///
+    /// # Note
+    /// This analyzer is provided for protocol detection and analysis.
+    /// Marked as allowed for dead code as it may be used dynamically
+    /// in protocol identification scenarios.
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             info: ProtocolInfo {

@@ -6,6 +6,7 @@
 use core::{alloc::Layout, ffi::c_void};
 
 use crate::subsystems::mm::allocator::HybridAllocator;
+use crate::subsystems::mm::traits::{CAllocator, UnifiedAllocator};
 
 /// libc memory allocator adapter
 ///

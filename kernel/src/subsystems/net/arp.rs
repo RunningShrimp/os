@@ -486,15 +486,12 @@ pub struct ArpCacheStats {
 
 /// ARP packet processor
 pub struct ArpProcessor {
-    /// Cache timeout
-    cache_timeout: Duration,
 }
 
 impl ArpProcessor {
     /// Create a new ARP processor
     pub fn new() -> Self {
         Self {
-            cache_timeout: Duration::from_secs(60 * 20), // 20 minutes
         }
     }
 
@@ -566,5 +563,3 @@ pub enum ArpError {
 /// ARP packet type alias for compatibility
 pub type ArpPacket = ArpHeader;
 
-/// Use atomic operations for thread safety
-const ARP_TABLE_SIZE: usize = 256;

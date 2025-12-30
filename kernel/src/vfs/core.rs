@@ -3,11 +3,12 @@
 //! 定义虚拟文件系统的核心 trait，包括文件系统类型和超级块。
 
 extern crate alloc;
+
+use crate::prelude::*;
 use alloc::sync::Arc;
 
 use crate::vfs::{
     inode::InodeOps,
-    error::VfsError,
     VfsResult,
 };
 

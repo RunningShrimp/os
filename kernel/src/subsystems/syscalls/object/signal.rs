@@ -1,5 +1,11 @@
 // Object signal management functions
 
+use core::ffi::c_char;
+use core::sync::atomic::Ordering;
+
+use alloc::string::ToString;
+use alloc::vec::Vec;
+
 use super::*;
 
 /// 注册对象信号
@@ -15,7 +21,7 @@ use super::*;
 /// # 返回值
 /// * 成功时返回信号ID
 /// * 失败时返回负数错误码
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sys_glib_object_signal_register(
     type_id: u64,
     name: *const c_char,
@@ -23,7 +29,7 @@ pub extern "C" fn sys_glib_object_signal_register(
     param_count: usize,
     return_type: u64,
     flags: u32,
-) -> SyscallResult<i32> {
+) -> i32 {
     crate::println!(
         "[glib_object] 注册信号: type={}, params={}, return={}, flags=0x{:x}",
         type_id,
@@ -41,9 +47,13 @@ pub extern "C" fn sys_glib_object_signal_register(
     // 读取信号名称
     let signal_name = unsafe {
         let len = (0..).find(|&i| *name.add(i) == 0).unwrap_or(255);
-        core::str::from_utf8(core::slice::from_raw_parts(name as *const u8, len))
-            .unwrap_or("invalid")
-            .to_string()
+        let bytes = core::slice::from_raw_parts(name as *const u8, len);
+        let s = core::str::from_utf8(bytes);
+        if let Ok(str_val) = s {
+            str_val.to_string()
+        } else {
+            "invalid".to_string()
+        }
     };
 
     if signal_name.is_empty() {
@@ -111,7 +121,7 @@ pub extern "C" fn sys_glib_object_signal_register(
         signal_id,
         type_id
     );
-    signal_id as SyscallResult
+    signal_id as i32
 }
 
 /// 发射对象信号
@@ -125,13 +135,13 @@ pub extern "C" fn sys_glib_object_signal_register(
 /// # 返回值
 /// * 成功时返回处理器数量
 /// * 失败时返回负数错误码
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sys_glib_object_signal_emit(
     instance_id: u64,
     signal_id: u64,
-    args: *const u64,
+    _args: *const u64,
     arg_count: usize,
-) -> SyscallResult<i32> {
+) -> i32 {
     crate::println!(
         "[glib_object] 发射信号: instance={}, signal={}, args={}",
         instance_id,
@@ -145,11 +155,11 @@ pub extern "C" fn sys_glib_object_signal_emit(
         return -22; // EINVAL
     }
 
-    // 获取实例信息
-    let instance_info = {
+    // 获取实例类型ID
+    let type_id = {
         let instances = OBJECT_INSTANCES.lock();
         match instances.get(&instance_id) {
-            Some(info) => info.clone(),
+            Some(info) => info.type_id,
             None => {
                 crate::println!("[glib_object] 对象实例不存在: {}", instance_id);
                 return -2; // ENOENT
@@ -160,7 +170,7 @@ pub extern "C" fn sys_glib_object_signal_emit(
     // 查找信号信息
     let handler_count = {
         let signals = OBJECT_SIGNALS.lock();
-        if let Some(signal_list) = signals.get(&instance_info.type_id) {
+        if let Some(signal_list) = signals.get(&type_id) {
             let mut found_handlers = 0;
             for signal in signal_list.iter() {
                 if signal.signal_id == signal_id {
@@ -171,7 +181,7 @@ pub extern "C" fn sys_glib_object_signal_emit(
             }
             found_handlers
         } else {
-            crate::println!("[glib_object] 类型信号列表不存在: type={}", instance_info.type_id);
+            crate::println!("[glib_object] 类型信号列表不存在: type={}", type_id);
             return -2; // ENOENT
         }
     };
@@ -184,5 +194,5 @@ pub extern "C" fn sys_glib_object_signal_emit(
     );
 
     // 实际的信号调用由用户空间GLib处理，这里只做统计
-    handler_count as SyscallResult
+    handler_count as i32
 }

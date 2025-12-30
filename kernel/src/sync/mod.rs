@@ -99,7 +99,7 @@
 //!
 //! ## 相关模块
 //!
-//! - [`crate::subsystems::sync`): 更多的同步原语实现
+//! - [`crate::subsystems::sync`]: 更多的同步原语实现
 //! - [`futex`]: 用户空间同步原语
 
 // Synchronization primitives for xv6-rust kernel
@@ -109,6 +109,7 @@
 
 use core::{
     cell::UnsafeCell,
+    fmt::Debug,
     ops::{Deref, DerefMut},
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
@@ -224,7 +225,7 @@ impl RawSpinLock {
         }
 
         // Record CPU holding the lock
-        self.cpu_id.store(crate::cpu::cpuid(), Ordering::Relaxed);
+        self.cpu_id.store(crate::platform_arch::cpuid(), Ordering::Relaxed);
     }
 
     pub fn unlock(&self) {
@@ -256,11 +257,12 @@ impl RawSpinLock {
 
     /// Check if the current CPU is holding the lock
     pub fn holding(&self) -> bool {
-        self.is_locked() && self.cpu_id.load(Ordering::Relaxed) == crate::cpu::cpuid()
+        self.is_locked() && self.cpu_id.load(Ordering::Relaxed) == crate::platform_arch::cpuid()
     }
 }
 
 pub mod primitives;
+pub mod lock_guard;
 
 #[cfg(feature = "realtime")]
 pub mod realtime;
@@ -270,8 +272,8 @@ pub mod rcu;
 #[cfg(feature = "kernel_tests")]
 pub mod tests;
 
+#[cfg(feature = "kernel_tests")]
 pub mod futex_tests;
-pub mod futex_validation;
 
 // Legacy compatibility alias
 pub type SpinLock = RawSpinLock;
@@ -702,7 +704,8 @@ impl<T: ?Sized> Drop for SleeplockGuard<'_, T> {
         self.lock.locked.store(false, Ordering::Release);
         // TODO: Wakeup waiting processes when scheduler is ready
         // This would involve calling the scheduler to wakeup processes waiting on this lock
-        crate::println!("[sync] SleepLock released - would wakeup waiting processes");
+        // Note: Println macro not available in this context
+        // crate::println!("[sync] SleepLock released - would wakeup waiting processes");
     }
 }
 
@@ -824,5 +827,22 @@ impl<T: ?Sized> DerefMut for RwLockWriteGuard<'_, T> {
 impl<T: ?Sized> Drop for RwLockWriteGuard<'_, T> {
     fn drop(&mut self) {
         self.lock.state.store(0, Ordering::Release);
+    }
+}
+
+// Debug implementations for mutex types
+impl<T: ?Sized + Debug> Debug for Mutex<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Mutex")
+            .field("locked", &self.lock.is_locked())
+            .finish_non_exhaustive()
+    }
+}
+
+impl<T: ?Sized + Debug> Debug for MutexIrq<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("MutexIrq")
+            .field("locked", &self.lock.is_locked())
+            .finish_non_exhaustive()
     }
 }

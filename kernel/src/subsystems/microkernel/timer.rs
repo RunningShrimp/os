@@ -8,9 +8,21 @@ use alloc::{collections::BTreeMap, vec::Vec};
 use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use crate::{
-    reliability::{EALREADY, EINVAL, ENOENT, ETIMEDOUT},
+    reliability::{EALREADY, EINVAL, ENOENT},
     subsystems::sync::Mutex,
 };
+
+/// Get current time in nanoseconds based on clock source
+fn get_current_time_ns(clock_source: ClockSource) -> u64 {
+    // TODO: Implement proper time retrieval based on clock source
+    // For now, return a simple placeholder value
+    match clock_source {
+        ClockSource::Realtime => 0,
+        ClockSource::Monotonic => 0,
+        ClockSource::Boottime => 0,
+        ClockSource::TAI => 0,
+    }
+}
 
 /// Timer types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -197,9 +209,7 @@ impl HighResolutionTimer {
         self.fire_count.fetch_add(1, Ordering::SeqCst);
 
         // Call the callback
-        unsafe {
-            (self.callback)(self.id, self.callback_data);
-        }
+        (self.callback)(self.id, self.callback_data);
 
         match self.timer_type {
             TimerType::OneShot | TimerType::Deadline => {
@@ -307,9 +317,7 @@ impl PeriodicTimer {
             self.fire_count.fetch_add(1, Ordering::SeqCst);
 
             // Call callback
-            unsafe {
-                (self.callback)(self.id, self.callback_data);
-            }
+            (self.callback)(self.id, self.callback_data);
 
             true
         }
@@ -674,21 +682,6 @@ pub fn get_timer_manager_mut() -> Option<&'static mut MicroTimerManager> {
 }
 
 /// Timer interrupt handler (called from interrupt system)
-extern "C" fn timer_interrupt_handler() {
-    if let Some(manager) = get_timer_manager() {
-        manager.tick();
-    }
-}
-
-/// Get current time based on clock source
-fn get_current_time_ns(clock_source: ClockSource) -> u64 {
-    match clock_source {
-        ClockSource::Realtime => crate::subsystems::time::get_time_ns(),
-        ClockSource::Monotonic => crate::subsystems::time::get_monotonic_time_ns(),
-        ClockSource::Boottime => crate::subsystems::time::get_boot_time_ns(),
-        ClockSource::TAI => crate::subsystems::time::get_time_ns(), // Fallback to realtime for now
-    }
-}
 
 /// Sleep for specified nanoseconds (high-resolution sleep)
 pub fn sleep_ns(duration_ns: u64) {

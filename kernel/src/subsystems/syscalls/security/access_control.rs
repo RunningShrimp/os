@@ -16,7 +16,7 @@ use alloc::{
 
 use spin::Mutex;
 
-use crate::error::UnifiedError;
+use crate::error::KernelError;
 
 /// 用户标识符
 pub type UserId = u32;
@@ -473,7 +473,7 @@ impl AccessControlManager {
             let groups = self.groups.lock();
 
             // 检查主组
-            if let Some(group) = groups.get(&user.gid) {
+            if let Some(_group) = groups.get(&user.gid) {
                 for entry in acl.iter() {
                     if entry.resource_type == resource_type
                         && (entry.resource_id == "*" || entry.resource_id == resource_id)
@@ -492,7 +492,7 @@ impl AccessControlManager {
 
             // 检查附加组
             for &gid in &user.supplementary_gids {
-                if let Some(group) = groups.get(&gid) {
+                if let Some(_group) = groups.get(&gid) {
                     for entry in acl.iter() {
                         if entry.resource_type == resource_type
                             && (entry.resource_id == "*" || entry.resource_id == resource_id)
@@ -592,7 +592,7 @@ impl AccessControlManager {
 
         // 检查用户是否已存在
         if users.contains_key(&user.uid) {
-            return Err(KernelError::AlreadyInProgress);
+            return Err(KernelError::ResourceBusy);
         }
 
         // 添加用户
@@ -607,7 +607,7 @@ impl AccessControlManager {
 
         // 检查组是否已存在
         if groups.contains_key(&group.gid) {
-            return Err(KernelError::AlreadyInProgress);
+            return Err(KernelError::ResourceBusy);
         }
 
         // 添加组
@@ -622,7 +622,7 @@ impl AccessControlManager {
 
         // 检查ACL条目数是否超过限制
         if acl.len() >= self.config.max_acl_entries {
-            return Err(KernelError::OutOfSpace);
+            return Err(KernelError::OutOfMemory);
         }
 
         // 添加ACL条目

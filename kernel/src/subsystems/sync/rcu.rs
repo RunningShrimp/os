@@ -21,7 +21,7 @@
 use alloc::{boxed::Box, vec::Vec};
 use core::{
     marker::PhantomData,
-    sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicPtr, AtomicU64, Ordering},
 };
 
 use crate::{cpu, subsystems::sync::Mutex};
@@ -203,21 +203,23 @@ pub fn call_rcu(callback: Box<dyn FnOnce() + Send>) {
     get_rcu_grace_period().call_rcu(callback);
 }
 
-/// RCU-protected data structure
+/// RCU (Read-Copy-Update) protected data
+///
+/// Provides lock-free reads with atomic pointer updates.
+/// Writers use copy-on-update semantics with grace period tracking.
 pub struct Rcu<T> {
-    /// Pointer to the protected data
+    /// Atomic pointer to protected data
     data: AtomicPtr<T>,
-    /// Phantom data for ownership tracking
-    _phantom: PhantomData<T>,
 }
 
 impl<T> Rcu<T> {
     /// Create a new RCU-protected value
     pub fn new(value: T) -> Self {
         let boxed = Box::new(value);
+        let ptr = Box::into_raw(boxed);
+
         Self {
-            data: AtomicPtr::new(Box::into_raw(boxed)),
-            _phantom: PhantomData,
+            data: AtomicPtr::new(ptr),
         }
     }
 
@@ -262,11 +264,14 @@ impl<T> Rcu<T> {
         // Memory barrier to ensure all readers see the new pointer
         core::sync::atomic::fence(Ordering::SeqCst);
 
-        // Wait for grace period and free old value
-        let old_ptr = prev_ptr;
-        get_rcu_grace_period().call_rcu(Box::new(move || unsafe {
-            let _ = Box::from_raw(old_ptr);
-        }));
+        // Wait for grace period and free old value directly
+        // This is simpler and avoids the complex lifetime issues with closures
+        synchronize_rcu();
+
+        // SAFETY: prev_ptr came from Box::into_raw and we've waited for grace period
+        unsafe {
+            drop(Box::from_raw(prev_ptr));
+        }
     }
 
     /// Replace the protected value

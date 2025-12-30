@@ -63,15 +63,17 @@ impl OptimizedBuddyAllocator {
     }
 
     /// Initialize the buddy allocator with a memory range
-    pub unsafe fn init(&mut self, start: usize, end: usize) {
+    pub unsafe fn init(&mut self, start: usize, end: usize, _page_size: usize) {
         let total_size = end - start;
         self.total_memory.store(total_size, Ordering::SeqCst);
 
         // Add entire memory to the largest free block
         let block_ptr = start as *mut BuddyBlock;
-        (*block_ptr).size = total_size;
-        (*block_ptr).allocated = false;
-        (*block_ptr).next = core::ptr::null_mut();
+        unsafe {
+            (*block_ptr).size = total_size;
+            (*block_ptr).allocated = false;
+            (*block_ptr).next = core::ptr::null_mut();
+        }
 
         // Find the appropriate order for this block
         let order = self.size_to_order(total_size);
@@ -89,20 +91,24 @@ impl OptimizedBuddyAllocator {
         for current_order in order..=MAX_ORDER {
             if !self.free_lists[current_order].is_null() {
                 let block = self.free_lists[current_order];
-                self.free_lists[current_order] = (*block).next;
+                unsafe {
+                    self.free_lists[current_order] = (*block).next;
+                }
 
                 // Split the block if necessary
                 let final_block = if current_order > order {
-                    self.split_block(block, current_order, order)
+                    unsafe { self.split_block(block, current_order, order) }
                 } else {
                     block
                 };
 
-                (*final_block).allocated = true;
+                unsafe {
+                    (*final_block).allocated = true;
+                }
                 self.allocated_memory.fetch_add(size, Ordering::SeqCst);
                 self.stats.allocated += size;
 
-                return final_block.add(core::mem::size_of::<BuddyBlock>()) as *mut u8;
+                return unsafe { final_block.add(core::mem::size_of::<BuddyBlock>()) as *mut u8 };
             }
         }
 
@@ -119,18 +125,20 @@ impl OptimizedBuddyAllocator {
         let size = layout.size();
         let block_ptr = (ptr as usize - core::mem::size_of::<BuddyBlock>()) as *mut BuddyBlock;
 
-        if !(*block_ptr).allocated {
-            // Double-free or invalid free
-            return;
-        }
+        unsafe {
+            if !(*block_ptr).allocated {
+                // Double-free or invalid free
+                return;
+            }
 
-        (*block_ptr).allocated = false;
+            (*block_ptr).allocated = false;
+        }
         self.allocated_memory.fetch_sub(size, Ordering::SeqCst);
         self.stats.freed += size;
 
         // Coalesce with buddy if possible
         let order = self.size_to_order(size);
-        self.coalesce_block(block_ptr, order);
+        unsafe { self.coalesce_block(block_ptr, order) };
     }
 
     /// Get allocator statistics
@@ -177,27 +185,31 @@ impl OptimizedBuddyAllocator {
             return block;
         }
 
-        let size = (*block).size / 2;
+        let size = unsafe { (*block).size } / 2;
         let second_half = (block as usize + size) as *mut BuddyBlock;
 
         // Create split blocks
-        (*block).size = size;
-        (*second_half).size = size;
-        (*second_half).allocated = false;
-        (*second_half).next = core::ptr::null_mut();
+        unsafe {
+            (*block).size = size;
+            (*second_half).size = size;
+            (*second_half).allocated = false;
+            (*second_half).next = core::ptr::null_mut();
+        }
 
         // Add second half to free list at current_order - 1
         self.free_lists[current_order - 1] = second_half;
 
         // Recursively split first half
-        self.split_block(block, current_order - 1, target_order)
+        unsafe { self.split_block(block, current_order - 1, target_order) }
     }
 
     /// Coalesce buddy blocks
     unsafe fn coalesce_block(&mut self, block: *mut BuddyBlock, order: usize) {
         if order >= MAX_ORDER {
             // Add to free list at current order
-            (*block).next = self.free_lists[order];
+            unsafe {
+                (*block).next = self.free_lists[order];
+            }
             self.free_lists[order] = block;
             return;
         }
@@ -208,15 +220,17 @@ impl OptimizedBuddyAllocator {
         let buddy = buddy_addr as *mut BuddyBlock;
 
         // Check if buddy is free and same size
-        if !self.is_block_in_free_list(buddy, order) {
+        if !unsafe { self.is_block_in_free_list(buddy, order) } {
             // Buddy not free, add current block to free list
-            (*block).next = self.free_lists[order];
+            unsafe {
+                (*block).next = self.free_lists[order];
+            }
             self.free_lists[order] = block;
             return;
         }
 
         // Remove buddy from free list
-        self.remove_from_free_list(buddy, order);
+        unsafe { self.remove_from_free_list(buddy, order) };
 
         // Merge blocks
         let merged_block = if block_addr < buddy_addr {
@@ -224,10 +238,12 @@ impl OptimizedBuddyAllocator {
         } else {
             buddy
         };
-        (*merged_block).size *= 2;
+        unsafe {
+            (*merged_block).size *= 2;
+        }
 
         // Recursively coalesce
-        self.coalesce_block(merged_block, order + 1);
+        unsafe { self.coalesce_block(merged_block, order + 1) };
     }
 
     /// Check if a block is in a free list
@@ -237,7 +253,7 @@ impl OptimizedBuddyAllocator {
             if current == block {
                 return true;
             }
-            current = (*current).next;
+            current = unsafe { (*current).next };
         }
         false
     }
@@ -250,14 +266,16 @@ impl OptimizedBuddyAllocator {
         while !current.is_null() {
             if current == block {
                 if prev.is_null() {
-                    self.free_lists[order] = (*current).next;
+                    self.free_lists[order] = unsafe { (*current).next };
                 } else {
-                    (*prev).next = (*current).next;
+                    unsafe {
+                        (*prev).next = (*current).next;
+                    }
                 }
                 return;
             }
             prev = current;
-            current = (*current).next;
+            current = unsafe { (*current).next };
         }
     }
 }

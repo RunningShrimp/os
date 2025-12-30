@@ -911,6 +911,12 @@ impl NvmeController {
         self.submit_admin_command(command)?;
         let completion = self.wait_for_completion(0)?;
 
+        // Check if the command completed successfully
+        if completion.status.status_code != 0 {
+            crate::println!("[nvme] 警告: 命名空间扫描命令完成状态: {:?}", completion.status);
+            // Continue anyway - we'll create a default namespace
+        }
+
         // 解析命名空间列表并创建命名空间对象
         // 这里简化实现
         let namespace = NvmeNamespace {

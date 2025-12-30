@@ -9,15 +9,15 @@
 //! - **扩展支持**: 支持文件锁、扩展属性等高级功能
 
 extern crate alloc;
+
+use crate::prelude::*;
 use alloc::sync::Arc;
 
-use crate::vfs::{
-    dir::DirEntry,
-    error::VfsError,
-    types::FileMode,
-    FileAttr,
-    VfsResult,
-};
+// Import from vfs_interface to avoid type conflicts
+use crate::vfs_interface::{FileAttr, FileMode, VfsError, DirEntry};
+
+// Import VfsResult type alias from vfs module
+use crate::vfs::VfsResult;
 
 /// Inode 操作 trait
 ///
@@ -42,7 +42,7 @@ pub trait InodeOps: Send + Sync {
     /// 在当前目录中查找给定的名称，返回对应的 inode。
     fn lookup(&self, name: &str) -> VfsResult<Arc<dyn InodeOps>> {
         let _ = name;
-        Err(VfsError::NotDirectory)
+        Err(VfsError::NotADirectory)
     }
 
     /// 创建常规文件
@@ -119,7 +119,7 @@ pub trait InodeOps: Send + Sync {
     /// 返回实际读取的字节数。
     fn read(&self, offset: u64, buf: &mut [u8]) -> VfsResult<usize> {
         let _ = (offset, buf);
-        Err(VfsError::IsDirectory)
+        Err(VfsError::IsADirectory)
     }
 
     /// 写入文件内容
@@ -128,7 +128,7 @@ pub trait InodeOps: Send + Sync {
     /// 返回实际写入的字节数。
     fn write(&self, offset: u64, buf: &[u8]) -> VfsResult<usize> {
         let _ = (offset, buf);
-        Err(VfsError::IsDirectory)
+        Err(VfsError::IsADirectory)
     }
 
     /// 截断文件

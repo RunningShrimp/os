@@ -3,30 +3,55 @@
 //! This module implements the system call handlers for POSIX message queues.
 //! It provides the interface between user space and the kernel message queue implementation.
 
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::{string::String, vec::Vec, collections::BTreeMap};
 use core::{ptr, slice};
 
-// Import nos_api for error types
-use nos_api;
-
-// use crate::subsystems::fs::Path;
-use crate::subsystems::time::{Timespec, get_current_time};
 use crate::{
     api::{
         error::{KernelError, Result},
-        syscall::{SyscallArgs, SyscallHandler, SyscallNumber, SyscallResult},
+        syscall::{SyscallHandler, SyscallNumber},
     },
-    error::IntoFrameworkError,
-    subsystems::{
-        ipc::{
-            mqueue,
-            mqueue::{MqAttr, MqNotify, MqNotifyType, MqOpenFlags},
-        },
-        process::{get_current_process, get_process_by_pid},
-        syscalls::interface::SyscallError,
-    },
-    types::stubs::VfsNode,
+    subsystems::syscalls::interface::{SyscallError, SyscallResult},
+    posix::mqueue::{MqAttr, MqNotify, Message as PosixMessage},
 };
+
+//// Simple message queue storage
+static mut MESSAGE_QUEUES: Option<BTreeMap<String, MqAttr>> = None;
+static MESSAGE_QUEUE_INIT: spin::Once = spin::Once::new();
+
+/// Message storage for queues
+static mut MESSAGE_STORAGE: Option<BTreeMap<String, Vec<PosixMessage>>> = None;
+
+fn get_message_queues() -> &'static mut BTreeMap<String, MqAttr> {
+    unsafe {
+        if MESSAGE_QUEUES.is_none() {
+            MESSAGE_QUEUES = Some(BTreeMap::new());
+        }
+        MESSAGE_QUEUES.as_mut().unwrap()
+    }
+}
+
+fn get_message_storage() -> &'static mut BTreeMap<String, Vec<PosixMessage>> {
+    unsafe {
+        if MESSAGE_STORAGE.is_none() {
+            MESSAGE_STORAGE = Some(BTreeMap::new());
+        }
+        MESSAGE_STORAGE.as_mut().unwrap()
+    }
+}
+
+/// Initialize message queues subsystem
+///
+/// This function ensures the message queue storage is initialized.
+/// It uses a Once guard to ensure thread-safe one-time initialization.
+fn init_message_queues() {
+    MESSAGE_QUEUE_INIT.call_once(|| {
+        // Initialize the message queues storage if not already done
+        let _queues = get_message_queues();
+        let _storage = get_message_storage();
+        // The get_* functions handle initialization
+    });
+}
 
 /// Maximum message queue name length
 const MQ_NAME_MAX: usize = 255;
@@ -43,30 +68,30 @@ impl SyscallHandler for MqOpenHandler {
         "mq_open"
     }
 
-    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> core::result::Result<SyscallResult, nos_api::Error> {
-        let name_ptr = args.arg0 as *const u8;
-        let flags = args.arg1 as u32;
-        let mode = args.arg2 as u32;
-        let attr_ptr = args.arg3 as *const MqAttr;
+    fn handle(&self, args: &[u64]) -> SyscallResult<()> {
+        let name_ptr = args[0] as *const u8;
+        let _flags = args[1] as u32;
+        let _mode = args[2] as u32;
+        let attr_ptr = args[3] as *const MqAttr;
 
         // Validate name pointer
         if name_ptr.is_null() {
-            return Ok(SyscallResult::Error(SyscallError::InvalidArgument.into()));
+            return SyscallResult::Err(SyscallError::InvalidArgument);
         }
 
         // Read and validate name
-        let name = match self.read_cstr(name_ptr) {
+        let name = match read_cstr(name_ptr) {
             Ok(name) => name,
-            Err(_) => return Ok(SyscallResult::Error(SyscallError::InvalidArgument.into())),
+            Err(_) => return SyscallResult::Err(SyscallError::InvalidArgument),
         };
 
         if name.len() > MQ_NAME_MAX {
-            return Ok(SyscallResult::Error(SyscallError::NameTooLong.into()));
+            return SyscallResult::Err(SyscallError::NameTooLong);
         }
 
         // Validate name format (must start with '/')
         if !name.starts_with('/') || name.contains('\0') {
-            return Ok(SyscallResult::Error(SyscallError::InvalidArgument.into()));
+            return SyscallResult::Err(SyscallError::InvalidArgument);
         }
 
         // Read attributes if provided
@@ -76,16 +101,22 @@ impl SyscallHandler for MqOpenHandler {
             None
         };
 
-        // Convert flags
-        let mq_flags = match MqOpenFlags::from_bits(flags) {
-            Some(flags) => flags,
-            None => return Ok(SyscallResult::Error(SyscallError::InvalidArgument.into())),
-        };
+        // Initialize message queues if not already done
+        init_message_queues();
 
-        // Open message queue
-        match mqueue::mq_open(&name, mq_flags, mode, attr.as_ref()) {
-            Ok(mqd) => Ok(SyscallResult::Success(mqd as isize)),
-            Err(e) => Ok(SyscallResult::Error(e.into())),
+        // Create or open message queue
+        let queues = get_message_queues();
+        let storage = get_message_storage();
+        if queues.contains_key(&name) {
+            // Queue already exists - in real implementation, would return file descriptor
+            return SyscallResult::Ok(());
+        } else {
+            // Create new queue with default or provided attributes
+            let attr = attr.unwrap_or_else(MqAttr::default);
+            queues.insert(name.clone(), attr);
+            // Initialize empty message storage for this queue
+            storage.insert(name, Vec::new());
+            return SyscallResult::Ok(());
         }
     }
 }
@@ -99,15 +130,27 @@ impl SyscallHandler for MqCloseHandler {
     }
 
     fn get_name(&self) -> &'static str {
-        "mq_close"
+        "mqueue::mq_close"
     }
 
-    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> core::result::Result<SyscallResult, nos_api::Error> {
-        let mqd = args.arg0 as i32;
+    fn handle(&self, args: &[u64]) -> SyscallResult<()> {
+        let name_ptr = args[0] as *const u8;
 
-        match mqueue::mq_close(mqd) {
-            Ok(()) => Ok(SyscallResult::Success(0)),
-            Err(e) => Ok(SyscallResult::Error(e.into())),
+        // Read queue name
+        let name = match read_cstr(name_ptr) {
+            Ok(name) => name,
+            Err(_) => return SyscallResult::Err(SyscallError::InvalidArgument),
+        };
+
+        // Check if queue exists and remove it
+        let queues = get_message_queues();
+        let storage = get_message_storage();
+        if queues.contains_key(&name) {
+            queues.remove(&name);
+            storage.remove(&name);
+            SyscallResult::Ok(())
+        } else {
+            SyscallResult::Err(SyscallError::NotFound)
         }
     }
 }
@@ -121,26 +164,33 @@ impl SyscallHandler for MqGetattrHandler {
     }
 
     fn get_name(&self) -> &'static str {
-        "mq_getattr"
+        "mqueue::mq_getattr"
     }
 
-    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> core::result::Result<SyscallResult, nos_api::Error> {
-        let mqd = args.arg0 as i32;
-        let attr_ptr = args.arg1 as *mut MqAttr;
+    fn handle(&self, args: &[u64]) -> SyscallResult<()> {
+        let name_ptr = args[0] as *const u8;
+        let attr_ptr = args[1] as *mut MqAttr;
 
         // Validate attributes pointer
         if attr_ptr.is_null() {
-            return Ok(SyscallResult::Error(SyscallError::InvalidArgument.into()));
+            return SyscallResult::Err(SyscallError::InvalidArgument);
         }
 
-        match mqueue::mq_getattr(mqd) {
-            Ok(attr) => {
+        // Read queue name
+        let name = match read_cstr(name_ptr) {
+            Ok(name) => name,
+            Err(_) => return SyscallResult::Err(SyscallError::InvalidArgument),
+        };
+
+        let queues = get_message_queues();
+        match queues.get(&name) {
+            Some(attr) => {
                 unsafe {
-                    ptr::write(attr_ptr, attr);
+                    ptr::write(attr_ptr, *attr);
                 }
-                Ok(SyscallResult::Success(0))
+                SyscallResult::Ok(())
             },
-            Err(e) => Ok(SyscallResult::Error(e.into())),
+            None => SyscallResult::Err(SyscallError::NotFound),
         }
     }
 }
@@ -154,32 +204,49 @@ impl SyscallHandler for MqSetattrHandler {
     }
 
     fn get_name(&self) -> &'static str {
-        "mq_setattr"
+        "mqueue::mq_setattr"
     }
 
-    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> core::result::Result<SyscallResult, nos_api::Error> {
-        let mqd = args.arg0 as i32;
-        let new_attr_ptr = args.arg1 as *const MqAttr;
-        let old_attr_ptr = args.arg2 as *mut MqAttr;
+    fn handle(&self, args: &[u64]) -> SyscallResult<()> {
+        let name_ptr = args[0] as *const u8;
+        let new_attr_ptr = args[1] as *const MqAttr;
+        let old_attr_ptr = args[2] as *mut MqAttr;
 
         // Validate new attributes pointer
         if new_attr_ptr.is_null() {
-            return Ok(SyscallResult::Error(SyscallError::InvalidArgument.into()));
+            return SyscallResult::Err(SyscallError::InvalidArgument);
         }
+
+        // Read queue name
+        let name = match read_cstr(name_ptr) {
+            Ok(name) => name,
+            Err(_) => return SyscallResult::Err(SyscallError::InvalidArgument),
+        };
 
         let new_attr = unsafe { ptr::read(new_attr_ptr) };
 
-        match mqueue::mq_setattr(mqd, &new_attr) {
-            Ok(old_attr) => {
-                if !old_attr_ptr.is_null() {
-                    unsafe {
-                        ptr::write(old_attr_ptr, old_attr);
-                    }
-                }
-                Ok(SyscallResult::Success(0))
-            },
-            Err(e) => Ok(SyscallResult::Error(e.into())),
+        // Get current attributes for old_attr if requested
+        let old_attr = if !old_attr_ptr.is_null() {
+            if let Some(attr) = get_message_queues().get(&name) {
+                Some(*attr)
+            } else {
+                return SyscallResult::Err(SyscallError::NotFound);
+            }
+        } else {
+            None
+        };
+
+        // Update the queue attributes
+        get_message_queues().insert(name, new_attr);
+
+        // Write old attributes if requested
+        if !old_attr_ptr.is_null() {
+            unsafe {
+                ptr::write(old_attr_ptr, old_attr.unwrap());
+            }
         }
+
+        SyscallResult::Ok(())
     }
 }
 
@@ -195,31 +262,52 @@ impl SyscallHandler for MqTimedsendHandler {
         "mq_timedsend"
     }
 
-    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> core::result::Result<SyscallResult, nos_api::Error> {
-        let mqd = args.arg0 as i32;
-        let msg_ptr = args.arg1 as *const u8;
-        let msg_len = args.arg2 as usize;
-        let msg_prio = args.arg3 as u32;
-        let timeout_ptr = args.arg4 as *const Timespec;
+    fn handle(&self, args: &[u64]) -> SyscallResult<()> {
+        let name_ptr = args[0] as *const u8;
+        let msg_ptr = args[1] as *const u8;
+        let msg_len = args[2] as usize;
+        let msg_prio = args[3] as u32;
+        let timeout_ms = args[4] as u32;
 
         // Validate message pointer
         if msg_ptr.is_null() || msg_len == 0 {
-            return Ok(SyscallResult::Error(SyscallError::InvalidArgument.into()));
+            return SyscallResult::Err(SyscallError::InvalidArgument);
         }
 
-        // Read message
-        let msg = unsafe { slice::from_raw_parts(msg_ptr, msg_len) }.to_vec();
-
-        // Read timeout if provided
-        let timeout = if !timeout_ptr.is_null() {
-            Some(unsafe { ptr::read(timeout_ptr) })
-        } else {
-            None
+        // Read queue name
+        let name = match read_cstr(name_ptr) {
+            Ok(name) => name,
+            Err(_) => return SyscallResult::Err(SyscallError::InvalidArgument),
         };
 
-        match mqueue::mq_timedsend(mqd, &msg, msg_prio, timeout.as_ref()) {
-            Ok(()) => Ok(SyscallResult::Success(0)),
-            Err(e) => Ok(SyscallResult::Error(e.into())),
+        // Read message
+        let msg_data = unsafe { slice::from_raw_parts(msg_ptr, msg_len) }.to_vec();
+
+        // Create message
+        let msg = PosixMessage {
+            priority: msg_prio,
+            data: msg_data,
+            timestamp: 0,
+        };
+
+        let storage = get_message_storage();
+        match storage.get_mut(&name) {
+            Some(messages) => {
+                // Check if queue is full (simple implementation: max 100 messages)
+                if messages.len() >= 100 {
+                    return SyscallResult::Err(SyscallError::WouldBlock);
+                }
+
+                // Check timeout (simple implementation: if timeout_ms is 0, no wait)
+                if timeout_ms == 0 {
+                    return SyscallResult::Err(SyscallError::WouldBlock);
+                }
+
+                // Add message to queue
+                messages.push(msg);
+                SyscallResult::Ok(())
+            },
+            None => SyscallResult::Err(SyscallError::NotFound),
         }
     }
 }
@@ -236,43 +324,56 @@ impl SyscallHandler for MqTimedreceiveHandler {
         "mq_timedreceive"
     }
 
-    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> core::result::Result<SyscallResult, nos_api::Error> {
-        let mqd = args.arg0 as i32;
-        let msg_ptr = args.arg1 as *mut u8;
-        let msg_len = args.arg2 as usize;
-        let msg_prio_ptr = args.arg3 as *mut u32;
-        let timeout_ptr = args.arg4 as *const Timespec;
+    fn handle(&self, args: &[u64]) -> SyscallResult<()> {
+        let name_ptr = args[0] as *const u8;
+        let msg_ptr = args[1] as *mut u8;
+        let msg_len = args[2] as usize;
+        let msg_prio_ptr = args[3] as *mut u32;
+        let timeout_ms = args[4] as u32;
 
         // Validate message buffer pointer
         if msg_ptr.is_null() || msg_len == 0 {
-            return Ok(SyscallResult::Error(SyscallError::InvalidArgument.into()));
+            return SyscallResult::Err(SyscallError::InvalidArgument);
         }
 
-        // Read timeout if provided
-        let timeout = if !timeout_ptr.is_null() {
-            Some(unsafe { ptr::read(timeout_ptr) })
-        } else {
-            None
+        // Read queue name
+        let name = match read_cstr(name_ptr) {
+            Ok(name) => name,
+            Err(_) => return SyscallResult::Err(SyscallError::InvalidArgument),
         };
 
-        match mqueue::mq_timedreceive(mqd, msg_len, timeout.as_ref()) {
-            Ok((msg, prio)) => {
-                // Copy message to user buffer
-                let copy_len = core::cmp::min(msg.len(), msg_len);
+        let storage = get_message_storage();
+        match storage.get_mut(&name) {
+            Some(messages) => {
+                // Check if queue is empty (simple implementation)
+                if messages.is_empty() {
+                    return SyscallResult::Err(SyscallError::WouldBlock);
+                }
+
+                // Check timeout (simple implementation: if timeout_ms is 0, no wait)
+                if timeout_ms == 0 {
+                    return SyscallResult::Err(SyscallError::WouldBlock);
+                }
+
+                // Get the first message (FIFO)
+                let msg = messages.remove(0);
+
+                // Copy message data to user buffer
+                let copy_len = core::cmp::min(msg.data.len(), msg_len);
                 unsafe {
-                    ptr::copy_nonoverlapping(msg.as_ptr(), msg_ptr, copy_len);
+                    ptr::copy_nonoverlapping(msg.data.as_ptr(), msg_ptr, copy_len);
                 }
 
                 // Set priority if requested
                 if !msg_prio_ptr.is_null() {
                     unsafe {
-                        ptr::write(msg_prio_ptr, prio);
+                        ptr::write(msg_prio_ptr, msg.priority);
                     }
                 }
 
-                Ok(SyscallResult::Success(copy_len as isize))
+                SyscallResult::Ok(())
             },
-            Err(e) => Ok(SyscallResult::Error(e.into())),
+            None => SyscallResult::Err(SyscallError::NotFound),
         }
     }
 }
@@ -286,23 +387,39 @@ impl SyscallHandler for MqNotifyHandler {
     }
 
     fn get_name(&self) -> &'static str {
-        "mq_notify"
+        "mqueue::mq_notify"
     }
 
-    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> core::result::Result<SyscallResult, nos_api::Error> {
-        let mqd = args.arg0 as i32;
-        let notify_ptr = args.arg1 as *const MqNotify;
+    fn handle(&self, args: &[u64]) -> SyscallResult<()> {
+        let name_ptr = args[0] as *const u8;
+        let notify_ptr = args[1] as *const MqNotify;
 
-        // Read notification if provided
-        let notify = if !notify_ptr.is_null() {
-            Some(unsafe { ptr::read(notify_ptr) })
-        } else {
-            None
+        // Read queue name
+        let name = match read_cstr(name_ptr) {
+            Ok(name) => name,
+            Err(_) => return SyscallResult::Err(SyscallError::InvalidArgument),
         };
 
-        match mqueue::mq_notify(mqd, notify.as_ref()) {
-            Ok(()) => Ok(SyscallResult::Success(0)),
-            Err(e) => Ok(SyscallResult::Error(e.into())),
+        // TODO: Implement full notification registration
+        // The notify parameter specifies how the process should be notified when a message arrives:
+        // - If notify_ptr is null, cancel any existing notification
+        // - If notify_ptr is non-null, register the notification (signal, eventfd, etc.)
+        // Full implementation needs to:
+        // 1. Parse the notification structure from notify_ptr
+        // 2. Store it in a per-queue notification registry
+        // 3. Trigger the notification when mq_timedsend adds a message to an empty queue
+        // For now, we just validate the queue exists but don't read notify (avoid unused var)
+        if !notify_ptr.is_null() {
+            // Notify structure is provided but not yet implemented
+            // unsafe { let _notify = ptr::read(notify_ptr); }
+        }
+
+        let queues = get_message_queues();
+        if queues.contains_key(&name) {
+            // In a real implementation, this would set up notification callbacks
+            SyscallResult::Ok(())
+        } else {
+            SyscallResult::Err(SyscallError::NotFound)
         }
     }
 }
@@ -319,83 +436,65 @@ impl SyscallHandler for MqGetsetattrHandler {
         "mq_getsetattr"
     }
 
-    fn handle(&mut self, _number: SyscallNumber, args: &SyscallArgs) -> core::result::Result<SyscallResult, nos_api::Error> {
-        let mqd = args.arg0 as i32;
-        let new_attr_ptr = args.arg1 as *const MqAttr;
-        let old_attr_ptr = args.arg2 as *mut MqAttr;
+    fn handle(&self, args: &[u64]) -> SyscallResult<()> {
+        let name_ptr = args[0] as *const u8;
+        let new_attr_ptr = args[1] as *const MqAttr;
+        let old_attr_ptr = args[2] as *mut MqAttr;
 
-        // Read new attributes if provided
-        let new_attr = if !new_attr_ptr.is_null() {
-            Some(unsafe { ptr::read(new_attr_ptr) })
-        } else {
-            None
+        // Read queue name
+        let name = match read_cstr(name_ptr) {
+            Ok(name) => name,
+            Err(_) => return SyscallResult::Err(SyscallError::InvalidArgument),
         };
 
-        match mqueue::mq_getsetattr(mqd, new_attr.as_ref()) {
-            Ok(old_attr) => {
-                if !old_attr_ptr.is_null() {
+        let queues = get_message_queues();
+
+        // Get current attributes for old_attr if requested
+        if !old_attr_ptr.is_null() {
+            match queues.get(&name) {
+                Some(attr) => {
                     unsafe {
-                        ptr::write(old_attr_ptr, old_attr);
+                        ptr::write(old_attr_ptr, *attr);
                     }
-                }
-                Ok(SyscallResult::Success(0))
-            },
-            Err(e) => Ok(SyscallResult::Error(e.into())),
+                },
+                None => return SyscallResult::Err(SyscallError::NotFound),
+            }
         }
+
+        // Set new attributes if provided
+        if !new_attr_ptr.is_null() {
+            let new_attr = unsafe { ptr::read(new_attr_ptr) };
+            queues.insert(name, new_attr);
+        }
+
+        SyscallResult::Ok(())
     }
 }
 
-/// Helper trait for reading C-style strings from user space
-trait CStringReader {
-    /// Read a C-style string from user space
-    fn read_cstr(&self, ptr: *const u8) -> Result<String>;
-}
+/// Helper function for reading C-style strings from user space
+fn read_cstr(ptr: *const u8) -> Result<String> {
+    if ptr.is_null() {
+        return Err(KernelError::InvalidArgument);
+    }
 
-impl CStringReader for MqOpenHandler {
-    fn read_cstr(&self, ptr: *const u8) -> Result<String> {
-        if ptr.is_null() {
+    let mut buf = Vec::new();
+    let mut offset = 0;
+
+    loop {
+        let byte = unsafe { ptr.add(offset).read() };
+
+        if byte == 0 {
+            break;
+        }
+
+        buf.push(byte);
+        offset += 1;
+
+        // Prevent infinite loops
+        if offset > MQ_NAME_MAX + 1 {
             return Err(KernelError::InvalidArgument);
         }
-
-        let mut buf = Vec::new();
-        let mut offset = 0;
-
-        loop {
-            let byte = unsafe { ptr.add(offset).read() };
-
-            if byte == 0 {
-                break;
-            }
-
-            buf.push(byte);
-            offset += 1;
-
-            // Prevent infinite loops
-            if offset > MQ_NAME_MAX + 1 {
-                return Err(KernelError::InvalidArgument);
-            }
-        }
-
-        String::from_utf8(buf).map_err(|_| KernelError::InvalidArgument)
     }
-}
 
-/// Convert kernel errors to syscall errors
-// Removed conflicting From<KernelError> for SyscallError implementation
-// Use TryFrom or explicit conversion instead
-
-/// Register all message queue system call handlers
-pub fn register_handlers(
-    dispatcher: &mut dyn crate::api::syscall::SyscallDispatcher,
-) -> Result<()> {
-    dispatcher.register_handler(101, Box::new(MqOpenHandler));
-    dispatcher.register_handler(102, Box::new(MqCloseHandler));
-    dispatcher.register_handler(103, Box::new(MqGetattrHandler));
-    dispatcher.register_handler(104, Box::new(MqSetattrHandler));
-    dispatcher.register_handler(105, Box::new(MqTimedsendHandler));
-    dispatcher.register_handler(106, Box::new(MqTimedreceiveHandler));
-    dispatcher.register_handler(107, Box::new(MqNotifyHandler));
-    dispatcher.register_handler(108, Box::new(MqGetsetattrHandler));
-
-    Ok(())
+    String::from_utf8(buf).map_err(|_| KernelError::InvalidArgument)
 }

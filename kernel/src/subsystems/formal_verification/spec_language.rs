@@ -11,7 +11,6 @@ use hashbrown::{HashMap, HashSet};
 use spin::Mutex;
 
 use super::*;
-use crate::compat::DefaultHasherBuilder;
 
 /// 规约语言解释器
 pub struct SpecLanguageInterpreter {
@@ -51,7 +50,7 @@ pub enum SpecNodeType {
 /// 语义分析器
 #[derive(Debug)]
 pub struct SpecSemanticAnalyzer {
-    pub symbol_table: HashMap<String, SpecSymbol, crate::compat::DefaultHasherBuilder>,
+    pub symbol_table: HashMap<String, SpecSymbol>,
 }
 
 impl Clone for SpecSemanticAnalyzer {
@@ -91,7 +90,7 @@ impl SpecLanguageInterpreter {
                 },
             },
             semantic_analyzer: SpecSemanticAnalyzer {
-                symbol_table: HashMap::with_hasher(DefaultHasherBuilder),
+                symbol_table: HashMap::new(),
             },
         }
     }

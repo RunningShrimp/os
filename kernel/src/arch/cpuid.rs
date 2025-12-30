@@ -50,16 +50,29 @@ pub unsafe fn cpuid_raw(eax: u32, ecx: u32) -> CpuidResult {
 }
 
 /// Check if CPU supports a specific feature
+///
+/// The `feature` parameter should be a CPU feature bit number.
+/// For x86_64, this checks against CPUID leaf 1 EDX register.
+/// Common features: 0-31 are in EDX, 32-63 would be in ECX.
 pub fn has_feature(feature: u32) -> bool {
     #[cfg(target_arch = "x86_64")]
     {
         unsafe {
             let result = cpuid_raw(1, 0);
-            (result.edx & (1 << (feature % 32))) != 0
+            // Map feature bit to appropriate register
+            let bit = feature % 32;
+            if feature < 32 {
+                (result.edx & (1 << bit)) != 0
+            } else {
+                // TODO: Check ECX register for features 32-63
+                false
+            }
         }
     }
     #[cfg(not(target_arch = "x86_64"))]
     {
+        // TODO: Implement feature detection for other architectures
+        let _ = feature; // Acknowledge parameter
         false
     }
 }

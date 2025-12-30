@@ -5,7 +5,7 @@
 
 extern crate alloc;
 
-use alloc::{collections::BTreeMap, vec::Vec};
+use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
 use crate::reliability::{EDEADLK, EINVAL};
@@ -131,9 +131,10 @@ impl RtMutex {
         // Wake up highest priority waiter
         {
             let mut waiters = self.waiters.lock();
-            if let Some(waiter) = waiters.pop() {
+            if let Some(_waiter) = waiters.pop() {
                 // In real implementation, wake up the thread
                 // For now, just remove from queue
+                // The waiter's thread would be signaled here
             }
         }
 

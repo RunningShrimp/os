@@ -19,7 +19,6 @@ use hashbrown::{HashMap, HashSet};
 use spin::Mutex;
 
 use super::*;
-use crate::compat::DefaultHasherBuilder;
 
 /// 验证管道
 pub struct VerificationPipeline {
@@ -78,7 +77,7 @@ pub struct VerificationPhase {
     /// 阶段类型
     pub phase_type: VerificationType,
     /// 阶段配置
-    pub configuration: HashMap<String, String, crate::compat::DefaultHasherBuilder>,
+    pub configuration: HashMap<String, String>,
     /// 依赖阶段
     pub dependencies: Vec<u64>,
     /// 阶段状态
@@ -450,7 +449,7 @@ impl VerificationPipeline {
                 id: 1,
                 name: "Type Checking".to_string(),
                 phase_type: VerificationType::TypeChecking,
-                configuration: HashMap::with_hasher(DefaultHasherBuilder),
+                configuration: HashMap::new(),
                 dependencies: Vec::new(),
                 status: PhaseStatus::NotStarted,
                 execution_order: 1,
@@ -460,7 +459,7 @@ impl VerificationPipeline {
                 id: 2,
                 name: "Static Analysis".to_string(),
                 phase_type: VerificationType::StaticAnalysis,
-                configuration: HashMap::with_hasher(DefaultHasherBuilder),
+                configuration: HashMap::new(),
                 dependencies: vec![1],
                 status: PhaseStatus::NotStarted,
                 execution_order: 2,
@@ -470,7 +469,7 @@ impl VerificationPipeline {
                 id: 3,
                 name: "Memory Safety Verification".to_string(),
                 phase_type: VerificationType::MemorySafety,
-                configuration: HashMap::with_hasher(DefaultHasherBuilder),
+                configuration: HashMap::new(),
                 dependencies: vec![1, 2],
                 status: PhaseStatus::NotStarted,
                 execution_order: 3,
@@ -480,7 +479,7 @@ impl VerificationPipeline {
                 id: 4,
                 name: "Concurrency Verification".to_string(),
                 phase_type: VerificationType::ConcurrencyVerification,
-                configuration: HashMap::with_hasher(DefaultHasherBuilder),
+                configuration: HashMap::new(),
                 dependencies: vec![1, 2],
                 status: PhaseStatus::NotStarted,
                 execution_order: 4,
@@ -490,7 +489,7 @@ impl VerificationPipeline {
                 id: 5,
                 name: "Security Verification".to_string(),
                 phase_type: VerificationType::SecurityVerification,
-                configuration: HashMap::with_hasher(DefaultHasherBuilder),
+                configuration: HashMap::new(),
                 dependencies: vec![1, 2, 3],
                 status: PhaseStatus::NotStarted,
                 execution_order: 5,
@@ -500,7 +499,7 @@ impl VerificationPipeline {
                 id: 6,
                 name: "Model Checking".to_string(),
                 phase_type: VerificationType::ModelChecking,
-                configuration: HashMap::with_hasher(DefaultHasherBuilder),
+                configuration: HashMap::new(),
                 dependencies: vec![1, 2],
                 status: PhaseStatus::NotStarted,
                 execution_order: 6,
@@ -510,7 +509,7 @@ impl VerificationPipeline {
                 id: 7,
                 name: "Theorem Proving".to_string(),
                 phase_type: VerificationType::TheoremProving,
-                configuration: HashMap::with_hasher(DefaultHasherBuilder),
+                configuration: HashMap::new(),
                 dependencies: vec![1, 2],
                 status: PhaseStatus::NotStarted,
                 execution_order: 7,
@@ -520,7 +519,7 @@ impl VerificationPipeline {
                 id: 8,
                 name: "Comprehensive Verification".to_string(),
                 phase_type: VerificationType::SpecificationVerification,
-                configuration: HashMap::with_hasher(DefaultHasherBuilder),
+                configuration: HashMap::new(),
                 dependencies: vec![1, 2, 3, 4, 5, 6, 7],
                 status: PhaseStatus::NotStarted,
                 execution_order: 8,

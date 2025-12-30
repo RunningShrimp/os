@@ -10,19 +10,15 @@ use core::sync::atomic::{AtomicI32, Ordering};
 
 use crate::subsystems::{
     mm::page_table_isolation::PageTable,
-    syscalls::{
-        common::SyscallError,
-        thread::{
-            FUTEX_WAIT_QUEUE, FutexWaiter, PiFutexData, add_futex_waiter, futex_lock_pi,
-            futex_requeue, futex_trylock_pi, futex_unlock_pi, futex_wait_timeout,
-            futex_wake_optimized, remove_futex_waiter, requeue_futex_waiters, wake_futex_waiters,
-        },
+    syscalls::thread::{
+        add_futex_waiter, futex_lock_pi, futex_requeue, futex_trylock_pi, futex_unlock_pi,
+        futex_wait_timeout, futex_wake_optimized, requeue_futex_waiters,
     },
 };
 
 /// Test configuration
 #[derive(Debug)]
-struct FutexTestConfig {
+pub struct FutexTestConfig {
     /// Number of threads to spawn for stress tests
     thread_count: usize,
     /// Number of operations per thread
@@ -43,7 +39,7 @@ impl Default for FutexTestConfig {
 
 /// Test statistics
 #[derive(Debug, Default)]
-struct FutexTestStats {
+pub struct FutexTestStats {
     /// Total operations performed
     total_operations: usize,
     /// Successful operations

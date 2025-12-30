@@ -112,23 +112,15 @@
 
 extern crate alloc;
 
-// Import kernel prelude for common types
-use crate::prelude::*;
-
 pub mod core;
 pub mod dentry;
 pub mod devices;
 pub mod dir;
+pub mod directory;
 pub mod error;
 pub mod ext4;
 pub mod file;
 pub mod fs;
-pub mod FileMode;
-pub mod VfsError;
-pub mod Mount;
-pub use FileMode::*;
-pub use VfsError::*;
-pub use Mount::*;
 pub mod inode;
 pub mod kernel;
 pub mod mount;
@@ -140,27 +132,65 @@ pub mod symlink;
 pub mod tmpfs;
 pub mod types;
 
-pub use core::*;
-pub use dentry::*;
-pub use dir::*;
-pub use error::*;
-pub use file::*;
-pub use fs::*;
-pub use inode::*;
-pub use mount::*;
-pub use ramfs::*;
-pub use sysfs::*;
+// Re-export from vfs_interface to break circular dependency
+// These are the core VFS types used throughout the kernel
+pub use crate::vfs_interface::{FileMode, VfsError, FileSystemType, SuperBlock, Inode, FileAttr, FileType, DirEntry};
+
+// Import Mount from mount.rs (the concrete Mount struct)
+pub use mount::Mount;
+
+// Define VfsResult as a type alias using vfs_interface::VfsError
+pub type VfsResult<T> = ::core::result::Result<T, crate::vfs_interface::VfsError>;
+
+// Re-export key types from submodules
+// Note: Only export what actually exists and is needed, avoid conflicts with vfs_interface
+pub use dentry::Dentry;
+pub use file::VfsFile;
+pub use fs::SysFsType;
+pub use inode::{InodeOps, FileLock};
+pub use path::Path;
+pub use symlink::{SymlinkCache, ResolveOptions, SymlinkInfo, SymlinkStats};
+pub use types::SeekWhence;
 
 /// Mount a filesystem at the specified path
 ///
 /// This is a convenience function for mounting filesystems.
 /// It delegates to the VFS manager's mount function.
 pub fn mount(fs_type: &str, device: Option<&str>, mount_point: &str, flags: u32) -> VfsResult<()> {
-    crate::subsystems::fs::vfs().mount(fs_type, device, mount_point, flags)
+    // VfsManager::mount expects: fs_type_name, mount_point, device, flags
+    crate::subsystems::fs::vfs().mount(fs_type, mount_point, device, flags)
+        .map_err(|fs_err| match fs_err {
+            crate::subsystems::fs::api::error::FsError::NotFound |
+            crate::subsystems::fs::api::error::FsError::PathNotFound |
+            crate::subsystems::fs::api::error::FsError::FileNotFound => VfsError::NotFound,
+            crate::subsystems::fs::api::error::FsError::PermissionDenied => VfsError::PermissionDenied,
+            crate::subsystems::fs::api::error::FsError::NotADirectory => VfsError::NotADirectory,
+            crate::subsystems::fs::api::error::FsError::IsADirectory => VfsError::IsADirectory,
+            crate::subsystems::fs::api::error::FsError::DirectoryNotEmpty |
+            crate::subsystems::fs::api::error::FsError::NotEmpty => VfsError::NotEmpty,
+            crate::subsystems::fs::api::error::FsError::FileExists |
+            crate::subsystems::fs::api::error::FsError::Exists => VfsError::Exists,
+            crate::subsystems::fs::api::error::FsError::FileSystemFull |
+            crate::subsystems::fs::api::error::FsError::NoSpace => VfsError::NoSpace,
+            crate::subsystems::fs::api::error::FsError::InvalidPath |
+            crate::subsystems::fs::api::error::FsError::InvalidInput => VfsError::InvalidPath,
+            crate::subsystems::fs::api::error::FsError::NotMounted => VfsError::NotMounted,
+            crate::subsystems::fs::api::error::FsError::ResourceBusy |
+            crate::subsystems::fs::api::error::FsError::Busy => VfsError::Busy,
+            crate::subsystems::fs::api::error::FsError::ReadOnly => VfsError::ReadOnly,
+            crate::subsystems::fs::api::error::FsError::IoError => VfsError::IoError,
+            crate::subsystems::fs::api::error::FsError::OperationNotSupported |
+            crate::subsystems::fs::api::error::FsError::NotSupported => VfsError::NotSupported,
+            crate::subsystems::fs::api::error::FsError::InvalidOperation => VfsError::InvalidOperation,
+            crate::subsystems::fs::api::error::FsError::Loop => VfsError::Loop,
+            crate::subsystems::fs::api::error::FsError::TooManyLinks => VfsError::TooManyLinks,
+            crate::subsystems::fs::api::error::FsError::QuotaExceeded => VfsError::NoSpace,
+            crate::subsystems::fs::api::error::FsError::PathTooLong => VfsError::InvalidPath,
+        })
 }
-pub use path::*;
-pub use symlink::*;
-pub use types::*;
+
+// Re-export additional functions from submodules
+pub use symlink::{resolve_symlink, resolve_symlink_with_options, readlink, symlink, is_symlink, get_symlink_info, get_stats, reset_stats};
 
 /// Get the global VFS manager instance
 ///

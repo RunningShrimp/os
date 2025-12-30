@@ -2,16 +2,17 @@
 //!
 //! 本模块提供性能监控功能，合并自nos-perf。
 
+use alloc::string::ToString;
+
 pub mod core;
 pub mod monitoring;
 
-use alloc::{collections::BTreeMap, sync::Arc};
+use crate::prelude::*;
+
 // Re-export commonly used types
 pub use core::{SyscallStatsSnapshot, UnifiedSyscallStats};
 
 pub use monitoring::get_perf_stats;
-use nos_api::Result;
-use spin::Mutex;
 
 /// 性能监控器
 pub struct PerformanceMonitor {

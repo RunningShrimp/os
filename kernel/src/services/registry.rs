@@ -8,6 +8,7 @@ use crate::services::types::{
     ServiceId, ServiceRef, ServiceEvent, ServiceListener, ServiceState,
 };
 use alloc::collections::BTreeMap;
+use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use spin::Mutex;
@@ -41,11 +42,11 @@ impl ServiceRegistry {
         
         // Check if service already exists
         if self.services.contains_key(&service_id) {
-            return Err(KernelError::AlreadyExists("Service already registered".into()));
+            return Err(KernelError::AlreadyExists);
         }
-        
+
         if self.services_by_name.contains_key(&service_name) {
-            return Err(KernelError::AlreadyExists("Service with this name already registered".into()));
+            return Err(KernelError::AlreadyExists);
         }
         
         // Add service to registry
@@ -65,7 +66,7 @@ impl ServiceRegistry {
         // Check if service exists
         let service = match self.services.get(&service_id) {
             Some(service) => service.clone(),
-            None => return Err(KernelError::NotFound("Service not found".into())),
+            None => return Err(KernelError::NotFound),
         };
         
         let service_name = service.name().to_string();
@@ -113,11 +114,11 @@ impl ServiceRegistry {
         state: ServiceState,
     ) -> Result<(), KernelError> {
         // Check if service exists
-        let mut service = match self.services.get_mut(&service_id) {
+        let service = match self.services.get_mut(&service_id) {
             Some(service) => service,
-            None => return Err(KernelError::NotFound("Service not found".into())),
+            None => return Err(KernelError::NotFound),
         };
-        
+
         // Update state
         service.info.state = state;
         
@@ -137,11 +138,11 @@ impl ServiceRegistry {
         value: alloc::string::String,
     ) -> Result<(), KernelError> {
         // Check if service exists
-        let mut service = match self.services.get_mut(&service_id) {
+        let service = match self.services.get_mut(&service_id) {
             Some(service) => service,
-            None => return Err(KernelError::NotFound("Service not found".into())),
+            None => return Err(KernelError::NotFound),
         };
-        
+
         // Update property
         service.info.properties.insert(key.clone(), value.clone());
         

@@ -11,7 +11,6 @@ use hashbrown::{HashMap, HashSet};
 use spin::Mutex;
 
 use super::*;
-use crate::compat::DefaultHasherBuilder;
 
 /// 内存安全验证器
 pub struct MemorySafetyVerifier {

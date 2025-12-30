@@ -8,8 +8,10 @@
 //! - Spinlock synchronization primitives
 
 use alloc::collections::BTreeMap;
+use core::ptr;
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
+use crate::posix::types::{ClockId, Pid};
 use crate::subsystems::sync::Mutex;
 
 /// Thread attribute structure

@@ -10,12 +10,13 @@
 extern crate alloc;
 
 use alloc::collections::BTreeMap;
+use crate::prelude::*;
 use core::{
     ffi::{c_int, c_void},
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::subsystems::{sync::Mutex, syscalls::interface::SyscallResult as InterfaceSyscallResult};
+use crate::subsystems::sync::Mutex;
 
 /// 异步操作状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,7 +51,7 @@ pub enum AsyncOperationType {
 }
 
 /// 异步操作信息
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct AsyncOperationInfo {
     /// 操作ID
     pub operation_id: u64,
@@ -80,8 +81,20 @@ pub struct AsyncOperationInfo {
     pub completed_timestamp: u64,
 }
 
+// SAFETY: AsyncOperationInfo is safe to send between threads because:
+// 1. The raw pointers (buffer, user_data, callback) are only used within the kernel context
+// 2. Access to these pointers is synchronized through the ASYNC_OPERATIONS Mutex
+// 3. The struct is only accessed in a thread-safe manner through the registry
+unsafe impl Send for AsyncOperationInfo {}
+
+// SAFETY: AsyncOperationInfo is safe to share between threads because:
+// 1. All mutable access is protected by the ASYNC_OPERATIONS Mutex
+// 2. AtomicUsize fields provide their own synchronization
+// 3. Raw pointers are only accessed through the mutex-protected registry
+unsafe impl Sync for AsyncOperationInfo {}
+
 /// 异步I/O上下文
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct AsyncIOContext {
     /// 上下文ID
     pub context_id: u64,
@@ -100,6 +113,17 @@ pub struct AsyncIOContext {
     /// 失败操作数统计
     pub failed_operations: AtomicUsize,
 }
+
+// SAFETY: AsyncIOContext is safe to send between threads because:
+// 1. All fields are either immutable (context_id, name, max_operations, created_timestamp)
+// 2. Or are atomic types (active_operations, total_operations, successful_operations, failed_operations)
+// 3. Access is synchronized through the ASYNC_CONTEXTS Mutex
+unsafe impl Send for AsyncIOContext {}
+
+// SAFETY: AsyncIOContext is safe to share between threads because:
+// 1. All mutable access is protected by the ASYNC_CONTEXTS Mutex
+// 2. Atomic fields provide their own synchronization
+unsafe impl Sync for AsyncIOContext {}
 
 /// 全局异步操作注册表
 static ASYNC_OPERATIONS: Mutex<BTreeMap<u64, AsyncOperationInfo>> = Mutex::new(BTreeMap::new());

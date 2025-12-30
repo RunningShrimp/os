@@ -3,6 +3,8 @@
 //! 定义了所有C标准库实现的统一接口，确保不同实现版本之间的一致性。
 //! 这个接口为内存管理、字符串操作、I/O操作等核心C库功能提供了标准化的API。
 
+use core::ffi::{c_char, c_int, c_uint, c_void};
+
 pub type SizeT = usize;
 #[allow(non_camel_case_types)]
 pub type size_t = SizeT;
@@ -777,14 +779,16 @@ static mut CLIB_INITIALIZED: bool = false;
 /// # 安全性
 /// 这个函数只能在系统初始化时调用一次
 pub unsafe fn initialize_c_lib(impl_: &'static dyn CLibInterface) {
-    if CLIB_INITIALIZED {
-        crate::println!("[libc] 警告：C库已经初始化，跳过重复初始化");
-        return;
-    }
+    unsafe {
+        if CLIB_INITIALIZED {
+            crate::println!("[libc] 警告：C库已经初始化，跳过重复初始化");
+            return;
+        }
 
-    GLOBAL_CLIB = Some(impl_);
-    CLIB_INITIALIZED = true;
-    crate::println!("[libc] C库接口初始化完成");
+        GLOBAL_CLIB = Some(impl_);
+        CLIB_INITIALIZED = true;
+        crate::println!("[libc] C库接口初始化完成");
+    }
 }
 
 /// 获取全局C库接口
@@ -795,11 +799,13 @@ pub unsafe fn initialize_c_lib(impl_: &'static dyn CLibInterface) {
 /// # 安全性
 /// 必须在C库初始化后调用
 pub unsafe fn get_c_lib() -> &'static dyn CLibInterface {
-    if let Some(lib) = GLOBAL_CLIB {
-        lib
-    } else {
-        // 在开发阶段，如果未初始化则panic
-        panic!("C库未初始化！请确保在系统启动时调用initialize_c_lib()");
+    unsafe {
+        if let Some(lib) = GLOBAL_CLIB {
+            lib
+        } else {
+            // 在开发阶段，如果未初始化则panic
+            panic!("C库未初始化！请确保在系统启动时调用initialize_c_lib()");
+        }
     }
 }
 

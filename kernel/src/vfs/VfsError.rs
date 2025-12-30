@@ -1,6 +1,8 @@
 //! VFS error types
 extern crate alloc;
 
+use crate::prelude::*;
+
 use alloc::fmt;
 
 /// VFS error types

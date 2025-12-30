@@ -1,6 +1,8 @@
 //! Directory entry for VFS
 extern crate alloc;
 
+use crate::prelude::*;
+
 use super::types::FileType;
 
 /// Directory entry for readdir

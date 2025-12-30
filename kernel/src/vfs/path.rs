@@ -3,6 +3,8 @@
 //! 提供路径解析、规范化和操作功能。
 
 extern crate alloc;
+
+use crate::prelude::*;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
@@ -144,6 +146,11 @@ impl Path {
     /// 判断是否是根路径
     pub fn is_root(&self) -> bool {
         self.inner == "/"
+    }
+
+    /// 转换为路径（返回自身）
+    pub fn to_path(&self) -> Path {
+        self.clone()
     }
 }
 

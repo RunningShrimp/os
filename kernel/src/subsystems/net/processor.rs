@@ -8,7 +8,6 @@ use alloc::{collections::BTreeMap, vec::Vec};
 
 use super::{
     arp::{ArpPacket, ArpProcessor},
-    device::NetworkDevice,
     fragment::FragmentReassembler,
     icmp::{IcmpPacket, IcmpProcessor},
     interface::Interface,
@@ -343,49 +342,31 @@ impl NetworkProcessor {
         self.send_icmp_port_unreachable(src_addr, dst_addr, data)
     }
 
-    /// Handle TCP packet for a specific socket
-    fn handle_tcp_socket_packet(
-        &mut self,
-        socket: &mut TcpSocket,
-        packet: &TcpPacket,
-        _src_addr: Ipv4Addr,
-    ) -> Result<PacketResult, ProcessorError> {
-        // Update socket state based on TCP flags and sequence numbers
-        // This is a simplified implementation
-        if packet.has_flag(super::tcp::tcp_flags::SYN) {
-            if socket.state == TcpState::Listen {
-                // Transition to SYN_RECEIVED
-                socket.state = TcpState::SynReceived;
-                socket.rcv_nxt = packet.seq_num() + 1;
-
-                // Send SYN-ACK response
-                return Ok(PacketResult::Success); // Would create response packet
-            }
-        } else if packet.has_flag(super::tcp::tcp_flags::ACK) {
-            // Handle ACK
-            socket.snd_una = packet.ack_num();
-        }
-
-        // Handle data payload
-        if !packet.payload.is_empty() {
-            // Process received data
-            socket.rcv_nxt = packet.seq_num() + packet.payload.len() as u32;
-        }
-
-        Ok(PacketResult::Success)
-    }
-
     /// Deliver UDP packet to socket
     fn deliver_udp_packet(
         &mut self,
-        _socket: &mut UdpSocket,
-        _packet: &UdpPacket,
-        _src_addr: Ipv4Addr,
+        socket: &mut UdpSocket,
+        packet: &UdpPacket,
+        src_addr: Ipv4Addr,
     ) -> Result<PacketResult, ProcessorError> {
-        // In a real implementation, this would queue data for the socket
-        // For now, just acknowledge receipt
+        // In a real implementation, this would:
+        // 1. Check socket buffer space
+        // 2. Copy packet data to socket receive buffer
+        // 3. Wake up any waiting readers
+
+        // For now, just log the delivery
+        crate::log_info!(
+            "UDP delivered {} bytes from {}:{} to socket {}",
+            packet.payload.len(),
+            src_addr,
+            packet.src_port(),
+            socket.local_port
+        );
+
         Ok(PacketResult::Success)
     }
+
+    /// Handle TCP packet for a specific socket
 
     /// Send ICMP error message
     fn send_icmp_error(

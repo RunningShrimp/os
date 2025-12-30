@@ -4,13 +4,72 @@
 
 use crate::prelude::*;
 
-#![allow(dead_code)]
+#[allow(dead_code)]
 
 // Submodule for stub implementations
 // Make stubs module public so external code can use crate::types::stubs::*
 pub mod stubs;
-// Re-export all stub items at the types level for convenience
-pub use stubs::*;
+
+// Re-export specific items from stubs that are not in prelude
+// Note: FileSystemError, MemoryError, NetworkError, ProcessError, SyscallError
+// are already exported from prelude, so we exclude them to avoid conflicts
+pub use stubs::{
+    // IPC types
+    Message,
+    MessageType,
+    ServiceId,
+
+    // POSIX types
+    PidT,
+    UidT,
+    GidT,
+    AfUnix,
+    pid_t,
+    uid_t,
+    gid_t,
+
+    // Sync types
+    SyncMutex,
+
+    // Socket constants
+    AF_UNIX,
+    AF_INET,
+    AF_INET6,
+    SOCK_STREAM,
+    SOCK_DGRAM,
+    SOCK_RAW,
+
+    // Type stubs (not in prelude)
+    VirtAddr,
+    Process,
+    VfsNode,
+    FileMode,
+    FileType,
+    FilesystemStats,
+    VfsError,
+
+    // RNG and utilities
+    RNG,
+    RNG_INSTANCE,
+    get_timestamp,
+
+    // IPC manager stubs
+    IpcManager,
+    IpcMessage,
+
+    // Memory manager
+    memory,
+
+    // Block device trait
+    BlockDevice,
+
+    // Function stubs
+    log_info,
+    kill_process,
+
+    // Constants
+    AF_UNIX_CONST,
+};
 
 
 // ============================================================================
@@ -88,6 +147,9 @@ pub enum ClockId {
 // Signal Types
 // ============================================================================
 
+/// Signal number type
+pub type Signal = i32;
+
 /// Signal set type
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct SigSet {
@@ -103,6 +165,11 @@ impl SigSet {
     /// Create a full signal set
     pub const fn full() -> Self {
         Self { bits: [u64::MAX] }
+    }
+
+    /// Create a SigSet from raw bits
+    pub const fn from_bits(bits: u64) -> Self {
+        Self { bits: [bits] }
     }
 
     /// Check if a signal is in the set
@@ -133,6 +200,11 @@ impl SigSet {
         let index = (sig - 1) / 64;
         let bit = (sig - 1) % 64;
         self.bits[index as usize] &= !(1 << bit);
+    }
+
+    /// Check if set contains a signal (alias for has)
+    pub fn contains(&self, sig: Signal) -> bool {
+        self.has(sig as u32)
     }
 }
 
@@ -204,6 +276,23 @@ impl MapFlags {
     /// Anonymous mapping
     pub const fn anonymous() -> u32 {
         0x40
+    }
+
+    /// PROT_READ flag
+    pub const PROT_READ: Self = Self(0x1);
+
+    /// PROT_WRITE flag
+    pub const PROT_WRITE: Self = Self(0x2);
+
+    /// PROT_EXEC flag
+    pub const PROT_EXEC: Self = Self(0x4);
+}
+
+impl core::ops::BitOr for MapFlags {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self {
+        Self(self.0 | rhs.0)
     }
 }
 

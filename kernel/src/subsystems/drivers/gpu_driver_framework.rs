@@ -10,24 +10,18 @@ use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
-use core::sync::atomic::{AtomicU32, AtomicU64, AtomicBool, Ordering};
-use crate::subsystems::sync::{Mutex, Sleeplock};
-use crate::subsystems::drivers::device_model::{
-    DeviceModel, EnhancedDeviceInfo, DeviceClass, DevicePowerState, 
-    DeviceCapabilities, DevicePerformanceMetrics
-};
-use crate::subsystems::drivers::driver_manager::{
-    Driver, DeviceId, DriverId, DeviceType, DeviceStatus, DriverStatus,
-    DeviceInfo, DriverInfo, DeviceResources, IoOperation, IoResult, InterruptInfo
-};
-use crate::error::UnifiedError;
+use alloc::boxed::Box;
+use core::sync::atomic::{AtomicU32, AtomicBool, Ordering};
+use crate::subsystems::sync::Mutex;
+use crate::subsystems::drivers::device_model::{DeviceModel, DevicePowerState};
+use crate::error::{KernelError, unified::UnifiedError};
 
 // ============================================================================
 // GPU Constants and Structures
 // ============================================================================
 
 /// GPU vendor IDs
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum GpuVendor {
     /// NVIDIA
     Nvidia,
@@ -321,7 +315,7 @@ pub trait GpuDriver: Send + Sync {
 }
 
 /// Framebuffer handle
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct FrameBufferHandle(pub u32);
 
 /// Framebuffer information
@@ -471,8 +465,8 @@ impl GpuDriverFramework {
     }
 
     /// Get GPU driver by device ID
-    pub fn get_driver(&self, device_id: u32) -> Option<Arc<Mutex<dyn GpuDriver>>> {
-        let drivers = self.drivers.lock();
+    pub fn get_driver(&self, _device_id: u32) -> Option<Arc<Mutex<dyn GpuDriver>>> {
+        let _drivers = self.drivers.lock();
         // Note: In a real implementation, we would need to handle Arc/Mutex wrapping properly
         // For now, we'll return None as this is just a placeholder
         None
@@ -480,15 +474,15 @@ impl GpuDriverFramework {
 
     /// Get all GPU drivers
     pub fn get_all_drivers(&self) -> Vec<Arc<Mutex<dyn GpuDriver>>> {
-        let drivers = self.drivers.lock();
+        let _drivers = self.drivers.lock();
         // Note: In a real implementation, we would need to handle Arc/Mutex wrapping properly
         // For now, we'll return an empty vector as this is just a placeholder
         Vec::new()
     }
 
     /// Get GPU drivers by vendor
-    pub fn get_drivers_by_vendor(&self, vendor: GpuVendor) -> Vec<Arc<Mutex<dyn GpuDriver>>> {
-        let drivers = self.drivers.lock();
+    pub fn get_drivers_by_vendor(&self, _vendor: GpuVendor) -> Vec<Arc<Mutex<dyn GpuDriver>>> {
+        let _drivers = self.drivers.lock();
         // Note: In a real implementation, we would need to handle Arc/Mutex wrapping properly
         // For now, we'll return an empty vector as this is just a placeholder
         Vec::new()
@@ -617,12 +611,13 @@ impl GpuDriver for VirtualGpuDriver {
 
     fn init(&mut self) -> Result<(), KernelError> {
         crate::println!("gpu: initializing virtual GPU {}", self.device_id);
-        
+
         // Set the default display mode
-        if let Some(mode) = self.device_info.display_modes.first() {
-            self.set_display_mode(mode)?;
+        let default_mode = self.device_info.display_modes.first().cloned();
+        if let Some(mode) = default_mode {
+            self.set_display_mode(&mode)?;
         }
-        
+
         Ok(())
     }
 
@@ -707,7 +702,7 @@ impl GpuDriver for VirtualGpuDriver {
             crate::println!("gpu: destroyed framebuffer {}", handle.0);
             Ok(())
         } else {
-            Err(KernelError::NotFound(format!("Framebuffer {} not found", handle.0)))
+            Err(UnifiedError::NotFound)
         }
     }
 
@@ -717,7 +712,7 @@ impl GpuDriver for VirtualGpuDriver {
             crate::println!("gpu: set active framebuffer to {}", handle.0);
             Ok(())
         } else {
-            Err(KernelError::NotFound(format!("Framebuffer {} not found", handle.0)))
+            Err(UnifiedError::NotFound)
         }
     }
 
@@ -729,11 +724,11 @@ impl GpuDriver for VirtualGpuDriver {
                        src_x: u32, src_y: u32, dst_x: u32, dst_y: u32, 
                        width: u32, height: u32) -> Result<(), KernelError> {
         if !self.framebuffers.contains_key(&src) {
-            return Err(KernelError::NotFound(format!("Source framebuffer {} not found", src.0)));
+            return Err(UnifiedError::NotFound);
         }
         
         if !self.framebuffers.contains_key(&dst) {
-            return Err(KernelError::NotFound(format!("Destination framebuffer {} not found", dst.0)));
+            return Err(UnifiedError::NotFound);
         }
         
         // In a real implementation, this would perform a hardware-accelerated blit
@@ -745,7 +740,7 @@ impl GpuDriver for VirtualGpuDriver {
     }
 
     fn clear_framebuffer(&mut self, handle: FrameBufferHandle, color: u32) -> Result<(), KernelError> {
-        if let Some(info) = self.framebuffers.get(&handle) {
+        if let Some(_info) = self.framebuffers.get(&handle) {
             // In a real implementation, this would perform a hardware-accelerated clear
             // For now, we'll just log the operation
             crate::println!("gpu: clearing framebuffer {} with color 0x{:08X}", 
@@ -753,7 +748,7 @@ impl GpuDriver for VirtualGpuDriver {
             
             Ok(())
         } else {
-            Err(KernelError::NotFound(format!("Framebuffer {} not found", handle.0)))
+            Err(UnifiedError::NotFound)
         }
     }
 
@@ -909,12 +904,13 @@ impl GpuDriver for IntelGpuDriver {
 
     fn init(&mut self) -> Result<(), KernelError> {
         crate::println!("gpu: initializing Intel GPU {}", self.device_id);
-        
+
         // Set the default display mode
-        if let Some(mode) = self.device_info.display_modes.first() {
-            self.set_display_mode(mode)?;
+        let default_mode = self.device_info.display_modes.first().cloned();
+        if let Some(mode) = default_mode {
+            self.set_display_mode(&mode)?;
         }
-        
+
         Ok(())
     }
 
@@ -999,7 +995,7 @@ impl GpuDriver for IntelGpuDriver {
             crate::println!("gpu: destroyed framebuffer {}", handle.0);
             Ok(())
         } else {
-            Err(KernelError::NotFound(format!("Framebuffer {} not found", handle.0)))
+            Err(UnifiedError::NotFound)
         }
     }
 
@@ -1009,7 +1005,7 @@ impl GpuDriver for IntelGpuDriver {
             crate::println!("gpu: set active framebuffer to {}", handle.0);
             Ok(())
         } else {
-            Err(KernelError::NotFound(format!("Framebuffer {} not found", handle.0)))
+            Err(UnifiedError::NotFound)
         }
     }
 
@@ -1021,11 +1017,11 @@ impl GpuDriver for IntelGpuDriver {
                        src_x: u32, src_y: u32, dst_x: u32, dst_y: u32, 
                        width: u32, height: u32) -> Result<(), KernelError> {
         if !self.framebuffers.contains_key(&src) {
-            return Err(KernelError::NotFound(format!("Source framebuffer {} not found", src.0)));
+            return Err(UnifiedError::NotFound);
         }
         
         if !self.framebuffers.contains_key(&dst) {
-            return Err(KernelError::NotFound(format!("Destination framebuffer {} not found", dst.0)));
+            return Err(UnifiedError::NotFound);
         }
         
         // In a real implementation, this would perform a hardware-accelerated blit
@@ -1037,7 +1033,7 @@ impl GpuDriver for IntelGpuDriver {
     }
 
     fn clear_framebuffer(&mut self, handle: FrameBufferHandle, color: u32) -> Result<(), KernelError> {
-        if let Some(info) = self.framebuffers.get(&handle) {
+        if let Some(_info) = self.framebuffers.get(&handle) {
             // In a real implementation, this would perform a hardware-accelerated clear
             // For now, we'll just log the operation
             crate::println!("gpu: clearing framebuffer {} with color 0x{:08X}", 
@@ -1045,7 +1041,7 @@ impl GpuDriver for IntelGpuDriver {
             
             Ok(())
         } else {
-            Err(KernelError::NotFound(format!("Framebuffer {} not found", handle.0)))
+            Err(UnifiedError::NotFound)
         }
     }
 

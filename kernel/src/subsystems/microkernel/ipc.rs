@@ -466,7 +466,7 @@ impl IpcSemaphore {
         Ok(())
     }
 
-    fn wake_process(&self, process_id: u64) -> Result<(), i32> {
+    fn wake_process(&self, _process_id: u64) -> Result<(), i32> {
         // In a real implementation, this would wake up the specified process
         // For now, just return success
         Ok(())
@@ -685,7 +685,7 @@ impl IpcManager {
         let memory_manager = super::memory::get_memory_manager().ok_or(EFAULT)?;
 
         let paddr_usize = memory_manager.allocate_physical_page()?; // For simplicity, allocate one page
-        let paddr = crate::subsystems::mm::phys::PhysAddr::new(paddr_usize);
+        let paddr = crate::subsystems::mm::phys::PhysAddr(paddr_usize);
 
         let id = self.next_shm_id.fetch_add(1, Ordering::SeqCst);
         let shm = SharedMemoryRegion::new(id, owner_id, size, paddr);
@@ -755,10 +755,8 @@ impl IpcManager {
             | vm::flags::PTE_R
             | vm::flags::PTE_W;
 
-        unsafe {
-            vm::map_pages(pagetable, va, paddr, shm.size, perm)
-                .map_err(|_| EFAULT)?;
-        }
+        vm::map_pages(pagetable, va, paddr, shm.size, perm)
+            .map_err(|_| EFAULT)?;
 
         Ok(va)
     }
@@ -786,13 +784,11 @@ impl IpcManager {
         }
 
         // Unmap pages
-        unsafe {
-            let mut current = addr;
-            let end = addr + shm.size;
-            while current < end {
-                let _ = vm::unmap_page(pagetable, current);
-                current += vm::PAGE_SIZE;
-            }
+        let mut current = addr;
+        let end = addr + shm.size;
+        while current < end {
+            let _ = vm::unmap_page(pagetable, current);
+            current += vm::PAGE_SIZE;
         }
 
         // Decrement reference count
@@ -948,7 +944,7 @@ mod tests {
 
     #[test]
     fn test_shared_memory_region() {
-        let paddr = crate::subsystems::mm::vm::PhysAddr::new(0x1000);
+        let paddr = crate::subsystems::mm::phys::PhysAddr(0x1000);
         let shm = SharedMemoryRegion::new(1, 1, 4096, paddr);
 
         assert_eq!(shm.id, 1);

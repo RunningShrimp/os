@@ -479,7 +479,7 @@ pub enum AuxType {
     /// Entry address
     Entry = 7,
     /// Program headers
-    Phdr = 3,
+    Phdr = 6,
     /// Program header size
     Phent = 4,
     /// Number of program headers

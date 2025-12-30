@@ -1,6 +1,8 @@
 //! Process information (/proc/[pid])
 
 extern crate alloc;
+
+use crate::prelude::*;
 use crate::subsystems::sync::Mutex;
 use crate::vfs::{
     error::*,
@@ -244,3 +246,6 @@ impl InodeOps for ProcInfoInode {
         }
     }
 }
+
+// Implement vfs_interface::Inode for ProcInfoInode
+crate::impl_inode!(ProcInfoInode);

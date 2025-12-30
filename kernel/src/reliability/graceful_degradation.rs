@@ -1717,7 +1717,7 @@ impl GracefulDegradationManager {
                 timestamp: crate::subsystems::time::get_timestamp(),
                 level,
                 message: message.to_string(),
-                details: None,
+                details: Some(format!("Source: {}", source)), // 使用 source 参数记录日志来源
             };
             session.logs.push(log);
         }

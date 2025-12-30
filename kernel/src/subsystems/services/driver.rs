@@ -2,7 +2,8 @@
 //!
 //! This module provides driver management functionality for system calls
 
-use nos_api::syscall::interface::{SyscallHandler, SyscallNumber, SyscallArgs, SyscallResult};
+use nos_api::syscall::interface::SyscallHandler;
+use nos_api::syscall::types::{SyscallNumber, SyscallArgs, SyscallResult};
 use nos_api::{Result, error::Error};
 
 /// Service driver handler
@@ -16,9 +17,15 @@ impl ServiceDriver {
 
 impl SyscallHandler for ServiceDriver {
     fn handle(&mut self, number: SyscallNumber, args: &SyscallArgs) -> Result<SyscallResult> {
-        // Placeholder implementation
-        let syscall_error = nos_api::perf::syscalls::common::SyscallError::NotSupported;
-        Err(Error::SystemError(format!("Syscall {} not implemented", number)).into())
+        // TODO: Implement proper syscall handling with argument processing
+        // For now, return error indicating the syscall is not implemented
+        // The args parameter will be used to extract syscall-specific arguments
+        // such as file descriptors, buffers, flags, etc.
+        Err(Error::SystemError(format!(
+            "Syscall {} not implemented (args: {:?})",
+            number, args
+        ))
+        .into())
     }
 
     fn name(&self) -> &str {
@@ -26,7 +33,11 @@ impl SyscallHandler for ServiceDriver {
     }
 
     fn supports(&self, number: SyscallNumber) -> bool {
-        // Placeholder implementation
+        // TODO: Implement syscall support detection
+        // This method should check if the given syscall number is supported
+        // by this driver. For now, no syscalls are supported.
+        // When implemented, this will return true for supported syscall numbers.
+        let _ = number; // Prefix with underscore to explicitly mark as intentionally unused until implemented
         false
     }
 }

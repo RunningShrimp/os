@@ -8,9 +8,9 @@ extern crate alloc;
 use alloc::{collections::BTreeMap, vec::Vec};
 use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
-use spin::Mutex;
+use crate::subsystems::sync::Mutex;
 
-use super::thread::{CancelState, CancelType, ThreadError, Tid};
+use crate::subsystems::process::thread::{CancelState, CancelType, ThreadError, Tid};
 
 /// Cancellation point types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -158,6 +158,11 @@ impl ThreadCancellationState {
     pub fn test_cancel_exit(&self) -> ! {
         if self.test_cancel() {
             self.handle_cancellation();
+        } else {
+            // If no cancellation pending, loop forever (never returns)
+            loop {
+                core::hint::spin_loop();
+            }
         }
     }
 
@@ -253,7 +258,7 @@ impl ThreadCancellationState {
     }
 
     /// Handle cancellation by executing cleanup handlers and exiting
-    fn handle_cancellation(&self) -> ! {
+    pub fn handle_cancellation(&self) -> ! {
         // Update statistics
         {
             let mut stats = self.stats.lock();
@@ -288,7 +293,7 @@ impl ThreadCancellationState {
         }
 
         // Exit thread with cancellation status
-        super::thread_exit(crate::libc::PTHREAD_CANCELED as *mut u8);
+        crate::subsystems::process::thread::thread_exit((-1isize) as *mut u8);
     }
 
     /// Get cancellation statistics
@@ -346,15 +351,27 @@ impl ThreadCancellationManager {
     }
 
     /// Get cancellation state for a thread
-    pub fn get_state(&self, thread_id: Tid) -> Option<&ThreadCancellationState> {
+    /// Returns a cloned copy of the state's statistics
+    pub fn get_state(&self, thread_id: Tid) -> Option<CancellationStats> {
         let states = self.states.lock();
-        states.get(&thread_id)
+        states.get(&thread_id).map(|s| s.get_stats())
     }
 
-    /// Get mutable cancellation state for a thread
-    pub fn get_state_mut(&self, thread_id: Tid) -> Option<&mut ThreadCancellationState> {
-        let mut states = self.states.lock();
-        states.get_mut(&thread_id)
+    /// Handle cancellation for a thread (internal use)
+    /// This will execute cleanup handlers and exit the thread
+    fn handle_cancellation_for_thread(&self, thread_id: Tid) -> Result<(), ThreadError> {
+        let states = self.states.lock();
+        if states.contains_key(&thread_id) {
+            // We need to call handle_cancellation but we can't hold the lock
+            // Since handle_cancellation never returns, we leak the lock
+            let state = states.get(&thread_id).unwrap();
+            let state_ptr = state as *const ThreadCancellationState;
+            core::mem::forget(states);
+            unsafe {
+                (*state_ptr).handle_cancellation();
+            }
+        }
+        Err(ThreadError::InvalidThreadId)
     }
 
     /// Cancel a thread
@@ -541,7 +558,7 @@ impl ThreadCancellationManager {
 
 /// Global thread cancellation manager instance
 static mut CANCELLATION_MANAGER: Option<ThreadCancellationManager> = None;
-static CANCELLATION_MANAGER_INIT: spin::Once = spin::Once::new();
+static CANCELLATION_MANAGER_INIT: crate::subsystems::sync::Once = crate::subsystems::sync::Once::new();
 
 /// Get the global thread cancellation manager
 pub fn get_cancellation_manager() -> &'static ThreadCancellationManager {
@@ -567,7 +584,7 @@ pub fn cleanup_thread_cancellation(thread_id: Tid) -> Result<(), ThreadError> {
 
 /// Cancel a thread
 pub fn cancel_thread(target_tid: Tid) -> Result<(), ThreadError> {
-    let requester_tid = super::thread::current_thread().unwrap_or(0);
+    let requester_tid = crate::subsystems::process::thread::current_thread().unwrap_or(0);
     let manager = get_cancellation_manager();
     manager.cancel_thread(target_tid, requester_tid)
 }
@@ -577,7 +594,7 @@ pub fn cancel_thread_with_type(
     target_tid: Tid,
     cancel_type: CancelType,
 ) -> Result<(), ThreadError> {
-    let requester_tid = super::thread::current_thread().unwrap_or(0);
+    let requester_tid = crate::subsystems::process::thread::current_thread().unwrap_or(0);
     let manager = get_cancellation_manager();
     manager.cancel_thread_with_type(target_tid, requester_tid, cancel_type)
 }
@@ -587,35 +604,33 @@ pub fn set_cancel_state(
     state: CancelState,
     old_state: &mut CancelState,
 ) -> Result<(), ThreadError> {
-    let thread_id = super::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
+    let thread_id = crate::subsystems::process::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
     let manager = get_cancellation_manager();
     manager.set_cancel_state(thread_id, state, old_state)
 }
 
 /// Set cancellation type for current thread
 pub fn set_cancel_type(cancel_type: CancelType) -> Result<(), ThreadError> {
-    let thread_id = super::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
+    let thread_id = crate::subsystems::process::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
     let manager = get_cancellation_manager();
     manager.set_cancel_type(thread_id, cancel_type)
 }
 
 /// Test for cancellation on current thread
 pub fn test_cancel() -> Result<bool, ThreadError> {
-    let thread_id = super::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
+    let thread_id = crate::subsystems::process::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
     let manager = get_cancellation_manager();
     manager.test_cancel(thread_id)
 }
 
 /// Test for cancellation and exit if pending
 pub fn test_cancel_exit() -> Result<(), ThreadError> {
-    let thread_id = super::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
+    let thread_id = crate::subsystems::process::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
     let manager = get_cancellation_manager();
 
     if manager.test_cancel(thread_id)? {
         // This will not return
-        if let Some(state) = manager.get_state(thread_id) {
-            state.handle_cancellation();
-        }
+        manager.handle_cancellation_for_thread(thread_id)?;
     }
 
     Ok(())
@@ -623,35 +638,35 @@ pub fn test_cancel_exit() -> Result<(), ThreadError> {
 
 /// Enter cancellation point for current thread
 pub fn enter_cancellation_point(point_type: CancellationPointType) -> Result<(), ThreadError> {
-    let thread_id = super::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
+    let thread_id = crate::subsystems::process::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
     let manager = get_cancellation_manager();
     manager.enter_cancellation_point(thread_id, point_type)
 }
 
 /// Exit cancellation point for current thread
 pub fn exit_cancellation_point(point_type: CancellationPointType) -> Result<(), ThreadError> {
-    let thread_id = super::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
+    let thread_id = crate::subsystems::process::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
     let manager = get_cancellation_manager();
     manager.exit_cancellation_point(thread_id, point_type)
 }
 
 /// Enter cancellation-unsafe region for current thread
 pub fn enter_unsafe_region() -> Result<(), ThreadError> {
-    let thread_id = super::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
+    let thread_id = crate::subsystems::process::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
     let manager = get_cancellation_manager();
     manager.enter_unsafe_region(thread_id)
 }
 
 /// Exit cancellation-unsafe region for current thread
 pub fn exit_unsafe_region() -> Result<(), ThreadError> {
-    let thread_id = super::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
+    let thread_id = crate::subsystems::process::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
     let manager = get_cancellation_manager();
     manager.exit_unsafe_region(thread_id)
 }
 
 /// Push cleanup handler for current thread
 pub fn push_cleanup_handler(handler: fn(*mut u8), arg: *mut u8) -> Result<u64, ThreadError> {
-    let thread_id = super::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
+    let thread_id = crate::subsystems::process::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
     let manager = get_cancellation_manager();
     manager.push_cleanup_handler(thread_id, handler, arg)
 }
@@ -660,14 +675,14 @@ pub fn push_cleanup_handler(handler: fn(*mut u8), arg: *mut u8) -> Result<u64, T
 pub fn pop_cleanup_handler(
     handler_id: u64,
 ) -> Result<Option<CancellationCleanupHandler>, ThreadError> {
-    let thread_id = super::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
+    let thread_id = crate::subsystems::process::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
     let manager = get_cancellation_manager();
     manager.pop_cleanup_handler(thread_id, handler_id)
 }
 
 /// Get cancellation statistics for current thread
 pub fn get_thread_stats() -> Result<CancellationStats, ThreadError> {
-    let thread_id = super::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
+    let thread_id = crate::subsystems::process::thread::current_thread().ok_or(ThreadError::InvalidThreadId)?;
     let manager = get_cancellation_manager();
     manager.get_thread_stats(thread_id)
 }

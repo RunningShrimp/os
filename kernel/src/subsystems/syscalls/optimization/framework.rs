@@ -10,7 +10,7 @@
 //! - 优化策略管理
 
 // use crate::subsystems::syscalls::common::{SyscallError, SyscallResult);
-use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::Vec};
+use alloc::{collections::BTreeMap, string::String, sync::Arc, vec::Vec};
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use spin::Mutex;
@@ -161,7 +161,7 @@ impl OptimizationStrategy for FastPathOptimization {
     ) -> Result<OptimizationResult, OptimizationError> {
         // 提升处理器优先级
         if let Some(ref dispatcher) = context.dispatcher {
-            let mut dispatcher = dispatcher.lock();
+            let _dispatcher = dispatcher.lock();
             // 这里应该实现优先级提升逻辑
             // 暂时返回成功结果
         }
@@ -323,7 +323,7 @@ impl OptimizationStrategy for BatchingOptimization {
 /// 统一优化管理器
 pub struct UnifiedOptimizationManager {
     /// 优化策略列表
-    strategies: Vec<Box<dyn OptimizationStrategy>>,
+    strategies: Vec<Arc<dyn OptimizationStrategy>>,
     /// 优化历史
     optimization_history: Vec<OptimizationRecord>,
     /// 活跃优化
@@ -357,15 +357,15 @@ impl UnifiedOptimizationManager {
     fn register_default_strategies(&mut self) {
         // 快速路径优化
         self.strategies
-            .push(Box::new(FastPathOptimization::new(90, 1000)));
+            .push(Arc::new(FastPathOptimization::new(90, 1000)));
 
         // 缓存优化
         self.strategies
-            .push(Box::new(CachingOptimization::new(80, 10, 1_000_000_000)));
+            .push(Arc::new(CachingOptimization::new(80, 10, 1_000_000_000)));
 
         // 批处理优化
         self.strategies
-            .push(Box::new(BatchingOptimization::new(70, 5, 16)));
+            .push(Arc::new(BatchingOptimization::new(70, 5, 16)));
 
         // 按优先级排序
         self.strategies
@@ -373,7 +373,7 @@ impl UnifiedOptimizationManager {
     }
 
     /// 注册自定义优化策略
-    pub fn register_strategy(&mut self, strategy: Box<dyn OptimizationStrategy>) {
+    pub fn register_strategy(&mut self, strategy: Arc<dyn OptimizationStrategy>) {
         self.strategies.push(strategy);
         self.strategies
             .sort_by(|a, b| b.priority().cmp(&a.priority()));
@@ -392,27 +392,32 @@ impl UnifiedOptimizationManager {
         let stats = self.get_syscall_stats(syscall_num);
 
         // 检查是否需要优化
-        for strategy in &self.strategies {
-            if strategy.should_apply(&stats) {
-                let mut context = OptimizationContext {
-                    syscall_num,
-                    current_stats: stats.clone(),
-                    config: self.config.clone(),
-                    dispatcher: None, // 这里应该传入实际的分发器
-                    optimization_history: self.optimization_history.clone(),
-                };
+        // Collect applicable strategies to avoid holding immutable borrow
+        let applicable_strategies: Vec<(alloc::string::String, Arc<dyn OptimizationStrategy>)> = self.strategies.iter()
+            .filter(|strategy| strategy.should_apply(&stats))
+            .map(|strategy| (alloc::string::String::from(strategy.name()), Arc::clone(strategy)))
+            .collect();
 
-                match strategy.apply(&mut context) {
-                    Ok(result) => {
-                        // 记录优化
-                        self.record_optimization(syscall_num, strategy.name(), &result, &stats);
-                        return Some(result);
-                    },
-                    Err(_) => {
-                        // 优化失败，继续尝试下一个策略
-                        continue;
-                    },
-                }
+        for (strategy_name, strategy_arc) in applicable_strategies {
+            let mut context = OptimizationContext {
+                syscall_num,
+                current_stats: stats.clone(),
+                config: self.config.clone(),
+                dispatcher: None, // 这里应该传入实际的分发器
+                optimization_history: self.optimization_history.clone(),
+            };
+
+            // Apply strategy directly using Arc
+            match strategy_arc.apply(&mut context) {
+                Ok(result) => {
+                    // 记录优化
+                    self.record_optimization(syscall_num, &strategy_name, &result, &stats);
+                    return Some(result);
+                },
+                Err(_) => {
+                    // 优化失败，继续尝试下一个策略
+                    continue;
+                },
             }
         }
 
@@ -446,7 +451,7 @@ impl UnifiedOptimizationManager {
     }
 
     /// 获取系统调用统计信息
-    fn get_syscall_stats(&self, syscall_num: u32) -> UnifiedSyscallStats {
+    fn get_syscall_stats(&self, _syscall_num: u32) -> UnifiedSyscallStats {
         // 这里应该从性能监控器获取统计信息
         // 暂时返回默认值
         UnifiedSyscallStats::new()

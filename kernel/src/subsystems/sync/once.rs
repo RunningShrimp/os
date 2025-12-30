@@ -3,6 +3,9 @@
 // This module provides a synchronization primitive for
 // one-time initialization, similar to std::sync::Once.
 
+use crate::prelude::*;
+use core::sync::atomic::Ordering;
+
 const ONCE_INCOMPLETE: usize = 0;
 const ONCE_RUNNING: usize = 1;
 const ONCE_COMPLETE: usize = 2;
@@ -26,7 +29,7 @@ impl Once {
         F: FnOnce(),
     {
         // Check if already completed
-        let mut state = self.state.load(Ordering::Acquire);
+        let state = self.state.load(Ordering::Acquire);
         if state == ONCE_COMPLETE {
             panic!("Once::call_once called twice");
         }

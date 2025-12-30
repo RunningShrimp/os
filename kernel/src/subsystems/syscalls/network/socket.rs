@@ -1,8 +1,14 @@
 //! Socket creation and management syscalls
 
-use super::*;
-use crate::subsystems::syscalls::common::{SyscallError, SyscallResult);
-use crate::net::socket::SocketAddr;
+use crate::prelude::*;
+use crate::subsystems::syscalls::common::{SyscallError, SyscallResult};
+use crate::net::socket::{
+    SocketAddr, SocketType, ProtocolFamily, SocketOptions,
+    Socket, SocketState, TcpSocketWrapper, UdpSocketWrapper,
+    SocketEntry
+};
+use crate::subsystems::net::tcp::manager::TcpConnectionManager;
+use crate::subsystems::net::ipv4::Ipv4Addr;
 
 /// Create a new socket
 ///
@@ -94,21 +100,22 @@ pub fn sys_socket(args: &[u64]) -> SyscallResult<i64> {
         Some(file_fd) => {
             // Create socket entry for tracking (legacy compatibility)
             let socket_entry = Arc::new(SocketEntry {
+                id: fd as u32,
                 socket_type,
-                protocol_family,
+                family: protocol_family,
+                state: SocketState::Uninitialized,
                 protocol,
                 options: SocketOptions::new(),
                 local_addr: None,
                 remote_addr: None,
-                state: SocketState::Uninitialized,
-                socket: Mutex::new(None), // Already stored in file system
+                socket: crate::sync::Mutex::new(None), // Use crate::sync::Mutex
                 connection_id: None,
             });
 
             // Store mapping from original fd to actual file fd
             set_socket_entry(fd as i32, Some(socket_entry));
 
-            Ok(file_fd as u64)  // Return the file descriptor
+            Ok(file_fd.try_into().unwrap_or(0))  // Return the file descriptor
         }
         None => {
             // Clean up socket table entry if file allocation fails
@@ -181,7 +188,7 @@ pub fn sys_bind(args: &[u64]) -> SyscallResult<i64> {
     };
 
     // Validate address family
-    if socket_addr.family != socket_entry.protocol_family {
+    if socket_addr.family != socket_entry.family {
         return Err(SyscallError::InvalidArgument);
     }
 
@@ -221,14 +228,14 @@ pub fn sys_bind(args: &[u64]) -> SyscallResult<i64> {
 
                 // Update socket entry with connection ID
                 let socket_table = get_socket_table();
-                if let Some(Some(entry)) = socket_table.get_mut(fd as usize) {
-                    // Since SocketEntry is Clone, we can create a new entry with updated values
-                    let old_entry = entry.as_ref();
-                    let mut new_entry = old_entry.clone();
-                    new_entry.local_addr = Some(socket_addr);
-                    new_entry.connection_id = Some(conn_id);
-                    new_entry.state = SocketState::Bound;
-                    *entry = Arc::new(new_entry);
+                let mut table_guard = socket_table.lock();
+                if let Some(Some(entry)) = table_guard.get_mut(fd as usize) {
+                    // Update the socket entry in place since we can't clone it
+                    if let Some(inner) = Arc::get_mut(entry) {
+                        inner.local_addr = Some(socket_addr);
+                        inner.connection_id = Some(conn_id);
+                        inner.state = SocketState::Bound;
+                    }
                 }
             }
             Socket::Udp(udp_socket) => {
@@ -237,25 +244,37 @@ pub fn sys_bind(args: &[u64]) -> SyscallResult<i64> {
 
                 // Update socket entry
                 let socket_table = get_socket_table();
-                if let Some(Some(entry)) = socket_table.get_mut(fd as usize) {
-                    // Since SocketEntry is Clone, we can create a new entry with updated values
-                    let old_entry = entry.as_ref();
-                    let mut new_entry = old_entry.clone();
-                    new_entry.local_addr = Some(socket_addr);
-                    new_entry.state = SocketState::Bound;
-                    *entry = Arc::new(new_entry);
+                let mut table_guard = socket_table.lock();
+                if let Some(Some(entry)) = table_guard.get_mut(fd as usize) {
+                    // Update the socket entry in place since we can't clone it
+                    if let Some(inner) = Arc::get_mut(entry) {
+                        inner.local_addr = Some(socket_addr);
+                        inner.state = SocketState::Bound;
+                    }
                 }
             }
             Socket::Raw(_) => {
                 // Raw sockets don't bind in the same way
                 let socket_table = get_socket_table();
-                if let Some(Some(entry)) = socket_table.get_mut(fd as usize) {
-                    // Since SocketEntry is Clone, we can create a new entry with updated values
-                    let old_entry = entry.as_ref();
-                    let mut new_entry = old_entry.clone();
-                    new_entry.local_addr = Some(socket_addr);
-                    new_entry.state = SocketState::Bound;
-                    *entry = Arc::new(new_entry);
+                let mut table_guard = socket_table.lock();
+                if let Some(Some(entry)) = table_guard.get_mut(fd as usize) {
+                    // Update the socket entry in place since we can't clone it
+                    if let Some(inner) = Arc::get_mut(entry) {
+                        inner.local_addr = Some(socket_addr);
+                        inner.state = SocketState::Bound;
+                    }
+                }
+            }
+            Socket::Unix(_) => {
+                // Unix domain socket binding
+                let socket_table = get_socket_table();
+                let mut table_guard = socket_table.lock();
+                if let Some(Some(entry)) = table_guard.get_mut(fd as usize) {
+                    // Update the socket entry in place since we can't clone it
+                    if let Some(inner) = Arc::get_mut(entry) {
+                        inner.local_addr = Some(socket_addr);
+                        inner.state = SocketState::Bound;
+                    }
                 }
             }
         }
@@ -328,23 +347,22 @@ pub fn sys_listen(args: &[u64]) -> SyscallResult<i64> {
 
     // Start listening using the socket implementation
     let socket_table = get_socket_table();
-    if let Some(Some(entry)) = socket_table.get_mut(fd as usize) {
-        // Since SocketEntry is Clone, we can create a new entry with updated values
-        let old_entry = entry.as_ref();
-        let mut new_entry = old_entry.clone();
-
-        // Call listen on the socket implementation
-        if let Some(ref mut socket) = new_entry.socket.lock().as_mut() {
-            match socket {
-                Socket::Tcp(tcp_socket) => {
-                    tcp_socket.listen(backlog).map_err(|e: crate::net::socket::SocketError| SyscallError::from(e))?;
+    let mut table_guard = socket_table.lock();
+    if let Some(Some(entry)) = table_guard.get_mut(fd as usize) {
+        // Update the socket entry in place since we can't clone it
+        if let Some(inner) = Arc::get_mut(entry) {
+            // Call listen on the socket implementation
+            if let Some(ref mut socket) = inner.socket.lock().as_mut() {
+                match socket {
+                    Socket::Tcp(tcp_socket) => {
+                        tcp_socket.listen(backlog).map_err(|e: crate::net::socket::SocketError| SyscallError::from(e))?;
+                    }
+                    _ => return Err(SyscallError::NotSupported), // Only TCP sockets can listen
                 }
-                _ => return Err(SyscallError::NotSupported), // Only TCP sockets can listen
             }
-        }
 
-        new_entry.state = SocketState::Listening;
-        *entry = Arc::new(new_entry);
+            inner.state = SocketState::Listening;
+        }
 
         Ok(0)
     } else {
@@ -418,7 +436,8 @@ pub fn sys_accept(args: &[u64]) -> SyscallResult<i64> {
 
     // Accept connection using the socket implementation
     let socket_table = get_socket_table();
-    if let Some(Some(entry)) = socket_table.get_mut(fd as usize) {
+    let mut table_guard = socket_table.lock();
+if let Some(Some(entry)) = table_guard.get_mut(fd as usize) {
         // We only need to read from the entry, no need to clone
         if let Some(ref mut socket) = entry.socket.lock().as_mut() {
             match socket {
@@ -434,14 +453,15 @@ pub fn sys_accept(args: &[u64]) -> SyscallResult<i64> {
 
                     // Create new socket entry for accepted connection
                     let new_socket_entry = Arc::new(SocketEntry {
+                        id: fd as u32,  // Use same ID as parent for now
                         socket_type: socket_entry.socket_type,
-                        protocol_family: socket_entry.protocol_family,
+                        family: socket_entry.family,
                         protocol: socket_entry.protocol,
                         options: socket_entry.options.clone(),
                         local_addr: socket_entry.local_addr,
                         remote_addr: Some(peer_addr),
                         state: SocketState::Connected,
-                        socket: Mutex::new(Some(accepted_socket)),
+                        socket: crate::sync::Mutex::new(Some(accepted_socket)),
                         connection_id: None,
                     });
 
@@ -471,7 +491,7 @@ pub fn sys_accept(args: &[u64]) -> SyscallResult<i64> {
                         }
                     };
 
-                    return Ok(proc_fd as u64);
+                    return Ok(proc_fd.try_into().unwrap_or(0));
                 }
                 _ => return Err(SyscallError::NotSupported), // Only TCP sockets can accept
             }
@@ -552,7 +572,7 @@ pub fn sys_connect(args: &[u64]) -> SyscallResult<i64> {
     };
 
     // Validate address family
-    if socket_addr.family != socket_entry.protocol_family {
+    if socket_addr.family != socket_entry.family {
         return Err(SyscallError::InvalidArgument);
     }
 
@@ -569,55 +589,54 @@ pub fn sys_connect(args: &[u64]) -> SyscallResult<i64> {
 
     // Perform actual connection using the socket implementation
     let socket_table = get_socket_table();
-    if let Some(Some(entry)) = socket_table.get_mut(fd as usize) {
-        // Since SocketEntry is Clone, we can create a new entry with updated values
-        let old_entry = entry.as_ref();
-        let mut new_entry = old_entry.clone();
+    let mut table_guard = socket_table.lock();
+    if let Some(Some(entry)) = table_guard.get_mut(fd as usize) {
+        // Update the socket entry in place since we can't clone it
+        if let Some(inner) = Arc::get_mut(entry) {
+            // Call connect on the socket implementation
+            if let Some(ref mut socket) = inner.socket.lock().as_mut() {
+                match socket {
+                    Socket::Tcp(tcp_socket) => {
+                        // Use TCP connection manager for proper connection establishment
+                        let mut tcp_manager = TcpConnectionManager::new();
+                        let opts = inner.options.clone();
+                        let tcp_opts = crate::net::tcp::manager::TcpOptions {
+                            keep_alive: opts.keep_alive,
+                            keep_alive_interval: 30,
+                            keep_alive_time: 7200,
+                            keep_alive_probes: 9,
+                            nagle_enabled: !opts.nodelay,
+                            reuse_addr: opts.reuse_addr,
+                            reuse_port: opts.reuse_port,
+                            recv_buf_size: opts.rcvbuf,
+                            send_buf_size: opts.sndbuf,
+                        };
 
-        // Call connect on the socket implementation
-        if let Some(ref mut socket) = new_entry.socket.lock().as_mut() {
-            match socket {
-                Socket::Tcp(tcp_socket) => {
-                    // Use TCP connection manager for proper connection establishment
-                    let mut tcp_manager = TcpConnectionManager::new();
-                    let opts = new_entry.options.clone();
-                    let tcp_opts = crate::net::tcp::manager::TcpOptions {
-                        keep_alive: opts.keep_alive,
-                        keep_alive_interval: 30,
-                        keep_alive_time: 7200,
-                        keep_alive_probes: 9,
-                        nagle_enabled: !opts.nodelay,
-                        reuse_addr: opts.reuse_addr,
-                        reuse_port: opts.reuse_port,
-                        recv_buf_size: opts.rcvbuf,
-                        send_buf_size: opts.sndbuf,
-                    };
+                        // Get local address (auto-bind if not bound)
+                        let local_addr = inner.local_addr
+                            .unwrap_or_else(|| SocketAddr::new_ipv4(Ipv4Addr::UNSPECIFIED, 0));
 
-                    // Get local address (auto-bind if not bound)
-                    let local_addr = new_entry.local_addr
-                        .unwrap_or_else(|| SocketAddr::new_ipv4(Ipv4Addr::UNSPECIFIED, 0));
-                    
-                    // Establish connection
-                    let conn_id = tcp_manager.connect(
-                        local_addr.ipv4_addr().unwrap_or(Ipv4Addr::UNSPECIFIED),
-                        socket_addr.ipv4_addr().unwrap_or(Ipv4Addr::UNSPECIFIED),
-                        socket_addr.port,
-                        tcp_opts
-                    ).map_err(|e: crate::net::tcp::manager::TcpError| SyscallError::from(e))?;
+                        // Establish connection
+                        let conn_id = tcp_manager.connect(
+                            local_addr.ipv4_addr().unwrap_or(Ipv4Addr::UNSPECIFIED),
+                            socket_addr.ipv4_addr().unwrap_or(Ipv4Addr::UNSPECIFIED),
+                            socket_addr.port,
+                            tcp_opts
+                        ).map_err(|e: crate::net::tcp::manager::TcpError| SyscallError::from(e))?;
 
-                    // Update socket with connection ID
-                    new_entry.connection_id = Some(conn_id);
-                    
-                    // Also call connect on socket wrapper for state update
-                    tcp_socket.connect(socket_addr).map_err(|e: crate::net::socket::SocketError| SyscallError::from(e))?;
+                        // Update socket with connection ID
+                        inner.connection_id = Some(conn_id);
+
+                        // Also call connect on socket wrapper for state update
+                        tcp_socket.connect(socket_addr).map_err(|e: crate::net::socket::SocketError| SyscallError::from(e))?;
+                    }
+                    _ => return Err(SyscallError::NotSupported), // Only TCP sockets can connect
                 }
-                _ => return Err(SyscallError::NotSupported), // Only TCP sockets can connect
             }
-        }
 
-        new_entry.remote_addr = Some(socket_addr);
-        new_entry.state = SocketState::Connected;
-        *entry = Arc::new(new_entry);
+            inner.remote_addr = Some(socket_addr);
+            inner.state = SocketState::Connected;
+        }
 
         // This would be errno_neg(EINPROGRESS) if non-blocking
         Ok(0)
@@ -715,53 +734,51 @@ pub fn sys_socketpair(args: &[u64]) -> SyscallResult<i64> {
     let socket1 = Socket::Unix(crate::net::socket::UnixSocketWrapper::new(SocketOptions::new()));
     let socket2 = Socket::Unix(crate::net::socket::UnixSocketWrapper::new(SocketOptions::new()));
     
-    // Store sockets in unified file descriptor system
-    let socket_arc1 = Arc::new(socket1);
-    let socket_arc2 = Arc::new(socket2);
-    
-    // Create file descriptors for both sockets
-    let file_fd1 = match crate::fs::file::file_socket_new(socket_arc1, true, true) {
-        Some(fd) => fd,
-        None => {
-            free_socket_entry(fd1 as i32);
-            free_socket_entry(fd2 as i32);
-            return Err(SyscallError::OutOfMemory);
-        }
-    };
-    
-    let file_fd2 = match crate::fs::file::file_socket_new(socket_arc2, true, true) {
-        Some(fd) => fd,
-        None => {
-            free_socket_entry(fd1 as i32);
-            free_socket_entry(fd2 as i32);
-            return Err(SyscallError::OutOfMemory);
-        }
-    };
-    
-    // Create socket entries for both sockets
+    // Create socket entries for both sockets (before moving them)
     let socket_entry1 = Arc::new(SocketEntry {
+        id: 1,  // Temporary ID
         socket_type: SocketType::Stream,
-        protocol_family: ProtocolFamily::Unix,
+        family: ProtocolFamily::Unix,
         protocol: 0,
         options: SocketOptions::new(),
         local_addr: None,
         remote_addr: None,
         state: SocketState::Connected,
-        socket: Mutex::new(Some(socket1)),
+        socket: crate::sync::Mutex::new(None),  // Will be managed by file system
         connection_id: None,
     });
-    
+
     let socket_entry2 = Arc::new(SocketEntry {
+        id: 2,  // Temporary ID
         socket_type: SocketType::Stream,
-        protocol_family: ProtocolFamily::Unix,
+        family: ProtocolFamily::Unix,
         protocol: 0,
         options: SocketOptions::new(),
         local_addr: None,
         remote_addr: None,
         state: SocketState::Connected,
-        socket: Mutex::new(Some(socket2)),
+        socket: crate::sync::Mutex::new(None),  // Will be managed by file system
         connection_id: None,
     });
+
+    // Create file descriptors for both sockets (moves the sockets)
+    let file_fd1 = match crate::fs::file::file_socket_new(socket1, true, true) {
+        Some(fd) => fd,
+        None => {
+            free_socket_entry(fd1 as i32);
+            free_socket_entry(fd2 as i32);
+            return Err(SyscallError::OutOfMemory);
+        }
+    };
+
+    let file_fd2 = match crate::fs::file::file_socket_new(socket2, true, true) {
+        Some(fd) => fd,
+        None => {
+            free_socket_entry(fd1 as i32);
+            free_socket_entry(fd2 as i32);
+            return Err(SyscallError::OutOfMemory);
+        }
+    };
     
     // Store socket entries
     set_socket_entry(fd1 as i32, Some(socket_entry1));
@@ -772,6 +789,91 @@ pub fn sys_socketpair(args: &[u64]) -> SyscallResult<i64> {
         *fds_ptr = file_fd1 as i32;
         *fds_ptr.add(1) = file_fd2 as i32;
     }
-    
+
     Ok(0)
+}
+
+// ============================================================================
+// Socket Table Helper Functions (Stubs)
+// ============================================================================
+
+/// Convert POSIX protocol family to internal ProtocolFamily
+fn posix_to_protocol_family(domain: i32) -> Option<ProtocolFamily> {
+    match domain {
+        crate::posix::AF_INET => Some(ProtocolFamily::IPv4),
+        crate::posix::AF_INET6 => Some(ProtocolFamily::IPv6),
+        crate::posix::AF_UNIX => Some(ProtocolFamily::Unix),
+        _ => None,
+    }
+}
+
+/// Convert POSIX socket type to internal SocketType
+fn posix_to_socket_type(type_: i32) -> Option<SocketType> {
+    match type_ {
+        crate::posix::SOCK_STREAM => Some(SocketType::Stream),
+        crate::posix::SOCK_DGRAM => Some(SocketType::Datagram),
+        crate::posix::SOCK_RAW => Some(SocketType::Raw),
+        _ => None,
+    }
+}
+
+/// Allocate a socket file descriptor
+fn alloc_socket_fd() -> i64 {
+    // TODO: Implement proper socket FD allocation
+    // For now, return a simple counter-based FD
+    use core::sync::atomic::{AtomicI64, Ordering};
+    static NEXT_FD: AtomicI64 = AtomicI64::new(3);
+    NEXT_FD.fetch_add(1, Ordering::SeqCst)
+}
+
+/// Get socket entry by file descriptor
+fn get_socket_entry(_fd: i32) -> Option<Arc<SocketEntry>> {
+    // TODO: Implement proper socket table lookup
+    // For now, return None as a stub
+    None
+}
+
+/// Set socket entry for a file descriptor
+fn set_socket_entry(_fd: i32, _entry: Option<Arc<SocketEntry>>) {
+    // TODO: Implement proper socket table storage
+    // For now, this is a stub
+}
+
+/// Get the socket table
+fn get_socket_table() -> &'static Mutex<Vec<Option<Arc<SocketEntry>>>> {
+    // TODO: Implement proper socket table
+    // For now, return a static empty table as a stub
+    use core::sync::atomic::{AtomicU8, Ordering};
+    static INIT: AtomicU8 = AtomicU8::new(0);
+    static mut TABLE: Option<Mutex<Vec<Option<Arc<SocketEntry>>>>> = None;
+
+    unsafe {
+        if INIT.load(Ordering::Acquire) == 0 {
+            TABLE = Some(Mutex::new(Vec::new()));
+            INIT.store(1, Ordering::Release);
+        }
+        TABLE.as_ref().unwrap()
+    }
+}
+
+/// Free a socket entry
+fn free_socket_entry(_fd: i32) {
+    // TODO: Implement proper socket entry cleanup
+    // For now, this is a stub
+}
+
+// ============================================================================
+// Error Conversions
+// ============================================================================
+
+impl From<crate::net::tcp::manager::TcpError> for crate::subsystems::syscalls::common::SyscallError {
+    fn from(_error: crate::net::tcp::manager::TcpError) -> Self {
+        crate::subsystems::syscalls::common::SyscallError::IoError
+    }
+}
+
+impl From<crate::net::socket::SocketError> for crate::subsystems::syscalls::common::SyscallError {
+    fn from(_error: crate::net::socket::SocketError) -> Self {
+        crate::subsystems::syscalls::common::SyscallError::IoError
+    }
 }

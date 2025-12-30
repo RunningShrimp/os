@@ -46,6 +46,13 @@ pub struct AllocationStats {
 
 impl Default for AllocationStats {
     fn default() -> Self {
+        Self::const_default()
+    }
+}
+
+impl AllocationStats {
+    /// Const constructor for static initialization
+    pub const fn const_default() -> Self {
         Self {
             total_allocations: 0,
             total_deallocations: 0,
@@ -188,6 +195,17 @@ pub struct LightweightAllocationStats {
 }
 
 impl LightweightAllocationStats {
+    /// Const constructor for static initialization
+    pub const fn const_default() -> Self {
+        Self {
+            fast_path_hits: AtomicUsize::new(0),
+            slow_path_allocations: AtomicUsize::new(0),
+            failed_allocations: AtomicUsize::new(0),
+        }
+    }
+}
+
+impl LightweightAllocationStats {
     pub fn record_fast_path(&self) {
         self.fast_path_hits.fetch_add(1, Ordering::Relaxed);
     }
@@ -210,7 +228,7 @@ impl LightweightAllocationStats {
 
     pub fn hit_ratio(&self) -> f64 {
         let hits = self.fast_path_hits.load(Ordering::Relaxed) as f64;
-        let total = (hits + self.slow_path_allocations.load(Ordering::Relaxed) as f64);
+        let total = hits + self.slow_path_allocations.load(Ordering::Relaxed) as f64;
         if total == 0.0 { 0.0 } else { hits / total }
     }
 }

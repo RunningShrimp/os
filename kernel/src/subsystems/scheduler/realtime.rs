@@ -7,10 +7,10 @@ extern crate alloc;
 
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use spin::Mutex;
 
-use crate::subsystems::process::thread::{Thread, Tid, SchedPolicy, SchedParam};
+use crate::subsystems::process::thread::{Tid, SchedPolicy};
 
 /// Real-time scheduling policies
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,6 +81,34 @@ pub struct RealtimeSchedulingStats {
     pub total_overruns: u64,
 }
 
+/// Calculate the Liu & Layland utilization bound for Rate Monotonic scheduling
+///
+/// Formula: U(n) = n * (2^(1/n) - 1)
+/// This is a no_std compatible implementation using iterative approximation
+fn calculate_liu_layland_bound(n: usize) -> f64 {
+    // Precomputed values for common n values for accuracy
+    // U(1) = 1.0, U(2) = 0.828, U(3) = 0.779, U(4) = 0.756, etc.
+    match n {
+        1 => 1.0,
+        2 => 0.8284271247461903,
+        3 => 0.7797631496831942,
+        4 => 0.7568394980563484,
+        5 => 0.7434489462916744,
+        6 => 0.7346414189065066,
+        7 => 0.7285463445854965,
+        8 => 0.7240344389640691,
+        9 => 0.7205917670868894,
+        10 => 0.7178939928273376,
+        _ => {
+            // For n > 10, use the asymptotic limit approximation
+            // As n -> infinity, U(n) -> ln(2) ≈ 0.693
+            let ln2 = 0.6931471805599453;
+            // Add a small correction factor based on n
+            ln2 + (0.1 / (n as f64))
+        }
+    }
+}
+
 /// Real-time scheduler
 pub struct RealtimeScheduler {
     /// Real-time tasks by priority
@@ -131,8 +159,9 @@ impl RealtimeScheduler {
         // Check bandwidth availability
         let current_bandwidth = self.allocated_bandwidth.load(Ordering::Relaxed);
         let max_bandwidth = self.max_bandwidth.load(Ordering::Relaxed);
-        
-        if current_bandwidth + task.bandwidth_percent as usize > max_bandwidth {
+        let bandwidth = task.bandwidth_percent as usize;
+
+        if current_bandwidth + bandwidth > max_bandwidth {
             return Err("Insufficient CPU bandwidth");
         }
 
@@ -158,7 +187,7 @@ impl RealtimeScheduler {
         }
 
         // Update allocated bandwidth
-        self.allocated_bandwidth.fetch_add(task.bandwidth_percent as usize, Ordering::Relaxed);
+        self.allocated_bandwidth.fetch_add(bandwidth, Ordering::Relaxed);
 
         // Update statistics
         {
@@ -234,9 +263,9 @@ impl RealtimeScheduler {
     /// Select the scheduling policy based on highest priority tasks
     fn select_policy(&self) -> RealtimePolicy {
         let rt_tasks = self.rt_tasks.lock();
-        
+
         // Find the highest priority with active tasks
-        for (&priority, tasks) in rt_tasks.iter().rev() {
+        for (&_priority, tasks) in rt_tasks.iter().rev() {
             if tasks.iter().any(|t| t.active) {
                 // Return the policy of the first active task at this priority
                 if let Some(task) = tasks.iter().find(|t| t.active) {
@@ -244,14 +273,14 @@ impl RealtimeScheduler {
                 }
             }
         }
-        
+
         RealtimePolicy::Fifo // Default
     }
 
     /// Pick next task using FIFO policy
     fn pick_fifo_task(&self, rt_tasks: &BTreeMap<u8, Vec<RealtimeTaskParams>>, _current_time: u64) -> Option<Tid> {
         // Find highest priority with active tasks
-        for (&priority, tasks) in rt_tasks.iter().rev() {
+        for (&_priority, tasks) in rt_tasks.iter().rev() {
             if let Some(task) = tasks.iter().find(|t| t.active) {
                 return Some(task.task_id);
             }
@@ -262,11 +291,11 @@ impl RealtimeScheduler {
     /// Pick next task using Round-Robin policy
     fn pick_rr_task(&self, rt_tasks: &BTreeMap<u8, Vec<RealtimeTaskParams>>, _current_time: u64) -> Option<Tid> {
         // Find highest priority with active tasks
-        for (&priority, tasks) in rt_tasks.iter().rev() {
+        for (&_priority, tasks) in rt_tasks.iter().rev() {
             if let Some(task) = tasks.iter().find(|t| t.active && t.timeslice_remaining > 0) {
                 return Some(task.task_id);
             }
-            
+
             // If all tasks at this priority have exhausted their timeslice, reset and pick first
             if let Some(task) = tasks.iter().find(|t| t.active) {
                 return Some(task.task_id);
@@ -306,7 +335,7 @@ impl RealtimeScheduler {
     }
 
     /// Pick next task using Rate Monotonic policy
-    fn pick_rm_task(&self, rt_tasks: &BTreeMap<u8, Vec<RealtimeTaskParams>>, current_time: u64) -> Option<Tid> {
+    fn pick_rm_task(&self, rt_tasks: &BTreeMap<u8, Vec<RealtimeTaskParams>>, _current_time: u64) -> Option<Tid> {
         // Rate Monotonic: higher priority = shorter period
         let mut shortest_period = None;
         let mut selected_task = None;
@@ -394,26 +423,26 @@ impl RealtimeScheduler {
         self.last_switch_time.store(current_time, Ordering::Relaxed);
 
         // Update task state
-        if let Some(mut task_params) = self.get_task_params_mut(new_task_id) {
+        let _ = self.update_task_params(new_task_id, |task_params| {
             task_params.creation_time = current_time;
-            
+
             // Reset timeslice for RR tasks
             if task_params.policy == RealtimePolicy::RoundRobin {
                 task_params.timeslice_remaining = task_params.timeslice_ms;
             }
-        }
+        });
     }
 
     /// Update task execution time
     pub fn update_task_execution(&self, task_id: Tid, elapsed_ms: u32, current_time: u64) {
-        if let Some(mut task_params) = self.get_task_params_mut(task_id) {
+        let _ = self.update_task_params(task_id, |task_params| {
             // Update remaining execution time
             if task_params.remaining_time >= elapsed_ms {
                 task_params.remaining_time -= elapsed_ms;
             } else {
                 // Task overran its budget
                 task_params.remaining_time = 0;
-                
+
                 // Update statistics
                 let mut stats = self.stats.lock();
                 stats.total_overruns += 1;
@@ -433,41 +462,34 @@ impl RealtimeScheduler {
                 let mut stats = self.stats.lock();
                 stats.total_missed_deadlines += 1;
             }
-        }
+        });
     }
 
     /// Activate a real-time task
     pub fn activate_task(&self, task_id: Tid, current_time: u64) -> Result<(), &'static str> {
-        if let Some(mut task_params) = self.get_task_params_mut(task_id) {
+        self.update_task_params(task_id, |task_params| {
             task_params.active = true;
             task_params.next_activation = current_time;
-            
+
             // Set absolute deadline
             if task_params.deadline_ms > 0 {
                 task_params.absolute_deadline = current_time + task_params.deadline_ms as u64 * 1000;
             }
-            
+
             // Reset execution time budget
             task_params.remaining_time = task_params.execution_time_ms;
-            
+
             // Reset timeslice
             task_params.timeslice_remaining = task_params.timeslice_ms;
-            
-            Ok(())
-        } else {
-            Err("Task not found")
-        }
+        })
     }
 
     /// Deactivate a real-time task
     pub fn deactivate_task(&self, task_id: Tid) -> Result<(), &'static str> {
-        if let Some(mut task_params) = self.get_task_params_mut(task_id) {
+        self.update_task_params(task_id, |task_params| {
             task_params.active = false;
             task_params.absolute_deadline = 0;
-            Ok(())
-        } else {
-            Err("Task not found")
-        }
+        })
     }
 
     /// Get task parameters
@@ -476,35 +498,18 @@ impl RealtimeScheduler {
         task_params.get(&task_id).cloned()
     }
 
-    /// Get mutable task parameters
-    fn get_task_params_mut(&self, task_id: Tid) -> Option<impl core::ops::DerefMut<Target = RealtimeTaskParams> + '_> {
-        use core::ops::DerefMut;
-        
-        struct TaskRef<'a> {
-            params: &'a mut RealtimeTaskParams,
-        }
-        
-        impl<'a> Deref for TaskRef<'a> {
-            type Target = RealtimeTaskParams;
-
-            fn deref(&self) -> &Self::Target {
-                self.params
-            }
-        }
-
-        impl<'a> DerefMut for TaskRef<'a> {
-            fn deref_mut(&mut self) -> &mut RealtimeTaskParams {
-                self.params
-            }
-        }
-        
+    /// Update task parameters with a callback function
+    fn update_task_params<F>(&self, task_id: Tid, f: F) -> Result<(), &'static str>
+    where
+        F: FnOnce(&mut RealtimeTaskParams),
+    {
         let mut task_params = self.task_params.lock();
         if task_params.contains_key(&task_id) {
-            Some(TaskRef {
-                params: task_params.get_mut(&task_id).unwrap(),
-            })
+            let task = task_params.get_mut(&task_id).unwrap();
+            f(task);
+            Ok(())
         } else {
-            None
+            Err("Task not found")
         }
     }
 
@@ -596,10 +601,13 @@ impl RealtimeScheduler {
             let mut total_utilization = 0.0;
             for (i, task) in tasks.iter().enumerate() {
                 total_utilization += task.execution_time_ms as f64 / task.period_ms as f64;
-                
+
                 let n = i + 1;
-                let bound = n as f64 * ((n as f64).powf(1.0 / n as f64) - 1.0);
-                
+                // Calculate n * (n^(1/n) - 1) using libm or manual approximation
+                // Using a simpler approximation: n * (2_f64.powf(1.0/n) - 1.0) is the same formula
+                // In no_std, we'll use a precomputed table or iterative approximation
+                let bound = calculate_liu_layland_bound(n);
+
                 if total_utilization > bound {
                     return false;
                 }

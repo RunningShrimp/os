@@ -72,22 +72,24 @@ impl OptimizedSlabAllocator {
 
         for (i, &object_size) in SLAB_SIZES.iter().enumerate() {
             let slab_ptr = current_ptr as *mut Slab;
-            (*slab_ptr).object_size = object_size;
-            (*slab_ptr).next_free = &mut (*slab_ptr).objects[0];
+            unsafe {
+                (*slab_ptr).object_size = object_size;
+                (*slab_ptr).next_free = &mut (*slab_ptr).objects[0];
 
-            // Initialize free list
-            for j in 0..64 {
-                (*slab_ptr).objects[j].data = if j == 0 {
-                    ptr::null_mut()
-                } else {
-                    let offset = j * object_size + 64 * object_size; // Skip slab header
-                    (slab_ptr as usize + offset) as *mut u8
-                };
-                (*slab_ptr).objects[j].in_use = false;
+                // Initialize free list
+                for j in 0..64 {
+                    (*slab_ptr).objects[j].data = if j == 0 {
+                        ptr::null_mut()
+                    } else {
+                        let offset = j * object_size + 64 * object_size; // Skip slab header
+                        (slab_ptr as usize + offset) as *mut u8
+                    };
+                    (*slab_ptr).objects[j].in_use = false;
 
-                if j < 63 {
-                    (*slab_ptr).objects[j].data =
-                        &mut (*slab_ptr).objects[j + 1] as *mut SlabObject as *mut u8;
+                    if j < 63 {
+                        (*slab_ptr).objects[j].data =
+                            &mut (*slab_ptr).objects[j + 1] as *mut SlabObject as *mut u8;
+                    }
                 }
             }
 
@@ -104,13 +106,15 @@ impl OptimizedSlabAllocator {
         for (i, &slab_size) in SLAB_SIZES.iter().enumerate() {
             if size <= slab_size {
                 if let Some(slab_ptr) = self.slabs[i] {
-                    if !(*slab_ptr).next_free.is_null() {
-                        let obj = (*slab_ptr).next_free;
-                        (*slab_ptr).next_free = (*obj).data as *mut SlabObject;
-                        (*obj).in_use = true;
-                        self.stats.used += 1;
-                        self.stats.allocated += slab_size;
-                        return obj as *mut u8;
+                    unsafe {
+                        if !(*slab_ptr).next_free.is_null() {
+                            let obj = (*slab_ptr).next_free;
+                            (*slab_ptr).next_free = (*obj).data as *mut SlabObject;
+                            (*obj).in_use = true;
+                            self.stats.used += 1;
+                            self.stats.allocated += slab_size;
+                            return obj as *mut u8;
+                        }
                     }
                 }
                 break;
@@ -129,18 +133,20 @@ impl OptimizedSlabAllocator {
         // Find which slab this pointer belongs to
         for i in 0..SLAB_SIZES.len() {
             if let Some(slab_ptr) = self.slabs[i] {
-                let slab_start = slab_ptr as usize;
-                let slab_end = slab_start + 64 * SLAB_SIZES[i];
+                unsafe {
+                    let slab_start = slab_ptr as usize;
+                    let slab_end = slab_start + 64 * SLAB_SIZES[i];
 
-                let ptr_addr = ptr as usize;
-                if ptr_addr >= slab_start && ptr_addr < slab_end {
-                    // This pointer belongs to this slab
-                    let obj = ptr as *mut SlabObject;
-                    (*obj).in_use = false;
-                    (*obj).data = (*slab_ptr).next_free as *mut u8;
-                    (*slab_ptr).next_free = obj;
-                    self.stats.used -= 1;
-                    return;
+                    let ptr_addr = ptr as usize;
+                    if ptr_addr >= slab_start && ptr_addr < slab_end {
+                        // This pointer belongs to this slab
+                        let obj = ptr as *mut SlabObject;
+                        (*obj).in_use = false;
+                        (*obj).data = (*slab_ptr).next_free as *mut u8;
+                        (*slab_ptr).next_free = obj;
+                        self.stats.used -= 1;
+                        return;
+                    }
                 }
             }
         }

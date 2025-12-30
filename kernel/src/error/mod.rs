@@ -5,19 +5,33 @@
 
 extern crate alloc;
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, string::ToString, vec::Vec};
 
 /// Result type for the kernel
-pub type Result<T> = core::result::Result<T, crate::api::error::Error>;
+pub type Result<T> = core::result::Result<T, Error>;
 
 /// Kernel error type - unified error representation
 pub type KernelError = UnifiedError;
+
+/// Unified error type alias for convenience
+pub type Error = UnifiedError;
 
 /// Kernel result type
 pub type KernelResult<T> = UnifiedResult<T>;
 
 /// Syscall result type
 pub type SyscallResult<T> = core::result::Result<T, SyscallError>;
+
+// Implement From<FrameworkError> for UnifiedError
+impl From<FrameworkError> for UnifiedError {
+    fn from(error: FrameworkError) -> Self {
+        match error {
+            FrameworkError::Unified(err) => err,
+            FrameworkError::Contextual { error, .. } => error,
+            FrameworkError::Chain { error, .. } => error,
+        }
+    }
+}
 
 /// Initialize error handling subsystem
 pub fn init() -> crate::error::UnifiedResult<()> {
@@ -292,19 +306,19 @@ impl ErrorHandler for DefaultErrorHandler {
     fn handle_error(&self, error: &ErrorContext) -> ErrorAction {
         match error.error {
             UnifiedError::MemoryError(MemoryError::OutOfMemory) => {
-                crate::log_error!("Out of memory: {}", error.description);
+                crate::log_error!("Out of memory: {}", &error.description);
                 ErrorAction::Recover
             },
             UnifiedError::FileSystemError(FileSystemError::PermissionDenied) => {
-                crate::log_warn!("Permission denied: {}", error.description);
+                crate::log_warn!("Permission denied: {}", &error.description);
                 ErrorAction::Propagate
             },
             UnifiedError::SecurityError(SecurityError::AccessDenied) => {
-                crate::log_error!("Security violation: {}", error.description);
+                crate::log_error!("Security violation: {}", &error.description);
                 ErrorAction::Panic
             },
             _ => {
-                crate::log_error!("Error: {}", error.description);
+                crate::log_error!("Error: {}", &error.description);
                 ErrorAction::Propagate
             },
         }
@@ -325,20 +339,38 @@ pub fn init_default_handlers() {
 /// This is a convenience function for creating UnifiedError instances
 /// with a custom message.
 pub fn create_error(message: &str) -> UnifiedError {
-    UnifiedError::FileSystemError(FileSystemError::GenericError(message.to_string()))
+    UnifiedError::Other(message.to_string())
 }
 
 /// Create a new error with a specific error type
 ///
-/// This is a convenience function for creating typed errors.
+/// This is a convenience function for creating typed errors from ErrorType enum.
+/// Maps the general ErrorType categories to specific UnifiedError variants.
 pub fn create_error_with_type(error_type: ErrorType, message: &str) -> UnifiedError {
     match error_type {
-        ErrorType::Memory => UnifiedError::MemoryError(MemoryError::GenericError(message.to_string())),
-        ErrorType::FileSystem => UnifiedError::FileSystemError(FileSystemError::GenericError(message.to_string())),
-        ErrorType::Network => UnifiedError::NetworkError(NetworkError::GenericError(message.to_string())),
-        ErrorType::Process => UnifiedError::ProcessError(ProcessError::GenericError(message.to_string())),
-        ErrorType::Security => UnifiedError::SecurityError(SecurityError::AccessDenied),
-        ErrorType::Syscall => UnifiedError::SyscallError(SyscallError::InvalidArgument),
+        // Memory-related errors
+        ErrorType::MemoryError => UnifiedError::Other(format!("MemoryError: {}", message)),
+
+        // Filesystem/I/O errors
+        ErrorType::IOError => UnifiedError::Other(format!("IOError: {}", message)),
+
+        // Network errors
+        ErrorType::NetworkError => UnifiedError::Other(format!("NetworkError: {}", message)),
+
+        // System call errors
+        ErrorType::SystemCallError => UnifiedError::SyscallError(SyscallError::InvalidArgument),
+
+        // Permission/security errors
+        ErrorType::PermissionError => UnifiedError::SecurityError(SecurityError::AccessDenied),
+
+        // Resource errors (process-related)
+        ErrorType::ResourceError => UnifiedError::Other(format!("ResourceError: {}", message)),
+
+        // Runtime errors (generic system error)
+        ErrorType::RuntimeError => UnifiedError::Other(format!("RuntimeError: {}", message)),
+
+        // Other error types map to generic errors
+        _ => UnifiedError::Other(message.to_string()),
     }
 }
 

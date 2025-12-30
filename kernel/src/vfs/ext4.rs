@@ -5,119 +5,31 @@
 
 extern crate alloc;
 
-use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use crate::prelude::*;
+
+use core::sync::atomic::{AtomicU64, Ordering};
+use alloc::{collections::BTreeMap, string::String, string::ToString, vec::Vec};
 
 use super::{
-    dir::DirEntry,
-    error::*,
-    fs::{FileSystemType, FsStats, InodeOps, SuperBlock},
-    types::*,
+    core::{FileSystemType, FsStats, SuperBlock},
+    inode::{FileLock, InodeOps},
 };
-use crate::{drivers::BlockDevice, subsystems::sync::Mutex};
+use crate::subsystems::sync::Mutex;
+
+// Re-export types from vfs_interface to match InodeOps trait signature
+use crate::vfs_interface::{
+    DirEntry as DirEntry,
+    FileAttr as FileAttr,
+    FileMode as FileMode,
+    VfsError as VfsError,
+};
+
+// VfsResult type alias
+pub type VfsResult<T> = core::result::Result<T, VfsError>;
 
 // ============================================================================
 // EXT4 Constants
 // ============================================================================
-
-/// EXT4 magic number
-const EXT4_SUPER_MAGIC: u16 = 0xEF53;
-
-/// EXT4 block size (4KB)
-const EXT4_BLOCK_SIZE: usize = 4096;
-
-/// EXT4 inode size
-const EXT4_INODE_SIZE: usize = 256;
-
-/// EXT4 directory entry file type
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-enum Ext4FileType {
-    Unknown = 0,
-    Regular = 1,
-    Directory = 2,
-    CharDevice = 3,
-    BlockDevice = 4,
-    Fifo = 5,
-    Socket = 6,
-    Symlink = 7,
-}
-
-// ============================================================================
-// EXT4 On-Disk Structures
-// ============================================================================
-
-/// EXT4 superblock structure (simplified)
-#[repr(C, packed)]
-struct Ext4SuperBlock {
-    inodes_count: u32,         // Total inodes count
-    blocks_count_lo: u32,      // Total blocks count
-    r_blocks_count_lo: u32,    // Reserved blocks count
-    free_blocks_count_lo: u32, // Free blocks count
-    free_inodes_count: u32,    // Free inodes count
-    first_data_block: u32,     // First data block
-    log_block_size: u32,       // Block size = 1024 << log_block_size
-    log_cluster_size: u32,     // Cluster size
-    blocks_per_group: u32,     // Blocks per group
-    clusters_per_group: u32,   // Clusters per group
-    inodes_per_group: u32,     // Inodes per group
-    mtime: u32,                // Mount time
-    wtime: u32,                // Write time
-    mnt_count: u16,            // Mount count
-    max_mnt_count: u16,        // Max mount count
-    magic: u16,                // Magic signature (0xEF53)
-    state: u16,                // File system state
-    errors: u16,               // Behavior when detecting errors
-    minor_rev_level: u16,      // Minor revision level
-    lastcheck: u32,            // Last check time
-    checkinterval: u32,        // Check interval
-    creator_os: u32,           // Creator OS
-    rev_level: u32,            // Revision level
-    def_resuid: u16,           // Default uid for reserved blocks
-    def_resgid: u16,           // Default gid for reserved blocks
-    first_ino: u32,            // First non-reserved inode
-    inode_size: u16,           // Size of inode structure
-    block_group_nr: u16,       // Block group number of this superblock
-    feature_compat: u32,       // Compatible feature set
-    feature_incompat: u32,     // Incompatible feature set
-    feature_ro_compat: u32,    // Readonly-compatible feature set
-    uuid: [u8; 16],            // 128-bit UUID for volume
-    volume_name: [u8; 16],     // Volume name
-    last_mounted: [u8; 64],    // Directory where last mounted
-    algorithm_usage_bitmap: u32, /* For compression
-                                * ... more fields omitted for simplicity */
-}
-
-/// EXT4 inode structure (simplified)
-#[repr(C, packed)]
-struct Ext4Inode {
-    mode: u16,        // File mode
-    uid: u16,         // Lower 16 bits of owner UID
-    size_lo: u32,     // Lower 32 bits of size in bytes
-    atime: u32,       // Access time
-    ctime: u32,       // Change time
-    mtime: u32,       // Modification time
-    dtime: u32,       // Deletion time
-    gid: u16,         // Lower 16 bits of group ID
-    links_count: u16, // Links count
-    blocks_lo: u32,   // Lower 32 bits of block count
-    flags: u32,       // File flags
-    // ... more fields omitted for simplicity
-    block: [u32; 15], // Pointers to blocks
-    generation: u32,  // File version (for NFS)
-    file_acl_lo: u32, // Lower 32 bits of extended attributes
-    size_hi: u32,     /* Upper 32 bits of size in bytes
-                       * ... more fields omitted for simplicity */
-}
-
-/// EXT4 directory entry (simplified)
-#[repr(C, packed)]
-struct Ext4DirEntry {
-    inode: u32,      // Inode number
-    rec_len: u16,    // Directory entry length
-    name_len: u8,    // Name length
-    file_type: u8,   // File type
-    name: [u8; 255], // File name (variable length)
-}
 
 // ============================================================================
 // EXT4 File System Type
@@ -148,7 +60,6 @@ impl FileSystemType for Ext4FsType {
 /// EXT4 superblock implementation
 struct Ext4SuperBlockImpl {
     root: Arc<Ext4InodeImpl>,
-    next_ino: AtomicU64,
     total_blocks: AtomicU64,
     free_blocks: AtomicU64,
     total_inodes: AtomicU64,
@@ -162,7 +73,6 @@ impl Ext4SuperBlockImpl {
 
         Self {
             root: Arc::new(root_ino),
-            next_ino: AtomicU64::new(3),
             total_blocks: AtomicU64::new(0),
             free_blocks: AtomicU64::new(0),
             total_inodes: AtomicU64::new(0),
@@ -170,9 +80,6 @@ impl Ext4SuperBlockImpl {
         }
     }
 
-    fn alloc_ino(&self) -> u64 {
-        self.next_ino.fetch_add(1, Ordering::Relaxed)
-    }
 }
 
 impl SuperBlock for Ext4SuperBlockImpl {
@@ -191,13 +98,13 @@ impl SuperBlock for Ext4SuperBlockImpl {
 
     fn statfs(&self) -> VfsResult<FsStats> {
         Ok(FsStats {
-            bsize: EXT4_BLOCK_SIZE as u64,
+            bsize: 4096,
             blocks: self.total_blocks.load(Ordering::Relaxed),
             bfree: self.free_blocks.load(Ordering::Relaxed),
             bavail: self.free_blocks.load(Ordering::Relaxed),
             files: self.total_inodes.load(Ordering::Relaxed),
             ffree: self.free_inodes.load(Ordering::Relaxed),
-            namelen: 255, // EXT4 supports up to 255 character filenames
+            namelen: 255,
         })
     }
 
@@ -220,6 +127,8 @@ struct Ext4InodeImpl {
     children: Mutex<BTreeMap<String, Arc<dyn InodeOps>>>,
     // For symlinks
     target: Mutex<Option<String>>,
+    // Extended attributes (name -> value)
+    xattrs: Mutex<BTreeMap<String, Vec<u8>>>,
 }
 
 impl Ext4InodeImpl {
@@ -235,6 +144,7 @@ impl Ext4InodeImpl {
             data: Mutex::new(Vec::new()),
             children: Mutex::new(BTreeMap::new()),
             target: Mutex::new(None),
+            xattrs: Mutex::new(BTreeMap::new()),
         }
     }
 
@@ -250,6 +160,7 @@ impl Ext4InodeImpl {
             data: Mutex::new(Vec::new()),
             children: Mutex::new(BTreeMap::new()),
             target: Mutex::new(None),
+            xattrs: Mutex::new(BTreeMap::new()),
         }
     }
 
@@ -265,6 +176,7 @@ impl Ext4InodeImpl {
             data: Mutex::new(Vec::new()),
             children: Mutex::new(BTreeMap::new()),
             target: Mutex::new(Some(target.to_string())),
+            xattrs: Mutex::new(BTreeMap::new()),
         }
     }
 }
@@ -283,6 +195,7 @@ impl InodeOps for Ext4InodeImpl {
         my_attr.atime = attr.atime;
         my_attr.mtime = attr.mtime;
         my_attr.ctime = attr.ctime;
+        my_attr.nlink = attr.nlink;
         Ok(())
     }
 
@@ -416,25 +329,6 @@ impl InodeOps for Ext4InodeImpl {
         Ok(())
     }
 
-    fn rename(&self, old_name: &str, new_dir: &dyn InodeOps, new_name: &str) -> VfsResult<()> {
-        let mut children = self.children.lock();
-        let inode = children.remove(old_name).ok_or(VfsError::NotFound)?;
-
-        // Add to new directory
-        // Note: This is simplified - real implementation would handle cross-directory rename
-        drop(children);
-
-        // For same directory rename, just update the name
-        if core::ptr::eq(self as *const _ as *const (), new_dir as *const _ as *const ()) {
-            let mut children = self.children.lock();
-            children.insert(new_name.to_string(), inode);
-            Ok(())
-        } else {
-            // Cross-directory rename - would need proper implementation
-            Err(VfsError::NotSupported)
-        }
-    }
-
     fn symlink(&self, name: &str, target: &str) -> VfsResult<Arc<dyn InodeOps>> {
         let mut children = self.children.lock();
         if children.contains_key(name) {
@@ -519,11 +413,61 @@ impl InodeOps for Ext4InodeImpl {
         Ok(())
     }
 
-    fn sync(&self) -> VfsResult<()> {
-        // TODO: Sync inode to disk
+    fn get_file_lock(&self, _cmd: u32, _lock: &FileLock) -> VfsResult<u64> {
+        // TODO: Implement file locking
+        Err(VfsError::NotSupported)
+    }
+
+    fn release_file_lock(&self, _lock: &FileLock) -> VfsResult<()> {
+        // TODO: Implement file locking
+        Err(VfsError::NotSupported)
+    }
+
+    fn set_xattr(&self, name: &str, value: &[u8], _flags: u32) -> VfsResult<()> {
+        let mut xattrs = self.xattrs.lock();
+        xattrs.insert(name.to_string(), value.to_vec());
         Ok(())
     }
+
+    fn get_xattr(&self, name: &str, value: &mut [u8]) -> VfsResult<usize> {
+        let xattrs = self.xattrs.lock();
+        if let Some(val) = xattrs.get(name) {
+            let len = val.len().min(value.len());
+            value[..len].copy_from_slice(&val[..len]);
+            Ok(val.len())
+        } else {
+            Err(VfsError::NotFound)
+        }
+    }
+
+    fn remove_xattr(&self, name: &str) -> VfsResult<()> {
+        let mut xattrs = self.xattrs.lock();
+        xattrs.remove(name)
+            .map(|_| ())
+            .ok_or(VfsError::NotFound)
+    }
+
+    fn list_xattr(&self, list: &mut [u8]) -> VfsResult<usize> {
+        let xattrs = self.xattrs.lock();
+        let mut offset = 0;
+        for name in xattrs.keys() {
+            let name_bytes = name.as_bytes();
+            if offset + name_bytes.len() > list.len() {
+                break;
+            }
+            list[offset..offset + name_bytes.len()].copy_from_slice(name_bytes);
+            offset += name_bytes.len();
+            if offset < list.len() {
+                list[offset] = b'\0';
+                offset += 1;
+            }
+        }
+        Ok(offset)
+    }
 }
+
+// Implement vfs_interface::Inode for Ext4InodeImpl
+crate::impl_inode!(Ext4InodeImpl);
 
 // ============================================================================
 // Initialization

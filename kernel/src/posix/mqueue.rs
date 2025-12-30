@@ -19,13 +19,15 @@ use alloc::{
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::libc::error::errno;
+use crate::subsystems::sync::Mutex;
+
+// Import open flags for mq_open
 
 // ============================================================================
 // Message Queue Structures
 // ============================================================================
 
 /// Message queue descriptor
-#[derive(Debug)]
 pub struct MessageQueue {
     /// Queue name
     pub name: String,
@@ -143,6 +145,16 @@ pub const MQ_NAME_MAX: usize = 255;
 // Helper Functions
 // ============================================================================
 
+/// Find message queue by descriptor
+fn find_mq_by_mqd(mqd: usize) -> Option<alloc::sync::Arc<MessageQueue>> {
+    MQD_TABLE.lock().get(&mqd).cloned()
+}
+
+/// Remove message queue descriptor from table
+fn remove_mqd_from_table(mqd: usize) {
+    MQD_TABLE.lock().remove(&mqd);
+}
+
 /// Validate message queue name
 fn validate_mq_name(name: &str) -> Result<(), i32> {
     if name.is_empty() {
@@ -172,70 +184,16 @@ fn generate_mqd() -> usize {
 }
 
 /// Find message queue by name
-fn find_mq_by_name(name: &str) -> Option<alloc::sync::Arc<MessageQueue>> {
-    let queues = MESSAGE_QUEUES.lock();
-    queues.get(name).cloned()
-}
-
-/// Find message queue by descriptor
-fn find_mq_by_mqd(mqd: usize) -> Option<alloc::sync::Arc<MessageQueue>> {
-    let table = MQD_TABLE.lock();
-    table.get(&mqd).cloned()
-}
 
 /// Add message queue to registry
-fn add_mq_to_registry(name: String, mq: alloc::sync::Arc<MessageQueue>) {
-    let mut queues = MESSAGE_QUEUES.lock();
-    queues.insert(name, mq);
-}
 
 /// Remove message queue from registry
-fn remove_mq_from_registry(name: &str) {
-    let mut queues = MESSAGE_QUEUES.lock();
-    queues.remove(name);
-}
 
 /// Add message queue descriptor to table
-fn add_mqd_to_table(mqd: usize, mq: alloc::sync::Arc<MessageQueue>) {
-    let mut table = MQD_TABLE.lock();
-    table.insert(mqd, mq);
-}
 
 /// Remove message queue descriptor from table
-fn remove_mqd_from_table(mqd: usize) {
-    let mut table = MQD_TABLE.lock();
-    table.remove(&mqd);
-}
 
 /// Send notification to registered process
-fn send_notification(mq: &MessageQueue) {
-    let notify = mq.notify.lock();
-    if let Some(notify_info) = notify.as_ref() {
-        match notify_info.notify_method {
-            MQ_SIGNAL => {
-                if notify_info.notify_sig != 0 {
-                    // Send signal to process
-                    crate::println!(
-                        "[mqueue] Sending signal {} to process {}",
-                        notify_info.notify_sig,
-                        notify_info.notify_pid
-                    );
-                    // TODO: Implement actual signal sending
-                }
-            },
-            MQ_PIPE => {
-                // TODO: Implement pipe notification
-                crate::println!("[mqueue] Pipe notification not implemented yet");
-            },
-            _ => {
-                crate::println!(
-                    "[mqueue] Unknown notification method: {}",
-                    notify_info.notify_method
-                );
-            },
-        }
-    }
-}
 
 // ============================================================================
 // POSIX Message Queue API Implementation
@@ -248,118 +206,6 @@ fn send_notification(mq: &MessageQueue) {
 /// * `oflag` - Open flags (O_RDONLY, O_WRONLY, O_RDWR, O_CREAT, O_EXCL, O_NONBLOCK)
 /// * `mode` - Permission mode (ignored for now)
 /// * `attr` - Queue attributes (can be null)
-///
-/// # Returns
-/// * Message queue descriptor on success
-/// * -1 on error
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mq_open(
-    name: *const i8,
-    oflag: i32,
-    _mode: crate::posix::Mode,
-    attr: *const MqAttr,
-) -> i32 {
-    // Convert name to string
-    let name_str = if name.is_null() {
-        return -(errno::EINVAL as i32);
-    } else {
-        unsafe {
-            let mut len = 0;
-            while *name.add(len) != 0 && len < MQ_NAME_MAX {
-                len += 1;
-            }
-            core::str::from_utf8_unchecked(core::slice::from_raw_parts(name as *const u8, len))
-        }
-    };
-
-    // Validate name
-    if let Err(errno) = validate_mq_name(name_str) {
-        return -errno;
-    }
-
-    // Check access mode
-    let read_only = match oflag & 3 {
-        O_RDONLY => true,
-        O_WRONLY => {
-            return -(errno::EINVAL as i32);
-        },
-        O_RDWR => false,
-        _ => {
-            return -(errno::EINVAL as i32);
-        },
-    };
-
-    let mut queues = MESSAGE_QUEUES.lock();
-
-    // Check if queue already exists
-    if let Some(mq_arc) = queues.get(name_str) {
-        // DEBUG: Log the type mismatch issue
-        crate::println!("[DEBUG] Found existing queue '{}' with Arc<MessageQueue>", name_str);
-        // Queue exists, check O_EXCL flag
-        if oflag & O_EXCL != 0 {
-            return -(errno::EEXIST as i32);
-        }
-
-        // Increment reference count - FIXED: Use Arc clone instead of mutable borrow
-        let _mq_clone = mq_arc.clone();
-        // Note: ref_count is now handled by Arc's internal reference counting
-
-        // Generate descriptor
-        let mqd = generate_mqd();
-        add_mqd_to_table(mqd, mq_arc.clone());
-
-        crate::println!("[mqueue] Opened existing queue '{}' with mqd {}", name_str, mqd);
-        return mqd as i32;
-    }
-
-    // Queue doesn't exist, check O_CREAT flag
-    if oflag & O_CREAT == 0 {
-        return -(errno::ENOENT as i32);
-    }
-
-    // Create new queue
-    let queue_attr = if attr.is_null() {
-        MQ_DEFAULT_ATTR
-    } else {
-        unsafe { *attr }
-    };
-
-    // Validate attributes
-    if queue_attr.mq_maxmsg <= 0 || queue_attr.mq_msgsize <= 0 {
-        return -(errno::EINVAL as i32);
-    }
-
-    // Create message queue
-    let mq = MessageQueue {
-        name: name_str.to_string(),
-        attr: Mutex::new(queue_attr),
-        messages: Mutex::new(VecDeque::new()),
-        current_count: AtomicUsize::new(0),
-        notify: Mutex::new(None),
-        ref_count: AtomicUsize::new(1),
-        read_only,
-    };
-
-    // Allocate and add to registry
-    let mq_arc = alloc::sync::Arc::new(mq);
-
-    queues.insert(name_str.to_string(), mq_arc.clone());
-    drop(queues);
-
-    // Generate descriptor
-    let mqd = generate_mqd();
-    add_mqd_to_table(mqd, mq_arc.clone());
-
-    crate::println!(
-        "[mqueue] Created new queue '{}' with mqd {}, maxmsg={}, msgsize={}",
-        name_str,
-        mqd,
-        queue_attr.mq_maxmsg,
-        queue_attr.mq_msgsize
-    );
-
-    mqd as i32
-}
 
 /// Close a message queue
 ///

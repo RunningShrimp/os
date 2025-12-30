@@ -3,7 +3,6 @@
 //! 提供Ext4超级块的读取、写入和管理功能
 
 extern crate alloc;
-use crate::drivers::BlockDevice;
 use crate::subsystems::fs::ext4::Ext4FileSystem;
 
 /// Ext4 file system state
@@ -455,6 +454,11 @@ impl Ext4FileSystem {
         let desc_per_block = block_size / desc_size;
         let desc_blocks = (self.group_count + desc_per_block as u32 - 1) / desc_per_block as u32;
 
+        // Validate that we have enough block groups to read the descriptor table
+        if desc_blocks == 0 {
+            return Err("Invalid descriptor block count");
+        }
+
         // Start block for group descriptor table
         let desc_start = if self.block_size == 1024 {
             2
@@ -462,10 +466,19 @@ impl Ext4FileSystem {
             1
         };
 
+        // Calculate end block to prevent reading beyond the descriptor table
+        let desc_end = desc_start + desc_blocks;
+
         // Read all group descriptors
         self.group_descs.clear();
         for group in 0..self.group_count {
             let desc_block = desc_start + (group / desc_per_block as u32);
+
+            // Validate that we're reading within the descriptor table bounds
+            if desc_block >= desc_end {
+                return Err("Block group descriptor out of bounds");
+            }
+
             let desc_offset = (group % desc_per_block as u32) * desc_size as u32;
 
             // Read block containing descriptor

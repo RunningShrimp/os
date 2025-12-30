@@ -7,18 +7,18 @@
 
 extern crate alloc;
 use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
-use core::sync::atomic::{AtomicU64, AtomicU32, AtomicBool, AtomicU8, Ordering};
-use crate::subsystems::sync::{Sleeplock, Mutex};
+use alloc::boxed::Box;
+use alloc::format;
+use core::sync::atomic::{AtomicU64, AtomicU32, AtomicBool, Ordering};
+use crate::subsystems::sync::Mutex;
 use crate::subsystems::drivers::{
     Driver, DriverInfo, DriverStatus, DeviceInfo, DeviceType, DeviceStatus,
-    DeviceId, IoOperation, IoResult, InterruptInfo, DeviceResources,
-    MemoryRegion, IoPortRange, InterruptLine, DmaChannel
+    DeviceId, IoOperation, IoResult, InterruptInfo,
 };
 use crate::platform::drivers::BlockDevice;
-use crate::error::UnifiedError;
+use crate::error::KernelError;
 
 // ============================================================================
 // Disk I/O Constants and Types
@@ -470,13 +470,13 @@ impl DiskIoDriver {
     /// Submit I/O request
     pub fn submit_request(&self, mut request: DiskIoRequest) -> Result<u64, KernelError> {
         if !self.enabled.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Invalid state".to_string()));
         }
 
         // Check queue depth
         let current_depth = self.current_queue_depth.load(Ordering::SeqCst);
         if current_depth >= self.queue_config.queue_depth {
-            return Err(KernelError::Busy);
+            return Err(KernelError::ResourceBusy);
         }
 
         // Generate request ID
@@ -670,13 +670,22 @@ impl DiskIoDriver {
 
             // Update request
             let mut completed_request = request.clone();
+            let success = result.is_ok();
             match result {
                 Ok(_) => {
                     completed_request.status = DiskIoStatus::Completed;
                 }
                 Err(e) => {
                     completed_request.status = DiskIoStatus::Failed;
-                    completed_request.error_code = e as u32;
+                    // Use a hash of the error to generate an error code
+                    completed_request.error_code = {
+                        let error_str = format!("{:?}", e);
+                        let mut hash: u32 = 0;
+                        for byte in error_str.bytes() {
+                            hash = hash.wrapping_mul(31).wrapping_add(byte as u32);
+                        }
+                        hash
+                    };
                     completed_request.error_message = Some(format!("I/O error: {:?}", e));
                 }
             }
@@ -685,7 +694,7 @@ impl DiskIoDriver {
             {
                 let mut pending = self.pending_requests.lock();
                 pending.remove(&request_id);
-                
+
                 let mut completed = self.completed_requests.lock();
                 completed.insert(request_id, completed_request);
             }
@@ -694,7 +703,7 @@ impl DiskIoDriver {
             self.current_queue_depth.fetch_sub(1, Ordering::SeqCst);
 
             // Update statistics
-            self.update_operation_stats(&request, latency, result.is_ok());
+            self.update_operation_stats(&request, latency, success);
         }
     }
 
@@ -703,19 +712,19 @@ impl DiskIoDriver {
         if let Some(ref block_device) = self.block_device {
             let sector_size = block_device.block_size();
             let mut buffer = vec![0u8; request.sector_count as usize * sector_size];
-            
+
             for i in 0..request.sector_count {
                 let lba = request.lba + i as u64;
                 let offset = i as usize * sector_size;
                 block_device.read(lba as usize, &mut buffer[offset..offset + sector_size]);
             }
-            
+
             // In a real implementation, we would copy the data to the request buffer
             // request.data = buffer;
-            
+
             Ok(())
         } else {
-            Err(KernelError::InvalidState)
+            Err(KernelError::Other("Invalid state: no block device".to_string()))
         }
     }
 
@@ -723,19 +732,19 @@ impl DiskIoDriver {
     fn execute_write(&self, request: &DiskIoRequest) -> Result<(), KernelError> {
         if let Some(ref block_device) = self.block_device {
             let sector_size = block_device.block_size();
-            
+
             for i in 0..request.sector_count {
                 let lba = request.lba + i as u64;
                 let offset = i as usize * sector_size;
-                
+
                 if offset + sector_size <= request.data.len() {
                     block_device.write(lba as usize, &request.data[offset..offset + sector_size]);
                 }
             }
-            
+
             Ok(())
         } else {
-            Err(KernelError::InvalidState)
+            Err(KernelError::Other("Invalid state: no block device".to_string()))
         }
     }
 
@@ -745,7 +754,7 @@ impl DiskIoDriver {
             block_device.flush();
             Ok(())
         } else {
-            Err(KernelError::InvalidState)
+            Err(KernelError::Other("Invalid state: no block device".to_string()))
         }
     }
 
@@ -795,18 +804,18 @@ impl DiskIoDriver {
     fn check_timeouts(&self) {
         let current_time = self.get_current_time();
         let mut timed_out_requests = Vec::new();
-        
+
         {
-            let mut pending = self.pending_requests.lock();
+            let pending = self.pending_requests.lock();
             for (request_id, request) in pending.iter() {
                 if current_time - request.timestamp >= request.timeout as u64 {
                     timed_out_requests.push(*request_id);
                 }
             }
         }
-        
+
         for request_id in timed_out_requests {
-            let mut request = {
+            let request = {
                 let mut pending = self.pending_requests.lock();
                 if let Some(request) = pending.remove(&request_id) {
                     Some(request)
@@ -814,19 +823,19 @@ impl DiskIoDriver {
                     None
                 }
             };
-            
+
             if let Some(mut request) = request {
                 request.status = DiskIoStatus::TimedOut;
-                
+
                 // Add to completed requests
                 {
                     let mut completed = self.completed_requests.lock();
                     completed.insert(request_id, request);
                 }
-                
+
                 // Update queue depth
                 self.current_queue_depth.fetch_sub(1, Ordering::SeqCst);
-                
+
                 // Update statistics
                 {
                     let mut stats = self.stats.lock();
@@ -1076,7 +1085,7 @@ impl Driver for DiskIoDriver {
         Ok(())
     }
 
-    fn handle_io(&mut self, device_id: DeviceId, operation: IoOperation) -> Result<IoResult, KernelError> {
+    fn handle_io(&mut self, _device_id: DeviceId, operation: IoOperation) -> Result<IoResult, KernelError> {
         match operation {
             IoOperation::Read { offset, size } => {
                 let sector_size = DEFAULT_SECTOR_SIZE;
@@ -1114,11 +1123,15 @@ impl Driver for DiskIoDriver {
                             });
                         }
                         DiskIoStatus::Failed => {
-                            let completed_request = self.get_completed_request(request_id)?;
-                            return Err(KernelError::IoError);
+                            let _completed_request = self.get_completed_request(request_id)?;
+                            return Err(KernelError::FileSystemError(
+                                crate::error::unified::FileSystemError::IoError
+                            ));
                         }
                         DiskIoStatus::TimedOut => {
-                            return Err(KernelError::Timeout);
+                            return Err(KernelError::NetworkError(
+                                crate::error::unified::NetworkError::TimedOut
+                            ));
                         }
                         _ => {
                             // Wait for completion
@@ -1126,7 +1139,7 @@ impl Driver for DiskIoDriver {
                     }
                 }
             }
-            IoOperation::Ioctl { command, arg } => {
+            IoOperation::Ioctl { command, arg: _ } => {
                 // Handle I/O control commands
                 match command {
                     0x01 => { // Get disk info
@@ -1178,10 +1191,14 @@ impl Driver for DiskIoDriver {
                                     return Ok(IoResult::IoctlResult { result: 0 });
                                 }
                                 DiskIoStatus::Failed => {
-                                    return Err(KernelError::IoError);
+                                    return Err(KernelError::FileSystemError(
+                                        crate::error::unified::FileSystemError::IoError
+                                    ));
                                 }
                                 DiskIoStatus::TimedOut => {
-                                    return Err(KernelError::Timeout);
+                                    return Err(KernelError::NetworkError(
+                                        crate::error::unified::NetworkError::TimedOut
+                                    ));
                                 }
                                 _ => {
                                     // Wait for completion
@@ -1302,56 +1319,9 @@ impl Driver for DiskIoDriver {
 /// Initialize disk I/O drivers
 pub fn init() {
     crate::println!("disk_io: initializing disk I/O drivers");
-    
+
     // In a real implementation, this would initialize the disk I/O drivers
     // and register them with the driver manager
-    
+
     crate::println!("disk_io: disk I/O drivers initialized");
-}IoError);
-                        }
-                        DiskIoStatus::TimedOut => {
-                            return Err(KernelError::Timeout);
-                        }
-                        _ => {
-                            // Wait for completion
-                        }
-                    }
-                }
-            }
-            IoOperation::Write { offset, data } => {
-                let sector_size = DEFAULT_SECTOR_SIZE;
-                let lba = offset / sector_size as u64;
-                let sector_count = (data.len() + sector_size as usize - 1) / sector_size as usize;
-                
-                let request = DiskIoRequest {
-                    id: 0,
-                    io_type: DiskIoType::Write,
-                    status: DiskIoStatus::Pending,
-                    priority: DiskIoPriority::Normal,
-                    lba,
-                    sector_count: sector_count as u32,
-                    data,
-                    timestamp: 0,
-                    timeout: DEFAULT_IO_TIMEOUT,
-                    retry_count: 0,
-                    max_retries: MAX_RETRY_COUNT,
-                    error_code: 0,
-                    error_message: None,
-                    completion_callback: None,
-                    context: 0,
-                };
-                
-                let request_id = self.submit_request(request)?;
-                
-                // Wait for completion
-                loop {
-                    match self.get_request_status(request_id)? {
-                        DiskIoStatus::Completed => {
-                            let completed_request = self.get_completed_request(request_id)?;
-                            return Ok(IoResult::WriteResult {
-                                bytes_written: completed_request.data.len() as u64,
-                            });
-                        }
-                        DiskIoStatus::Failed => {
-                            let completed_request = self.get_completed_request(request_id)?;
-                            return Err(KernelError::
+}

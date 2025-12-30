@@ -5,7 +5,7 @@
 //! closest memory node to the CPU, improving performance by reducing
 //! memory access latency.
 
-use alloc::vec::Vec;
+use crate::prelude::*;
 use core::{
     ptr::null_mut,
     sync::atomic::{AtomicPtr, AtomicUsize, Ordering},
@@ -13,7 +13,7 @@ use core::{
 
 use nos_api::{Error, Result};
 
-use crate::subsystems::{mm::unified_stats::{AllocationStats, AtomicAllocationStats}, sync::Mutex};
+use crate::subsystems::mm::unified_stats::{AllocationStats, NumStats};
 
 /// NUMA node identifier
 pub type NodeId = usize;
@@ -22,7 +22,7 @@ pub type NodeId = usize;
 pub const MAX_NUMA_NODES: usize = 8;
 
 /// Memory zone types
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MemoryZoneType {
     Normal,      // Normal memory
     HighMem,     // High memory (for systems with >4GB memory)
@@ -72,8 +72,8 @@ impl NumaNode {
             memory_zones: Vec::new(),
             free_memory: AtomicUsize::new(0),
             total_memory: 0,
-            distance: [10; MAXNODES], // Default distance
-            allocation_stats: AllocationStats::default(),
+            distance: [10; MAX_NUMA_NODES], // Default distance
+            allocation_stats: crate::subsystems::mm::unified_stats::AllocationStats::const_default(),
             preferred_zone: None,
         }
     }
@@ -169,9 +169,11 @@ impl NumaNode {
     }
 
     /// Allocate pages from a specific zone
-    pub fn allocate_from_zone(&self, zone_idx: usize, page_count: usize) -> Result<*mut u8> {
+    pub fn allocate_from_zone(&mut self, zone_idx: usize, page_count: usize) -> Result<*mut u8> {
         if zone_idx >= self.memory_zones.len() {
-            return Err(Error::InvalidArgument);
+            return Err(Error::InvalidArgument(
+                "Invalid zone index".to_string()
+            ));
         }
 
         let zone = &self.memory_zones[zone_idx];
@@ -179,9 +181,7 @@ impl NumaNode {
 
         // Check if we have enough free memory
         if zone.free_memory.load(Ordering::Relaxed) < size {
-            self.allocation_stats
-                .allocation_failures
-                .fetch_add(1, Ordering::Relaxed);
+            self.allocation_stats.allocation_failures += 1;
             return Err(Error::OutOfMemory);
         }
 
@@ -193,46 +193,18 @@ impl NumaNode {
         zone.free_memory.fetch_sub(size, Ordering::Relaxed);
         self.free_memory.fetch_sub(size, Ordering::Relaxed);
 
-        self.allocation_stats
-            .total_allocations
-            .fetch_add(1, Ordering::Relaxed);
-        self.allocation_stats
-            .current_allocations
-            .fetch_add(1, Ordering::Relaxed);
-        self.allocation_stats
-            .total_allocated_bytes
-            .fetch_add(size, Ordering::Relaxed);
-        self.allocation_stats
-            .current_allocated_bytes
-            .fetch_add(size, Ordering::Relaxed);
+        self.allocation_stats.total_allocations += 1;
+        self.allocation_stats.current_allocations += 1;
+        self.allocation_stats.total_allocated_bytes += size as u64;
+        self.allocation_stats.current_allocated_bytes += size as u64;
 
         // Update peak allocations
-        let current = self
-            .allocation_stats
-            .current_allocations
-            .load(Ordering::Relaxed);
-        let peak = self
-            .allocation_stats
-            .peak_allocations
-            .load(Ordering::Relaxed);
-        if current > peak {
-            self.allocation_stats
-                .peak_allocations
-                .store(current, Ordering::Relaxed);
+        if self.allocation_stats.current_allocations > self.allocation_stats.peak_allocations {
+            self.allocation_stats.peak_allocations = self.allocation_stats.current_allocations;
         }
 
-        let current_bytes = self
-            .allocation_stats
-            .current_allocated_bytes
-            .load(Ordering::Relaxed);
-        let peak_bytes = self
-            .allocation_stats
-            .peak_allocated_bytes
-            .load(Ordering::Relaxed);
-        if current_bytes > peak_bytes {
-            self.allocation_stats
-                .peak_allocated_bytes
-                .store(current_bytes, Ordering::Relaxed);
+        if self.allocation_stats.current_allocated_bytes > self.allocation_stats.peak_allocated_bytes {
+            self.allocation_stats.peak_allocated_bytes = self.allocation_stats.current_allocated_bytes;
         }
 
         Ok(address as *mut u8)
@@ -241,7 +213,9 @@ impl NumaNode {
     /// Find contiguous pages in a zone
     fn find_contiguous_pages(&self, zone_idx: usize, page_count: usize) -> Result<usize> {
         if zone_idx >= self.memory_zones.len() {
-            return Err(Error::InvalidArgument);
+            return Err(Error::InvalidArgument(
+                "Invalid zone index".to_string()
+            ));
         }
 
         let zone = &self.memory_zones[zone_idx];
@@ -275,21 +249,25 @@ impl NumaNode {
 
     /// Deallocate pages to a specific zone
     pub fn deallocate_to_zone(
-        &self,
+        &mut self,
         zone_idx: usize,
         ptr: *mut u8,
         page_count: usize,
     ) -> Result<()> {
         if zone_idx >= self.memory_zones.len() {
-            return Err(Error::InvalidArgument);
+            return Err(Error::InvalidArgument(
+                "Invalid zone index".to_string()
+            ));
         }
 
-        let zone = &self.memory_zones[zone_idx];
+        let zone = &mut self.memory_zones[zone_idx];
         let address = ptr as usize;
 
         // Verify address is within zone bounds
         if address < zone.start_address || address >= zone.end_address {
-            return Err(Error::InvalidArgument);
+            return Err(Error::InvalidArgument(
+                "Address out of zone bounds".to_string()
+            ));
         }
 
         let start_page = (address - zone.start_address) / zone.page_size;
@@ -306,18 +284,10 @@ impl NumaNode {
         zone.free_memory.fetch_add(size, Ordering::Relaxed);
         self.free_memory.fetch_add(size, Ordering::Relaxed);
 
-        self.allocation_stats
-            .total_deallocations
-            .fetch_add(1, Ordering::Relaxed);
-        self.allocation_stats
-            .current_allocations
-            .fetch_sub(1, Ordering::Relaxed);
-        self.allocation_stats
-            .total_deallocated_bytes
-            .fetch_add(size, Ordering::Relaxed);
-        self.allocation_stats
-            .current_allocated_bytes
-            .fetch_sub(size, Ordering::Relaxed);
+        self.allocation_stats.total_deallocations += 1;
+        self.allocation_stats.current_allocations -= 1;
+        self.allocation_stats.total_deallocated_bytes += size as u64;
+        self.allocation_stats.current_allocated_bytes -= size as u64;
 
         Ok(())
     }
@@ -325,51 +295,15 @@ impl NumaNode {
     /// Get allocation statistics
     pub fn get_allocation_stats(&self) -> AllocationStats {
         AllocationStats {
-            total_allocations: AtomicUsize::new(
-                self.allocation_stats
-                    .total_allocations
-                    .load(Ordering::Relaxed),
-            ),
-            total_deallocations: AtomicUsize::new(
-                self.allocation_stats
-                    .total_deallocations
-                    .load(Ordering::Relaxed),
-            ),
-            current_allocations: AtomicUsize::new(
-                self.allocation_stats
-                    .current_allocations
-                    .load(Ordering::Relaxed),
-            ),
-            peak_allocations: AtomicUsize::new(
-                self.allocation_stats
-                    .peak_allocations
-                    .load(Ordering::Relaxed),
-            ),
-            total_allocated_bytes: AtomicUsize::new(
-                self.allocation_stats
-                    .total_allocated_bytes
-                    .load(Ordering::Relaxed),
-            ),
-            total_deallocated_bytes: AtomicUsize::new(
-                self.allocation_stats
-                    .total_deallocated_bytes
-                    .load(Ordering::Relaxed),
-            ),
-            current_allocated_bytes: AtomicUsize::new(
-                self.allocation_stats
-                    .current_allocated_bytes
-                    .load(Ordering::Relaxed),
-            ),
-            peak_allocated_bytes: AtomicUsize::new(
-                self.allocation_stats
-                    .peak_allocated_bytes
-                    .load(Ordering::Relaxed),
-            ),
-            allocation_failures: AtomicUsize::new(
-                self.allocation_stats
-                    .allocation_failures
-                    .load(Ordering::Relaxed),
-            ),
+            total_allocations: self.allocation_stats.total_allocations,
+            total_deallocations: self.allocation_stats.total_deallocations,
+            current_allocations: self.allocation_stats.current_allocations,
+            peak_allocations: self.allocation_stats.peak_allocations,
+            total_allocated_bytes: self.allocation_stats.total_allocated_bytes,
+            total_deallocated_bytes: self.allocation_stats.total_deallocated_bytes,
+            current_allocated_bytes: self.allocation_stats.current_allocated_bytes,
+            peak_allocated_bytes: self.allocation_stats.peak_allocated_bytes,
+            allocation_failures: self.allocation_stats.allocation_failures,
         }
     }
 }
@@ -501,7 +435,7 @@ impl NumaController {
     }
 
     /// Allocate memory with NUMA awareness
-    pub fn allocate(&self, size: usize, align: usize, policy: NumaPolicy) -> Result<*mut u8> {
+    pub fn allocate(&self, size: usize, _align: usize, policy: NumaPolicy) -> Result<*mut u8> {
         if size == 0 {
             return Ok(null_mut());
         }
@@ -510,7 +444,7 @@ impl NumaController {
         let node_id = self.select_node(policy, size).ok_or(Error::OutOfMemory)?;
 
         // Get the node
-        let node_guard = self.nodes[node_id].lock();
+        let mut node_guard = self.nodes[node_id].lock();
 
         // Find a suitable zone
         let zone_idx = node_guard
@@ -522,7 +456,7 @@ impl NumaController {
         let page_count = (size + page_size - 1) / page_size;
 
         // Allocate from the zone
-        node_guard.allocate_from_zone(zone_idx, page_count)
+        NumaNode::allocate_from_zone(&mut *node_guard, zone_idx, page_count)
     }
 
     /// Deallocate memory
@@ -534,8 +468,8 @@ impl NumaController {
         // Find which node contains this address
         let address = ptr as usize;
 
-        for (node_id, node) in self.nodes.iter().enumerate() {
-            let node_guard = node.lock();
+        for (_node_id, node) in self.nodes.iter().enumerate() {
+            let mut node_guard = node.lock();
 
             // Check each zone in this node
             for (zone_idx, zone) in node_guard.memory_zones.iter().enumerate() {
@@ -543,12 +477,14 @@ impl NumaController {
                     // Found the zone, deallocate from it
                     let page_size = zone.page_size;
                     let page_count = (size + page_size - 1) / page_size;
-                    return node_guard.deallocate_to_zone(zone_idx, ptr, page_count);
+                    return NumaNode::deallocate_to_zone(&mut *node_guard, zone_idx, ptr, page_count);
                 }
             }
         }
 
-        Err(Error::InvalidArgument)
+        Err(Error::InvalidArgument(
+            "Invalid memory address".to_string()
+        ))
     }
 
     /// Get NUMA statistics
@@ -621,7 +557,7 @@ pub fn init_numa() -> Result<()> {
 /// Shutdown the NUMA controller
 pub fn shutdown_numa() -> Result<()> {
     // Clean up NUMA controller resources
-    let controller = NUMA_CONTROLLER.lock();
+    let _controller = NUMA_CONTROLLER.lock();
 
     // In a real implementation, we would clean up allocated memory
     // and other resources here
@@ -649,10 +585,10 @@ pub unsafe fn numa_alloc_aligned(size: usize, align: usize, policy: NumaPolicy) 
 
 /// Allocate zero-initialized memory with NUMA awareness
 pub unsafe fn numa_alloc_zeroed(size: usize, policy: NumaPolicy) -> *mut u8 {
-    let ptr = numa_alloc(size, policy);
+    let ptr = unsafe { numa_alloc(size, policy) };
     if !ptr.is_null() {
         // Zero initialize the memory
-        core::ptr::write_bytes(ptr, 0, size);
+        unsafe { core::ptr::write_bytes(ptr, 0, size) };
     }
     ptr
 }
@@ -845,10 +781,7 @@ mod tests {
             let stats_after = numa_get_stats();
             let node_stats = &stats_after.allocation_stats_per_node[0];
             assert!(
-                node_stats
-                    .total_allocations
-                    .load(core::sync::atomic::Ordering::Relaxed)
-                    > 0
+                node_stats.total_allocations > 0
             );
 
             numa_dealloc(ptr, 4096);

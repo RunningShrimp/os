@@ -9,7 +9,7 @@ use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use crate::{
-    reliability::{EBUSY, EINVAL, ENOENT},
+    reliability::{EBUSY, ENOENT},
     subsystems::sync::Mutex,
 };
 
@@ -594,69 +594,6 @@ impl MicroInterruptHandler {
     }
 }
 
-/// Default interrupt handlers
-extern "C" fn default_exception_handler(context: &InterruptContext) {
-    crate::println!("Exception {}: Error code: {:?}", context.vector.as_u8(), context.error_code);
-    crate::println!(
-        "RIP: 0x{:x}, RSP: 0x{:x}, RFLAGS: 0x{:x}",
-        context.rip,
-        context.rsp,
-        context.rflags
-    );
-
-    // In a real system, this would terminate the current process or panic
-    panic!("Unhandled exception");
-}
-
-extern "C" fn default_irq_handler(_context: &InterruptContext) {
-    // Default IRQ handler - acknowledge and return
-    // In a real system, this would handle the specific IRQ
-}
-
-extern "C" fn default_system_call_handler(context: &InterruptContext) {
-    // System call handler would be called here
-    // In a real system, this would dispatch to the appropriate system call
-    crate::println!("System call from RIP: 0x{:x}", context.rip);
-}
-
-extern "C" fn default_spurious_handler(_context: &InterruptContext) {
-    // Spurious interrupt - do nothing but count
-}
-
-/// Global interrupt handler
-static mut GLOBAL_INTERRUPT_HANDLER: Option<MicroInterruptHandler> = None;
-static INTERRUPT_INIT: AtomicUsize = AtomicUsize::new(0);
-
-/// Initialize interrupt subsystem
-pub fn init() -> Result<(), i32> {
-    if INTERRUPT_INIT.load(Ordering::SeqCst) != 0 {
-        return Ok(());
-    }
-
-    let handler = MicroInterruptHandler::new();
-
-    // Register default handlers
-    handler.register_interrupt_handler(
-        InterruptVector::GeneralProtectionFault,
-        default_exception_handler,
-        0,
-    )?;
-    handler.register_interrupt_handler(InterruptVector::PageFault, default_exception_handler, 0)?;
-    handler.register_interrupt_handler(InterruptVector::Timer, default_irq_handler, 0)?;
-    handler.register_interrupt_handler(
-        InterruptVector::SystemCall,
-        default_system_call_handler,
-        0,
-    )?;
-
-    unsafe {
-        GLOBAL_INTERRUPT_HANDLER = Some(handler);
-    }
-
-    INTERRUPT_INIT.store(1, Ordering::SeqCst);
-    Ok(())
-}
-
 /// Get global interrupt handler
 pub fn get_interrupt_handler() -> Option<&'static mut MicroInterruptHandler> {
     unsafe { GLOBAL_INTERRUPT_HANDLER.as_mut() }
@@ -697,6 +634,25 @@ pub fn are_interrupts_enabled() -> bool {
 /// Get current time in nanoseconds
 fn get_current_time() -> u64 {
     crate::subsystems::time::get_time_ns()
+}
+
+/// Global interrupt handler instance
+///
+/// This is a global mutable reference to the microkernel interrupt handler.
+/// It is initialized during system boot and used by the trap handling code.
+pub static mut GLOBAL_INTERRUPT_HANDLER: Option<MicroInterruptHandler> = None;
+
+/// Initialize interrupt handling
+///
+/// This function initializes the microkernel interrupt handler and
+/// must be called during microkernel initialization.
+pub fn init() -> Result<(), i32> {
+    unsafe {
+        if GLOBAL_INTERRUPT_HANDLER.is_none() {
+            GLOBAL_INTERRUPT_HANDLER = Some(MicroInterruptHandler::new());
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

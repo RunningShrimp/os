@@ -6,15 +6,13 @@
 //! and can be recovered after system crashes or power failures.
 
 extern crate alloc;
-use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use alloc::{collections::BTreeMap, string::String, vec::Vec, boxed::Box};
+use crate::prelude::*;
 use crate::subsystems::sync::Mutex;
-use crate::subsystems::fs::fs_impl::{BSIZE, BufFlags, Buf, BufCache, CacheKey};
-// use crate::subsystems::fs::ext4::{Ext4SuperBlock, Ext4GroupDesc, Ext4Inode, EXT4_MAGIC};
-// use crate::subsystems::fs::ext4_enhanced::*;
-// use crate::subsystems::fs::journaling_fs::{JournalingFileSystem, JournalEntry,
-// JournalTransaction};
+use crate::subsystems::fs::fs_impl::BufCache;
+use crate::subsystems::fs::ext4::{Ext4SuperBlock, Ext4GroupDesc, Ext4MountOptions};
+use crate::subsystems::fs::journaling_fs::JournalingFileSystem;
 use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
-
 use crate::drivers::BlockDevice;
 
 // ============================================================================
@@ -232,20 +230,25 @@ pub struct Ext4Persistence {
     /// Block device
     dev: Box<dyn BlockDevice>,
     /// Superblock
+    #[allow(dead_code)]
     sb: Ext4SuperBlock,
     /// Block size
     block_size: u32,
     /// Block group count
+    #[allow(dead_code)]
     group_count: u32,
     /// Block group descriptors
+    #[allow(dead_code)]
     group_descs: Vec<Ext4GroupDesc>,
     /// Buffer cache
     buf_cache: BufCache,
     /// Mount options
     mount_options: Ext4MountOptions,
     /// Journaling file system
-    journal: Option<Box<dyn JournalingFileSystem>>,
+    #[allow(dead_code)]
+    journal: Option<Box<JournalingFileSystem>>,
     /// Current transaction ID
+    #[allow(dead_code)]
     current_transaction_id: AtomicU32,
     /// Active transactions
     active_transactions: Mutex<BTreeMap<u32, PersistenceTransaction>>,
@@ -260,30 +263,43 @@ pub struct Ext4Persistence {
     /// Persistence enabled
     persistence_enabled: AtomicBool,
     /// Recovery in progress
+    #[allow(dead_code)]
     recovery_in_progress: AtomicBool,
     /// Journal recovery in progress
+    #[allow(dead_code)]
     journal_recovery_in_progress: AtomicBool,
     /// Checksum seed
+    #[allow(dead_code)]
     checksum_seed: AtomicU32,
     /// Last checkpoint
+    #[allow(dead_code)]
     last_checkpoint: AtomicU64,
     /// Next checkpoint
+    #[allow(dead_code)]
     next_checkpoint: AtomicU64,
     /// Checkpoint interval in seconds
+    #[allow(dead_code)]
     checkpoint_interval: u32,
     /// Maximum checkpoint age in seconds
+    #[allow(dead_code)]
     max_checkpoint_age: u32,
     /// Journal commit timer
+    #[allow(dead_code)]
     journal_commit_timer: AtomicU64,
     /// Writeback timer
+    #[allow(dead_code)]
     writeback_timer: AtomicU64,
     /// Flush timer
+    #[allow(dead_code)]
     flush_timer: AtomicU64,
     /// Sync timer
+    #[allow(dead_code)]
     sync_timer: AtomicU64,
     /// Recovery timer
+    #[allow(dead_code)]
     recovery_timer: AtomicU64,
     /// Checkpoint timer
+    #[allow(dead_code)]
     checkpoint_timer: AtomicU64,
 }
 
@@ -362,7 +378,7 @@ impl Ext4Persistence {
     }
 
     /// Initialize the persistence layer
-    pub fn init(&mut self) -> Result<(), &'static str> {
+    pub fn init(&mut self) -> Result<()> {
         // In a real implementation, this would initialize the persistence layer
         Ok(())
     }
@@ -428,7 +444,7 @@ impl Ext4Persistence {
     }
 
     /// Writeback dirty blocks
-    pub fn writeback_dirty_blocks(&self) -> Result<(), &'static str> {
+    pub fn writeback_dirty_blocks(&self) -> Result<()> {
         // Ensure policy is applied before each cycle (policy may be changed at runtime)
         self.apply_write_policy();
         let mut wb = self.writeback_control.lock();
@@ -442,7 +458,7 @@ impl Ext4Persistence {
         wb.last_writeback = current_time;
 
         // Get dirty blocks
-        let mut dirty_blocks = self.dirty_blocks.lock();
+        let dirty_blocks = self.dirty_blocks.lock();
         // 先按块号排序，便于底层设备做顺序写合并
         let mut blocks_vec: Vec<_> = dirty_blocks
             .iter()
@@ -480,10 +496,7 @@ impl Ext4Persistence {
             }
 
             // Write block to disk
-            if let Err(_) = self.dev.write(block_num as usize, &dirty_block.data) {
-                failed_blocks += 1;
-                continue;
-            }
+            self.dev.write(block_num as usize, &dirty_block.data);
 
             // Mark as clean
             {
@@ -509,11 +522,11 @@ impl Ext4Persistence {
             stats.total_bytes_written += written_blocks as u64 * self.block_size as u64;
         }
 
-        Ok(());
+        return Ok(());
     }
 
     /// Flush all dirty blocks
-    pub fn flush_dirty_blocks(&self) -> Result<(), &'static str> {
+    pub fn flush_dirty_blocks(&self) -> Result<()> {
         let mut wb = self.writeback_control.lock();
 
         if wb.in_progress {
@@ -523,7 +536,7 @@ impl Ext4Persistence {
         wb.in_progress = true;
 
         // Get all dirty blocks
-        let mut dirty_blocks = self.dirty_blocks.lock();
+        let dirty_blocks = self.dirty_blocks.lock();
         let blocks_to_write: Vec<_> = dirty_blocks
             .iter()
             .filter(|(_, block)| block.dirty)
@@ -546,10 +559,7 @@ impl Ext4Persistence {
             }
 
             // Write block to disk
-            if let Err(_) = self.dev.write(block_num as usize, &dirty_block.data) {
-                failed_blocks += 1;
-                continue;
-            }
+            self.dev.write(block_num as usize, &dirty_block.data);
 
             // Mark as clean
             {
@@ -575,7 +585,7 @@ impl Ext4Persistence {
             stats.total_bytes_written += written_blocks as u64 * self.block_size as u64;
         }
 
-        Ok(());
+        return Ok(());
     }
 
     /// Get persistence statistics

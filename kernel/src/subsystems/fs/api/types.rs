@@ -7,7 +7,7 @@ extern crate alloc;
 /// 文件句柄类型
 ///
 /// 用于标识打开的文件
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct FileHandle(pub u32);
 
 /// 目录条目类型

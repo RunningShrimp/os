@@ -4,9 +4,12 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VfsError {
     NotFound,
+    NoEntry,
     PermissionDenied,
     NotDirectory,
+    NotADirectory,
     IsDirectory,
+    IsADirectory,
     NotEmpty,
     Exists,
     NoSpace,

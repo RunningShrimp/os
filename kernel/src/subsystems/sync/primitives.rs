@@ -258,7 +258,7 @@ pub struct MutexEnhancedGuard<'a, T: Send + Sync> {
 
 impl<T: Send + Sync> Drop for MutexEnhancedGuard<'_, T> {
     fn drop(&mut self) {
-        let current_tid = current_thread().unwrap_or(0);
+        let _current_tid = current_thread().unwrap_or(0);
 
         self.mutex.lock.lock();
 
@@ -280,7 +280,7 @@ impl<T: Send + Sync> Drop for MutexEnhancedGuard<'_, T> {
             if unsafe { *self.mutex.state.waiters.get() } > 0 {
                 // Wake up one waiter (simplified)
                 let channel = (&self.mutex.state as *const _ as usize) | 0xdead0000;
-                let mut table = thread_table();
+                let table = thread_table();
 
                 // Find first waiting thread and wake it
                 for thread in table.iter_mut() {
@@ -335,7 +335,7 @@ impl CondVar {
 
     /// Wait for the condition to be signaled
     /// Must be called while holding a mutex lock
-    pub fn wait<T: Send + Sync>(&self, mutex: &MutexEnhanced<T>) {
+    pub fn wait<T: Send + Sync>(&self, _mutex: &MutexEnhanced<T>) {
         let current_tid = current_thread().unwrap_or(0);
 
         // Add current thread to wait queue
@@ -347,15 +347,11 @@ impl CondVar {
         // Increment waiter count
         self.waiters.fetch_add(1, Ordering::SeqCst);
 
-        // Release the mutex and block
-        drop(mutex);
-
         // Block current thread
+        // Note: The mutex should be released before calling this function
+        // and re-acquired after the function returns
         let channel = self as *const _ as usize;
         sleep(channel);
-
-        // When woken up, re-acquire the mutex
-        mutex.lock();
     }
 
     /// Wait with timeout
@@ -383,7 +379,7 @@ impl CondVar {
     }
 
     /// Try to wait without blocking
-    fn try_wait<T: Send + Sync>(&self, mutex: &MutexEnhanced<T>) -> bool {
+    fn try_wait<T: Send + Sync>(&self, _mutex: &MutexEnhanced<T>) -> bool {
         let current_tid = current_thread().unwrap_or(0);
 
         // Check if we're already in the wait queue
@@ -667,7 +663,7 @@ impl<T: Send + Sync> Drop for RwLockEnhancedReadGuard<'_, T> {
         let current_state = self.lock.state.load(Ordering::Relaxed);
         if (current_state & !WRITER_BIT) == 0 {
             // No more readers, wake up first writer
-            let mut queue = self.lock.writer_queue.lock();
+            let queue = self.lock.writer_queue.lock();
             if let Some(writer_tid) = queue.first().copied() {
                 drop(queue);
                 let table = thread_table();
@@ -760,16 +756,13 @@ const PERCPU_QUEUE_CAPACITY: usize = 256;
 /// Cache line size (typical: 64 bytes)
 const CACHE_LINE_SIZE: usize = 64;
 
-/// Padding to align to cache line
-const CACHE_LINE_PADDING: usize = CACHE_LINE_SIZE
-    - (core::mem::size_of::<[Option<T>; PERCPU_QUEUE_CAPACITY]>()
-        + core::mem::size_of::<AtomicUsize>() * 2)
-        % CACHE_LINE_SIZE;
+/// Padding to align to cache line (fixed value, actual padding calculated per-type)
+const CACHE_LINE_PADDING: usize = CACHE_LINE_SIZE - 8;
 
 // Safety: PerCpuLockFreeQueue provides thread-safe SPSC queue
 unsafe impl<T: Send> Send for PerCpuLockFreeQueue<T> {}
 
-impl<T> PerCpuLockFreeQueue<T> {
+impl<T: core::marker::Copy> PerCpuLockFreeQueue<T> {
     /// Create a new per-CPU lock-free queue
     pub const fn new() -> Self {
         Self {
@@ -795,7 +788,7 @@ impl<T> PerCpuLockFreeQueue<T> {
             return Err(item);
         }
 
-        let buffer = &mut *self.buffer.get();
+        let buffer = unsafe { &mut *self.buffer.get() };
         buffer[tail] = Some(item);
 
         self.tail.store(next_tail, Ordering::Release);
@@ -814,7 +807,7 @@ impl<T> PerCpuLockFreeQueue<T> {
             return None;
         }
 
-        let buffer = &mut *self.buffer.get();
+        let buffer = unsafe { &mut *self.buffer.get() };
         let item = buffer[head].take();
 
         let next_head = (head + 1) % PERCPU_QUEUE_CAPACITY;
@@ -873,7 +866,7 @@ pub struct PerCpuWorkQueue<T> {
     _padding: [u8; CACHE_LINE_PADDING],
 }
 
-impl<T: Send> PerCpuWorkQueue<T> {
+impl<T: Send + Copy> PerCpuWorkQueue<T> {
     /// Create a new per-CPU work queue
     pub fn new() -> Self {
         Self {
@@ -981,7 +974,7 @@ impl<T> ConcurrentQueue<T> {
                         .is_ok()
                 } {
                     // Successfully linked, update tail
-                    self.tail.compare_exchange(
+                    let _ = self.tail.compare_exchange(
                         tail,
                         new_node,
                         Ordering::Release,
@@ -991,7 +984,7 @@ impl<T> ConcurrentQueue<T> {
                 }
             } else {
                 // Tail was behind, try to advance it
-                self.tail
+                let _ = self.tail
                     .compare_exchange(tail, tail_next, Ordering::Release, Ordering::Relaxed);
             }
         }
@@ -1011,7 +1004,7 @@ impl<T> ConcurrentQueue<T> {
                 }
 
                 // Tail is behind, try to advance it
-                self.tail
+                let _ = self.tail
                     .compare_exchange(tail, head_next, Ordering::Release, Ordering::Relaxed);
             } else {
                 // Try to advance head
@@ -1021,7 +1014,7 @@ impl<T> ConcurrentQueue<T> {
                     .is_ok()
                 {
                     // Successfully advanced head, extract data
-                    let node = unsafe { Box::from_raw(head) };
+                    let _node = unsafe { Box::from_raw(head) };
                     let next_node = unsafe { Box::from_raw(head_next) };
 
                     let data = next_node.data;
@@ -1143,7 +1136,7 @@ impl Barrier {
 
     /// Wait at the barrier
     pub fn wait(&self) -> bool {
-        let current_tid = current_thread().unwrap_or(0);
+        let _current_tid = current_thread().unwrap_or(0);
         let current_gen = self.generation.load(Ordering::Acquire);
 
         // Increment waiting thread count

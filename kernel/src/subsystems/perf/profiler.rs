@@ -1,4 +1,4 @@
-use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use alloc::{collections::BTreeMap, string::String, string::ToString, vec::Vec};
 use core::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 
 use spin::Mutex;
@@ -63,6 +63,29 @@ pub struct ProfilingStatistics {
     pub average_stack_depth: f64,
 }
 
+impl Default for ProfilingStatistics {
+    fn default() -> Self {
+        Self::const_default()
+    }
+}
+
+impl ProfilingStatistics {
+    /// Const constructor for static initialization
+    pub const fn const_default() -> Self {
+        Self {
+            total_samples: 0,
+            total_events: 0,
+            cpu_time_ns: 0,
+            interrupt_count: 0,
+            context_switch_count: 0,
+            page_fault_count: 0,
+            function_calls: 0,
+            max_stack_depth: 0,
+            average_stack_depth: 0.0,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct CallGraph {
     pub root: FunctionInfo,
@@ -97,6 +120,13 @@ pub struct ProfilingConfig {
 
 impl Default for ProfilingConfig {
     fn default() -> Self {
+        Self::const_default()
+    }
+}
+
+impl ProfilingConfig {
+    /// Const constructor for static initialization
+    pub const fn const_default() -> Self {
         Self {
             sampling_interval_ns: 1_000_000,
             max_samples: 1_000_000,
@@ -104,7 +134,7 @@ impl Default for ProfilingConfig {
             trace_functions: true,
             trace_interrupts: true,
             trace_context_switches: true,
-            trace_page_faultes: true,
+            trace_page_faults: true,
             trace_cache_misses: false,
             include_kernel: true,
             include_userspace: true,
@@ -129,6 +159,15 @@ pub enum FrameType {
     InterruptHandler,
     SystemCall,
     Unknown,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum EventCategory {
+    FunctionCall,
+    Interrupt,
+    ContextSwitch,
+    PageFault,
+    Other,
 }
 
 pub struct Profiler {
@@ -175,7 +214,7 @@ impl Profiler {
         self.call_stack.lock().clear();
 
         let statistics = ProfilingStatistics::default();
-        *self.statistics.lock() = statistics;
+        *self.statistics.lock() = statistics.clone();
 
         let session = ProfilingSession {
             id: session_id,
@@ -242,11 +281,12 @@ impl Profiler {
         }
         drop(config);
 
+        let stack_depth = sample.stack_frames.len();
         self.samples.lock().push(sample);
 
         let mut stats = self.statistics.lock();
         stats.total_samples += 1;
-        stats.max_stack_depth = stats.max_stack_depth.max(sample.stack_frames.len());
+        stats.max_stack_depth = stats.max_stack_depth.max(stack_depth);
     }
 
     pub fn record_event(&self, event: ProfilingEvent) {
@@ -254,25 +294,35 @@ impl Profiler {
             return;
         }
 
+        let event_type = match &event {
+            ProfilingEvent::FunctionEnter { .. } | ProfilingEvent::FunctionExit { .. } => {
+                EventCategory::FunctionCall
+            },
+            ProfilingEvent::Interrupt { .. } => EventCategory::Interrupt,
+            ProfilingEvent::ContextSwitch { .. } => EventCategory::ContextSwitch,
+            ProfilingEvent::PageFault { .. } => EventCategory::PageFault,
+            _ => EventCategory::Other,
+        };
+
         self.events.lock().push(event);
 
         let mut stats = self.statistics.lock();
         stats.total_events += 1;
 
-        match &event {
-            ProfilingEvent::FunctionEnter { .. } | ProfilingEvent::FunctionExit { .. } => {
+        match event_type {
+            EventCategory::FunctionCall => {
                 stats.function_calls += 1;
             },
-            ProfilingEvent::Interrupt { .. } => {
+            EventCategory::Interrupt => {
                 stats.interrupt_count += 1;
             },
-            ProfilingEvent::ContextSwitch { .. } => {
+            EventCategory::ContextSwitch => {
                 stats.context_switch_count += 1;
             },
-            ProfilingEvent::PageFault { .. } => {
+            EventCategory::PageFault => {
                 stats.page_fault_count += 1;
             },
-            _ => {},
+            EventCategory::Other => {},
         }
     }
 
@@ -373,7 +423,7 @@ impl Profiler {
         }
 
         let config = self.config.lock();
-        if !config.trace_page_faultes {
+        if !config.trace_page_faults {
             return;
         }
         drop(config);
@@ -554,7 +604,21 @@ impl Default for Profiler {
     }
 }
 
-pub static PROFILER: Profiler = Profiler::new();
+// Use a const-compatible initialization for the static profiler
+// The Profiler struct contains only atomic types and sync types that can be const-initialized
+pub static PROFILER: Profiler = Profiler {
+    mode: AtomicU8::new(ProfilingMode::Off as u8),
+    session_id: AtomicU64::new(0),
+    samples: Mutex::new(Vec::new()),
+    events: Mutex::new(Vec::new()),
+    config: Mutex::new(ProfilingConfig::const_default()),
+    statistics: Mutex::new(ProfilingStatistics::const_default()),
+    call_stack: Mutex::new(Vec::new()),
+    active_session: Mutex::new(None),
+    function_map: Mutex::new(BTreeMap::new()),
+    name_to_id: Mutex::new(BTreeMap::new()),
+    next_function_id: AtomicU64::new(1),
+};
 
 #[derive(Debug, Clone, Copy)]
 pub enum ExportFormat {

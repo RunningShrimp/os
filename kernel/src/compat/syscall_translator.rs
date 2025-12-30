@@ -11,19 +11,21 @@
 extern crate alloc;
 extern crate hashbrown;
 
-use core::hash::{Hash, Hasher};
+use core::hash::{Hash, Hasher, BuildHasher};
 use alloc::vec::Vec;
 use alloc::sync::Arc;
-use alloc::{format, vec};
+use alloc::vec;
 use alloc::boxed::Box;
+use alloc::string::String;
 use alloc::string::ToString;
+use alloc::collections::BTreeMap;
 use hashbrown::HashMap;
 pub type SyscallHashMap<K, V> = HashMap<K, V, CustomHasher>;
 use crate::compat::abi::AbiConverter;
-use crate::compat::DefaultHasherBuilder;
+use crate::sync::Mutex;
 
 #[derive(Default)]
-struct CustomHasher;
+pub struct CustomHasher;
 impl core::hash::Hasher for CustomHasher {
     fn finish(&self) -> u64 {
         0 // Placeholder implementation
@@ -35,8 +37,8 @@ impl core::hash::Hasher for CustomHasher {
 }
 
 use crate::compat::*;
-use crate::syscalls;
-use crate::subsystems::syscalls::thread::dispatch;
+use crate::subsystems::syscalls::dispatch::get_unified_dispatcher;
+use crate::subsystems::syscalls::interface::SyscallDispatcher;
 
 /// Foreign system call representation
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -424,7 +426,23 @@ impl SyscallTranslator {
         }
 
         // Execute the native syscall
-        let return_value = syscalls::dispatch(*native_number, &converted_args);
+        // Convert usize args to u64 for unified dispatcher
+        let u64_args: Vec<u64> = converted_args.iter().map(|&x| x as u64).collect();
+        let return_value = match get_unified_dispatcher() {
+            Some(dispatcher_mutex) => {
+                let dispatcher_guard = dispatcher_mutex.lock();
+                match dispatcher_guard.as_ref() {
+                    Some(dispatcher) => {
+                        match dispatcher.dispatch(*native_number as u32, &u64_args) {
+                            Ok(_) => 0, // Success
+                            Err(_) => -1, // Error occurred
+                        }
+                    }
+                    None => -1, // Dispatcher not initialized
+                }
+            }
+            None => -1, // No dispatcher available
+        };
 
         Ok(TranslationResult {
             return_value,
@@ -445,26 +463,40 @@ impl SyscallTranslator {
         }
 
         // Otherwise execute the native syscall directly
-        unsafe {
-            let mut converted_args = [0usize; 6];
-            {
-                let mut abi_converter = self.abi_converter.lock();
-                for (i, &arg) in syscall.args.iter().enumerate() {
-                    converted_args[i] = abi_converter.convert_argument(
-                        syscall.platform,
-                        TargetPlatform::Nos,
-                        arg,
-                        i,
-                    )?;
+        let mut converted_args = [0usize; 6];
+        {
+            let mut abi_converter = self.abi_converter.lock();
+            for (i, &arg) in syscall.args.iter().enumerate() {
+                converted_args[i] = abi_converter.convert_argument(
+                    syscall.platform,
+                    TargetPlatform::Nos,
+                    arg,
+                    i,
+                )?;
+            }
+        }
+
+        // Convert usize args to u64 for unified dispatcher
+        let u64_args: Vec<u64> = converted_args.iter().map(|&x| x as u64).collect();
+        match get_unified_dispatcher() {
+            Some(dispatcher_mutex) => {
+                let dispatcher_guard = dispatcher_mutex.lock();
+                match dispatcher_guard.as_ref() {
+                    Some(dispatcher) => {
+                        match dispatcher.dispatch(cached.native_number as u32, &u64_args) {
+                            Ok(_) => Ok(0), // Success
+                            Err(_) => Ok(-1), // Error occurred
+                        }
+                    }
+                    None => Ok(-1), // Dispatcher not initialized
                 }
             }
-
-            Ok(syscalls::dispatch(cached.native_number, &converted_args))
+            None => Ok(-1), // No dispatcher available
         }
     }
 
     /// Execute JIT-compiled code
-    fn execute_jit_code(&self, entry_point: usize, syscall: &ForeignSyscall) -> Result<isize> {
+    fn execute_jit_code(&self, _entry_point: usize, _syscall: &ForeignSyscall) -> Result<isize> {
         // This would execute the JIT-compiled code
         // For now, return a placeholder
         Ok(0)
@@ -472,7 +504,7 @@ impl SyscallTranslator {
 
     /// Hash a syscall for caching
     fn hash_syscall(&self, syscall: &ForeignSyscall) -> u64 {
-        let mut hasher = DefaultHasher::new();
+        let mut hasher = hashbrown::DefaultHashBuilder::default().build_hasher();
         syscall.platform.hash(&mut hasher);
         syscall.number.hash(&mut hasher);
         for arg in &syscall.args {
@@ -500,7 +532,7 @@ impl SyscallTranslator {
         // File I/O syscalls (most common)
         number_translation.insert(0, crate::syscalls::SYS_READ as usize);   // sys_read
         number_translation.insert(1, crate::syscalls::SYS_WRITE as usize);  // sys_write
-        number_translation.insert(2, crate::syscalls::SYS_OPEN as usize);   // sys_open
+        number_translation.insert(2, 0x2001);  // sys_open -> open
         number_translation.insert(3, crate::syscalls::SYS_CLOSE as usize);  // sys_close
         number_translation.insert(8, 0x2004);  // sys_lseek -> lseek
         number_translation.insert(9, 0x3001);  // sys_mmap -> mmap
@@ -528,14 +560,14 @@ impl SyscallTranslator {
 
         // Process management syscalls
         number_translation.insert(39, crate::syscalls::SYS_GETPID as usize); // sys_getpid
-        number_translation.insert(57, crate::syscalls::SYS_FORK as usize);   // sys_fork
-        number_translation.insert(58, crate::syscalls::SYS_FORK as usize);   // sys_vfork -> fork
-        number_translation.insert(59, 0x1005);  // sys_execve -> execve
-        number_translation.insert(60, crate::syscalls::SYS_EXIT as usize);  // sys_exit
+        number_translation.insert(57, 0x1001);   // sys_fork -> fork
+        number_translation.insert(58, 0x1001);   // sys_vfork -> fork
+        number_translation.insert(59, 0x1002);  // sys_execve -> execve
+        number_translation.insert(60, 0x1003);  // sys_exit -> exit
         number_translation.insert(231, 0x1003);  // sys_exit_group -> exit
         number_translation.insert(61, 0x1006);  // sys_wait4 -> wait4
         number_translation.insert(247, 0x1006); // sys_waitid -> wait4
-        number_translation.insert(62, crate::syscalls::SYS_KILL as usize);   // sys_kill
+        number_translation.insert(62, 0x1007);   // sys_kill -> kill
         number_translation.insert(56, 0x8000);   // sys_clone -> clone
         number_translation.insert(110, 0x1007);  // sys_getppid -> getppid
         number_translation.insert(111, 0x1008);  // sys_getpgrp -> getpgrp
@@ -1118,7 +1150,7 @@ impl JitCompiler {
     }
 
     /// Compile a syscall translation to native code
-    pub fn compile_syscall(&mut self, cached: &CachedTranslation) -> Result<usize> {
+    pub fn compile_syscall(&mut self, _cached: &CachedTranslation) -> Result<usize> {
         // This would generate machine code for the syscall translation
         // For now, return a placeholder address
         let cache_id = self.next_cache_id;

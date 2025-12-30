@@ -1,6 +1,7 @@
 //! GLib async manager trait and implementation
 
 use super::*;
+use core::result::Result;
 
 /// GLib异步I/O管理器特征
 pub trait GAsyncManager {
@@ -88,7 +89,7 @@ impl GAsyncManager for () {
         if result > 0 {
             Ok(result as u64)
         } else {
-            Err(result)
+            Err(result as c_int)
         }
     }
 
@@ -109,7 +110,7 @@ impl GAsyncManager for () {
         if result > 0 {
             Ok(result as u64)
         } else {
-            Err(result)
+            Err(result as c_int)
         }
     }
 

@@ -10,6 +10,9 @@
 extern crate alloc;
 use alloc::vec::Vec;
 
+// 导入C类型
+use core::ffi::{c_double, c_int, c_uint};
+
 /// 随机数生成器类型
 #[derive(Debug, Clone, Copy)]
 pub enum RandomGeneratorType {
@@ -449,28 +452,28 @@ pub fn get_random_generator() -> &'static mut EnhancedRandomGenerator {
 // 便捷的随机数函数包装器
 #[inline]
 pub fn srand(seed: c_uint) {
-    unsafe { get_random_generator().srand(seed) }
+    get_random_generator().srand(seed)
 }
 
 #[inline]
 pub fn rand() -> c_int {
-    unsafe { get_random_generator().rand() }
+    get_random_generator().rand()
 }
 
 // 高级随机数函数
 #[inline]
 pub fn rand_float() -> c_double {
-    unsafe { get_random_generator().rand_float() }
+    get_random_generator().rand_float()
 }
 
 #[inline]
 pub fn rand_between(min: c_int, max: c_int) -> c_int {
-    unsafe { get_random_generator().rand_between(min, max) }
+    get_random_generator().rand_between(min, max)
 }
 
 #[inline]
 pub fn rand_normal(mean: c_double, std_dev: c_double) -> c_double {
-    unsafe { get_random_generator().rand_normal(mean, std_dev) }
+    get_random_generator().rand_normal(mean, std_dev)
 }
 
 /// 随机数测试函数

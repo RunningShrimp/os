@@ -10,5 +10,18 @@
 pub mod access_control;
 pub mod syscall_validator;
 
-pub use access_control::*;
-pub use syscall_validator::*;
+// Re-exports from access_control (excluding conflicting ResourceType)
+pub use access_control::{
+    UserId, GroupId, ProcessId, AccessResult, UserInfo, UserType, AccountStatus,
+    Permission, ResourceType as AccessResourceType, AccessControlEntry,
+    PrincipalType, AccessRule, Capability, CapabilityType,
+    AccessControlManager, GroupInfo, AccessControlConfig,
+};
+
+// Re-exports from syscall_validator (excluding conflicting ResourceType)
+pub use syscall_validator::{
+    SecurityValidationResult, SecurityContext, SecurityLevel, ResourceAccess,
+    SyscallSecurityPolicy, ArgumentValidationRule, ArgumentValidationType,
+    ResourceRequirement, ResourceType as ValidatorResourceType, AuditLogEntry,
+    SyscallSecurityValidator, ValidatorConfig,
+};

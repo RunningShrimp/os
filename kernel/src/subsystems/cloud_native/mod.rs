@@ -12,13 +12,11 @@ pub mod oci;
 pub mod virtio;
 
 use alloc::{
-    format,
     string::{String, ToString},
 };
 
 use crate::{
-    reliability::{EINVAL, EIO, ENOENT, ENOMEM},
-    subsystems,
+    reliability::{EINVAL, EIO, ENOMEM},
     subsystems::microkernel::service_registry::{
         InterfaceVersion, ServiceCategory, ServiceInfo, get_service_registry,
     },

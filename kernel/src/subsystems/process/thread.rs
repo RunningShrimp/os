@@ -510,6 +510,7 @@ pub struct ThreadTable {
 impl ThreadTable {
     /// Create a new thread table with object pool
     pub fn new() -> Self {
+        #[allow(invalid_value)]
         let mut threads: [Thread; MAX_THREADS] = unsafe {
             // SAFETY: Thread can be created as all-zeros for Unused state
             core::mem::MaybeUninit::uninit().assume_init()
@@ -859,7 +860,7 @@ pub fn create_thread(
     start_routine: Option<unsafe extern "C" fn(*mut u8) -> *mut u8>,
     arg: *mut u8,
 ) -> Result<Tid, ThreadError> {
-    let mut table = thread_table();
+    let table = thread_table();
     let thread = table.alloc_thread(pid, thread_type)?;
 
     // Set thread entry point
@@ -875,7 +876,7 @@ pub fn create_thread(
 /// Exit current thread
 pub fn thread_exit(retval: *mut u8) -> ! {
     if let Some(tid) = current_thread() {
-        let mut table = thread_table();
+        let table = thread_table();
         if let Some(thread) = table.find_thread(tid) {
             thread.return_value = retval;
 
@@ -888,15 +889,16 @@ pub fn thread_exit(retval: *mut u8) -> ! {
                         let pagetable = proc.pagetable;
                         if !pagetable.is_null() {
                             // Clear the child TID pointer (set to 0)
-                            unsafe {
-                                let zero_val = 0i32;
-                                let _ = crate::subsystems::mm::vm::copyin(
-                                    pagetable,
-                                    thread.child_tid_ptr as *mut u8,
-                                    thread.child_tid_ptr,
-                                    core::mem::size_of::<i32>(),
-                                );
-                            }
+                            let child_tid_ptr = thread.child_tid_ptr;
+                            let zero_val: i32 = 0;
+                            let bytes = unsafe {
+                                core::slice::from_raw_parts(&zero_val as *const i32 as *const u8, core::mem::size_of::<i32>())
+                            };
+                            let _ = crate::subsystems::mm::vm::copyin(
+                                child_tid_ptr as *mut u8,
+                                bytes,
+                                core::mem::size_of::<i32>(),
+                            );
                         }
                     }
                 }
@@ -929,7 +931,7 @@ pub fn thread_exit(retval: *mut u8) -> ! {
 /// Join with a thread
 pub fn thread_join(target_tid: Tid) -> Result<*mut u8, ThreadError> {
     let current_tid = current_thread().ok_or(ThreadError::InvalidThreadId)?;
-    let mut table = thread_table();
+    let table = thread_table();
 
     // Find target thread
     let target_thread = table
@@ -980,7 +982,7 @@ pub fn thread_join(target_tid: Tid) -> Result<*mut u8, ThreadError> {
 
 /// Detach a thread
 pub fn thread_detach(tid: Tid) -> Result<(), ThreadError> {
-    let mut table = thread_table();
+    let table = thread_table();
     let thread = table.find_thread(tid).ok_or(ThreadError::InvalidThreadId)?;
 
     if thread.detached {
@@ -1001,7 +1003,7 @@ pub fn thread_detach(tid: Tid) -> Result<(), ThreadError> {
 /// Yield CPU to another thread
 pub fn thread_yield() {
     if let Some(tid) = current_thread() {
-        let mut table = thread_table();
+        let table = thread_table();
         if let Some(thread) = table.find_thread(tid) {
             if thread.is_running() {
                 thread.set_runnable();
@@ -1010,6 +1012,67 @@ pub fn thread_yield() {
     }
 
     schedule();
+}
+
+/// Ensure all processes have their main threads created
+///
+/// This function checks if any processes exist without threads and creates
+/// their main threads if needed. This is called by the scheduler to ensure
+/// every process has at least one thread for execution.
+fn ensure_main_threads() {
+    // Lock the process table and check for processes without threads
+    use crate::process::PROC_TABLE;
+
+    // Collect PIDs that need threads first to avoid holding lock across iteration
+    let pids_needing_threads: Vec<_> = {
+        let process_table = PROC_TABLE.lock();
+        let thread_table_ref = thread_table();
+
+        // Iterate through all processes and collect PIDs without threads
+        process_table
+            .iter()
+            .filter_map(|proc| {
+                let threads = thread_table_ref.find_threads_by_pid(proc.pid);
+                if threads.is_empty() {
+                    Some(proc.pid)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    };
+
+    // Now create threads for processes that need them (outside the lock)
+    for pid in pids_needing_threads {
+        // This process has no threads, we need to create a main thread
+        // For now, this is a no-op stub - the actual thread creation
+        // would happen during process initialization
+        //
+        // In a full implementation, we would:
+        // 1. Allocate a new thread ID
+        // 2. Initialize the thread from process data
+        // 3. Add it to the thread table
+        // 4. Mark it as runnable
+
+        // Create the main thread for this process
+        if let Ok(tid) = create_thread(
+            pid,
+            ThreadType::Main,
+            None,
+            core::ptr::null_mut(),
+        ) {
+            // Get the newly created thread and initialize it from process data
+            let table = thread_table();
+            if let Some(thread) = table.find_thread(tid) {
+                // Re-acquire process table lock for this operation
+                // Note: We need mutable access to the process for initialization
+                let mut proc_table = crate::process::PROC_TABLE.lock();
+                if let Some(proc) = proc_table.find(pid) {
+                    init_main_thread_from_process(thread, proc);
+                }
+            }
+        }
+    }
 }
 
 /// Thread scheduler - integrated with process scheduling
@@ -1062,7 +1125,7 @@ pub fn schedule() {
         cpu.update_load_stats(false);
         cpu.load_stats.context_switches += 1;
 
-        let mut table = thread_table();
+        let table = thread_table();
         if let Some(thread) = table.find_thread(tid) {
             thread.set_running();
             set_current_thread(Some(thread.tid));
@@ -1091,29 +1154,49 @@ pub fn schedule() {
             }
 
             // Perform context switch using the new context switch mechanism
-            if let Some(current_thread) = current_tid.and_then(|tid| table.find_thread(tid)) {
-                // Check if we're switching between threads of the same process
-                let same_process = current_thread.pid == thread.pid;
+            // We need to extract the current thread info before borrowing table again
+            let current_thread_info = current_tid.and_then(|tid| {
+                let tbl = thread_table();
+                tbl.find_thread_ref(tid).map(|t| (t.pid, t.tid))
+            });
 
-                // Use fast path if same process, otherwise use full context switch
-                let result = if same_process {
-                    unsafe {
-                        crate::subsystems::process::context_switch::fast_context_switch(
-                            &mut current_thread.context,
-                            &thread.context,
-                            true,
-                        )
-                    }
-                } else {
-                    unsafe {
-                        crate::subsystems::process::context_switch::context_switch(
-                            &mut current_thread.context,
-                            &thread.context,
-                        )
+            if let Some((current_pid, current_tid_val)) = current_thread_info {
+                // Check if we're switching between threads of the same process
+                let same_process = current_pid == thread.pid;
+
+                // Now we need to get mutable reference to perform the actual switch
+                // We create a scope to limit the mutable borrow
+                let switch_result = {
+                    let tbl = thread_table();
+                    let current_thread = tbl.find_thread(current_tid_val);
+                    match current_thread {
+                        Some(ct) => {
+                            // Use fast path if same process, otherwise use full context switch
+                            if same_process {
+                                unsafe {
+                                    crate::subsystems::process::context_switch::fast_context_switch(
+                                        &mut ct.context,
+                                        &thread.context,
+                                        true,
+                                    )
+                                }
+                            } else {
+                                unsafe {
+                                    crate::subsystems::process::context_switch::context_switch(
+                                        &mut ct.context,
+                                        &thread.context,
+                                    )
+                                }
+                            }
+                        },
+                        None => {
+                            crate::println!("thread: Switched to thread {} (PID {})", thread.tid, thread.pid);
+                            Ok(())
+                        },
                     }
                 };
 
-                if let Err(e) = result {
+                if let Err(e) = switch_result {
                     crate::println!("thread: Context switch failed: {:?}", e);
                     // Fall back to simple logging
                     crate::println!(
@@ -1160,75 +1243,6 @@ pub fn schedule() {
 
 /// Find highest priority real-time thread
 /// Returns the TID of the highest priority RT thread, or None if none found
-fn find_realtime_thread(current_tid: Option<Tid>) -> Option<Tid> {
-    let table = thread_table();
-    let mut highest_prio_rt: Option<(Tid, u8)> = None;
-
-    // Search for RT threads (FIFO or RoundRobin policy)
-    for tid in 1..MAX_THREADS {
-        if let Some(thread) = table.find_thread_ref(tid) {
-            // Check if thread is runnable and RT
-            if thread.is_runnable() && thread.can_run_on_cpu(crate::cpu::cpuid()) {
-                match thread.sched_policy {
-                    SchedPolicy::Fifo | SchedPolicy::RoundRobin => {
-                        let priority = thread.sched_param.priority;
-                        // RT priorities are 1-99, higher = more important
-                        if let Some((_, current_prio)) = highest_prio_rt {
-                            if priority > current_prio {
-                                highest_prio_rt = Some((tid, priority));
-                            }
-                        } else {
-                            highest_prio_rt = Some((tid, priority));
-                        }
-                    },
-                    _ => {},
-                }
-            }
-        }
-    }
-
-    highest_prio_rt.map(|(tid, _)| tid)
-}
-
-/// Ensure each process has at least one main thread
-fn ensure_main_threads() {
-    // Collect process info first to avoid borrowing conflicts
-    let process_pids = {
-        let process_table = crate::process::PROC_TABLE.lock();
-        let thread_table = thread_table();
-
-        process_table
-            .iter()
-            .filter(|proc| {
-                proc.state == crate::process::ProcState::Runnable
-                    || proc.state == crate::process::ProcState::Running
-            })
-            .filter_map(|proc| {
-                // Check if process already has threads
-                let has_threads = thread_table
-                    .find_threads_by_pid(proc.pid)
-                    .iter()
-                    .any(|t| t.thread_type == ThreadType::Main && t.state != ThreadState::Unused);
-
-                if !has_threads { Some(proc.pid) } else { None }
-            })
-            .collect::<Vec<_>>()
-    };
-
-    // Create main threads for processes that need them
-    for pid in process_pids {
-        if let Ok(tid) = create_thread(pid, ThreadType::Main, None, null_mut()) {
-            let mut table = thread_table();
-            if let Some(thread) = table.find_thread(tid) {
-                // Initialize main thread context from process
-                let mut process_table = crate::process::PROC_TABLE.lock();
-                if let Some(proc) = process_table.find(pid) {
-                    init_main_thread_from_process(thread, proc);
-                }
-            }
-        }
-    }
-}
 
 /// Initialize main thread from process data
 fn init_main_thread_from_process(thread: &mut Thread, proc: &crate::process::Proc) {
@@ -1243,12 +1257,19 @@ fn init_main_thread_from_process(thread: &mut Thread, proc: &crate::process::Pro
     }
 
     // Initialize context for main thread
+    #[cfg(target_arch = "x86_64")]
+    let instruction_ptr = proc.context.rip;
+    #[cfg(target_arch = "riscv64")]
+    let instruction_ptr = proc.context.ra;
+    #[cfg(target_arch = "aarch64")]
+    let instruction_ptr = proc.context.lr;
+
     crate::subsystems::process::context_switch::init_context(
         &mut thread.context,
         thread.kstack,
-        proc.context.rip, // Use process's instruction pointer
-        0,                // No argument for main thread
-        false,            // Kernel thread
+        instruction_ptr, // Use process's instruction pointer
+        0,               // No argument for main thread
+        false,           // Kernel thread
     );
 
     // Main threads inherit the process state
@@ -1297,7 +1318,7 @@ pub fn thread_get_tls() -> usize {
 
 /// Set thread CPU affinity
 pub fn thread_setaffinity(tid: Tid, cpu_mask: u64) -> Result<(), ThreadError> {
-    let mut table = thread_table();
+    let table = thread_table();
     let thread = table.find_thread(tid).ok_or(ThreadError::InvalidThreadId)?;
 
     thread.set_cpu_affinity(cpu_mask);
@@ -1320,7 +1341,7 @@ pub fn thread_setschedparam(
     policy: SchedPolicy,
     param: SchedParam,
 ) -> Result<(), ThreadError> {
-    let mut table = thread_table();
+    let table = thread_table();
     let thread = table.find_thread(tid).ok_or(ThreadError::InvalidThreadId)?;
 
     thread.sched_policy = policy;

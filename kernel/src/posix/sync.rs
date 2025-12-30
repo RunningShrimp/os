@@ -3,12 +3,11 @@
 //! This module provides POSIX-compliant versions of mutexes,
 //! condition variables, and read-write locks for pthread API.
 
-extern crate alloc;
-
 use alloc::boxed::Box;
 use core::{cell::UnsafeCell, ptr::null_mut};
 
 use crate::reliability::{EBUSY, EDEADLK, EINVAL, EOK, EPERM, ETIMEDOUT};
+use crate::subsystems::sync::primitives::{CondVar, MutexEnhanced, RwLockEnhanced};
 // ============================================================================
 // POSIX Mutex Types
 // ============================================================================
@@ -184,11 +183,13 @@ pub unsafe extern "C" fn pthread_mutex_init(
     let kind = if attr.is_null() {
         PthreadMutexKind::Default
     } else {
-        match *attr {
-            PthreadMutexAttrT::Normal => PthreadMutexKind::Normal,
-            PthreadMutexAttrT::Recursive => PthreadMutexKind::Recursive,
-            PthreadMutexAttrT::ErrorChecking => PthreadMutexKind::ErrorChecking,
-            PthreadMutexAttrT::Default => PthreadMutexKind::Default,
+        unsafe {
+            match *attr {
+                PthreadMutexAttrT::Normal => PthreadMutexKind::Normal,
+                PthreadMutexAttrT::Recursive => PthreadMutexKind::Recursive,
+                PthreadMutexAttrT::ErrorChecking => PthreadMutexKind::ErrorChecking,
+                PthreadMutexAttrT::Default => PthreadMutexKind::Default,
+            }
         }
     };
 
@@ -210,7 +211,9 @@ pub unsafe extern "C" fn pthread_mutex_init(
         })),
     };
 
-    *mutex = internal;
+    unsafe {
+        *mutex = internal;
+    }
     EOK
 }
 
@@ -220,12 +223,12 @@ pub unsafe extern "C" fn pthread_mutex_destroy(mutex: *mut PthreadMutexT) -> i32
         return EINVAL;
     }
 
-    let internal = *mutex;
+    let internal = unsafe { *mutex };
     if internal.is_null() {
         return EINVAL;
     }
 
-    let mutex_ref = &*internal;
+    let mutex_ref = unsafe { &*internal };
 
     // Check if mutex is locked
     if mutex_ref.mutex.is_locked() {
@@ -233,8 +236,10 @@ pub unsafe extern "C" fn pthread_mutex_destroy(mutex: *mut PthreadMutexT) -> i32
     }
 
     // Free the mutex
-    drop(Box::from_raw(internal));
-    *mutex = null_mut();
+    drop(unsafe { Box::from_raw(internal) });
+    unsafe {
+        *mutex = null_mut();
+    }
 
     EOK
 }
@@ -245,7 +250,7 @@ pub unsafe extern "C" fn pthread_mutex_lock(mutex: PthreadMutexT) -> i32 {
         return EINVAL;
     }
 
-    let internal = &*mutex;
+    let internal = unsafe { &*mutex };
     if !internal.initialized {
         return EINVAL;
     }
@@ -253,7 +258,7 @@ pub unsafe extern "C" fn pthread_mutex_lock(mutex: PthreadMutexT) -> i32 {
     // Check for deadlock in error-checking mode
     if internal.kind == PthreadMutexKind::ErrorChecking {
         let current_tid = crate::process::thread::current_thread().unwrap_or(0);
-        if *internal.owner_tid.get() == current_tid as u64 {
+        if unsafe { *internal.owner_tid.get() } == current_tid as u64 {
             return EDEADLK;
         }
     }
@@ -262,26 +267,40 @@ pub unsafe extern "C" fn pthread_mutex_lock(mutex: PthreadMutexT) -> i32 {
     match internal.kind {
         PthreadMutexKind::Normal | PthreadMutexKind::ErrorChecking => {
             let _guard = internal.mutex.lock();
-            *internal.owner_tid.get() =
-                crate::process::thread::current_thread().unwrap_or(0) as u64;
-            *internal.depth.get() = 1;
+            unsafe {
+                *internal.owner_tid.get() =
+                    crate::process::thread::current_thread().unwrap_or(0) as u64;
+            }
+            unsafe {
+                *internal.depth.get() = 1;
+            }
         },
         PthreadMutexKind::Recursive => {
             let current_tid = crate::process::thread::current_thread().unwrap_or(0);
-            if *internal.owner_tid.get() == current_tid as u64 {
+            if unsafe { *internal.owner_tid.get() } == current_tid as u64 {
                 // Recursive acquisition
-                *internal.depth.get() += 1;
+                unsafe {
+                    *internal.depth.get() += 1;
+                }
             } else {
                 let _guard = internal.mutex.lock();
-                *internal.owner_tid.get() = current_tid as u64;
-                *internal.depth.get() = 1;
+                unsafe {
+                    *internal.owner_tid.get() = current_tid as u64;
+                }
+                unsafe {
+                    *internal.depth.get() = 1;
+                }
             }
         },
         PthreadMutexKind::Default => {
             let _guard = internal.mutex.lock();
-            *internal.owner_tid.get() =
-                crate::process::thread::current_thread().unwrap_or(0) as u64;
-            *internal.depth.get() = 1;
+            unsafe {
+                *internal.owner_tid.get() =
+                    crate::process::thread::current_thread().unwrap_or(0) as u64;
+            }
+            unsafe {
+                *internal.depth.get() = 1;
+            }
         },
     }
 
@@ -294,7 +313,7 @@ pub unsafe extern "C" fn pthread_mutex_trylock(mutex: PthreadMutexT) -> i32 {
         return EINVAL;
     }
 
-    let internal = &*mutex;
+    let internal = unsafe { &*mutex };
     if !internal.initialized {
         return EINVAL;
     }
@@ -303,9 +322,13 @@ pub unsafe extern "C" fn pthread_mutex_trylock(mutex: PthreadMutexT) -> i32 {
     match internal.kind {
         PthreadMutexKind::Normal | PthreadMutexKind::ErrorChecking => {
             if let Some(_guard) = internal.mutex.try_lock() {
-                *internal.owner_tid.get() =
-                    crate::process::thread::current_thread().unwrap_or(0) as u64;
-                *internal.depth.get() = 1;
+                unsafe {
+                    *internal.owner_tid.get() =
+                        crate::process::thread::current_thread().unwrap_or(0) as u64;
+                }
+                unsafe {
+                    *internal.depth.get() = 1;
+                }
                 EOK
             } else {
                 EBUSY
@@ -313,13 +336,19 @@ pub unsafe extern "C" fn pthread_mutex_trylock(mutex: PthreadMutexT) -> i32 {
         },
         PthreadMutexKind::Recursive => {
             let current_tid = crate::process::thread::current_thread().unwrap_or(0);
-            if *internal.owner_tid.get() == current_tid as u64 {
+            if unsafe { *internal.owner_tid.get() } == current_tid as u64 {
                 // Recursive acquisition always succeeds
-                *internal.depth.get() += 1;
+                unsafe {
+                    *internal.depth.get() += 1;
+                }
                 EOK
             } else if let Some(_guard) = internal.mutex.try_lock() {
-                *internal.owner_tid.get() = current_tid as u64;
-                *internal.depth.get() = 1;
+                unsafe {
+                    *internal.owner_tid.get() = current_tid as u64;
+                }
+                unsafe {
+                    *internal.depth.get() = 1;
+                }
                 EOK
             } else {
                 EBUSY
@@ -327,9 +356,13 @@ pub unsafe extern "C" fn pthread_mutex_trylock(mutex: PthreadMutexT) -> i32 {
         },
         PthreadMutexKind::Default => {
             if let Some(_guard) = internal.mutex.try_lock() {
-                *internal.owner_tid.get() =
-                    crate::process::thread::current_thread().unwrap_or(0) as u64;
-                *internal.depth.get() = 1;
+                unsafe {
+                    *internal.owner_tid.get() =
+                        crate::process::thread::current_thread().unwrap_or(0) as u64;
+                }
+                unsafe {
+                    *internal.depth.get() = 1;
+                }
                 EOK
             } else {
                 EBUSY
@@ -344,7 +377,7 @@ pub unsafe extern "C" fn pthread_mutex_unlock(mutex: PthreadMutexT) -> i32 {
         return EINVAL;
     }
 
-    let internal = &*mutex;
+    let internal = unsafe { &*mutex };
     if !internal.initialized {
         return EINVAL;
     }
@@ -386,7 +419,9 @@ pub unsafe extern "C" fn pthread_mutexattr_init(attr: *mut PthreadMutexAttrT) ->
         return EINVAL;
     }
 
-    *attr = PthreadMutexAttrT::Default;
+    unsafe {
+        *attr = PthreadMutexAttrT::Default;
+    }
     EOK
 }
 
@@ -413,7 +448,9 @@ pub unsafe extern "C" fn pthread_mutexattr_settype(attr: *mut PthreadMutexAttrT,
         _ => return EINVAL,
     };
 
-    *attr = mutex_kind;
+    unsafe {
+        *attr = mutex_kind;
+    }
     EOK
 }
 
@@ -433,7 +470,7 @@ pub unsafe extern "C" fn pthread_cond_init(
     let attrs = if attr.is_null() {
         PthreadCondAttrT { clock: 0 } // CLOCK_REALTIME
     } else {
-        *attr
+        unsafe { *attr }
     };
 
     let internal = Box::into_raw(Box::new(PthreadCondInternal {
@@ -443,7 +480,9 @@ pub unsafe extern "C" fn pthread_cond_init(
         initialized: true,
     }));
 
-    *cond = internal;
+    unsafe {
+        *cond = internal;
+    }
     EOK
 }
 
@@ -453,12 +492,12 @@ pub unsafe extern "C" fn pthread_cond_destroy(cond: *mut PthreadCondT) -> i32 {
         return EINVAL;
     }
 
-    let internal = *cond;
+    let internal = unsafe { *cond };
     if internal.is_null() {
         return EINVAL;
     }
 
-    let cond_ref = &*internal;
+    let cond_ref = unsafe { &*internal };
     if !cond_ref.initialized {
         return EINVAL;
     }
@@ -469,8 +508,8 @@ pub unsafe extern "C" fn pthread_cond_destroy(cond: *mut PthreadCondT) -> i32 {
     }
 
     // Free the condition variable
-    drop(Box::from_raw(internal));
-    *cond = null_mut();
+    drop(unsafe { Box::from_raw(internal) });
+    unsafe { *cond = null_mut() };
 
     EOK
 }
@@ -481,8 +520,8 @@ pub unsafe extern "C" fn pthread_cond_wait(cond: PthreadCondT, mutex: PthreadMut
         return EINVAL;
     }
 
-    let cond_ref = &*cond;
-    let mutex_ref = &*mutex;
+    let cond_ref = unsafe { &*cond };
+    let mutex_ref = unsafe { &*mutex };
 
     if !cond_ref.initialized || !mutex_ref.initialized {
         return EINVAL;
@@ -503,16 +542,17 @@ pub unsafe extern "C" fn pthread_cond_timedwait(
         return EINVAL;
     }
 
-    let cond_ref = &*cond;
-    let mutex_ref = &*mutex;
+    let cond_ref = unsafe { &*cond };
+    let mutex_ref = unsafe { &*mutex };
+    let abstime_ref = unsafe { &*abstime };
 
     if !cond_ref.initialized || !mutex_ref.initialized {
         return EINVAL;
     }
 
     // Convert timespec to Duration (simplified)
-    let timeout = core::time::Duration::from_secs((*abstime).tv_sec as u64)
-        + core::time::Duration::from_nanos((*abstime).tv_nsec as u64);
+    let timeout = core::time::Duration::from_secs(abstime_ref.tv_sec as u64)
+        + core::time::Duration::from_nanos(abstime_ref.tv_nsec as u64);
 
     // Use the enhanced condition variable with timeout
     if cond_ref.condvar.wait_timeout(&mutex_ref.mutex, timeout) {
@@ -528,7 +568,7 @@ pub unsafe extern "C" fn pthread_cond_signal(cond: PthreadCondT) -> i32 {
         return EINVAL;
     }
 
-    let cond_ref = &*cond;
+    let cond_ref = unsafe { &*cond };
     if !cond_ref.initialized {
         return EINVAL;
     }
@@ -543,7 +583,7 @@ pub unsafe extern "C" fn pthread_cond_broadcast(cond: PthreadCondT) -> i32 {
         return EINVAL;
     }
 
-    let cond_ref = &*cond;
+    let cond_ref = unsafe { &*cond };
     if !cond_ref.initialized {
         return EINVAL;
     }
@@ -562,7 +602,9 @@ pub unsafe extern "C" fn pthread_condattr_init(attr: *mut PthreadCondAttrT) -> i
         return EINVAL;
     }
 
-    *attr = PthreadCondAttrT { clock: 0 };
+    unsafe {
+        *attr = PthreadCondAttrT { clock: 0 };
+    }
     EOK
 }
 
@@ -582,7 +624,7 @@ pub unsafe extern "C" fn pthread_condattr_setclock(attr: *mut PthreadCondAttrT, 
         return EINVAL;
     }
 
-    (*attr).clock = clock;
+    unsafe { (*attr).clock = clock };
     EOK
 }
 
@@ -602,7 +644,7 @@ pub unsafe extern "C" fn pthread_rwlock_init(
     let attrs = if attr.is_null() {
         PthreadRwlockAttrT { kind: PthreadRwlockKind::Default }
     } else {
-        *attr
+        unsafe { *attr }
     };
 
     // Configure lock based on attributes
@@ -628,7 +670,9 @@ pub unsafe extern "C" fn pthread_rwlock_init(
         initialized: true,
     }));
 
-    *rwlock = internal;
+    unsafe {
+        *rwlock = internal;
+    }
     EOK
 }
 
@@ -638,12 +682,12 @@ pub unsafe extern "C" fn pthread_rwlock_destroy(rwlock: *mut PthreadRwlockT) -> 
         return EINVAL;
     }
 
-    let internal = *rwlock;
+    let internal = unsafe { *rwlock };
     if internal.is_null() {
         return EINVAL;
     }
 
-    let rwlock_ref = &*internal;
+    let rwlock_ref = unsafe { &*internal };
     if !rwlock_ref.initialized {
         return EINVAL;
     }
@@ -655,8 +699,8 @@ pub unsafe extern "C" fn pthread_rwlock_destroy(rwlock: *mut PthreadRwlockT) -> 
     }
 
     // Free the read-write lock
-    drop(Box::from_raw(internal));
-    *rwlock = null_mut();
+    drop(unsafe { Box::from_raw(internal) });
+    unsafe { *rwlock = null_mut() };
 
     EOK
 }
@@ -667,7 +711,7 @@ pub unsafe extern "C" fn pthread_rwlock_rdlock(rwlock: PthreadRwlockT) -> i32 {
         return EINVAL;
     }
 
-    let rwlock_ref = &*rwlock;
+    let rwlock_ref = unsafe { &*rwlock };
     if !rwlock_ref.initialized {
         return EINVAL;
     }
@@ -687,7 +731,7 @@ pub unsafe extern "C" fn pthread_rwlock_tryrdlock(rwlock: PthreadRwlockT) -> i32
         return EINVAL;
     }
 
-    let rwlock_ref = &*rwlock;
+    let rwlock_ref = unsafe { &*rwlock };
     if !rwlock_ref.initialized {
         return EINVAL;
     }
@@ -707,7 +751,7 @@ pub unsafe extern "C" fn pthread_rwlock_wrlock(rwlock: PthreadRwlockT) -> i32 {
         return EINVAL;
     }
 
-    let rwlock_ref = &*rwlock;
+    let rwlock_ref = unsafe { &*rwlock };
     if !rwlock_ref.initialized {
         return EINVAL;
     }
@@ -727,7 +771,7 @@ pub unsafe extern "C" fn pthread_rwlock_trywrlock(rwlock: PthreadRwlockT) -> i32
         return EINVAL;
     }
 
-    let rwlock_ref = &*rwlock;
+    let rwlock_ref = unsafe { &*rwlock };
     if !rwlock_ref.initialized {
         return EINVAL;
     }
@@ -750,7 +794,7 @@ pub unsafe extern "C" fn pthread_rwlock_unlock(rwlock: PthreadRwlockT) -> i32 {
         return EINVAL;
     }
 
-    let rwlock_ref = &*rwlock;
+    let rwlock_ref = unsafe { &*rwlock };
     if !rwlock_ref.initialized {
         return EINVAL;
     }
@@ -760,12 +804,16 @@ pub unsafe extern "C" fn pthread_rwlock_unlock(rwlock: PthreadRwlockT) -> i32 {
     // Determine if we're unlocking a read or write lock
     if unsafe { *rwlock_ref.owner_tid.get() == current_tid as u64 } {
         // Unlocking write lock
-        unsafe { *rwlock_ref.owner_tid.get() = 0 }
+        unsafe {
+            *rwlock_ref.owner_tid.get() = 0;
+        }
         // Write lock guard is automatically dropped
     } else {
         // Unlocking read lock
         if unsafe { *rwlock_ref.readers.get() > 0 } {
-            unsafe { *rwlock_ref.readers.get() -= 1 };
+            unsafe {
+                *rwlock_ref.readers.get() -= 1;
+            }
             // Read lock guard is automatically dropped
         }
     }
@@ -790,7 +838,7 @@ pub unsafe extern "C" fn pthread_barrier_init(
     let attrs = if attr.is_null() {
         PthreadBarrierAttrT { pshared: 0 } // Private to process
     } else {
-        *attr
+        unsafe { *attr }
     };
 
     let internal = Box::into_raw(Box::new(PthreadBarrierInternal {
@@ -799,7 +847,9 @@ pub unsafe extern "C" fn pthread_barrier_init(
         initialized: true,
     }));
 
-    *barrier = internal;
+    unsafe {
+        *barrier = internal;
+    }
     EOK
 }
 
@@ -809,19 +859,19 @@ pub unsafe extern "C" fn pthread_barrier_destroy(barrier: *mut PthreadBarrierT) 
         return EINVAL;
     }
 
-    let internal = *barrier;
+    let internal = unsafe { *barrier };
     if internal.is_null() {
         return EINVAL;
     }
 
-    let barrier_ref = &*internal;
+    let barrier_ref = unsafe { &*internal };
     if !barrier_ref.initialized {
         return EINVAL;
     }
 
     // Free the barrier
-    drop(Box::from_raw(internal));
-    *barrier = null_mut();
+    drop(unsafe { Box::from_raw(internal) });
+    unsafe { *barrier = null_mut() };
 
     EOK
 }
@@ -832,7 +882,7 @@ pub unsafe extern "C" fn pthread_barrier_wait(barrier: PthreadBarrierT) -> i32 {
         return EINVAL;
     }
 
-    let barrier_ref = &*barrier;
+    let barrier_ref = unsafe { &*barrier };
     if !barrier_ref.initialized {
         return EINVAL;
     }

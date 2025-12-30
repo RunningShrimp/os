@@ -12,6 +12,125 @@ use core::ffi::c_void;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::{process::Pid as ProcessId, subsystems::microkernel::scheduler};
+use crate::sync::Mutex;
+use crate::posix::{Pid, Uid, SigVal, SigSet, Timespec};
+
+// SigSet helper methods
+impl SigSet {
+    /// Create an empty signal set
+    pub fn empty() -> Self {
+        Self { bits: [0] }
+    }
+
+    /// Check if a signal is in the set
+    pub fn has(&self, sig: i32) -> bool {
+        if sig <= 0 || sig > 64 {
+            return false;
+        }
+        let idx = (sig - 1) as usize;
+        let word = idx / 64;
+        let bit = idx % 64;
+        if word < self.bits.len() {
+            (self.bits[word] & (1 << bit)) != 0
+        } else {
+            false
+        }
+    }
+
+    /// Add a signal to the set
+    pub fn add(&mut self, sig: i32) -> bool {
+        if sig <= 0 || sig > 64 {
+            return false;
+        }
+        let idx = (sig - 1) as usize;
+        let word = idx / 64;
+        let bit = idx % 64;
+        if word < self.bits.len() {
+            self.bits[word] |= 1 << bit;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Remove a signal from the set
+    pub fn remove(&mut self, sig: i32) -> bool {
+        if sig <= 0 || sig > 64 {
+            return false;
+        }
+        let idx = (sig - 1) as usize;
+        let word = idx / 64;
+        let bit = idx % 64;
+        if word < self.bits.len() {
+            self.bits[word] &= !(1 << bit);
+            true
+        } else {
+            false
+        }
+    }
+}
+
+impl Clone for SigSet {
+    fn clone(&self) -> Self {
+        Self { bits: self.bits }
+    }
+}
+
+impl Copy for SigSet {}
+
+// Implement Debug for SigVal since it's used in SigInfoT
+impl core::fmt::Debug for SigVal {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        // SAFETY: We're only reading the union fields for debugging purposes
+        // and the union is a simple POD type
+        unsafe {
+            f.debug_struct("SigVal")
+                .field("sival_int", &self.sival_int)
+                .field("sival_ptr", &self.sival_ptr)
+                .finish()
+        }
+    }
+}
+
+// Type alias for clock ticks
+pub type ClockT = i64;
+
+// Signal mask manipulation constants
+pub const SIG_BLOCK: i32 = 0;
+pub const SIG_UNBLOCK: i32 = 1;
+pub const SIG_SETMASK: i32 = 2;
+
+// Signal stack constants
+pub const MINSIGSTKSZ: usize = 2048;
+pub const SS_ONSTACK: i32 = 1;
+pub const SS_DISABLE: i32 = 2;
+
+// Real-time signal range
+pub const SIGRTMIN: i32 = 34;
+pub const SIGRTMAX: i32 = 64;
+
+// Signal cause codes
+pub const SI_QUEUE: i32 = 0;
+
+// Alternate signal stack structure
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct StackT {
+    pub ss_sp: *mut u8,
+    pub ss_flags: i32,
+    pub ss_size: usize,
+}
+
+impl Default for StackT {
+    fn default() -> Self {
+        Self {
+            ss_sp: core::ptr::null_mut(),
+            ss_flags: SS_DISABLE,
+            ss_size: 0,
+        }
+    }
+}
+
 /// Maximum number of pending signals per process
 pub const MAX_PENDING_SIGNALS: usize = 64;
 
@@ -23,10 +142,10 @@ pub struct SigInfoT {
     pub si_errno: i32,
     pub si_code: i32,
     pub si_pid: ProcessId,
-    pub si_uid: crate::posix::Uid,
+    pub si_uid: Uid,
     pub si_status: i32,
-    pub si_utime: crate::posix::ClockT,
-    pub si_stime: crate::posix::ClockT,
+    pub si_utime: ClockT,
+    pub si_stime: ClockT,
     pub si_value: SigVal,
     pub si_timerid: i32,
     pub si_overrun: i32,
@@ -35,8 +154,17 @@ pub struct SigInfoT {
     pub si_fd: i32,
 }
 
-/// Signal cause codes
-pub const SI_QUEUE: i32 = 0; /* Queue signal from sigqueue */
+// SAFETY: SigInfoT is safe to send between threads because:
+// 1. The raw pointer `si_addr` only used for storing address information
+// 2. It's never dereferenced in a way that could cause data races
+// 3. All other fields are primitive types which are Send/Sync
+unsafe impl Send for SigInfoT {}
+
+// SAFETY: SigInfoT is safe to share between threads because:
+// 1. Access to the signal info is protected by Mutex
+// 2. The raw pointer is only used for address storage, not dereferencing
+// 3. All fields are immutable after creation
+unsafe impl Sync for SigInfoT {}
 
 /// Signal queue entry for queued signals
 #[derive(Clone)]
@@ -72,8 +200,9 @@ impl QueuedSignal {
     pub fn from_sigqueue(sig: i32, pid: Pid, uid: Uid, value: SigVal) -> Self {
         let info = SigInfoT {
             si_signo: sig,
-            si_code: crate::posix::SI_QUEUE,
-            si_pid: pid,
+            si_errno: 0,
+            si_code: SI_QUEUE,
+            si_pid: pid as ProcessId,
             si_uid: uid,
             si_status: 0,
             si_utime: 0,
@@ -81,7 +210,7 @@ impl QueuedSignal {
             si_value: value,
             si_timerid: 0,
             si_overrun: 0,
-            si_addr: 0,
+            si_addr: core::ptr::null_mut(),
             si_band: 0,
             si_fd: -1,
         };
@@ -253,12 +382,6 @@ pub enum SignalQueueError {
     ProcessNotFound,
 }
 
-/// Signal stack type
-pub type StackT = *mut u8;
-
-/// Minimum signal stack size
-pub const MINSIGSTKSZ: usize = 2048;
-
 /// Alternate signal stack management
 #[derive(Debug)]
 pub struct AlternateSignalStack {
@@ -275,7 +398,7 @@ pub struct AlternateSignalStack {
 impl AlternateSignalStack {
     /// Create a new alternate signal stack
     pub fn new(size: usize) -> Result<Self, SignalStackError> {
-        if size < crate::posix::MINSIGSTKSZ {
+        if size < MINSIGSTKSZ {
             return Err(SignalStackError::StackTooSmall);
         }
 
@@ -295,13 +418,13 @@ impl AlternateSignalStack {
     }
 
     /// Get the stack as a StackT structure
-    pub fn as_stackt(&self) -> crate::posix::StackT {
-        crate::posix::StackT {
+    pub fn as_stackt(&self) -> StackT {
+        StackT {
             ss_sp: self.base,
             ss_flags: if self.in_use {
-                crate::posix::SS_ONSTACK
+                SS_ONSTACK
             } else {
-                crate::posix::SS_DISABLE
+                SS_DISABLE
             },
             ss_size: self.size,
         }
@@ -383,17 +506,21 @@ impl ThreadSignalMask {
 
         // Apply new mask based on how
         match how {
-            crate::posix::SIG_BLOCK => {
+            SIG_BLOCK => {
                 // Add signals to current mask
-                current_mask.bits |= new_mask.bits;
+                for i in 0..current_mask.bits.len() {
+                    current_mask.bits[i] |= new_mask.bits[i];
+                }
             },
-            crate::posix::SIG_UNBLOCK => {
+            SIG_UNBLOCK => {
                 // Remove signals from current mask
-                current_mask.bits &= !new_mask.bits;
+                for i in 0..current_mask.bits.len() {
+                    current_mask.bits[i] &= !new_mask.bits[i];
+                }
             },
-            crate::posix::SIG_SETMASK => {
+            SIG_SETMASK => {
                 // Set mask to new mask
-                current_mask.bits = new_mask.bits;
+                current_mask.bits.copy_from_slice(&new_mask.bits);
             },
             _ => return Err(SignalMaskError::InvalidHow),
         }
@@ -553,12 +680,12 @@ pub fn sigqueue(pid: Pid, sig: i32, value: SigVal) -> Result<(), SignalQueueErro
     };
 
     // Create queued signal
-    let signal = QueuedSignal::from_sigqueue(sig, current_pid, current_uid, value);
+    let signal = QueuedSignal::from_sigqueue(sig, current_pid as Pid, current_uid, value);
 
     // Get or create signal queue for target process
     let queue = {
         let mut registry = SIGNAL_QUEUE_REGISTRY.lock();
-        registry.get_or_create_queue(pid)
+        registry.get_or_create_queue(pid as ProcessId)
     };
 
     // Add signal to queue
@@ -568,7 +695,7 @@ pub fn sigqueue(pid: Pid, sig: i32, value: SigVal) -> Result<(), SignalQueueErro
 /// Wait for a signal synchronously (sigtimedwait implementation)
 pub fn sigtimedwait(
     sigmask: &SigSet,
-    timeout: Option<&crate::posix::Timespec>,
+    timeout: Option<&Timespec>,
 ) -> Result<SigInfoT, SignalWaitError> {
     // Get current process
     let pid = match crate::process::myproc() {
@@ -622,8 +749,8 @@ pub fn sigwaitinfo(sigmask: &SigSet) -> Result<SigInfoT, SignalWaitError> {
 
 /// Set alternate signal stack (sigaltstack implementation)
 pub fn sigaltstack(
-    new_stack: Option<&crate::posix::StackT>,
-    old_stack: Option<&mut crate::posix::StackT>,
+    new_stack: Option<&StackT>,
+    old_stack: Option<&mut StackT>,
 ) -> Result<(), SignalStackError> {
     // Get current process
     let pid = match crate::process::myproc() {
@@ -642,23 +769,23 @@ pub fn sigaltstack(
         if let Some(ref alt_stack) = proc.alt_signal_stack {
             *old = *alt_stack;
         } else {
-            *old = crate::posix::StackT::default();
+            *old = StackT::default();
         }
     }
 
     // Set new stack if provided
     if let Some(new) = new_stack {
         // Validate new stack
-        if new.ss_flags & crate::posix::SS_ONSTACK != 0 {
+        if new.ss_flags & SS_ONSTACK != 0 {
             return Err(SignalStackError::StackInUse);
         }
 
-        if new.ss_flags & crate::posix::SS_DISABLE != 0 {
+        if new.ss_flags & SS_DISABLE != 0 {
             // Disable alternate stack
             proc.alt_signal_stack = None;
         } else {
             // Validate stack size
-            if new.ss_size < crate::posix::MINSIGSTKSZ {
+            if new.ss_size < MINSIGSTKSZ {
                 return Err(SignalStackError::StackTooSmall);
             }
 
@@ -679,7 +806,7 @@ pub fn pthread_sigmask(
 ) -> Result<(), SignalMaskError> {
     // Get current thread
     let thread_id = match crate::process::thread::current_thread() {
-        Some(tid) => tid,
+        Some(tid) => tid as ProcessId,
         None => return Err(SignalMaskError::InvalidSignal),
     };
 

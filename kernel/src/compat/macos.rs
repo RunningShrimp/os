@@ -10,7 +10,7 @@
 extern crate alloc;
 extern crate hashbrown;
 
-use alloc::string::String;
+use alloc::string::{String, ToString};
 
 use hashbrown::HashMap;
 
@@ -47,11 +47,11 @@ impl PlatformModule for MacOSModule {
         true
     }
 
-    fn initialize(&mut self) -> Result<(), &'static str> {
+    fn initialize(&mut self) -> Result<()> {
         Ok(())
     }
 
-    fn shutdown(&mut self) -> Result<(), &'static str> {
+    fn shutdown(&mut self) -> Result<()> {
         Ok(())
     }
 }
@@ -59,7 +59,7 @@ impl PlatformModule for MacOSModule {
 /// macOS Framework Registry
 #[derive(Debug)]
 pub struct MacOSFrameworkRegistry {
-    loaded_frameworks: HashMap<String, MacOSFramework, DefaultHasherBuilder>,
+    loaded_frameworks: HashMap<String, MacOSFramework>,
 }
 
 #[derive(Debug)]
@@ -67,13 +67,13 @@ pub struct MacOSFramework {
     name: String,
     version: String,
     path: String,
-    symbols: HashMap<String, usize, DefaultHasherBuilder>,
+    symbols: HashMap<String, usize>,
 }
 
 impl MacOSFrameworkRegistry {
     pub fn new() -> Self {
         let mut registry = Self {
-            loaded_frameworks: HashMap::with_hasher(DefaultHasherBuilder),
+            loaded_frameworks: HashMap::new(),
         };
 
         registry.register_core_frameworks();
@@ -86,7 +86,7 @@ impl MacOSFrameworkRegistry {
             name: "CoreFoundation".to_string(),
             version: "1575.15".to_string(),
             path: "/System/Library/Frameworks/CoreFoundation.framework".to_string(),
-            symbols: HashMap::with_hasher(DefaultHasherBuilder),
+            symbols: HashMap::new(),
         };
 
         cf_framework.symbols.insert("CFAllocate".to_string(), 1);
@@ -100,7 +100,7 @@ impl MacOSFrameworkRegistry {
             name: "Foundation".to_string(),
             version: "1575.15".to_string(),
             path: "/System/Library/Frameworks/Foundation.framework".to_string(),
-            symbols: HashMap::with_hasher(DefaultHasherBuilder),
+            symbols: HashMap::new(),
         };
 
         foundation_framework
@@ -115,7 +115,7 @@ impl MacOSFrameworkRegistry {
             name: "AppKit".to_string(),
             version: "1894.20".to_string(),
             path: "/System/Library/Frameworks/AppKit.framework".to_string(),
-            symbols: HashMap::with_hasher(DefaultHasherBuilder),
+            symbols: HashMap::new(),
         };
 
         appkit_framework
@@ -138,7 +138,7 @@ impl MacOSFrameworkRegistry {
 #[derive(Debug)]
 pub struct ObjectiveCRuntime {
     class_registry: HashMap<String, ObjCClass, DefaultHasherBuilder>,
-    selector_registry: HashMap<String, usize, DefaultHasherBuilder>,
+    selector_registry: HashMap<String, usize>,
 }
 
 #[derive(Debug)]
@@ -146,7 +146,7 @@ pub struct ObjCClass {
     name: String,
     super_class: Option<String>,
     methods: HashMap<String, ObjCMethod, DefaultHasherBuilder>,
-    ivars: HashMap<String, usize, DefaultHasherBuilder>,
+    ivars: HashMap<String, usize>,
 }
 
 #[derive(Debug)]
@@ -160,8 +160,8 @@ pub struct ObjCMethod {
 impl ObjectiveCRuntime {
     pub fn new() -> Self {
         let mut runtime = Self {
-            class_registry: HashMap::with_hasher(DefaultHasherBuilder),
-            selector_registry: HashMap::with_hasher(DefaultHasherBuilder),
+            class_registry: HashMap::with_hasher(DefaultHasherBuilder::default()),
+            selector_registry: HashMap::new(),
         };
 
         runtime.register_core_classes();
@@ -173,8 +173,8 @@ impl ObjectiveCRuntime {
         let mut nsobject = ObjCClass {
             name: "NSObject".to_string(),
             super_class: None,
-            methods: HashMap::with_hasher(DefaultHasherBuilder),
-            ivars: HashMap::with_hasher(DefaultHasherBuilder),
+            methods: HashMap::with_hasher(DefaultHasherBuilder::default()),
+            ivars: HashMap::new(),
         };
 
         nsobject.methods.insert(

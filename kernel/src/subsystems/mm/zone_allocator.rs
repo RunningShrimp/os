@@ -19,6 +19,26 @@ extern crate alloc;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
+/// Square root using Newton-Raphson method for f64 in no_std environment
+fn sqrt_f64(n: f64) -> f64 {
+    if n < 0.0 {
+        return 0.0; // Handle negative numbers
+    }
+    if n == 0.0 {
+        return 0.0;
+    }
+
+    let mut x = n;
+    let mut y = (x + 1.0) / 2.0;
+
+    while y < x {
+        x = y;
+        y = (x + n / x) / 2.0;
+    }
+
+    x
+}
+
 use crate::subsystems::sync::Mutex;
 
 /// Number of lock stripes (must be power of 2)
@@ -55,10 +75,19 @@ impl AllocOrder {
             return None;
         }
         let order = pages.trailing_zeros() as usize;
-        if order <= 10 {
-            Some(unsafe { core::mem::transmute::<usize, AllocOrder>(order) })
-        } else {
-            None
+        match order {
+            0 => Some(AllocOrder::Order0),
+            1 => Some(AllocOrder::Order1),
+            2 => Some(AllocOrder::Order2),
+            3 => Some(AllocOrder::Order3),
+            4 => Some(AllocOrder::Order4),
+            5 => Some(AllocOrder::Order5),
+            6 => Some(AllocOrder::Order6),
+            7 => Some(AllocOrder::Order7),
+            8 => Some(AllocOrder::Order8),
+            9 => Some(AllocOrder::Order9),
+            10 => Some(AllocOrder::Order10),
+            _ => None,
         }
     }
 
@@ -341,7 +370,7 @@ impl ZoneAllocator {
             })
             .sum();
 
-        let std_dev = (variance / NUM_STRIPES as f64).sqrt();
+        let std_dev = sqrt_f64(variance / NUM_STRIPES as f64);
 
         // Contention = std_dev / mean (lower is better)
         if mean > 0.0 {
@@ -366,21 +395,21 @@ pub fn init_zones(dma_range: (usize, usize), normal_range: (usize, usize), highm
 
     // Initialize zone statistics
     {
-        let mut dma_zone = alloc.zones[0].lock();
+        let dma_zone = alloc.zones[0].lock();
         let size = dma_range.1 - dma_range.0;
         dma_zone.total_pages.store((size / 4096) as u64, Ordering::Relaxed);
         dma_zone.free_pages.store((size / 4096) as u64, Ordering::Relaxed);
     }
 
     {
-        let mut normal_zone = alloc.zones[1].lock();
+        let normal_zone = alloc.zones[1].lock();
         let size = normal_range.1 - normal_range.0;
         normal_zone.total_pages.store((size / 4096) as u64, Ordering::Relaxed);
         normal_zone.free_pages.store((size / 4096) as u64, Ordering::Relaxed);
     }
 
     if let Some((start, end)) = highmem_range {
-        let mut highmem_zone = alloc.zones[2].lock();
+        let highmem_zone = alloc.zones[2].lock();
         let size = end - start;
         highmem_zone.total_pages.store((size / 4096) as u64, Ordering::Relaxed);
         highmem_zone.free_pages.store((size / 4096) as u64, Ordering::Relaxed);

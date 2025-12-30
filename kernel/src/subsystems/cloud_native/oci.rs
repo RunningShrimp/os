@@ -14,7 +14,15 @@ use alloc::{
 };
 use core::sync::atomic::{AtomicU64, Ordering};
 
-use crate::reliability::{EACCES, EINVAL, EIO, ENOENT, ENOMEM};
+use crate::reliability::{EINVAL, EIO, ENOENT, ENOMEM};
+
+// Clone flags for namespace creation (Linux constants)
+pub const CLONE_NEWNS: u64 = 0x00020000;   /* New mount namespace */
+pub const CLONE_NEWUTS: u64 = 0x04000000;  /* New UTS namespace */
+pub const CLONE_NEWIPC: u64 = 0x08000000;  /* New IPC namespace */
+pub const CLONE_NEWNET: u64 = 0x40000000;  /* New network namespace */
+pub const CLONE_NEWPID: u64 = 0x20000000;  /* New PID namespace */
+pub const CLONE_NEWUSER: u64 = 0x10000000; /* New user namespace */
 
 /// OCI运行时配置
 #[derive(Debug, Clone)]
@@ -316,6 +324,8 @@ pub struct OciRuntime {
     config: OciRuntimeConfig,
     /// 运行时状态
     containers: BTreeMap<String, OciRuntimeState>,
+    /// 容器规范
+    specs: BTreeMap<String, OciContainerSpec>,
     /// 下一个容器ID
     next_container_id: AtomicU64,
 }
@@ -326,6 +336,7 @@ impl OciRuntime {
         Self {
             config,
             containers: BTreeMap::new(),
+            specs: BTreeMap::new(),
             next_container_id: AtomicU64::new(1),
         }
     }
@@ -364,14 +375,16 @@ impl OciRuntime {
             self.apply_resource_limits(resources)?;
         }
 
-        // 保存状态
+        // 保存状态和规范
         self.containers.insert(container_id.clone(), state);
+        self.specs.insert(container_id.clone(), spec);
 
         crate::println!("[oci] Created container: {}", container_id);
         Ok(container_id)
     }
 
     /// 启动容器
+    #[allow(dropping_references)]
     pub fn start_container(&mut self, container_id: &str) -> Result<u32, i32> {
         let current_time = self.get_current_time();
 
@@ -383,7 +396,7 @@ impl OciRuntime {
 
         // 创建进程 - 需要暂时释放借用
         let container_id_owned = container_id.to_string();
-        drop(state);
+        drop(state); // Explicitly drop the mutable reference to state
         let pid = self.create_process(&container_id_owned)?;
 
         // 重新获取并更新状态
@@ -407,6 +420,13 @@ impl OciRuntime {
             if state.state != OciSpecState::Running {
                 return Err(EINVAL);
             }
+
+            // Log the stop initiation time for debugging
+            crate::println!(
+                "[oci] Initiating stop for container {} at time {}",
+                container_id,
+                current_time
+            );
 
             state.pid
         };
@@ -490,17 +510,32 @@ impl OciRuntime {
 
     /// 暂停容器
     pub fn pause_container(&mut self, container_id: &str) -> Result<(), i32> {
-        let state = self.containers.get_mut(container_id).ok_or(ENOENT)?;
+        // First, extract the pid and check state
+        let (pid, current_state) = {
+            let state = self.containers.get_mut(container_id).ok_or(ENOENT)?;
 
-        if state.state != OciSpecState::Running {
-            return Err(EINVAL);
-        }
+            if state.state != OciSpecState::Running {
+                return Err(EINVAL);
+            }
 
-        if let Some(pid) = state.pid {
+            (state.pid, state.state)
+        };
+
+        // Log state transition for debugging
+        crate::println!(
+            "[oci] Pausing container {} - current state: {:?}",
+            container_id,
+            current_state
+        );
+
+        // Now we can send signal without the mutable borrow active
+        if let Some(pid) = pid {
             // 发送 SIGSTOP 信号暂停进程
             self.send_signal(pid, 19)?; // SIGSTOP
         }
 
+        // Update state
+        let state = self.containers.get_mut(container_id).ok_or(ENOENT)?;
         state.state = OciSpecState::Paused;
         crate::println!("[oci] Paused container: {}", container_id);
         Ok(())
@@ -508,17 +543,32 @@ impl OciRuntime {
 
     /// 恢复容器
     pub fn resume_container(&mut self, container_id: &str) -> Result<(), i32> {
-        let state = self.containers.get_mut(container_id).ok_or(ENOENT)?;
+        // First, extract the pid and check state
+        let (pid, current_state) = {
+            let state = self.containers.get_mut(container_id).ok_or(ENOENT)?;
 
-        if state.state != OciSpecState::Paused {
-            return Err(EINVAL);
-        }
+            if state.state != OciSpecState::Paused {
+                return Err(EINVAL);
+            }
 
-        if let Some(pid) = state.pid {
+            (state.pid, state.state)
+        };
+
+        // Log state transition for debugging
+        crate::println!(
+            "[oci] Resuming container {} - current state: {:?}",
+            container_id,
+            current_state
+        );
+
+        // Now we can send signal without the mutable borrow active
+        if let Some(pid) = pid {
             // 发送 SIGCONT 信号恢复进程
             self.send_signal(pid, 18)?; // SIGCONT
         }
 
+        // Update state
+        let state = self.containers.get_mut(container_id).ok_or(ENOENT)?;
         state.state = OciSpecState::Running;
         crate::println!("[oci] Resumed container: {}", container_id);
         Ok(())
@@ -531,19 +581,35 @@ impl OciRuntime {
 
     /// 更新容器状态（检查进程是否还在运行）
     pub fn update_container_state(&mut self, container_id: &str) -> Result<(), i32> {
-        let state = self.containers.get_mut(container_id).ok_or(ENOENT)?;
+        // Extract pid and check if we need to update
+        let (pid, should_update) = {
+            let state = self.containers.get_mut(container_id).ok_or(ENOENT)?;
 
-        if let Some(pid) = state.pid {
-            if state.state == OciSpecState::Running && !self.is_process_running(pid) {
-                // 进程已退出
-                state.state = OciSpecState::Exited;
-                state.finished_at = Some(self.get_current_time());
-
-                // 获取退出代码
-                let table = crate::subsystems::process::manager::PROC_TABLE.lock();
-                if let Some(proc) = table.find_ref(pid as usize) {
-                    state.exit_code = Some(proc.xstate);
+            match state.pid {
+                Some(pid) => {
+                    let should_update = state.state == OciSpecState::Running && !self.is_process_running(pid);
+                    (Some(pid), should_update)
                 }
+                None => (None, false),
+            }
+        };
+
+        // Update state if needed
+        if let Some(pid) = pid {
+            if should_update {
+                let current_time = self.get_current_time();
+
+                // Get exit code
+                let exit_code = {
+                    let table = crate::subsystems::process::manager::PROC_TABLE.lock();
+                    table.find_ref(pid as i32).map(|proc| proc.xstate)
+                };
+
+                // Now update the state
+                let state = self.containers.get_mut(container_id).ok_or(ENOENT)?;
+                state.state = OciSpecState::Exited;
+                state.finished_at = Some(current_time);
+                state.exit_code = exit_code;
 
                 crate::println!(
                     "[oci] Container {} exited (PID: {}, exit code: {:?})",
@@ -650,7 +716,7 @@ impl OciRuntime {
     /// 创建进程
     fn create_process(&self, container_id: &str) -> Result<u32, i32> {
         // 获取容器规范
-        let spec = self.containers.get(container_id).ok_or(ENOENT)?;
+        let spec = self.specs.get(container_id).ok_or(ENOENT)?;
 
         // 构建clone标志，根据OCI规范中的namespaces
         let mut clone_flags: i32 = 0;
@@ -659,22 +725,22 @@ impl OciRuntime {
             for namespace in &linux.namespaces {
                 match namespace.typ {
                     OciLinuxNamespaceType::Mount => {
-                        clone_flags |= crate::posix::CLONE_NEWNS;
+                        clone_flags |= CLONE_NEWNS as i32;
                     },
                     OciLinuxNamespaceType::UTS => {
-                        clone_flags |= crate::posix::CLONE_NEWUTS;
+                        clone_flags |= CLONE_NEWUTS as i32;
                     },
                     OciLinuxNamespaceType::IPC => {
-                        clone_flags |= crate::posix::CLONE_NEWIPC;
+                        clone_flags |= CLONE_NEWIPC as i32;
                     },
                     OciLinuxNamespaceType::Network => {
-                        clone_flags |= crate::posix::CLONE_NEWNET;
+                        clone_flags |= CLONE_NEWNET as i32;
                     },
                     OciLinuxNamespaceType::PID => {
-                        clone_flags |= crate::posix::CLONE_NEWPID;
+                        clone_flags |= CLONE_NEWPID as i32;
                     },
                     OciLinuxNamespaceType::User => {
-                        clone_flags |= crate::posix::CLONE_NEWUSER;
+                        clone_flags |= CLONE_NEWUSER as i32;
                     },
                     OciLinuxNamespaceType::Cgroup => {
                         // Cgroup namespace is not directly supported by clone flags
@@ -716,7 +782,7 @@ impl OciRuntime {
                             // 将进程添加到指定的cgroup
                             if let Err(e) =
                                 crate::subsystems::cloud_native::cgroups::add_process_to_cgroup(
-                                    cgroups_path,
+                                    &cgroups_path,
                                     child_pid,
                                 )
                             {
@@ -766,7 +832,7 @@ impl OciRuntime {
     fn is_process_running(&self, pid: u32) -> bool {
         // 检查进程表中是否存在该PID
         let proc_table = crate::process::PROC_TABLE.lock();
-        let exists = proc_table.find_ref(pid as usize).is_some();
+        let exists = proc_table.find_ref(pid as i32).is_some();
         drop(proc_table);
         exists
     }

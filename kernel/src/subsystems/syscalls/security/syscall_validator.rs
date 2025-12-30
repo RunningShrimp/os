@@ -15,10 +15,7 @@ use alloc::{
 
 use spin::Mutex;
 
-use crate::{
-    api::syscall::{SyscallCategory, get_syscall_category},
-    error::UnifiedError,
-};
+use crate::api::syscall::SyscallCategory;
 
 /// 安全验证结果
 #[derive(Debug, Clone, PartialEq)]
@@ -476,8 +473,35 @@ impl SyscallSecurityValidator {
             ArgumentValidationType::StringLength => {
                 if rule.validation_params.len() >= 1 {
                     let max_len: usize = rule.validation_params[0].parse().unwrap_or(1024);
-                    // 这里应该实际检查字符串长度
-                    // 简化实现，假设字符串长度合理
+
+                    // 验证字符串指针参数是否为空
+                    if arg_value == 0 {
+                        return Err(SecurityValidationResult::DeniedInvalidArgument(format!(
+                            "Argument {} is null string pointer",
+                            rule.index
+                        )));
+                    }
+
+                    // TODO: 实现实际的字符串长度检查
+                    // 当前实现仅验证指针非空，完整实现需要：
+                    // 1. 安全地读取用户空间字符串（使用 copy_from_user 或类似机制）
+                    // 2. 计算字符串长度直到遇到 null 终止符
+                    // 3. 与 max_len 比较并拒绝过长的字符串
+                    // 4. 考虑使用 crate::memory::validate_user_string(ptr, max_len)
+                    //
+                    // 伪代码示例：
+                    // let actual_len = unsafe {
+                    //     crate::memory::user_string_len(arg_value as *const u8, max_len)
+                    // };
+                    // if actual_len > max_len {
+                    //     return Err(SecurityValidationResult::DeniedInvalidArgument(format!(
+                    //         "Argument {} string length {} exceeds maximum {}",
+                    //         rule.index, actual_len, max_len
+                    //     )));
+                    // }
+
+                    // 暂时只检查指针非空，这是一个基本的安全检查
+                    debug_assert!(max_len > 0, "Maximum string length should be positive");
                 }
             },
             ArgumentValidationType::MemoryRange => {

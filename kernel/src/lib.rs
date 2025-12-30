@@ -199,25 +199,41 @@ pub use crate::{
         KernelError, KernelResult, Result, SyscallError, SyscallResult,
         DriverError, SecurityError, UnifiedError, UnifiedResult,
     },
-    vfs::{
-        FileMode, VfsError, VfsResult,
-    },
-  };
+};
 
 // Re-export additional commonly used types
 pub use crate::{
+    subsystems::mm::{AllocationStats, MemoryManagementStats, NumStats},
+    subsystems::syscalls::memory::MemoryService,
+    libc::CLibStats,
+    api::MemoryRegionType,
     memory::{MemoryPermissions, MemoryRegion},
-    subsystems::process::MemoryRegionType,
-    subsystems::mm::{MemoryService, AllocationStats, MemoryManagementStats, CLibStats, NumStats},
-    subsystems::sync::CallingConvention,
-    subsystems::time::Timestamp,
-    subsystems::cloud_native::container::{Container, ContainerService},
+    vfs_interface::{FileMode, VfsError},
     security::enhanced_permissions::AccessResult,
 };
 
 // Prelude - imports commonly used types throughout the kernel
 pub mod prelude;
 pub use prelude::*;
+
+// Define print/println macros at crate root for use throughout the kernel
+// These must be defined here to be available as crate::print and crate::println
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => {
+        $crate::platform::drivers::console::_print(::core::format_args!($($arg)*))
+    };
+}
+
+#[macro_export]
+macro_rules! println {
+    () => {
+        $crate::print!("\n")
+    };
+    ($($arg:tt)*) => {
+        $crate::print!("{}\n", ::core::format_args!($($arg)*))
+    };
+}
 
 #[cfg(feature = "kernel_tests")]
 #[macro_use]
@@ -244,7 +260,7 @@ macro_rules! log_error { ($($arg:tt)*) => { { let _ = ($($arg)*); } }; }
 pub mod api;
 
 // Virtual File System (VFS) - now accessed through subsystems
-// pub mod vfs;  // Removed: duplicate with subsystems::vfs
+pub mod vfs;  // Re-enabled: needed for proper type exports
 
 // VFS interface layer - breaks circular dependency between VFS and FS
 pub mod vfs_interface;
@@ -268,7 +284,8 @@ pub mod subsystems;
 // Top-level aliases for backward compatibility
 // These allow code to use crate::syscalls instead of crate::subsystems::syscalls
 pub use crate::subsystems::syscalls;
-pub use crate::subsystems::services;
+// services is a root-level module (not a re-export) to provide init() function
+// pub use crate::subsystems::services;  // REMOVED: Conflict with root-level services module
 pub use crate::subsystems::mm;
 // compat remains at root level, declared below
 // trap is now exported via platform::{arch, boot, drivers, trap} below
@@ -279,6 +296,7 @@ pub mod syscall;
 pub mod signal;
 pub mod compat;
 pub mod sync;
+pub mod trap;
 
 // Re-export key types for external use
 /// Core kernel functionality
@@ -296,44 +314,49 @@ pub use nos_error_handling as error_handling;
 // pub use nos_syscalls as syscalls;
 /// Performance monitoring
 pub use perf::*;
-pub use platform::{arch as platform_arch, boot, drivers, trap};
+pub use platform::{arch as platform_arch, boot, drivers};
 /// POSIX types and constants
 pub use posix::*;
 // Re-export moved modules to maintain compatibility
 pub use subsystems::fs;
 #[cfg(feature = "networking")]
 pub use subsystems::net;
-pub use subsystems::{ipc, process, sync as subsystems_sync, time, vfs};
+pub use subsystems::{ipc, process, sync as subsystems_sync, time};
 
 /// Boot parameters passed from bootloader to kernel
 pub use crate::boot::BootParameters;
 
 mod collections;
-mod cpu;
+pub mod cpu;  // Make cpu public so main.rs can import it
 #[cfg(feature = "debug")]
 pub mod debug;
 pub mod epoll;
 mod di;
 mod event;
 mod ids;
-mod libc;
-// mod services;  // Removed: now using nos_services when feature is enabled
+pub mod libc;
+mod memory;
+pub mod types;
+pub mod services;  // Re-enabled: subsystems::services doesn't have init(), need the root-level services module
 mod syscall_interface;
 // Legacy modules - now accessed through subsystems
-mod monitoring;
-mod perf;
+pub mod monitoring;  // Made public to match glob re-export
+pub mod perf;  // Made public to match glob re-export
 pub mod posix;
 mod procfs;
-mod sched;
-mod security;
+pub mod sched;  // Made public to match potential glob re-export
+pub mod security;  // Made public to match glob re-export
 #[cfg(feature = "security")]
 pub mod security_audit;
+pub mod tests;
 
 #[cfg(not(feature = "cloud_native"))]
 mod cloud_native {
     pub mod namespaces {
         use alloc::string::String;
-        #[derive(Debug)]
+
+        /// Namespace type enumeration
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
         pub enum NamespaceType {
             Mount,
             UTS,
@@ -341,13 +364,8 @@ mod cloud_native {
             Network,
             PID,
             User,
-        }
-
-        pub struct NamespaceParameters {
-            pub mount_params: Option<()>,
-            pub network_params: Option<()>,
-            pub user_params: Option<()>,
-            pub uts_params: Option<()>,
+            Cgroup,
+            Time,
         }
 
         pub struct NamespaceConfig {
@@ -356,12 +374,6 @@ mod cloud_native {
             pub existing_path: Option<String>,
         }
 
-        pub fn create_namespace(_config: NamespaceConfig) -> Result<u64, ()> {
-            Ok(0)
-        }
-        pub fn join_namespace(_path: &str) -> Result<u64, ()> {
-            Ok(0)
-        }
     }
 }
 
@@ -371,86 +383,6 @@ mod cloud_native {
 /// for operation.
 /// It uses the same core initialization logic as `rust_main_with_boot_info`,
 /// ensuring consistency between bootloader-based and library-based startup.
-///
-/// # Arguments
-///
-/// * `boot_params` - Boot parameters passed from the bootloader
-///
-/// # Returns
-///
-/// * `nos_api::Result<()>` - Success or error
-pub fn init_kernel(boot_params: BootParameters) -> nos_api::Result<()> {
-    // Use the same core initialization function as bootloader entry
-    // This ensures consistency between different entry points
-    core::init::init_kernel_core(Some(&boot_params));
-
-    log_info!("NOS Kernel initialized successfully");
-
-    Ok(())
-}
-
-/// Shutdown the kernel
-///
-/// This function shuts down all kernel subsystems in a controlled manner.
-///
-/// # Returns
-///
-/// * `nos_api::Result<()>` - Success or error
-pub fn shutdown_kernel() -> nos_api::Result<()> {
-    log_info!("Shutting down NOS Kernel");
-
-    // Shutdown performance monitoring
-    // perf::shutdown_performance_monitor()?; // Function not found
-
-    // Shutdown scheduler
-    // sched::shutdown_scheduler()?; // Function not found
-
-    // Shutdown security
-    // security::shutdown_security()?; // Function not found
-
-    // Shutdown network stack (if enabled)
-    // #[cfg(feature = "net_stack")]
-    // {
-    //     subsystems::net::shutdown_network_stack()?;
-    // }
-
-    // Shutdown error handling (if enabled)
-    #[cfg(feature = "error_handling")]
-    {
-        nos_error_handling::shutdown_error_handling()?;
-    }
-
-    // Shutdown services (if enabled)
-    #[cfg(feature = "services")]
-    {
-        nos_services::shutdown_services()?;
-    }
-
-    // Shutdown system calls (if enabled)
-    #[cfg(all(feature = "syscalls", feature = "alloc"))]
-    {
-        nos_syscalls::shutdown_syscalls()?;
-    }
-
-    // Shutdown IPC
-    // subsystems::ipc::shutdown_ipc()?; // Function not found
-
-    // Shutdown file system
-    // subsystems::fs::shutdown_file_system()?; // Function not found
-
-    // Shutdown process management
-    // subsystems::process::shutdown_process_management()?; // Function not found
-
-    // Shutdown memory management
-    crate::subsystems::mm::shutdown_advanced_memory_management()?;
-
-    // Shutdown platform
-    platform::shutdown_platform()?;
-
-    log_info!("NOS Kernel shutdown complete");
-
-    Ok(())
-}
 
 /// Get kernel version
 ///

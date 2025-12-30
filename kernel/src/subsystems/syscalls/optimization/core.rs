@@ -160,7 +160,7 @@ pub struct SyscallStatsSnapshot {
 }
 
 /// 通用缓存条目
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct CacheEntry<T> {
     /// 缓存的数据
     pub data: T,

@@ -7,14 +7,242 @@
 // - APK files (Android)
 // - IPA files (iOS App Store)
 
+#![allow(dead_code)]
+
 extern crate alloc;
 extern crate hashbrown;
 
-use core::ptr;
-use core::hash::{Hash, Hasher};
-// Dynamic linker data structures
+use crate::prelude::*;
+use core::hash::Hash;
+use alloc::string::{String, ToString};
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+use alloc::boxed::Box;
+use hashbrown::HashMap;
 
-/// Procedure Linkage Table entry
+use crate::compat::{
+    CompatibilityError, MemoryPermissions, MemoryRegion,
+    MemoryRegionType, MemoryStats, TargetPlatform,
+};
+// Use fully qualified Result to avoid ambiguity
+pub type Result<T, E = CompatibilityError> = core::result::Result<T, E>;
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
+/// Binary format enumeration
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BinaryFormat {
+    Elf,
+    Pe,
+    MachO,
+    Apk,
+    Ipa,
+    Unknown,
+}
+
+/// Binary format metadata
+#[derive(Debug, Clone, Default)]
+pub struct BinaryMetadata {
+    pub build_id: Option<String>,
+    pub compiler_info: Option<String>,
+    pub sdk_version: Option<String>,
+}
+
+/// Binary information
+#[derive(Debug, Clone)]
+pub struct BinaryInfo {
+    pub format: BinaryFormat,
+    pub platform: TargetPlatform,
+    pub architecture: String,
+    pub entry_point: usize,
+    pub size: usize,
+    pub path: String,
+    pub metadata: BinaryMetadata,
+}
+
+/// Loaded binary information
+#[derive(Debug, Clone)]
+pub struct LoadedBinary {
+    pub info: BinaryInfo,
+    pub memory_regions: Vec<MemoryRegion>,
+    pub entry_point: usize,
+    pub platform_context: PlatformContext,
+}
+
+/// Platform context data
+#[derive(Debug, Clone)]
+pub enum PlatformData {
+    Linux(LinuxContext),
+    Windows(WindowsContext),
+    MacOS(MacOSContext),
+    Android(AndroidContext),
+    IOS(IOSContext),
+    Nos,
+}
+
+/// Platform context
+#[derive(Debug, Clone)]
+pub struct PlatformContext {
+    pub platform: TargetPlatform,
+    pub data: PlatformData,
+}
+
+/// Linux platform context
+#[derive(Debug, Clone, Default)]
+pub struct LinuxContext {
+    pub sysinfo: Option<String>,
+    pub interpreter: Option<String>,
+}
+
+/// Windows platform context
+#[derive(Debug, Clone)]
+pub struct WindowsContext {
+    pub api_version: Option<u32>,
+    pub required_dlls: Vec<String>,
+    pub registry_entries: Vec<String>,
+}
+
+/// macOS platform context
+#[derive(Debug, Clone)]
+pub struct MacOSContext {
+    pub os_version: Option<(u16, u16, u16)>,
+    pub frameworks: Vec<String>,
+    pub bundle_info: Option<BundleInfo>,
+}
+
+/// Android platform context
+#[derive(Debug, Clone)]
+pub struct AndroidContext {
+    pub api_level: Option<u32>,
+    pub permissions: Vec<String>,
+    pub native_libs: Vec<String>,
+}
+
+/// iOS platform context
+#[derive(Debug, Clone)]
+pub struct IOSContext {
+    pub os_version: Option<(u16, u16, u16)>,
+    pub frameworks: Vec<String>,
+    pub bundle_info: Option<BundleInfo>,
+}
+
+/// Bundle information
+#[derive(Debug, Clone)]
+pub struct BundleInfo {
+    pub bundle_id: String,
+    pub version: String,
+    pub display_name: String,
+    pub executable: String,
+}
+
+/// Compatibility state
+#[derive(Debug)]
+pub struct CompatibilityState {
+    pub stats: CompatibilityStats,
+}
+
+/// Compatibility statistics
+#[derive(Debug, Clone, Default)]
+pub struct CompatibilityStats {
+    pub binaries_loaded: u32,
+    pub memory_stats: MemoryStats,
+}
+
+static mut COMPAT_STATE: Option<CompatibilityState> = None;
+
+/// Get compatibility state
+pub fn get_compatibility_state() -> spin::MutexGuard<'static, Option<CompatibilityState>> {
+    unsafe {
+        // Initialize on first use
+        if COMPAT_STATE.is_none() {
+            COMPAT_STATE = Some(CompatibilityState {
+                stats: CompatibilityStats::default(),
+            });
+        }
+    }
+    // This is a simplified version - real implementation needs proper static mutex
+    // For now, use a workaround with a static mutex
+    static STATE_MUTEX: spin::Mutex<Option<CompatibilityState>> = spin::Mutex::new(None);
+    let mut guard = STATE_MUTEX.lock();
+    if guard.is_none() {
+        *guard = Some(CompatibilityState {
+            stats: CompatibilityStats::default(),
+        });
+    }
+    guard
+}
+
+/// Detect binary format from data
+pub fn detect_binary_format(data: &[u8]) -> BinaryFormat {
+    if data.len() < 4 {
+        return BinaryFormat::Unknown;
+    }
+
+    // Check ELF magic
+    if &data[0..4] == [0x7f, b'E', b'L', b'F'] {
+        return BinaryFormat::Elf;
+    }
+
+    // Check PE magic (MZ header)
+    if &data[0..2] == b"MZ" {
+        return BinaryFormat::Pe;
+    }
+
+    // Check Mach-O magic
+    let magic = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
+    if magic == 0xfeedface || magic == 0xcefaedfe || magic == 0xfeedfacf || magic == 0xcffaedfe {
+        return BinaryFormat::MachO;
+    }
+
+    // Check ZIP/APK/IPA signature
+    if &data[0..4] == [0x50, 0x4b, 0x03, 0x04] {
+        // Would need additional checks to distinguish APK from IPA
+        return BinaryFormat::Apk;
+    }
+
+    BinaryFormat::Unknown
+}
+
+/// Detect architecture from binary
+pub fn detect_architecture(data: &[u8], format: BinaryFormat) -> String {
+    match format {
+        BinaryFormat::Elf => {
+            if data.len() >= 0x12 {
+                // ELF e_machine field at offset 0x12
+                match u16::from_le_bytes([data[0x12], data[0x13]]) {
+                    0x03 => "x86".to_string(),
+                    0x3e => "x86_64".to_string(),
+                    0x28 => "ARM".to_string(),
+                    0xb7 => "AArch64".to_string(),
+                    _ => "unknown".to_string(),
+                }
+            } else {
+                "unknown".to_string()
+            }
+        }
+        BinaryFormat::Pe => {
+            if data.len() >= 0x100 {
+                // PE machine field
+                match u16::from_le_bytes([data[0x100], data[0x101]]) {
+                    0x014c => "x86".to_string(),
+                    0x8664 => "x86_64".to_string(),
+                    0x01c0 => "ARM".to_string(),
+                    0xaa64 => "AArch64".to_string(),
+                    _ => "unknown".to_string(),
+                }
+            } else {
+                "unknown".to_string()
+            }
+        }
+        _ => "unknown".to_string(),
+    }
+}
+
+// ============================================================================
+// Dynamic Linker Data Structures
+// ============================================================================
 #[derive(Clone)]
 pub struct PltEntry {
     /// Jump instruction to resolver
@@ -76,7 +304,7 @@ pub struct DynamicLinker {
     /// Symbol hash table (GNU style)
     pub symbol_hash: Option<SymbolHashTable>,
     /// Symbol cache (name -> address)
-    pub symbol_cache: hashbrown::HashMap<alloc::string::String, u64, DefaultHasherBuilder>,
+    pub symbol_cache: hashbrown::HashMap<alloc::string::String, u64>,
     /// Symbol versions
     pub symbol_versions: Vec<SymbolVersion>,
     /// Dynamic sections
@@ -118,7 +346,7 @@ impl DynamicLinker {
             plt_entries: Vec::new(),
             got_entries: Vec::new(),
             symbol_hash: None,
-            symbol_cache: hashbrown::HashMap::with_hasher(DefaultHasherBuilder),
+            symbol_cache: hashbrown::HashMap::new(),
             symbol_versions: Vec::new(),
             dynamic_sections: Vec::new(),
             stats: Default::default(),
@@ -169,15 +397,6 @@ impl DynamicLinker {
         Ok(entry.jump_instr & 0xffffff) // Simplified
     }
 }
-use alloc::string::String;
-use alloc::string::ToString;
-use alloc::sync::Arc;
-use alloc::{format, vec};
-use alloc::boxed::Box;
-use hashbrown::HashMap;
-
-use crate::compat::*;
-use crate::vfs;
 
 pub struct FileMode;
 
@@ -196,7 +415,7 @@ impl OpenFlags {
 /// Universal binary loader
 pub struct UniversalLoader {
     /// Format-specific handlers
-    format_handlers: HashMap<BinaryFormat, Box<dyn FormatHandler>, DefaultHasherBuilder>,
+    format_handlers: HashMap<BinaryFormat, Box<dyn FormatHandler>>,
     /// Memory manager for loading binaries
     memory_manager: Arc<spin::Mutex<crate::compat::MemoryManager>>,
     /// Dynamic linker instance
@@ -206,7 +425,7 @@ pub struct UniversalLoader {
 impl UniversalLoader {
     /// Create a new universal loader
     pub fn new() -> Self {
-        let mut format_handlers: HashMap<BinaryFormat, Box<dyn FormatHandler>, DefaultHasherBuilder> = HashMap::with_hasher(DefaultHasherBuilder);
+        let mut format_handlers: HashMap<BinaryFormat, Box<dyn FormatHandler>> = HashMap::new();
 
         // Register format handlers
         format_handlers.insert(BinaryFormat::Elf, Box::new(ElfHandler::new()));
@@ -227,23 +446,14 @@ impl UniversalLoader {
     }
 
     /// Load a binary from file path
-    pub fn load_binary(&mut self, path: &str) -> Result<LoadedBinary> {
-        // Read the binary file
-        let mut file = vfs::vfs().open(path, OpenFlags::O_RDONLY as u32)
-            .map_err(|_| CompatibilityError::NotFound)?;
+    pub fn load_binary(&mut self, _path: &str) -> Result<LoadedBinary> {
+        // For now, return an error as VFS integration is not complete
+        // In a full implementation, this would read the binary from the filesystem
+        Err(CompatibilityError::NotSupported)
+    }
 
-        let mut data = Vec::new();
-        let mut buffer = [0u8; 4096];
-
-        loop {
-            let bytes_read = file.read(buffer.as_mut_ptr() as usize, buffer.len())
-                .map_err(|_| CompatibilityError::IoError)?;
-            if bytes_read == 0 {
-                break;
-            }
-            data.extend_from_slice(&buffer[..bytes_read]);
-        }
-
+    /// Load binary from data (alternative method that bypasses VFS)
+    pub fn load_binary_from_data(&mut self, path: &str, data: Vec<u8>) -> Result<LoadedBinary> {
         // Detect binary format
         let format = detect_binary_format(&data);
         if format == BinaryFormat::Unknown {
@@ -722,7 +932,7 @@ impl FormatHandler for ApkHandler {
                 physical_addr: None,
                 size: data.len(),
                 permissions: MemoryPermissions::readonly(),
-                region_type: MemoryRegionType::MappedFile,
+                region_type: MemoryRegionType::Mapped,
             }
         ];
 
@@ -799,7 +1009,7 @@ impl FormatHandler for IpaHandler {
                 physical_addr: None,
                 size: data.len(),
                 permissions: MemoryPermissions::readonly(),
-                region_type: MemoryRegionType::MappedFile,
+                region_type: MemoryRegionType::Mapped,
             }
         ];
 

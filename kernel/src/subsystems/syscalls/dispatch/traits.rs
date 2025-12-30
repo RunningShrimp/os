@@ -1,16 +1,13 @@
 //! 服务特征定义模块
-//! 
+//!
 //! 本模块定义了服务管理系统的核心特征接口，包括：
 //! - Service: 基础服务特征
 //! - SyscallService: 系统调用服务特征
 //! - ServiceLifecycle: 服务生命周期管理特征
-//! 
+//!
 //! 这些特征为依赖注入和服务发现机制提供了统一的接口规范。
 
-use crate::error::{UnifiedError, KernelError, Result};
-use alloc::sync::Arc;
-use alloc::string::String;
-use alloc::vec::Vec;
+use crate::prelude::*;
 use crate::subsystems::syscalls::memory::service::MemoryService;
 
 /// 基础服务特征

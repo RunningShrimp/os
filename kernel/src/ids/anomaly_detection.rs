@@ -8,7 +8,7 @@ use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use crate::subsystems::sync::{Mutex, SpinLock};
 use crate::{
     collections::{HashMap, VecDeque},
-    compat::DefaultHasherBuilder,
+    compat::DefaultHashBuilder,
     subsystems::time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -666,7 +666,7 @@ impl AnomalyDetector {
             timestamp,
             source: String::from("AnomalyDetector"),
             metrics,
-            context: HashMap::with_hasher(DefaultHasherBuilder),
+            context: HashMap::with_hasher(DefaultHashBuilder::default()),
             suggested_actions: vec![
                 String::from("Investigate the unusual pattern"),
                 String::from("Check system logs for related events"),

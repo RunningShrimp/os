@@ -1,6 +1,7 @@
 //! Test utilities and types for kernel testing
 
 extern crate alloc;
+use alloc::string::ToString;
 
 /// Test result type
 pub type TestResult = Result<(), alloc::string::String>;

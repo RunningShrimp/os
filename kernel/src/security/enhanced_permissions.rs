@@ -3,9 +3,8 @@
 //! 本模块提供细粒度的权限管理机制，支持基于角色的访问控制(RBAC)、
 //! 能力安全(capabilities)和强制访问控制(MAC)。
 
-use alloc::{collections::BTreeMap, string::String, vec::Vec};
-
-use crate::subsystems::sync::Mutex;
+use crate::prelude::*;
+use core::sync::atomic::Ordering;
 
 /// 权限位定义
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -106,13 +105,13 @@ pub struct SecurityContext {
     pub user_id: UserId,
     pub group_id: GroupId,
     pub supplementary_groups: Vec<GroupId>,
-    pub capabilities: CapabilitySet,
+    pub capabilities: Arc<CapabilitySet>,
     pub role: Option<RoleId>,
     pub clearance_level: ClearanceLevel,
 }
 
 /// 能力集
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct CapabilitySet {
     bits: AtomicU64,
 }
@@ -326,7 +325,7 @@ impl EnhancedPermissionManager {
     }
 
     /// 检查能力
-    fn check_capabilities(&self, context: &SecurityContext, requested: PermissionBits) -> bool {
+    fn check_capabilities(&self, _context: &SecurityContext, _requested: PermissionBits) -> bool {
         // 检查每个请求的权限是否在能力集中
         // 这里简化实现，实际应该检查每个位
         true // 暂时返回true，实际需要详细实现
@@ -389,7 +388,7 @@ impl EnhancedPermissionManager {
             Subject::User(uid) => *uid == context.user_id,
             Subject::Group(gid) => *gid == context.group_id,
             Subject::Role(rid) => context.role == Some(*rid),
-            Subject::Process(pid) => false, // 需要获取当前进程ID
+            Subject::Process(_pid) => false, // 需要获取当前进程ID
         }
     }
 
@@ -419,21 +418,21 @@ impl EnhancedPermissionManager {
     fn check_condition(
         &self,
         condition: &AccessCondition,
-        context: &SecurityContext,
-        object: &Object,
+        _context: &SecurityContext,
+        _object: &Object,
     ) -> bool {
         match condition {
-            AccessCondition::TimeWindow { start, end } => {
+            AccessCondition::TimeWindow { start: _, end: _ } => {
                 // 获取当前时间并检查是否在窗口内
                 // 这里简化实现
                 true
             },
-            AccessCondition::IpAddress(ip) => {
+            AccessCondition::IpAddress(_ip) => {
                 // 检查源IP地址
                 // 这里简化实现
                 true
             },
-            AccessCondition::ProcessState(state) => {
+            AccessCondition::ProcessState(_state) => {
                 // 检查进程状态
                 // 这里简化实现
                 true
@@ -478,7 +477,7 @@ impl EnhancedPermissionManager {
     }
 
     /// 检查时间限制
-    fn check_time_restrictions(&self, context: &SecurityContext, object: &Object) -> bool {
+    fn check_time_restrictions(&self, _context: &SecurityContext, _object: &Object) -> bool {
         // 简化实现，实际应该检查具体的时间窗口
         true
     }
@@ -522,20 +521,20 @@ impl EnhancedPermissionManager {
     }
 
     /// 添加角色
-    pub fn add_role(&self, role: Role) -> Result<(), &'static str> {
+    pub fn add_role(&self, role: Role) -> Result<()> {
         let mut roles = self.roles.lock();
         if roles.contains_key(&role.id) {
-            return Err("Role already exists");
+            return Err(Error::AlreadyExists);
         }
         roles.insert(role.id, role);
         Ok(())
     }
 
     /// 删除角色
-    pub fn remove_role(&self, role_id: RoleId) -> Result<(), &'static str> {
+    pub fn remove_role(&self, role_id: RoleId) -> Result<()> {
         let mut roles = self.roles.lock();
         if !roles.contains_key(&role_id) {
-            return Err("Role not found");
+            return Err(Error::NotFound);
         }
         roles.remove(&role_id);
         Ok(())
@@ -548,10 +547,10 @@ impl EnhancedPermissionManager {
     }
 
     /// 删除访问控制条目
-    pub fn remove_access_control_entry(&self, index: usize) -> Result<(), &'static str> {
+    pub fn remove_access_control_entry(&self, index: usize) -> Result<()> {
         let mut acl = self.access_control.lock();
         if index >= acl.len() {
-            return Err("Invalid index");
+            return Err(Error::InvalidArgument);
         }
         acl.remove(index);
         Ok(())
@@ -583,7 +582,7 @@ pub struct AuditEntry {
 static GLOBAL_PERMISSION_MANAGER: Mutex<Option<EnhancedPermissionManager>> = Mutex::new(None);
 
 /// 获取全局权限管理器
-pub fn get_global_permission_manager() -> &'static Mutex<EnhancedPermissionManager> {
+pub fn get_global_permission_manager() -> &'static Mutex<Option<EnhancedPermissionManager>> {
     &GLOBAL_PERMISSION_MANAGER
 }
 
@@ -592,7 +591,7 @@ pub fn init_permission_manager() {
     let mut manager = GLOBAL_PERMISSION_MANAGER.lock();
     if manager.is_none() {
         *manager = Some(EnhancedPermissionManager::new());
-        crate::println!("[security] Enhanced permission manager initialized");
+        log_info!("[security] Enhanced permission manager initialized");
     }
 }
 
@@ -617,7 +616,7 @@ pub fn get_current_security_context() -> SecurityContext {
         user_id: 0,
         group_id: 0,
         supplementary_groups: Vec::new(),
-        capabilities: CapabilitySet::new(),
+        capabilities: Arc::new(CapabilitySet::new()),
         role: None,
         clearance_level: ClearanceLevel::Unclassified,
     }

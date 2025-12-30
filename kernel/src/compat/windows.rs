@@ -5,11 +5,13 @@ extern crate alloc;
 
 extern crate hashbrown;
 
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::{boxed::Box, string::String, string::ToString, vec::Vec};
 
 use hashbrown::HashMap;
 
-use crate::compat::{DefaultHasherBuilder, *};
+use crate::compat::*;
+use crate::error::unified::UnifiedError;
+use core::ffi::c_void;
 
 /// Windows compatibility module
 pub struct WindowsModule {
@@ -43,11 +45,11 @@ impl PlatformModule for WindowsModule {
         true
     }
 
-    fn initialize(&mut self) -> Result<(), &'static str> {
+    fn initialize(&mut self) -> Result<()> {
         Ok(())
     }
 
-    fn shutdown(&mut self) -> Result<(), &'static str> {
+    fn shutdown(&mut self) -> Result<()> {
         Ok(())
     }
 }
@@ -55,15 +57,15 @@ impl PlatformModule for WindowsModule {
 /// Windows API registry
 #[derive(Debug)]
 pub struct WindowsApiRegistry {
-    registered_functions: HashMap<String, usize, DefaultHasherBuilder>,
-    api_versions: HashMap<String, u32, DefaultHasherBuilder>,
+    registered_functions: HashMap<String, usize>,
+    api_versions: HashMap<String, u32>,
 }
 
 impl WindowsApiRegistry {
     pub fn new() -> Self {
         let mut registry = Self {
-            registered_functions: HashMap::with_hasher(DefaultHasherBuilder),
-            api_versions: HashMap::with_hasher(DefaultHasherBuilder),
+            registered_functions: HashMap::new(),
+            api_versions: HashMap::new(),
         };
 
         // Register core Win32 APIs
@@ -118,8 +120,8 @@ impl WindowsApiRegistry {
 /// Windows Registry simulation
 #[derive(Debug)]
 pub struct WindowsRegistry {
-    registry: HashMap<String, RegistryValue, DefaultHasherBuilder>,
-    dll_registry: HashMap<String, DllInfo, DefaultHasherBuilder>,
+    registry: HashMap<String, RegistryValue>,
+    dll_registry: HashMap<String, DllInfo>,
 }
 
 #[derive(Debug, Clone)]
@@ -140,8 +142,8 @@ pub struct DllInfo {
 impl WindowsRegistry {
     pub fn new() -> Self {
         let mut registry = Self {
-            registry: HashMap::with_hasher(DefaultHasherBuilder),
-            dll_registry: HashMap::with_hasher(DefaultHasherBuilder),
+            registry: HashMap::new(),
+            dll_registry: HashMap::new(),
         };
 
         registry.initialize_system_registry();
@@ -225,19 +227,11 @@ impl WindowsRegistry {
 /// Windows Service Manager
 #[derive(Debug)]
 pub struct WindowsServiceManager {
-    services: HashMap<String, WindowsService, DefaultHasherBuilder>,
+    services: HashMap<String, WindowsService>,
 }
 
 #[derive(Debug, Clone)]
-pub struct WindowsService {
-    name: String,
-    display_name: String,
-    service_type: u32,
-    start_type: u32,
-    error_control: u32,
-    binary_path: String,
-    state: ServiceState,
-}
+pub struct WindowsService;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ServiceState {
@@ -250,7 +244,7 @@ pub enum ServiceState {
 
 impl WindowsServiceManager {
     pub fn new() -> Self {
-        Self { services: HashMap::with_hasher(DefaultHasherBuilder) }
+        Self { services: HashMap::new() }
     }
 }
 
@@ -265,23 +259,23 @@ pub enum ComError {
     Unexpected,
 }
 
-impl From<ComError> for nos_api::Error {
+impl From<ComError> for UnifiedError {
     fn from(err: ComError) -> Self {
-        nos_api::Error::ComError(match err {
-            ComError::Failed(msg) => msg,
-            ComError::NotImpl => "Not implemented".to_string(),
-            ComError::NoInterface => "No such interface".to_string(),
-            ComError::InvalidArg => "Invalid argument".to_string(),
-            ComError::OutOfMemory => "Out of memory".to_string(),
-            ComError::Unexpected => "Unexpected error".to_string(),
-        })
+        match err {
+            ComError::Failed(msg) => UnifiedError::Other(msg),
+            ComError::NotImpl => UnifiedError::Other("Not implemented".to_string()),
+            ComError::NoInterface => UnifiedError::Other("No such interface".to_string()),
+            ComError::InvalidArg => UnifiedError::InvalidArgument,
+            ComError::OutOfMemory => UnifiedError::OutOfMemory,
+            ComError::Unexpected => UnifiedError::Other("Unexpected error".to_string()),
+        }
     }
 }
 
 /// Windows COM Runtime
 pub struct WindowsComRuntime {
-    class_factory_registry: HashMap<String, ComClassFactory, DefaultHasherBuilder>,
-    active_objects: HashMap<u32, Box<dyn ComObject>, DefaultHasherBuilder>,
+    class_factory_registry: HashMap<String, ComClassFactory>,
+    active_objects: HashMap<u32, Box<dyn ComObject>>,
     next_object_id: u32,
 }
 
@@ -299,8 +293,8 @@ pub trait ComObject: Send + Sync {
 impl WindowsComRuntime {
     pub fn new() -> Self {
         Self {
-            class_factory_registry: HashMap::with_hasher(DefaultHasherBuilder),
-            active_objects: HashMap::with_hasher(DefaultHasherBuilder),
+            class_factory_registry: HashMap::new(),
+            active_objects: HashMap::new(),
             next_object_id: 1,
         }
     }

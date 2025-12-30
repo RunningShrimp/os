@@ -1,46 +1,17 @@
 // GLib object manager trait and implementation
 
-use super::*;
+use crate::subsystems::syscalls::interface::{SyscallResult, SyscallError};
+use core::ffi::c_void;
 
-/// GLib对象系统管理器特征
-pub trait GObjectManager {
-    /// 注册新的对象类型
-    fn register_type(
-        &mut self,
-        name: &str,
-        parent_type: u64,
-        size: usize,
-        flags: u32,
-    ) -> Result<u64, c_int>;
-
-    /// 创建对象实例
-    fn create_instance(&mut self, type_id: u64, object_ptr: *mut c_void) -> Result<u64, c_int>;
-
-    /// 增加引用计数
-    fn ref_instance(&self, instance_id: u64) -> Result<usize, c_int>;
-
-    /// 减少引用计数
-    fn unref_instance(&self, instance_id: u64) -> Result<usize, c_int>;
-
-    /// 注册信号
-    fn register_signal(
-        &mut self,
-        type_id: u64,
-        name: &str,
-        param_types: &[u64],
-        return_type: u64,
-        flags: u32,
-    ) -> Result<u64, c_int>;
-
-    /// 发射信号
-    fn emit_signal(&self, instance_id: u64, signal_id: u64, args: &[u64]) -> Result<usize, c_int>;
-
-    /// 设置属性
-    fn set_property(&mut self, instance_id: u64, name: &str, value: u64) -> Result<(), c_int>;
-
-    /// 获取属性
-    fn get_property(&self, instance_id: u64, name: &str) -> Result<u64, c_int>;
+/// Convert i32 error code to SyscallError
+fn convert_error(result: i32) -> SyscallError {
+    match result {
+        _ => SyscallError::InvalidArgument,
+    }
 }
+
+// Import the trait from parent module
+use crate::subsystems::syscalls::object::GObjectManager;
 
 // impl Default for GObjectManager {
 //     fn default() -> Self {
@@ -55,7 +26,7 @@ impl GObjectManager for () {
         parent_type: u64,
         size: usize,
         flags: u32,
-    ) -> Result<u64, c_int> {
+    ) -> SyscallResult<u64> {
         let result = super::type_::sys_glib_object_type_register(
             name.as_ptr() as *const core::ffi::c_char,
             parent_type,
@@ -65,34 +36,34 @@ impl GObjectManager for () {
         if result > 0 {
             Ok(result as u64)
         } else {
-            Err(result)
+            Err(SyscallError::InvalidArgument)
         }
     }
 
-    fn create_instance(&mut self, type_id: u64, object_ptr: *mut c_void) -> Result<u64, c_int> {
-        let result = super::instance::sys_glib_object_instance_create(type_id, object_ptr);
+    fn create_instance(&mut self, type_id: u64, object_ptr: *mut c_void) -> SyscallResult<u64> {
+        let result = unsafe { super::instance::sys_glib_object_instance_create(type_id, object_ptr) };
         if result > 0 {
             Ok(result as u64)
         } else {
-            Err(result)
+            Err(SyscallError::InvalidArgument)
         }
     }
 
-    fn ref_instance(&self, instance_id: u64) -> Result<usize, c_int> {
-        let result = super::instance::sys_glib_object_ref(instance_id);
+    fn ref_instance(&self, instance_id: u64) -> SyscallResult<usize> {
+        let result = unsafe { super::instance::sys_glib_object_ref(instance_id) };
         if result > 0 {
             Ok(result as usize)
         } else {
-            Err(result)
+            Err(SyscallError::InvalidArgument)
         }
     }
 
-    fn unref_instance(&self, instance_id: u64) -> Result<usize, c_int> {
-        let result = super::instance::sys_glib_object_unref(instance_id);
+    fn unref_instance(&self, instance_id: u64) -> SyscallResult<usize> {
+        let result = unsafe { super::instance::sys_glib_object_unref(instance_id) };
         if result >= 0 {
             Ok(result as usize)
         } else {
-            Err(result)
+            Err(SyscallError::InvalidArgument)
         }
     }
 
@@ -103,7 +74,7 @@ impl GObjectManager for () {
         param_types: &[u64],
         return_type: u64,
         flags: u32,
-    ) -> Result<u64, c_int> {
+    ) -> SyscallResult<u64> {
         let result = super::signal::sys_glib_object_signal_register(
             type_id,
             name.as_ptr() as *const core::ffi::c_char,
@@ -115,11 +86,11 @@ impl GObjectManager for () {
         if result > 0 {
             Ok(result as u64)
         } else {
-            Err(result)
+            Err(SyscallError::InvalidArgument)
         }
     }
 
-    fn emit_signal(&self, instance_id: u64, signal_id: u64, args: &[u64]) -> Result<usize, c_int> {
+      fn emit_signal(&self, instance_id: u64, signal_id: u64, args: &[u64]) -> SyscallResult<usize> {
         let result = super::signal::sys_glib_object_signal_emit(
             instance_id,
             signal_id,
@@ -129,27 +100,39 @@ impl GObjectManager for () {
         if result >= 0 {
             Ok(result as usize)
         } else {
-            Err(result)
+            Err(SyscallError::InvalidArgument)
         }
     }
 
-    fn set_property(&mut self, instance_id: u64, name: &str, value: u64) -> Result<(), c_int> {
-        let result = super::property::sys_glib_object_set_property(
-            instance_id,
-            name.as_ptr() as *const core::ffi::c_char,
-            value,
-        );
-        if result == 0 { Ok(()) } else { Err(result) }
+    fn set_property(&mut self, instance_id: u64, name: &str, value: u64) -> SyscallResult<()> {
+        let result = unsafe {
+            super::property::sys_glib_object_set_property(
+                instance_id,
+                name.as_ptr() as *const core::ffi::c_char,
+                value,
+            )
+        };
+        if result == 0 {
+            Ok(())
+        } else {
+            Err(SyscallError::InvalidArgument)
+        }
     }
 
-    fn get_property(&self, instance_id: u64, name: &str) -> Result<u64, c_int> {
+    fn get_property(&self, instance_id: u64, name: &str) -> SyscallResult<u64> {
         let mut value = 0u64;
-        let result = super::property::sys_glib_object_get_property(
-            instance_id,
-            name.as_ptr() as *const core::ffi::c_char,
-            &mut value as *mut u64,
-        );
-        if result == 0 { Ok(value) } else { Err(result) }
+        let result = unsafe {
+            super::property::sys_glib_object_get_property(
+                instance_id,
+                name.as_ptr() as *const core::ffi::c_char,
+                &mut value as *mut u64,
+            )
+        };
+        if result == 0 {
+            Ok(value)
+        } else {
+            Err(SyscallError::InvalidArgument)
+        }
     }
 }
 
@@ -191,12 +174,15 @@ mod tests {
 
         // 测试引用计数
         let ref_count = super::instance::sys_glib_object_ref(instance_id as u64);
+        assert!(ref_count > 0);
         assert_eq!(ref_count, 2);
 
         let ref_count = super::instance::sys_glib_object_unref(instance_id as u64);
+        assert!(ref_count >= 0);
         assert_eq!(ref_count, 1);
 
         let ref_count = super::instance::sys_glib_object_unref(instance_id as u64);
+        assert!(ref_count >= 0);
         assert_eq!(ref_count, 0); // 对象应该被销毁
 
         // 清理
@@ -252,7 +238,9 @@ mod tests {
             b"test-property\0".as_ptr() as *const core::ffi::c_char,
             42,
         );
-        assert_eq!(result, 0);
+        if result != 0 {
+            panic!("Expected result 0, got {}", result);
+        }
 
         // 获取属性
         let mut value = 0u64;
@@ -261,8 +249,11 @@ mod tests {
             b"test-property\0".as_ptr() as *const core::ffi::c_char,
             &mut value as *mut u64,
         );
-        assert_eq!(result, 0);
-        assert_eq!(value, 42);
+        if result == 0 {
+            assert_eq!(value, 42);
+        } else {
+            panic!("Expected success, got error: {}", result);
+        }
 
         // 清理
         super::property::sys_glib_object_cleanup();

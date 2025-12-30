@@ -1,29 +1,24 @@
 //! Directory entry cache for VFS
 extern crate alloc;
-use core::sync::atomic::{AtomicUsize, Ordering};
 
-use super::{fs::InodeOps, mount::Mount};
+use crate::prelude::*;
+
+use super::{InodeOps, Mount};
 use crate::subsystems::sync::Mutex;
 
 /// Directory entry cache
 pub struct Dentry {
-    name: String,
-    parent: Option<Arc<Mutex<Dentry>>>,
     pub inode: Arc<dyn InodeOps>,
     mount: Option<Arc<Mount>>,
     children: BTreeMap<String, Arc<Mutex<Dentry>>>,
-    ref_count: AtomicUsize,
 }
 
 impl Dentry {
-    pub fn new(name: String, inode: Arc<dyn InodeOps>, parent: Option<Arc<Mutex<Dentry>>>) -> Self {
+    pub fn new(_name: String, inode: Arc<dyn InodeOps>, _parent: Option<Arc<Mutex<Dentry>>>) -> Self {
         Self {
-            name,
-            parent,
             inode,
             mount: None,
             children: BTreeMap::new(),
-            ref_count: AtomicUsize::new(1),
         }
     }
 

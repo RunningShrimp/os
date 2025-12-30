@@ -26,10 +26,10 @@ impl Syscon {
     }
 
     pub fn read64(&self, off: usize) -> u64 {
-        unsafe { crate::subsystems::mm::mmio_read64(self.p64(off) as *const u64) }
+        crate::subsystems::mm::mmio_read64(self.p64(off) as *const u64)
     }
 
     pub fn write64(&self, off: usize, val: u64) {
-        unsafe { crate::subsystems::mm::mmio_write64(self.p64(off), val) }
+        crate::subsystems::mm::mmio_write64(self.p64(off), val)
     }
 }

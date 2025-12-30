@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 /// Response Engine Module for IDS
 extern crate alloc;
 use alloc::{string::String, sync::Arc, vec::Vec};
@@ -11,7 +12,7 @@ use crate::ids::ResponseAction;
 use crate::subsystems::sync::{Mutex, SpinLock};
 use crate::{
     collections::HashMap,
-    compat::DefaultHasherBuilder,
+    compat::DefaultHashBuilder,
     subsystems::time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -128,11 +129,12 @@ pub struct ResponseEngine {
     engine_lock: SpinLock,
 }
 
+#[allow(dead_code)]
 impl ResponseEngine {
     /// Create a new response engine
     pub fn new() -> Self {
         Self {
-            rules: HashMap::with_hasher(DefaultHasherBuilder),
+            rules: HashMap::with_hasher(DefaultHashBuilder::default()),
             executions: Vec::new(),
             execution_history: VecDeque::new(),
             execution_counter: AtomicU64::new(0),
@@ -232,7 +234,7 @@ impl ResponseEngine {
 
         // Prepare minimal execution context from the detection
         let mut ctx: HashMap<String, String> =
-            HashMap::with_hasher(crate::compat::DefaultHasherBuilder);
+            HashMap::with_hasher(crate::compat::DefaultHashBuilder::default());
         ctx.insert(String::from("detection_id"), format!("{}", detection.id));
         if let Some(pid) = detection.evidence.iter().find_map(|e| {
             // look for a pid in evidence content (very naive)
@@ -637,23 +639,23 @@ pub struct ResponseStats {
 }
 
 impl ResponseStats {
-    /// Create new statistics
+    #[must_use]
     pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Default for ResponseStats {
+    fn default() -> Self {
         Self {
             total_rules: 0,
             active_rules: 0,
             successful_actions: 0,
             failed_actions: 0,
             total_executions: 0,
-            actions_by_type: HashMap::with_hasher(DefaultHasherBuilder),
+            actions_by_type: HashMap::with_hasher(DefaultHashBuilder::default()),
             avg_execution_time: 0.0,
         }
-    }
-}
-
-impl Default for ResponseStats {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

@@ -63,7 +63,7 @@ pub struct EnhancedPerCpuAllocator {
     /// Reference to global allocator (shared)
     global_ref: *const HybridAllocator,
     /// Padding to prevent false sharing
-    _padding: [u8; CACHE_LINE_SIZE - 80],
+    _padding: [u8; CACHE_LINE_SIZE.saturating_sub(80)],
 }
 
 unsafe impl Send for EnhancedPerCpuAllocator {}
@@ -77,7 +77,7 @@ impl EnhancedPerCpuAllocator {
             cache_misses: AtomicUsize::new(0),
             batch_size: BATCH_SIZE,
             global_ref: global_allocator as *const HybridAllocator,
-            _padding: [0; CACHE_LINE_SIZE - 80],
+            _padding: [0; CACHE_LINE_SIZE.saturating_sub(80)],
         }
     }
 
@@ -113,7 +113,10 @@ impl EnhancedPerCpuAllocator {
                 break;
             }
 
-            let layout = Layout::from_size_align(*size, 8).ok()?;
+            let layout = match Layout::from_size_align(*size, 8) {
+                Ok(layout) => layout,
+                Err(_) => continue,
+            };
             let ptr = unsafe { global.alloc(layout) };
 
             if !ptr.is_null() {
@@ -212,7 +215,7 @@ pub fn current_enhanced_allocator() -> Option<&'static mut EnhancedPerCpuAllocat
     }
 
     unsafe {
-        let cpu_id = cpuid() as usize;
+        let cpu_id = crate::cpu::cpuid() as usize;
         ENHANCED_ALLOCATORS.as_mut()?.get_mut(cpu_id)
     }
 }
