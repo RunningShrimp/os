@@ -160,6 +160,7 @@ pub mod fast_path;
 pub mod fs;
 pub mod glib;
 pub mod ipc;
+pub mod lockfree_stats;
 pub mod memory;
 pub mod network;
 pub mod object;

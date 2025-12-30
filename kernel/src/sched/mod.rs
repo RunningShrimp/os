@@ -195,7 +195,8 @@ impl PerCpuScheduler {
         }
     }
 
-    /// 添加任务到就绪队列
+    /// 添加任务到就绪队列（快速路径）
+    #[inline(always)]
     fn enqueue(&self, task_id: usize, priority: usize) {
         if priority >= MAX_PRIORITY {
             return;
@@ -204,22 +205,23 @@ impl PerCpuScheduler {
         let queue = &self.ready_queues[priority];
         queue.lock().push_back(task_id);
 
-        // 设置优先级位
+        // 设置优先级位（原子操作）
         let bitmask = 1u32 << (priority as u32 % 32);
         self.priority_bitmap.fetch_or(bitmask, Ordering::Release);
 
         self.task_count.fetch_add(1, Ordering::Relaxed);
     }
 
-    /// 从就绪队列取出任务
+    /// 从就绪队列取出任务（O(1)快速路径）
+    #[inline(always)]
     fn dequeue(&self) -> Option<usize> {
-        // 查找最高优先级非空队列
+        // 查找最高优先级非空队列（O(1)位操作）
         let bitmap = self.priority_bitmap.load(Ordering::Acquire);
         if bitmap == 0 {
             return None;
         }
 
-        // 找到最高设置位（最高优先级）
+        // 找到最高设置位（最高优先级）- O(1)操作
         let highest_priority = bitmap.trailing_zeros() as usize;
         if highest_priority >= MAX_PRIORITY {
             return None;

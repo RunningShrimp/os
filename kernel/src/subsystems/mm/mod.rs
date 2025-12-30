@@ -181,6 +181,7 @@ pub mod page_table_isolation;
 pub mod numa;
 pub mod optimized_page_allocator;
 pub mod percpu_allocator;
+pub mod sharded_allocator;
 pub mod zone_allocator;        // Fine-grained locking allocator
 pub mod prefetch;
 pub mod traits;

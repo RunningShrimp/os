@@ -450,6 +450,29 @@ impl VectorTable {
         Ok(())
     }
 
+    /// 快速中断处理（用于高频中断如定时器）
+    #[inline(always)]
+    pub fn handle_interrupt_fast(&self, context: &mut InterruptContext) {
+        let vector = context.vector.as_u8();
+
+        // 快速路径：跳过统计更新
+        // 直接查找并调用handler
+        let entries = self.entries.lock();
+        if let Some(entry) = entries.get(&vector) {
+            if entry.enabled {
+                entry.increment_call_count();
+
+                // 快速路径：跳过时间统计
+                (entry.handler)(context);
+
+                // Update global interrupt statistics（快速）
+                super::MICROKERNEL_STATS
+                    .interrupt_count
+                    .fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    }
+
     pub fn handle_interrupt(&self, context: &mut InterruptContext) {
         let vector = context.vector.as_u8();
 

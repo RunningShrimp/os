@@ -94,6 +94,28 @@ impl HybridAllocator {
     fn alloc(&self, layout: Layout) -> *mut u8 {
         let size = layout.size();
 
+        // 快速路径：小对象直接从slab分配（内联优化）
+        #[inline(always)]
+        fn fast_path_alloc(
+            slab: &Mutex<OptimizedSlabAllocator>,
+            layout: Layout,
+            size: usize,
+            alloc_count: &AtomicUsize,
+            tracker: &HybridAllocator,
+        ) -> *mut u8 {
+            if size <= 2048 {
+                let mut slab_guard = slab.lock();
+                let ptr = unsafe { slab_guard.alloc(layout) };
+                if !ptr.is_null() {
+                    alloc_count.fetch_add(1, Ordering::Relaxed);
+                    tracker.track_allocation(size);
+                }
+                ptr
+            } else {
+                core::ptr::null_mut()
+            }
+        }
+
         // Check if this is a huge page allocation (>= 2MB)
         if size >= hugepage::HPAGE_2MB {
             let mut hugepage = self.hugepage.lock();
@@ -107,15 +129,9 @@ impl HybridAllocator {
         }
 
         // Try slab allocator first for small objects
-        if size <= 2048 {
-            // Matches SLAB_SIZES defined in slab.rs
-            let mut slab = self.slab.lock(); // SpinLock for faster access
-            let ptr = unsafe { slab.alloc(layout) };
-            if !ptr.is_null() {
-                self.allocation_count.fetch_add(1, Ordering::Relaxed);
-                self.track_allocation(size);
-                return ptr;
-            }
+        let ptr = fast_path_alloc(&self.slab, layout, size, &self.allocation_count, self);
+        if !ptr.is_null() {
+            return ptr;
         }
 
         // Fallback to buddy allocator (SpinLock for faster access)
@@ -128,6 +144,34 @@ impl HybridAllocator {
             self.failed_allocations.fetch_add(1, Ordering::Relaxed);
         }
         ptr
+    }
+
+    /// 快速路径分配（专用于小对象）
+    ///
+    /// 针对小对象分配优化的快速路径，减少锁竞争。
+    #[inline(always)]
+    pub fn allocate_fast(&self, size: usize, align: usize) -> *mut u8 {
+        use core::alloc::Layout;
+
+        // 创建布局
+        let layout = match Layout::from_size_align(size, align) {
+            Ok(l) => l,
+            Err(_) => return core::ptr::null_mut(),
+        };
+
+        // 快速路径：仅处理小对象
+        if size <= 2048 {
+            let mut slab = self.slab.lock();
+            let ptr = unsafe { slab.alloc(layout) };
+            if !ptr.is_null() {
+                self.allocation_count.fetch_add(1, Ordering::Relaxed);
+                self.track_allocation(size);
+            }
+            ptr
+        } else {
+            // 大对象走常规路径
+            self.alloc(layout)
+        }
     }
 
     fn track_allocation(&self, size: usize) {

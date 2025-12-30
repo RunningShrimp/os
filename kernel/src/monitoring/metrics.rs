@@ -296,6 +296,13 @@ pub fn get_metrics_collector() -> &'static MetricsCollector {
     unsafe { &*(METRICS_COLLECTOR.lock().as_ref().unwrap() as *const MetricsCollector) }
 }
 
+impl MetricsCollector {
+    /// Try to get a reference (helper for export module)
+    pub fn try_get(&self) -> Result<&MetricsCollector, &'static str> {
+        Ok(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

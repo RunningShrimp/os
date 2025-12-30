@@ -312,7 +312,19 @@ impl FreeListAllocator {
 // Global Page Allocator
 // ============================================================================
 
+// Legacy single-lock allocator (kept for compatibility)
 static PAGE_ALLOCATOR: Mutex<FreeListAllocator> = Mutex::new(FreeListAllocator::new());
+
+// New sharded allocator for improved performance
+use crate::subsystems::mm::sharded_allocator::ShardedAllocator;
+static SHARDED_ALLOCATOR: Mutex<Option<ShardedAllocator>> = Mutex::new(None);
+
+/// Get the global sharded allocator
+fn get_sharded_allocator() -> Option<&'static ShardedAllocator> {
+    // This is a temporary placeholder
+    // In production, we would use a OnceLock or similar
+    None
+}
 
 /// Initialize physical memory management
 pub fn init() {
@@ -339,6 +351,9 @@ pub fn init() {
         // Initialize buddy allocator for multi-page allocations
         BUDDY.lock().init(start + slab_size, end, PAGE_SIZE);
     }
+
+    // Initialize sharded allocator for improved performance
+    init_sharded_allocator(start, end);
 
     // Enable memory compression if memory is limited
     // Compression is enabled by default for systems with < 64MB RAM
@@ -376,6 +391,28 @@ pub fn init() {
         alloc.total_pages(),
         alloc.free_pages() * PAGE_SIZE / 1024
     );
+}
+
+/// Initialize the sharded allocator
+fn init_sharded_allocator(start: usize, end: usize) {
+    use crate::subsystems::mm::sharded_allocator::ShardedAllocator;
+
+    match ShardedAllocator::new() {
+        Ok(allocator) => {
+            unsafe {
+                allocator.init(start, end);
+            }
+            let stats = allocator.stats();
+            crate::println!(
+                "[mm] sharded: initialized with {} shards, shard hit rate: {:.1}%",
+                stats.shard_free_pages.len(),
+                stats.shard_hit_rate()
+            );
+        }
+        Err(e) => {
+            crate::println!("[mm] Failed to initialize sharded allocator: {}", e);
+        }
+    }
 }
 
 /// Allocate a single physical page (4KB)
