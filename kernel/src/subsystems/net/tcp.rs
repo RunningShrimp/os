@@ -7,9 +7,13 @@ use alloc::vec::Vec;
 
 use super::ipv4::Ipv4Addr;
 
+pub mod batch_ack;
 pub mod congestion;
 pub mod manager;
 pub mod state;
+
+#[cfg(test)]
+mod integration_tests;
 
 /// TCP header
 #[derive(Debug, Clone, Copy)]
@@ -800,6 +804,12 @@ pub struct TcpConfig {
     pub enable_fast_recovery: bool,
     pub initial_cwnd: u32,
     pub max_retransmit_attempts: u32,
+    /// Enable batch ACK aggregation
+    pub enable_batch_ack: bool,
+    /// ACK aggregation threshold
+    pub batch_ack_threshold: usize,
+    /// ACK aggregation timeout (milliseconds)
+    pub batch_ack_timeout_ms: u64,
 }
 
 impl Default for TcpConfig {
@@ -815,6 +825,9 @@ impl Default for TcpConfig {
             enable_fast_recovery: true,
             initial_cwnd: 10 * 1460,
             max_retransmit_attempts: 5,
+            enable_batch_ack: true,
+            batch_ack_threshold: 4,
+            batch_ack_timeout_ms: 40,
         }
     }
 }

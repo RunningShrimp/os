@@ -17,7 +17,7 @@ pub type DeviceId = u32;
 pub type DriverId = u32;
 
 /// 设备类型
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DeviceType {
     /// 字符设备
     Character,

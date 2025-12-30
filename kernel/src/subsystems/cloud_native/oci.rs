@@ -956,3 +956,6 @@ pub fn update_oci_container_state(container_id: &str) -> Result<(), i32> {
     let runtime = get_oci_runtime().ok_or(EIO)?;
     runtime.update_container_state(container_id)
 }
+
+// 导出OCI规范模块
+pub mod spec;

@@ -1074,3 +1074,6 @@ fn nos_api_error_to_i32(_error: nos_api::Error) -> i32 {
 fn get_current_pid() -> u32 {
     crate::syscalls::process::getpid() as u32
 }
+
+// 导出增强命名空间模块
+pub mod enhanced;

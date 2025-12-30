@@ -18,6 +18,12 @@ pub mod pci_device_manager;
 pub mod usb_device_manager;
 pub mod gpu_driver_framework;
 
+// 新增驱动框架模块
+pub mod framework;
+pub mod base;
+pub mod pci_msi;
+pub mod examples;
+
 // Selectively re-export to avoid naming conflicts
 pub use driver_manager::{DriverManager, DriverManagerConfig, DriverStatistics, get_driver_manager};
 pub use driver_manager::{DeviceId, DriverId};
@@ -36,3 +42,17 @@ pub use basic_drivers::*;
 // Note: HotplugEventType is defined in both pci and usb modules - import from pci to avoid conflict
 pub use pci_device_manager::{PciDeviceManager, PciAddress, PciConfigHeader, PciDeviceInfo, HotplugEventType, init as pci_init, get_pci_device_manager};
 pub use usb_device_manager::{UsbDeviceManager, init as usb_init, get_usb_device_manager};
+
+// 导出新框架
+pub use framework::{
+    Device, DeviceIdentifier, Driver as FrameworkDriver,
+    PowerState, DriverManager as FrameworkDriverManager,
+    Irq, IrqType, IrqTriggerMode
+};
+pub use base::{BaseDriver, GenericDevice, DriverBuilder};
+pub use pci_msi::{MsiManager, MsiVector, MsiXTable};
+pub use examples::{
+    VirtualDriver, CharDeviceDriver, CharDeviceType,
+    create_virtual_driver, create_null_driver, create_zero_driver,
+    create_random_driver, create_tty_driver
+};

@@ -1,18 +1,45 @@
 //! Optimized TCP Protocol Stack
 //!
-//! This module provides high-performance TCP implementation including:
-//! - Zero-copy packet processing
+//! # DEPRECATED
+//!
+//! This module is maintained for backward compatibility with existing tests.
+//! The optimized features have been integrated into the main TCP implementation:
+//!
+//! - **BBR Congestion Control**: Now in `tcp::congregation` (more complete implementation)
+//! - **Batch ACK Aggregation**: Now in `tcp::batch_ack` (with full integration)
+//! - **Connection Pool**: Features integrated into `tcp::manager`
+//! - **Lock-free Queues**: Available in `sync::lockfree`
+//!
+//! ## Migration Guide
+//!
+//! If you're using this module, consider migrating to the main TCP implementation:
+//!
+//! ```rust,ignore
+//! // Old (this module)
+//! use nos_kernel::net::tcp_optimized::OptimizedTcpStack;
+//!
+//! // New (recommended)
+//! use nos_kernel::net::tcp::{
+//!     TcpConfig,
+//!     manager::TcpConnectionManager,
+//!     congestion::{CongestionControl, Bbr},
+//!     batch_ack::BatchAckAggregator,
+//! };
+//! ```
+//!
+//! ## What Was Not Migrated
+//!
+//! - "Zero-copy" I/O: Requires DMA and page mapping support not yet available
+//! - `OptimizedTcpStack`: Monolithic design incompatible with modular architecture
+//!
+//! ## Original Documentation
+//!
+//! This module provided high-performance TCP implementation including:
+//! - Zero-copy packet processing (conceptual)
 //! - Connection pooling and reuse
 //! - Optimized congestion control
-//! - Batch ACK processing
-//! - Lock-free packet queues
-//!
-//! Features:
-//! - Zero-copy data transfer
-//! - Connection cache for fast reuse
-//! - BBR-like congestion control
-//! - SACK-based loss recovery
-//! - Batch ACK aggregation
+//! - Batch ACK processing (now in tcp::batch_ack)
+//! - Lock-free packet queues (now in sync::lockfree)
 
 use alloc::collections::BTreeMap;
 use core::sync::atomic;

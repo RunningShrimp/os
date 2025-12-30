@@ -1043,3 +1043,6 @@ pub fn get_active_container_count() -> usize {
 fn get_current_time() -> u64 {
     crate::subsystems::time::rdtsc() as u64
 }
+
+// 导出容器管理器模块
+pub mod manager;
