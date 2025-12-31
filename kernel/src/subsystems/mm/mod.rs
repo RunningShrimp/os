@@ -171,6 +171,7 @@ pub mod madvise;
 pub mod phys;
 pub mod slab;
 pub mod vm;
+pub mod vm_arch;  // Architecture-specific VM operations (moved from vm/arch)
 
 // Advanced memory management extensions
 pub mod api;

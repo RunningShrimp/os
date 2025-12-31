@@ -71,7 +71,8 @@ pub type PhysFrame = PhysAddr;
 pub mod mmap;
 pub mod protection;
 pub mod lock;
-pub mod arch;
+// Note: arch module has been moved to kernel/src/subsystems/mm/vm_arch.rs
+// This reduces nesting depth from 4 levels (mm/vm/arch) to 3 levels (mm/vm_arch)
 
 // 重新导出常用类型和函数
 pub use mmap::*;
