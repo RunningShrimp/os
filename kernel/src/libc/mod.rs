@@ -14,7 +14,7 @@
 
 extern crate alloc;
 
-use core::ffi::{c_char, c_double, c_int, c_uint, c_void};
+use core::ffi::{c_char, c_int, c_uint, c_void};
 // 核心接口和 errors handling
 pub mod config;
 pub mod error;
@@ -68,8 +68,8 @@ static mut CLIB_INITIALIZED: bool = false;
 ///
 /// # 返回值
 /// * `Ok(())` - 初始化成功
-/// * `Err(String)` - 初始化失败，包含错误描述
-pub fn init() -> Result<(), String> {
+/// * `Err(alloc::string::String)` - 初始化失败，包含错误描述
+pub fn init() -> Result<(), alloc::string::String> {
     if unsafe { CLIB_INITIALIZED } {
         crate::println!("[libc] C库已经初始化，跳过重复初始化");
         return Ok(());
@@ -107,7 +107,7 @@ pub fn init() -> Result<(), String> {
 
     // 4. 初始化C库实例
     if let Err(e) = libc_impl.initialize() {
-        return Err(format!("C库实例初始化失败: {:?}", e));
+        return Err(alloc::format!("C库实例初始化失败: {:?}", e));
     }
 
     // 5. 设置全局接口
@@ -246,7 +246,8 @@ pub mod convenience {
         if format.is_null() {
             return -1;
         }
-        let fmt_str = core::ffi::CStr::from_ptr(format).to_str().unwrap_or("");
+        // SAFETY: The caller ensures format is a valid null-terminated C string
+        let fmt_str = unsafe { core::ffi::CStr::from_ptr(format).to_str().unwrap_or("") };
         crate::print!("{}", fmt_str);
         fmt_str.len() as c_int
     }

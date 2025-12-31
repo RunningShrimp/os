@@ -9,7 +9,7 @@
 
 extern crate alloc;
 
-use alloc::{collections::BTreeMap, string::String};
+use alloc::{collections::BTreeMap, string::String, string::ToString};
 
 use crate::compat::*;
 /// Linux compatibility module
@@ -42,11 +42,11 @@ impl PlatformModule for LinuxModule {
         true
     }
 
-    fn initialize(&mut self) -> Result<(), &'static str> {
+    fn initialize(&mut self) -> Result<()> {
         Ok(())
     }
 
-    fn shutdown(&mut self) -> Result<(), &'static str> {
+    fn shutdown(&mut self) -> Result<()> {
         Ok(())
     }
 }

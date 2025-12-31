@@ -3,6 +3,7 @@
 //! 提供统一的errno错误码管理和错误处理功能，确保所有C库实现使用一致的错误处理机制。
 
 use core::ffi::c_int;
+use core::sync::atomic::{AtomicI32, Ordering};
 
 use heapless::Vec;
 
@@ -302,13 +303,12 @@ pub fn strerror(error_code: c_int) -> &'static str {
         errno::EL2HLT => "Level 2 halted",
         errno::ETIME => "Timer expired",
         errno::EREMOTE => "Remote I/O error",
-        errno::EPROTO => "Protocol error",
         errno::EMULTIHOP => "Multihop attempted",
         errno::EDOTDOT => "RFS specific error",
         errno::EMSGSIZE => "Message too long",
         errno::EPROTONOSUPPORT => "Protocol not supported",
         errno::ESOCKTNOSUPPORT => "Socket type not supported",
-        errno::ENOTSUP | errno::EOPNOTSUPP => "Operation not supported",
+        errno::ENOTSUP => "Operation not supported",
         errno::EPFNOSUPPORT => "Protocol family not supported",
         errno::EAFNOSUPPORT => "Address family not supported",
         errno::EADDRINUSE => "Address already in use",

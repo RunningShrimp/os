@@ -9,7 +9,37 @@ use super::{
     signalfd::{sys_signalfd, sys_signalfd4},
     timerfd::{sys_timerfd_create, sys_timerfd_gettime, sys_timerfd_settime},
 };
-use crate::error::SyscallError;
+use crate::subsystems::syscalls::interface::InterfaceSyscallError;
+
+/// Wrapper functions to convert syscall results to FastPathHandler expected type
+/// The FastPathHandler type is: fn(u32, &[u64]) -> Result<u64, InterfaceSyscallError>
+fn wrap_eventfd(_num: u32, args: &[u64]) -> Result<u64, InterfaceSyscallError> {
+    sys_eventfd(args).map(|v| v as u64)
+}
+
+fn wrap_eventfd2(_num: u32, args: &[u64]) -> Result<u64, InterfaceSyscallError> {
+    sys_eventfd2(args).map(|v| v as u64)
+}
+
+fn wrap_timerfd_create(_num: u32, args: &[u64]) -> Result<u64, InterfaceSyscallError> {
+    sys_timerfd_create(args).map(|v| v as u64)
+}
+
+fn wrap_timerfd_settime(_num: u32, args: &[u64]) -> Result<u64, InterfaceSyscallError> {
+    sys_timerfd_settime(args).map(|v| v as u64)
+}
+
+fn wrap_timerfd_gettime(_num: u32, args: &[u64]) -> Result<u64, InterfaceSyscallError> {
+    sys_timerfd_gettime(args).map(|v| v as u64)
+}
+
+fn wrap_signalfd(_num: u32, args: &[u64]) -> Result<u64, InterfaceSyscallError> {
+    sys_signalfd(args).map(|v| v as u64)
+}
+
+fn wrap_signalfd4(_num: u32, args: &[u64]) -> Result<u64, InterfaceSyscallError> {
+    sys_signalfd4(args).map(|v| v as u64)
+}
 
 /// System call numbers for POSIX file descriptor syscalls
 pub mod syscall_numbers {
@@ -30,23 +60,23 @@ pub mod syscall_numbers {
 }
 
 /// Register POSIX file descriptor system calls with the unified dispatcher
-pub fn register_posix_fd_syscalls() -> Result<(), SyscallError> {
-    let dispatcher_mutex = get_unified_dispatcher().ok_or(SyscallError::SystemError)?;
+pub fn register_posix_fd_syscalls() -> Result<(), crate::subsystems::syscalls::interface::InterfaceSyscallError> {
+    let dispatcher_mutex = get_unified_dispatcher()
+        .ok_or(crate::subsystems::syscalls::interface::InterfaceSyscallError::InterfaceNotFound)?;
 
     let dispatcher = dispatcher_mutex.lock();
     if let Some(ref d) = *dispatcher {
         use syscall_numbers::*;
 
         // Register fast-path handlers for these syscalls
-        // Wrap functions to match FastPathHandler signature: fn(u32, &[u64]) -> Result<u64,
-        // SyscallError>
-        d.register_fast_path(SYS_EVENTFD, |_num, args| sys_eventfd(args))?;
-        d.register_fast_path(SYS_EVENTFD2, |_num, args| sys_eventfd2(args))?;
-        d.register_fast_path(SYS_TIMERFD_CREATE, |_num, args| sys_timerfd_create(args))?;
-        d.register_fast_path(SYS_TIMERFD_SETTIME, |_num, args| sys_timerfd_settime(args))?;
-        d.register_fast_path(SYS_TIMERFD_GETTIME, |_num, args| sys_timerfd_gettime(args))?;
-        d.register_fast_path(SYS_SIGNALFD, |_num, args| sys_signalfd(args))?;
-        d.register_fast_path(SYS_SIGNALFD4, |_num, args| sys_signalfd4(args))?;
+        // The wrapper functions already match FastPathHandler signature: fn(u32, &[u64]) -> Result<u64, InterfaceSyscallError>
+        d.register_fast_path(SYS_EVENTFD, wrap_eventfd)?;
+        d.register_fast_path(SYS_EVENTFD2, wrap_eventfd2)?;
+        d.register_fast_path(SYS_TIMERFD_CREATE, wrap_timerfd_create)?;
+        d.register_fast_path(SYS_TIMERFD_SETTIME, wrap_timerfd_settime)?;
+        d.register_fast_path(SYS_TIMERFD_GETTIME, wrap_timerfd_gettime)?;
+        d.register_fast_path(SYS_SIGNALFD, wrap_signalfd)?;
+        d.register_fast_path(SYS_SIGNALFD4, wrap_signalfd4)?;
     }
 
     Ok(())

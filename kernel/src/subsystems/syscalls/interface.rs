@@ -2,11 +2,10 @@
 //!
 //! This module defines the core interfaces and traits for system call handling.
 
-use alloc::sync::Arc;
-
+use alloc::vec::Vec;
 
 /// Interface system call error
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum InterfaceSyscallError {
     /// Invalid interface ID
     InvalidInterface,
@@ -21,16 +20,46 @@ pub enum InterfaceSyscallError {
     /// Invalid argument
     InvalidArgument,
     /// System call failed
-    SyscallFailed(crate::api::SyscallError),
+    SyscallFailed(crate::error::SyscallError),
+    /// Operation not permitted
+    OperationNotPermitted,
+    /// Not found
+    NotFound,
+    /// Operation would block
+    WouldBlock,
+    /// Out of memory
+    OutOfMemory,
+    /// File exists
+    FileExists,
+    /// No space left on device
+    NoSpaceLeft,
+    /// Broken pipe
+    BrokenPipe,
+    /// Connection refused
+    ConnectionRefused,
+    /// Connection reset
+    ConnectionReset,
+    /// Operation timed out
+    TimedOut,
+    /// Name too long
+    NameTooLong,
+    /// Deadlock would occur
+    DeadlockWouldOccur,
+    /// Bad file descriptor
+    BadFileDescriptor,
+    /// No buffer space available
+    NoBufferSpace,
+    /// I/O error
+    IoError,
 }
 
 /// System call arguments
 pub type SyscallArgs = [u64; 6];
 
 /// System call result type
-pub type SyscallResult<T> = core::result::Result<T, InterfaceSyscallError>;
+pub type SyscallResult<T> = core::result::Result<T, SyscallError>;
 
-/// SyscallError type alias for compatibility
+/// SyscallError type alias - use InterfaceSyscallError for consistency
 pub type SyscallError = InterfaceSyscallError;
 
 /// System call number
@@ -90,7 +119,11 @@ pub trait SyscallDispatcher {
 /// System call handler trait
 ///
 /// This trait must be implemented by all system call handlers.
-pub trait SyscallHandler {
+///
+/// # Safety
+/// Implementations must be thread-safe (Send + Sync) since handlers
+/// can be invoked from multiple threads concurrently.
+pub trait SyscallHandler: Send + Sync {
     /// Get the system call number this handler handles
     ///
     /// # Returns
@@ -109,14 +142,14 @@ pub trait SyscallHandler {
     /// * `args` - System call arguments
     ///
     /// # Returns
-    /// * `SyscallResult<i64> - Result of the system call
+    /// * `SyscallResult<()> - Result of the system call
     fn handle(&self, args: &[u64]) -> SyscallResult<()>;
 }
 
 /// System call context trait
 ///
 /// This trait provides access to system call context information.
-pub trait SyscallContext {
+pub trait SyscallContext: Send + Sync {
     /// Get the current process ID
     ///
     /// # Returns
@@ -245,5 +278,70 @@ pub fn get_syscall_category(num: u32) -> Option<SyscallCategory> {
         0xE000..=0xEFFF => Some(SyscallCategory::Realtime),
         0xF000..=0xFFFF => Some(SyscallCategory::Security),
         _ => None,
+    }
+}
+
+// Implement From conversions between InterfaceSyscallError and crate::error::SyscallError
+impl From<crate::error::SyscallError> for InterfaceSyscallError {
+    fn from(error: crate::error::SyscallError) -> Self {
+        match error {
+            crate::error::SyscallError::InvalidSyscall => InterfaceSyscallError::InvalidInterface,
+            crate::error::SyscallError::PermissionDenied => InterfaceSyscallError::PermissionDenied,
+            crate::error::SyscallError::InvalidArgument => InterfaceSyscallError::InvalidArgument,
+            crate::error::SyscallError::NotFound => InterfaceSyscallError::NotFound,
+            crate::error::SyscallError::OutOfMemory => InterfaceSyscallError::OutOfMemory,
+            crate::error::SyscallError::Interrupted => InterfaceSyscallError::SyscallFailed(crate::error::SyscallError::Interrupted),
+            crate::error::SyscallError::IoError => InterfaceSyscallError::IoError,
+            crate::error::SyscallError::WouldBlock => InterfaceSyscallError::WouldBlock,
+            crate::error::SyscallError::NotSupported => InterfaceSyscallError::NotSupported,
+            crate::error::SyscallError::NotImplemented => InterfaceSyscallError::NotSupported,
+            crate::error::SyscallError::BadFileDescriptor => InterfaceSyscallError::BadFileDescriptor,
+            crate::error::SyscallError::TooManyOpenFiles => InterfaceSyscallError::ResourceBusy,
+            crate::error::SyscallError::NoBufferSpace => InterfaceSyscallError::NoBufferSpace,
+            crate::error::SyscallError::NotADirectory => InterfaceSyscallError::InvalidArgument,
+            crate::error::SyscallError::IsADirectory => InterfaceSyscallError::InvalidArgument,
+            crate::error::SyscallError::DirectoryNotEmpty => InterfaceSyscallError::InvalidArgument,
+            crate::error::SyscallError::FileExists => InterfaceSyscallError::FileExists,
+            crate::error::SyscallError::NoSpaceLeft => InterfaceSyscallError::NoSpaceLeft,
+            crate::error::SyscallError::BadAddress => InterfaceSyscallError::InvalidArgument,
+            crate::error::SyscallError::DeadlockWouldOccur => InterfaceSyscallError::DeadlockWouldOccur,
+            crate::error::SyscallError::NameTooLong => InterfaceSyscallError::NameTooLong,
+            crate::error::SyscallError::ConnectionRefused => InterfaceSyscallError::ConnectionRefused,
+            crate::error::SyscallError::ConnectionReset => InterfaceSyscallError::ConnectionReset,
+            crate::error::SyscallError::BrokenPipe => InterfaceSyscallError::BrokenPipe,
+            crate::error::SyscallError::TimedOut => InterfaceSyscallError::TimedOut,
+            crate::error::SyscallError::NoProcess => InterfaceSyscallError::NotFound,
+            crate::error::SyscallError::OperationNotPermitted => InterfaceSyscallError::OperationNotPermitted,
+            _ => InterfaceSyscallError::SyscallFailed(error),
+        }
+    }
+}
+
+impl From<InterfaceSyscallError> for crate::error::SyscallError {
+    fn from(error: InterfaceSyscallError) -> Self {
+        match error {
+            InterfaceSyscallError::InvalidInterface => crate::error::SyscallError::InvalidSyscall,
+            InterfaceSyscallError::InterfaceNotFound => crate::error::SyscallError::NotFound,
+            InterfaceSyscallError::NotSupported => crate::error::SyscallError::NotSupported,
+            InterfaceSyscallError::PermissionDenied => crate::error::SyscallError::PermissionDenied,
+            InterfaceSyscallError::ResourceBusy => crate::error::SyscallError::Interrupted,
+            InterfaceSyscallError::InvalidArgument => crate::error::SyscallError::InvalidArgument,
+            InterfaceSyscallError::SyscallFailed(err) => err,
+            InterfaceSyscallError::OperationNotPermitted => crate::error::SyscallError::OperationNotPermitted,
+            InterfaceSyscallError::NotFound => crate::error::SyscallError::NotFound,
+            InterfaceSyscallError::WouldBlock => crate::error::SyscallError::WouldBlock,
+            InterfaceSyscallError::OutOfMemory => crate::error::SyscallError::OutOfMemory,
+            InterfaceSyscallError::FileExists => crate::error::SyscallError::FileExists,
+            InterfaceSyscallError::NoSpaceLeft => crate::error::SyscallError::NoSpaceLeft,
+            InterfaceSyscallError::BrokenPipe => crate::error::SyscallError::BrokenPipe,
+            InterfaceSyscallError::ConnectionRefused => crate::error::SyscallError::ConnectionRefused,
+            InterfaceSyscallError::ConnectionReset => crate::error::SyscallError::ConnectionReset,
+            InterfaceSyscallError::TimedOut => crate::error::SyscallError::TimedOut,
+            InterfaceSyscallError::NameTooLong => crate::error::SyscallError::NameTooLong,
+            InterfaceSyscallError::DeadlockWouldOccur => crate::error::SyscallError::DeadlockWouldOccur,
+            InterfaceSyscallError::BadFileDescriptor => crate::error::SyscallError::BadFileDescriptor,
+            InterfaceSyscallError::NoBufferSpace => crate::error::SyscallError::NoBufferSpace,
+            InterfaceSyscallError::IoError => crate::error::SyscallError::IoError,
+        }
     }
 }

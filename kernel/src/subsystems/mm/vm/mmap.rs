@@ -2,16 +2,30 @@
 //!
 //! 提供mmap/munmap等内存映射相关的系统调用实现
 
-extern crate alloc;
-
 use alloc::vec::Vec;
-use alloc::sync::Arc;
 
-use crate::subsystems::sync::Mutex;
-use crate::subsystems::mm::types::*;
-use crate::subsystems::mm::PageTable;
-use crate::subsystems::mm::vm::{VmSpace, VmRegion, VmRegionType, VmError};
+use crate::subsystems::mm::vm::{VmRegion, VmRegionType, VmError, PAGE_SIZE};
+use crate::subsystems::mm::PhysAddr;
 use crate::subsystems::syscalls::common::SyscallResult;
+use crate::types::MapFlags;
+use crate::error::SyscallError;
+
+/// Physical frame type - alias for physical address
+pub type PhysFrame = PhysAddr;
+
+/// Convert VmError to SyscallError
+impl From<VmError> for SyscallError {
+    fn from(err: VmError) -> Self {
+        match err {
+            VmError::InvalidAddress => SyscallError::BadAddress,
+            VmError::OutOfMemory => SyscallError::OutOfMemory,
+            VmError::PermissionDenied => SyscallError::PermissionDenied,
+            VmError::Overlap => SyscallError::InvalidArgument,
+            VmError::Alignment => SyscallError::InvalidArgument,
+            VmError::Other => SyscallError::IoError,
+        }
+    }
+}
 
 /// 创建内存映射
 ///
@@ -27,14 +41,14 @@ use crate::subsystems::syscalls::common::SyscallResult;
 pub fn sys_mmap(
     addr: Option<usize>,
     length: usize,
-    flags: MapFlags,
+    flags: u32,
     fd: isize,
-    offset: usize,
+    _offset: usize,
 ) -> SyscallResult<i64> {
     // 获取当前地址空间
     let vm_space = crate::subsystems::mm::vm::vm_manager().lock()
         .current_space()
-        .map_err(|_| SyscallError::EINVAL)?;
+        .map_err(|_| SyscallError::InvalidArgument)?;
 
     // 对齐长度到页边界
     let aligned_length = (length + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
@@ -45,8 +59,11 @@ pub fn sys_mmap(
         (addr + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE
     } else {
         // 自动分配地址
-        vm_space.allocate(aligned_length).map_err(|_| SyscallError::ENOMEM)?
+        vm_space.allocate(aligned_length).map_err(|_| SyscallError::OutOfMemory)?
     };
+
+    // 转换flags为MapFlags
+    let map_flags = MapFlags::from_bits(flags);
 
     // 创建内存区域
     let region = if fd == -1 {
@@ -55,26 +72,26 @@ pub fn sys_mmap(
             start: map_addr,
             end: map_addr + aligned_length,
             frames: allocate_physical_frames(aligned_length / PAGE_SIZE)?,
-            flags,
+            flags: map_flags,
             offset: 0,
             region_type: VmRegionType::Anonymous,
         }
     } else {
         // 文件映射
         // TODO: 实现文件映射
-        return Err(SyscallError::ENOSYS);
+        return Err(SyscallError::NotSupported);
     };
 
     // 添加到地址空间
-    vm_space.add_region(region.clone()).map_err(|_| SyscallError::ENOMEM)?;
+    vm_space.add_region(region.clone()).map_err(|_| SyscallError::OutOfMemory)?;
 
     // 映射物理页到虚拟地址
     for (i, &frame) in region.frames.iter().enumerate() {
         let virt = region.start + i * PAGE_SIZE;
-        vm_space.map(virt, frame, flags).map_err(|_| SyscallError::ENOMEM)?;
+        vm_space.map(virt, frame, map_flags).map_err(|_| SyscallError::OutOfMemory)?;
     }
 
-    Ok(map_addr as isize)
+    Ok(map_addr as i64)
 }
 
 /// 取消内存映射
@@ -89,27 +106,27 @@ pub fn sys_munmap(addr: usize, length: usize) -> SyscallResult<i64> {
     // 获取当前地址空间
     let vm_space = crate::subsystems::mm::vm::vm_manager().lock()
         .current_space()
-        .map_err(|_| SyscallError::EINVAL)?;
+        .map_err(|_| SyscallError::InvalidArgument)?;
 
     // 对齐长度到页边界
     let aligned_length = (length + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
 
     // 查找内存区域
-    let region = vm_space.find_region(addr).ok_or(SyscallError::EINVAL)?;
+    let region = vm_space.find_region(addr).ok_or(SyscallError::InvalidArgument)?;
 
     // 检查长度是否匹配
     if region.end - region.start != aligned_length {
-        return Err(SyscallError::EINVAL);
+        return Err(SyscallError::InvalidArgument);
     }
 
     // 取消映射所有页
     for i in 0..(aligned_length / PAGE_SIZE) {
         let virt = region.start + i * PAGE_SIZE;
-        vm_space.unmap(virt).map_err(|_| SyscallError::EINVAL)?;
+        vm_space.unmap(virt).map_err(|_| SyscallError::InvalidArgument)?;
     }
 
     // 移除内存区域
-    vm_space.remove_region(region.start).map_err(|_| SyscallError::EINVAL)?;
+    vm_space.remove_region(region.start).map_err(|_| SyscallError::InvalidArgument)?;
 
     // 释放物理页
     free_physical_frames(&region.frames);
@@ -131,23 +148,23 @@ pub fn sys_mremap(
     old_addr: usize,
     old_size: usize,
     new_size: usize,
-    flags: Option<MapFlags>,
+    _flags: Option<u32>,
 ) -> SyscallResult<i64> {
     // 获取当前地址空间
     let vm_space = crate::subsystems::mm::vm::vm_manager().lock()
         .current_space()
-        .map_err(|_| SyscallError::EINVAL)?;
+        .map_err(|_| SyscallError::InvalidArgument)?;
 
     // 对齐大小到页边界
     let aligned_old_size = (old_size + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
     let aligned_new_size = (new_size + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
 
     // 查找旧区域
-    let old_region = vm_space.find_region(old_addr).ok_or(SyscallError::EINVAL)?;
+    let old_region = vm_space.find_region(old_addr).ok_or(SyscallError::InvalidArgument)?;
 
     // 如果大小相同，直接返回
     if aligned_old_size == aligned_new_size {
-        return Ok(old_addr as isize);
+        return Ok(old_addr as i64);
     }
 
     // 如果新大小更小，截断区域
@@ -155,7 +172,7 @@ pub fn sys_mremap(
         // 取消映射多余的页
         for i in (aligned_new_size / PAGE_SIZE)..(aligned_old_size / PAGE_SIZE) {
             let virt = old_region.start + i * PAGE_SIZE;
-            vm_space.unmap(virt).map_err(|_| SyscallError::EINVAL)?;
+            vm_space.unmap(virt).map_err(|_| SyscallError::InvalidArgument)?;
         }
 
         // 更新区域
@@ -163,17 +180,17 @@ pub fn sys_mremap(
         new_region.end = new_region.start + aligned_new_size;
         new_region.frames.truncate(aligned_new_size / PAGE_SIZE);
 
-        vm_space.remove_region(old_region.start).map_err(|_| SyscallError::EINVAL)?;
-        vm_space.add_region(new_region).map_err(|_| SyscallError::EINVAL)?;
+        vm_space.remove_region(old_region.start).map_err(|_| SyscallError::InvalidArgument)?;
+        vm_space.add_region(new_region).map_err(|_| SyscallError::InvalidArgument)?;
 
-        return Ok(old_addr as isize);
+        return Ok(old_addr as i64);
     }
 
     // 新大小更大，需要扩展
     // 检查是否有足够空间
     let new_end = old_region.start + aligned_new_size;
     if new_end > vm_space.end_addr {
-        return Err(SyscallError::ENOMEM);
+        return Err(SyscallError::OutOfMemory);
     }
 
     // 分配新的物理页
@@ -190,14 +207,14 @@ pub fn sys_mremap(
     for (i, &frame) in additional_frames.iter().enumerate() {
         let virt = old_region.start + aligned_old_size + i * PAGE_SIZE;
         let flags = old_region.flags;
-        vm_space.map(virt, frame, flags).map_err(|_| SyscallError::ENOMEM)?;
+        vm_space.map(virt, frame, flags).map_err(|_| SyscallError::OutOfMemory)?;
     }
 
     // 更新区域
-    vm_space.remove_region(old_region.start).map_err(|_| SyscallError::EINVAL)?;
-    vm_space.add_region(new_region).map_err(|_| SyscallError::EINVAL)?;
+    vm_space.remove_region(old_region.start).map_err(|_| SyscallError::InvalidArgument)?;
+    vm_space.add_region(new_region).map_err(|_| SyscallError::InvalidArgument)?;
 
-    Ok(old_addr as isize)
+    Ok(old_addr as i64)
 }
 
 /// 同步内存映射到文件
@@ -209,34 +226,23 @@ pub fn sys_mremap(
 ///
 /// # 返回
 /// 成功时返回0，失败时返回错误
-pub fn sys_msync(addr: usize, length: usize, flags: MsyncFlags) -> SyscallResult<i64> {
+pub fn sys_msync(addr: usize, _length: usize, _flags: u32) -> SyscallResult<i64> {
     // 获取当前地址空间
     let vm_space = crate::subsystems::mm::vm::vm_manager().lock()
         .current_space()
-        .map_err(|_| SyscallError::EINVAL)?;
+        .map_err(|_| SyscallError::InvalidArgument)?;
 
     // 查找内存区域
-    let region = vm_space.find_region(addr).ok_or(SyscallError::EINVAL)?;
+    let region = vm_space.find_region(addr).ok_or(SyscallError::InvalidArgument)?;
 
     // 如果是文件映射，同步到文件
     if region.region_type == VmRegionType::File {
         // TODO: 实现文件同步
-        return Err(SyscallError::ENOSYS);
+        return Err(SyscallError::NotSupported);
     }
 
     // 匿名映射不需要同步
     Ok(0)
-}
-
-/// 内存同步标志
-#[derive(Debug, Clone, Copy)]
-pub struct MsyncFlags {
-    /// 异步同步
-    pub r#async: bool,
-    /// 使同步无效
-    pub invalidate: bool,
-    /// 同步元数据
-    pub sync: bool,
 }
 
 // ============================================================================
@@ -257,7 +263,7 @@ fn allocate_physical_frames(count: usize) -> Result<Vec<PhysFrame>, VmError> {
 }
 
 /// 释放物理页帧
-fn free_physical_frames(frames: &[PhysFrame]) {
+fn free_physical_frames(_frames: &[PhysFrame]) {
     // TODO: 实现真正的物理页释放
 }
 
@@ -271,14 +277,14 @@ mod tests {
 
     #[test]
     fn test_mmap_anonymous() {
-        let result = sys_mmap(None, 4096, MapFlags::PROT_READ, -1, 0);
+        let result = sys_mmap(None, 4096, MapFlags::readable(), -1, 0);
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_munmap() {
         // 首先创建映射
-        let addr = sys_mmap(None, 4096, MapFlags::PROT_READ, -1, 0).unwrap();
+        let addr = sys_mmap(None, 4096, MapFlags::readable(), -1, 0).unwrap();
 
         // 然后取消映射
         let result = sys_munmap(addr as usize, 4096);
@@ -288,7 +294,7 @@ mod tests {
     #[test]
     fn test_mremap_expand() {
         // 创建初始映射
-        let addr = sys_mmap(None, 4096, MapFlags::PROT_READ, -1, 0).unwrap();
+        let addr = sys_mmap(None, 4096, MapFlags::readable(), -1, 0).unwrap();
 
         // 扩展映射
         let result = sys_mremap(addr as usize, 4096, 8192, None);
@@ -298,7 +304,7 @@ mod tests {
     #[test]
     fn test_mremap_shrink() {
         // 创建初始映射
-        let addr = sys_mmap(None, 8192, MapFlags::PROT_READ, -1, 0).unwrap();
+        let addr = sys_mmap(None, 8192, MapFlags::readable(), -1, 0).unwrap();
 
         // 缩小映射
         let result = sys_mremap(addr as usize, 8192, 4096, None);

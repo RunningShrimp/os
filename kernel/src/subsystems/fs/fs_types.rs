@@ -2,8 +2,6 @@
 //!
 //! Unified type definitions for file system operations
 
-use alloc::vec::Vec;
-
 /// Block size for file system
 pub const BSIZE: u32 = 1024;
 

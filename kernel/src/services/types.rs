@@ -1,10 +1,9 @@
 //! Service Types Module
-//! 
+//!
 //! This module defines the types and structures used for service registration
 //! and management in the NOS kernel.
 
-use alloc::collections::BTreeMap;
-use alloc::string::String;
+use crate::prelude::*;
 use alloc::sync::Arc;
 use spin::Mutex;
 
@@ -128,29 +127,38 @@ pub trait ServiceInterface: Send + Sync {
     fn version(&self) -> &str;
     
     /// Initialize the service
-    fn initialize(&mut self) -> Result<(), crate::error::KernelError>;
-    
+    fn initialize(&mut self) -> Result<()>;
+
     /// Start the service
-    fn start(&mut self) -> Result<(), crate::error::KernelError>;
-    
+    fn start(&mut self) -> Result<()>;
+
     /// Stop the service
-    fn stop(&mut self) -> Result<(), crate::error::KernelError>;
-    
+    fn stop(&mut self) -> Result<()>;
+
     /// Cleanup the service
-    fn cleanup(&mut self) -> Result<(), crate::error::KernelError>;
-    
+    fn cleanup(&mut self) -> Result<()>;
+
     /// Handle a service request
-    fn handle_request(&mut self, request: &[u8]) -> Result<Vec<u8>, crate::error::KernelError>;
+    fn handle_request(&mut self, request: &[u8]) -> Result<Vec<u8>>;
     
     /// Get the service state
     fn state(&self) -> ServiceState;
 }
 
 /// Service reference
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ServiceRef {
     pub info: ServiceInfo,
     pub interface: Arc<Mutex<dyn ServiceInterface>>,
+}
+
+impl core::fmt::Debug for ServiceRef {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("ServiceRef")
+            .field("info", &self.info)
+            .field("interface", &"<ServiceInterface>")
+            .finish()
+    }
 }
 
 impl ServiceRef {

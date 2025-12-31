@@ -4,22 +4,19 @@
 
 use alloc::string::ToString;
 
-use super::types::*;
-use crate::{
-    error::UnifiedError,
-    subsystems::ipc::enhanced_ipc::{
-        EnhancedIpcMessage, IpcError, MSG_FLAG_NONBLOCK, MSG_PRIORITY_NORMAL, SHM_PERM_READ,
-        SHM_PERM_WRITE, attach_shared_memory, complete_rpc_call, condition_broadcast,
-        condition_signal, condition_wait, create_condition, create_event, create_message_queue,
-        create_mutex, create_rpc_endpoint, create_semaphore, create_shared_memory,
-        delete_shared_memory, detach_shared_memory, event_trigger, event_wait, get_rpc_result,
-        make_rpc_call, mutex_lock, mutex_unlock, receive_message, register_rpc_procedure,
-        semaphore_signal, semaphore_wait, send_message,
-    },
+use crate::prelude::*;
+use crate::subsystems::ipc::enhanced_ipc::{
+    EnhancedIpcMessage, MSG_FLAG_NONBLOCK, MSG_PRIORITY_NORMAL,
+    attach_shared_memory, complete_rpc_call, condition_broadcast,
+    condition_signal, condition_wait, create_condition, create_event, create_message_queue,
+    create_mutex, create_rpc_endpoint, create_semaphore, create_shared_memory,
+    delete_shared_memory, detach_shared_memory, event_trigger, event_wait, get_rpc_result,
+    make_rpc_call, mutex_lock, mutex_unlock, receive_message,
+    semaphore_signal, semaphore_wait, send_message,
 };
 
 /// Handle enhanced_msgq_create system call - create enhanced message queue
-pub fn handle_enhanced_msgq_create(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_msgq_create(args: &[u64]) -> Result<u64> {
     if args.len() != 1 {
         return Err(KernelError::InvalidArgument);
     }
@@ -33,7 +30,7 @@ pub fn handle_enhanced_msgq_create(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_msgq_send system call - send message to enhanced queue
-pub fn handle_enhanced_msgq_send(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_msgq_send(args: &[u64]) -> Result<u64> {
     if args.len() != 4 {
         return Err(KernelError::InvalidArgument);
     }
@@ -41,10 +38,10 @@ pub fn handle_enhanced_msgq_send(args: &[u64]) -> Result<u64, KernelError> {
     let queue_id = args[0] as u32;
     let dst_pid = args[1] as u32;
     let msg_type = args[2] as u32;
-    let data_ptr = args[3] as *const u8;
+    let _data_ptr = args[3] as *const u8;
 
     // Get current process ID
-    let src_pid = crate::process::myproc().map_or(0, |p| p.pid);
+    let src_pid = crate::subsystems::process::myproc().unwrap_or(0) as u32;
 
     // Read message data from user space
     // In a real implementation, we would need to read the data from user space
@@ -52,14 +49,18 @@ pub fn handle_enhanced_msgq_send(args: &[u64]) -> Result<u64, KernelError> {
     let data = vec![0u8; 64]; // Placeholder
 
     // Create message
-    let msg = EnhancedIpcMessage::new(
+    let msg = EnhancedIpcMessage {
+        msg_id: 0, // Will be assigned by the message queue
+        msg_type,
         src_pid,
         dst_pid,
-        msg_type,
-        MSG_PRIORITY_NORMAL,
-        MSG_FLAG_NONBLOCK,
-        &data,
-    );
+        priority: MSG_PRIORITY_NORMAL,
+        flags: MSG_FLAG_NONBLOCK,
+        timestamp: 0, // Will be set by the message queue
+        data,
+        reply_to: None,
+        timeout: None,
+    };
 
     match send_message(queue_id, msg) {
         Ok(()) => Ok(0),
@@ -68,14 +69,14 @@ pub fn handle_enhanced_msgq_send(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_msgq_recv system call - receive message from enhanced queue
-pub fn handle_enhanced_msgq_recv(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_msgq_recv(args: &[u64]) -> Result<u64> {
     if args.len() != 3 {
         return Err(KernelError::InvalidArgument);
     }
 
     let queue_id = args[0] as u32;
     let timeout = args[1] as u32;
-    let msg_ptr = args[2] as *mut u8;
+    let _msg_ptr = args[2] as *mut u8;
 
     match receive_message(queue_id, Some(timeout)) {
         Ok(msg) => {
@@ -88,7 +89,7 @@ pub fn handle_enhanced_msgq_recv(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_shm_create system call - create enhanced shared memory
-pub fn handle_enhanced_shm_create(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_shm_create(args: &[u64]) -> Result<u64> {
     if args.len() != 2 {
         return Err(KernelError::InvalidArgument);
     }
@@ -97,7 +98,7 @@ pub fn handle_enhanced_shm_create(args: &[u64]) -> Result<u64, KernelError> {
     let permissions = args[1] as u32;
 
     // Get current process ID
-    let pid = crate::process::myproc().map_or(0, |p| p.pid);
+    let pid = crate::subsystems::process::myproc().unwrap_or(0) as u32;
 
     match create_shared_memory(size, pid, permissions) {
         Ok(shm_id) => Ok(shm_id as u64),
@@ -106,7 +107,7 @@ pub fn handle_enhanced_shm_create(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_shm_attach system call - attach to enhanced shared memory
-pub fn handle_enhanced_shm_attach(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_shm_attach(args: &[u64]) -> Result<u64> {
     if args.len() != 1 {
         return Err(KernelError::InvalidArgument);
     }
@@ -114,7 +115,7 @@ pub fn handle_enhanced_shm_attach(args: &[u64]) -> Result<u64, KernelError> {
     let shm_id = args[0] as u32;
 
     // Get current process ID
-    let pid = crate::process::myproc().map_or(0, |p| p.pid);
+    let pid = crate::subsystems::process::myproc().unwrap_or(0) as u32;
 
     match attach_shared_memory(shm_id, pid) {
         Ok(addr) => Ok(addr as u64),
@@ -123,7 +124,7 @@ pub fn handle_enhanced_shm_attach(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_shm_detach system call - detach from enhanced shared memory
-pub fn handle_enhanced_shm_detach(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_shm_detach(args: &[u64]) -> Result<u64> {
     if args.len() != 1 {
         return Err(KernelError::InvalidArgument);
     }
@@ -131,7 +132,7 @@ pub fn handle_enhanced_shm_detach(args: &[u64]) -> Result<u64, KernelError> {
     let shm_id = args[0] as u32;
 
     // Get current process ID
-    let pid = crate::process::myproc().map_or(0, |p| p.pid);
+    let pid = crate::subsystems::process::myproc().unwrap_or(0) as u32;
 
     match detach_shared_memory(shm_id, pid) {
         Ok(()) => Ok(0),
@@ -140,7 +141,7 @@ pub fn handle_enhanced_shm_detach(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_shm_delete system call - delete enhanced shared memory
-pub fn handle_enhanced_shm_delete(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_shm_delete(args: &[u64]) -> Result<u64> {
     if args.len() != 1 {
         return Err(KernelError::InvalidArgument);
     }
@@ -148,7 +149,7 @@ pub fn handle_enhanced_shm_delete(args: &[u64]) -> Result<u64, KernelError> {
     let shm_id = args[0] as u32;
 
     // Get current process ID
-    let pid = crate::process::myproc().map_or(0, |p| p.pid);
+    let pid = crate::subsystems::process::myproc().unwrap_or(0) as u32;
 
     match delete_shared_memory(shm_id, pid) {
         Ok(()) => Ok(0),
@@ -157,7 +158,7 @@ pub fn handle_enhanced_shm_delete(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_sem_create system call - create enhanced semaphore
-pub fn handle_enhanced_sem_create(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_sem_create(args: &[u64]) -> Result<u64> {
     if args.len() != 2 {
         return Err(KernelError::InvalidArgument);
     }
@@ -172,7 +173,7 @@ pub fn handle_enhanced_sem_create(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_sem_wait system call - wait on enhanced semaphore
-pub fn handle_enhanced_sem_wait(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_sem_wait(args: &[u64]) -> Result<u64> {
     if args.len() != 2 {
         return Err(KernelError::InvalidArgument);
     }
@@ -187,7 +188,7 @@ pub fn handle_enhanced_sem_wait(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_sem_signal system call - signal enhanced semaphore
-pub fn handle_enhanced_sem_signal(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_sem_signal(args: &[u64]) -> Result<u64> {
     if args.len() != 1 {
         return Err(KernelError::InvalidArgument);
     }
@@ -201,7 +202,7 @@ pub fn handle_enhanced_sem_signal(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_mutex_create system call - create enhanced mutex
-pub fn handle_enhanced_mutex_create(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_mutex_create(args: &[u64]) -> Result<u64> {
     if args.len() != 0 {
         return Err(KernelError::InvalidArgument);
     }
@@ -213,7 +214,7 @@ pub fn handle_enhanced_mutex_create(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_mutex_lock system call - lock enhanced mutex
-pub fn handle_enhanced_mutex_lock(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_mutex_lock(args: &[u64]) -> Result<u64> {
     if args.len() != 2 {
         return Err(KernelError::InvalidArgument);
     }
@@ -228,7 +229,7 @@ pub fn handle_enhanced_mutex_lock(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_mutex_unlock system call - unlock enhanced mutex
-pub fn handle_enhanced_mutex_unlock(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_mutex_unlock(args: &[u64]) -> Result<u64> {
     if args.len() != 1 {
         return Err(KernelError::InvalidArgument);
     }
@@ -242,7 +243,7 @@ pub fn handle_enhanced_mutex_unlock(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_cond_create system call - create enhanced condition variable
-pub fn handle_enhanced_cond_create(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_cond_create(args: &[u64]) -> Result<u64> {
     if args.len() != 1 {
         return Err(KernelError::InvalidArgument);
     }
@@ -257,7 +258,7 @@ pub fn handle_enhanced_cond_create(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_cond_wait system call - wait on enhanced condition variable
-pub fn handle_enhanced_cond_wait(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_cond_wait(args: &[u64]) -> Result<u64> {
     if args.len() != 2 {
         return Err(KernelError::InvalidArgument);
     }
@@ -272,7 +273,7 @@ pub fn handle_enhanced_cond_wait(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_cond_signal system call - signal enhanced condition variable
-pub fn handle_enhanced_cond_signal(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_cond_signal(args: &[u64]) -> Result<u64> {
     if args.len() != 1 {
         return Err(KernelError::InvalidArgument);
     }
@@ -286,7 +287,7 @@ pub fn handle_enhanced_cond_signal(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_cond_broadcast system call - broadcast enhanced condition variable
-pub fn handle_enhanced_cond_broadcast(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_cond_broadcast(args: &[u64]) -> Result<u64> {
     if args.len() != 1 {
         return Err(KernelError::InvalidArgument);
     }
@@ -300,16 +301,16 @@ pub fn handle_enhanced_cond_broadcast(args: &[u64]) -> Result<u64, KernelError> 
 }
 
 /// Handle enhanced_event_create system call - create enhanced event
-pub fn handle_enhanced_event_create(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_event_create(args: &[u64]) -> Result<u64> {
     if args.len() != 2 {
         return Err(KernelError::InvalidArgument);
     }
 
     let event_type = args[0] as u32;
-    let data_ptr = args[1] as *const u8;
+    let _data_ptr = args[1] as *const u8;
 
     // Get current process ID
-    let pid = crate::process::myproc().map_or(0, |p| p.pid);
+    let pid = crate::subsystems::process::myproc().unwrap_or(0) as u32;
 
     // Read event data from user space
     // In a real implementation, we would need to read the data from user space
@@ -323,7 +324,7 @@ pub fn handle_enhanced_event_create(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_event_wait system call - wait for enhanced event
-pub fn handle_enhanced_event_wait(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_event_wait(args: &[u64]) -> Result<u64> {
     if args.len() != 2 {
         return Err(KernelError::InvalidArgument);
     }
@@ -338,7 +339,7 @@ pub fn handle_enhanced_event_wait(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_event_trigger system call - trigger enhanced event
-pub fn handle_enhanced_event_trigger(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_event_trigger(args: &[u64]) -> Result<u64> {
     if args.len() != 1 {
         return Err(KernelError::InvalidArgument);
     }
@@ -352,12 +353,12 @@ pub fn handle_enhanced_event_trigger(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_rpc_create_endpoint system call - create RPC endpoint
-pub fn handle_enhanced_rpc_create_endpoint(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_rpc_create_endpoint(args: &[u64]) -> Result<u64> {
     if args.len() != 1 {
         return Err(KernelError::InvalidArgument);
     }
 
-    let name_ptr = args[0] as *const u8;
+    let _name_ptr = args[0] as *const u8;
 
     // Read endpoint name from user space
     // In a real implementation, we would need to read the name from user space
@@ -365,7 +366,7 @@ pub fn handle_enhanced_rpc_create_endpoint(args: &[u64]) -> Result<u64, KernelEr
     let name = "rpc_endpoint".to_string();
 
     // Get current process ID
-    let pid = crate::process::myproc().map_or(0, |p| p.pid);
+    let pid = crate::subsystems::process::myproc().unwrap_or(0) as u32;
 
     match create_rpc_endpoint(name, pid) {
         Ok(endpoint_id) => Ok(endpoint_id as u64),
@@ -374,14 +375,14 @@ pub fn handle_enhanced_rpc_create_endpoint(args: &[u64]) -> Result<u64, KernelEr
 }
 
 /// Handle enhanced_rpc_call system call - make RPC call
-pub fn handle_enhanced_rpc_call(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_rpc_call(args: &[u64]) -> Result<u64> {
     if args.len() != 4 {
         return Err(KernelError::InvalidArgument);
     }
 
     let endpoint_id = args[0] as u32;
-    let proc_name_ptr = args[1] as *const u8;
-    let args_ptr = args[2] as *const u8;
+    let _proc_name_ptr = args[1] as *const u8;
+    let _args_ptr = args[2] as *const u8;
     let timeout = args[3] as u32;
 
     // Read procedure name and arguments from user space
@@ -397,14 +398,14 @@ pub fn handle_enhanced_rpc_call(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_rpc_complete system call - complete RPC call
-pub fn handle_enhanced_rpc_complete(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_rpc_complete(args: &[u64]) -> Result<u64> {
     if args.len() != 3 {
         return Err(KernelError::InvalidArgument);
     }
 
     let endpoint_id = args[0] as u32;
     let call_id = args[1] as u64;
-    let response_ptr = args[2] as *const u8;
+    let _response_ptr = args[2] as *const u8;
 
     // Read response data from user space
     // In a real implementation, we would need to read the data from user space
@@ -418,7 +419,7 @@ pub fn handle_enhanced_rpc_complete(args: &[u64]) -> Result<u64, KernelError> {
 }
 
 /// Handle enhanced_rpc_get_result system call - get RPC call result
-pub fn handle_enhanced_rpc_get_result(args: &[u64]) -> Result<u64, KernelError> {
+pub fn handle_enhanced_rpc_get_result(args: &[u64]) -> Result<u64> {
     if args.len() != 2 {
         return Err(KernelError::InvalidArgument);
     }

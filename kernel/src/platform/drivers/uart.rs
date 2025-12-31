@@ -135,12 +135,12 @@ mod imp {
 
     #[inline]
     fn read_reg(offset: usize) -> u32 {
-        crate::subsystems::mm::mmio_read32(reg(offset))
+        unsafe { crate::subsystems::mm::mmio_read32(reg(offset)) }
     }
 
     #[inline]
     fn write_reg(offset: usize, val: u32) {
-        crate::subsystems::mm::mmio_write32(reg(offset), val)
+        unsafe { crate::subsystems::mm::mmio_write32(reg(offset), val) }
     }
 
     /// Initialize UART

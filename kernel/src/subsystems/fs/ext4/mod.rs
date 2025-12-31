@@ -18,6 +18,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::collections::BTreeMap;
+use alloc::boxed::Box;
 use crate::drivers::BlockDevice;
 use crate::subsystems::sync::Mutex;
 use crate::subsystems::fs::fs_impl::BufCache;
@@ -46,25 +47,45 @@ pub struct Ext4FileSystem {
     inode_cache: Mutex<BTreeMap<u32, Ext4Inode>>,
     block_bitmap_cache: Mutex<BTreeMap<u32, Vec<bool>>>,
     inode_bitmap_cache: Mutex<BTreeMap<u32, Vec<bool>>>,
+    #[allow(dead_code)]
     mount_options: Ext4MountOptions,
+    #[allow(dead_code)]
     journal: Option<Box<dyn JournalingFileSystem>>,
+    #[allow(dead_code)]
     xattr_cache: Mutex<BTreeMap<u32, BTreeMap<String, Vec<u8>>>>,
+    #[allow(dead_code)]
     acl_cache: Mutex<BTreeMap<u32, Vec<u8>>>,
+    #[allow(dead_code)]
     quota_info: Mutex<BTreeMap<u32, Ext4QuotaInfo>>,
+    #[allow(dead_code)]
     project_quota: Mutex<BTreeMap<u32, Ext4ProjectQuota>>,
+    #[allow(dead_code)]
     encryption_contexts: Mutex<BTreeMap<u32, Ext4EncryptionContext>>,
+    #[allow(dead_code)]
     extent_status_trees: Mutex<BTreeMap<u32, Ext4ExtentStatusTree>>,
+    #[allow(dead_code)]
     mmp: Option<Ext4MmpStruct>,
+    #[allow(dead_code)]
     stats: Mutex<Ext4Stats>,
+    #[allow(dead_code)]
     checksum_seed: Mutex<Ext4ChecksumSeed>,
+    #[allow(dead_code)]
     flex_bg_descs: Mutex<BTreeMap<u32, Ext4FlexBgDesc>>,
+    #[allow(dead_code)]
     dir_index_roots: Mutex<BTreeMap<u32, Ext4DirIndexRoot>>,
+    #[allow(dead_code)]
     dir_index_tails: Mutex<BTreeMap<u32, Ext4DirIndexTail>>,
+    #[allow(dead_code)]
     dir_index_nodes: Mutex<BTreeMap<u32, Ext4DirIndexNode>>,
+    #[allow(dead_code)]
     xattr_headers: Mutex<BTreeMap<u32, Ext4XattrHeader>>,
+    #[allow(dead_code)]
     xattr_entries: Mutex<BTreeMap<u32, Vec<Ext4XattrEntry>>>,
+    #[allow(dead_code)]
     journal_entries: Mutex<BTreeMap<u32, Vec<JournalEntry>>>,
+    #[allow(dead_code)]
     journal_transactions: Mutex<BTreeMap<u32, JournalTransaction>>,
+    #[allow(dead_code)]
     journal_checkpoint: Mutex<u32>,
 }
 
@@ -120,9 +141,9 @@ impl Ext4FileSystem {
         self.block_size = 1024 << self.sb.s_log_block_size;
 
         // Calculate block group count
-        let blocks_per_group = self.sb.s_blocks_per_group;
+        let blocks_per_group = self.sb.s_blocks_per_group as u64;
         let total_blocks = self.get_total_blocks();
-        self.group_count = (total_blocks + blocks_per_group - 1) / blocks_per_group;
+        self.group_count = ((total_blocks + blocks_per_group - 1) / blocks_per_group) as u32;
 
         // Read block group descriptors
         self.read_group_descriptors()?;

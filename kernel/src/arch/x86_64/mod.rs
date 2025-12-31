@@ -31,16 +31,26 @@ pub fn shutdown() -> Result<(), &'static str> {
 
 /// Read Time-Stamp Counter
 #[inline]
+#[cfg(target_arch = "x86_64")]
 pub unsafe fn rdtsc() -> u64 {
-    let low: u32;
-    let high: u32;
-    core::arch::asm!(
-        "rdtsc",
-        out("eax") low,
-        out("edx") high,
-        options(nostack, nomem)
-    );
+    let (high, low): (u32, u32);
+    unsafe {
+        core::arch::asm!(
+            "rdtsc",
+            out("edx") high,
+            out("eax") low,
+            options(nostack, nomem, pure)
+        );
+    }
     ((high as u64) << 32) | (low as u64)
+}
+
+/// Read Time-Stamp Counter (fallback for non-x86_64)
+#[inline]
+#[cfg(not(target_arch = "x86_64"))]
+pub unsafe fn rdtsc() -> u64 {
+    // Fallback implementation using a dummy value
+    0
 }
 
 /// Check if RDRAND instruction is available
@@ -54,10 +64,12 @@ pub fn has_rdrand() -> bool {
 #[inline]
 pub unsafe fn rdrand64() -> u64 {
     let mut value: u64;
-    core::arch::asm!(
-        "rdrand {}",
-        out(reg) value,
-        options(nostack, nomem)
-    );
+    unsafe {
+        core::arch::asm!(
+            "rdrand {}",
+            out(reg) value,
+            options(nostack, nomem)
+        );
+    }
     value
 }

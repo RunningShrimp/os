@@ -8,7 +8,7 @@ use core::sync::atomic::{AtomicU64, Ordering};
 use crate::subsystems::sync::{Mutex, SpinLock};
 use crate::{
     collections::{HashMap, HashSet},
-    compat::DefaultHasherBuilder,
+    compat::DefaultHashBuilder,
     subsystems::time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -179,7 +179,7 @@ impl CorrelationEngine {
     /// Create a new correlation engine
     pub fn new() -> Self {
         Self {
-            rules: HashMap::with_hasher(DefaultHasherBuilder),
+            rules: HashMap::with_hasher(DefaultHashBuilder::default()),
             event_buffer: Vec::new(),
             correlations: Vec::new(),
             clusters: Vec::new(),
@@ -256,7 +256,7 @@ impl CorrelationEngine {
 
     /// Get attack pattern statistics
     pub fn get_pattern_statistics(&self) -> HashMap<AttackPattern, usize> {
-        let mut pattern_stats = HashMap::with_hasher(DefaultHasherBuilder);
+        let mut pattern_stats = HashMap::with_hasher(DefaultHashBuilder::default());
 
         for correlation in &self.correlations {
             let count = pattern_stats.entry(correlation.pattern).or_insert(0);
@@ -277,7 +277,7 @@ impl CorrelationEngine {
 
     /// Get MITRE ATT&CK mapping
     pub fn get_mitre_mapping(&self) -> HashMap<AttackPattern, Vec<String>> {
-        let mut mapping = HashMap::with_hasher(DefaultHasherBuilder);
+        let mut mapping = HashMap::with_hasher(DefaultHashBuilder::default());
 
         mapping.insert(
             AttackPattern::PortScanning,
@@ -352,7 +352,7 @@ impl CorrelationEngine {
 
     /// Perform correlation analysis
     fn perform_correlation(&mut self) {
-        let current_time = SystemTime::now()
+        let _current_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
@@ -518,7 +518,7 @@ impl CorrelationEngine {
     /// Perform event clustering
     fn perform_event_clustering(&mut self) {
         // Simple clustering based on source and event type
-        let mut clusters: HashMap<String, Vec<usize>> = HashMap::with_hasher(DefaultHasherBuilder);
+        let mut clusters: HashMap<String, Vec<usize>> = HashMap::with_hasher(DefaultHashBuilder::default());
 
         for (index, event) in self.event_buffer.iter().enumerate() {
             let cluster_key = format!("{}:{}", event.source, event.event_type);
@@ -584,7 +584,7 @@ impl CorrelationEngine {
     fn detect_port_scanning(&mut self, current_time: u64) {
         let time_window = 300; // 5 minutes
         let mut source_ports: HashMap<String, Vec<u16>> =
-            HashMap::with_hasher(DefaultHasherBuilder);
+            HashMap::with_hasher(DefaultHashBuilder::default());
 
         for event in &self.event_buffer {
             if current_time - event.timestamp > time_window {
@@ -639,7 +639,7 @@ impl CorrelationEngine {
     fn detect_brute_force(&mut self, current_time: u64) {
         let time_window = 600; // 10 minutes
         let mut failed_attempts: HashMap<String, usize> =
-            HashMap::with_hasher(DefaultHasherBuilder);
+            HashMap::with_hasher(DefaultHashBuilder::default());
 
         for event in &self.event_buffer {
             if current_time - event.timestamp > time_window {
@@ -690,7 +690,7 @@ impl CorrelationEngine {
     /// Detect DDoS attack patterns
     fn detect_ddos(&mut self, current_time: u64) {
         let time_window = 60; // 1 minute
-        let mut request_count: HashMap<String, usize> = HashMap::with_hasher(DefaultHasherBuilder);
+        let mut request_count: HashMap<String, usize> = HashMap::with_hasher(DefaultHashBuilder::default());
 
         for event in &self.event_buffer {
             if current_time - event.timestamp > time_window {
@@ -828,7 +828,7 @@ impl CorrelationStats {
             total_rules: 0,
             correlations_found: 0,
             clusters_found: 0,
-            patterns_by_type: HashMap::with_hasher(DefaultHasherBuilder),
+            patterns_by_type: HashMap::with_hasher(DefaultHashBuilder::default()),
             avg_correlation_time: 0.0,
         }
     }

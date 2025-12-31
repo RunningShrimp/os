@@ -8,21 +8,17 @@ extern crate alloc;
 
 use core::sync::atomic::{AtomicI32, Ordering};
 
-use crate::{
-    error::SyscallError,
-    subsystems::{
-        mm::page_table_isolation::PageTable,
-        syscalls::thread::{
-            FUTEX_WAIT_QUEUE, FutexWaiter, PiFutexData, add_futex_waiter, futex_lock_pi,
-            futex_requeue, futex_trylock_pi, futex_unlock_pi, futex_wait_timeout,
-            futex_wake_optimized, remove_futex_waiter, requeue_futex_waiters, wake_futex_waiters,
-        },
+use crate::subsystems::{
+    mm::page_table_isolation::PageTable,
+    syscalls::{
+        thread::{add_futex_waiter, futex_lock_pi, futex_requeue, futex_trylock_pi, futex_unlock_pi, futex_wait_timeout, futex_wake_optimized, requeue_futex_waiters},
+        thread_futex::{FutexWaiter, FutexWaitQueue},
     },
 };
 
 /// Test configuration
 #[derive(Debug)]
-struct FutexTestConfig {
+pub struct FutexTestConfig {
     /// Number of threads to spawn for stress tests
     thread_count: usize,
     /// Number of operations per thread
@@ -43,7 +39,7 @@ impl Default for FutexTestConfig {
 
 /// Test statistics
 #[derive(Debug, Default)]
-struct FutexTestStats {
+pub struct FutexTestStats {
     /// Total operations performed
     total_operations: usize,
     /// Successful operations
@@ -109,8 +105,7 @@ impl FutexTestSuite {
 
         // Test immediate wake (no waiters)
         let result = futex_wake_optimized(futex_addr, 1);
-        assert!(result.is_ok(), "FUTEX_WAKE should succeed even with no waiters");
-        assert_eq!(result.unwrap(), 0, "Should wake 0 threads when no waiters");
+        assert_eq!(result, 0, "Should wake 0 threads when no waiters");
 
         // Test wait with matching value
         test_futex.store(1, Ordering::SeqCst);
@@ -119,7 +114,7 @@ impl FutexTestSuite {
         let mock_pagetable = core::ptr::null_mut::<PageTable>();
 
         // This would normally block, but for testing we'll simulate
-        let result = futex_wait_timeout(mock_pagetable, futex_addr, 1, 0);
+        let _result = futex_wait_timeout(mock_pagetable, futex_addr as u64, 1, None);
 
         // Update stats
         self.stats.total_operations += 2;
@@ -140,12 +135,12 @@ impl FutexTestSuite {
         let futex2_addr = &futex2 as *const AtomicI32 as usize;
 
         // Add mock waiters to first futex
-        add_futex_waiter(futex1_addr, 1001, 0, 0);
-        add_futex_waiter(futex1_addr, 1002, 0, 0);
+        add_futex_waiter(FutexWaiter::new(1001, futex1_addr, None));
+        add_futex_waiter(FutexWaiter::new(1002, futex1_addr, None));
 
         // Test requeue operation
         let mock_pagetable = core::ptr::null_mut::<PageTable>();
-        let result = futex_requeue(mock_pagetable, futex1_addr, futex2_addr, 1, 1, false);
+        let result = futex_requeue(mock_pagetable, futex1_addr as u64, futex2_addr as u64, 1, 1, false);
 
         assert!(result.is_ok(), "FUTEX_REQUEUE should succeed");
 
@@ -168,11 +163,11 @@ impl FutexTestSuite {
         let futex2_addr = &futex2 as *const AtomicI32 as usize;
 
         // Add mock waiters
-        add_futex_waiter(futex1_addr, 1003, 42, 0);
+        add_futex_waiter(FutexWaiter::new(1003, futex1_addr, None));
 
         // Test compare requeue with matching values
         let mock_pagetable = core::ptr::null_mut::<PageTable>();
-        let result = futex_requeue(mock_pagetable, futex1_addr, futex2_addr, 1, 1, true);
+        let result = futex_requeue(mock_pagetable, futex1_addr as u64, futex2_addr as u64, 1, 1, true);
 
         assert!(result.is_ok(), "FUTEX_CMP_REQUEUE should succeed when values match");
 
@@ -195,11 +190,11 @@ impl FutexTestSuite {
         let mock_pagetable = core::ptr::null_mut::<PageTable>();
 
         // Test PI lock on uncontended futex
-        let result = futex_lock_pi(mock_pagetable, futex_addr, 0);
+        let result = futex_lock_pi(mock_pagetable, futex_addr as u64, None);
         assert!(result.is_ok(), "PI lock should succeed on uncontended futex");
 
         // Test PI unlock
-        let result = futex_unlock_pi(mock_pagetable, futex_addr);
+        let result = futex_unlock_pi(mock_pagetable, futex_addr as u64);
         assert!(result.is_ok(), "PI unlock should succeed");
 
         // Update stats
@@ -221,11 +216,11 @@ impl FutexTestSuite {
         let mock_pagetable = core::ptr::null_mut::<PageTable>();
 
         // Test PI trylock on uncontended futex
-        let result = futex_trylock_pi(mock_pagetable, futex_addr);
+        let result = futex_trylock_pi(mock_pagetable, futex_addr as u64);
         assert!(result.is_ok(), "PI trylock should succeed on uncontended futex");
 
         // Test PI trylock on contended futex
-        let result = futex_trylock_pi(mock_pagetable, futex_addr);
+        let result = futex_trylock_pi(mock_pagetable, futex_addr as u64);
         assert!(result.is_err(), "PI trylock should fail on contended futex");
 
         // Update stats
@@ -248,7 +243,7 @@ impl FutexTestSuite {
         let mock_pagetable = core::ptr::null_mut::<PageTable>();
 
         // Test PI lock with timeout (should timeout)
-        let result = futex_lock_pi(mock_pagetable, futex_addr, 1000);
+        let result = futex_lock_pi(mock_pagetable, futex_addr as u64, Some(1000));
 
         // Update stats
         self.stats.total_operations += 1;
@@ -273,7 +268,7 @@ impl FutexTestSuite {
         let mock_pagetable = core::ptr::null_mut::<PageTable>();
 
         // Test wait with non-matching value (should return immediately)
-        let result = futex_wait_timeout(mock_pagetable, futex_addr, 0, 1000);
+        let result = futex_wait_timeout(mock_pagetable, futex_addr as u64, 0, Some(1000));
         assert!(result.is_err(), "Should return error when value doesn't match");
 
         // Update stats
@@ -296,7 +291,7 @@ impl FutexTestSuite {
 
         // Test with very short timeout
         let start_time = crate::syscalls::thread::get_current_time_ns();
-        let result = futex_wait_timeout(mock_pagetable, futex_addr, 1, 100); // 100ns timeout
+        let _result = futex_wait_timeout(mock_pagetable, futex_addr as u64, 1, Some(100)); // 100ns timeout
         let end_time = crate::syscalls::thread::get_current_time_ns();
 
         let elapsed = end_time - start_time;
@@ -349,7 +344,7 @@ impl FutexTestSuite {
 
         // Add many waiters
         for i in 0..100 {
-            add_futex_waiter(futex_addr, 2000 + i, 0, 0);
+            add_futex_waiter(FutexWaiter::new(2000 + i, futex_addr, None));
         }
 
         // Test waking many threads
@@ -357,8 +352,7 @@ impl FutexTestSuite {
         let result = futex_wake_optimized(futex_addr, 50);
         let end_time = crate::syscalls::thread::get_current_time_ns();
 
-        assert!(result.is_ok(), "Should succeed to wake many threads");
-        assert_eq!(result.unwrap(), 50, "Should wake exactly 50 threads");
+        assert_eq!(result, 50, "Should wake exactly 50 threads");
 
         let elapsed = end_time - start_time;
 
@@ -377,14 +371,14 @@ impl FutexTestSuite {
         let mock_pagetable = core::ptr::null_mut::<PageTable>();
 
         // Test with invalid address (should return BadAddress)
-        let result = futex_wait_timeout(mock_pagetable, 0xdeadbeef, 0, 0);
+        let result = futex_wait_timeout(mock_pagetable, 0xdeadbeef as u64, 0, Some(0));
         assert!(result.is_err(), "Should return error for invalid address");
 
         // Test PI operations on unlocked futex
         let unlocked_futex = AtomicI32::new(0);
         let futex_addr = &unlocked_futex as *const AtomicI32 as usize;
 
-        let result = futex_unlock_pi(mock_pagetable, futex_addr);
+        let result = futex_unlock_pi(mock_pagetable, futex_addr as u64);
         assert!(result.is_err(), "Should return error for unlocking unlocked futex");
 
         // Update stats
@@ -440,13 +434,19 @@ pub fn benchmark_futex_operations() -> Result<(), &'static str> {
 
     // Add some waiters for requeue testing
     for i in 0..10 {
-        add_futex_waiter(futex_addr, 3000 + i, 0, 0);
+        add_futex_waiter(FutexWaiter::new(3000 + i, futex_addr, None));
     }
 
     let start_time = crate::syscalls::thread::get_current_time_ns();
+    let mut queue = FutexWaitQueue::new();
+
+    // Manually add waiters to our test queue
+    for i in 0..10 {
+        queue.insert(futex_addr as u64, FutexWaiter::new(3000 + i, futex_addr, None));
+    }
 
     for _ in 0..iterations {
-        let _ = requeue_futex_waiters(futex_addr, futex2_addr, 5);
+        let _ = requeue_futex_waiters(&mut queue, futex_addr as u64, futex2_addr as u64, 5);
     }
 
     let end_time = crate::syscalls::thread::get_current_time_ns();

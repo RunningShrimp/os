@@ -11,16 +11,16 @@ extern crate alloc;
 extern crate hashbrown;
 
 use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::{format, vec};
+use alloc::string::{String, ToString};
+use alloc::vec;
 use hashbrown::HashMap;
-use crate::compat::{*, DefaultHasherBuilder};
+use crate::compat::*;
 
 pub struct SecuritySandbox {
     /// Active sandboxes
-    active_sandboxes: HashMap<u64, Sandbox, DefaultHasherBuilder>,
+    active_sandboxes: HashMap<u64, Sandbox>,
     /// Security policies
-    policies: HashMap<String, SecurityPolicy, DefaultHasherBuilder>,
+    policies: HashMap<String, SecurityPolicy>,
     /// Resource monitors
     resource_monitors: Vec<Box<dyn ResourceMonitor>>,
     /// Next sandbox ID
@@ -331,7 +331,7 @@ pub struct ViolationAction {
     /// Action to take
     pub action: RuleAction,
     /// Additional parameters
-    pub parameters: HashMap<String, String, DefaultHasherBuilder>,
+    pub parameters: HashMap<String, String>,
 }
 
 /// Sandbox states
@@ -399,8 +399,8 @@ impl SecuritySandbox {
     /// Create a new security sandbox manager
     pub fn new() -> Self {
         let mut manager = Self {
-            active_sandboxes: HashMap::with_hasher(DefaultHasherBuilder),
-            policies: HashMap::with_hasher(DefaultHasherBuilder),
+            active_sandboxes: HashMap::new(),
+            policies: HashMap::new(),
             resource_monitors: Vec::new(),
             next_sandbox_id: 1,
         };
@@ -435,7 +435,7 @@ impl SecuritySandbox {
                 ViolationAction {
                     violation_type: "SystemFileAccess".to_string(),
                     action: RuleAction::Terminate,
-                    parameters: HashMap::with_hasher(DefaultHasherBuilder),
+                    parameters: HashMap::new(),
                 },
             ],
         };
@@ -621,6 +621,7 @@ impl SecuritySandbox {
             TargetPlatform::Android => "android",
             TargetPlatform::IOS => "ios",
             TargetPlatform::Nos => "nos",
+            TargetPlatform::Unknown => "unknown",
         };
 
         self.policies.get(policy_key)

@@ -3,7 +3,7 @@
 //! This module implements system calls for POSIX message queues
 
 use super::common::{SyscallError, SyscallResult, extract_args};
-use crate::posix::mqueue::*;
+use crate::subsystems::posix::mqueue::*;
 use crate::process::myproc;
 
 /// Dispatch message queue syscalls

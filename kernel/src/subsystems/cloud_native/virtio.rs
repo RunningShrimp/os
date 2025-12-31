@@ -10,7 +10,7 @@ use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use spin::Mutex;
 
-use crate::reliability::{EACCES, EAGAIN, EINVAL, EIO, ENOENT, ENOMEM};
+use crate::reliability::{EAGAIN, EINVAL, EIO, ENOENT};
 
 /// VirtIO设备类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

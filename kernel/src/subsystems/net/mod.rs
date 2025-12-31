@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Network stack implementation
 //!
 //! This module implements a complete TCP/IP network stack for NOS,
@@ -23,6 +24,9 @@ pub mod route;
 pub mod socket;
 pub mod tcp;
 pub mod udp;
+pub mod udp_fast_path;
+pub mod udp_optimization;
+pub mod udp_multicast;
 pub mod zero_copy; // POSIX-compatible network API (required for socket syscalls)
 
 // Test modules
@@ -46,8 +50,6 @@ use packet::PacketPool;
 pub struct NetworkStack {
     /// Network interfaces
     interfaces: Vec<Interface>,
-    /// Routing table
-    routes: Vec<Route>,
     /// Packet buffer pool
     packet_pool: PacketPool,
     /// Next interface ID
@@ -61,7 +63,6 @@ impl NetworkStack {
     pub fn new() -> Self {
         Self {
             interfaces: Vec::new(),
-            routes: Vec::new(),
             packet_pool: PacketPool::new(),
             next_interface_id: AtomicU32::new(1),
             enhanced_manager: enhanced_network::EnhancedNetworkManager::new(),
@@ -132,7 +133,7 @@ impl NetworkStack {
             core::mem::swap(pkt, &mut to_send);
             match self.send_packet(to_send, dest_ip) {
                 Ok(_) => sent += 1,
-                Err(e) => return Ok(sent), // caller can retry remaining
+                Err(_e) => return Ok(sent), // caller can retry remaining
             }
         }
         Ok(sent)
@@ -210,8 +211,7 @@ pub fn init() {
     // This will initialize the global network stack on first access
     let _stack = network_stack();
 
-    // Initialize enhanced network manager
-    network_stack().enhanced_manager_mut().init();
+    // Enhanced network manager is already initialized in new()
 
     // Initialize loopback device
     use alloc::sync::Arc;
@@ -404,6 +404,9 @@ pub use self::{
         },
     },
     udp::{UdpHeader, UdpPacket, UdpSocket},
+    udp_fast_path::{UdpFastPath, PacketBuffer as UdpPacketBuffer, RingBuffer},
+    udp_optimization::{UdpOffload, BatchedPacketProcessor, JumboFrameSupport, UdpOffloadConfig},
+    udp_multicast::{UdpMulticast, MulticastGroup, IgmpVersion, IgmpType},
 };
 use crate::subsystems::sync::Once;
 

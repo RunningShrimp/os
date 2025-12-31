@@ -8,7 +8,7 @@ use core::sync::atomic::{AtomicU64, Ordering};
 use crate::subsystems::sync::{Mutex, SpinLock};
 use crate::{
     collections::HashMap,
-    compat::DefaultHasherBuilder,
+    compat::DefaultHashBuilder,
     subsystems::time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -199,9 +199,9 @@ impl BehaviorAnalyzer {
     /// Create a new behavior analyzer
     pub fn new() -> Self {
         Self {
-            baselines: HashMap::with_hasher(DefaultHasherBuilder),
-            user_profiles: HashMap::with_hasher(DefaultHasherBuilder),
-            event_patterns: HashMap::with_hasher(DefaultHasherBuilder),
+            baselines: HashMap::with_hasher(DefaultHashBuilder::default()),
+            user_profiles: HashMap::with_hasher(DefaultHashBuilder::default()),
+            event_patterns: HashMap::with_hasher(DefaultHashBuilder::default()),
             events: Vec::new(),
             anomalies: Vec::new(),
             event_counter: AtomicU64::new(0),
@@ -275,8 +275,8 @@ impl BehaviorAnalyzer {
     pub fn analyze_user_behavior(
         &mut self,
         user_id: u32,
-        action: &str,
-        resource: &str,
+        _action: &str,
+        _resource: &str,
         details: &HashMap<String, String>,
     ) -> Option<BehaviorAnomaly> {
         let _lock = self.analyzer_lock.lock();
@@ -624,7 +624,7 @@ impl BehaviorStats {
     pub fn new() -> Self {
         Self {
             total_events: 0,
-            events_by_category: HashMap::with_hasher(DefaultHasherBuilder),
+            events_by_category: HashMap::with_hasher(DefaultHashBuilder::default()),
             total_baselines: 0,
             total_anomalies: 0,
             active_user_profiles: 0,

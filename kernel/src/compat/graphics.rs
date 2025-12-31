@@ -428,7 +428,7 @@ pub struct Window {
 impl UniversalWindowManager {
     pub fn new() -> Self {
         Self {
-            windows: HashMap::with_hasher(DefaultHasherBuilder),
+            windows: HashMap::with_hasher(DefaultHasherBuilder::default()),
             next_window_id: 1,
         }
     }
@@ -456,7 +456,7 @@ impl UniversalWindowManager {
 
     pub fn destroy_window(&mut self, handle: WindowHandle) -> Result<()> {
         self.windows.remove(&handle)
-            .ok_or(CompatibilityError::NotFound)?;
+            .ok_or_else(|| CompatibilityError::NotFound)?;
         Ok(())
     }
 
@@ -596,10 +596,10 @@ impl InputEventHandler {
 impl GraphicsTranslator {
     pub fn new() -> Self {
         let mut translator = Self {
-            contexts: HashMap::with_hasher(DefaultHasherBuilder),
+            contexts: HashMap::with_hasher(DefaultHasherBuilder::default()),
             window_manager: UniversalWindowManager::new(),
             input_handler: InputEventHandler::new(),
-            api_translators: HashMap::with_hasher(DefaultHasherBuilder),
+            api_translators: HashMap::with_hasher(DefaultHasherBuilder::default()),
         };
 
         // Initialize API translators
@@ -609,7 +609,7 @@ impl GraphicsTranslator {
         translator
     }
 
-    pub fn create_graphics_context(&mut self, platform: TargetPlatform, config: GraphicsConfig) -> Result<()> {
+    pub fn create_graphics_context(&mut self, _platform: TargetPlatform, _config: GraphicsConfig) -> Result<()> {
         // Create platform-specific graphics context
         // This is a placeholder implementation
         Ok(())

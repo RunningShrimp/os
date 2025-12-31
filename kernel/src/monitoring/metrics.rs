@@ -4,7 +4,7 @@
 
 extern crate alloc;
 
-use alloc::{collections::BTreeMap, string::String};
+use alloc::{collections::BTreeMap, string::String, string::ToString};
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use crate::subsystems::sync::Mutex;
@@ -135,11 +135,24 @@ impl MetricsCollector {
         metrics.insert(name.clone(), SystemMetric::new_gauge(name));
     }
 
-    /// Get metric
-    pub fn get_metric(&self, name: &str) -> Option<&SystemMetric> {
+    /// Get metric value by name
+    ///
+    /// Returns the current value of the specified metric.
+    /// For counters, returns the counter value; for gauges, returns the gauge value.
+    pub fn get_metric_value(&self, name: &str) -> Option<u64> {
         let metrics = self.metrics.lock();
-        // Return reference - in real implementation, would use Arc
-        None // Placeholder
+        let metric = metrics.get(name)?;
+
+        match metric.metric_type {
+            MetricType::Counter => Some(metric.get_counter()),
+            MetricType::Gauge => Some(metric.get_gauge()),
+            MetricType::Histogram => {
+                // Return histogram count as summary value
+                let buckets = metric.histogram_buckets.lock();
+                let count: u64 = buckets.values().sum();
+                Some(count)
+            }
+        }
     }
 
     /// Increment counter
@@ -281,6 +294,13 @@ pub fn get_metrics_collector() -> &'static MetricsCollector {
     });
 
     unsafe { &*(METRICS_COLLECTOR.lock().as_ref().unwrap() as *const MetricsCollector) }
+}
+
+impl MetricsCollector {
+    /// Try to get a reference (helper for export module)
+    pub fn try_get(&self) -> Result<&MetricsCollector, &'static str> {
+        Ok(self)
+    }
 }
 
 #[cfg(test)]

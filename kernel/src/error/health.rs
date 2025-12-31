@@ -6,15 +6,16 @@ extern crate alloc;
 
 use alloc::{
     collections::BTreeMap,
-    string::{String, ToString},
+    string::String,
 };
 
 use spin::Mutex;
 
 /// Health level
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub enum HealthLevel {
     /// Healthy
+    #[default]
     Healthy = 0,
     /// Degraded
     Degraded = 1,
@@ -72,7 +73,7 @@ pub struct HealthThreshold {
 }
 
 /// Health status
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct HealthStatus {
     /// Overall health level
     pub overall_health: HealthLevel,
@@ -83,7 +84,7 @@ pub struct HealthStatus {
 }
 
 /// Health statistics
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct HealthStats {
     /// Total metrics checked
     pub total_metrics: u64,
@@ -125,11 +126,7 @@ impl HealthMonitor {
     /// Update a metric value
     pub fn update_metric(&mut self, name: &str, value: f64) -> crate::error::UnifiedResult<()> {
         let metric = self.metrics.get_mut(name).ok_or_else(|| {
-            crate::error::create_error(
-                crate::error::ErrorSeverity::Error,
-                crate::error::ProcessError::NotFound,
-                "Metric not found".to_string(),
-            )
+            crate::error::UnifiedError::NotFound
         })?;
         metric.current_value = value;
         metric.last_updated = crate::common::get_timestamp();

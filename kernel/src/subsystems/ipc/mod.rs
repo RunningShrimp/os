@@ -67,6 +67,27 @@ pub struct MessageQueue {
     pub max_size: usize, // Maximum number of messages in queue
 }
 
+impl SharedMemory {
+    pub fn new(base_addr: usize, size: usize, permissions: u32) -> Self {
+        Self {
+            base_addr,
+            size,
+            permissions,
+            ref_count: 1,
+        }
+    }
+}
+
+impl MessageQueue {
+    pub fn new(queue_id: u32, max_size: usize) -> Self {
+        Self {
+            queue_id,
+            messages: Mutex::new(Vec::new()),
+            max_size,
+        }
+    }
+}
+
 // ============================================================================
 // Global State
 // ============================================================================
@@ -74,58 +95,12 @@ pub struct MessageQueue {
 static SHARED_MEMORIES: Mutex<Vec<SharedMemory>> = Mutex::new(Vec::new());
 static MESSAGE_QUEUES: Mutex<Vec<MessageQueue>> = Mutex::new(Vec::new());
 static NEXT_SHM_ID: Mutex<u32> = Mutex::new(1);
-static NEXT_MSGQ_ID: Mutex<u32> = Mutex::new(1);
-
-// ============================================================================
-// Public API
-// ============================================================================
-
-impl IpcMessage {
-    /// Create a new IPC message
-    pub fn new(src_pid: u32, dst_pid: u32, msg_type: u32, data: &[u8]) -> Self {
-        Self {
-            header: IpcMsgHeader {
-                msg_type,
-                msg_size: data.len() as u32,
-                src_pid,
-                dst_pid,
-                flags: 0,
-            },
-            data: data.to_vec(),
-        }
-    }
-}
-
-impl SharedMemory {
-    /// Create a new shared memory region
-    pub fn new(base_addr: usize, size: usize, permissions: u32) -> Self {
-        Self { base_addr, size, permissions, ref_count: 1 }
-    }
-}
-
-impl MessageQueue {
-    /// Create a new message queue
-    pub fn new(queue_id: u32, max_size: usize) -> Self {
-        Self { queue_id, messages: Mutex::new(Vec::new()), max_size }
-    }
-}
 
 /// Initialize IPC subsystem
 ///
-/// This function initializes all IPC components including:
-/// - Shared memory pools
-/// - Message queues
-/// - POSIX message queues
+/// This function initializes the IPC subsystem and should be called
+/// during kernel startup.
 pub fn init() -> nos_api::Result<()> {
-    // Initialize shared memory and message queue pools
-    crate::println!("ipc: initialized");
-
-    // Initialize POSIX message queues
-    // Note: mqueue::init() returns Result<(), &'static str>, convert to nos_api::Result
-    if let Err(e) = mqueue::init() {
-        return Err(nos_api::Error::ConfigError(e.into()));
-    }
-
     crate::println!("[ipc] IPC subsystem initialized");
     Ok(())
 }
@@ -390,7 +365,6 @@ pub fn shm_info(shm_id: u32) -> Option<(usize, usize, u32)> {
 }
 
 pub mod enhanced_ipc;
-pub mod mqueue;
 pub mod mqueue_syscall;
 pub mod pipe;
 pub mod signal;

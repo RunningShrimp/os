@@ -1290,7 +1290,7 @@ macro_rules! libc_mocks {
 pub use libc_funcs::*;
 
 // 导出C标准库符号
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" {
     // 内存管理
     pub fn malloc(size: usize) -> *mut c_void;

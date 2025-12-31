@@ -8,14 +8,13 @@ extern crate alloc;
 use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
-use alloc::sync::Arc;
-use core::sync::atomic::{AtomicU64, AtomicU32, AtomicBool, Ordering};
-use crate::subsystems::sync::{Mutex, Sleeplock};
+use core::sync::atomic::{AtomicU32, AtomicBool, Ordering};
+use crate::subsystems::sync::Mutex;
 use crate::subsystems::drivers::driver_manager::{
-    Driver, DeviceId, DriverId, DeviceType, DeviceStatus, DriverStatus,
-    DeviceInfo, DriverInfo, DeviceResources, IoOperation, IoResult, InterruptInfo
+    DeviceId, DeviceType, DeviceStatus,
+    DeviceInfo, DeviceResources
 };
-use crate::error::UnifiedError;
+use crate::error::KernelError;
 
 // ============================================================================
 // Device Model Constants
@@ -38,7 +37,7 @@ pub const DEVICE_CLASS_MASK: u32 = 0xF0000000;
 // ============================================================================
 
 /// Enhanced device class
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum DeviceClass {
     /// System devices (controllers, etc.)
@@ -76,22 +75,23 @@ pub enum DeviceClass {
 impl DeviceClass {
     /// Get device class from value
     pub fn from_value(value: u32) -> Self {
-        match value & DEVICE_CLASS_MASK {
-            DEVICE_CLASS_BASE => DeviceClass::System,
-            DEVICE_CLASS_BASE + 0x10000000 => DeviceClass::Processor,
-            DEVICE_CLASS_BASE + 0x20000000 => DeviceClass::Memory,
-            DEVICE_CLASS_BASE + 0x30000000 => DeviceClass::Bus,
-            DEVICE_CLASS_BASE + 0x40000000 => DeviceClass::Communication,
-            DEVICE_CLASS_BASE + 0x50000000 => DeviceClass::HumanInterface,
-            DEVICE_CLASS_BASE + 0x60000000 => DeviceClass::Storage,
-            DEVICE_CLASS_BASE + 0x70000000 => DeviceClass::Multimedia,
-            DEVICE_CLASS_BASE + 0x80000000 => DeviceClass::Network,
-            DEVICE_CLASS_BASE + 0x90000000 => DeviceClass::Display,
-            DEVICE_CLASS_BASE + 0xA0000000 => DeviceClass::Input,
-            DEVICE_CLASS_BASE + 0xB0000000 => DeviceClass::Output,
-            DEVICE_CLASS_BASE + 0xC0000000 => DeviceClass::Sensor,
-            DEVICE_CLASS_BASE + 0xD0000000 => DeviceClass::Virtual,
-            DEVICE_CLASS_BASE + 0xE0000000 => DeviceClass::Custom,
+        let masked = value & DEVICE_CLASS_MASK;
+        match masked {
+            v if v == DEVICE_CLASS_BASE => DeviceClass::System,
+            v if v == DEVICE_CLASS_BASE + 0x10000000 => DeviceClass::Processor,
+            v if v == DEVICE_CLASS_BASE + 0x20000000 => DeviceClass::Memory,
+            v if v == DEVICE_CLASS_BASE + 0x30000000 => DeviceClass::Bus,
+            v if v == DEVICE_CLASS_BASE + 0x40000000 => DeviceClass::Communication,
+            v if v == DEVICE_CLASS_BASE + 0x50000000 => DeviceClass::HumanInterface,
+            v if v == DEVICE_CLASS_BASE + 0x60000000 => DeviceClass::Storage,
+            v if v == DEVICE_CLASS_BASE + 0x70000000 => DeviceClass::Multimedia,
+            v if v == DEVICE_CLASS_BASE + 0x80000000 => DeviceClass::Network,
+            v if v == DEVICE_CLASS_BASE + 0x90000000 => DeviceClass::Display,
+            v if v == DEVICE_CLASS_BASE + 0xA0000000 => DeviceClass::Input,
+            v if v == DEVICE_CLASS_BASE + 0xB0000000 => DeviceClass::Output,
+            v if v == DEVICE_CLASS_BASE + 0xC0000000 => DeviceClass::Sensor,
+            v if v == DEVICE_CLASS_BASE + 0xD0000000 => DeviceClass::Virtual,
+            v if v == DEVICE_CLASS_BASE + 0xE0000000 => DeviceClass::Custom,
             _ => DeviceClass::System,
         }
     }
@@ -119,7 +119,7 @@ impl DeviceClass {
 }
 
 /// Device power state
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum DevicePowerState {
     /// Device is in an unknown power state
@@ -461,7 +461,7 @@ impl DeviceModel for EnhancedDeviceModel {
     
     fn register_device(&mut self, device_info: EnhancedDeviceInfo) -> Result<DeviceId, KernelError> {
         if !self.initialized.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Invalid state".to_string()));
         }
         
         // Generate device ID
@@ -518,10 +518,10 @@ impl DeviceModel for EnhancedDeviceModel {
             
             // Update devices by class
             *stats.devices_by_class.entry(new_device_info.device_class).or_insert(0) += 1;
-            
+
             // Update devices by power state
             *stats.devices_by_power_state.entry(new_device_info.power_state).or_insert(0) += 1;
-            
+
             // Update devices by status
             *stats.devices_by_status.entry(new_device_info.base_info.status).or_insert(0) += 1;
             
@@ -541,7 +541,7 @@ impl DeviceModel for EnhancedDeviceModel {
     
     fn unregister_device(&mut self, device_id: DeviceId) -> Result<(), KernelError> {
         if !self.initialized.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Invalid state".to_string()));
         }
         
         // Get device info before removal
@@ -556,7 +556,7 @@ impl DeviceModel for EnhancedDeviceModel {
             let hierarchy = self.hierarchy.lock();
             if let Some(node) = hierarchy.get(&device_id) {
                 if !node.children.is_empty() {
-                    return Err(KernelError::InvalidState); // Cannot remove device with children
+                    return Err(KernelError::Other("Invalid state".to_string())); // Cannot remove device with children
                 }
             }
         }
@@ -632,7 +632,7 @@ impl DeviceModel for EnhancedDeviceModel {
     
     fn get_device_info(&self, device_id: DeviceId) -> Result<EnhancedDeviceInfo, KernelError> {
         if !self.initialized.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Invalid state".to_string()));
         }
         
         let devices = self.devices.lock();
@@ -642,7 +642,7 @@ impl DeviceModel for EnhancedDeviceModel {
     
     fn update_device_info(&mut self, device_id: DeviceId, device_info: EnhancedDeviceInfo) -> Result<(), KernelError> {
         if !self.initialized.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Invalid state".to_string()));
         }
         
         // Check if device exists
@@ -676,7 +676,7 @@ impl DeviceModel for EnhancedDeviceModel {
     
     fn get_device_hierarchy(&self) -> Result<BTreeMap<DeviceId, DeviceHierarchyNode>, KernelError> {
         if !self.initialized.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Invalid state".to_string()));
         }
         
         let hierarchy = self.hierarchy.lock();
@@ -685,7 +685,7 @@ impl DeviceModel for EnhancedDeviceModel {
     
     fn get_child_devices(&self, parent_id: DeviceId) -> Result<Vec<DeviceId>, KernelError> {
         if !self.initialized.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Invalid state".to_string()));
         }
         
         let hierarchy = self.hierarchy.lock();
@@ -698,7 +698,7 @@ impl DeviceModel for EnhancedDeviceModel {
     
     fn get_parent_device(&self, child_id: DeviceId) -> Result<Option<DeviceId>, KernelError> {
         if !self.initialized.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Invalid state".to_string()));
         }
         
         let hierarchy = self.hierarchy.lock();
@@ -711,7 +711,7 @@ impl DeviceModel for EnhancedDeviceModel {
     
     fn find_devices_by_class(&self, device_class: DeviceClass) -> Result<Vec<DeviceId>, KernelError> {
         if !self.initialized.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Invalid state".to_string()));
         }
         
         let devices = self.devices.lock();
@@ -728,7 +728,7 @@ impl DeviceModel for EnhancedDeviceModel {
     
     fn find_devices_by_type(&self, device_type: DeviceType) -> Result<Vec<DeviceId>, KernelError> {
         if !self.initialized.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Invalid state".to_string()));
         }
         
         let devices = self.devices.lock();
@@ -745,7 +745,7 @@ impl DeviceModel for EnhancedDeviceModel {
     
     fn find_devices_by_capability(&self, capability: fn(&DeviceCapabilities) -> bool) -> Result<Vec<DeviceId>, KernelError> {
         if !self.initialized.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Invalid state".to_string()));
         }
         
         let devices = self.devices.lock();
@@ -762,7 +762,7 @@ impl DeviceModel for EnhancedDeviceModel {
     
     fn find_devices_by_power_state(&self, power_state: DevicePowerState) -> Result<Vec<DeviceId>, KernelError> {
         if !self.initialized.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Invalid state".to_string()));
         }
         
         let devices = self.devices.lock();
@@ -779,14 +779,14 @@ impl DeviceModel for EnhancedDeviceModel {
     
     fn set_device_power_state(&mut self, device_id: DeviceId, power_state: DevicePowerState) -> Result<(), KernelError> {
         if !self.initialized.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Invalid state".to_string()));
         }
         
         // Get current device info
-        let mut device_info = {
+        let device_info = {
             let mut devices = self.devices.lock();
             let info = devices.get_mut(&device_id).ok_or(KernelError::NotFound)?;
-            let old_power_state = info.power_state;
+            let _old_power_state = info.power_state;
             info.power_state = power_state;
             info.clone()
         };
@@ -822,7 +822,7 @@ impl DeviceModel for EnhancedDeviceModel {
     
     fn get_device_power_state(&self, device_id: DeviceId) -> Result<DevicePowerState, KernelError> {
         if !self.initialized.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Invalid state".to_string()));
         }
         
         let devices = self.devices.lock();
@@ -832,7 +832,7 @@ impl DeviceModel for EnhancedDeviceModel {
     
     fn update_device_performance_metrics(&mut self, device_id: DeviceId, metrics: DevicePerformanceMetrics) -> Result<(), KernelError> {
         if !self.initialized.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Invalid state".to_string()));
         }
         
         // Update device info
@@ -861,7 +861,7 @@ impl DeviceModel for EnhancedDeviceModel {
     
     fn get_device_performance_metrics(&self, device_id: DeviceId) -> Result<DevicePerformanceMetrics, KernelError> {
         if !self.initialized.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Invalid state".to_string()));
         }
         
         let devices = self.devices.lock();
@@ -880,7 +880,7 @@ impl DeviceModel for EnhancedDeviceModel {
     
     fn validate_hierarchy(&self) -> Result<(), KernelError> {
         if !self.initialized.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Invalid state".to_string()));
         }
         
         let hierarchy = self.hierarchy.lock();
@@ -892,7 +892,7 @@ impl DeviceModel for EnhancedDeviceModel {
         for (device_id, _) in hierarchy.iter() {
             if !visited.contains_key(device_id) {
                 if self.has_cycle(*device_id, &hierarchy, &mut visited, &mut recursion_stack)? {
-                    return Err(KernelError::InvalidState); // Cycle detected
+                    return Err(KernelError::Other("Invalid state".to_string())); // Cycle detected
                 }
             }
         }
@@ -906,7 +906,7 @@ impl DeviceModel for EnhancedDeviceModel {
             
             if let Some(parent_id) = node.parent {
                 if !hierarchy.contains_key(&parent_id) {
-                    return Err(KernelError::InvalidState); // Parent not found
+                    return Err(KernelError::Other("Invalid state".to_string())); // Parent not found
                 }
             }
         }
@@ -914,7 +914,7 @@ impl DeviceModel for EnhancedDeviceModel {
         // Check depth limits
         for (_, node) in hierarchy.iter() {
             if node.depth > MAX_DEVICE_DEPTH {
-                return Err(KernelError::InvalidState); // Depth exceeded
+                return Err(KernelError::Other("Invalid state".to_string())); // Depth exceeded
             }
         }
         
@@ -923,7 +923,7 @@ impl DeviceModel for EnhancedDeviceModel {
     
     fn optimize_hierarchy(&mut self) -> Result<(), KernelError> {
         if !self.initialized.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Invalid state".to_string()));
         }
         
         // In a real implementation, this would optimize the device hierarchy

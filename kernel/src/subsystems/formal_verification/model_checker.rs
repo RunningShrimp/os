@@ -22,7 +22,6 @@ use hashbrown::{HashMap, HashSet};
 use spin::Mutex;
 
 use super::*;
-use crate::compat::DefaultHasherBuilder;
 
 /// 模型检查器
 pub struct ModelChecker {
@@ -160,7 +159,7 @@ pub enum AbstractionLevel {
 #[derive(Debug, Clone)]
 pub struct StateSpace {
     /// 已访问的状态
-    visited_states: HashMap<u64, SystemState, DefaultHasherBuilder>,
+    visited_states: HashMap<u64, SystemState>,
     /// 待探索的状态
     pending_states: Vec<StateNode>,
     /// 初始状态
@@ -168,9 +167,9 @@ pub struct StateSpace {
     /// 错误状态
     error_states: Vec<SystemState>,
     /// 状态转移
-    transitions: HashMap<u64, Vec<StateTransition>, DefaultHasherBuilder>,
+    transitions: HashMap<u64, Vec<StateTransition>>,
     /// 状态哈希
-    state_hashes: HashMap<u64, u64, DefaultHasherBuilder>,
+    state_hashes: HashMap<u64, u64>,
 }
 
 /// 状态节点
@@ -1066,12 +1065,12 @@ impl StateSpace {
     /// 创建新的状态空间
     pub fn new() -> Self {
         Self {
-            visited_states: HashMap::with_hasher(DefaultHasherBuilder),
+            visited_states: HashMap::new(),
             pending_states: Vec::new(),
             initial_states: Vec::new(),
             error_states: Vec::new(),
-            transitions: HashMap::with_hasher(DefaultHasherBuilder),
-            state_hashes: HashMap::with_hasher(DefaultHasherBuilder),
+            transitions: HashMap::new(),
+            state_hashes: HashMap::new(),
         }
     }
 }

@@ -10,15 +10,13 @@ extern crate alloc;
 
 use alloc::collections::BTreeMap;
 use core::{
-    ffi::{c_int, c_void},
+    ffi::c_int,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
 use crate::{
     subsystems::{
-        fs::epoll::{EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLOUT, EpollEvent, EpollEventInfo, EpollManager},
         sync::Mutex,
-        syscalls::interface::SyscallResult as InterfaceSyscallResult
     },
 };
 
@@ -35,7 +33,7 @@ pub enum EpollError {
 pub type EpollResult<T> = Result<T, EpollError>;
 
 /// GLib专用的epoll实例信息
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct GLibEpollInstance {
     /// epoll文件描述符
     pub epfd: c_int,
@@ -57,6 +55,19 @@ static GLIB_EPOLL_INSTANCES: Mutex<BTreeMap<c_int, GLibEpollInstance>> =
 
 /// 下一个可用的epoll实例ID
 static NEXT_EPOLL_ID: AtomicUsize = AtomicUsize::new(1);
+
+impl Clone for GLibEpollInstance {
+    fn clone(&self) -> Self {
+        Self {
+            epfd: self.epfd,
+            source_count: AtomicUsize::new(self.source_count.load(Ordering::SeqCst)),
+            max_sources: self.max_sources,
+            created_timestamp: self.created_timestamp,
+            total_waits: AtomicUsize::new(self.total_waits.load(Ordering::SeqCst)),
+            total_events: AtomicUsize::new(self.total_events.load(Ordering::SeqCst)),
+        }
+    }
+}
 
 /// GLib事件循环管理器单例
 pub static mut GLIB_EPOLL_MANAGER: () = ();

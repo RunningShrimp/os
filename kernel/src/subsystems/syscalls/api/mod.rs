@@ -2,8 +2,6 @@
 //!
 //! Provides type definitions for system call results
 
-use nos_api::Result;
-
 pub mod syscall_result;
 pub mod syscall_id;
 
@@ -14,6 +12,9 @@ pub enum SyscallError {
     PermissionDenied,
     NotFound,
     IoError,
+    NoProcess,
+    OperationNotPermitted,
+    NotImplemented,
 }
 
 /// System call result type - re-exported from nos_api
@@ -23,7 +24,5 @@ pub use nos_api::syscall::types::SyscallResult;
 /// Error module
 pub mod error {
     pub use super::SyscallError as Error;
-    pub use nos_api::syscall::types::SyscallResultas Result;
+    pub use nos_api::syscall::types::SyscallResult as Result;
 }
-
-pub use syscall_result::*;

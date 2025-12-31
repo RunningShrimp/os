@@ -231,24 +231,12 @@ impl RoutingTable {
         self.invalidate_cache();
     }
 
-    /// Cache a route lookup result
-    fn cache_entry(&mut self, destination: Ipv4Addr, route: Option<RouteEntry>) {
-        // Remove oldest entry if cache is full
-        if self.cache.len() >= self.max_cache_size {
-            // Find the oldest key without holding a borrow
-            let oldest_key = self.cache.iter().next().map(|(k, _)| *k);
-            if let Some(key) = oldest_key {
-                self.cache.remove(&key);
-            }
-        }
-
-        self.cache.insert(destination, route);
-    }
-
-    /// Invalidate the route cache
+    /// Invalidate the routing cache
     fn invalidate_cache(&mut self) {
         self.cache.clear();
     }
+
+    /// Cache a route lookup result
 
     /// Get routing table statistics
     pub fn stats(&self) -> RoutingTableStats {

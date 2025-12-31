@@ -177,21 +177,21 @@ impl Default for Buf {
 /// Cache key: (device, blockno)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CacheKey {
-    dev: u32,
-    blockno: u32,
+    pub dev: u32,
+    pub block_num: u32,
 }
 
 impl CacheKey {
-    fn new(dev: u32, blockno: u32) -> Self {
-        Self { dev, blockno }
+    pub fn new(dev: u32, block_num: u32) -> Self {
+        Self { dev, block_num }
     }
 }
 
 impl Hash for CacheKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        // Combine dev and blockno into a single hash value
+        // Combine dev and block_num into a single hash value
         // Using a simple but effective mixing strategy
-        let combined = ((self.dev as u64) << 32) | (self.blockno as u64);
+        let combined = ((self.dev as u64) << 32) | (self.block_num as u64);
         combined.hash(state);
     }
 }
@@ -747,6 +747,21 @@ impl Fs {
     /// List root directory
     pub fn list_root(&self) -> Vec<Inode> {
         Vec::new()
+    }
+
+    /// Get access to inodes (for compatibility with API)
+    pub fn get_inodes(&self) -> &Mutex<[Inode; NINODE]> {
+        &self.inodes
+    }
+
+    /// Get superblock (for compatibility with API)
+    pub fn get_superblock(&self) -> &SuperBlock {
+        &self.sb
+    }
+
+    /// Write data to device
+    pub fn device_write(&self, block: usize, data: &[u8]) {
+        self.dev.write(block, data);
     }
 
     /// Create file system on device

@@ -250,7 +250,7 @@ impl OptimizedProcessLockManager {
     pub fn acquire_fine_grained_read_lock(
         &self,
         lock_type: FineGrainedLockType,
-    ) -> FineGrainedReadLockGuard {
+    ) -> FineGrainedReadLockGuard<'_> {
         let start_time = crate::subsystems::time::hrtime_nanos();
 
         let lock = match lock_type {
@@ -282,7 +282,7 @@ impl OptimizedProcessLockManager {
     pub fn acquire_fine_grained_write_lock(
         &self,
         lock_type: FineGrainedLockType,
-    ) -> FineGrainedWriteLockGuard {
+    ) -> FineGrainedWriteLockGuard<'_> {
         let start_time = crate::subsystems::time::hrtime_nanos();
 
         let lock = match lock_type {
@@ -311,7 +311,7 @@ impl OptimizedProcessLockManager {
 
     /// 获取主表读锁
     #[inline]
-    pub fn acquire_main_table_read_lock(&self) -> MainTableReadLockGuard {
+    pub fn acquire_main_table_read_lock(&self) -> MainTableReadLockGuard<'_> {
         let start_time = crate::subsystems::time::hrtime_nanos();
 
         let guard = self.main_table_lock.read();
@@ -330,7 +330,7 @@ impl OptimizedProcessLockManager {
 
     /// 获取主表写锁
     #[inline]
-    pub fn acquire_main_table_write_lock(&self) -> MainTableWriteLockGuard {
+    pub fn acquire_main_table_write_lock(&self) -> MainTableWriteLockGuard<'_> {
         let start_time = crate::subsystems::time::hrtime_nanos();
 
         let guard = self.main_table_lock.write();
@@ -348,11 +348,14 @@ impl OptimizedProcessLockManager {
     }
 
     /// 尝试锁升级（读锁升级为写锁）
+    ///
+    /// 注意：此函数需要一个显式的 lock_type 参数，因为 read_guard 是一个引用
+    /// 无法被 drop。调用者应该在调用此函数前手动释放读锁。
     #[inline]
     pub fn try_lock_upgrade(
         &self,
-        read_guard: &FineGrainedReadLockGuard,
-    ) -> Option<FineGrainedWriteLockGuard> {
+        lock_type: FineGrainedLockType,
+    ) -> Option<FineGrainedWriteLockGuard<'_>> {
         if self.lock_upgrade_in_progress.compare_exchange(
             false,
             true,
@@ -365,8 +368,8 @@ impl OptimizedProcessLockManager {
 
         let start_time = crate::subsystems::time::hrtime_nanos();
 
-        // 释放读锁并尝试获取写锁
-        let lock = match read_guard.lock_type {
+        // 获取对应的锁
+        let lock = match lock_type {
             FineGrainedLockType::ProcessInfo => &self.fine_grained_locks[0],
             FineGrainedLockType::ProcessState => &self.fine_grained_locks[1],
             FineGrainedLockType::FileDescriptors => &self.fine_grained_locks[2],
@@ -374,9 +377,6 @@ impl OptimizedProcessLockManager {
             FineGrainedLockType::SignalState => &self.fine_grained_locks[4],
             FineGrainedLockType::SchedulingInfo => &self.fine_grained_locks[5],
         };
-
-        // 释放读锁
-        core::mem::drop(read_guard);
 
         // 获取写锁
         let write_guard = lock.write();
@@ -401,7 +401,7 @@ impl OptimizedProcessLockManager {
 
         Some(FineGrainedWriteLockGuard {
             _guard: write_guard,
-            lock_type: read_guard.lock_type,
+            lock_type,
             stats: &self.stats,
         })
     }
@@ -474,7 +474,12 @@ static mut GLOBAL_LOCK_MANAGER: Option<OptimizedProcessLockManager> = None;
 static LOCK_MANAGER_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
 /// 获取全局锁管理器
-pub fn get_global_lock_manager() -> &'static mut OptimizedProcessLockManager {
+///
+/// # Safety
+///
+/// This function is unsafe because it accesses a mutable static variable.
+/// Callers must ensure that there is no concurrent access to the global lock manager.
+pub unsafe fn get_global_lock_manager() -> &'static mut OptimizedProcessLockManager {
     unsafe {
         if !LOCK_MANAGER_INITIALIZED.load(Ordering::Relaxed) {
             GLOBAL_LOCK_MANAGER = Some(OptimizedProcessLockManager::with_defaults());
@@ -491,70 +496,60 @@ pub mod convenience {
     /// 获取进程信息读锁
     #[inline]
     pub fn lock_process_info_read() -> FineGrainedReadLockGuard<'static> {
-        unsafe {
-            get_global_lock_manager()
-                .acquire_fine_grained_read_lock(FineGrainedLockType::ProcessInfo)
-        }
+        unsafe { get_global_lock_manager() }
+            .acquire_fine_grained_read_lock(FineGrainedLockType::ProcessInfo)
     }
 
     /// 获取进程信息写锁
     #[inline]
     pub fn lock_process_info_write() -> FineGrainedWriteLockGuard<'static> {
-        unsafe {
-            get_global_lock_manager()
-                .acquire_fine_grained_write_lock(FineGrainedLockType::ProcessInfo)
-        }
+        unsafe { get_global_lock_manager() }
+            .acquire_fine_grained_write_lock(FineGrainedLockType::ProcessInfo)
     }
 
     /// 获取文件描述符读锁
     #[inline]
     pub fn lock_file_descriptors_read() -> FineGrainedReadLockGuard<'static> {
-        unsafe {
-            get_global_lock_manager()
-                .acquire_fine_grained_read_lock(FineGrainedLockType::FileDescriptors)
-        }
+        unsafe { get_global_lock_manager() }
+            .acquire_fine_grained_read_lock(FineGrainedLockType::FileDescriptors)
     }
 
     /// 获取文件描述符写锁
     #[inline]
     pub fn lock_file_descriptors_write() -> FineGrainedWriteLockGuard<'static> {
-        unsafe {
-            get_global_lock_manager()
-                .acquire_fine_grained_write_lock(FineGrainedLockType::FileDescriptors)
-        }
+        unsafe { get_global_lock_manager() }
+            .acquire_fine_grained_write_lock(FineGrainedLockType::FileDescriptors)
     }
 
     /// 获取主表读锁
     #[inline]
     pub fn lock_main_table_read() -> MainTableReadLockGuard<'static> {
-        unsafe { get_global_lock_manager().acquire_main_table_read_lock() }
+        unsafe { get_global_lock_manager() }.acquire_main_table_read_lock()
     }
 
     /// 获取主表写锁
     #[inline]
     pub fn lock_main_table_write() -> MainTableWriteLockGuard<'static> {
-        unsafe { get_global_lock_manager().acquire_main_table_write_lock() }
+        unsafe { get_global_lock_manager() }.acquire_main_table_write_lock()
     }
 
     /// 尝试锁升级
     #[inline]
     pub fn try_upgrade_lock(
-        read_guard: &FineGrainedReadLockGuard<'static>,
+        lock_type: FineGrainedLockType,
     ) -> Option<FineGrainedWriteLockGuard<'static>> {
-        unsafe { get_global_lock_manager().try_lock_upgrade(read_guard) }
+        unsafe { get_global_lock_manager() }.try_lock_upgrade(lock_type)
     }
 }
 
 /// 获取锁统计信息
 pub fn get_lock_stats() -> LockStatsSnapshot {
-    unsafe { get_global_lock_manager().get_stats().get_snapshot() }
+    unsafe { get_global_lock_manager() }.get_stats().get_snapshot()
 }
 
 /// 重置锁统计信息
 pub fn reset_lock_stats() {
-    unsafe {
-        get_global_lock_manager().reset_stats();
-    }
+    unsafe { get_global_lock_manager() }.reset_stats();
 }
 
 /// 自适应锁策略

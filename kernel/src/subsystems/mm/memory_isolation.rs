@@ -14,15 +14,12 @@ extern crate alloc;
 use alloc::{collections::BTreeMap, vec::Vec};
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use spin::mutex::Mutex;
-
 use crate::subsystems::{
     mm::{
-        PAGE_SIZE,
-        vm::{VmArea, VmPerm, VmSpace},
+        vm::VmPerm,
         page_table_isolation::PageTable,
     },
-    sync::Mutex as NosMutex,
+    sync::{Mutex as NosMutex, lazy::Lazy},
 };
 
 /// Memory protection domain identifier
@@ -32,7 +29,7 @@ pub type ProtectionDomainId = u32;
 pub type MemoryRegionId = u64;
 
 /// Memory protection domain
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ProtectionDomain {
     /// Domain identifier
     pub id: ProtectionDomainId,
@@ -47,7 +44,7 @@ pub struct ProtectionDomain {
 }
 
 /// Memory region with protection attributes
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct MemoryRegion {
     /// Region identifier
     pub id: MemoryRegionId,
@@ -65,6 +62,22 @@ pub struct MemoryRegion {
     pub region_type: MemoryRegionType,
     /// Access count for monitoring
     pub access_count: AtomicUsize,
+}
+
+impl MemoryRegion {
+    /// Create a clone of the region without the atomic counter
+    pub fn clone_without_counter(&self) -> Self {
+        Self {
+            id: self.id,
+            start: self.start,
+            end: self.end,
+            permissions: self.permissions,
+            domain_id: self.domain_id,
+            secure: self.secure,
+            region_type: self.region_type,
+            access_count: AtomicUsize::new(0),
+        }
+    }
 }
 
 /// Memory region type
@@ -271,7 +284,7 @@ impl MemoryIsolationManager {
             }
         }
 
-        let id = self.next_region_id.fetch_add(1, Ordering::SeqCst);
+        let id = self.next_region_id.fetch_add(1, Ordering::SeqCst) as MemoryRegionId;
 
         let region = MemoryRegion {
             id,
@@ -292,7 +305,7 @@ impl MemoryIsolationManager {
         };
 
         // Update region with randomized start
-        let mut randomized_region = region.clone();
+        let mut randomized_region = region.clone_without_counter();
         randomized_region.start = randomized_start;
         randomized_region.end = randomized_start + size;
 
@@ -360,7 +373,7 @@ impl MemoryIsolationManager {
             return AccessValidationResult::DeniedPermission;
         }
 
-        if is_execute && !region.permissions.exec {
+        if is_execute && !region.permissions.execute {
             return AccessValidationResult::DeniedPermission;
         }
 
@@ -470,14 +483,14 @@ impl MemoryIsolationManager {
             domain_id,
             start,
             size,
-            VmPerm { read: true, write: true, exec: false, user: false },
+            VmPerm { read: true, write: true, execute: false },
             region_type,
             true,
         )
     }
 
     /// Find a secure address range
-    fn find_secure_address_range(&self, size: usize) -> Result<usize, MemoryIsolationError> {
+    fn find_secure_address_range(&self, _size: usize) -> Result<usize, MemoryIsolationError> {
         // TODO: Implement secure address allocation
         // For now, return a fixed address in kernel space
         Ok(0xFFFF_8000_0000_0000)
@@ -596,7 +609,7 @@ impl ProtectionKeyManager {
     }
 
     /// Allocate a protection key
-    pub fn allocate_key(&self, permissions: VmPerm) -> Result<Option<u8>, MemoryIsolationError> {
+    pub fn allocate_key(&self, _permissions: VmPerm) -> Result<Option<u8>, MemoryIsolationError> {
         if self.available_keys.is_empty() {
             return Ok(None);
         }
@@ -632,9 +645,19 @@ pub enum MemoryIsolationError {
     PermissionDenied,
 }
 
+impl From<MemoryIsolationError> for crate::security::memory_security::SecurityError {
+    fn from(err: MemoryIsolationError) -> Self {
+        match err {
+            MemoryIsolationError::PermissionDenied =>
+                crate::security::memory_security::SecurityError::PermissionDenied,
+            _ => crate::security::memory_security::SecurityError::MemoryIsolationError(err),
+        }
+    }
+}
+
 /// Global memory isolation manager instance
-static MEMORY_ISOLATION_MANAGER: NosMutex<MemoryIsolationManager> =
-    NosMutex::new(MemoryIsolationManager::new());
+static MEMORY_ISOLATION_MANAGER: Lazy<NosMutex<MemoryIsolationManager>> =
+    Lazy::new(|| NosMutex::new(MemoryIsolationManager::new()));
 
 /// Initialize memory isolation system
 pub fn init_memory_isolation() -> Result<(), MemoryIsolationError> {

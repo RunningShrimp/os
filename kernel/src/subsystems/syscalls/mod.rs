@@ -30,7 +30,10 @@
 //!
 
 // Import kernel prelude for common types
+// Note: This import is used by submodules but marked as unused here due to glob re-exports
+#[allow(unused_imports)]
 use crate::prelude::*;
+
 // ### 高级特性
 //
 // - [`async_ops`]: 异步系统调用操作
@@ -157,6 +160,7 @@ pub mod fast_path;
 pub mod fs;
 pub mod glib;
 pub mod ipc;
+pub mod lockfree_stats;
 pub mod memory;
 pub mod network;
 pub mod object;
@@ -172,28 +176,40 @@ pub mod thread_futex;
 pub mod timerfd;
 pub mod types;
 
-// 重新导出主要接口
-pub use core::*;
+// ============================================================================
+// Re-exports
+// ============================================================================
 
-pub use aio::*;
-pub use async_ops::*;
-pub use common::*;
-pub use dispatch::*;
-pub use epoll::*;
-pub use fast_path::*;
-pub use fs::*;
-pub use glib::*;
-pub use ipc::*;
-pub use memory::*;
-pub use network::*;
-// Note: memory module not glob-imported due to dispatch function ambiguity
-pub use object::*;
-pub use process::*;
-pub use security::*;
-pub use signal::*;
-pub use thread::*;
-pub use thread_futex::*;
-pub use types::*;
+// Core functionality
+pub use core::{
+    SyscallCoreDispatcher,
+    init_syscall_dispatcher,
+    get_syscall_dispatcher,
+    dispatch_syscall,
+    register_syscall_handler,
+    unregister_syscall_handler,
+    get_syscall_stats,
+};
+
+// Types (defined in types/mod.rs)
+pub use types::{
+    SyscallInfo,
+    SyscallArgType,
+    SyscallReturnType,
+    SyscallContext,
+    SyscallExecutionResult,
+    SyscallStatistics,
+    SyscallFilter,
+    SyscallInterceptor,
+    SyscallLogger,
+    SyscallLogLevel,
+};
+
+// API types (re-exported from nos_api and api modules)
+pub use api::{
+    SyscallError,
+    SyscallResult,
+};
 
 // Export syscall constants from api module
 pub use api::syscall_id::{SYS_BATCH, SYS_CLOSE, SYS_GETPID, SYS_READ, SYS_WRITE};

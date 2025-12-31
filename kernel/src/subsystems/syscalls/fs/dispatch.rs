@@ -2,13 +2,13 @@
 //!
 //! Routes syscall numbers to appropriate handler functions
 
-use nos_api::syscall::SyscallResult;
+use crate::prelude::*;
 
 use super::handlers;
-use crate::error::{SyscallError, UnifiedError};
+use crate::error::KernelError;
 
 /// Dispatch filesystem syscalls to appropriate handlers
-pub fn dispatch(syscall_number: u32, args: &[u64]) -> Result<u64, KernelError> {
+pub fn dispatch(syscall_number: u32, args: &[u64]) -> KernelResult<u64> {
     match syscall_number {
         0x7000 => handlers::handle_chdir(args),     // chdir
         0x7001 => handlers::handle_fchdir(args),    // fchdir
@@ -24,13 +24,13 @@ pub fn dispatch(syscall_number: u32, args: &[u64]) -> Result<u64, KernelError> {
         0x700B => handlers::handle_fchmod(args),    // fchmod
         0x700C => handlers::handle_chown(args),     // chown
         0x700D => handlers::handle_fchown(args),    // fchown
-        0x700E => handlers::handle_lchown(args),    // lchown
+        0x700E => return Err(KernelError::NotSupported), // lchown - not implemented
         0x700F => handlers::handle_umask(args),     // umask
         0x7010 => handlers::handle_stat(args),      // stat
         0x7011 => handlers::handle_lstat(args),     // lstat
         0x7012 => handlers::handle_access(args),    // access
         0x7014 => handlers::handle_faccessat(args), // faccessat
         0x7013 => handlers::handle_readdir(args),   // readdir/getdents
-        _ => Err(KernelError::InvalidSyscall),
+        _ => Err(KernelError::NotFound),
     }
 }

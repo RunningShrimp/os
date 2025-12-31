@@ -11,11 +11,13 @@ use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use crate::{
     reliability::{EFAULT, EINVAL, ENOMEM},
     subsystems::sync::Mutex,
+    subsystems::mm::page_table_isolation::PageTable,
 };
 // use crate::subsystems::mm::vm::{Page, VirtAddr, PhysAddr}; // TODO: Implement vm module
 
 // Virtual and physical address types are defined in nos-api::core::types
 pub use nos_api::core::types::{VirtAddr, PhysAddr};
+#[derive(Debug)]
 pub struct Page {
     pub addr: VirtAddr,
     pub size: usize,
@@ -273,12 +275,12 @@ impl PageTableManager {
         Ok(())
     }
 
-    fn update_tlb(&self, vaddr: VirtAddr, paddr: PhysAddr, protection: MemoryProtection) {
+    fn update_tlb(&self, _vaddr: VirtAddr, _paddr: PhysAddr, _protection: MemoryProtection) {
         // In a real implementation, this would update hardware TLB
         // For now, this is a placeholder
     }
 
-    fn invalidate_tlb(&self, vaddr: VirtAddr) {
+    fn invalidate_tlb(&self, _vaddr: VirtAddr) {
         // In a real implementation, this would invalidate TLB entry
         // For now, this is a placeholder
     }
@@ -418,7 +420,7 @@ impl AddressSpaceManager {
         if let Some(space) = spaces.remove(&asid) {
             // Clean up all mapped pages
             for (_, region) in space.regions {
-                if let Some(paddr) = region.backing_paddr {
+                if let Some(_paddr) = region.backing_paddr {
                     // Free the physical page
                     // Note: In a real implementation, we'd need a reference to the physical memory
                     // manager
@@ -603,20 +605,20 @@ pub fn get_memory_manager_mut() -> Option<&'static mut MicroMemoryManager> {
 /// Allocate a single physical page
 pub fn alloc_page() -> Option<usize> {
     get_memory_manager()
-        .and_then(|mgr| mgr.physical_memory.allocate_page().ok())
+        .and_then(|mgr| mgr.physical_manager.allocate_page().ok())
 }
 
 /// Free a physical page
 pub fn free_page(paddr: usize) -> Result<(), i32> {
     get_memory_manager()
         .ok_or(ENOMEM)?
-        .physical_memory
+        .physical_manager
         .free_page(paddr)
 }
 
 /// Map a page in a page table
 pub fn map_page(
-    pagetable: *mut u8,
+    pagetable: *mut PageTable,
     vaddr: usize,
     paddr: usize,
     perm: u64
@@ -626,7 +628,7 @@ pub fn map_page(
     }
 
     // Convert perm bits to MemoryProtection
-    let protection = MemoryProtection {
+    let _protection = MemoryProtection {
         readable: (perm & 0x1) != 0,      // PTE_R
         writable: (perm & 0x2) != 0,      // PTE_W
         executable: (perm & 0x4) != 0,    // PTE_X
@@ -643,7 +645,7 @@ pub fn map_page(
 }
 
 /// Unmap a page from a page table
-pub fn unmap_page(pagetable: *mut u8, vaddr: usize) -> Result<(), i32> {
+pub fn unmap_page(pagetable: *mut PageTable, vaddr: usize) -> Result<(), i32> {
     if pagetable.is_null() || vaddr == 0 {
         return Err(EFAULT);
     }
@@ -662,7 +664,7 @@ pub fn find_free_range(size: usize) -> Option<usize> {
     let aligned_size = (size + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
 
     // Simple linear search (in reality, this would be more sophisticated)
-    let mut addr = USER_SPACE_START;
+    let addr = USER_SPACE_START;
     while addr + aligned_size <= USER_SPACE_END {
         // For now, just return the first available address
         // In a real implementation, this would check existing mappings
@@ -704,7 +706,7 @@ pub mod flags {
 
 /// Map multiple pages into a page table
 pub fn map_pages(
-    pagetable: *mut u8,
+    pagetable: *mut PageTable,
     mut vaddr: usize,
     mut paddr: usize,
     size: usize,

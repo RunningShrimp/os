@@ -7,11 +7,8 @@
 //! - 驱动程序生命周期管理
 //! - 设备资源管理
 
-use crate::error::UnifiedError;
-use alloc::collections::BTreeMap;
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
-use alloc::sync::Arc;
+use crate::prelude::*;
+use alloc::string::ToString;
 use spin::Mutex;
 
 /// 设备ID类型
@@ -20,7 +17,7 @@ pub type DeviceId = u32;
 pub type DriverId = u32;
 
 /// 设备类型
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DeviceType {
     /// 字符设备
     Character,
@@ -43,7 +40,7 @@ pub enum DeviceType {
 }
 
 /// 设备状态
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DeviceStatus {
     /// 未初始化
     Uninitialized,
@@ -202,45 +199,45 @@ pub struct DriverInfo {
 }
 
 /// 驱动程序接口
-pub trait Driver {
+pub trait Driver: Send {
     /// 获取驱动程序信息
     fn get_info(&self) -> DriverInfo;
     
     /// 初始化驱动程序
-    fn initialize(&mut self) -> Result<(), KernelError>;
-    
+    fn initialize(&mut self) -> Result<()>;
+
     /// 清理驱动程序
-    fn cleanup(&mut self) -> Result<(), KernelError>;
-    
+    fn cleanup(&mut self) -> Result<()>;
+
     /// 探测设备
-    fn probe_device(&self, device_info: &DeviceInfo) -> Result<bool, KernelError>;
-    
+    fn probe_device(&self, device_info: &DeviceInfo) -> Result<bool>;
+
     /// 添加设备
-    fn add_device(&mut self, device_info: &DeviceInfo) -> Result<(), KernelError>;
-    
+    fn add_device(&mut self, device_info: &DeviceInfo) -> Result<()>;
+
     /// 移除设备
-    fn remove_device(&mut self, device_id: DeviceId) -> Result<(), KernelError>;
-    
+    fn remove_device(&mut self, device_id: DeviceId) -> Result<()>;
+
     /// 处理设备I/O
-    fn handle_io(&mut self, device_id: DeviceId, operation: IoOperation) -> Result<IoResult, KernelError>;
-    
+    fn handle_io(&mut self, device_id: DeviceId, operation: IoOperation) -> Result<IoResult>;
+
     /// 获取设备状态
-    fn get_device_status(&self, device_id: DeviceId) -> Result<DeviceStatus, KernelError>;
-    
+    fn get_device_status(&self, device_id: DeviceId) -> Result<DeviceStatus>;
+
     /// 设置设备属性
-    fn set_device_attribute(&mut self, device_id: DeviceId, name: &str, value: &str) -> Result<(), KernelError>;
-    
+    fn set_device_attribute(&mut self, device_id: DeviceId, name: &str, value: &str) -> Result<()>;
+
     /// 获取设备属性
-    fn get_device_attribute(&self, device_id: DeviceId, name: &str) -> Result<String, KernelError>;
-    
+    fn get_device_attribute(&self, device_id: DeviceId, name: &str) -> Result<String>;
+
     /// 暂停设备
-    fn suspend_device(&mut self, device_id: DeviceId) -> Result<(), KernelError>;
-    
+    fn suspend_device(&mut self, device_id: DeviceId) -> Result<()>;
+
     /// 恢复设备
-    fn resume_device(&mut self, device_id: DeviceId) -> Result<(), KernelError>;
-    
+    fn resume_device(&mut self, device_id: DeviceId) -> Result<()>;
+
     /// 处理中断
-    fn handle_interrupt(&mut self, device_id: DeviceId, interrupt_info: &InterruptInfo) -> Result<(), KernelError>;
+    fn handle_interrupt(&mut self, device_id: DeviceId, interrupt_info: &InterruptInfo) -> Result<()>;
 }
 
 /// I/O操作
@@ -289,7 +286,7 @@ pub struct InterruptInfo {
 /// 驱动程序管理器
 pub struct DriverManager {
     /// 驱动程序列表
-    drivers: Arc<Mutex<BTreeMap<DriverId, Arc<Mutex<Box<dyn Driver>>>>>,
+    drivers: Arc<Mutex<BTreeMap<DriverId, Arc<Mutex<Box<dyn Driver>>>>>>,
     /// 设备列表
     devices: Arc<Mutex<BTreeMap<DeviceId, DeviceInfo>>>,
     /// 设备到驱动程序的映射
@@ -376,7 +373,7 @@ impl DriverManager {
     }
     
     /// 注册驱动程序
-    pub fn register_driver(&self, driver: Box<dyn Driver>) -> Result<DriverId, KernelError> {
+    pub fn register_driver(&self, driver: Box<dyn Driver>) -> Result<DriverId> {
         // 生成驱动程序ID
         let driver_id = {
             let mut next_id = self.next_driver_id.lock();
@@ -385,14 +382,11 @@ impl DriverManager {
             id
         };
         
-        // 获取驱动程序信息
-        let driver_info = driver.get_info();
-        
         // 检查驱动程序数量限制
         {
             let drivers = self.drivers.lock();
             if drivers.len() >= self.config.max_drivers {
-                return Err(KernelError::OutOfSpace);
+                return Err(KernelError::ResourceUnavailable);
             }
         }
         
@@ -440,7 +434,7 @@ impl DriverManager {
     }
     
     /// 注销驱动程序
-    pub fn unregister_driver(&self, driver_id: DriverId) -> Result<(), KernelError> {
+    pub fn unregister_driver(&self, driver_id: DriverId) -> Result<()> {
         // 检查驱动程序是否存在
         let exists = {
             let drivers = self.drivers.lock();
@@ -452,10 +446,10 @@ impl DriverManager {
         }
         
         // 获取驱动程序管理的设备列表
-        let managed_devices = {
+        let managed_devices: Vec<DeviceId> = {
             let mapping = self.device_driver_mapping.lock();
             mapping.iter()
-                .filter(|(_, &did)| did == driver_id)
+                .filter(|(_, did)| **did == driver_id)
                 .map(|(&did, _)| did)
                 .collect::<Vec<_>>()
         };
@@ -490,7 +484,7 @@ impl DriverManager {
     }
     
     /// 添加设备
-    pub fn add_device(&self, mut device_info: DeviceInfo) -> Result<DeviceId, KernelError> {
+    pub fn add_device(&self, mut device_info: DeviceInfo) -> Result<DeviceId> {
         // 生成设备ID
         let device_id = {
             let mut next_id = self.next_device_id.lock();
@@ -505,7 +499,7 @@ impl DriverManager {
         {
             let devices = self.devices.lock();
             if devices.len() >= self.config.max_devices {
-                return Err(KernelError::OutOfSpace);
+                return Err(KernelError::ResourceUnavailable);
             }
         }
         
@@ -560,7 +554,7 @@ impl DriverManager {
     }
     
     /// 移除设备
-    pub fn remove_device(&self, device_id: DeviceId) -> Result<(), KernelError> {
+    pub fn remove_device(&self, device_id: DeviceId) -> Result<()> {
         // 检查设备是否存在
         let device_info = {
             let devices = self.devices.lock();
@@ -613,7 +607,7 @@ impl DriverManager {
     }
     
     /// 处理设备I/O
-    pub fn handle_device_io(&self, device_id: DeviceId, operation: IoOperation) -> Result<IoResult, KernelError> {
+    pub fn handle_device_io(&self, device_id: DeviceId, operation: IoOperation) -> Result<IoResult> {
         // 获取驱动程序ID
         let driver_id = {
             let mapping = self.device_driver_mapping.lock();
@@ -648,7 +642,7 @@ impl DriverManager {
     }
     
     /// 处理中断
-    pub fn handle_interrupt(&self, device_id: DeviceId, interrupt_info: InterruptInfo) -> Result<(), KernelError> {
+    pub fn handle_interrupt(&self, device_id: DeviceId, interrupt_info: InterruptInfo) -> Result<()> {
         // 获取驱动程序ID
         let driver_id = {
             let mapping = self.device_driver_mapping.lock();
@@ -728,8 +722,8 @@ impl DriverManager {
         };
         
         if let Some(driver) = driver {
-            let mut driver = driver.lock();
-            
+            let driver = driver.lock();
+
             // 探测每个设备
             for device in devices {
                 // 检查设备是否已有驱动程序
@@ -750,7 +744,7 @@ impl DriverManager {
     }
     
     /// 查找设备的驱动程序
-    fn find_driver_for_device(&self, device_info: &DeviceInfo) -> Result<DriverId, KernelError> {
+    fn find_driver_for_device(&self, device_info: &DeviceInfo) -> Result<DriverId> {
         let drivers = self.drivers.lock();
         
         for (driver_id, driver) in drivers.iter() {
@@ -768,4 +762,14 @@ impl DriverManager {
         
         Err(KernelError::NotFound)
     }
+}
+
+/// 全局驱动程序管理器实例
+static GLOBAL_DRIVER_MANAGER: Lazy<DriverManager> = Lazy::new(|| {
+    DriverManager::with_default_config()
+});
+
+/// 获取全局驱动程序管理器实例
+pub fn get_driver_manager() -> &'static DriverManager {
+    &GLOBAL_DRIVER_MANAGER
 }

@@ -17,7 +17,7 @@ use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use spin::Mutex;
 
 use crate::{
-    reliability::{EINVAL, EIO, ENOENT, ENOMEM, EPERM},
+    reliability::{EINVAL, EIO, ENOENT},
     subsystems::{
         cloud_native::oci::{OciContainerSpec, OciProcess, OciRoot, OciUser},
         syscalls::signal::service::kill_process,
@@ -453,7 +453,7 @@ impl Container {
 
         if let Some(pid) = self.pid {
             // 发送SIGSTOP信号
-            kill_process(pid as u64, 19)?; // SIGSTOP
+            kill_process(pid as u64, 19).map_err(|_| crate::reliability::errno::EIO)?; // SIGSTOP
         }
 
         self.state = ContainerState::Paused;
@@ -470,7 +470,7 @@ impl Container {
 
         if let Some(pid) = self.pid {
             // 发送SIGCONT信号
-            crate::subsystems::syscalls::process::kill_process(pid as u64, 18)?; // SIGCONT
+            kill_process(pid as u64, 18).map_err(|_| crate::reliability::errno::EIO)?; // SIGCONT
         }
 
         self.state = ContainerState::Running;
@@ -480,7 +480,7 @@ impl Container {
     }
 
     /// 删除容器
-    pub fn remove(mut self) -> Result<(), i32> {
+    pub fn remove(self) -> Result<(), i32> {
         if self.state == ContainerState::Running {
             return Err(EINVAL);
         }
@@ -696,10 +696,8 @@ impl Container {
 
         // 设置主机名
         if let Some(ref hostname) = self.config.network.hostname {
-            crate::subsystems::syscalls::process::set_hostname_for_process(
-                self.pid.unwrap_or(0) as u64,
-                hostname,
-            )?;
+            crate::subsystems::syscalls::process::set_hostname(hostname)
+                .map_err(|_| crate::reliability::errno::EIO)?;
         }
 
         Ok(())
@@ -805,25 +803,25 @@ impl Container {
     }
 
     /// 获取CPU使用率
-    fn get_cpu_usage(&self, pid: u32) -> f64 {
+    fn get_cpu_usage(&self, _pid: u32) -> f64 {
         // 在实际实现中，这里会读取/proc/[pid]/stat并计算CPU使用率
         0.0 // 简化实现
     }
 
     /// 获取内存使用量
-    fn get_memory_usage(&self, pid: u32) -> u64 {
+    fn get_memory_usage(&self, _pid: u32) -> u64 {
         // 在实际实现中，这里会读取/proc/[pid]/status并获取内存使用量
         0 // 简化实现
     }
 
     /// 获取网络I/O统计
-    fn get_network_io_stats(&self, pid: u32) -> NetworkIOStats {
+    fn get_network_io_stats(&self, _pid: u32) -> NetworkIOStats {
         // 在实际实现中，这里会获取容器的网络I/O统计
         NetworkIOStats { rx_bytes: 0, tx_bytes: 0, rx_packets: 0, tx_packets: 0 }
     }
 
     /// 获取磁盘I/O统计
-    fn get_disk_io_stats(&self, pid: u32) -> DiskIOStats {
+    fn get_disk_io_stats(&self, _pid: u32) -> DiskIOStats {
         // 在实际实现中，这里会获取容器的磁盘I/O统计
         DiskIOStats { read_bytes: 0, write_bytes: 0, reads: 0, writes: 0 }
     }
@@ -1009,7 +1007,7 @@ pub fn stop_container(container_id: ContainerId) -> Result<(), i32> {
 pub fn remove_container(container_id: ContainerId) -> Result<(), i32> {
     let manager = get_container_manager().ok_or(EIO)?;
     let container = manager.get_container(container_id).ok_or(ENOENT)?;
-    let mut cont = container.lock();
+    let cont = container.lock();
 
     // 检查容器状态
     if cont.state == ContainerState::Running {
@@ -1045,3 +1043,6 @@ pub fn get_active_container_count() -> usize {
 fn get_current_time() -> u64 {
     crate::subsystems::time::rdtsc() as u64
 }
+
+// 导出容器管理器模块
+pub mod manager;

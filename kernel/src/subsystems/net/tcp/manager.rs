@@ -10,6 +10,7 @@ use core::sync::atomic::{AtomicU16, AtomicU32, AtomicU64, Ordering};
 use super::{
     TcpState,
     state::{TcpAction, TcpStateMachine},
+    batch_ack::BatchAckAggregator,
 };
 use crate::net::ipv4::Ipv4Addr;
 
@@ -347,6 +348,10 @@ pub struct TcpConnectionManager {
     port_bitmap: PortBitmap,
     /// Connection ID counter
     next_connection_id: AtomicU32,
+    /// Batch ACK aggregator
+    ack_aggregator: BatchAckAggregator,
+    /// Enable batch ACK aggregation
+    enable_batch_ack: bool,
 }
 
 impl TcpConnectionManager {
@@ -357,7 +362,36 @@ impl TcpConnectionManager {
             listening_sockets: BTreeMap::new(),
             port_bitmap: PortBitmap::new(),
             next_connection_id: AtomicU32::new(1),
+            ack_aggregator: BatchAckAggregator::new(),
+            enable_batch_ack: true,
         }
+    }
+
+    /// Create a new TCP connection manager with custom configuration
+    pub fn with_config(enable_batch_ack: bool, ack_threshold: usize, ack_timeout_ms: u64) -> Self {
+        Self {
+            connections: BTreeMap::new(),
+            listening_sockets: BTreeMap::new(),
+            port_bitmap: PortBitmap::new(),
+            next_connection_id: AtomicU32::new(1),
+            ack_aggregator: BatchAckAggregator::with_config(ack_threshold, ack_timeout_ms),
+            enable_batch_ack,
+        }
+    }
+
+    /// Enable or disable batch ACK aggregation
+    pub fn set_batch_ack_enabled(&mut self, enabled: bool) {
+        self.enable_batch_ack = enabled;
+    }
+
+    /// Get the ACK aggregator
+    pub fn ack_aggregator(&self) -> &BatchAckAggregator {
+        &self.ack_aggregator
+    }
+
+    /// Get mutable ACK aggregator
+    pub fn ack_aggregator_mut(&mut self) -> &mut BatchAckAggregator {
+        &mut self.ack_aggregator
     }
 
     /// Allocate a new port
@@ -584,10 +618,22 @@ impl TcpConnectionManager {
 
     /// Get manager statistics
     pub fn stats(&self) -> TcpManagerStats {
+        let ack_stats = self.ack_aggregator.stats();
         TcpManagerStats {
             active_connections: self.connections.len(),
             listening_sockets: self.listening_sockets.len(),
             allocated_ports: self.port_bitmap.count_allocated() as usize,
+            total_acks_aggregated: ack_stats.total_aggregated,
+            total_ack_batches: ack_stats.total_batches,
+            pending_acks: ack_stats.pending_acks,
+            batch_ack_enabled: self.enable_batch_ack,
+        }
+    }
+
+    /// Flush pending ACKs if batch ACK is enabled
+    pub fn flush_pending_acks(&mut self) {
+        if self.enable_batch_ack {
+            self.ack_aggregator.flush();
         }
     }
 }
@@ -607,6 +653,14 @@ pub struct TcpManagerStats {
     pub listening_sockets: usize,
     /// Number of allocated ports
     pub allocated_ports: usize,
+    /// Total ACKs aggregated
+    pub total_acks_aggregated: u64,
+    /// Total ACK batches sent
+    pub total_ack_batches: u64,
+    /// Current pending ACKs
+    pub pending_acks: usize,
+    /// Whether batch ACK is enabled
+    pub batch_ack_enabled: bool,
 }
 
 /// TCP errors

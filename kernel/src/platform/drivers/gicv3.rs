@@ -26,41 +26,45 @@ impl GicV3 {
             core::arch::asm!("isb");
             core::arch::asm!("msr icc_pmr_el1, {}", in(reg) 0xFFu64);
             core::arch::asm!("msr icc_igrpen1_el1, {}", in(reg) 1u64);
-        }
 
-        // Wake redistributor (clear Sleep bit) and wait ChildrenAsleep==0
-        let mut waker = crate::subsystems::mm::mmio_read32(self.r32(0x0014) as *const u32);
-        crate::subsystems::mm::mmio_write32(self.r32(0x0014), waker & !(1 << 1));
-        loop {
-            waker = crate::subsystems::mm::mmio_read32(self.r32(0x0014) as *const u32);
-            if (waker & (1 << 2)) == 0 {
-                break;
+            // Wake redistributor (clear Sleep bit) and wait ChildrenAsleep==0
+            let mut waker = crate::subsystems::mm::mmio_read32(self.r32(0x0014) as *const u32);
+            crate::subsystems::mm::mmio_write32(self.r32(0x0014), waker & !(1 << 1));
+            loop {
+                waker = crate::subsystems::mm::mmio_read32(self.r32(0x0014) as *const u32);
+                if (waker & (1 << 2)) == 0 {
+                    break;
+                }
+                core::hint::spin_loop();
             }
-            core::hint::spin_loop();
-        }
 
-        // Enable distributor for Group1NS
-        crate::subsystems::mm::mmio_write32(self.d32(0x000), 0x2);
+            // Enable distributor for Group1NS
+            crate::subsystems::mm::mmio_write32(self.d32(0x000), 0x2);
+        }
     }
 
     pub fn disable(&self) {
         unsafe {
             core::arch::asm!("msr icc_igrpen1_el1, {}", in(reg) 0u64);
+            crate::subsystems::mm::mmio_write32(self.d32(0x000), 0x0);
         }
-        crate::subsystems::mm::mmio_write32(self.d32(0x000), 0x0);
     }
 
     pub fn set_enable(&self, irq: usize) {
         let reg = 0x100 + ((irq / 32) * 4);
         let bit = 1u32 << (irq % 32);
-        let v = crate::subsystems::mm::mmio_read32(self.d32(reg) as *const u32);
-        crate::subsystems::mm::mmio_write32(self.d32(reg), v | bit);
+        unsafe {
+            let v = crate::subsystems::mm::mmio_read32(self.d32(reg) as *const u32);
+            crate::subsystems::mm::mmio_write32(self.d32(reg), v | bit);
+        }
     }
 
     pub fn clear_enable(&self, irq: usize) {
         let reg = 0x180 + ((irq / 32) * 4);
         let bit = 1u32 << (irq % 32);
-        crate::subsystems::mm::mmio_write32(self.d32(reg), bit);
+        unsafe {
+            crate::subsystems::mm::mmio_write32(self.d32(reg), bit);
+        }
     }
 
     pub fn cpu_enable(&self) {

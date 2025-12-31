@@ -4,7 +4,7 @@
 
 extern crate alloc;
 
-use alloc::{string::String, vec::Vec};
+use alloc::{string::String, string::ToString, vec::Vec};
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use crate::subsystems::sync::Mutex;

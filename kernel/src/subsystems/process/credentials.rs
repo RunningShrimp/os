@@ -16,7 +16,7 @@
 //! - 权限检查：非特权进程只能设置 SUID
 
 use crate::api::SyscallError;
-use crate::posix::{Uid, Gid};
+use crate::subsystems::posix::{Uid, Gid};
 
 /// setuid 系统调用 - 设置用户 ID
 ///
@@ -60,12 +60,12 @@ use crate::posix::{Uid, Gid};
 /// // let result = sys_setuid(1000);  // 可能失败 EPERM
 /// ```
 pub fn sys_setuid(uid: Uid) -> Result<(), SyscallError> {
-    use crate::subsystems::process::manager::PROC_TABLE;
+    use crate::subsystems::process::PROC_TABLE;
 
     // 获取当前进程
-    let pid = crate::process::myproc().ok_or(SyscallError::NoProcess)?;
+    let pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
     let mut table = PROC_TABLE.lock();
-    let proc = table.find(pid).ok_or(SyscallError::NoProcess)?;
+    let proc = table.find(pid).ok_or(SyscallError::NotFound)?;
 
     let old_ruid = proc.uid;
     let old_euid = proc.euid;
@@ -83,12 +83,12 @@ pub fn sys_setuid(uid: Uid) -> Result<(), SyscallError> {
         // 非特权进程：权限检查
         // 1. RUID 只能设置为当前 RUID
         if uid != old_ruid {
-            return Err(SyscallError::OperationNotPermitted);
+            return Err(SyscallError::PermissionDenied);
         }
 
         // 2. EUID 可以设置为 RUID、EUID 或 SUID
         if uid != old_ruid && uid != old_euid && uid != old_suid {
-            return Err(SyscallError::OperationNotPermitted);
+            return Err(SyscallError::PermissionDenied);
         }
 
         // 3. SUID 总是设置为旧的 EUID
@@ -106,11 +106,11 @@ pub fn sys_setuid(uid: Uid) -> Result<(), SyscallError> {
 ///
 /// 返回进程的真实用户 ID (RUID)
 pub fn sys_getuid() -> Result<Uid, SyscallError> {
-    use crate::subsystems::process::manager::PROC_TABLE;
+    use crate::subsystems::process::PROC_TABLE;
 
-    let pid = crate::process::myproc().ok_or(SyscallError::NoProcess)?;
-    let table = PROC_TABLE.lock();
-    let proc = table.find(pid).ok_or(SyscallError::NoProcess)?;
+    let pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
+    let mut table = PROC_TABLE.lock();
+    let proc = table.find(pid).ok_or(SyscallError::NotFound)?;
 
     Ok(proc.uid)
 }
@@ -121,11 +121,11 @@ pub fn sys_getuid() -> Result<Uid, SyscallError> {
 ///
 /// 返回进程的有效用户 ID (EUID)
 pub fn sys_geteuid() -> Result<Uid, SyscallError> {
-    use crate::subsystems::process::manager::PROC_TABLE;
+    use crate::subsystems::process::PROC_TABLE;
 
-    let pid = crate::process::myproc().ok_or(SyscallError::NoProcess)?;
-    let table = PROC_TABLE.lock();
-    let proc = table.find(pid).ok_or(SyscallError::NoProcess)?;
+    let pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
+    let mut table = PROC_TABLE.lock();
+    let proc = table.find(pid).ok_or(SyscallError::NotFound)?;
 
     Ok(proc.euid)
 }
@@ -157,12 +157,12 @@ pub fn sys_geteuid() -> Result<Uid, SyscallError> {
 ///
 /// - `EPERM`: 权限不足
 pub fn sys_setgid(gid: Gid) -> Result<(), SyscallError> {
-    use crate::subsystems::process::manager::PROC_TABLE;
+    use crate::subsystems::process::PROC_TABLE;
 
     // 获取当前进程
-    let pid = crate::process::myproc().ok_or(SyscallError::NoProcess)?;
+    let pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
     let mut table = PROC_TABLE.lock();
-    let proc = table.find(pid).ok_or(SyscallError::NoProcess)?;
+    let proc = table.find(pid).ok_or(SyscallError::NotFound)?;
 
     let old_rgid = proc.gid;
     let old_egid = proc.egid;
@@ -180,12 +180,12 @@ pub fn sys_setgid(gid: Gid) -> Result<(), SyscallError> {
         // 非特权进程：权限检查
         // 1. RGID 只能设置为当前 RGID
         if gid != old_rgid {
-            return Err(SyscallError::OperationNotPermitted);
+            return Err(SyscallError::PermissionDenied);
         }
 
         // 2. EGID 可以设置为 RGID、EGID 或 SGID
         if gid != old_rgid && gid != old_egid && gid != old_sgid {
-            return Err(SyscallError::OperationNotPermitted);
+            return Err(SyscallError::PermissionDenied);
         }
 
         // 3. SGID 总是设置为旧的 EGID
@@ -203,11 +203,11 @@ pub fn sys_setgid(gid: Gid) -> Result<(), SyscallError> {
 ///
 /// 返回进程的真实组 ID (RGID)
 pub fn sys_getgid() -> Result<Gid, SyscallError> {
-    use crate::subsystems::process::manager::PROC_TABLE;
+    use crate::subsystems::process::PROC_TABLE;
 
-    let pid = crate::process::myproc().ok_or(SyscallError::NoProcess)?;
-    let table = PROC_TABLE.lock();
-    let proc = table.find(pid).ok_or(SyscallError::NoProcess)?;
+    let pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
+    let mut table = PROC_TABLE.lock();
+    let proc = table.find(pid).ok_or(SyscallError::NotFound)?;
 
     Ok(proc.gid)
 }
@@ -218,11 +218,11 @@ pub fn sys_getgid() -> Result<Gid, SyscallError> {
 ///
 /// 返回进程的有效组 ID (EGID)
 pub fn sys_getegid() -> Result<Gid, SyscallError> {
-    use crate::subsystems::process::manager::PROC_TABLE;
+    use crate::subsystems::process::PROC_TABLE;
 
-    let pid = crate::process::myproc().ok_or(SyscallError::NoProcess)?;
-    let table = PROC_TABLE.lock();
-    let proc = table.find(pid).ok_or(SyscallError::NoProcess)?;
+    let pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
+    let mut table = PROC_TABLE.lock();
+    let proc = table.find(pid).ok_or(SyscallError::NotFound)?;
 
     Ok(proc.egid)
 }
@@ -248,11 +248,11 @@ pub fn sys_getegid() -> Result<Gid, SyscallError> {
 /// * `Ok(())` - 成功
 /// * `Err(SyscallError)` - 失败
 pub fn sys_seteuid(euid: Uid) -> Result<(), SyscallError> {
-    use crate::subsystems::process::manager::PROC_TABLE;
+    use crate::subsystems::process::PROC_TABLE;
 
-    let pid = crate::process::myproc().ok_or(SyscallError::NoProcess)?;
+    let pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
     let mut table = PROC_TABLE.lock();
-    let proc = table.find(pid).ok_or(SyscallError::NoProcess)?;
+    let proc = table.find(pid).ok_or(SyscallError::NotFound)?;
 
     let old_euid = proc.euid;
     let old_ruid = proc.uid;
@@ -264,7 +264,7 @@ pub fn sys_seteuid(euid: Uid) -> Result<(), SyscallError> {
     } else {
         // 非特权进程：EUID 只能设置为 RUID、EUID 或 SUID
         if euid != old_ruid && euid != old_euid && euid != old_suid {
-            return Err(SyscallError::OperationNotPermitted);
+            return Err(SyscallError::PermissionDenied);
         }
         proc.euid = euid;
     }
@@ -287,11 +287,11 @@ pub fn sys_seteuid(euid: Uid) -> Result<(), SyscallError> {
 /// * `Ok(())` - 成功
 /// * `Err(SyscallError)` - 失败
 pub fn sys_setegid(egid: Gid) -> Result<(), SyscallError> {
-    use crate::subsystems::process::manager::PROC_TABLE;
+    use crate::subsystems::process::PROC_TABLE;
 
-    let pid = crate::process::myproc().ok_or(SyscallError::NoProcess)?;
+    let pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
     let mut table = PROC_TABLE.lock();
-    let proc = table.find(pid).ok_or(SyscallError::NoProcess)?;
+    let proc = table.find(pid).ok_or(SyscallError::NotFound)?;
 
     let old_egid = proc.egid;
     let old_rgid = proc.gid;
@@ -303,7 +303,7 @@ pub fn sys_setegid(egid: Gid) -> Result<(), SyscallError> {
     } else {
         // 非特权进程：EGID 只能设置为 RGID、EGID 或 SGID
         if egid != old_rgid && egid != old_egid && egid != old_sgid {
-            return Err(SyscallError::OperationNotPermitted);
+            return Err(SyscallError::PermissionDenied);
         }
         proc.egid = egid;
     }
@@ -334,13 +334,13 @@ pub fn sys_setegid(egid: Gid) -> Result<(), SyscallError> {
 /// * `Ok(())` - 成功
 /// * `Err(SyscallError)` - 失败
 pub fn sys_setreuid(ruid: i32, euid: i32) -> Result<(), SyscallError> {
-    use crate::subsystems::process::manager::PROC_TABLE;
+    use crate::subsystems::process::PROC_TABLE;
 
     const UID_NO_CHANGE: i32 = -1;
 
-    let pid = crate::process::myproc().ok_or(SyscallError::NoProcess)?;
+    let pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
     let mut table = PROC_TABLE.lock();
-    let proc = table.find(pid).ok_or(SyscallError::NoProcess)?;
+    let proc = table.find(pid).ok_or(SyscallError::NotFound)?;
 
     let old_ruid = proc.uid;
     let old_euid = proc.euid;
@@ -355,7 +355,7 @@ pub fn sys_setreuid(ruid: i32, euid: i32) -> Result<(), SyscallError> {
         } else {
             // 非特权进程：RUID 只能设置为当前 RUID 或 EUID
             if new_ruid != old_ruid && new_ruid != old_euid {
-                return Err(SyscallError::OperationNotPermitted);
+                return Err(SyscallError::PermissionDenied);
             }
             proc.uid = new_ruid;
         }
@@ -369,7 +369,7 @@ pub fn sys_setreuid(ruid: i32, euid: i32) -> Result<(), SyscallError> {
         } else {
             // 非特权进程：EUID 只能设置为当前 RUID、EUID 或 SUID
             if new_euid != old_ruid && new_euid != old_euid && new_euid != old_suid {
-                return Err(SyscallError::OperationNotPermitted);
+                return Err(SyscallError::PermissionDenied);
             }
             proc.euid = new_euid;
         }
@@ -399,13 +399,13 @@ pub fn sys_setreuid(ruid: i32, euid: i32) -> Result<(), SyscallError> {
 /// * `Ok(())` - 成功
 /// * `Err(SyscallError)` - 失败
 pub fn sys_setregid(rgid: i32, egid: i32) -> Result<(), SyscallError> {
-    use crate::subsystems::process::manager::PROC_TABLE;
+    use crate::subsystems::process::PROC_TABLE;
 
     const GID_NO_CHANGE: i32 = -1;
 
-    let pid = crate::process::myproc().ok_or(SyscallError::NoProcess)?;
+    let pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
     let mut table = PROC_TABLE.lock();
-    let proc = table.find(pid).ok_or(SyscallError::NoProcess)?;
+    let proc = table.find(pid).ok_or(SyscallError::NotFound)?;
 
     let old_rgid = proc.gid;
     let old_egid = proc.egid;
@@ -420,7 +420,7 @@ pub fn sys_setregid(rgid: i32, egid: i32) -> Result<(), SyscallError> {
         } else {
             // 非特权进程：RGID 只能设置为当前 RGID 或 EGID
             if new_rgid != old_rgid && new_rgid != old_egid {
-                return Err(SyscallError::OperationNotPermitted);
+                return Err(SyscallError::PermissionDenied);
             }
             proc.gid = new_rgid;
         }
@@ -434,7 +434,7 @@ pub fn sys_setregid(rgid: i32, egid: i32) -> Result<(), SyscallError> {
         } else {
             // 非特权进程：EGID 只能设置为当前 RGID、EGID 或 SGID
             if new_egid != old_rgid && new_egid != old_egid && new_egid != old_sgid {
-                return Err(SyscallError::OperationNotPermitted);
+                return Err(SyscallError::PermissionDenied);
             }
             proc.egid = new_egid;
         }

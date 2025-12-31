@@ -33,3 +33,9 @@ impl MemFdInstance {
 pub fn init() -> Result<(), KernelError> {
     Ok(())
 }
+
+/// Get a memfd instance by index
+pub fn get_memfd_instance(_instance_idx: usize) -> Option<MemFdInstance> {
+    // TODO: Implement actual instance management
+    Some(MemFdInstance::new())
+}

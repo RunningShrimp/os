@@ -8,16 +8,59 @@ extern crate alloc;
 // - 继承和接口管理
 // - 引用计数管理
 
+use crate::prelude::*;
+use crate::subsystems::syscalls::interface::SyscallResult;
 use alloc::collections::BTreeMap;
 use core::{
-    ffi::{c_int, c_void},
-    sync::atomic::{AtomicUsize, Ordering},
+    ffi::c_void,
+    marker::PhantomData,
+    sync::atomic::AtomicUsize,
 };
 
-use crate::subsystems::{sync::Mutex, syscalls::interface::SyscallResult as InterfaceSyscallResult;
+use crate::subsystems::sync::Mutex;
+
+/// GLib Object Manager trait
+pub trait GObjectManager {
+    /// Register a new object type
+    fn register_type(
+        &mut self,
+        name: &str,
+        parent_type: u64,
+        size: usize,
+        flags: u32,
+    ) -> SyscallResult<u64>;
+
+    /// Create a new object instance
+    fn create_instance(&mut self, type_id: u64, object_ptr: *mut c_void) -> SyscallResult<u64>;
+
+    /// Increment reference count for an instance
+    fn ref_instance(&self, instance_id: u64) -> SyscallResult<usize>;
+
+    /// Decrement reference count for an instance
+    fn unref_instance(&self, instance_id: u64) -> SyscallResult<usize>;
+
+    /// Register a signal for a type
+    fn register_signal(
+        &mut self,
+        type_id: u64,
+        name: &str,
+        param_types: &[u64],
+        return_type: u64,
+        flags: u32,
+    ) -> SyscallResult<u64>;
+
+    /// Emit a signal on an instance
+    fn emit_signal(&self, instance_id: u64, signal_id: u64, args: &[u64]) -> SyscallResult<usize>;
+
+    /// Set a property value on an instance
+    fn set_property(&mut self, instance_id: u64, name: &str, value: u64) -> SyscallResult<()>;
+
+    /// Get a property value from an instance
+    fn get_property(&self, instance_id: u64, name: &str) -> SyscallResult<u64>;
+}
 
 /// 对象类型信息
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct GObjectTypeInfo {
     /// 类型名称
     pub name: String,
@@ -38,7 +81,7 @@ pub struct GObjectTypeInfo {
 }
 
 /// 信号信息
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct GObjectSignalInfo {
     /// 信号名称
     pub name: String,
@@ -57,7 +100,7 @@ pub struct GObjectSignalInfo {
 }
 
 /// 对象实例信息
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct GObjectInstanceInfo {
     /// 实例ID
     pub instance_id: u64,
@@ -71,7 +114,14 @@ pub struct GObjectInstanceInfo {
     pub created_timestamp: u64,
     /// 属性存储
     pub properties: BTreeMap<String, u64>,
+    /// 用于确保类型安全的标记数据
+    pub _phantom: PhantomData<*mut c_void>,
 }
+
+// 手动实现 Send 和 Sync，因为裸指针不是线程安全的
+// 但 GObjectInstanceInfo 通过 Mutex 保护访问，所以可以安全地在线程间传递
+unsafe impl Send for GObjectInstanceInfo {}
+unsafe impl Sync for GObjectInstanceInfo {}
 
 /// 全局对象类型注册表
 static OBJECT_TYPES: Mutex<BTreeMap<u64, GObjectTypeInfo>> = Mutex::new(BTreeMap::new());
@@ -95,7 +145,7 @@ static NEXT_SIGNAL_ID: AtomicUsize = AtomicUsize::new(1);
 pub static mut GLIB_OBJECT_MANAGER: () = ();
 
 /// 获取GLib对象管理器引用
-pub fn get_glib_object_manager() -> &'static dyn manager::GObjectManager {
+pub fn get_glib_object_manager() -> &'static dyn GObjectManager {
     unsafe { &GLIB_OBJECT_MANAGER }
 }
 

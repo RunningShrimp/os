@@ -472,14 +472,14 @@ impl IntoFrameworkError for MemoryError {
             MemoryError::PermissionDenied => UnifiedError::PermissionDenied.into_framework_error(),
             MemoryError::AlreadyMapped => UnifiedError::AlreadyExists.into_framework_error(),
             MemoryError::NotMapped => UnifiedError::NotFound.into_framework_error(),
-            MemoryError::MappingConflict => UnifiedError::InvalidState.into_framework_error(),
+            MemoryError::MappingConflict => UnifiedError::InvalidArgument.into_framework_error(),
             MemoryError::ResourceBusy => UnifiedError::ResourceBusy.into_framework_error(),
             MemoryError::ResourceUnavailable => {
                 UnifiedError::ResourceUnavailable.into_framework_error()
             },
             MemoryError::InvalidArgument => UnifiedError::InvalidArgument.into_framework_error(),
-            MemoryError::NotSupported => UnifiedError::NotSupported.into_framework_error(),
-            MemoryError::Unknown => UnifiedError::Unknown.into_framework_error(),
+            MemoryError::NotSupported => UnifiedError::Other(String::from("Not supported")).into_framework_error(),
+            MemoryError::Unknown => UnifiedError::Other(String::from("Unknown")).into_framework_error(),
         }
     }
 
@@ -503,7 +503,7 @@ impl IntoFrameworkError for MemoryError {
             },
             MemoryError::NotMapped => UnifiedError::NotFound.with_context(context, location),
             MemoryError::MappingConflict => {
-                UnifiedError::InvalidState.with_context(context, location)
+                UnifiedError::InvalidArgument.with_context(context, location)
             },
             MemoryError::ResourceBusy => UnifiedError::ResourceBusy.with_context(context, location),
             MemoryError::ResourceUnavailable => {
@@ -512,8 +512,8 @@ impl IntoFrameworkError for MemoryError {
             MemoryError::InvalidArgument => {
                 UnifiedError::InvalidArgument.with_context(context, location)
             },
-            MemoryError::NotSupported => UnifiedError::NotSupported.with_context(context, location),
-            MemoryError::Unknown => UnifiedError::Unknown.with_context(context, location),
+            MemoryError::NotSupported => UnifiedError::Other(String::from("Not supported")).with_context(context, location),
+            MemoryError::Unknown => UnifiedError::Other(String::from("Unknown")).with_context(context, location),
         }
     }
 }

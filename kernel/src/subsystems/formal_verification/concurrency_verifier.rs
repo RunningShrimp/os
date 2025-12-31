@@ -11,7 +11,6 @@ use hashbrown::{HashMap, HashSet};
 use spin::Mutex;
 
 use super::*;
-use crate::compat::DefaultHasherBuilder;
 
 /// 并发验证器
 pub struct ConcurrencyVerifier {

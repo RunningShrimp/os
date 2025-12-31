@@ -49,12 +49,15 @@ impl Thread {
 
 /// Get current process
 pub fn get_current_process() -> Option<Arc<Mutex<Process>>> {
-    // Placeholder implementation
+    // TODO: Implement proper process lookup
+    // This should return the currently executing process
     None
 }
 
 /// Get process by PID
 pub fn get_process_by_pid(pid: ProcessId) -> Option<Arc<Mutex<Process>>> {
-    // Placeholder implementation
+    // TODO: Implement process table lookup by PID
+    // This should search the global process table and return the process
+    let _ = pid; // Parameter will be used when process table is implemented
     None
 }

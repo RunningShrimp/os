@@ -1,6 +1,9 @@
 // Object type management functions
 
 use core::ffi::c_char;
+use core::sync::atomic::Ordering;
+
+use crate::prelude::*;
 
 use super::*;
 
@@ -15,13 +18,13 @@ use super::*;
 /// # 返回值
 /// * 成功时返回类型ID
 /// * 失败时返回负数错误码
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sys_glib_object_type_register(
     name: *const c_char,
     parent_type: u64,
     type_size: usize,
     flags: u32,
-) -> SyscallResult<i32> {
+) -> i32 {
     crate::println!(
         "[glib_object] 注册对象类型: parent={}, size={}, flags=0x{:x}",
         parent_type,
@@ -43,9 +46,8 @@ pub extern "C" fn sys_glib_object_type_register(
     // 读取类型名称
     let type_name = unsafe {
         let len = (0..).find(|&i| *name.add(i) == 0).unwrap_or(255);
-        core::str::from_utf8(core::slice::from_raw_parts(name as *const u8, len))
-            .unwrap_or("invalid")
-            .to_string()
+        String::from(core::str::from_utf8(core::slice::from_raw_parts(name as *const u8, len))
+            .unwrap_or_else(|_| "invalid"))
     };
 
     if type_name.is_empty() {
@@ -109,7 +111,7 @@ pub extern "C" fn sys_glib_object_type_register(
     }
 
     crate::println!("[glib_object] 成功注册对象类型: {} (ID={})", type_name, type_id);
-    type_id as SyscallResult
+    type_id as i32
 }
 
 /// 获取对象类型信息
@@ -121,11 +123,11 @@ pub extern "C" fn sys_glib_object_type_register(
 /// # 返回值
 /// * 成功时返回0
 /// * 失败时返回负数错误码
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sys_glib_object_type_info(
     type_id: u64,
     info: *mut GObjectTypeInfo,
-) -> SyscallResult<i32> {
+) -> i32 {
     crate::println!("[glib_object] 获取类型信息: {}", type_id);
 
     // 验证参数
@@ -134,32 +136,31 @@ pub extern "C" fn sys_glib_object_type_info(
         return -22; // EINVAL
     }
 
-    // 获取类型信息
-    let type_info = {
+    // 复制信息
+    {
         let types = OBJECT_TYPES.lock();
         match types.get(&type_id) {
-            Some(info) => info.clone(),
+            Some(type_info) => {
+                unsafe {
+                    *info = GObjectTypeInfo {
+                        name: type_info.name.clone(),
+                        parent_type: type_info.parent_type,
+                        type_size: type_info.type_size,
+                        type_id: type_info.type_id,
+                        is_abstract: type_info.is_abstract,
+                        is_final: type_info.is_final,
+                        created_timestamp: type_info.created_timestamp,
+                        instance_count: AtomicUsize::new(type_info.instance_count.load(Ordering::SeqCst)),
+                    };
+                }
+                crate::println!("[glib_object] 类型信息获取成功: {} ({})", type_info.name, type_id);
+            },
             None => {
                 crate::println!("[glib_object] 对象类型不存在: {}", type_id);
                 return -2; // ENOENT
             },
         }
-    };
-
-    // 复制信息
-    unsafe {
-        *info = GObjectTypeInfo {
-            name: type_info.name.clone(),
-            parent_type: type_info.parent_type,
-            type_size: type_info.type_size,
-            type_id: type_info.type_id,
-            is_abstract: type_info.is_abstract,
-            is_final: type_info.is_final,
-            created_timestamp: type_info.created_timestamp,
-            instance_count: AtomicUsize::new(type_info.instance_count.load(Ordering::SeqCst)),
-        };
     }
 
-    crate::println!("[glib_object] 类型信息获取成功: {} ({})", type_info.name, type_id);
     0
 }

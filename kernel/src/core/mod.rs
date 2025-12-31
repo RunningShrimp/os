@@ -2,8 +2,14 @@
 //!
 //! 本模块提供内核核心功能，合并自nos-kernel-core。
 
+// Import prelude for common types (String, Vec, Box, etc.)
+use crate::prelude::*;
+
+// Import ToString trait for string conversion
+use alloc::string::ToString;
+
+// Import specific Result type from API
 use nos_api::Result;
-use alloc::vec::Vec;
 
 /// Kernel initialization module
 pub mod init;
@@ -65,10 +71,9 @@ pub fn get_kernel_info() -> KernelInfo {
 }
 
 /// 获取启用的功能
+#[allow(unused_mut)]
 fn get_enabled_features() -> Vec<String> {
     let mut features = Vec::new();
-
-    // 移除了无效的 #[cfg(feature = "std")] 条件编译
 
     #[cfg(feature = "log")]
     features.push("log".to_string());
@@ -91,10 +96,10 @@ pub fn initialize_kernel() -> Result<()> {
     crate::arch::initialize()?;
 
     // 初始化中断处理
-    crate::trap::initialize()?;
+    crate::trap::initialize();
 
     // 初始化同步原语
-    crate::subsystems::sync::initialize()?;
+    crate::subsystems::sync::initialize();
 
     Ok(())
 }
@@ -102,7 +107,7 @@ pub fn initialize_kernel() -> Result<()> {
 /// 关闭内核核心
 pub fn shutdown_kernel() -> Result<()> {
     // 关闭中断处理
-    crate::trap::shutdown()?;
+    crate::trap::shutdown();
 
     // 关闭架构特定代码
     crate::arch::shutdown()?;

@@ -13,8 +13,12 @@ use core::{
     sync::atomic::{AtomicBool, AtomicPtr, AtomicUsize, Ordering},
 };
 
-use super::phys::{PAGE_SIZE, page_round_down, page_round_up};
-use crate::subsystems::{mm::unified_stats::ExtendedAllocationStats, sync::Mutex};
+use super::phys::PAGE_SIZE;
+use crate::subsystems::{
+    mm::unified_stats::LightweightAllocationStats,
+    sync::{Mutex, RwLock},
+    time,
+};
 
 /// Page order (log2 of number of pages)
 pub type PageOrder = u8;
@@ -40,6 +44,19 @@ pub struct PageDescriptor {
     pub flags: PageFlags,
     /// Last access time (for defragmentation)
     pub last_access: AtomicUsize,
+}
+
+impl Clone for PageDescriptor {
+    fn clone(&self) -> Self {
+        Self {
+            pfn: self.pfn,
+            order: self.order,
+            numa_node: self.numa_node,
+            ref_count: AtomicUsize::new(self.ref_count.load(Ordering::Relaxed)),
+            flags: self.flags,
+            last_access: AtomicUsize::new(self.last_access.load(Ordering::Relaxed)),
+        }
+    }
 }
 
 /// Page flags
@@ -239,7 +256,7 @@ pub struct BuddyAllocator {
     /// Free pages count
     free_pages: AtomicUsize,
     /// Allocation statistics
-    pub alloc_stats: AllocationStats,
+    pub alloc_stats: LightweightAllocationStats,
     /// Defragmentation runs
     pub defragmentation_runs: AtomicUsize,
 }
@@ -259,7 +276,7 @@ impl BuddyAllocator {
             free_lists: [NULL; MAX_ORDER as usize + 1],
             total_pages: 0,
             free_pages: AtomicUsize::new(0),
-            alloc_stats: AllocationStats::default(),
+            alloc_stats: LightweightAllocationStats::const_default(),
             defragmentation_runs: AtomicUsize::new(0),
         }
     }
@@ -313,9 +330,6 @@ impl BuddyAllocator {
                 self.free_pages
                     .fetch_sub(1usize << order, Ordering::Relaxed);
                 self.alloc_stats
-                    .total_allocations
-                    .fetch_add(1, Ordering::Relaxed);
-                self.alloc_stats
                     .slow_path_allocations
                     .fetch_add(1, Ordering::Relaxed);
 
@@ -342,13 +356,10 @@ impl BuddyAllocator {
 
         self.free_pages
             .fetch_add(1usize << merged_pfn.1, Ordering::Relaxed);
-        self.alloc_stats
-            .total_deallocations
-            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Get allocation statistics
-    pub fn get_stats(&self) -> &AllocationStats {
+    pub fn get_stats(&self) -> &LightweightAllocationStats {
         &self.alloc_stats
     }
 
@@ -471,8 +482,8 @@ pub struct OptimizedPageAllocator {
     per_cpu_caches: Vec<Mutex<PerCpuPageCache>>,
     /// Current CPU ID
     current_cpu: AtomicUsize,
-    /// Page descriptors
-    page_descriptors: Vec<PageDescriptor>,
+    /// Page descriptors (wrapped in RwLock for interior mutability)
+    page_descriptors: RwLock<Vec<PageDescriptor>>,
     /// Defragmentation enabled
     defragmentation_enabled: AtomicBool,
     /// NUMA node ID
@@ -491,7 +502,7 @@ impl OptimizedPageAllocator {
             buddy: BuddyAllocator::new(),
             per_cpu_caches,
             current_cpu: AtomicUsize::new(0),
-            page_descriptors: Vec::new(),
+            page_descriptors: RwLock::new(Vec::new()),
             defragmentation_enabled: AtomicBool::new(true),
             numa_node,
         }
@@ -499,15 +510,18 @@ impl OptimizedPageAllocator {
 
     /// Initialize the allocator with a memory range
     pub unsafe fn init(&mut self, start: usize, end: usize) {
-        self.buddy.init(start, end);
+        unsafe {
+            self.buddy.init(start, end);
+        }
 
         // Initialize page descriptors
         let start_pfn = start / PAGE_SIZE;
         let end_pfn = end / PAGE_SIZE;
-        self.page_descriptors.reserve(end_pfn - start_pfn);
+        let mut descriptors = self.page_descriptors.write();
+        descriptors.reserve(end_pfn - start_pfn);
 
         for pfn in start_pfn..end_pfn {
-            self.page_descriptors.push(PageDescriptor {
+            descriptors.push(PageDescriptor {
                 pfn,
                 order: 0,
                 numa_node: self.numa_node,
@@ -572,14 +586,16 @@ impl OptimizedPageAllocator {
 
     /// Deallocate a single page
     pub fn deallocate_page(&self, pfn: PageFrame) {
-        if pfn >= self.page_descriptors.len() {
+        let descriptors = self.page_descriptors.read();
+        if pfn >= descriptors.len() {
             return;
         }
 
-        let descriptor = &self.page_descriptors[pfn];
+        let descriptor = &descriptors[pfn];
         if !descriptor.flags.allocated {
             return; // Already free
         }
+        drop(descriptors); // Release read lock before getting write lock
 
         self.update_page_descriptor(pfn, 0, false);
 
@@ -588,24 +604,25 @@ impl OptimizedPageAllocator {
         // Try to return to per-CPU cache
         {
             let mut cache = self.per_cpu_caches[cpu_id].lock();
+            // Always try to cache first - the cache itself checks if it's full
             cache.put_single_page(pfn);
-            return;
         }
-
-        // Fall back to buddy allocator
-        self.buddy.deallocate(pfn, 0);
+        // If cache was full, page should go to buddy allocator instead
+        // But put_single_page already handles the full check, so we're done
     }
 
     /// Deallocate multiple pages
     pub fn deallocate_pages(&self, pfn: PageFrame, order: PageOrder) {
-        if pfn >= self.page_descriptors.len() {
+        let descriptors = self.page_descriptors.read();
+        if pfn >= descriptors.len() {
             return;
         }
 
-        let descriptor = &self.page_descriptors[pfn];
+        let descriptor = &descriptors[pfn];
         if !descriptor.flags.allocated {
             return; // Already free
         }
+        drop(descriptors); // Release read lock before getting write lock
 
         self.update_page_descriptor(pfn, order, false);
 
@@ -614,12 +631,11 @@ impl OptimizedPageAllocator {
         // Try to return to per-CPU cache
         {
             let mut cache = self.per_cpu_caches[cpu_id].lock();
+            // Always try to cache first - the cache itself checks if it's full
             cache.put_multi_pages(pfn, order);
-            return;
         }
-
-        // Fall back to buddy allocator
-        self.buddy.deallocate(pfn, order);
+        // If cache was full, pages should go to buddy allocator instead
+        // But put_multi_pages already handles the full check, so we're done
     }
 
     /// Set the current CPU ID
@@ -628,7 +644,7 @@ impl OptimizedPageAllocator {
     }
 
     /// Get allocation statistics
-    pub fn get_stats(&self) -> &AllocationStats {
+    pub fn get_stats(&self) -> &LightweightAllocationStats {
         self.buddy.get_stats()
     }
 
@@ -655,7 +671,6 @@ impl OptimizedPageAllocator {
         }
 
         self.buddy
-            .get_stats()
             .defragmentation_runs
             .fetch_add(1, Ordering::Relaxed);
 
@@ -686,22 +701,24 @@ impl OptimizedPageAllocator {
 
     /// Update page descriptor
     fn update_page_descriptor(&self, pfn: PageFrame, order: PageOrder, allocated: bool) {
-        if pfn < self.page_descriptors.len() {
-            let descriptor = &self.page_descriptors[pfn];
+        let mut descriptors = self.page_descriptors.write();
+        if pfn < descriptors.len() {
+            let descriptor = &mut descriptors[pfn];
             descriptor.order = order;
             descriptor.flags.allocated = allocated;
 
             if allocated {
                 descriptor
                     .last_access
-                    .store(crate::subsystems::time::get_ticks(), Ordering::Relaxed);
+                    .store(time::get_ticks() as usize, Ordering::Relaxed);
             }
         }
     }
 
     /// Get page descriptor
-    pub fn get_page_descriptor(&self, pfn: PageFrame) -> Option<&PageDescriptor> {
-        self.page_descriptors.get(pfn)
+    pub fn get_page_descriptor(&self, pfn: PageFrame) -> Option<PageDescriptor> {
+        let descriptors = self.page_descriptors.read();
+        descriptors.get(pfn).cloned()
     }
 }
 

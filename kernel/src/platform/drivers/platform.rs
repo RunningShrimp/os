@@ -511,8 +511,10 @@ pub fn probe_dtb() {
 
 unsafe fn strlen(ptr: *const u8) -> usize {
     let mut len = 0;
-    while *ptr.add(len) != 0 {
-        len += 1;
+    unsafe {
+        while *ptr.add(len) != 0 {
+            len += 1;
+        }
     }
     len
 }

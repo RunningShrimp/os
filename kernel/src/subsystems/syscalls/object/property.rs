@@ -1,6 +1,7 @@
 // Object property management functions
 
-use core::ffi::c_char;
+use core::ffi::{c_char, c_int};
+use core::sync::atomic::Ordering;
 
 use super::*;
 
@@ -14,12 +15,12 @@ use super::*;
 /// # 返回值
 /// * 成功时返回0
 /// * 失败时返回负数错误码
-#[no_mangle]
-pub extern "C" fn sys_glib_object_set_property(
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sys_glib_object_set_property(
     instance_id: u64,
     name: *const c_char,
     value: u64,
-) -> SyscallResult<i32> {
+) -> i32 {
     crate::println!(
         "[glib_object] 设置属性: instance={}, name={}, value={}",
         instance_id,
@@ -60,7 +61,7 @@ pub extern "C" fn sys_glib_object_set_property(
         let mut instances = OBJECT_INSTANCES.lock();
         match instances.get_mut(&instance_id) {
             Some(instance_info) => {
-                instance_info.properties.insert(property_name, value);
+                instance_info.properties.insert(property_name.clone(), value);
             },
             None => {
                 crate::println!("[glib_object] 对象实例不存在: {}", instance_id);
@@ -87,12 +88,12 @@ pub extern "C" fn sys_glib_object_set_property(
 /// # 返回值
 /// * 成功时返回0
 /// * 失败时返回负数错误码
-#[no_mangle]
-pub extern "C" fn sys_glib_object_get_property(
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sys_glib_object_get_property(
     instance_id: u64,
     name: *const c_char,
     value: *mut u64,
-) -> SyscallResult<i32> {
+) -> i32 {
     crate::println!("[glib_object] 获取属性: instance={}", instance_id);
 
     // 验证参数
@@ -117,72 +118,6 @@ pub extern "C" fn sys_glib_object_get_property(
     if property_name.is_empty() {
         crate::println!("[glib_object] 属性名称无效");
         return -22; // EINVAL
-    }
-    /// 清理所有GLib对象（用于调试）
-    #[no_mangle]
-    pub extern "C" fn sys_glib_object_cleanup() -> c_int {
-        crate::println!("[glib_object] 清理所有GLib对象");
-
-        let mut total_types = 0;
-        let mut total_instances = 0;
-        let mut total_signals = 0;
-        let mut leaked_instances = 0;
-
-        {
-            let types = OBJECT_TYPES.lock();
-            total_types = types.len();
-
-            for (_, type_info) in types.iter() {
-                let instance_count = type_info.instance_count.load(Ordering::SeqCst);
-                total_instances += instance_count;
-                if instance_count > 0 {
-                    leaked_instances += instance_count;
-                    crate::println!(
-                        "[glib_object] 泄漏警告: 类型 {} 仍有 {} 个实例",
-                        type_info.name,
-                        instance_count
-                    );
-                }
-            }
-        }
-
-        {
-            let signals = OBJECT_SIGNALS.lock();
-            for (_, signal_list) in signals.iter() {
-                total_signals += signal_list.len();
-            }
-        }
-
-        // 清理注册表
-        {
-            let mut types = OBJECT_TYPES.lock();
-            types.clear();
-        }
-
-        {
-            let mut instances = OBJECT_INSTANCES.lock();
-            instances.clear();
-        }
-
-        {
-            let mut signals = OBJECT_SIGNALS.lock();
-            signals.clear();
-        }
-
-        // 重置ID计数器
-        NEXT_TYPE_ID.store(1, Ordering::SeqCst);
-        NEXT_INSTANCE_ID.store(1, Ordering::SeqCst);
-        NEXT_SIGNAL_ID.store(1, Ordering::SeqCst);
-
-        crate::println!(
-            "[glib_object] 清理完成: {} 个类型, {} 个信号, {} 个实例 ({} 个泄漏)",
-            total_types,
-            total_signals,
-            total_instances,
-            leaked_instances
-        );
-
-        0
     }
 
     // 获取属性
@@ -219,5 +154,36 @@ pub extern "C" fn sys_glib_object_get_property(
         property_name,
         property_value
     );
+    0
+}
+
+/// 清理所有GLib对象（用于调试）
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sys_glib_object_cleanup() -> c_int {
+    crate::println!("[glib_object] 清理所有GLib对象");
+
+    // 清理注册表
+    {
+        let mut types = OBJECT_TYPES.lock();
+        types.clear();
+    }
+
+    {
+        let mut instances = OBJECT_INSTANCES.lock();
+        instances.clear();
+    }
+
+    {
+        let mut signals = OBJECT_SIGNALS.lock();
+        signals.clear();
+    }
+
+    // 重置ID计数器
+    NEXT_TYPE_ID.store(1, Ordering::SeqCst);
+    NEXT_INSTANCE_ID.store(1, Ordering::SeqCst);
+    NEXT_SIGNAL_ID.store(1, Ordering::SeqCst);
+
+    crate::println!("[glib_object] 清理完成");
+
     0
 }

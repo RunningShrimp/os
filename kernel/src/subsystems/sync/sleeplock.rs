@@ -6,10 +6,8 @@
 // Unlike spinlocks, sleeplocks yield the CPU while waiting.
 
 use core::cell::UnsafeCell;
+use core::ops::{Deref, DerefMut};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-
-use crate::process::thread::current_thread;
-use crate::process::sleep;
 
 /// A lock that can be held during sleeping operations
 /// Unlike spinlocks, sleeplocks yield the CPU while waiting

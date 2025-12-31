@@ -7,13 +7,12 @@ extern crate alloc;
 use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
-use core::sync::atomic::{AtomicU64, AtomicU32, AtomicBool, Ordering};
-use crate::subsystems::sync::{Mutex, Sleeplock};
+use crate::subsystems::sync::Mutex;
 use crate::subsystems::drivers::driver_manager::{
-    Driver, DeviceId, DriverId, DeviceType, DeviceStatus, DriverStatus,
-    DeviceInfo, DriverInfo, DeviceResources, IoOperation, IoResult, InterruptInfo
+    Driver, DeviceId, DeviceType, DeviceStatus, DriverStatus,
+    DeviceInfo, DriverInfo, IoOperation, IoResult, InterruptInfo
 };
-use crate::error::UnifiedError;
+use crate::error::KernelError;
 
 // ============================================================================
 // Console Driver
@@ -118,7 +117,7 @@ impl ConsoleDriver {
 
     /// Read a string from the console
     pub fn read_string(&self, max_len: usize) -> Result<String, KernelError> {
-        let mut buffer = self.buffer.lock();
+        let buffer = self.buffer.lock();
         let mut read_pos = self.read_pos.lock();
         let write_pos = self.write_pos.lock();
         
@@ -232,9 +231,10 @@ impl Driver for ConsoleDriver {
         match operation {
             IoOperation::Read { offset: _, size } => {
                 let s = self.read_string(size as usize)?;
-                Ok(IoResult::ReadResult { 
-                    data: s.into_bytes(), 
-                    bytes_read: s.len() as u64 
+                let bytes_read = s.len() as u64;
+                Ok(IoResult::ReadResult {
+                    data: s.into_bytes(),
+                    bytes_read
                 })
             }
             IoOperation::Write { offset: _, data } => {
@@ -244,7 +244,7 @@ impl Driver for ConsoleDriver {
                     bytes_written: data.len() as u64 
                 })
             }
-            _ => Err(KernelError::NotSupported),
+            _ => Err(KernelError::Other("Operation not supported".to_string())),
         }
     }
 
@@ -270,7 +270,7 @@ impl Driver for ConsoleDriver {
                     return Err(KernelError::InvalidArgument);
                 }
             }
-            _ => return Err(KernelError::NotSupported),
+            _ => return Err(KernelError::Other("Operation not supported".to_string())),
         }
 
         Ok(())
@@ -293,7 +293,7 @@ impl Driver for ConsoleDriver {
                          stats.chars_written, stats.chars_read, stats.lines_written, 
                          stats.lines_read, stats.buffer_overflows))
             }
-            _ => Err(KernelError::NotSupported),
+            _ => Err(KernelError::Other("Operation not supported".to_string())),
         }
     }
 
@@ -570,7 +570,7 @@ impl Driver for BlockDeviceDriver {
                     bytes_written 
                 })
             }
-            _ => Err(KernelError::NotSupported),
+            _ => Err(KernelError::Other("Operation not supported".to_string())),
         }
     }
 
@@ -596,7 +596,7 @@ impl Driver for BlockDeviceDriver {
                     return Err(KernelError::InvalidArgument);
                 }
             }
-            _ => return Err(KernelError::NotSupported),
+            _ => return Err(KernelError::Other("Operation not supported".to_string())),
         }
 
         Ok(())
@@ -617,7 +617,7 @@ impl Driver for BlockDeviceDriver {
                          stats.blocks_read, stats.blocks_written, stats.bytes_read, stats.bytes_written,
                          stats.read_errors, stats.write_errors))
             }
-            _ => Err(KernelError::NotSupported),
+            _ => Err(KernelError::Other("Operation not supported".to_string())),
         }
     }
 
@@ -745,7 +745,7 @@ impl NetworkDeviceDriver {
         let mut rx_buffer = self.rx_buffer.lock();
         
         if rx_buffer.is_empty() {
-            return Err(KernelError::NoData);
+            return Err(KernelError::Other("No data available".to_string()));
         }
 
         let packet = rx_buffer.remove(0);
@@ -854,15 +854,18 @@ impl Driver for NetworkDeviceDriver {
         }
 
         match operation {
-            IoOperation::Read { offset: _, size } => {
+            IoOperation::Read { offset: _, size: _ } => {
                 match self.receive_packet() {
-                    Ok(packet) => Ok(IoResult::ReadResult { 
-                        data: packet, 
-                        bytes_read: packet.len() as u64 
-                    }),
-                    Err(KernelError::NoData) => Ok(IoResult::ReadResult { 
-                        data: Vec::new(), 
-                        bytes_read: 0 
+                    Ok(packet) => {
+                        let bytes_read = packet.len() as u64;
+                        Ok(IoResult::ReadResult {
+                            data: packet,
+                            bytes_read
+                        })
+                    },
+                    Err(KernelError::Other(_)) => Ok(IoResult::ReadResult {
+                        data: Vec::new(),
+                        bytes_read: 0
                     }),
                     Err(e) => Err(e),
                 }
@@ -873,7 +876,7 @@ impl Driver for NetworkDeviceDriver {
                     bytes_written: data.len() as u64 
                 })
             }
-            _ => Err(KernelError::NotSupported),
+            _ => Err(KernelError::Other("Operation not supported".to_string())),
         }
     }
 
@@ -915,7 +918,7 @@ impl Driver for NetworkDeviceDriver {
                     return Err(KernelError::InvalidArgument);
                 }
             }
-            _ => return Err(KernelError::NotSupported),
+            _ => return Err(KernelError::Other("Operation not supported".to_string())),
         }
 
         Ok(())
@@ -939,7 +942,7 @@ impl Driver for NetworkDeviceDriver {
                          stats.packets_rx, stats.packets_tx, stats.bytes_rx, stats.bytes_tx,
                          stats.rx_errors, stats.tx_errors, stats.dropped_packets))
             }
-            _ => Err(KernelError::NotSupported),
+            _ => Err(KernelError::Other("Operation not supported".to_string())),
         }
     }
 

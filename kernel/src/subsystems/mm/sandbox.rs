@@ -522,11 +522,25 @@ pub struct SandboxPolicy {
 
 impl Default for SandboxPolicy {
     fn default() -> Self {
-        Self {
-            max_sandboxes: 64,
-            default_profile: SandboxProfile::default(),
-            enable_monitoring: true,
-            enable_auditing: true,
+        // When YOLO mode is enabled, be permissive by default and reduce monitoring/auditing
+        #[cfg(feature = "yolo-mode")]
+        {
+            Self {
+                max_sandboxes: 64,
+                default_profile: SandboxProfile::Development,
+                enable_monitoring: false,
+                enable_auditing: false,
+            }
+        }
+
+        #[cfg(not(feature = "yolo-mode"))]
+        {
+            Self {
+                max_sandboxes: 64,
+                default_profile: SandboxProfile::default(),
+                enable_monitoring: true,
+                enable_auditing: true,
+            }
         }
     }
 }

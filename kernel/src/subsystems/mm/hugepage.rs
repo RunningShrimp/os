@@ -4,7 +4,7 @@ extern crate alloc;
 
 use core::ptr::null_mut;
 
-use crate::subsystems::mm::{buddy, buddy::BuddyBlock};
+use crate::subsystems::mm::buddy::BuddyBlock;
 
 // ============================================================================
 // Constants
@@ -43,12 +43,10 @@ impl Default for HugePageAllocator {
         // For simplicity, we'll only support 2MB and 1GB pages
 
         let mut index = 0;
-        if cfg!(feature = "hpage_2mb") {
+        if cfg!(feature = "huge_pages") {
             allocator.hpage_sizes[index] = HPAGE_2MB;
             index += 1;
-        }
 
-        if cfg!(feature = "hpage_1gb") {
             allocator.hpage_sizes[index] = HPAGE_1GB;
             index += 1;
         }
@@ -99,9 +97,11 @@ impl HugePageAllocator {
             while addr + hpage_size <= aligned_end {
                 let block = addr as *mut BuddyBlock;
 
-                (*block).size = hpage_size;
-                (*block).next = self.free_lists[i];
-                self.free_lists[i] = block;
+                unsafe {
+                    (*block).size = hpage_size;
+                    (*block).next = self.free_lists[i];
+                    self.free_lists[i] = block;
+                }
 
                 addr += hpage_size;
             }
@@ -265,7 +265,7 @@ mod tests {
         }
 
         // Allocate a 2MB huge page (if supported)
-        if cfg!(feature = "hpage_2mb") {
+        if cfg!(feature = "huge_pages") {
             let ptr = alloc.alloc(HPAGE_2MB);
             assert!(!ptr.is_null());
 

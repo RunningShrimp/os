@@ -4,15 +4,23 @@
 //! providing transactional guarantees and crash recovery capabilities.
 //! The implementation is inspired by ext3 and NTFS journaling mechanisms.
 
-extern crate alloc;
-use alloc::{collections::BTreeMap, vec::Vec};
+// Import prelude for common types
+use crate::prelude::*;
 
-// use alloc::string::String;
-use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+// Import block device trait
+use crate::platform::drivers::BlockDevice;
 
-// use crate::drivers::BlockDevice;
-use crate::sync::Mutex;
-use crate::subsystems::fs::{BSIZE, BufFlags, Dirent, DiskInode, InodeType, SuperBlock};
+// Import VFS constants
+use crate::subsystems::fs::fs_types::BSIZE;
+
+// Import time function
+use crate::subsystems::time::get_timestamp;
+
+// Import atomic ordering
+use core::sync::atomic::Ordering;
+
+// Type alias for Result with JfsError
+type JfsResult<T> = core::result::Result<T, JfsError>;
 
 /// Journaling file system constants
 pub const JOURNAL_MAGIC: u32 = 0x4A4F5552; // "JOUR" in hex
@@ -102,7 +110,7 @@ impl JournalTransaction {
             modified_blocks: Vec::new(),
             entries: Vec::new(),
             original_data: BTreeMap::new(),
-            timestamp: crate::subsystems::time::get_timestamp(),
+            timestamp: get_timestamp(),
         }
     }
 
@@ -204,7 +212,7 @@ impl JournalingFileSystem {
     }
 
     /// Initialize the journaling file system
-    pub fn init(&self) -> Result<(), JfsError> {
+    pub fn init(&self) -> JfsResult<()> {
         // Read journal superblock
         self.read_journal_superblock()?;
 
@@ -228,9 +236,9 @@ impl JournalingFileSystem {
     }
 
     /// Read the journal superblock
-    fn read_journal_superblock(&self) -> Result<(), JfsError> {
+    fn read_journal_superblock(&self) -> JfsResult<()> {
         let device = self.device.lock();
-        let mut buf = [0u8; BSIZE];
+        let mut buf = [0u8; BSIZE as usize];
 
         // Journal superblock is at block 0 of the journal area
         device.read(0, &mut buf);
@@ -254,9 +262,9 @@ impl JournalingFileSystem {
     }
 
     /// Write the journal superblock
-    fn write_journal_superblock(&self) -> Result<(), JfsError> {
+    fn write_journal_superblock(&self) -> JfsResult<()> {
         let sb = self.journal_sb.lock();
-        let mut buf = [0u8; BSIZE];
+        let mut buf = [0u8; BSIZE as usize];
 
         buf[0..4].copy_from_slice(&sb.magic.to_le_bytes());
         buf[4..8].copy_from_slice(&sb.version.to_le_bytes());
@@ -275,25 +283,27 @@ impl JournalingFileSystem {
     }
 
     /// Format a new journal
-    fn format_journal(&self) -> Result<(), JfsError> {
-        let mut sb = self.journal_sb.lock();
-        sb.magic = JOURNAL_MAGIC;
-        sb.version = 1;
-        sb.size = 1000; // Default journal size
-        sb.start_block = 1;
-        sb.sequence = 1;
-        sb.first_transaction_id = 1;
-        sb.last_transaction_id = 0;
-        sb.active_transactions = 0;
-        sb.flags = 0;
+    fn format_journal(&self) -> JfsResult<()> {
+        let journal_size = {
+            let mut sb = self.journal_sb.lock();
+            sb.magic = JOURNAL_MAGIC;
+            sb.version = 1;
+            sb.size = 1000; // Default journal size
+            sb.start_block = 1;
+            sb.sequence = 1;
+            sb.first_transaction_id = 1;
+            sb.last_transaction_id = 0;
+            sb.active_transactions = 0;
+            sb.flags = 0;
+            sb.size
+        };
 
-        drop(sb);
         self.write_journal_superblock()?;
 
         // Zero out the journal area
         let device = self.device.lock();
-        let zero_block = [0u8; BSIZE];
-        for i in 1..sb.size {
+        let zero_block = [0u8; BSIZE as usize];
+        for i in 1..journal_size {
             device.write(i as usize, &zero_block);
         }
 
@@ -308,7 +318,7 @@ impl JournalingFileSystem {
     }
 
     /// Recover from a crash
-    fn recover(&self) -> Result<(), JfsError> {
+    fn recover(&self) -> JfsResult<()> {
         self.recovery_mode.store(1, Ordering::SeqCst);
 
         let mut stats = self.stats.lock();
@@ -336,14 +346,14 @@ impl JournalingFileSystem {
     }
 
     /// Scan the journal for transactions
-    fn scan_journal(&self) -> Result<(), JfsError> {
+    fn scan_journal(&self) -> JfsResult<()> {
         let sb = self.journal_sb.lock();
         let start = sb.start_block;
         let size = sb.size;
         drop(sb);
 
         let device = self.device.lock();
-        let mut buf = [0u8; BSIZE];
+        let mut buf = [0u8; BSIZE as usize];
 
         for block_num in start..start + size {
             device.read(block_num as usize, &mut buf);
@@ -390,7 +400,7 @@ impl JournalingFileSystem {
     }
 
     /// Replay incomplete transactions
-    fn replay_transactions(&self) -> Result<(), JfsError> {
+    fn replay_transactions(&self) -> JfsResult<()> {
         let transactions = self.transactions.lock();
 
         for (tx_id, tx) in transactions.iter() {
@@ -404,7 +414,7 @@ impl JournalingFileSystem {
     }
 
     /// Replay a specific transaction
-    fn replay_transaction(&self, tx_id: u64) -> Result<(), JfsError> {
+    fn replay_transaction(&self, tx_id: u64) -> JfsResult<()> {
         let transactions = self.transactions.lock();
         let tx = transactions
             .get(&tx_id)
@@ -416,7 +426,7 @@ impl JournalingFileSystem {
         for entry in &tx.entries {
             if entry.entry_type == 2 {
                 // Update block
-                let mut buf = [0u8; BSIZE];
+                let mut buf = [0u8; BSIZE as usize];
                 device.read(entry.block_number as usize, &mut buf);
 
                 // Apply the modification
@@ -432,7 +442,7 @@ impl JournalingFileSystem {
     }
 
     /// Begin a new transaction
-    pub fn begin_transaction(&self) -> Result<u64, JfsError> {
+    pub fn begin_transaction(&self) -> JfsResult<u64> {
         let tx_id = self.next_transaction_id.fetch_add(1, Ordering::SeqCst);
 
         let mut tx = JournalTransaction::new(tx_id);
@@ -467,13 +477,15 @@ impl JournalingFileSystem {
     }
 
     /// Write a journal entry
-    fn write_journal_entry(&self, entry: &JournalEntry) -> Result<(), JfsError> {
-        let sb = self.journal_sb.lock();
-        let mut sequence = sb.sequence;
-        sb.sequence = sequence + 1;
-        drop(sb);
+    fn write_journal_entry(&self, entry: &JournalEntry) -> JfsResult<()> {
+        let (start_block, size, sequence) = {
+            let mut sb = self.journal_sb.lock();
+            let seq = sb.sequence;
+            sb.sequence = seq + 1;
+            (sb.start_block, sb.size, seq)
+        };
 
-        let mut buf = [0u8; BSIZE];
+        let mut buf = [0u8; BSIZE as usize];
 
         buf[0..4].copy_from_slice(&entry.magic.to_le_bytes());
         buf[4..8].copy_from_slice(&entry.entry_type.to_le_bytes());
@@ -484,7 +496,7 @@ impl JournalingFileSystem {
         buf[28..32].copy_from_slice(&entry.checksum.to_le_bytes());
 
         let device = self.device.lock();
-        let block_num = sb.start_block + (sequence % sb.size);
+        let block_num = start_block + (sequence % size);
         device.write(block_num as usize, &buf);
 
         Ok(())
@@ -497,7 +509,7 @@ impl JournalingFileSystem {
         block_num: u32,
         old_data: &[u8],
         new_data: &[u8],
-    ) -> Result<(), JfsError> {
+    ) -> JfsResult<()> {
         let mut transactions = self.transactions.lock();
         let tx = transactions
             .get_mut(&tx_id)
@@ -536,7 +548,7 @@ impl JournalingFileSystem {
     }
 
     /// Commit a transaction
-    pub fn commit_transaction(&self, tx_id: u64) -> Result<(), JfsError> {
+    pub fn commit_transaction(&self, tx_id: u64) -> JfsResult<()> {
         let mut transactions = self.transactions.lock();
         let tx = transactions
             .get_mut(&tx_id)
@@ -582,7 +594,7 @@ impl JournalingFileSystem {
     }
 
     /// Abort a transaction
-    pub fn abort_transaction(&self, tx_id: u64) -> Result<(), JfsError> {
+    pub fn abort_transaction(&self, tx_id: u64) -> JfsResult<()> {
         let mut transactions = self.transactions.lock();
         let tx = transactions
             .get_mut(&tx_id)
@@ -616,7 +628,7 @@ impl JournalingFileSystem {
     }
 
     /// Create a transaction (internal helper)
-    fn create_transaction(&self, tx_id: u64) -> Result<(), JfsError> {
+    fn create_transaction(&self, tx_id: u64) -> JfsResult<()> {
         let tx = JournalTransaction::new(tx_id);
         let mut transactions = self.transactions.lock();
         transactions.insert(tx_id, tx);
@@ -625,7 +637,16 @@ impl JournalingFileSystem {
 
     /// Get journal statistics
     pub fn get_stats(&self) -> JournalStats {
-        self.stats.lock().clone()
+        let stats = self.stats.lock();
+        // Clone the inner JournalStats, not the MutexGuard
+        JournalStats {
+            total_transactions: stats.total_transactions,
+            committed_transactions: stats.committed_transactions,
+            aborted_transactions: stats.aborted_transactions,
+            recovery_operations: stats.recovery_operations,
+            journal_space_used: stats.journal_space_used,
+            avg_transaction_size: stats.avg_transaction_size,
+        }
     }
 
     /// Check if the system is in recovery mode
@@ -634,7 +655,7 @@ impl JournalingFileSystem {
     }
 
     /// Checkpoint the journal (free up space)
-    pub fn checkpoint(&self) -> Result<(), JfsError> {
+    pub fn checkpoint(&self) -> JfsResult<()> {
         // In a real implementation, this would free up journal space
         // by removing committed transactions that are no longer needed
 
@@ -664,7 +685,7 @@ pub enum JfsError {
 static mut JFS: Option<JournalingFileSystem> = None;
 
 /// Initialize the journaling file system
-pub fn init(device: Box<dyn BlockDevice>) -> Result<(), JfsError> {
+pub fn init(device: Box<dyn BlockDevice>) -> JfsResult<()> {
     unsafe {
         let jfs = JournalingFileSystem::new(device);
         jfs.init()?;

@@ -26,7 +26,7 @@
 //!
 //! madvise 是 Linux 扩展，不是 POSIX 标准，但被广泛支持。
 
-use crate::api::SyscallError;
+use crate::error::UnifiedError;
 
 /// madvise 建议类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -149,7 +149,7 @@ impl MadviceAdvice {
 /// - MADV_DONTNEED 不会取消映射，只是释放内容
 /// - MADV_REMOVE 会取消映射（仅私有映射）
 /// - 建议的效果因实现而异
-pub fn sys_madvise(addr: usize, length: usize, advice: i32) -> Result<(), SyscallError> {
+pub fn sys_madvise(addr: usize, length: usize, advice: i32) -> Result<(), UnifiedError> {
     use crate::subsystems::mm::PAGE_SIZE;
 
     // 验证参数
@@ -159,20 +159,20 @@ pub fn sys_madvise(addr: usize, length: usize, advice: i32) -> Result<(), Syscal
 
     // 地址必须页对齐
     if addr & (PAGE_SIZE - 1) != 0 {
-        return Err(SyscallError::InvalidArgument);
+        return Err(UnifiedError::InvalidArgument);
     }
 
     // 解析建议类型
-    let advice_type = MadviceAdvice::from_i32(advice).ok_or(SyscallError::InvalidArgument)?;
+    let advice_type = MadviceAdvice::from_i32(advice).ok_or(UnifiedError::InvalidArgument)?;
 
     // 获取当前进程的页表
-    let pid = crate::process::myproc().ok_or(SyscallError::NoProcess)?;
-    let proc_table = crate::subsystems::process::manager::PROC_TABLE.lock();
-    let proc = proc_table.find(pid).ok_or(SyscallError::NoProcess)?;
+    let pid = crate::process::myproc().ok_or(UnifiedError::NoProcess)?;
+    let mut proc_table = crate::subsystems::process::manager::PROC_TABLE.lock();
+    let proc = proc_table.find(pid).ok_or(UnifiedError::NoProcess)?;
     let pagetable = proc.pagetable;
 
     if pagetable.is_null() {
-        return Err(SyscallError::InvalidArgument);
+        return Err(UnifiedError::InvalidArgument);
     }
 
     drop(proc_table);
@@ -273,7 +273,7 @@ pub fn sys_madvise(addr: usize, length: usize, advice: i32) -> Result<(), Syscal
 ///
 /// NOS 实现：posix_madvise 内部调用 sys_madvise，
 /// 将 POSIX 建议映射到 Linux 建议类型。
-pub fn sys_posix_madvise(addr: usize, length: usize, advice: i32) -> Result<(), SyscallError> {
+pub fn sys_posix_madvise(addr: usize, length: usize, advice: i32) -> Result<(), UnifiedError> {
     // POSIX madvise 建议类型
     const POSIX_PMADV_NORMAL: i32 = 0;
     const POSIX_PMADV_RANDOM: i32 = 1;
@@ -288,7 +288,7 @@ pub fn sys_posix_madvise(addr: usize, length: usize, advice: i32) -> Result<(), 
         POSIX_PMADV_SEQUENTIAL => MadviceAdvice::Sequential as i32,
         POSIX_PMADV_WILLNEED => MadviceAdvice::WillNeed as i32,
         POSIX_PMADV_DONTNEED => MadviceAdvice::DontNeed as i32,
-        _ => return Err(SyscallError::InvalidArgument),
+        _ => return Err(UnifiedError::InvalidArgument),
     };
 
     sys_madvise(addr, length, linux_advice)

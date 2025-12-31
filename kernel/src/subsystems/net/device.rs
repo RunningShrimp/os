@@ -516,8 +516,6 @@ pub struct MockEthernetDevice {
     mac_addr: MacAddr,
     /// Device statistics
     stats: DeviceStats,
-    /// Packet buffer for testing
-    packet_buffer: alloc::vec::Vec<alloc::vec::Vec<u8>>,
 }
 
 #[cfg(debug_assertions)]
@@ -530,7 +528,6 @@ impl MockEthernetDevice {
             mtu,
             mac_addr: MacAddr::from_u64(0x123456789ABC), // Mock MAC address
             stats: DeviceStats::new(),
-            packet_buffer: alloc::vec::Vec::new(),
         }
     }
 }

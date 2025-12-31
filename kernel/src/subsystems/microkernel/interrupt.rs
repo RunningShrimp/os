@@ -9,7 +9,7 @@ use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use crate::{
-    reliability::{EBUSY, EINVAL, ENOENT},
+    reliability::{EBUSY, ENOENT},
     subsystems::sync::Mutex,
 };
 
@@ -450,6 +450,29 @@ impl VectorTable {
         Ok(())
     }
 
+    /// 快速中断处理（用于高频中断如定时器）
+    #[inline(always)]
+    pub fn handle_interrupt_fast(&self, context: &mut InterruptContext) {
+        let vector = context.vector.as_u8();
+
+        // 快速路径：跳过统计更新
+        // 直接查找并调用handler
+        let entries = self.entries.lock();
+        if let Some(entry) = entries.get(&vector) {
+            if entry.enabled {
+                entry.increment_call_count();
+
+                // 快速路径：跳过时间统计
+                (entry.handler)(context);
+
+                // Update global interrupt statistics（快速）
+                super::MICROKERNEL_STATS
+                    .interrupt_count
+                    .fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    }
+
     pub fn handle_interrupt(&self, context: &mut InterruptContext) {
         let vector = context.vector.as_u8();
 
@@ -594,69 +617,6 @@ impl MicroInterruptHandler {
     }
 }
 
-/// Default interrupt handlers
-extern "C" fn default_exception_handler(context: &InterruptContext) {
-    crate::println!("Exception {}: Error code: {:?}", context.vector.as_u8(), context.error_code);
-    crate::println!(
-        "RIP: 0x{:x}, RSP: 0x{:x}, RFLAGS: 0x{:x}",
-        context.rip,
-        context.rsp,
-        context.rflags
-    );
-
-    // In a real system, this would terminate the current process or panic
-    panic!("Unhandled exception");
-}
-
-extern "C" fn default_irq_handler(_context: &InterruptContext) {
-    // Default IRQ handler - acknowledge and return
-    // In a real system, this would handle the specific IRQ
-}
-
-extern "C" fn default_system_call_handler(context: &InterruptContext) {
-    // System call handler would be called here
-    // In a real system, this would dispatch to the appropriate system call
-    crate::println!("System call from RIP: 0x{:x}", context.rip);
-}
-
-extern "C" fn default_spurious_handler(_context: &InterruptContext) {
-    // Spurious interrupt - do nothing but count
-}
-
-/// Global interrupt handler
-static mut GLOBAL_INTERRUPT_HANDLER: Option<MicroInterruptHandler> = None;
-static INTERRUPT_INIT: AtomicUsize = AtomicUsize::new(0);
-
-/// Initialize interrupt subsystem
-pub fn init() -> Result<(), i32> {
-    if INTERRUPT_INIT.load(Ordering::SeqCst) != 0 {
-        return Ok(());
-    }
-
-    let handler = MicroInterruptHandler::new();
-
-    // Register default handlers
-    handler.register_interrupt_handler(
-        InterruptVector::GeneralProtectionFault,
-        default_exception_handler,
-        0,
-    )?;
-    handler.register_interrupt_handler(InterruptVector::PageFault, default_exception_handler, 0)?;
-    handler.register_interrupt_handler(InterruptVector::Timer, default_irq_handler, 0)?;
-    handler.register_interrupt_handler(
-        InterruptVector::SystemCall,
-        default_system_call_handler,
-        0,
-    )?;
-
-    unsafe {
-        GLOBAL_INTERRUPT_HANDLER = Some(handler);
-    }
-
-    INTERRUPT_INIT.store(1, Ordering::SeqCst);
-    Ok(())
-}
-
 /// Get global interrupt handler
 pub fn get_interrupt_handler() -> Option<&'static mut MicroInterruptHandler> {
     unsafe { GLOBAL_INTERRUPT_HANDLER.as_mut() }
@@ -697,6 +657,25 @@ pub fn are_interrupts_enabled() -> bool {
 /// Get current time in nanoseconds
 fn get_current_time() -> u64 {
     crate::subsystems::time::get_time_ns()
+}
+
+/// Global interrupt handler instance
+///
+/// This is a global mutable reference to the microkernel interrupt handler.
+/// It is initialized during system boot and used by the trap handling code.
+pub static mut GLOBAL_INTERRUPT_HANDLER: Option<MicroInterruptHandler> = None;
+
+/// Initialize interrupt handling
+///
+/// This function initializes the microkernel interrupt handler and
+/// must be called during microkernel initialization.
+pub fn init() -> Result<(), i32> {
+    unsafe {
+        if GLOBAL_INTERRUPT_HANDLER.is_none() {
+            GLOBAL_INTERRUPT_HANDLER = Some(MicroInterruptHandler::new());
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

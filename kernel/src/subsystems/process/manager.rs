@@ -11,8 +11,9 @@
 
 extern crate alloc;
 
-use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use alloc::{string::String, vec::Vec};
 use core::ptr::null_mut;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use hashbrown::HashMap;
 
@@ -27,6 +28,11 @@ use crate::{
         sync::Mutex,
     },
 };
+
+
+// Waitpid constants (matching Linux values)
+pub const WNOHANG: i32 = 0x00000001; // Don't block if no child has exited
+pub const WUNTRACED: i32 = 0x00000002; // Report status of stopped children
 
 // ============================================================================
 // Constants
@@ -614,7 +620,8 @@ impl ResourcePools {
 
 /// Process table with O(1) average-case PID lookup
 pub struct ProcTable {
-    procs: [Proc; NPROC],
+    /// Process array
+    pub procs: [Proc; NPROC],
     next_pid: Pid,
     pid_to_index: HashMap<Pid, usize, DefaultHasherBuilder>, /* O(1) average-case PID lookup
                                                               * using HashMap (always
@@ -628,22 +635,6 @@ pub struct ProcTable {
 }
 
 impl ProcTable {
-    /// Create a new process table for static initialization
-    pub const fn const_new() -> Self {
-        const INIT_PROC: Proc = Proc::new();
-        Self {
-            procs: [INIT_PROC; NPROC],
-            next_pid: 1,
-            pid_to_index: HashMap::with_hasher(DefaultHasherBuilder), /* Will be properly initialized at runtime */
-            parent_to_children: HashMap::with_hasher(DefaultHasherBuilder), /* Will be properly
-                                                                       * initialized at
-                                                                       * runtime */
-            free_list: Vec::new(),
-            resource_pools: ResourcePools::new(),
-            initialized: false,
-        }
-    }
-
     /// Create a new process table
     /// HashMap is always initialized (not Option)
     pub fn new() -> Self {
@@ -651,8 +642,8 @@ impl ProcTable {
         let mut table = Self {
             procs: [INIT_PROC; NPROC],
             next_pid: 1,
-            pid_to_index: HashMap::with_hasher(DefaultHasherBuilder), // Always initialized
-            parent_to_children: HashMap::with_hasher(DefaultHasherBuilder), // Always initialized
+            pid_to_index: HashMap::with_capacity_and_hasher(0, DefaultHasherBuilder), // Always initialized
+            parent_to_children: HashMap::with_capacity_and_hasher(0, DefaultHasherBuilder), // Always initialized
             free_list: Vec::new(),
             resource_pools: ResourcePools::new(),
             initialized: false,
@@ -706,8 +697,11 @@ impl ProcTable {
         proc.state = ProcState::Used;
 
         // Initialize ASLR for new process
-        if crate::security::is_aslr_enabled() {
-            let _ = crate::security::init_process_aslr_by_pid(new_pid as u64);
+        #[cfg(feature = "security")]
+        {
+            if crate::security::aslr::is_aslr_enabled() {
+                let _ = crate::security::aslr::init_process_aslr_by_pid(new_pid as u64);
+            }
         }
 
         // Initialize process group and session ID
@@ -749,7 +743,9 @@ impl ProcTable {
         // Note: We can safely insert here because ensure_initialized() was called earlier
         self.pid_to_index.insert(pid, idx);
         // RCU 分片注册（占位，不改变主路径）
-        crate::process::rcu_table::with_sharded(|s| s.register(pid));
+        // Note: RCU integration temporarily disabled, will be re-enabled when feature flag is added
+        // #[cfg(feature = "rcu")]
+        // crate::subsystems::process::rcu_table::with_sharded(|s| s.register(pid));
 
         // Return reference to the proc (idx is valid, managed internally)
         Some(proc)
@@ -861,9 +857,7 @@ impl ProcTable {
 
             // Free page table and all user pages
             if !proc.pagetable.is_null() {
-                unsafe {
-                    free_pagetable(proc.pagetable);
-                }
+                free_pagetable();
                 proc.pagetable = null_mut();
             }
 
@@ -877,7 +871,9 @@ impl ProcTable {
 
             // Remove from PID map
             self.pid_to_index.remove(&pid);
-            crate::process::rcu_table::with_sharded(|s| s.remove(pid));
+            // Note: RCU integration temporarily disabled, will be re-enabled when feature flag is added
+            // #[cfg(feature = "rcu")]
+            // crate::subsystems::process::rcu_table::with_sharded(|s| s.remove(pid));
 
             // Add back to free list for O(1) reuse
             self.free_list.push(idx);
@@ -933,8 +929,42 @@ impl ProcTable {
 // Global State
 // ============================================================================
 
-/// Global process table
-pub static PROC_TABLE: Mutex<ProcTable> = Mutex::new(ProcTable::const_new());
+/// Global process table initialization flag
+static PROC_TABLE_INIT: AtomicBool = AtomicBool::new(false);
+static mut PROC_TABLE_UNINIT: Option<Mutex<ProcTable>> = None;
+
+/// Get the global process table (lazy initialization)
+pub fn get_proc_table() -> &'static Mutex<ProcTable> {
+    if !PROC_TABLE_INIT.load(Ordering::Acquire) {
+        unsafe {
+            if PROC_TABLE_UNINIT.is_none() {
+                PROC_TABLE_UNINIT = Some(Mutex::new(ProcTable::new()));
+            }
+            PROC_TABLE_INIT.store(true, Ordering::Release);
+        }
+    }
+    unsafe { PROC_TABLE_UNINIT.as_ref().unwrap_unchecked() }
+}
+
+/// Global process table accessor
+/// Provides a convenient way to access the process table from other modules
+pub const PROC_TABLE: ProcTableAccessor = ProcTableAccessor::new();
+
+/// Accessor for the global process table
+#[derive(Copy, Clone)]
+pub struct ProcTableAccessor;
+
+impl ProcTableAccessor {
+    /// Create a new accessor (const fn)
+    pub const fn new() -> Self {
+        Self
+    }
+
+    /// Get the underlying process table
+    pub fn lock(&self) -> crate::sync::MutexGuard<'static, ProcTable> {
+        get_proc_table().lock()
+    }
+}
 
 /// Current process PID for each CPU (indexed by CPU ID)
 static mut CURRENT_PID: [Option<Pid>; 8] = [None; 8];
@@ -945,7 +975,7 @@ static mut CURRENT_PID: [Option<Pid>; 8] = [None; 8];
 
 /// Initialize process subsystem
 pub fn init() {
-    let mut table = PROC_TABLE.lock();
+    let mut table = get_proc_table().lock();
 
     // Ensure hash maps are initialized with pre-allocated capacity for optimal performance
     table.ensure_initialized();
@@ -978,7 +1008,7 @@ pub fn current_thread_id() -> u64 {
 pub fn parent_pid() -> Pid {
     let current_pid = myproc();
     if let Some(pid) = current_pid {
-        let table = PROC_TABLE.lock();
+        let table = get_proc_table().lock();
         if let Some(proc) = table.find_ref(pid) {
             return proc.parent.unwrap_or(0);
         }
@@ -987,197 +1017,11 @@ pub fn parent_pid() -> Pid {
 }
 
 /// Set current process PID
-fn set_current(pid: Option<Pid>) {
-    let cpu_id = crate::cpu::cpuid();
-    unsafe {
-        CURRENT_PID[cpu_id] = pid;
-    }
-}
-
-/// Fork current process
-pub fn fork() -> Option<Pid> {
-    let parent_pid = myproc()?;
-    let mut table = PROC_TABLE.lock();
-
-    // Extract all parent data first, then release borrow
-    let (
-        parent_pgid,
-        parent_sid,
-        parent_uid,
-        parent_gid,
-        parent_euid,
-        parent_egid,
-        parent_suid,
-        parent_sgid,
-        parent_nice,
-        parent_umask,
-        parent_ofile,
-        parent_cwd_path,
-        parent_cwd,
-        parent_rlimits,
-        parent_pagetable,
-        parent_sz,
-        parent_trapframe,
-        parent_namespaces,
-        parent_cgroup,
-    ) = {
-        let parent = table.find(parent_pid)?;
-        (
-            parent.pgid,
-            parent.sid,
-            parent.uid,
-            parent.gid,
-            parent.euid,
-            parent.egid,
-            parent.suid,
-            parent.sgid,
-            parent.nice,
-            parent.umask,
-            parent.ofile.clone(),
-            parent.cwd_path.clone(),
-            parent.cwd,
-            parent.rlimits.clone(),
-            parent.pagetable,
-            parent.sz,
-            parent.trapframe,
-            parent.namespaces.clone(),
-            parent.cgroup.clone(),
-        )
-    };
-
-    // Allocate child process (now we can use table mutably again)
-    let child = table.alloc()?;
-    let child_pid = child.pid;
-
-    // Initialize child process state
-    child.parent = Some(parent_pid);
-    child.state = ProcState::Runnable;
-    child.pgid = parent_pgid;
-    child.sid = parent_sid;
-
-    // Create security context for child process
-    let security_level = crate::security::get_current_security_level(parent_pid);
-    let domain_id = match crate::security::create_process_security_context(
-        child_pid,
-        Some(parent_pid),
-        security_level,
-        false, // Not sandboxed by default
-    ) {
-        Ok(id) => id,
-        Err(_) => {
-            // Failed to create security context, clean up and return None
-            table.free(child_pid);
-            return None;
-        },
-    };
-
-    // Store domain ID in process
-    child.domain_id = domain_id;
-    // Inherit credentials from parent
-    child.uid = parent_uid;
-    child.gid = parent_gid;
-    child.euid = parent_euid;
-    child.egid = parent_egid;
-    child.suid = parent_suid;
-    child.sgid = parent_sgid;
-    child.nice = parent_nice;
-    child.umask = parent_umask;
-
-    // Drop mutable borrow of child before calling add_child_to_parent
-    drop(child);
-
-    // Add child to parent's children list for O(1) wait() lookup
-    table.ensure_initialized();
-    let child_idx = table.pid_to_index.get(&child_pid).copied();
-
-    table.add_child_to_parent(parent_pid, child_pid);
-
-    // Re-acquire child reference for remaining initialization
-    let child = if let Some(idx) = child_idx {
-        &mut table.procs[idx]
-    } else {
-        return None;
-    };
-
-    // Copy parent's file descriptors (shallow copy)
-    child.ofile.copy_from_slice(&parent_ofile);
-    // Increment file reference counts for copied file descriptors
-    for fd in &child.ofile {
-        if let Some(file) = fd {
-            // Note: This will be properly implemented when the file system is complete
-            // For now, we acknowledge that file references should be incremented
-            crate::println!("[process] Copied file descriptor, should increment ref count");
-        }
-    }
-
-    // Copy working directory
-    child.cwd_path = parent_cwd_path;
-    child.cwd = parent_cwd;
-
-    // Copy resource limits
-    child.rlimits.copy_from_slice(&parent_rlimits);
-
-    // Inherit namespaces from parent
-    child.namespaces = parent_namespaces;
-
-    // Inherit cgroup from parent
-    child.cgroup = parent_cgroup;
-    // If parent is in a cgroup, add child to the same cgroup
-    if let Some(ref cgroup_name) = child.cgroup {
-        if let Err(e) = crate::subsystems::cloud_native::cgroups::add_process_to_cgroup(
-            cgroup_name,
-            child_pid as u32,
-        ) {
-            crate::println!(
-                "[fork] Warning: Failed to add child process {} to cgroup {}: {}",
-                child_pid,
-                cgroup_name,
-                e
-            );
-        }
-    }
-
-    // Copy page table with copy-on-write semantics
-    if let Some(pagetable) = unsafe { crate::subsystems::mm::vm::copy_pagetable(parent_pagetable) }
-    {
-        child.pagetable = pagetable;
-        child.sz = parent_sz;
-    } else {
-        // Failed to copy pagetable, clean up and return None
-        table.free(child_pid);
-        return None;
-    }
-
-    // Copy trapframe from parent and set child's return value to 0
-    unsafe {
-        *child.trapframe = *parent_trapframe;
-    }
-
-    // Set return value to 0 for child process (architecture-specific register)
-    unsafe {
-        #[cfg(target_arch = "riscv64")]
-        {
-            (*child.trapframe).a0 = 0;
-        }
-
-        #[cfg(target_arch = "aarch64")]
-        {
-            (*child.trapframe).regs[0] = 0; // On aarch64, a0 is regs[0]
-        }
-
-        #[cfg(target_arch = "x86_64")]
-        {
-            (*child.trapframe).rax = 0; // On x86_64, rax is the return value register
-        }
-    }
-
-    Some(child_pid)
-}
 
 /// Exit current process
 pub fn exit(status: i32) {
     if let Some(pid) = myproc() {
-        let mut table = PROC_TABLE.lock();
+        let mut table = get_proc_table().lock();
         if let Some(proc) = table.find(pid) {
             // Encode exit status according to POSIX format
             // Normal exit: bits 8-15 contain exit code, bit 7 is 0
@@ -1187,7 +1031,7 @@ pub fn exit(status: i32) {
             // Close all open files efficiently
             for fd_slot in proc.ofile.iter_mut() {
                 if let Some(fd_idx) = *fd_slot {
-                    crate::vfs::file_close(fd_idx);
+                    crate::subsystems::fs::file::file_close(fd_idx);
                     *fd_slot = None;
                 }
             }
@@ -1208,7 +1052,8 @@ pub fn exit(status: i32) {
             reparent_children(&mut table, pid);
 
             // Remove security context for the exiting process
-            let _ = crate::security::remove_process_security_context(pid);
+            #[cfg(feature = "security")]
+            let _ = crate::security::memory_security::remove_process_security_context(pid as u32);
         }
     }
 
@@ -1218,7 +1063,7 @@ pub fn exit(status: i32) {
 
 /// Terminate a specific process by PID
 pub fn terminate_process(pid: u64) {
-    let mut table = PROC_TABLE.lock();
+    let mut table = get_proc_table().lock();
     if let Some(proc) = table.find(pid as Pid) {
         // Mark process as killed
         proc.killed = true;
@@ -1243,7 +1088,7 @@ pub fn wait(status: *mut i32) -> Option<Pid> {
     let parent_pid = myproc()?;
 
     loop {
-        let mut table = PROC_TABLE.lock();
+        let mut table = get_proc_table().lock();
         let mut zombie_child: Option<(Pid, i32)> = None;
 
         // Use O(1) lookup to get children list
@@ -1283,14 +1128,12 @@ pub fn wait(status: *mut i32) -> Option<Pid> {
 /// Arguments: pid - child PID to wait for (-1 for any child), status - pointer to status, options -
 /// wait options Returns: child PID on success, None on failure
 pub fn waitpid(pid: i32, status: *mut i32, options: i32) -> Option<Pid> {
-    use crate::posix;
-
     let parent_pid = myproc()?;
-    let no_hang = (options & posix::WNOHANG) != 0;
-    let untraced = (options & posix::WUNTRACED) != 0;
+    let no_hang = (options & WNOHANG) != 0;
+    let untraced = (options & WUNTRACED) != 0;
 
     loop {
-        let mut table = PROC_TABLE.lock();
+        let mut table = get_proc_table().lock();
         let mut found_child: Option<(Pid, i32)> = None;
 
         // Determine which children to check
@@ -1380,7 +1223,7 @@ pub fn waitpid(pid: i32, status: *mut i32, options: i32) -> Option<Pid> {
 
 /// Kill a process
 pub fn kill(pid: usize) -> bool {
-    let mut table = PROC_TABLE.lock();
+    let mut table = get_proc_table().lock();
     if let Some(proc) = table.find(pid as Pid) {
         proc.killed = true;
         if proc.state == ProcState::Sleeping {
@@ -1394,10 +1237,10 @@ pub fn kill(pid: usize) -> bool {
 
 /// Kill a process with a signal
 pub fn kill_proc(pid: Pid, sig: u32) -> Result<(), ()> {
-    let mut table = PROC_TABLE.lock();
+    let mut table = get_proc_table().lock();
     if let Some(proc) = table.find(pid) {
         if let Some(ref mut signals) = proc.signals {
-            let _ = signals.send_signal(sig);
+            signals.add_pending(sig);
         }
         if proc.state == ProcState::Sleeping {
             proc.state = ProcState::Runnable;
@@ -1420,7 +1263,7 @@ pub fn getpid() -> Pid {
 /// for commonly used file descriptors (0-7) to enable O(1) lookup.
 pub fn fdalloc(file_idx: usize) -> Option<i32> {
     let pid = myproc()?;
-    let mut table = PROC_TABLE.lock();
+    let mut table = get_proc_table().lock();
     let proc = table.find(pid)?;
 
     for (i, slot) in proc.ofile.iter_mut().enumerate() {
@@ -1441,7 +1284,7 @@ pub fn fdalloc(file_idx: usize) -> Option<i32> {
 /// for commonly used file descriptors (0-7).
 pub fn fdclose(fd: i32) -> Option<usize> {
     if let Some(pid) = myproc() {
-        let mut table = PROC_TABLE.lock();
+        let mut table = get_proc_table().lock();
         if let Some(proc) = table.find(pid) {
             if fd >= 0 && (fd as usize) < NOFILE {
                 if let Some(file_idx) = proc.ofile[fd as usize] {
@@ -1464,7 +1307,7 @@ pub fn fdclose(fd: i32) -> Option<usize> {
 /// and provides statistics for performance monitoring.
 pub fn fdlookup(fd: i32) -> Option<usize> {
     let pid = myproc()?;
-    let table = PROC_TABLE.lock();
+    let table = get_proc_table().lock();
     let proc = table.find_ref(pid)?;
 
     // Try cache first for commonly used file descriptors (0-15)
@@ -1495,7 +1338,7 @@ pub fn fdlookup(fd: i32) -> Option<usize> {
 /// updates the extended cache for commonly used file descriptors (0-15).
 pub fn fdinstall(fd: i32, file_idx: usize) -> Result<(), ()> {
     let pid = myproc().ok_or(())?;
-    let mut table = PROC_TABLE.lock();
+    let mut table = get_proc_table().lock();
     let proc = table.find(pid).ok_or(())?;
 
     if fd >= 0 && (fd as usize) < NOFILE {
@@ -1511,7 +1354,7 @@ pub fn fdinstall(fd: i32, file_idx: usize) -> Result<(), ()> {
 /// Sleep on a channel
 pub fn sleep(chan: usize) {
     if let Some(pid) = myproc() {
-        let mut table = PROC_TABLE.lock();
+        let mut table = get_proc_table().lock();
         if let Some(proc) = table.find(pid) {
             proc.chan = chan;
             proc.state = ProcState::Sleeping;
@@ -1522,7 +1365,7 @@ pub fn sleep(chan: usize) {
 
 /// Wake up all processes sleeping on a channel
 pub fn wakeup(chan: usize) {
-    let mut table = PROC_TABLE.lock();
+    let mut table = get_proc_table().lock();
     for proc in table.iter_mut() {
         if proc.state == ProcState::Sleeping && proc.chan == chan {
             proc.state = ProcState::Runnable;
@@ -1564,7 +1407,7 @@ fn reparent_children(table: &mut ProcTable, parent_pid: Pid) {
 /// Yield CPU to scheduler
 pub fn yield_cpu() {
     if let Some(pid) = myproc() {
-        let mut table = PROC_TABLE.lock();
+        let mut table = get_proc_table().lock();
         if let Some(proc) = table.find(pid) {
             if proc.state == ProcState::Running {
                 proc.state = ProcState::Runnable;
@@ -1579,16 +1422,16 @@ pub fn yield_cpu() {
 fn sched() {
     // Context switch to scheduler
     // This is simplified; real implementation needs assembly
-    crate::arch::wfi();
+    crate::platform::arch::wfi();
 }
 
 /// Main scheduler loop
 pub fn scheduler() -> ! {
     loop {
         // Enable interrupts to allow timer interrupts
-        crate::arch::intr_on();
+        crate::platform::arch::intr_on();
 
         // Use the new thread-based scheduler
-        crate::process::thread::schedule();
+        crate::subsystems::process::thread::schedule();
     }
 }

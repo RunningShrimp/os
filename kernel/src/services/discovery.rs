@@ -5,12 +5,11 @@
 
 use crate::error::KernelError;
 use crate::services::types::{
-    ServiceId, ServiceRef, ServiceType, ServicePriority,
+    ServiceRef, ServiceType, ServicePriority,
 };
 use crate::services::registry::get_registry;
 use alloc::collections::BTreeMap;
-use alloc::string::String;
-use alloc::sync::Arc;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use spin::Mutex;
 
@@ -218,9 +217,9 @@ impl ServiceDiscovery {
             key.push(';');
         }
         
-        for (key, value) in &query.properties {
+        for (k, value) in &query.properties {
             key.push_str("prop:");
-            key.push_str(key);
+            key.push_str(k);
             key.push(':');
             key.push_str(value);
             key.push(';');

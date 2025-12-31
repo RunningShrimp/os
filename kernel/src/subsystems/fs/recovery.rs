@@ -8,15 +8,10 @@ extern crate alloc;
 use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
-// Sleeplock在当前文件中未使用，暂时注释掉
-// use crate::subsystems::sync::Sleeplock;
-// use crate::subsystems::fs::journaling_fs::{JournalTransaction, JournalEntry, JfsError};
-// JournalingFileSystem在当前文件中未使用，暂时注释掉
-// use crate::subsystems::fs::journaling_fs::JournalingFileSystem;
-// BlockDevice在当前文件中未使用，暂时注释掉
-// use crate::platform::drivers::BlockDevice;crate::subsystems::fs::fs_cache::FsCache;
-// use crate::platform::drivers::BlockDevice;
-use crate::error::{UnifiedError, KernelError};
+use crate::error::KernelError;
+use crate::error::UnifiedError;
+use crate::subsystems::fs::fs_cache::FsCache;
+use crate::subsystems::fs::journaling_fs::JournalingFileSystem;
 use crate::subsystems::sync::Mutex;
 
 // ============================================================================
@@ -293,7 +288,7 @@ impl RecoveryManager {
         // Step 1: Check file system cache for corruption
         if let Err(e) = self.check_cache_integrity() {
             crate::println!("recovery: cache integrity check failed: {:?}", e);
-            self.log_event(RecoveryLogEntryType::CorruptionDetected, 0, e as u32, Vec::new())?;
+            self.log_event(RecoveryLogEntryType::CorruptionDetected, 0, 0, Vec::new())?;
 
             let mut stats = self.stats.lock();
             stats.corruption_events += 1;
@@ -310,7 +305,7 @@ impl RecoveryManager {
         // Step 3: Check for file system corruption
         if let Err(e) = self.check_filesystem_integrity() {
             crate::println!("recovery: file system integrity check failed: {:?}", e);
-            self.log_event(RecoveryLogEntryType::CorruptionDetected, 0, e as u32, Vec::new())?;
+            self.log_event(RecoveryLogEntryType::CorruptionDetected, 0, 0, Vec::new())?;
 
             let mut stats = self.stats.lock();
             stats.corruption_events += 1;
@@ -367,7 +362,7 @@ impl RecoveryManager {
         // Step 2: Checkpoint journaling file system
         if let Some(ref jfs) = *self.jfs.lock() {
             jfs.checkpoint()
-                .map_err(|e| KernelError::IoError(e as i32))?;
+                .map_err(|_| UnifiedError::IoError)?;
         }
 
         // Step 3: Update last checkpoint time
@@ -508,14 +503,13 @@ impl RecoveryManager {
 
     /// Delete a snapshot
     pub fn delete_snapshot(&self, snapshot_id: u32) -> Result<(), KernelError> {
-        // Get snapshot metadata
-        let metadata = {
-            let mut snapshots = self.snapshots.lock();
+        // Verify snapshot exists
+        {
+            let snapshots = self.snapshots.lock();
             snapshots
                 .get(&snapshot_id)
-                .cloned()
-                .ok_or(KernelError::NotFound)?
-        };
+                .ok_or(KernelError::NotFound)?;
+        }
 
         // Update snapshot state
         {
@@ -682,7 +676,7 @@ impl RecoveryManager {
         if let Some(ref jfs) = *self.jfs.lock() {
             // Force a checkpoint to clear any pending transactions
             jfs.checkpoint()
-                .map_err(|e| KernelError::IoError(e as i32))?;
+                .map_err(|_| UnifiedError::IoError)?;
         }
 
         Ok(())
@@ -706,8 +700,10 @@ impl RecoveryManager {
         let mut log = self.recovery_log.lock();
 
         // Keep only the most recent entries
-        if log.len() > MAX_RECOVERY_ENTRIES as usize {
-            log.drain(0..log.len() - MAX_RECOVERY_ENTRIES as usize);
+        let log_len = log.len();
+        if log_len > MAX_RECOVERY_ENTRIES as usize {
+            let drain_count = log_len - MAX_RECOVERY_ENTRIES as usize;
+            log.drain(0..drain_count);
         }
 
         Ok(())

@@ -12,14 +12,16 @@ extern crate alloc;
 
 extern crate hashbrown;
 
-use alloc::vec::Vec;
-use alloc::string::String;
 use alloc::string::ToString;
-use alloc::{format, vec};
-use alloc::boxed::Box;
+
+// Import prelude for common types
+use crate::prelude::*;
+
+use crate::collections::HashMap;
 use crate::compat::{*, DefaultHasherBuilder};
+use crate::compat::abi::Architecture;
+use crate::compat::Result as CompatibilityResult;
 use spin::Mutex;
-use crate::vfs;
 /// Universal package manager
 pub struct PackageManager {
     /// Format-specific package installers
@@ -67,19 +69,19 @@ pub trait PackageInstaller: Send + Sync {
     fn format(&self) -> PackageFormat;
 
     /// Analyze package file
-    fn analyze_package(&self, package_path: &str) -> Result<PackageInfo>;
+    fn analyze_package(&self, package_path: &str) -> CompatibilityResult<PackageInfo>;
 
     /// Extract package contents
-    fn extract_package(&self, package_path: &str, extract_path: &str) -> Result<()>;
+    fn extract_package(&self, package_path: &str, extract_path: &str) -> CompatibilityResult<()>;
 
     /// Install package
-    fn install_package(&self, package_path: &str, install_path: &str) -> Result<InstallResult>;
+    fn install_package(&self, package_path: &str, install_path: &str) -> CompatibilityResult<InstallResult>;
 
     /// Uninstall package
-    fn uninstall_package(&self, package_id: &str) -> Result<()>;
+    fn uninstall_package(&self, package_id: &str) -> CompatibilityResult<()>;
 
     /// Verify package integrity
-    fn verify_package(&self, package_path: &str) -> Result<VerificationResult>;
+    fn verify_package(&self, package_path: &str) -> CompatibilityResult<VerificationResult>;
 }
 
 /// Package information
@@ -387,10 +389,10 @@ pub struct PackageManagerStats {
 
 impl PackageManager {
     /// Create a new package manager
-    pub fn new() -> Result<Self> {
+    pub fn new() -> CompatibilityResult<Self> {
         let mut manager = Self {
-            installers: HashMap::with_hasher(DefaultHasherBuilder),
-            installed_packages: Mutex::new(HashMap::with_hasher(DefaultHasherBuilder)),
+            installers: HashMap::with_hasher(DefaultHasherBuilder::default()),
+            installed_packages: Mutex::new(HashMap::with_hasher(DefaultHasherBuilder::default())),
             dependency_resolver: Arc::new(Mutex::new(DependencyResolver::new())),
             package_database: Arc::new(Mutex::new(PackageDatabase::new())),
             stats: Mutex::new(PackageManagerStats::default()),
@@ -403,7 +405,7 @@ impl PackageManager {
     }
 
     /// Initialize package installers for different formats
-    fn init_installers(&mut self) -> Result<()> {
+    fn init_installers(&mut self) -> CompatibilityResult<()> {
         self.installers.insert(PackageFormat::Msi, Box::new(MsiInstaller::new()));
         self.installers.insert(PackageFormat::Dmg, Box::new(DmgInstaller::new()));
         self.installers.insert(PackageFormat::Deb, Box::new(DebInstaller::new()));
@@ -419,112 +421,45 @@ impl PackageManager {
     }
 
     /// Detect package format from file
-    pub fn detect_package_format(&self, package_path: &str) -> Result<PackageFormat> {
-        // Open and read file header
-        let mut file = vfs::vfs().open(package_path, crate::compat::loader::OpenFlags::O_RDONLY as u32)
-            .map_err(|_| CompatibilityError::NotFound)?;
-
-        let mut header = [0u8; 512];
-        let bytes_read = file.read(header.as_mut_ptr() as usize, header.len())
-            .map_err(|_| CompatibilityError::IoError)?;
-
-        if bytes_read == 0 {
-            return Err(CompatibilityError::InvalidBinaryFormat);
+    pub fn detect_package_format(&self, package_path: &str) -> CompatibilityResult<PackageFormat> {
+        // Simplified detection based on file extension
+        // TODO: Add magic number detection when VFS API is stable
+        if package_path.ends_with(".msi") {
+            return Ok(PackageFormat::Msi);
         }
-
-        // Detect format based on magic numbers and file signatures
-        if bytes_read >= 4 {
-            // ZIP format (includes APK, IPA, some MSIs)
-            if header[0..4] == [0x50, 0x4b, 0x03, 0x04] || header[0..4] == [0x50, 0x4b, 0x05, 0x06] {
-                // Further inspection to determine specific ZIP-based format
-                return self.detect_zip_based_format(package_path);
-            }
-
-            // MSI format (OLE2 Compound Document)
-            if &header[0..8] == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" {
-                return Ok(PackageFormat::Msi);
-            }
-
-            // DMG format
-            if &header[0..4] == b"\x7f\x45\x4c\x46" && bytes_read >= 512 {
-                // Check for DMG-specific markers
-                if &header[512..516] == b"koly" {
-                    return Ok(PackageFormat::Dmg);
-                }
-            }
-
-            // DEB format (ar archive)
-            if &header[0..8] == b"!<arch>\n" {
-                return Ok(PackageFormat::Deb);
-            }
-
-            // RPM format
-            if &header[0..4] == b"\xed\xab\xee\xdb" {
-                return Ok(PackageFormat::Rpm);
-            }
-
-            // TAR format
-            if bytes_read >= 512 {
-                // Check for valid TAR header (512-byte blocks)
-                if self.is_valid_tar_header(&header) {
-                    return if package_path.ends_with(".gz") || package_path.ends_with(".tgz") {
-                        Ok(PackageFormat::TarGz)
-                    } else {
-                        Ok(PackageFormat::Tar)
-                    };
-                }
-            }
-
-            // ELF executable (binary package)
-            if &header[0..4] == b"\x7fELF" {
-                return Ok(PackageFormat::Bin);
-            }
+        if package_path.ends_with(".dmg") {
+            return Ok(PackageFormat::Dmg);
         }
-
-        Ok(PackageFormat::Unknown)
-    }
-
-    /// Detect specific ZIP-based format
-    fn detect_zip_based_format(&self, package_path: &str) -> Result<PackageFormat> {
-        // Check file extension first
+        if package_path.ends_with(".deb") {
+            return Ok(PackageFormat::Deb);
+        }
+        if package_path.ends_with(".rpm") {
+            return Ok(PackageFormat::Rpm);
+        }
         if package_path.ends_with(".apk") {
             return Ok(PackageFormat::Apk);
         }
         if package_path.ends_with(".ipa") {
             return Ok(PackageFormat::Ipa);
         }
-        if package_path.ends_with(".msi") {
-            return Ok(PackageFormat::Msi);
-        }
         if package_path.ends_with(".zip") {
             return Ok(PackageFormat::Zip);
         }
-
-        // If extension is ambiguous, inspect ZIP contents
-        // For now, default to ZIP
-        Ok(PackageFormat::Zip)
-    }
-
-    /// Check if this is a valid TAR header
-    fn is_valid_tar_header(&self, header: &[u8]) -> bool {
-        if header.len() < 512 {
-            return false;
+        if package_path.ends_with(".tar") {
+            return Ok(PackageFormat::Tar);
+        }
+        if package_path.ends_with(".tar.gz") || package_path.ends_with(".tgz") {
+            return Ok(PackageFormat::TarGz);
+        }
+        if package_path.ends_with(".bin") {
+            return Ok(PackageFormat::Bin);
         }
 
-        // Check for null bytes at the end ( TAR files are padded with nulls)
-        let mut non_null_count = 0;
-        for &byte in &header[0..512] {
-            if byte != 0 {
-                non_null_count += 1;
-            }
-        }
-
-        // Valid TAR header should have some non-null bytes but not all
-        non_null_count > 0 && non_null_count < 512
+        Ok(PackageFormat::Unknown)
     }
 
     /// Install a package
-    pub fn install_package(&mut self, package_path: &str) -> Result<InstallResult> {
+    pub fn install_package(&mut self, package_path: &str) -> CompatibilityResult<InstallResult> {
         let start_time = self.get_timestamp_ms();
 
         // Detect package format
@@ -577,7 +512,7 @@ impl PackageManager {
     }
 
     /// Uninstall a package
-    pub fn uninstall_package(&mut self, package_id: &str) -> Result<()> {
+    pub fn uninstall_package(&mut self, package_id: &str) -> CompatibilityResult<()> {
         // Check if package is installed
         let installed_packages = self.installed_packages.lock();
         if !installed_packages.contains_key(package_id) {
@@ -608,7 +543,7 @@ impl PackageManager {
     }
 
     /// Resolve package dependencies
-    pub fn resolve_dependencies(&self, package_info: &PackageInfo) -> Result<ResolutionResult> {
+    pub fn resolve_dependencies(&self, package_info: &PackageInfo) -> CompatibilityResult<ResolutionResult> {
         let mut resolver = self.dependency_resolver.lock();
         resolver.resolve_dependencies(package_info, &*self.package_database.lock())
     }
@@ -624,13 +559,13 @@ impl PackageManager {
     }
 
     /// Search for packages
-    pub fn search_packages(&self, query: &str) -> Result<Vec<PackageInfo>> {
+    pub fn search_packages(&self, query: &str) -> CompatibilityResult<Vec<PackageInfo>> {
         let database = self.package_database.lock();
         Ok(database.search_packages(query))
     }
 
     /// Get installation path for a package
-    fn get_install_path(&self, package_info: &PackageInfo) -> Result<String> {
+    fn get_install_path(&self, package_info: &PackageInfo) -> CompatibilityResult<String> {
         match package_info.platform {
             TargetPlatform::Windows => Ok("/compat/windows/programs".to_string()),
             TargetPlatform::Linux => Ok("/compat/linux/opt".to_string()),
@@ -638,6 +573,7 @@ impl PackageManager {
             TargetPlatform::Android => Ok("/compat/android/data".to_string()),
             TargetPlatform::IOS => Ok("/compat/ios/Applications".to_string()),
             TargetPlatform::Nos => Ok("/opt".to_string()),
+            TargetPlatform::Unknown => Ok("/compat/unknown".to_string()),
         }
     }
 
@@ -649,7 +585,7 @@ impl PackageManager {
             install_path: install_path.to_string(),
             state: PackageState::Installed,
             source: "file".to_string(), // Would track actual source
-            configuration: HashMap::with_hasher(DefaultHasherBuilder),
+            configuration: HashMap::with_hasher(DefaultHasherBuilder::default()),
         };
 
         let mut installed_packages = self.installed_packages.lock();
@@ -671,7 +607,7 @@ impl PackageManager {
     }
 
     /// Infer package format from package info
-    fn infer_package_format(&self, package_info: &PackageInfo) -> Result<PackageFormat> {
+    fn infer_package_format(&self, package_info: &PackageInfo) -> CompatibilityResult<PackageFormat> {
         match package_info.platform {
             TargetPlatform::Windows => Ok(PackageFormat::Msi),
             TargetPlatform::Linux => Ok(PackageFormat::Deb), // Default to DEB
@@ -679,6 +615,7 @@ impl PackageManager {
             TargetPlatform::Android => Ok(PackageFormat::Apk),
             TargetPlatform::IOS => Ok(PackageFormat::Ipa),
             TargetPlatform::Nos => Ok(PackageFormat::Bin),
+            TargetPlatform::Unknown => Ok(PackageFormat::Unknown),
         }
     }
 
@@ -712,16 +649,16 @@ impl MsiInstaller {
 impl PackageInstaller for MsiInstaller {
     fn format(&self) -> PackageFormat { PackageFormat::Msi }
 
-    fn analyze_package(&self, _package_path: &str) -> Result<PackageInfo> {
+    fn analyze_package(&self, _package_path: &str) -> CompatibilityResult<PackageInfo> {
         // Placeholder implementation
         Err(CompatibilityError::UnsupportedApi)
     }
 
-    fn extract_package(&self, _package_path: &str, _extract_path: &str) -> Result<()> {
+    fn extract_package(&self, _package_path: &str, _extract_path: &str) -> CompatibilityResult<()> {
         Err(CompatibilityError::UnsupportedApi)
     }
 
-    fn install_package(&self, _package_path: &str, _install_path: &str) -> Result<InstallResult> {
+    fn install_package(&self, _package_path: &str, _install_path: &str) -> CompatibilityResult<InstallResult> {
         Ok(InstallResult {
             package_id: "test.msi".to_string(),
             status: InstallStatus::Success,
@@ -733,16 +670,16 @@ impl PackageInstaller for MsiInstaller {
         })
     }
 
-    fn uninstall_package(&self, _package_id: &str) -> Result<()> {
+    fn uninstall_package(&self, _package_id: &str) -> CompatibilityResult<()> {
         Ok(())
     }
 
-    fn verify_package(&self, _package_path: &str) -> Result<VerificationResult> {
+    fn verify_package(&self, _package_path: &str) -> CompatibilityResult<VerificationResult> {
         Ok(VerificationResult {
             passed: true,
             checksum_valid: true,
             signature_valid: true,
-            integrity_checks: HashMap::with_hasher(DefaultHasherBuilder),
+            integrity_checks: HashMap::with_hasher(DefaultHasherBuilder::default()),
             messages: vec![],
         })
     }
@@ -764,15 +701,15 @@ macro_rules! create_installer {
         impl PackageInstaller for $name {
             fn format(&self) -> PackageFormat { $format }
 
-            fn analyze_package(&self, _package_path: &str) -> Result<PackageInfo> {
+            fn analyze_package(&self, _package_path: &str) -> CompatibilityResult<PackageInfo> {
                 Err(CompatibilityError::UnsupportedApi)
             }
 
-            fn extract_package(&self, _package_path: &str, _extract_path: &str) -> Result<()> {
+            fn extract_package(&self, _package_path: &str, _extract_path: &str) -> CompatibilityResult<()> {
                 Err(CompatibilityError::UnsupportedApi)
             }
 
-            fn install_package(&self, _package_path: &str, _install_path: &str) -> Result<InstallResult> {
+            fn install_package(&self, _package_path: &str, _install_path: &str) -> CompatibilityResult<InstallResult> {
                 Ok(InstallResult {
                     package_id: "test".to_string(),
                     status: InstallStatus::Success,
@@ -784,16 +721,16 @@ macro_rules! create_installer {
                 })
             }
 
-            fn uninstall_package(&self, _package_id: &str) -> Result<()> {
+            fn uninstall_package(&self, _package_id: &str) -> CompatibilityResult<()> {
                 Ok(())
             }
 
-            fn verify_package(&self, _package_path: &str) -> Result<VerificationResult> {
+            fn verify_package(&self, _package_path: &str) -> CompatibilityResult<VerificationResult> {
                 Ok(VerificationResult {
                     passed: true,
                     checksum_valid: true,
                     signature_valid: true,
-                    integrity_checks: HashMap::with_hasher(DefaultHasherBuilder),
+                    integrity_checks: HashMap::with_hasher(DefaultHasherBuilder::default()),
                     messages: vec![],
                 })
             }
@@ -815,12 +752,12 @@ impl DependencyResolver {
     pub fn new() -> Self {
         Self {
             package_graph: DependencyGraph::new(),
-            resolution_cache: HashMap::with_hasher(DefaultHasherBuilder),
+            resolution_cache: HashMap::with_hasher(DefaultHasherBuilder::default()),
         }
     }
 
     pub fn resolve_dependencies(&mut self, package_info: &PackageInfo,
-                               _database: &PackageDatabase) -> Result<ResolutionResult> {
+                               _database: &PackageDatabase) -> CompatibilityResult<ResolutionResult> {
         // Simplified dependency resolution
         Ok(ResolutionResult {
             success: true,
@@ -835,8 +772,8 @@ impl DependencyResolver {
 impl DependencyGraph {
     pub fn new() -> Self {
         Self {
-            nodes: HashMap::with_hasher(DefaultHasherBuilder),
-            edges: HashMap::with_hasher(DefaultHasherBuilder),
+            nodes: HashMap::with_hasher(DefaultHasherBuilder::default()),
+            edges: HashMap::with_hasher(DefaultHasherBuilder::default()),
         }
     }
 }
@@ -844,9 +781,9 @@ impl DependencyGraph {
 impl PackageDatabase {
     pub fn new() -> Self {
         Self {
-            available_packages: HashMap::with_hasher(DefaultHasherBuilder),
+            available_packages: HashMap::with_hasher(DefaultHasherBuilder::default()),
             repositories: vec![],
-            index_cache: HashMap::with_hasher(DefaultHasherBuilder),
+            index_cache: HashMap::with_hasher(DefaultHasherBuilder::default()),
         }
     }
 
@@ -860,6 +797,6 @@ impl PackageDatabase {
 }
 
 /// Create a new package manager
-pub fn create_package_manager() -> Result<PackageManager> {
+pub fn create_package_manager() -> CompatibilityResult<PackageManager> {
     PackageManager::new()
 }

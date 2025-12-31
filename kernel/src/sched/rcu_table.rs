@@ -18,12 +18,10 @@ extern crate alloc;
 
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use core::num::NonZeroU64;
-use core::ptr;
 
 use crate::subsystems::sync::Mutex;
 
-use super::sharded_table::{Pid, ProcEntry, ProcState};
+use super::sharded_table::{Pid, ProcEntry};
 
 /// Epoch counter for RCU grace periods
 static GLOBAL_EPOCH: AtomicU64 = AtomicU64::new(0);
@@ -51,19 +49,19 @@ impl RcPointer {
     const fn new() -> Self {
         Self {
             ptr: AtomicUsize::new(0),
-            epoch: AtomicUsize::new(0) as AtomicU64,
+            epoch: AtomicU64::new(0),
         }
     }
 
     /// Load the current process (lock-free read)
-    unsafe fn load(&self) -> Option<Arc<ProcEntry>> {
+    unsafe fn load(&self) -> Option<Arc<ProcEntry>> { unsafe {
         let addr = self.ptr.load(Ordering::Acquire);
         if addr == 0 {
             None
         } else {
             Some(Arc::from_raw(addr as *const ProcEntry))
         }
-    }
+    }}
 
     /// Store a new process (write operation)
     unsafe fn store(&self, entry: Arc<ProcEntry>) {
@@ -73,7 +71,7 @@ impl RcPointer {
     }
 
     /// Swap to a new process, returning the old one
-    unsafe fn swap(&self, entry: Arc<ProcEntry>) -> Option<Arc<ProcEntry>> {
+    unsafe fn swap(&self, entry: Arc<ProcEntry>) -> Option<Arc<ProcEntry>> { unsafe {
         let new_addr = Arc::into_raw(entry) as usize;
         let old_addr = self.ptr.swap(new_addr, Ordering::AcqRel);
         self.epoch.store(current_epoch(), Ordering::Release);
@@ -83,7 +81,7 @@ impl RcPointer {
         } else {
             Some(Arc::from_raw(old_addr as *const ProcEntry))
         }
-    }
+    }}
 }
 
 /// RCU-protected process table entry

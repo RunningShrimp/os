@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Platform-specific compatibility modules
 //!
 //! This module contains platform-specific compatibility implementations:
@@ -9,7 +10,9 @@
 
 extern crate alloc;
 extern crate hashbrown;
+
 use alloc::boxed::Box;
+use alloc::vec::Vec;
 
 /// Compatibility error types
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,7 +33,7 @@ pub enum CompatibilityError {
     NotSupported,
 }
 
-pub type Result<T> = core::result::Result<T, CompatibilityError>;
+pub type Result<T, E = CompatibilityError> = core::result::Result<T, E>;
 
 pub mod android;
 pub mod ios;
@@ -41,15 +44,41 @@ pub mod loader;
 pub mod abi;
 pub mod graphics;
 pub mod memory;
-pub mod MemoryPermissions;
-pub use MemoryPermissions::*;
+
+// Explicitly load the MemoryPermissions module (uppercase filename)
+#[path = "MemoryPermissions.rs"]
+mod memory_permissions_impl;
+
+// Re-export memory types and permissions
+pub use memory::{MemoryRegion, MemoryRegionType};
+
+// Re-export MemoryPermissions
+pub use memory_permissions_impl::MemoryPermissions;
+
 pub mod package_manager;
 pub mod sandbox;
 pub mod syscall_translator;
 
+/// Memory manager for compatibility layer
+#[derive(Debug)]
+pub struct MemoryManager {
+    pub regions: Vec<MemoryRegion>,
+    pub next_addr: usize,
+    pub stats: MemoryStats,
+}
+
+/// Memory statistics
+#[derive(Debug, Clone, Default)]
+pub struct MemoryStats {
+    pub total_allocated: usize,
+    pub peak_allocation: usize,
+    pub allocation_count: usize,
+}
+
 /// Target platform enumeration
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum TargetPlatform {
+    Nos,
     Windows,
     MacOS,
     Linux,
@@ -63,22 +92,31 @@ pub trait PlatformModule {
     fn name(&self) -> &str;
     fn version(&self) -> &str;
     fn is_supported(&self) -> bool;
-    fn initialize(&mut self) -> Result<(), &'static str>;
-    fn shutdown(&mut self) -> Result<(), &'static str>;
+    fn initialize(&mut self) -> Result<()>;
+    fn shutdown(&mut self) -> Result<()>;
 }
 
 /// Default hasher builder for hash maps
-// We use a custom BuildHasher that wraps hashbrown's default.
-// This avoids using the type alias which seems to trigger rustc_private checks
-// when used with hashbrown::HashMap in some contexts.
-#[derive(Default, Clone)]
+// We use core::hash::BuildHasherDefault with hashbrown::DefaultHasher
+// hashbrown::DefaultHasher has a new() method but not Default trait
+// We use a custom builder that calls new()
+#[derive(Clone, Copy)]
 pub struct DefaultHasherBuilder;
 
+// Re-export hashbrown's DefaultHashBuilder for convenience
+pub use hashbrown::DefaultHashBuilder;
+
+impl Default for DefaultHasherBuilder {
+    fn default() -> Self {
+        Self
+    }
+}
+
 impl core::hash::BuildHasher for DefaultHasherBuilder {
-    type Hasher = hashbrown::hash_map::DefaultHasher;
+    type Hasher = hashbrown::DefaultHasher;
 
     fn build_hasher(&self) -> Self::Hasher {
-        hashbrown::hash_map::DefaultHasher::default()
+        hashbrown::DefaultHashBuilder::default().build_hasher()
     }
 }
 

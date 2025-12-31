@@ -7,17 +7,17 @@
 
 extern crate alloc;
 use alloc::{
+    boxed::Box,
     collections::{BTreeMap, VecDeque},
-    string::String,
+    string::{String, ToString},
     vec::Vec,
 };
 
-// use alloc::sync::Arc;
 use core::sync::atomic::{AtomicU64, AtomicU32, AtomicBool, Ordering};
 use crate::sync::Mutex;
-// use crate::subsystems::fs::fs_impl::{Buf, BufFlags, BufCache, CacheKey};
+use crate::subsystems::fs::fs_impl::CacheKey;
 use crate::platform::drivers::BlockDevice;
-use crate::{collections::HashMap, error::{UnifiedError, KernelError}};
+use crate::error::KernelError;
 
 // ============================================================================
 // File System Cache Constants and Types
@@ -283,16 +283,20 @@ pub struct FsCache {
     /// ARC T2 (frequently used)
     arc_t2: Mutex<BTreeMap<CacheKey, CacheEntry>>,
     /// ARC B1 (recently evicted from T1)
+    #[allow(dead_code)]
     arc_b1: Mutex<BTreeMap<CacheKey, CacheEntry>>,
     /// ARC B2 (recently evicted from T2)
+    #[allow(dead_code)]
     arc_b2: Mutex<BTreeMap<CacheKey, CacheEntry>>,
     /// ARC ghost list sizes
+    #[allow(dead_code)]
     arc_p: AtomicU32,
     /// 2Q A1in (new entries)
     twoq_a1in: Mutex<BTreeMap<CacheKey, CacheEntry>>,
     /// 2Q A1out (demoted entries)
     twoq_a1out: Mutex<BTreeMap<CacheKey, CacheEntry>>,
     /// 2Q Am (frequently used entries)
+    #[allow(dead_code)]
     twoq_am: Mutex<BTreeMap<CacheKey, CacheEntry>>,
     /// Cache statistics
     stats: Mutex<CacheStats>,
@@ -479,7 +483,7 @@ impl FsCache {
     /// Put cache entry
     pub fn put(&self, key: CacheKey, entry: CacheEntry) -> Result<(), KernelError> {
         if !self.enabled.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Cache is disabled".to_string()));
         }
 
         // Check if we need to evict entries
@@ -549,7 +553,7 @@ impl FsCache {
     /// Flush dirty entries
     pub fn flush_dirty(&self) -> Result<(), KernelError> {
         if !self.enabled.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Cache is disabled".to_string()));
         }
 
         let mut dirty_entries = Vec::new();
@@ -574,7 +578,7 @@ impl FsCache {
             // Mark entry as clean
             {
                 let mut entries = self.entries.lock();
-                if let Some(entry) = entries.get_mut(key) {
+                if let Some(entry) = entries.get_mut(&key) {
                     entry.dirty = false;
                     entry.status = CacheEntryStatus::Valid;
                 }
@@ -593,7 +597,7 @@ impl FsCache {
     /// Evict entries to make space
     pub fn evict_entries(&self, required_size: u64) -> Result<(), KernelError> {
         if !self.enabled.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Cache is disabled".to_string()));
         }
 
         let mut freed_size = 0u64;
@@ -681,7 +685,7 @@ impl FsCache {
     /// Clear all cache entries
     pub fn clear(&self) -> Result<(), KernelError> {
         if !self.enabled.load(Ordering::SeqCst) {
-            return Err(KernelError::InvalidState);
+            return Err(KernelError::Other("Cache is disabled".to_string()));
         }
 
         // Flush dirty entries first
@@ -781,9 +785,9 @@ impl FsCache {
 
     /// Get LFU key
     fn get_lfu_key(&self) -> Option<CacheKey> {
-        let mut lfu_map = self.lfu_map.lock();
+        let lfu_map = self.lfu_map.lock();
 
-        if let Some((key, _)) = lfu_map.iter().min_by_key(|(_, &count)| count) {
+        if let Some((key, _)) = lfu_map.iter().min_by_key(|(_, count)| *count) {
             Some(key.clone())
         } else {
             None
@@ -852,7 +856,7 @@ impl FsCache {
 
         // First try to evict from T1 (recently evicted once)
         while *freed_size < required_size {
-            let mut t1 = self.arc_t1.lock();
+            let t1 = self.arc_t1.lock();
             if let Some((key, entry)) = t1.iter().next() {
                 let key = key.clone();
                 let entry = entry.clone();
@@ -868,7 +872,7 @@ impl FsCache {
 
         // Then try to evict from T2 (frequently used)
         while *freed_size < required_size {
-            let mut t2 = self.arc_t2.lock();
+            let t2 = self.arc_t2.lock();
             if let Some((key, entry)) = t2.iter().next() {
                 let key = key.clone();
                 let entry = entry.clone();
@@ -890,7 +894,7 @@ impl FsCache {
 
         // First try to evict from A1out (demoted entries)
         while *freed_size < required_size {
-            let mut a1out = self.twoq_a1out.lock();
+            let a1out = self.twoq_a1out.lock();
             if let Some((key, entry)) = a1out.iter().next() {
                 let key = key.clone();
                 let entry = entry.clone();
@@ -906,7 +910,7 @@ impl FsCache {
 
         // Then try to evict from A1in (new entries)
         while *freed_size < required_size {
-            let mut a1in = self.twoq_a1in.lock();
+            let a1in = self.twoq_a1in.lock();
             if let Some((key, entry)) = a1in.iter().next() {
                 let key = key.clone();
                 let entry = entry.clone();
@@ -938,7 +942,7 @@ impl FsCache {
             block_device.write(block_num, &data);
             Ok(())
         } else {
-            Err(KernelError::InvalidState)
+            Err(KernelError::Other("No block device configured".to_string()))
         }
     }
 
@@ -988,7 +992,7 @@ impl FsCache {
     }
 
     /// Update put statistics
-    fn update_put_stats(&self, entry: &CacheEntry) {
+    fn update_put_stats(&self, _entry: &CacheEntry) {
         let mut stats = self.stats.lock();
 
         stats.used_entries = self.used_entries.load(Ordering::SeqCst);
@@ -1001,7 +1005,7 @@ impl FsCache {
     }
 
     /// Update remove statistics
-    fn update_remove_stats(&self, entry: &CacheEntry) {
+    fn update_remove_stats(&self, _entry: &CacheEntry) {
         let mut stats = self.stats.lock();
 
         stats.used_entries = self.used_entries.load(Ordering::SeqCst);

@@ -3,7 +3,6 @@
 //! This module provides the core kernel initialization logic that is shared
 //! between bootloader-based startup and library-based initialization.
 
-use crate::prelude::*;
 use crate::platform::boot::BootParameters;
 
 /// Core kernel initialization function
@@ -23,9 +22,7 @@ pub fn init_kernel_core(boot_params: Option<&BootParameters>) {
     if let Some(params) = boot_params {
         // Boot parameters are already initialized in rust_main_with_boot_info
         // For library entry, we need to initialize them here
-        unsafe {
-            crate::platform::boot::init_from_boot_parameters(params as *const BootParameters);
-        }
+        crate::platform::boot::init_from_boot_parameters(params as *const BootParameters);
     } else if !crate::platform::boot::is_bootloader_boot() {
         // No boot parameters - initialize legacy mode
         crate::platform::boot::init_direct_boot();
@@ -117,14 +114,14 @@ pub fn init_kernel_core(boot_params: Option<&BootParameters>) {
     crate::vfs::sysfs::init();
 
     // Try to mount ramfs first, fall back to tmpfs if it fails
-    let root_mounted = match crate::vfs::mount("ramfs", "/", None, 0) {
+    let root_mounted = match crate::vfs::mount("ramfs", None, "/", 0) {
         Ok(()) => {
             crate::println!("[boot] VFS root mounted (ramfs)");
             true
         },
         Err(e) => {
             crate::println!("[boot] ramfs mount failed: {:?}, trying tmpfs...", e);
-            match crate::vfs::mount("tmpfs", "/", None, 0) {
+            match crate::vfs::mount("tmpfs", None, "/", 0) {
                 Ok(()) => {
                     crate::println!("[boot] VFS root mounted (tmpfs)");
                     true
@@ -139,7 +136,7 @@ pub fn init_kernel_core(boot_params: Option<&BootParameters>) {
 
     // Verify root file system is accessible
     if root_mounted {
-        match crate::vfs::verify_root() {
+        match crate::subsystems::fs::verify_root() {
             Ok(()) => {
                 if let Ok(attr) = crate::vfs::vfs().stat("/") {
                     crate::println!(
@@ -250,8 +247,8 @@ pub fn init_kernel_core(boot_params: Option<&BootParameters>) {
     // Initialize unified scheduler with priority queues
     {
         use crate::sched::unified::init_unified_scheduler;
+        let _ = init_unified_scheduler();
         let num_cpus = crate::cpu::ncpus();
-        init_unified_scheduler(num_cpus);
         crate::println!("[boot] unified scheduler initialized ({} CPUs)", num_cpus);
     }
 

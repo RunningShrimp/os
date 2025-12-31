@@ -18,8 +18,8 @@ pub const EPOLLHUP: i32 = 0x010;
 pub const EPOLLRDHUP: i32 = 0x2000;
 pub const EPOLLEXCL: i32 = 0x1000000;
 pub const EPOLLWAKEUP: i32 = 0x20000000;
-pub const EPOLLONESHOT: i32 = 0x40000000;
-pub const EPOLLET: i32 = 0x80000000;
+pub const EPOLLONESHOT: i32 = 0x40000000_u32 as i32;
+pub const EPOLLET: i32 = 0x80000000_u32 as i32;
 
 /// epoll manager for handling multiple epoll instances
 pub struct EpollManager {
@@ -77,7 +77,7 @@ pub enum EpollEvent {
 }
 
 /// epoll event structure
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct EpollEventInfo {
     /// Event types
     pub events: EpollEvent,
@@ -155,7 +155,18 @@ impl Epoll {
 static EPOLL_INSTANCES: Mutex<BTreeMap<i32, Arc<Mutex<Epoll>>>> = Mutex::new(BTreeMap::new());
 
 /// Create a new epoll instance and return its file descriptor
+///
+/// The `size` parameter is validated for compatibility with Linux epoll_create.
+/// While modern Linux ignores this parameter (using dynamic sizing), we validate
+/// it to catch potential user errors.
 pub fn epoll_create(size: i32) -> Result<i32, &'static str> {
+    // Validate size parameter for compatibility
+    // In older Linux kernels, size had to be > 0. Modern kernels ignore it,
+    // but we validate to catch API misuse.
+    if size <= 0 {
+        return Err("size must be positive");
+    }
+
     static mut EPOLL_FD_COUNTER: i32 = 0;
 
     unsafe {

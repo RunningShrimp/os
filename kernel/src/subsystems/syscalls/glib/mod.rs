@@ -3,10 +3,32 @@
 pub mod inotify;
 pub mod memfd;
 
-// Simple re-exports for GLib modules
-pub use crate::subsystems::syscalls::eventfd::*;
-pub use crate::subsystems::syscalls::signalfd::*;
-pub use crate::subsystems::syscalls::timerfd::*;
+// Re-export specific types and functions from eventfd module (excluding flags to avoid conflicts)
+pub use crate::subsystems::syscalls::eventfd::{
+    EventFdInstance,
+    EventFdHandler,
+    sys_eventfd,
+    sys_eventfd2,
+};
+
+// Re-export specific types and functions from signalfd module (excluding flags to avoid conflicts)
+pub use crate::subsystems::syscalls::signalfd::{
+    SigInfo,
+    SignalfdInstance,
+    SignalfdSiginfo,
+    SignalFdHandler,
+    sys_signalfd,
+    sys_signalfd4,
+};
+
+// Re-export specific types and functions from timerfd module (excluding flags to avoid conflicts)
+pub use crate::subsystems::syscalls::timerfd::{
+    TimerFdInstance,
+    TimerFdHandler,
+    sys_timerfd_create,
+    sys_timerfd_settime,
+    sys_timerfd_gettime,
+};
 
 // Inotify flags module
 pub mod inotify_flags {
@@ -82,7 +104,7 @@ pub fn get_memfd_instance(_idx: usize) -> Option<crate::subsystems::syscalls::gl
 }
 
 /// Deliver signal to signalfd (stub)
-pub fn deliver_signal_to_signalfd(_pid: usize, _sig: usize, _info: crate::subsystems::ipc::signal::SigInfo) -> bool {
+pub fn deliver_signal_to_signalfd(_pid: usize, _sig: usize, _info: crate::subsystems::syscalls::signalfd::SigInfo) -> bool {
     false
 }
 
@@ -103,7 +125,7 @@ pub fn dispatch(syscall_num: u32, args: &[u64]) -> i64 {
     match syscall_num {
         0xB009 => {
             // inotify_init
-            if let Some(instance) = get_inotify_instance(0) {
+            if let Some(_instance) = get_inotify_instance(0) {
                 // Return a file descriptor (stub implementation)
                 1
             } else {
@@ -113,7 +135,7 @@ pub fn dispatch(syscall_num: u32, args: &[u64]) -> i64 {
         0xB00A => {
             // inotify_init1
             if args.len() > 0 {
-                let flags = args[0] as u32;
+                let _flags = args[0] as u32;
                 if let Some(_instance) = get_inotify_instance(0) {
                     // Return a file descriptor (stub implementation)
                     1

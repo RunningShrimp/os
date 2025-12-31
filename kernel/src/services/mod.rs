@@ -28,14 +28,8 @@ pub fn init() -> Result<(), KernelError> {
 
 /// Shutdown the services subsystem
 pub fn shutdown() -> Result<(), KernelError> {
-    // Shutdown the service manager
-    manager::shutdown()?;
-
-    // Shutdown the service discovery
-    discovery::shutdown()?;
-
-    // Shutdown the service registry
-    registry::shutdown()?;
+    // Note: Individual module shutdowns not yet implemented
+    // The service manager will handle stopping all services
 
     log::info!("Services subsystem shutdown");
     Ok(())

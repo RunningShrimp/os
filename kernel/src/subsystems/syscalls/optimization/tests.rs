@@ -7,15 +7,16 @@
 //! 3. Boundary condition handling
 //! 4. Stress testing
 
+use alloc::string::ToString;
 use alloc::vec::Vec;
-use core::time::Duration;
 
 use crate::{
     subsystems::syscalls::{
-        SYS_BATCH, SYS_CLOSE, SYS_GETPID, SYS_READ, SYS_WRITE, common::SyscallResult<i64>
+        SYS_BATCH, SYS_CLOSE, SYS_GETPID, SYS_READ,
     },
     subsystems::syscalls::fast_path::dispatch,
     tests::TestResult,
+    test_assert, test_assert_eq,
 };
 
 /// Test function consistency between optimized and non-optimized paths
@@ -27,8 +28,14 @@ pub fn test_syscall_function_consistency() -> TestResult {
     let args = [];
 
     // Call getpid multiple times - should return the same result every time
-    let pid1 = dispatch(SYS_GETPID as usize, &args);
-    let pid2 = dispatch(SYS_GETPID as usize, &args);
+    let pid1_result = dispatch(SYS_GETPID as u32, &args);
+    let pid2_result = dispatch(SYS_GETPID as u32, &args);
+
+    // Check if both calls succeeded
+    let pid1 = pid1_result.ok_or_else(|| "getpid call 1 failed".to_string())?
+        .map_err(|e| alloc::format!("getpid error: {}", e))?;
+    let pid2 = pid2_result.ok_or_else(|| "getpid call 2 failed".to_string())?
+        .map_err(|e| alloc::format!("getpid error: {}", e))?;
 
     // Verify consistency
     test_assert_eq!(pid1, pid2, "getpid should return consistent results");
@@ -47,7 +54,7 @@ pub fn test_syscall_performance_comparison() -> TestResult {
     let start_time = crate::subsystems::time::get_ticks();
 
     for _ in 0..iterations {
-        let _ = dispatch(SYS_GETPID as usize, &args_empty);
+        let _ = dispatch(SYS_GETPID as u32, &args_empty);
     }
 
     let end_time = crate::subsystems::time::get_ticks();
@@ -59,12 +66,12 @@ pub fn test_syscall_performance_comparison() -> TestResult {
 
     // Test with dummy read (will likely fall back to non-optimized path)
     // but we can test the fast path rejection behavior
-    let args_read = [0usize, 0x10000000, 1024];
+    let args_read = [0u64, 0x10000000, 1024];
 
     let start_time = crate::subsystems::time::get_ticks();
 
     for _ in 0..iterations {
-        let _ = dispatch(SYS_READ as usize, &args_read);
+        let _ = dispatch(SYS_READ as u32, &args_read);
     }
 
     let end_time = crate::subsystems::time::get_ticks();
@@ -83,35 +90,47 @@ pub fn test_syscall_boundary_conditions() -> TestResult {
     // The fast path handles fd 0-7
 
     // Test with fd 0 (stdin) - should be handled by fast path if valid
-    let result0 = dispatch(SYS_CLOSE as usize, &[0]);
+    let result0 = dispatch(SYS_CLOSE as u32, &[0u64]);
     // Either succeeds or fails with EBADF, but should not crash
 
     // Test with fd 7 (highest fast path fd)
-    let result7 = dispatch(SYS_CLOSE as usize, &[7]);
+    let result7 = dispatch(SYS_CLOSE as u32, &[7u64]);
 
     // Test with fd 8 (beyond fast path, should fall back to normal path)
-    let result8 = dispatch(SYS_CLOSE as usize, &[8]);
+    let result8 = dispatch(SYS_CLOSE as u32, &[8u64]);
 
     // None should panic, but they might return errors
-    test_assert!(result0 <= 0 || result0 > 0, "close(0) should not crash");
-    test_assert!(result7 <= 0 || result7 > 0, "close(7) should not crash");
-    test_assert!(result8 <= 0 || result8 > 0, "close(8) should not crash");
+    test_assert!(match result0 {
+        Some(Ok(_)) | Some(Err(_)) => true,
+        None => false,
+    }, "close(0) should not crash");
+    test_assert!(match result7 {
+        Some(Ok(_)) | Some(Err(_)) => true,
+        None => false,
+    }, "close(7) should not crash");
+    test_assert!(match result8 {
+        Some(Ok(_)) | Some(Err(_)) => true,
+        None => false,
+    }, "close(8) should not crash");
 
     // Test read/write with boundary buffer sizes
     // Fast path handles up to 4096 bytes
 
     // Test with 0 bytes (should be handled by fast path rejection)
-    let args_read_0 = [0usize, 0x10000000, 0];
-    let result_read_0 = dispatch(SYS_READ as usize, &args_read_0);
-    test_assert!(result_read_0 <= 0 || result_read_0 == 0, "read(0) should return 0 or error");
+    let args_read_0 = [0u64, 0x10000000, 0u64];
+    let result_read_0 = dispatch(SYS_READ as u32, &args_read_0);
+    test_assert!(match result_read_0 {
+        Some(Ok(0)) | Some(Ok(_)) | Some(Err(_)) => true,
+        None => false,
+    }, "read(0) should return 0 or error");
 
     // Test with 4096 bytes (max fast path size)
-    let args_read_4k = [0usize, 0x10000000, 4096];
-    let result_read_4k = dispatch(SYS_READ as usize, &args_read_4k);
+    let args_read_4k = [0u64, 0x10000000, 4096u64];
+    let _result_read_4k = dispatch(SYS_READ as u32, &args_read_4k);
 
     // Test with 4097 bytes (just above fast path limit)
-    let args_read_4k1 = [0usize, 0x10000000, 4097];
-    let result_read_4k1 = dispatch(SYS_READ as usize, &args_read_4k1);
+    let args_read_4k1 = [0u64, 0x10000000, 4097u64];
+    let _result_read_4k1 = dispatch(SYS_READ as u32, &args_read_4k1);
 
     Ok(())
 }
@@ -126,7 +145,7 @@ pub fn test_syscall_stress() -> TestResult {
     let start_time = crate::subsystems::time::get_ticks();
 
     for i in 0..iterations {
-        let _ = dispatch(SYS_GETPID as usize, &args);
+        let _ = dispatch(SYS_GETPID as u32, &args);
 
         // Print progress every 1000 iterations
         if i % 1000 == 0 {
@@ -154,12 +173,15 @@ pub fn test_batch_syscall_optimization() -> TestResult {
     // Test with empty batch
 
     // Note: Batch syscall implementation is currently a stub in fast_path_batch
-    let args = [0usize]; // batch request pointer (null for test)
+    let args = [0u64]; // batch request pointer (null for test)
 
-    let result = dispatch(SYS_BATCH as usize, &args);
+    let result = dispatch(SYS_BATCH as u32, &args);
 
     // Should not panic
-    test_assert!(result <= 0 || result >= 0, "batch syscall should not crash");
+    test_assert!(match result {
+        Some(Ok(_)) | Some(Err(_)) => true,
+        None => false,
+    }, "batch syscall should not crash");
 
     Ok(())
 }
@@ -207,6 +229,6 @@ pub fn run_all_syscall_optimization_tests() -> TestResult {
     if passed == total {
         Ok(())
     } else {
-        Err(alloc::string::ToString::to_string!("{} tests failed", total - passed))
+        Err(alloc::format!("{} tests failed", total - passed))
     }
 }

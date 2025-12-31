@@ -9,8 +9,18 @@
 //! - 用户信息：getuid, getgid, geteuid, getegid
 
 use core::str::FromStr;
+use core::ffi::{c_char, c_double, c_int, c_uint};
 
-use crate::libc::{error::set_errno, interface::c_ulong};
+use crate::prelude::*;
+
+// C types from libc
+use crate::libc::{
+    error::{set_errno, errno::{EINVAL, EPERM, ENAMETOOLONG}},
+    interface::{c_long, c_ushort, c_ulong},
+};
+
+// Heapless types for fixed-size collections
+use heapless::{String, Vec};
 
 #[repr(C)]
 #[derive(Debug, Clone)]
@@ -413,7 +423,7 @@ impl EnhancedSystemInfo {
     }
 
     /// 获取网络接口信息
-    pub fn get_network_interfaces(&self) -> heapless::Vec<NetworkInterface, 8> {
+    pub fn get_network_interfaces(&self) -> Vec<NetworkInterface, 8> {
         self.collect_network_info()
     }
 
@@ -489,13 +499,13 @@ impl EnhancedSystemInfo {
     /// 收集系统名称信息
     fn collect_utsname(&self) -> UtsName {
         UtsName {
-            sysname: heapless::String::from_str("NOS").unwrap_or_default(),
-            nodename: heapless::String::from_str("localhost").unwrap_or_default(),
-            release: heapless::String::from_str("1.0.0").unwrap_or_default(),
-            version: heapless::String::from_str("NOS Kernel v1.0.0 (Build 2024)")
+            sysname: String::from_str("NOS").unwrap_or_default(),
+            nodename: String::from_str("localhost").unwrap_or_default(),
+            release: String::from_str("1.0.0").unwrap_or_default(),
+            version: String::from_str("NOS Kernel v1.0.0 (Build 2024)")
                 .unwrap_or_default(),
-            machine: heapless::String::from_str("x86_64").unwrap_or_default(),
-            domainname: heapless::String::from_str("localdomain").unwrap_or_default(),
+            machine: String::from_str("x86_64").unwrap_or_default(),
+            domainname: String::from_str("localdomain").unwrap_or_default(),
         }
     }
 
@@ -523,26 +533,26 @@ impl EnhancedSystemInfo {
     /// 收集CPU信息
     fn collect_cpu_info(&self) -> CpuInfo {
         CpuInfo {
-            architecture: heapless::String::from_str("x86_64").unwrap_or_default(),
-            model: heapless::String::from_str("NOS Virtual CPU").unwrap_or_default(),
+            architecture: String::from_str("x86_64").unwrap_or_default(),
+            model: String::from_str("NOS Virtual CPU").unwrap_or_default(),
             frequency_mhz: 2400,
             cores: 4,
             logical_processors: 8,
             cache_size: 8192,
             virtualization: true,
             features: {
-                let mut features = heapless::Vec::new();
+                let mut features = Vec::new();
                 features
-                    .push(heapless::String::from_str("mmx").unwrap_or_default())
+                    .push(String::from_str("mmx").unwrap_or_default())
                     .ok();
                 features
-                    .push(heapless::String::from_str("sse").unwrap_or_default())
+                    .push(String::from_str("sse").unwrap_or_default())
                     .ok();
                 features
-                    .push(heapless::String::from_str("sse2").unwrap_or_default())
+                    .push(String::from_str("sse2").unwrap_or_default())
                     .ok();
                 features
-                    .push(heapless::String::from_str("avx").unwrap_or_default())
+                    .push(String::from_str("avx").unwrap_or_default())
                     .ok();
                 features
             },
@@ -570,15 +580,15 @@ impl EnhancedSystemInfo {
     }
 
     /// 收集网络信息
-    fn collect_network_info(&self) -> heapless::Vec<NetworkInterface, 8> {
-        let mut interfaces = heapless::Vec::new();
+    fn collect_network_info(&self) -> Vec<NetworkInterface, 8> {
+        let mut interfaces = Vec::new();
 
         // 模拟网络接口
         interfaces
             .push(NetworkInterface {
-                name: heapless::String::from_str("lo").unwrap_or_default(),
-                mac_address: heapless::String::from_str("00:00:00:00:00:00").unwrap_or_default(),
-                ip_address: heapless::String::from_str("127.0.0.1").unwrap_or_default(),
+                name: String::from_str("lo").unwrap_or_default(),
+                mac_address: String::from_str("00:00:00:00:00:00").unwrap_or_default(),
+                ip_address: String::from_str("127.0.0.1").unwrap_or_default(),
                 is_up: true,
                 rx_bytes: 1048576,
                 tx_bytes: 1048576,
@@ -589,9 +599,9 @@ impl EnhancedSystemInfo {
 
         interfaces
             .push(NetworkInterface {
-                name: heapless::String::from_str("eth0").unwrap_or_default(),
-                mac_address: heapless::String::from_str("52:54:00:12:34:56").unwrap_or_default(),
-                ip_address: heapless::String::from_str("192.168.1.100").unwrap_or_default(),
+                name: String::from_str("eth0").unwrap_or_default(),
+                mac_address: String::from_str("52:54:00:12:34:56").unwrap_or_default(),
+                ip_address: String::from_str("192.168.1.100").unwrap_or_default(),
                 is_up: true,
                 rx_bytes: 1073741824,
                 tx_bytes: 536870912,
@@ -635,27 +645,27 @@ pub fn get_system_info() -> &'static mut EnhancedSystemInfo {
 // 便捷的系统信息函数包装器
 #[inline]
 pub fn uname(name: *mut UtsName) -> c_int {
-    unsafe { get_system_info().uname(name) }
+    get_system_info().uname(name)
 }
 
 #[inline]
 pub fn sysinfo(info: *mut SysInfo) -> c_int {
-    unsafe { get_system_info().sysinfo(info) }
+    get_system_info().sysinfo(info)
 }
 
 #[inline]
 pub fn gethostname(name: *mut c_char, len: usize) -> c_int {
-    unsafe { get_system_info().gethostname(name, len) }
+    get_system_info().gethostname(name, len)
 }
 
 #[inline]
 pub fn getdomainname(name: *mut c_char, len: usize) -> c_int {
-    unsafe { get_system_info().getdomainname(name, len) }
+    get_system_info().getdomainname(name, len)
 }
 
 #[inline]
 pub fn getloadavg(loadavg: *mut c_double, nelem: c_int) -> c_int {
-    unsafe { get_system_info().getloadavg(loadavg, nelem) }
+    get_system_info().getloadavg(loadavg, nelem)
 }
 
 /// 系统信息测试函数

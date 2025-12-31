@@ -9,14 +9,15 @@
 
 extern crate alloc;
 
+use crate::prelude::*;
 use alloc::{collections::BTreeMap, vec::Vec};
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::{
     subsystems::mm::memory_isolation::{
         AccessValidationResult, DomainPermissions, MemoryRegionId, MemoryRegionType,
         ProtectionDomainId, get_memory_isolation_manager, init_memory_isolation,
     },
-    syscall::SyscallResult,
 };
 /// Security context for a process
 #[derive(Debug, Clone)]
@@ -150,7 +151,7 @@ impl SecurityManager {
     }
 
     /// Initialize security manager
-    pub fn init(&mut self) -> Result<(), SecurityError> {
+    pub fn init(&mut self) -> core::result::Result<(), SecurityError> {
         // Initialize memory isolation
         init_memory_isolation()?;
 
@@ -187,12 +188,19 @@ impl SecurityManager {
         parent_pid: Option<u32>,
         security_level: SecurityLevel,
         sandboxed: bool,
-    ) -> Result<ProtectionDomainId, SecurityError> {
-        // Get parent context if available
+    ) -> core::result::Result<ProtectionDomainId, SecurityError> {
+        // Get parent context if available to inherit settings
         let parent_context = parent_pid.and_then(|p| self.security_contexts.get(&p));
 
+        // If parent exists, ensure child's security level doesn't exceed parent's
+        let effective_security_level = if let Some(parent) = parent_context {
+            security_level.min(parent.security_level)
+        } else {
+            security_level
+        };
+
         // Create new protection domain
-        let domain_permissions = match security_level {
+        let domain_permissions = match effective_security_level {
             SecurityLevel::Untrusted => DomainPermissions::default(),
             SecurityLevel::Low => DomainPermissions {
                 can_read_others: false,
@@ -230,12 +238,12 @@ impl SecurityManager {
             isolation_manager.create_domain(
                 domain_name,
                 domain_permissions,
-                security_level >= SecurityLevel::High,
+                effective_security_level >= SecurityLevel::High,
             )?
         };
 
         // Determine capabilities based on security level and parent
-        let capabilities = match security_level {
+        let capabilities = match effective_security_level {
             SecurityLevel::Untrusted => vec![],
             SecurityLevel::Low => vec![],
             SecurityLevel::Medium => vec![Capability::ReadAnyMemory],
@@ -260,7 +268,13 @@ impl SecurityManager {
         };
 
         // Create security context
-        let context = SecurityContext { pid, domain_id, security_level, capabilities, sandboxed };
+        let context = SecurityContext {
+            pid,
+            domain_id,
+            security_level: effective_security_level,
+            capabilities,
+            sandboxed,
+        };
 
         self.security_contexts.insert(pid, context);
 
@@ -268,7 +282,7 @@ impl SecurityManager {
     }
 
     /// Remove security context for a terminated process
-    pub fn remove_process_security_context(&mut self, pid: u32) -> Result<(), SecurityError> {
+    pub fn remove_process_security_context(&mut self, pid: u32) -> core::result::Result<(), SecurityError> {
         self.security_contexts.remove(&pid);
         Ok(())
     }
@@ -281,7 +295,7 @@ impl SecurityManager {
         size: usize,
         is_write: bool,
         is_execute: bool,
-    ) -> Result<bool, SecurityError> {
+    ) -> core::result::Result<bool, SecurityError> {
         let context = self
             .security_contexts
             .get(&pid)
@@ -334,7 +348,7 @@ impl SecurityManager {
         pid: u32,
         syscall_number: u32,
         args: &[usize],
-    ) -> Result<bool, SecurityError> {
+    ) -> core::result::Result<bool, SecurityError> {
         let context = self
             .security_contexts
             .get(&pid)
@@ -382,7 +396,7 @@ impl SecurityManager {
         context: &SecurityContext,
         syscall_number: u32,
         _args: &[usize],
-    ) -> Result<bool, SecurityError> {
+    ) -> core::result::Result<bool, SecurityError> {
         // System calls that require special permissions
         match syscall_number {
             // Memory management syscalls
@@ -476,7 +490,7 @@ impl SecurityManager {
         &mut self,
         pid: u32,
         new_level: SecurityLevel,
-    ) -> Result<(), SecurityError> {
+    ) -> core::result::Result<(), SecurityError> {
         let context = self
             .security_contexts
             .get_mut(&pid)
@@ -495,7 +509,7 @@ impl SecurityManager {
         &mut self,
         pid: u32,
         capability: Capability,
-    ) -> Result<(), SecurityError> {
+    ) -> core::result::Result<(), SecurityError> {
         let context = self
             .security_contexts
             .get_mut(&pid)
@@ -513,7 +527,7 @@ impl SecurityManager {
         &mut self,
         pid: u32,
         capability: &Capability,
-    ) -> Result<(), SecurityError> {
+    ) -> core::result::Result<(), SecurityError> {
         let context = self
             .security_contexts
             .get_mut(&pid)
@@ -539,7 +553,7 @@ impl SecurityManager {
         pid: u32,
         size: usize,
         region_type: MemoryRegionType,
-    ) -> Result<MemoryRegionId, SecurityError> {
+    ) -> core::result::Result<MemoryRegionId, SecurityError> {
         let context = self
             .security_contexts
             .get(&pid)
@@ -569,7 +583,7 @@ impl SecurityManager {
         &mut self,
         pid: u32,
         region_id: MemoryRegionId,
-    ) -> Result<(), SecurityError> {
+    ) -> core::result::Result<(), SecurityError> {
         let context = self
             .security_contexts
             .get(&pid)
@@ -611,19 +625,34 @@ pub enum SecurityError {
 }
 
 /// Global security manager instance
-static SECURITY_MANAGER: crate::subsystems::sync::Mutex<SecurityManager> =
-    crate::subsystems::sync::Mutex::new(SecurityManager::new());
+static SECURITY_MANAGER_INIT: AtomicBool = AtomicBool::new(false);
+static mut SECURITY_MANAGER: Option<crate::subsystems::sync::Mutex<SecurityManager>> = None;
+
+/// Get or initialize the security manager (internal helper)
+fn get_security_manager_internal() -> &'static crate::subsystems::sync::Mutex<SecurityManager> {
+    if !SECURITY_MANAGER_INIT.load(Ordering::Acquire) {
+        // Initialize the security manager
+        unsafe {
+            if SECURITY_MANAGER.is_none() {
+                SECURITY_MANAGER = Some(crate::subsystems::sync::Mutex::new(SecurityManager::new()));
+            }
+            SECURITY_MANAGER_INIT.store(true, Ordering::Release);
+        }
+    }
+
+    unsafe { SECURITY_MANAGER.as_ref().unwrap_unchecked() }
+}
 
 /// Initialize security system
-pub fn init_security() -> Result<(), SecurityError> {
+pub fn init_security() -> core::result::Result<(), SecurityError> {
     // 直接初始化内存安全管理器，不调用完整的安全子系统初始化（避免循环依赖）
-    let mut manager = SECURITY_MANAGER.lock();
+    let mut manager = get_security_manager_internal().lock();
     manager.init()
 }
 
 /// Get security manager
 pub fn get_security_manager() -> &'static crate::subsystems::sync::Mutex<SecurityManager> {
-    &SECURITY_MANAGER
+    get_security_manager_internal()
 }
 
 /// Validate memory access (convenience function)
@@ -633,8 +662,8 @@ pub fn validate_memory_access(
     size: usize,
     is_write: bool,
     is_execute: bool,
-) -> Result<bool, SecurityError> {
-    let mut manager = SECURITY_MANAGER.lock();
+) -> core::result::Result<bool, SecurityError> {
+    let mut manager = get_security_manager_internal().lock();
     manager.validate_memory_access(pid, addr, size, is_write, is_execute)
 }
 
@@ -643,8 +672,8 @@ pub fn validate_syscall(
     pid: u32,
     syscall_number: u32,
     args: &[usize],
-) -> Result<bool, SecurityError> {
-    let mut manager = SECURITY_MANAGER.lock();
+) -> core::result::Result<bool, SecurityError> {
+    let mut manager = get_security_manager_internal().lock();
     manager.validate_syscall(pid, syscall_number, args)
 }
 
@@ -654,20 +683,20 @@ pub fn create_process_security_context(
     parent_pid: Option<u32>,
     security_level: SecurityLevel,
     sandboxed: bool,
-) -> Result<ProtectionDomainId, SecurityError> {
-    let mut manager = SECURITY_MANAGER.lock();
+) -> core::result::Result<ProtectionDomainId, SecurityError> {
+    let mut manager = get_security_manager_internal().lock();
     manager.create_process_security_context(pid, parent_pid, security_level, sandboxed)
 }
 
 /// Remove security context for terminated process (convenience function)
-pub fn remove_process_security_context(pid: u32) -> Result<(), SecurityError> {
-    let mut manager = SECURITY_MANAGER.lock();
+pub fn remove_process_security_context(pid: u32) -> core::result::Result<(), SecurityError> {
+    let mut manager = get_security_manager_internal().lock();
     manager.remove_process_security_context(pid)
 }
 
 /// Check if process has capability (convenience function)
 pub fn has_capability(pid: u32, capability: &Capability) -> bool {
-    let manager = SECURITY_MANAGER.lock();
+    let manager = get_security_manager_internal().lock();
     manager.has_capability(pid, capability)
 }
 
@@ -676,14 +705,14 @@ pub fn create_secure_memory_region(
     pid: u32,
     size: usize,
     region_type: MemoryRegionType,
-) -> Result<MemoryRegionId, SecurityError> {
-    let mut manager = SECURITY_MANAGER.lock();
+) -> core::result::Result<MemoryRegionId, SecurityError> {
+    let mut manager = get_security_manager_internal().lock();
     manager.create_secure_memory_region(pid, size, region_type)
 }
 
 /// Zero secure memory region (convenience function)
-pub fn zero_secure_memory_region(pid: u32, region_id: MemoryRegionId) -> Result<(), SecurityError> {
-    let mut manager = SECURITY_MANAGER.lock();
+pub fn zero_secure_memory_region(pid: u32, region_id: MemoryRegionId) -> core::result::Result<(), SecurityError> {
+    let mut manager = get_security_manager_internal().lock();
     manager.zero_secure_memory_region(pid, region_id)
 }
 

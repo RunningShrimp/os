@@ -3,8 +3,10 @@
 //! This module provides thread-related system call implementations for the NOS kernel.
 //! It includes functions for thread creation, synchronization, and management.
 
-use crate::api::{SyscallError, KernelErrorExt};
-use crate::subsystems::syscalls::common::SyscallResult
+use crate::prelude::*;
+use crate::subsystems::mm::page_table_isolation;
+use crate::error::SyscallResult;
+use crate::subsystems::syscalls::thread_futex;
 
 /// Thread control structure
 pub struct ThreadControl;
@@ -23,8 +25,8 @@ impl ThreadControl {
     /// * `flags` - Thread creation flags
     ///
     /// # Returns
-    /// * `Result<i32, crate::api::SyscallError>` - Thread ID or error
-    pub fn create_thread(&self, _entry: usize, _arg: usize, _flags: u32) -> Result<i32, crate::api::SyscallError> {
+    /// * `Result<i32>` - Thread ID or error
+    pub fn create_thread(&self, _entry: usize, _arg: usize, _flags: u32) -> Result<i32> {
         // TODO: Implement actual thread creation
         // For now, just return success as a stub
         Ok(0)
@@ -34,7 +36,7 @@ impl ThreadControl {
     ///
     /// # Arguments
     /// * `exit_code` - Thread exit code
-    pub fn exit_thread(&self, _exit_code: i32) -> Result<(), crate::api::SyscallError> {
+    pub fn exit_thread(&self, _exit_code: i32) -> Result<()> {
         // TODO: Implement actual thread exit
         // For now, just return success as a stub
         Ok(())
@@ -46,8 +48,8 @@ impl ThreadControl {
     /// * `thread_id` - Thread ID to join
     ///
     /// # Returns
-    /// * `Result<i32, crate::api::SyscallError>` - Exit code of the joined thread
-    pub fn join_thread(&self, _thread_id: i32) -> Result<i32, crate::api::SyscallError> {
+    /// * `Result<i32>` - Exit code of the joined thread
+    pub fn join_thread(&self, _thread_id: i32) -> Result<i32> {
         // TODO: Implement actual thread join
         // For now, just return success as a stub
         Ok(0)
@@ -80,8 +82,8 @@ impl ThreadControl {
     /// * `priority` - New priority value
     ///
     /// # Returns
-    /// * `Result<(), crate::api::SyscallError>` - Success or error
-    pub fn set_thread_priority(&self, _thread_id: i32, _priority: i32) -> Result<(), crate::api::SyscallError> {
+    /// * `Result<()>` - Success or error
+    pub fn set_thread_priority(&self, _thread_id: i32, _priority: i32) -> Result<()> {
         // TODO: Implement actual thread priority setting
         // For now, just return success as a stub
         Ok(())
@@ -93,8 +95,8 @@ impl ThreadControl {
     /// * `thread_id` - Thread ID
     ///
     /// # Returns
-    /// * `Result<i32, crate::api::SyscallError>` - Thread priority
-    pub fn get_thread_priority(&self, _thread_id: i32) -> Result<i32, crate::api::SyscallError> {
+    /// * `Result<i32>` - Thread priority
+    pub fn get_thread_priority(&self, _thread_id: i32) -> Result<i32> {
         // TODO: Implement actual thread priority retrieval
         // For now, return a placeholder
         Ok(0)
@@ -103,8 +105,8 @@ impl ThreadControl {
     /// Yield the current thread
     ///
     /// # Returns
-    /// * `Result<(), crate::api::SyscallError>` - Success or error
-    pub fn yield_thread(&self) -> Result<(), crate::api::SyscallError> {
+    /// * `Result<()>` - Success or error
+    pub fn yield_thread(&self) -> Result<()> {
         // TODO: Implement actual thread yielding
         // For now, just return success as a stub
         Ok(())
@@ -117,8 +119,8 @@ impl ThreadControl {
     /// * `cpumask` - CPU affinity mask
     ///
     /// # Returns
-    /// * `Result<(), crate::api::SyscallError>` - Success or error
-    pub fn set_thread_affinity(&self, _thread_id: i32, _cpumask: u64) -> Result<(), crate::api::SyscallError> {
+    /// * `Result<()>` - Success or error
+    pub fn set_thread_affinity(&self, _thread_id: i32, _cpumask: u64) -> Result<()> {
         // TODO: Implement actual thread affinity setting
         // For now, just return success as a stub
         Ok(())
@@ -130,8 +132,8 @@ impl ThreadControl {
     /// * `thread_id` - Thread ID
     ///
     /// # Returns
-    /// * `Result<u64, crate::api::SyscallError>` - CPU affinity mask
-    pub fn get_thread_affinity(&self, _thread_id: i32) -> Result<u64, crate::api::SyscallError> {
+    /// * `Result<u64>` - CPU affinity mask
+    pub fn get_thread_affinity(&self, _thread_id: i32) -> Result<u64> {
         // TODO: Implement actual thread affinity retrieval
         // For now, return a placeholder
         Ok(0)
@@ -144,8 +146,8 @@ impl ThreadControl {
     /// * `name` - Thread name
     ///
     /// # Returns
-    /// * `Result<(), crate::api::SyscallError>` - Success or error
-    pub fn set_thread_name(&self, _thread_id: i32, _name: &str) -> Result<(), crate::api::SyscallError> {
+    /// * `Result<()>` - Success or error
+    pub fn set_thread_name(&self, _thread_id: i32, _name: &str) -> Result<()> {
         // TODO: Implement actual thread name setting
         // For now, just return success as a stub
         Ok(())
@@ -157,8 +159,8 @@ impl ThreadControl {
     /// * `thread_id` - Thread ID
     ///
     /// # Returns
-    /// * `Result<String, crate::api::SyscallError>` - Thread name
-    pub fn get_thread_name(&self, _thread_id: i32) -> Result<String, crate::api::SyscallError> {
+    /// * `Result<String>` - Thread name
+    pub fn get_thread_name(&self, _thread_id: i32) -> Result<String> {
         // TODO: Implement actual thread name retrieval
         // For now, return a placeholder
         Ok("".to_string())
@@ -171,8 +173,8 @@ impl ThreadControl {
     /// * `stack_size` - Stack size in bytes
     ///
     /// # Returns
-    /// * `Result<(), crate::api::SyscallError>` - Success or error
-    pub fn set_thread_stack_size(&self, _thread_id: i32, _stack_size: usize) -> Result<(), crate::api::SyscallError> {
+    /// * `Result<()>` - Success or error
+    pub fn set_thread_stack_size(&self, _thread_id: i32, _stack_size: usize) -> Result<()> {
         // TODO: Implement actual thread stack size setting
         // For now, just return success as a stub
         Ok(())
@@ -184,8 +186,8 @@ impl ThreadControl {
     /// * `thread_id` - Thread ID
     ///
     /// # Returns
-    /// * `Result<usize, crate::api::SyscallError>` - Stack size in bytes
-    pub fn get_thread_stack_size(&self, _thread_id: i32) -> Result<usize, crate::api::SyscallError> {
+    /// * `Result<usize>` - Stack size in bytes
+    pub fn get_thread_stack_size(&self, _thread_id: i32) -> Result<usize> {
         // TODO: Implement actual thread stack size retrieval
         // For now, return a placeholder
         Ok(0)
@@ -198,8 +200,8 @@ impl ThreadControl {
     /// * `guard_size` - Guard size in bytes
     ///
     /// # Returns
-    /// * `Result<(), crate::api::SyscallError>` - Success or error
-    pub fn set_thread_guard_size(&self, _thread_id: i32, _guard_size: usize) -> Result<(), crate::api::SyscallError> {
+    /// * `Result<()>` - Success or error
+    pub fn set_thread_guard_size(&self, _thread_id: i32, _guard_size: usize) -> Result<()> {
         // TODO: Implement actual thread guard size setting
         // For now, just return success as a stub
         Ok(())
@@ -211,8 +213,8 @@ impl ThreadControl {
     /// * `thread_id` - Thread ID
     ///
     /// # Returns
-    /// * `Result<usize, crate::api::SyscallError>` - Guard size in bytes
-    pub fn get_thread_guard_size(&self, _thread_id: i32) -> Result<usize, crate::api::SyscallError> {
+    /// * `Result<usize>` - Guard size in bytes
+    pub fn get_thread_guard_size(&self, _thread_id: i32) -> Result<usize> {
         // TODO: Implement actual thread guard size retrieval
         // For now, return a placeholder
         Ok(0)
@@ -225,8 +227,8 @@ impl ThreadControl {
     /// * `policy` - Scheduling policy
     ///
     /// # Returns
-    /// * `Result<(), crate::api::SyscallError>` - Success or error
-    pub fn set_thread_scheduling_policy(&self, _thread_id: i32, _policy: i32) -> Result<(), crate::api::SyscallError> {
+    /// * `Result<()>` - Success or error
+    pub fn set_thread_scheduling_policy(&self, _thread_id: i32, _policy: i32) -> Result<()> {
         // TODO: Implement actual thread scheduling policy setting
         // For now, just return success as a stub
         Ok(())
@@ -238,8 +240,8 @@ impl ThreadControl {
     /// * `thread_id` - Thread ID
     ///
     /// # Returns
-    /// * `Result<i32, crate::api::SyscallError>` - Scheduling policy
-    pub fn get_thread_scheduling_policy(&self, _thread_id: i32) -> Result<i32, crate::api::SyscallError> {
+    /// * `Result<i32>` - Scheduling policy
+    pub fn get_thread_scheduling_policy(&self, _thread_id: i32) -> Result<i32> {
         // TODO: Implement actual thread scheduling policy retrieval
         // For now, return a placeholder
         Ok(0)
@@ -252,8 +254,8 @@ impl ThreadControl {
     /// * `param` - Scheduling parameters
     ///
     /// # Returns
-    /// * `Result<(), crate::api::SyscallError>` - Success or error
-    pub fn set_thread_scheduling_parameters(&self, _thread_id: i32, _param: SchedulingParameters) -> Result<(), crate::api::SyscallError> {
+    /// * `Result<()>` - Success or error
+    pub fn set_thread_scheduling_parameters(&self, _thread_id: i32, _param: SchedulingParameters) -> Result<()> {
         // TODO: Implement actual thread scheduling parameters setting
         // For now, just return success as a stub
         Ok(())
@@ -265,8 +267,8 @@ impl ThreadControl {
     /// * `thread_id` - Thread ID
     ///
     /// # Returns
-    /// * `Result<SchedulingParameters, crate::api::SyscallError>` - Scheduling parameters
-    pub fn get_thread_scheduling_parameters(&self, _thread_id: i32) -> Result<SchedulingParameters, crate::api::SyscallError> {
+    /// * `Result<SchedulingParameters>` - Scheduling parameters
+    pub fn get_thread_scheduling_parameters(&self, _thread_id: i32) -> Result<SchedulingParameters> {
         // TODO: Implement actual thread scheduling parameters retrieval
         // For now, return placeholder
         Ok(SchedulingParameters::default())
@@ -348,20 +350,20 @@ impl SchedulingParameters {
 }
 
 /// Global thread control instance
-pub static THREAD_CONTROL: ThreadControl = ThreadControl;
+pub static THREAD_CONTROL: spin::Lazy<ThreadControl> = spin::Lazy::new(|| ThreadControl::new());
 
 /// Create a new thread
-pub fn create_thread(entry: usize, arg: usize, flags: u32) -> Result<i32, crate::api::SyscallError> {
+pub fn create_thread(entry: usize, arg: usize, flags: u32) -> Result<i32> {
     THREAD_CONTROL.create_thread(entry, arg, flags)
 }
 
 /// Exit the current thread
-pub fn exit_thread(exit_code: i32) -> Result<(), crate::api::SyscallError> {
+pub fn exit_thread(exit_code: i32) -> Result<()> {
     THREAD_CONTROL.exit_thread(exit_code)
 }
 
 /// Join a thread
-pub fn join_thread(thread_id: i32) -> Result<i32, crate::api::SyscallError> {
+pub fn join_thread(thread_id: i32) -> Result<i32> {
     THREAD_CONTROL.join_thread(thread_id)
 }
 
@@ -376,161 +378,156 @@ pub fn get_current_process_id() -> i32 {
 }
 
 /// Set thread priority
-pub fn set_thread_priority(thread_id: i32, priority: i32) -> Result<(), crate::api::SyscallError> {
+pub fn set_thread_priority(thread_id: i32, priority: i32) -> Result<()> {
     THREAD_CONTROL.set_thread_priority(thread_id, priority)
 }
 
 /// Get thread priority
-pub fn get_thread_priority(thread_id: i32) -> Result<i32, crate::api::SyscallError> {
+pub fn get_thread_priority(thread_id: i32) -> Result<i32> {
     THREAD_CONTROL.get_thread_priority(thread_id)
 }
 
 /// Yield the current thread
-pub fn yield_thread() -> Result<(), crate::api::SyscallError> {
+pub fn yield_thread() -> Result<()> {
     THREAD_CONTROL.yield_thread()
 }
 
 /// Set thread affinity
-pub fn set_thread_affinity(thread_id: i32, cpumask: u64) -> Result<(), crate::api::SyscallError> {
+pub fn set_thread_affinity(thread_id: i32, cpumask: u64) -> Result<()> {
     THREAD_CONTROL.set_thread_affinity(thread_id, cpumask)
 }
 
 /// Get thread affinity
-pub fn get_thread_affinity(thread_id: i32) -> Result<u64, crate::api::SyscallError> {
+pub fn get_thread_affinity(thread_id: i32) -> Result<u64> {
     THREAD_CONTROL.get_thread_affinity(thread_id)
 }
 
 /// Set thread name
-pub fn set_thread_name(thread_id: i32, name: &str) -> Result<(), crate::api::SyscallError> {
+pub fn set_thread_name(thread_id: i32, name: &str) -> Result<()> {
     THREAD_CONTROL.set_thread_name(thread_id, name)
 }
 
 /// Get thread name
-pub fn get_thread_name(thread_id: i32) -> Result<String, crate::api::SyscallError> {
+pub fn get_thread_name(thread_id: i32) -> Result<String> {
     THREAD_CONTROL.get_thread_name(thread_id)
 }
 
 /// Set thread stack size
-pub fn set_thread_stack_size(thread_id: i32, stack_size: usize) -> Result<(), crate::api::SyscallError> {
+pub fn set_thread_stack_size(thread_id: i32, stack_size: usize) -> Result<()> {
     THREAD_CONTROL.set_thread_stack_size(thread_id, stack_size)
 }
 
 /// Get thread stack size
-pub fn get_thread_stack_size(thread_id: i32) -> Result<usize, crate::api::SyscallError> {
+pub fn get_thread_stack_size(thread_id: i32) -> Result<usize> {
     THREAD_CONTROL.get_thread_stack_size(thread_id)
 }
 
 /// Set thread guard size
-pub fn set_thread_guard_size(thread_id: i32, guard_size: usize) -> Result<(), crate::api::SyscallError> {
+pub fn set_thread_guard_size(thread_id: i32, guard_size: usize) -> Result<()> {
     THREAD_CONTROL.set_thread_guard_size(thread_id, guard_size)
 }
 
 /// Get thread guard size
-pub fn get_thread_guard_size(thread_id: i32) -> Result<usize, crate::api::SyscallError> {
+pub fn get_thread_guard_size(thread_id: i32) -> Result<usize> {
     THREAD_CONTROL.get_thread_guard_size(thread_id)
 }
 
 /// Set thread scheduling policy
-pub fn set_thread_scheduling_policy(thread_id: i32, policy: i32) -> Result<(), crate::api::SyscallError> {
+pub fn set_thread_scheduling_policy(thread_id: i32, policy: i32) -> Result<()> {
     THREAD_CONTROL.set_thread_scheduling_policy(thread_id, policy)
 }
 
 /// Get thread scheduling policy
-pub fn get_thread_scheduling_policy(thread_id: i32) -> Result<i32, crate::api::SyscallError> {
+pub fn get_thread_scheduling_policy(thread_id: i32) -> Result<i32> {
     THREAD_CONTROL.get_thread_scheduling_policy(thread_id)
 }
 
 /// Set thread scheduling parameters
-pub fn set_thread_scheduling_parameters(thread_id: i32, param: SchedulingParameters) -> Result<(), crate::api::SyscallError> {
+pub fn set_thread_scheduling_parameters(thread_id: i32, param: SchedulingParameters) -> Result<()> {
     THREAD_CONTROL.set_thread_scheduling_parameters(thread_id, param)
 }
 
 /// Get thread scheduling parameters
-pub fn get_thread_scheduling_parameters(thread_id: i32) -> Result<SchedulingParameters, crate::api::SyscallError> {
+pub fn get_thread_scheduling_parameters(thread_id: i32) -> Result<SchedulingParameters> {
     THREAD_CONTROL.get_thread_scheduling_parameters(thread_id)
 }
 
-// Futex types and functions
-
-/// Futex wait queue
-pub type FUTEX_WAIT_QUEUE = alloc::collections::BTreeMap<u64, FutexWaiter>;
-
-/// Futex waiter structure
-pub struct FutexWaiter {
-    /// Key for the futex
-    pub key: u64,
-    /// TID of waiting thread
-    pub tid: u64,
-    /// Wait timeout
-    pub timeout: Option<u64>,
-    /// Priority inheritance data
-    pub pi_data: Option<PiFutexData>,
-}
-
-/// Priority inheritance futex data
-pub struct PiFutexData {
-    /// Priority inheritance lock
-    pub lock: u64,
-    /// Original priority
-    pub original_priority: u32,
-    /// Inherited priority
-    pub inherited_priority: u32,
-}
+// Futex types and functions - re-export from thread_futex module
+pub use crate::subsystems::syscalls::thread_futex::{
+    FutexWaiter,
+    PiFutexData,
+    FUTEX_WAIT_QUEUE
+};
 
 /// Futex operations
-pub fn add_futex_waiter(queue: &mut FUTEX_WAIT_QUEUE, key: u64, waiter: FutexWaiter) -> Option<FutexWaiter> {
-    queue.insert(key, waiter)
+pub fn add_futex_waiter(waiter: FutexWaiter) {
+    let mut queue = FUTEX_WAIT_QUEUE.lock();
+    queue.add(waiter);
 }
 
-pub fn futex_lock_pi(key: u64, timeout: Option<u64>) -> Result<(), i32> {
+pub fn futex_lock_pi(_pagetable: *mut page_table_isolation::PageTable, _key: u64, _timeout: Option<u64>) -> Result<()> {
+    // TODO: Implement actual futex lock PI
+    // For now, just return success as a stub
     Ok(())
 }
 
-pub fn futex_requeue(key1: u64, key2: u64, waiters: u32) -> Result<(), i32> {
+pub fn futex_requeue(_pagetable: *mut page_table_isolation::PageTable, _key1: u64, _key2: u64, _waiters: u32, _count: u32, _replace: bool) -> Result<()> {
+    // TODO: Implement actual futex requeue
+    // For now, just return success as a stub
     Ok(())
 }
 
-pub fn futex_trylock_pi(key: u64) -> Result<(), i32> {
+pub fn futex_trylock_pi(_pagetable: *mut page_table_isolation::PageTable, _key: u64) -> Result<()> {
+    // TODO: Implement actual futex trylock PI
+    // For now, just return success as a stub
     Ok(())
 }
 
-pub fn futex_unlock_pi(key: u64) -> Result<(), i32> {
+pub fn futex_unlock_pi(_pagetable: *mut page_table_isolation::PageTable, _key: u64) -> Result<()> {
+    // TODO: Implement actual futex unlock PI
+    // For now, just return success as a stub
     Ok(())
 }
 
-pub fn futex_wait_timeout(key: u64, timeout: Option<u64>) -> Result<(), i32> {
+pub fn futex_wait_timeout(_pagetable: *mut page_table_isolation::PageTable, _key: u64, _val: u64, _timeout: Option<u64>) -> Result<()> {
+    // TODO: Implement actual futex wait with timeout
+    // For now, just return success as a stub
     Ok(())
 }
 
-pub fn futex_wake_optimized(key: u64, waiters: u32) -> Result<(), i32> {
-    Ok(())
+pub fn futex_wake_optimized(futex_addr: usize, count: usize) -> usize {
+    let mut queue = FUTEX_WAIT_QUEUE.lock();
+    queue.wake(futex_addr, count)
 }
 
-pub fn remove_futex_waiter(queue: &mut FUTEX_WAIT_QUEUE, key: u64, tid: u64) -> Option<FutexWaiter> {
-    queue.iter_mut()
-        .find_map(|(k, w)| {
-            if *k == key && w.tid == tid {
-                queue.remove(k)
-            } else {
-                None
-            }
-        })
-}
+pub fn remove_futex_waiter(queue: &mut thread_futex::FutexWaitQueue, key: u64, tid: u64) -> Option<thread_futex::FutexWaiter> {
+    let mut to_remove = None;
 
-pub fn requeue_futex_waiters(queue: &mut FUTEX_WAIT_QUEUE, old_key: u64, new_key: u64, max_waiters: u32) -> u32 {
-    let mut requeued = 0;
-    if let Some(waiter) = queue.remove(&old_key) {
-        queue.insert(new_key, waiter);
-        requeued += 1;
-        if requeued >= max_waiters {
-            return requeued;
+    for (k, w) in queue.iter_mut() {
+        if *k == key && w.tid == tid as u32 {
+            to_remove = Some(*k);
+            break;
         }
+    }
+
+    if let Some(k) = to_remove {
+        queue.remove_key(&k)
+    } else {
+        None
+    }
+}
+
+pub fn requeue_futex_waiters(queue: &mut thread_futex::FutexWaitQueue, old_key: u64, new_key: u64, _max_waiters: u32) -> u32 {
+    let mut requeued = 0;
+    if let Some(_waiter) = queue.remove_key(&old_key) {
+        queue.insert(new_key, thread_futex::FutexWaiter::new(0, new_key as usize, None));
+        requeued += 1;
     }
     requeued
 }
 
-pub fn wake_futex_waiters(queue: &mut FUTEX_WAIT_QUEUE, key: u64, max_waiters: u32) -> u32 {
-    let woken = if let Some(waiter) = queue.remove(&key) {
+pub fn wake_futex_waiters(queue: &mut thread_futex::FutexWaitQueue, key: u64, _max_waiters: u32) -> u32 {
+    let woken = if let Some(_waiter) = queue.remove_key(&key) {
         // In a real implementation, we would wake the thread here
         1
     } else {
@@ -560,7 +557,7 @@ pub fn is_timeout_expired(timeout: Option<u64>) -> bool {
 ///
 /// # Returns
 /// * `SyscallResult<i64> - System call result
-pub fn dispatch(syscall_num: u32, args: &[u64]) -> SyscallResult<i64> {
+pub fn dispatch(syscall_num: u32, _args: &[u64]) -> SyscallResult<i64> {
     // Placeholder implementation - in a real system this would route to the appropriate handler
     match syscall_num {
         0x8000 => {
@@ -568,7 +565,7 @@ pub fn dispatch(syscall_num: u32, args: &[u64]) -> SyscallResult<i64> {
             Ok(0i64) // Return 0 to indicate child process
         },
         _ => {
-            Err(crate::api::SyscallError::ENOSYS)
+            Err(crate::syscalls::common::SyscallError::NotImplemented)
         }
     }
 }

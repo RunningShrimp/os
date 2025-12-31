@@ -15,6 +15,7 @@ pub mod memory;
 pub mod process;
 pub mod syscall;
 pub mod syscall_id;
+pub mod sysinfo;
 
 // Re-export common types for convenience
 // 从adapter模块导出API适配器类型（优先级最高）
@@ -24,7 +25,11 @@ pub use adapter::*;
 pub use context::*;
 // 从error模块导出所有类型，包括KernelError
 pub use error::*;
-pub use interfaces::*;
+// 从interfaces模块导出类型，但排除与adapter重复的Service相关类型
+pub use interfaces::{
+    DriverError, DriverInterface, DriverStats, DriverStatus, ModuleConfig, ModuleError,
+    ModuleInterface, ModuleRegistry, ModuleStatus, ModuleStats,
+};
 // 明确导出memory模块中的类型，避免与process模块中的MemoryRegion冲突
 pub use memory::{
     AllocationFlags, MappingFlags, MemoryAdvice, MemoryError, MemoryManager, MemoryStats,
@@ -43,3 +48,7 @@ pub use process::{
 };
 pub use syscall::{KernelErrorExt, SyscallError};
 pub use syscall_id as kernel_syscall_id;
+pub use sysinfo::{
+    CpuInformation, MemoryInformation, NetworkInterface, SystemIdentification, SystemInfoApi,
+    SystemInfoConfig, SystemStatistics,
+};

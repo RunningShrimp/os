@@ -46,6 +46,9 @@ pub use alloc::boxed::Box;
 /// Heap-allocated string type
 pub use alloc::string::String;
 
+/// ToString trait for string conversions
+pub use alloc::string::ToString;
+
 /// Heap-allocated growable vector type
 pub use alloc::vec::Vec;
 
@@ -130,13 +133,14 @@ pub use core::cmp::PartialOrd;
 /// Ordering trait
 pub use core::cmp::Ord;
 
-/// Async iterator trait
-#[cfg(feature = "async")]
-pub use core::async_iter::AsyncIterator;
-
-/// Async iterator trait (extended)
-#[cfg(feature = "async")]
-pub use core::future::Future;
+// Note: Async features disabled - no "async" feature defined in Cargo.toml
+// /// Async iterator trait
+// #[cfg(feature = "async")]
+// pub use core::async_iter::AsyncIterator;
+//
+// /// Async iterator trait (extended)
+// #[cfg(feature = "async")]
+// pub use core::future::Future;
 
 // ============================================================================
 // Memory Management
@@ -188,7 +192,7 @@ pub use crate::subsystems::mm::AllocationStats;
 pub use crate::subsystems::mm::MemoryManagementStats;
 
 /// C library statistics
-pub use crate::subsystems::mm::CLibStats;
+pub use crate::libc::CLibStats;
 
 /// Numeric statistics
 pub use crate::subsystems::mm::NumStats;
@@ -265,16 +269,7 @@ pub use crate::memory::MemoryRegion;
 pub use crate::memory::MemoryPermissions;
 
 /// Memory region type for processes
-pub use crate::subsystems::process::MemoryRegionType;
-
-/// File mode type
-pub use crate::vfs::FileMode;
-
-/// VFS error type
-pub use crate::vfs::VfsError;
-
-/// VFS result type
-pub use crate::vfs::VfsResult;
+pub use crate::api::MemoryRegionType;
 
 /// Syscall error type
 pub use crate::error::SyscallError;
@@ -306,20 +301,23 @@ pub use crate::error::SecurityError;
 /// Driver error type
 pub use crate::error::DriverError;
 
+/// Process ID type
+pub use crate::types::ProcessId;
+
 /// Access result type
 pub use crate::security::enhanced_permissions::AccessResult;
 
-/// Calling convention type
-pub use crate::subsystems::sync::CallingConvention;
+// Note: CallingConvention is in subsystems::formal_verification, not sync
+// pub use crate::subsystems::sync::CallingConvention;
 
-/// Timestamp type
-pub use crate::subsystems::time::Timestamp;
+// Note: Timestamp type doesn't exist in subsystems::time
+// pub use crate::subsystems::time::Timestamp;
 
 /// Container type
 pub use crate::subsystems::cloud_native::container::Container;
 
-/// Container service type
-pub use crate::subsystems::cloud_native::container::ContainerService;
+// Note: ContainerService doesn't exist
+// pub use crate::subsystems::cloud_native::container::ContainerService;
 
 // ============================================================================
 // Test the prelude

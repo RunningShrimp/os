@@ -5,6 +5,9 @@
 
 use core::cell::Cell;
 
+// 导入C库实现类型
+use super::interface::ImplementationType;
+
 /// C库配置结构
 #[derive(Debug, Clone)]
 pub struct LibcConfig {
@@ -286,19 +289,21 @@ static mut CONFIG_INITIALIZED: bool = false;
 /// # 安全性
 /// 只能在系统初始化时调用一次
 pub unsafe fn initialize_config(config: LibcConfig) -> Result<(), ConfigError> {
-    if CONFIG_INITIALIZED {
-        crate::println!("[libc] 警告：配置已经初始化，跳过重复初始化");
-        return Ok(());
+    unsafe {
+        if CONFIG_INITIALIZED {
+            crate::println!("[libc] 警告：配置已经初始化，跳过重复初始化");
+            return Ok(());
+        }
+
+        // 验证配置
+        config.validate()?;
+
+        GLOBAL_CONFIG = Some(config);
+        CONFIG_INITIALIZED = true;
+
+        crate::println!("[libc] C库配置初始化完成");
+        Ok(())
     }
-
-    // 验证配置
-    config.validate()?;
-
-    GLOBAL_CONFIG = Some(config);
-    CONFIG_INITIALIZED = true;
-
-    crate::println!("[libc] C库配置初始化完成");
-    Ok(())
 }
 
 /// 获取全局配置
@@ -309,10 +314,12 @@ pub unsafe fn initialize_config(config: LibcConfig) -> Result<(), ConfigError> {
 /// # 安全性
 /// 必须在配置初始化后调用
 pub unsafe fn get_config() -> &'static LibcConfig {
-    if let Some(ref config) = GLOBAL_CONFIG {
-        config
-    } else {
-        panic!("C库配置未初始化！请确保在系统启动时调用initialize_config()");
+    unsafe {
+        if let Some(ref config) = GLOBAL_CONFIG {
+            config
+        } else {
+            panic!("C库配置未初始化！请确保在系统启动时调用initialize_config()");
+        }
     }
 }
 
@@ -324,10 +331,12 @@ pub unsafe fn get_config() -> &'static LibcConfig {
 /// # 安全性
 /// 必须在配置初始化后调用，并且需要确保独占访问
 pub unsafe fn get_config_mut() -> &'static mut LibcConfig {
-    if let Some(config) = GLOBAL_CONFIG.as_mut() {
-        config
-    } else {
-        panic!("C库配置未初始化！请确保在系统启动时调用initialize_config()");
+    unsafe {
+        if let Some(config) = GLOBAL_CONFIG.as_mut() {
+            config
+        } else {
+            panic!("C库配置未初始化！请确保在系统启动时调用initialize_config()");
+        }
     }
 }
 

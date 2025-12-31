@@ -2,10 +2,8 @@
 //!
 //! 提供性能统计和监控功能
 
-use alloc::collections::BTreeMap;
-use core::sync::atomic;
-
-use spin::Mutex;
+use crate::prelude::*;
+use core::sync::atomic::Ordering;
 
 /// 性能统计信息
 #[derive(Debug, Clone)]
@@ -76,8 +74,8 @@ impl PerfStats {
 }
 
 /// 性能统计映射
-static PERF_STATS: spin::Mutex<BTreeMap<&'static str, AtomicU64>> =
-    spin::Mutex::new(BTreeMap::new());
+static PERF_STATS: Mutex<BTreeMap<&'static str, AtomicU64>> =
+    Mutex::new(BTreeMap::new());
 
 /// 获取性能统计信息
 pub fn get_perf_stats(name: &'static str) -> u64 {

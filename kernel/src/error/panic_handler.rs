@@ -372,14 +372,11 @@ impl SystemState {
 
 /// Collect crash information from panic info
 pub fn collect_crash_info(info: &PanicInfo) -> CrashInfo {
-    let message = if let Some(msg) = info.message() {
-        format!("{}", msg)
-    } else {
-        "No panic message".to_string()
-    };
+    // Get the panic message
+    let message = alloc::format!("{}", info.message());
 
     let (file, line, column) = if let Some(location) = info.location() {
-        (Some(location.file().to_string()), Some(location.line()), Some(location.column()))
+        (Some(String::from(location.file())), Some(location.line()), Some(location.column()))
     } else {
         (None, None, None)
     };
@@ -388,7 +385,7 @@ pub fn collect_crash_info(info: &PanicInfo) -> CrashInfo {
     let cpu_id = crate::platform::arch::cpuid();
 
     // Get current process ID (if available)
-    let pid = crate::subsystems::process::manager::myproc();
+    let pid = crate::subsystems::process::manager::myproc().map(|p| p as usize);
 
     // Collect registers (simplified - in real implementation would read from trap frame)
     let registers = RegisterDump::new();
@@ -545,7 +542,7 @@ pub fn report_crash(crash_info: &CrashInfo) {
     let location = crash_info
         .file
         .clone()
-        .unwrap_or_else(|| "unknown".to_string());
+        .unwrap_or_else(|| String::from("unknown"));
     let context =
         format!("{}:{} on CPU {}", location, crash_info.line.unwrap_or(0), crash_info.cpu_id);
 

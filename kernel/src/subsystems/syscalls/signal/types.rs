@@ -302,6 +302,7 @@ impl Default for SignalFlags {
 /// 信号处理程序标志位
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(non_camel_case_types)]
 pub enum SignalFlag {
     /// 在信号处理程序执行期间，不自动屏蔽该信号
     SA_NODEFER = 0x40000000,
@@ -320,6 +321,7 @@ pub enum SignalFlag {
 /// 用于sigprocmask系统调用，指定如何修改信号掩码
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(non_camel_case_types)]
 pub enum SigmaskHow {
     /// 阻塞信号集
     SIG_BLOCK = 0,
@@ -389,6 +391,7 @@ pub struct SignalStack {
 /// 信号栈标志
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(non_camel_case_types)]
 pub enum SignalStackFlag {
     /// 禁用信号栈
     SS_DISABLE = 2,
@@ -502,7 +505,6 @@ pub mod signals {
             SIGUSR2 => "SIGUSR2",
             SIGHUP => "SIGHUP",
             SIGTSTP => "SIGTSTP",
-            SIGCONT => "SIGCONT",
             SIGTTIN => "SIGTTIN",
             SIGTTOU => "SIGTTOU",
             _ => "UNKNOWN",

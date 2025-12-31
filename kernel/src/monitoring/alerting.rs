@@ -4,7 +4,7 @@
 
 extern crate alloc;
 
-use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use alloc::{collections::BTreeMap, string::String, string::ToString, vec::Vec};
 
 use crate::subsystems::sync::Mutex;
 

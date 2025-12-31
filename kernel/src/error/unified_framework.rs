@@ -6,7 +6,7 @@
 
 extern crate alloc;
 
-use alloc::{boxed::Box, format, string::String};
+use alloc::{boxed::Box, format, string::String, string::ToString};
 use core::fmt;
 
 // Re-export existing unified error types
@@ -46,8 +46,6 @@ pub trait IntoFrameworkError {
     /// Convert self into a FrameworkError with context
     fn with_context(self, context: &str, location: &str) -> FrameworkError;
 }
-
-/// Error conversion implementation for UnifiedError
 
 /// Error conversion implementation for &str
 impl IntoFrameworkError for &str {
@@ -267,14 +265,10 @@ impl fmt::Display for FrameworkError {
     }
 }
 
-/// Implement Error for FrameworkError
-impl core::error::Error for FrameworkError {
-    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-        match self {
-            FrameworkError::Chain { cause, .. } => Some(cause.as_ref()),
-            FrameworkError::Contextual { error, .. } => Some(error),
-            FrameworkError::Unified(e) => Some(e),
-        }
+/// Implement From<UnifiedError> for FrameworkError
+impl From<UnifiedError> for FrameworkError {
+    fn from(error: UnifiedError) -> Self {
+        FrameworkError::Unified(error)
     }
 }
 
@@ -285,10 +279,8 @@ pub fn init_framework() -> FrameworkResult<()> {
     // Initialize existing error handling
     super::init()?;
 
-    // Add default recovery strategy
-    let recovery = DefaultErrorRecovery;
-    let mut manager = super::get_error_manager();
-    manager.add_recovery_strategy(Box::new(recovery));
+    // Note: Default recovery strategy is handled by FrameworkErrorManager
+    // which is separate from the base ErrorManager
 
     Ok(())
 }

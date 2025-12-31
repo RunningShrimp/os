@@ -1,14 +1,12 @@
 extern crate alloc;
 
-use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::subsystems::mm::PAGE_SIZE;
 use crate::types::stubs::VirtAddr;
 
-const KPTI_ENTRY_SIZE: usize = 8;
-
-pub static KPTI_ENABLED: AtomicBool = AtomicBool::new(true);
+/// Global KPTI enabled flag
+pub static KPTI_ENABLED: AtomicBool = AtomicBool::new(false);
 
 pub static USER_KASLR_BASE: VirtAddr = VirtAddr(0x555500000000);
 
@@ -287,6 +285,11 @@ pub fn set_cr3(value: u64) {
             );
         }
     }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        let _ = value;
+    }
 }
 
 #[inline]
@@ -325,6 +328,11 @@ pub fn flush_tlb_addr(addr: VirtAddr) {
                 options(nostack, nostack, memory)
             );
         }
+    }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        let _ = addr;
     }
 }
 

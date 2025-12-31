@@ -8,7 +8,7 @@ use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use crate::subsystems::sync::{Mutex, SpinLock};
 use crate::{
     collections::HashMap,
-    compat::DefaultHasherBuilder,
+    compat::DefaultHashBuilder,
     subsystems::time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -191,8 +191,8 @@ impl SignatureEngine {
     /// Create a new signature engine
     pub fn new() -> Self {
         Self {
-            signatures: HashMap::with_hasher(DefaultHasherBuilder),
-            signatures_by_type: HashMap::with_hasher(DefaultHasherBuilder),
+            signatures: HashMap::with_hasher(DefaultHashBuilder::default()),
+            signatures_by_type: HashMap::with_hasher(DefaultHashBuilder::default()),
             events: Vec::new(),
             event_counter: AtomicU64::new(0),
             signature_counter: AtomicU64::new(0),
@@ -319,7 +319,7 @@ impl SignatureEngine {
 
     /// Scan network packet
     pub fn scan_packet(&mut self, packet: &[u8], packet_info: &NetworkInfo) -> Vec<DetectionEvent> {
-        let mut context = HashMap::with_hasher(DefaultHasherBuilder);
+        let mut context = HashMap::with_hasher(DefaultHashBuilder::default());
         context.insert(String::from("src_ip"), packet_info.src_ip.clone());
         context.insert(String::from("dst_ip"), packet_info.dst_ip.clone());
         context.insert(String::from("src_port"), format!("{}", packet_info.src_port));
@@ -331,7 +331,7 @@ impl SignatureEngine {
 
     /// Scan file
     pub fn scan_file(&mut self, file_data: &[u8], file_info: &FileInfo) -> Vec<DetectionEvent> {
-        let mut context = HashMap::with_hasher(DefaultHasherBuilder);
+        let mut context = HashMap::with_hasher(DefaultHashBuilder::default());
         context.insert(String::from("file_path"), file_info.path.clone());
         context.insert(String::from("file_name"), file_info.name.clone());
         context.insert(String::from("file_size"), format!("{}", file_info.size));
@@ -560,7 +560,7 @@ impl SignatureEngine {
                 .as_secs(),
             active: true,
             references: vec![String::from("CVE-2023-XXXX")],
-            context: HashMap::with_hasher(DefaultHasherBuilder),
+            context: HashMap::with_hasher(DefaultHashBuilder::default()),
         });
 
         // Malware signatures
@@ -586,7 +586,7 @@ impl SignatureEngine {
                 .as_secs(),
             active: true,
             references: Vec::new(),
-            context: HashMap::with_hasher(DefaultHasherBuilder),
+            context: HashMap::with_hasher(DefaultHashBuilder::default()),
         });
 
         // Web attack signatures
@@ -610,7 +610,7 @@ impl SignatureEngine {
                 .as_secs(),
             active: true,
             references: vec![String::from("OWASP Top 10")],
-            context: HashMap::with_hasher(DefaultHasherBuilder),
+            context: HashMap::with_hasher(DefaultHashBuilder::default()),
         });
     }
 }

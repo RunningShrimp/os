@@ -50,7 +50,7 @@ impl PacketBuffer {
     /// Create a packet buffer from existing data
     pub fn from_bytes(data: &[u8]) -> Result<Self, PacketError> {
         let mut buffer = Self::new(data.len())?;
-        buffer.write_bytes(data);
+        let _ = buffer.write_bytes(data);
         Ok(buffer)
     }
 
@@ -390,6 +390,9 @@ impl Packet {
 
     /// Construct a packet directly from an existing buffer (zero-copy handoff)
     pub fn from_buffer(buffer: PacketBuffer, packet_type: PacketType) -> Self {
+        // Get length before moving buffer
+        let buffer_len = buffer.len();
+
         Self {
             buffer,
             packet_type,
@@ -410,7 +413,7 @@ impl Packet {
             dst_port: 0,
             tcp_flags: alloc::string::String::new(),
             payload: Vec::new(),
-            size: buffer.len(),
+            size: buffer_len,
         }
     }
 }

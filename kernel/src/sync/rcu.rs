@@ -21,7 +21,7 @@
 use alloc::{boxed::Box, vec::Vec};
 use core::{
     marker::PhantomData,
-    sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicPtr, AtomicU64, Ordering},
 };
 
 use crate::{cpu, subsystems::sync::Mutex};
@@ -196,6 +196,30 @@ pub fn call_rcu(callback: Box<dyn FnOnce() + Send>) {
     get_rcu_grace_period().call_rcu(callback);
 }
 
+/// Sendable wrapper for raw pointers to boxed types
+///
+/// # Safety
+/// This wrapper is safe to send across threads because T is Send
+struct SendableBoxPtr<T>(*mut T);
+
+// SAFETY: SendableBoxPtr wraps a raw pointer to a Send type
+// It's only used in RCU context with proper synchronization
+unsafe impl<T: Send> Send for SendableBoxPtr<T> {}
+
+impl<T> SendableBoxPtr<T> {
+    /// Consume this wrapper and drop the boxed value
+    ///
+    /// # Safety
+    /// This must be called exactly once per SendableBoxPtr instance
+    unsafe fn drop_box(self) {
+        let Self(ptr) = self;
+        unsafe {
+            drop(Box::from_raw(ptr));
+        }
+        core::mem::forget(self); // Prevent double-drop
+    }
+}
+
 /// RCU-protected data structure
 pub struct Rcu<T> {
     /// Pointer to the protected data
@@ -204,7 +228,7 @@ pub struct Rcu<T> {
     _phantom: PhantomData<T>,
 }
 
-impl<T> Rcu<T> {
+impl<T: Send + 'static> Rcu<T> {
     /// Create a new RCU-protected value
     pub fn new(value: T) -> Self {
         let boxed = Box::new(value);
@@ -256,10 +280,13 @@ impl<T> Rcu<T> {
         core::sync::atomic::fence(Ordering::SeqCst);
 
         // Wait for grace period and free old value
-        let old_ptr = prev_ptr;
-        get_rcu_grace_period().call_rcu(Box::new(move || unsafe {
-            let _ = Box::from_raw(old_ptr);
-        }));
+        // Use SendableBoxPtr wrapper to make it safe to send across threads
+        let sendable = SendableBoxPtr(prev_ptr);
+        unsafe {
+            get_rcu_grace_period().call_rcu(Box::new(move || {
+                sendable.drop_box();
+            }));
+        }
     }
 
     /// Replace the protected value

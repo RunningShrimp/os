@@ -17,7 +17,7 @@ use alloc::{
 
 use spin::Mutex;
 
-use crate::{error::{UnifiedError, KernelError, Result}, subsystems::syscalls::services::traits::*};
+use crate::{error::{UnifiedError, Result}, subsystems::syscalls::services::traits::*};
 /// Version struct for syscall versioning (semantic versioning: major.minor.patch)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Version {
@@ -36,20 +36,18 @@ impl Version {
     pub fn from_str(s: &str) -> Result<Self> {
         let parts: Vec<&str> = s.split('.').collect();
         if parts.len() != 3 {
-            return Err(KernelError::InvalidInput(
-                "Version string must be in format major.minor.patch".to_string(),
-            ));
+            return Err(UnifiedError::InvalidInput);
         }
 
         let major = parts[0]
             .parse::<u32>()
-            .map_err(|_| KernelError::InvalidInput("Invalid major version".to_string()))?;
+            .map_err(|_| UnifiedError::InvalidInput)?;
         let minor = parts[1]
             .parse::<u32>()
-            .map_err(|_| KernelError::InvalidInput("Invalid minor version".to_string()))?;
+            .map_err(|_| UnifiedError::InvalidInput)?;
         let patch = parts[2]
             .parse::<u32>()
-            .map_err(|_| KernelError::InvalidInput("Invalid patch version".to_string()))?;
+            .map_err(|_| UnifiedError::InvalidInput)?;
 
         Ok(Self { major, minor, patch })
     }
@@ -201,7 +199,7 @@ impl ServiceRegistry {
         {
             let services = self.services.lock();
             if services.contains_key(&service_name) {
-                return Err(KernelError::AlreadyExists("Service already exists".to_string()));
+                return Err(UnifiedError::AlreadyExists);
             }
         }
 
@@ -253,10 +251,7 @@ impl ServiceRegistry {
             let dep_graph = self.dependency_graph.lock();
             if let Some(dependents) = dep_graph.get_dependents(name) {
                 if !dependents.is_empty() {
-                    return Err(KernelError::InvalidOperation(format!(
-                        "Service has dependents: {:?}",
-                        dependents
-                    )));
+                    return Err(UnifiedError::InvalidOperation);
                 }
             }
         }
@@ -264,11 +259,11 @@ impl ServiceRegistry {
         // 移除服务
         {
             let mut services = self.services.lock();
-            if let Some(mut entry) = services.remove(name) {
-                // 停止服务
-                let _ = entry.service.stop();
+            if let Some(_entry) = services.remove(name) {
+                // Service will be stopped when dropped
+                // Note: Service implementations should handle cleanup in Drop
             } else {
-                return Err(KernelError::NotFound(format!("Service not found: {}", name)));
+                return Err(UnifiedError::NotFound);
             }
         }
 
@@ -328,10 +323,7 @@ impl ServiceRegistry {
     /// * `Err(Error)` - 不支持的操作
     #[deprecated(note = "Use Arc<Service> with internal mutability instead")]
     pub fn get_service_mut_ref(&self, _name: &str) -> Result<Option<&mut dyn Service>> {
-        Err(KernelError::InvalidOperation(
-            "Operation not supported: Use Arc<Service> with internal mutability instead"
-                .to_string(),
-        ))
+        Err(UnifiedError::InvalidOperation)
     }
 
     /// 获取系统调用服务
@@ -426,10 +418,10 @@ impl ServiceRegistry {
                 default_versions.insert(syscall_number, version);
                 Ok(())
             } else {
-                Err(KernelError::NotFound("Version not found for syscall".to_string()))
+                Err(UnifiedError::NotFound)
             }
         } else {
-            Err(KernelError::NotFound("Syscall not found".to_string()))
+            Err(UnifiedError::NotFound)
         }
     }
 
@@ -482,7 +474,7 @@ impl ServiceRegistry {
         if let Some(entry) = services.get(name) {
             Ok(entry.service.status())
         } else {
-            Err(KernelError::NotFound(format!("Service not found: {}", name)))
+            Err(UnifiedError::NotFound)
         }
     }
 
@@ -536,7 +528,7 @@ impl ServiceRegistry {
 
         for dep in dependencies {
             if !services.contains_key(dep) {
-                return Err(KernelError::NotFound(format!("Dependency not found: {}", dep)));
+                return Err(UnifiedError::NotFound);
             }
         }
 
@@ -559,20 +551,17 @@ impl ServiceRegistry {
         let services = self.services.lock();
         let service_entry = services
             .get(service_name)
-            .ok_or_else(|| KernelError::NotFound(format!("Service not found: {}", service_name)))?;
+            .ok_or_else(|| UnifiedError::NotFound)?;
 
         // 尝试将服务转换为 SyscallService
-        let syscall_service = service_entry
-            .service
-            .as_any()
-            .downcast_ref::<dyn SyscallService>();
+        let syscall_service = service_entry.service.as_syscall_service();
 
         if let Some(syscall_service) = syscall_service {
             // 获取服务支持的系统调用
-            let syscalls = syscall_service.supported_syscalls();
+            let syscalls: Vec<u32> = syscall_service.supported_syscalls();
             // 解析服务版本
             let service_version = Version::from_str(syscall_service.version())
-                .map_err(|e| KernelError::InvalidInput(format!("Invalid version: {}", e)))?;
+                .map_err(|_| UnifiedError::InvalidInput)?;
             drop(services); // 释放服务锁
 
             // 更新系统调用映射
@@ -616,7 +605,7 @@ impl DependencyGraph {
     /// 添加服务
     ///
     /// 将服务添加到依赖图中。
-    pub fn add_service(&mut self, name: &str, metadata: &ServiceMetadata) {
+    pub fn add_service(&mut self, name: &str, _metadata: &ServiceMetadata) {
         // 初始化依赖关系（这里需要从服务实例获取）
         self.dependencies.insert(name.to_string(), Vec::new());
         self.dependents.insert(name.to_string(), Vec::new());
@@ -653,7 +642,7 @@ impl DependencyGraph {
     /// 拓扑排序
     ///
     /// 计算服务的启动顺序。
-    pub fn topological_sort(&self) -> Result<Vec<String>, KernelError> {
+    pub fn topological_sort(&self) -> Result<Vec<String>> {
         let mut visited = BTreeMap::new();
         let mut result = Vec::new();
         let temp_mark = 1;
@@ -677,13 +666,10 @@ impl DependencyGraph {
         result: &mut Vec<String>,
         temp_mark: u32,
         perm_mark: u32,
-    ) -> Result<(), KernelError> {
+    ) -> Result<()> {
         if let Some(mark) = visited.get(service) {
             if *mark == temp_mark {
-                return Err(KernelError::InvalidOperation(format!(
-                    "Circular dependency detected: {}",
-                    service
-                )));
+                return Err(UnifiedError::InvalidOperation);
             }
             if *mark == perm_mark {
                 return Ok(());

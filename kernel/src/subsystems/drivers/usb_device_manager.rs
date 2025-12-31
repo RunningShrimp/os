@@ -10,17 +10,16 @@ use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
-use core::sync::atomic::{AtomicU32, AtomicU64, AtomicBool, Ordering};
-use crate::subsystems::sync::{Mutex, Sleeplock};
+use core::sync::atomic::{AtomicBool, Ordering};
+use crate::subsystems::sync::Mutex;
+use crate::prelude::*;
 use crate::subsystems::drivers::device_model::{
-    DeviceModel, EnhancedDeviceInfo, DeviceClass, DevicePowerState, 
+    DeviceModel, EnhancedDeviceInfo, DeviceClass, DevicePowerState,
     DeviceCapabilities, DevicePerformanceMetrics
 };
 use crate::subsystems::drivers::driver_manager::{
-    Driver, DeviceId, DriverId, DeviceType, DeviceStatus, DriverStatus,
-    DeviceInfo, DriverInfo, DeviceResources, IoOperation, IoResult, InterruptInfo
+    DeviceType, DeviceStatus, DeviceInfo, DeviceResources
 };
-use crate::error::UnifiedError;
 
 // ============================================================================
 // USB Constants and Structures
@@ -51,7 +50,7 @@ impl UsbVersion {
 }
 
 /// USB speeds
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum UsbSpeed {
     /// Low speed (1.5 Mbps)
     Low,
@@ -68,7 +67,7 @@ pub enum UsbSpeed {
 }
 
 /// USB device class codes
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum UsbClassCode {
     /// Use class information in the Interface Descriptors
@@ -295,8 +294,6 @@ pub struct UsbDeviceManager {
     controllers: Mutex<BTreeMap<u32, UsbHostControllerInfo>>,
     /// Device model reference
     device_model: Arc<Mutex<dyn DeviceModel>>,
-    /// Next device ID
-    next_device_id: AtomicU32,
     /// Manager statistics
     stats: Mutex<UsbStats>,
     /// Manager initialized flag
@@ -343,14 +340,13 @@ impl UsbDeviceManager {
             devices: Mutex::new(BTreeMap::new()),
             controllers: Mutex::new(BTreeMap::new()),
             device_model,
-            next_device_id: AtomicU32::new(1),
             stats: Mutex::new(UsbStats::default()),
             initialized: AtomicBool::new(false),
         }
     }
 
     /// Initialize the USB device manager
-    pub fn init(&self) -> Result<(), KernelError> {
+    pub fn init(&self) -> Result<()> {
         if self.initialized.load(Ordering::SeqCst) {
             return Ok(());
         }
@@ -385,7 +381,7 @@ impl UsbDeviceManager {
     }
 
     /// Enumerate USB host controllers
-    fn enumerate_host_controllers(&self) -> Result<(), KernelError> {
+    fn enumerate_host_controllers(&self) -> Result<()> {
         // In a real implementation, this would scan PCI for USB host controllers
         // For now, we'll create a few example controllers
         
@@ -449,7 +445,7 @@ impl UsbDeviceManager {
     }
 
     /// Enumerate USB devices on all controllers
-    fn enumerate_usb_devices(&self) -> Result<(), KernelError> {
+    fn enumerate_usb_devices(&self) -> Result<()> {
         let controllers = self.controllers.lock();
         
         for controller in controllers.values() {
@@ -467,7 +463,7 @@ impl UsbDeviceManager {
     }
 
     /// Check if a device is connected to a specific port
-    fn is_device_connected(&self, controller_id: u32, port: u8) -> Result<bool, KernelError> {
+    fn is_device_connected(&self, controller_id: u32, port: u8) -> Result<bool> {
         // In a real implementation, this would read the port status register
         // For now, we'll simulate a few connected devices
         match (controller_id, port) {
@@ -479,7 +475,7 @@ impl UsbDeviceManager {
     }
 
     /// Enumerate a device on a specific port
-    fn enumerate_device_on_port(&self, controller_id: u32, port: u8) -> Result<(), KernelError> {
+    fn enumerate_device_on_port(&self, controller_id: u32, port: u8) -> Result<()> {
         // Allocate a device address
         let device_address = self.allocate_device_address()?;
         
@@ -535,21 +531,32 @@ impl UsbDeviceManager {
     }
 
     /// Allocate a device address
-    fn allocate_device_address(&self) -> Result<u8, KernelError> {
+    fn allocate_device_address(&self) -> Result<u8> {
         let devices = self.devices.lock();
         for addr in 1..128 {
             if !devices.contains_key(&addr) {
                 return Ok(addr);
             }
         }
-        Err(KernelError::ResourceExhausted("No available USB device addresses".to_string()))
+        Err(KernelError::Other("No available USB device addresses".to_string()))
     }
 
     /// Get device descriptor
-    fn get_device_descriptor(&self, controller_id: u32, port: u8, device_address: u8) -> Result<UsbDeviceDescriptor, KernelError> {
+    fn get_device_descriptor(&self, controller_id: u32, port: u8, device_address: u8) -> Result<UsbDeviceDescriptor> {
         // In a real implementation, this would send a control transfer to get the descriptor
         // For now, we'll return example descriptors based on the port
-        
+
+        // Validate that the device address matches expected addressing scheme
+        // USB device addresses should be in range 1-127 (0 is reserved for unaddressed state)
+        if device_address == 0 || device_address > 127 {
+            return Err(KernelError::Other(format!("Invalid USB device address: {}", device_address)));
+        }
+
+        // TODO: Use device_address for caching descriptors
+        // In a production implementation, we should cache descriptors by device_address
+        // to avoid repeated USB transactions. This would improve performance significantly.
+        // For now, we return mock data based on controller_id and port.
+
         match (controller_id, port) {
             (1, 0) => {
                 // EHCI port 0: Mass storage device
@@ -666,7 +673,7 @@ impl UsbDeviceManager {
     }
 
     /// Determine device speed
-    fn determine_device_speed(&self, controller_id: u32, port: u8) -> Result<UsbSpeed, KernelError> {
+    fn determine_device_speed(&self, controller_id: u32, port: u8) -> Result<UsbSpeed> {
         // In a real implementation, this would read the port status register
         // For now, we'll return example speeds based on the controller and port
         match (controller_id, port) {
@@ -678,7 +685,7 @@ impl UsbDeviceManager {
     }
 
     /// Get configuration descriptors
-    fn get_configurations(&self, _controller_id: u32, _port: u8, _device_address: u8) -> Result<Vec<UsbConfigurationDescriptor>, KernelError> {
+    fn get_configurations(&self, _controller_id: u32, _port: u8, _device_address: u8) -> Result<Vec<UsbConfigurationDescriptor>> {
         // In a real implementation, this would send control transfers to get the descriptors
         // For now, we'll return a single configuration
         Ok(vec![
@@ -694,7 +701,7 @@ impl UsbDeviceManager {
     }
 
     /// Get interface descriptors
-    fn get_interfaces(&self, _controller_id: u32, _port: u8, _device_address: u8) -> Result<Vec<UsbInterfaceDescriptor>, KernelError> {
+    fn get_interfaces(&self, _controller_id: u32, _port: u8, _device_address: u8) -> Result<Vec<UsbInterfaceDescriptor>> {
         // In a real implementation, this would send control transfers to get the descriptors
         // For now, we'll return a single interface
         Ok(vec![
@@ -711,7 +718,7 @@ impl UsbDeviceManager {
     }
 
     /// Get endpoint descriptors
-    fn get_endpoints(&self, _controller_id: u32, _port: u8, _device_address: u8) -> Result<Vec<UsbEndpointDescriptor>, KernelError> {
+    fn get_endpoints(&self, _controller_id: u32, _port: u8, _device_address: u8) -> Result<Vec<UsbEndpointDescriptor>> {
         // In a real implementation, this would send control transfers to get the descriptors
         // For now, we'll return two endpoints (bulk in and bulk out)
         Ok(vec![
@@ -731,7 +738,7 @@ impl UsbDeviceManager {
     }
 
     /// Get string descriptors
-    fn get_string_descriptors(&self, _controller_id: u32, _port: u8, _device_address: u8) -> Result<BTreeMap<u8, String>, KernelError> {
+    fn get_string_descriptors(&self, _controller_id: u32, _port: u8, _device_address: u8) -> Result<BTreeMap<u8, String>> {
         // In a real implementation, this would send control transfers to get the descriptors
         // For now, we'll return a few example strings
         let mut strings = BTreeMap::new();
@@ -742,7 +749,7 @@ impl UsbDeviceManager {
     }
 
     /// Register a USB device with the device model
-    fn register_usb_device(&self, controller_id: u32, device_info: UsbDeviceInfo) -> Result<(), KernelError> {
+    fn register_usb_device(&self, controller_id: u32, device_info: UsbDeviceInfo) -> Result<()> {
         // Add to device registry
         {
             let mut devices = self.devices.lock();
@@ -779,43 +786,44 @@ impl UsbDeviceManager {
             UsbClassCode::Wireless => "wireless",
             UsbClassCode::Miscellaneous => "miscellaneous",
             UsbClassCode::ApplicationSpecific => "application_specific",
-            UsbClassCode::VendorSpecific(_) => "vendor_specific",
+            UsbClassCode::VendorSpecific => "vendor_specific",
             UsbClassCode::UseInterfaceClass => "use_interface_class",
         };
 
         let device_class = match device_info.device_class {
-            UsbClassCode::Audio => DeviceClass::Audio,
+            UsbClassCode::Audio => DeviceClass::Multimedia,
             UsbClassCode::Communications => DeviceClass::Communication,
             UsbClassCode::Hid => DeviceClass::Input,
             UsbClassCode::Physical => DeviceClass::Sensor,
-            UsbClassCode::Image => DeviceClass::Camera,
-            UsbClassCode::Printer => DeviceClass::Printer,
+            UsbClassCode::Image => DeviceClass::Multimedia,
+            UsbClassCode::Printer => DeviceClass::Output,
             UsbClassCode::MassStorage => DeviceClass::Storage,
             UsbClassCode::Hub => DeviceClass::Bus,
             UsbClassCode::CdcData => DeviceClass::Communication,
-            UsbClassCode::SmartCard => DeviceClass::SmartCard,
-            UsbClassCode::ContentSecurity => DeviceClass::Security,
-            UsbClassCode::Video => DeviceClass::Camera,
-            UsbClassCode::PersonalHealthcare => DeviceClass::Medical,
+            UsbClassCode::SmartCard => DeviceClass::Custom,
+            UsbClassCode::ContentSecurity => DeviceClass::Custom,
+            UsbClassCode::Video => DeviceClass::Multimedia,
+            UsbClassCode::PersonalHealthcare => DeviceClass::Custom,
             UsbClassCode::AudioVideo => DeviceClass::Multimedia,
             UsbClassCode::Billboard => DeviceClass::Display,
             UsbClassCode::UsbTypeCBridge => DeviceClass::Bus,
-            UsbClassCode::Diagnostic => DeviceClass::Diagnostic,
+            UsbClassCode::Diagnostic => DeviceClass::System,
             UsbClassCode::Wireless => DeviceClass::Network,
             UsbClassCode::Miscellaneous => DeviceClass::Custom,
             UsbClassCode::ApplicationSpecific => DeviceClass::Custom,
-            UsbClassCode::VendorSpecific(_) => DeviceClass::Custom,
+            UsbClassCode::VendorSpecific => DeviceClass::Custom,
             UsbClassCode::UseInterfaceClass => DeviceClass::Custom,
         };
 
         // Create device resources
         let mut resources = DeviceResources::default();
-        
+
         // Add interrupt resource
-        resources.interrupts.push(InterruptInfo {
+        use crate::subsystems::drivers::driver_manager::InterruptLine;
+        resources.interrupt_lines.push(InterruptLine {
             irq: device_info.port_number as u32,
-            trigger: "edge".to_string(),
-            priority: 5,
+            interrupt_type: 0,
+            trigger_mode: 0,
         });
 
         // Create device capabilities
@@ -823,19 +831,19 @@ impl UsbDeviceManager {
         capabilities.interrupts = true;
         capabilities.hotplug = true;
         capabilities.power_management = true;
-        
+
         match device_info.speed {
             UsbSpeed::Low | UsbSpeed::Full => {
                 capabilities.power_management = true;
             }
             UsbSpeed::High => {
                 capabilities.power_management = true;
-                capabilities.high_speed = true;
+                capabilities.streaming = true;
             }
             UsbSpeed::SuperSpeed | UsbSpeed::SuperSpeedPlus => {
                 capabilities.power_management = true;
-                capabilities.high_speed = true;
-                capabilities.super_speed = true;
+                capabilities.streaming = true;
+                capabilities.dma = true;
             }
             UsbSpeed::Unknown => {}
         }
@@ -846,7 +854,7 @@ impl UsbDeviceManager {
                 id: 0, // Will be set by device model
                 name: device_name,
                 device_type: DeviceType::Custom("usb".to_string()),
-                status: DeviceStatus::Present,
+                status: DeviceStatus::Ready,
                 driver_id: 0, // Will be set when driver is bound
                 path: format!("/sys/devices/usb{}/{}", controller_id, device_info.address),
                 version: format!("{}.{}.{}", 
@@ -1059,7 +1067,7 @@ impl UsbDeviceManager {
     }
 
     /// Configure a device
-    pub fn configure_device(&self, address: u8, configuration_value: u8) -> Result<(), KernelError> {
+    pub fn configure_device(&self, address: u8, configuration_value: u8) -> Result<()> {
         let mut devices = self.devices.lock();
         if let Some(device) = devices.get_mut(&address) {
             device.current_configuration = Some(configuration_value);
@@ -1069,7 +1077,7 @@ impl UsbDeviceManager {
             return Ok(());
         }
         
-        Err(KernelError::NotFound(format!("USB device {} not found", address)))
+        Err(KernelError::Other(format!("USB device {} not found", address)))
     }
 
     /// Get device configuration
@@ -1079,7 +1087,7 @@ impl UsbDeviceManager {
     }
 
     /// Reset a device
-    pub fn reset_device(&self, address: u8) -> Result<(), KernelError> {
+    pub fn reset_device(&self, address: u8) -> Result<()> {
         let devices = self.devices.lock();
         if devices.contains_key(&address) {
             // In a real implementation, this would send a reset command to the controller
@@ -1087,11 +1095,11 @@ impl UsbDeviceManager {
             return Ok(());
         }
         
-        Err(KernelError::NotFound(format!("USB device {} not found", address)))
+        Err(KernelError::Other(format!("USB device {} not found", address)))
     }
 
     /// Suspend a device
-    pub fn suspend_device(&self, address: u8) -> Result<(), KernelError> {
+    pub fn suspend_device(&self, address: u8) -> Result<()> {
         let devices = self.devices.lock();
         if devices.contains_key(&address) {
             // In a real implementation, this would send a suspend command to the controller
@@ -1099,11 +1107,11 @@ impl UsbDeviceManager {
             return Ok(());
         }
         
-        Err(KernelError::NotFound(format!("USB device {} not found", address)))
+        Err(KernelError::Other(format!("USB device {} not found", address)))
     }
 
     /// Resume a device
-    pub fn resume_device(&self, address: u8) -> Result<(), KernelError> {
+    pub fn resume_device(&self, address: u8) -> Result<()> {
         let devices = self.devices.lock();
         if devices.contains_key(&address) {
             // In a real implementation, this would send a resume command to the controller
@@ -1111,7 +1119,7 @@ impl UsbDeviceManager {
             return Ok(());
         }
         
-        Err(KernelError::NotFound(format!("USB device {} not found", address)))
+        Err(KernelError::Other(format!("USB device {} not found", address)))
     }
 
     /// Get host controller information
@@ -1140,7 +1148,7 @@ pub enum HotplugEventType {
 static mut USB_DEVICE_MANAGER: Option<UsbDeviceManager> = None;
 
 /// Initialize USB device manager
-pub fn init(device_model: Arc<Mutex<dyn DeviceModel>>) -> Result<(), KernelError> {
+pub fn init(device_model: Arc<Mutex<dyn DeviceModel>>) -> Result<()> {
     unsafe {
         let manager = UsbDeviceManager::new(device_model);
         manager.init()?;

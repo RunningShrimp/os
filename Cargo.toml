@@ -13,7 +13,7 @@ nos-services = { path = "./nos-services", default-features = false }
 nos-error-handling = { path = "./nos-error-handling", default-features = false }
 
 # External dependencies
-hashbrown = "0.16.1"
+hashbrown = { version = "0.16.1", features = ["default-hasher"] }
 spin = "0.10.0"
 log = { version = "0.4.29" }
 bitflags = "2.10.0"
@@ -22,7 +22,7 @@ lazy_static = { version = "1.5.0", features = ["spin_no_std"] }
 libm = "0.2.15"
 
 # Test dependencies
-criterion = { version = "0.5.1" }
+criterion = { version = "0.8.1" }
 proptest = "1.9.0"
 mockall = "0.14.0"
 serde = { version = "1.0.228", features = ["derive"] }

@@ -8,12 +8,44 @@
 //! and use the RCU mechanism, while writes create a new copy of the table
 //! and update the pointer atomically.
 
+use crate::prelude::*;
 use core::sync::atomic::{AtomicPtr, Ordering};
 
 use crate::subsystems::{
     process::manager::{NPROC, Pid, Proc, ProcState, ProcTable},
     sync::{Mutex, rcu},
 };
+
+// SAFETY: ProcTable contains only Send+Sync types (HashMap, Vec, arrays of Proc)
+// We assert it's safe to send ProcTable across threads for RCU purposes
+unsafe impl Send for ProcTable {}
+
+/// Wrapper for raw pointer to ProcTable that is safe to send across threads
+///
+/// # Safety
+/// This wrapper is safe to send because:
+/// 1. ProcTable is Send (implemented above)
+/// 2. The pointer is only used in RCU context with proper synchronization
+/// 3. The pointer is never dereferenced unsafely across threads
+struct SendablePtr(*mut ProcTable);
+
+// SAFETY: SendablePtr wraps a raw pointer to a Send type (ProcTable)
+// It's only used in RCU context with proper synchronization
+unsafe impl Send for SendablePtr {}
+
+impl SendablePtr {
+    /// Consume this wrapper and drop the boxed ProcTable
+    ///
+    /// # Safety
+    /// This must be called exactly once per SendablePtr instance
+    unsafe fn drop_box(self) {
+        let Self(ptr) = self;
+        unsafe {
+            drop(Box::from_raw(ptr));
+        }
+        core::mem::forget(self); // Prevent double-drop
+    }
+}
 
 /// RCU-protected process table
 ///
@@ -40,7 +72,7 @@ impl RcuProcTable {
         Self {
             table: AtomicPtr::new(ptr),
             write_lock: Mutex::new(()),
-            initial_table: ProcTable::const_new(), // Dummy for static initialization
+            initial_table: ProcTable::new(), // Default initial table
         }
     }
 
@@ -94,8 +126,13 @@ impl RcuProcTable {
             .swap(Box::into_raw(Box::new(new_table)), Ordering::Release);
 
         // Schedule old table for deletion after grace period
-        rcu::call_rcu(Box::new(move || unsafe {
-            let _ = Box::from_raw(old_ptr);
+        // Wrap the pointer in SendablePtr to make it safe to send across threads
+        let sendable = SendablePtr(old_ptr);
+        rcu::call_rcu(Box::new(move || {
+            // SAFETY: The sendable is owned by this closure and drop_box is called exactly once
+            unsafe {
+                sendable.drop_box();
+            }
         }));
     }
 
@@ -190,7 +227,9 @@ impl ProcRef {
     /// # Safety
     /// The returned reference is valid as long as the guard is held.
     pub unsafe fn as_ref(&self) -> &Proc {
-        &*self.proc
+        unsafe {
+            &*self.proc
+        }
     }
 }
 

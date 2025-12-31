@@ -9,13 +9,44 @@ extern crate alloc;
 // - Shared memory regions
 // - Memory mapping for foreign binaries
 
-use core::ptr;
-use alloc::vec::Vec;
-use alloc::sync::Arc;
+use alloc::collections::BTreeMap;
 
 use crate::compat::*;
-use crate::subsystems::mm::vm;
-use crate::mm;
+use crate::sync::Mutex;
+
+/// Memory region for cross-platform process management
+#[derive(Debug, Clone)]
+pub struct MemoryRegion {
+    /// Virtual address
+    pub virtual_addr: usize,
+    /// Physical address (None if not mapped)
+    pub physical_addr: Option<usize>,
+    /// Size in bytes
+    pub size: usize,
+    /// Memory permissions
+    pub permissions: MemoryPermissions,
+    /// Region type
+    pub region_type: MemoryRegionType,
+}
+
+/// Memory region type
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MemoryRegionType {
+    /// Code segment
+    Code,
+    /// Data segment
+    Data,
+    /// Heap region
+    Heap,
+    /// Stack region
+    Stack,
+    /// Guard page
+    Guard,
+    /// Memory mapped file
+    Mapped,
+    /// Shared memory
+    Shared,
+}
 
 /// Memory layout manager for cross-platform processes
 pub struct MemoryLayoutManager {
@@ -440,7 +471,7 @@ impl MemoryLayoutManager {
                 virtual_addr: stack_base,
                 physical_addr: None,
                 size: guard_size,
-                permissions: crate::compat::MemoryPermissions::new(false, false, false), // No access
+                permissions: MemoryPermissions::new(false, false, false), // No access
                 region_type: MemoryRegionType::Guard,
             };
             self.allocate_memory_region(guard_region.clone())?;
@@ -516,15 +547,15 @@ impl MemoryLayoutManager {
         for segment in segments {
             let permissions = {
                 if segment.permissions.readable && segment.permissions.writable && segment.permissions.executable {
-                    crate::compat::MemoryPermissions::new(true, true, true)
+                    MemoryPermissions::new(true, true, true)
                 } else if segment.permissions.readable && segment.permissions.writable {
-                    crate::compat::MemoryPermissions::new(true, true, false)
+                    MemoryPermissions::new(true, true, false)
                 } else if segment.permissions.readable && segment.permissions.executable {
-                    crate::compat::MemoryPermissions::new(true, false, true)
+                    MemoryPermissions::new(true, false, true)
                 } else if segment.permissions.readable {
-                    crate::compat::MemoryPermissions::new(true, false, false)
+                    MemoryPermissions::new(true, false, false)
                 } else {
-                    crate::compat::MemoryPermissions::new(false, false, false)
+                    MemoryPermissions::new(false, false, false)
                 }
             };
 

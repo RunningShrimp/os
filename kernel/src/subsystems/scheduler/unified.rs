@@ -15,7 +15,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use crate::subsystems::sync::Mutex;
 use crate::cpu;
-use crate::process::thread::{ThreadState, Tid, SchedPolicy, SchedParam};
+use crate::process::thread::{ThreadState, Tid, SchedPolicy};
 
 /// Maximum number of CPUs supported
 const MAX_CPUS: usize = 256;
@@ -26,93 +26,71 @@ const MAX_PRIORITY: u8 = 255;
 /// Minimum priority level
 const MIN_PRIORITY: u8 = 0;
 
-/// Real-time priority range (100-199)
-const RT_PRIORITY_MIN: u8 = 100;
-const RT_PRIORITY_MAX: u8 = 199;
-
-/// Normal priority range (0-99)
-const NORMAL_PRIORITY_MIN: u8 = 0;
-const NORMAL_PRIORITY_MAX: u8 = 99;
-
-/// Thread entry in priority queue
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct PriorityQueueEntry {
+/// Queue entry for priority queue
+#[derive(Debug)]
+struct QueueEntry {
     /// Thread ID
     tid: Tid,
-    /// Effective priority (for tie-breaking)
-    effective_priority: u8,
-    /// Timestamp when thread became runnable (for FIFO ordering)
-    enqueue_time: u64,
+    /// FIFO order counter
+    order: u64,
 }
 
-impl PartialOrd for PriorityQueueEntry {
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for PriorityQueueEntry {
-    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        // Lower priority value = higher priority (inverted comparison)
-        // For real-time: lower number = higher priority (e.g., 1 > 99)
-        match self.effective_priority.cmp(&other.effective_priority) {
-            core::cmp::Ordering::Equal => {
-                // For same priority, FIFO: earlier enqueue time first
-                self.enqueue_time.cmp(&other.enqueue_time)
-            }
-            // Invert: lower priority number = higher priority
-            ordering => ordering.reverse(),
-        }
-    }
-}
-
-/// Priority queue for threads
-/// Uses BTreeMap for O(log n) operations
+/// Priority queue for scheduler
+///
+/// Uses multiple FIFO queues, one per priority level.
+/// Lower priority number = higher priority (like Linux nice values).
+#[derive(Debug)]
 struct PriorityQueue {
-    /// Map from priority to list of thread entries
-    /// Higher priority threads are at the end (for efficient pop)
-    queues: BTreeMap<u8, Vec<PriorityQueueEntry>>,
-    /// Total number of threads in queue
+    /// Per-priority FIFO queues (BTreeMap for sorted iteration)
+    queues: BTreeMap<u8, Vec<QueueEntry>>,
+    /// Total thread count
     count: AtomicUsize,
-    /// Sequence number for FIFO ordering
-    sequence: AtomicU64,
-    /// Cached lowest (highest-priority) non-empty priority
+    /// Minimum priority with non-empty queue (cached)
     min_priority: AtomicU8,
-    /// Whether min_priority is valid
+    /// Whether we have a valid cached min priority
     has_min: AtomicBool,
+    /// Next FIFO order counter
+    next_order: AtomicU64,
 }
 
 impl PriorityQueue {
+    /// Create a new priority queue
     fn new() -> Self {
         Self {
             queues: BTreeMap::new(),
             count: AtomicUsize::new(0),
-            sequence: AtomicU64::new(0),
-            min_priority: AtomicU8::new(MAX_PRIORITY),
+            min_priority: AtomicU8::new(0),
             has_min: AtomicBool::new(false),
+            next_order: AtomicU64::new(0),
         }
     }
 
-    /// Enqueue a thread with given priority
-    /// Note: Lower priority number = higher priority (e.g., RT priority 1 > RT priority 99)
+    /// Enqueue a thread with priority
     fn enqueue(&mut self, tid: Tid, priority: u8) {
-        let entry = PriorityQueueEntry {
-            tid,
-            effective_priority: priority,
-            enqueue_time: self.sequence.fetch_add(1, Ordering::Relaxed),
-        };
+        let order = self.next_order.fetch_add(1, Ordering::Relaxed);
+        let entry = QueueEntry { tid, order };
 
-        self.queues.entry(priority).or_insert_with(Vec::new).push(entry);
-        self.count.fetch_add(1, Ordering::Relaxed);
+        self.queues
+            .entry(priority)
+            .or_insert_with(Vec::new)
+            .push(entry);
 
-        // Update cached min priority for fast dequeue
-        let has_min = self.has_min.load(Ordering::Relaxed);
-        if !has_min || priority < self.min_priority.load(Ordering::Relaxed) {
+        let count = self.count.fetch_add(1, Ordering::Relaxed) + 1;
+
+        // Update min priority if this is the first thread or lower priority
+        if count == 1 {
             self.min_priority.store(priority, Ordering::Relaxed);
             self.has_min.store(true, Ordering::Relaxed);
+        } else {
+            let current_min = self.min_priority.load(Ordering::Relaxed);
+            if priority < current_min {
+                self.min_priority.store(priority, Ordering::Relaxed);
+            }
         }
     }
+}
 
+impl PriorityQueue {
     /// Dequeue the highest priority thread
     /// Note: Lower priority number = higher priority
     fn dequeue(&mut self) -> Option<Tid> {
@@ -131,7 +109,7 @@ impl PriorityQueue {
                 self.count.fetch_sub(1, Ordering::Relaxed);
 
                 // Recompute min if needed
-                if let Some((&p, q)) = self.queues.iter().find(|(_, q)| !q.is_empty()) {
+                if let Some((&p, _q)) = self.queues.iter().find(|(_, q)| !q.is_empty()) {
                     self.min_priority.store(p, Ordering::Relaxed);
                     self.has_min.store(true, Ordering::Relaxed);
                 } else {
@@ -143,24 +121,28 @@ impl PriorityQueue {
         }
 
         // Slow path: scan for next non-empty priority
-        for (&priority, queue) in self.queues.iter() {
-            if !queue.is_empty() {
-                if let Some(queue_mut) = self.queues.get_mut(&priority) {
-                    if let Some(entry) = queue_mut.pop() {
-                        if queue_mut.is_empty() {
-                            self.queues.remove(&priority);
-                        }
-                        self.count.fetch_sub(1, Ordering::Relaxed);
+        // Collect priorities with non-empty queues first
+        let non_empty_priorities: Vec<u8> = self.queues.iter()
+            .filter(|(_, queue)| !queue.is_empty())
+            .map(|(&priority, _)| priority)
+            .collect();
 
-                        if let Some((&p, q)) = self.queues.iter().find(|(_, q)| !q.is_empty()) {
-                            self.min_priority.store(p, Ordering::Relaxed);
-                            self.has_min.store(true, Ordering::Relaxed);
-                        } else {
-                            self.has_min.store(false, Ordering::Relaxed);
-                        }
-
-                        return Some(entry.tid);
+        for priority in non_empty_priorities {
+            if let Some(queue_mut) = self.queues.get_mut(&priority) {
+                if let Some(entry) = queue_mut.pop() {
+                    if queue_mut.is_empty() {
+                        self.queues.remove(&priority);
                     }
+                    self.count.fetch_sub(1, Ordering::Relaxed);
+
+                    if let Some((&p, _q)) = self.queues.iter().find(|(_, q)| !q.is_empty()) {
+                        self.min_priority.store(p, Ordering::Relaxed);
+                        self.has_min.store(true, Ordering::Relaxed);
+                    } else {
+                        self.has_min.store(false, Ordering::Relaxed);
+                    }
+
+                    return Some(entry.tid);
                 }
             }
         }
@@ -169,50 +151,30 @@ impl PriorityQueue {
         None
     }
 
-    /// Peek at the highest priority thread without removing it
-    /// Note: Lower priority number = higher priority
-    fn peek(&self) -> Option<Tid> {
-        // Find lowest priority number (highest priority) non-empty queue
-        // BTreeMap iterates in ascending order, so first non-empty is highest priority
-        for (&priority, queue) in self.queues.iter() {
-            if !queue.is_empty() {
-                // Return first thread in FIFO order (first in queue)
-                return queue.first().map(|e| e.tid);
-            }
-        }
-        None
+
+    /// Get number of threads in queue
+    fn len(&self) -> usize {
+        self.count.load(Ordering::Relaxed)
     }
 
     /// Remove a specific thread from the queue
     fn remove(&mut self, tid: Tid) -> bool {
-        for (priority, queue) in self.queues.iter_mut() {
-            if let Some(pos) = queue.iter().position(|e| e.tid == tid) {
+        for (_, queue) in self.queues.iter_mut() {
+            if let Some(pos) = queue.iter().position(|entry| entry.tid == tid) {
                 queue.remove(pos);
-                if queue.is_empty() {
-                    self.queues.remove(priority);
-                }
                 self.count.fetch_sub(1, Ordering::Relaxed);
 
-                if self.count.load(Ordering::Relaxed) == 0 {
-                    self.has_min.store(false, Ordering::Relaxed);
-                } else if let Some((&p, q)) = self.queues.iter().find(|(_, q)| !q.is_empty()) {
+                // Update min priority cache
+                if let Some((&p, _q)) = self.queues.iter().find(|(_, q)| !q.is_empty()) {
                     self.min_priority.store(p, Ordering::Relaxed);
                     self.has_min.store(true, Ordering::Relaxed);
+                } else {
+                    self.has_min.store(false, Ordering::Relaxed);
                 }
                 return true;
             }
         }
         false
-    }
-
-    /// Check if queue is empty
-    fn is_empty(&self) -> bool {
-        self.count.load(Ordering::Relaxed) == 0
-    }
-
-    /// Get number of threads in queue
-    fn len(&self) -> usize {
-        self.count.load(Ordering::Relaxed)
     }
 }
 
@@ -255,23 +217,6 @@ impl PerCpuScheduler {
         queue.dequeue()
     }
 
-    /// Peek at next thread without removing
-    fn peek(&self) -> Option<Tid> {
-        let queue = self.ready_queue.lock();
-        queue.peek()
-    }
-
-    /// Remove a thread from queue
-    fn remove(&self, tid: Tid) -> bool {
-        let mut queue = self.ready_queue.lock();
-        queue.remove(tid)
-    }
-
-    /// Check if queue is empty
-    fn is_empty(&self) -> bool {
-        let queue = self.ready_queue.lock();
-        queue.is_empty()
-    }
 
     /// Get queue length
     fn len(&self) -> usize {
@@ -296,6 +241,12 @@ impl PerCpuScheduler {
     /// Get current thread
     fn get_current(&self) -> Tid {
         self.current_thread.load(Ordering::Relaxed)
+    }
+
+    /// Remove a specific thread from the queue
+    fn remove(&self, tid: Tid) {
+        let mut queue = self.ready_queue.lock();
+        queue.remove(tid);
     }
 }
 
@@ -476,10 +427,8 @@ impl UnifiedScheduler {
 
             // Try to steal from this CPU
             if let Some(stolen_tid) = steal_scheduler.dequeue() {
-                // Steal successful, update stolen thread's CPU affinity
-                if let Some(mut metadata) = self.thread_metadata.lock().get_mut(&stolen_tid).copied() {
-                    metadata.last_cpu = Some(local_cpu_id);
-                }
+                // Steal successful - update stolen thread's CPU affinity if needed
+                // The thread will now run on the local CPU
                 local_scheduler.set_current(stolen_tid);
                 return Some(stolen_tid);
             }
@@ -514,21 +463,25 @@ impl UnifiedScheduler {
         let timestamp = crate::subsystems::time::get_ticks();
         let cpu_id = cpu::cpuid();
         let combined = timestamp.wrapping_mul(31).wrapping_add(cpu_id as u64);
-        (combined as u32)
+        combined as u32
     }
 
     /// Set thread state
     pub fn set_thread_state(&self, tid: Tid, state: ThreadState) -> Result<(), &'static str> {
         let mut table = self.thread_metadata.lock();
         let metadata = table.get_mut(&tid).ok_or("Thread not found")?;
-        
-        let old_state = metadata.state;
+
+        let _old_state = metadata.state;
+        let priority = metadata.priority;
         metadata.state = state;
+
+        // Drop the table lock before calling other methods
+        drop(table);
 
         match state {
             ThreadState::Runnable => {
                 // Add to ready queue
-                self.enqueue_thread(tid, metadata.priority);
+                self.enqueue_thread(tid, priority);
             }
             ThreadState::Blocked | ThreadState::Zombie => {
                 // Remove from all queues
@@ -546,19 +499,23 @@ impl UnifiedScheduler {
     pub fn set_priority(&self, tid: Tid, priority: u8) -> Result<(), &'static str> {
         let mut table = self.thread_metadata.lock();
         let metadata = table.get_mut(&tid).ok_or("Thread not found")?;
-        
-        let old_priority = metadata.priority;
+
+        let _old_priority = metadata.priority;
         metadata.priority = priority.min(MAX_PRIORITY);
 
         // Re-enqueue with new priority if thread is runnable
-        if metadata.state == ThreadState::Runnable {
-            drop(table);
+        let is_runnable = metadata.state == ThreadState::Runnable;
+        let new_priority = metadata.priority;
+
+        drop(table);
+
+        if is_runnable {
             // Remove from old position
             for scheduler in &self.per_cpu_schedulers {
                 scheduler.remove(tid);
             }
             // Add with new priority
-            self.enqueue_thread(tid, metadata.priority);
+            self.enqueue_thread(tid, new_priority);
         }
 
         Ok(())

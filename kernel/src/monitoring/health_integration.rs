@@ -6,14 +6,13 @@
 
 extern crate alloc;
 
-use alloc::{format, string::String};
+use alloc::format;
 
 use crate::{
     monitoring::health::{HealthCheckResult, HealthChecker, HealthStatus, get_health_checker},
     reliability::graceful_degradation::{
         GracefulDegradationManager, create_graceful_degradation_manager,
     },
-    subsystems::sync::Mutex,
 };
 
 /// Health monitoring integration manager
@@ -21,7 +20,7 @@ pub struct HealthIntegrationManager {
     /// Health checker reference
     health_checker: &'static HealthChecker,
     /// Graceful degradation manager
-    degradation_manager: alloc::sync::Arc<Mutex<GracefulDegradationManager>>,
+    degradation_manager: alloc::sync::Arc<spin::Mutex<GracefulDegradationManager>>,
     /// Integration enabled flag
     enabled: bool,
     /// Last health check time
@@ -212,7 +211,7 @@ impl HealthIntegrationManager {
 
     /// Check if system can recover from degradation
     fn check_recovery(&self) -> Result<(), i32> {
-        let mut manager = self.degradation_manager.lock();
+        let _manager = self.degradation_manager.lock();
 
         // Check active degradations and attempt recovery
         // This is a simplified implementation - in production, this would
@@ -223,7 +222,7 @@ impl HealthIntegrationManager {
 }
 
 /// Global health integration manager instance
-static HEALTH_INTEGRATION_MANAGER: Mutex<Option<HealthIntegrationManager>> = Mutex::new(None);
+static HEALTH_INTEGRATION_MANAGER: spin::Mutex<Option<HealthIntegrationManager>> = spin::Mutex::new(None);
 
 /// Initialize health integration
 pub fn init_health_integration() -> Result<(), i32> {
@@ -236,22 +235,22 @@ pub fn init_health_integration() -> Result<(), i32> {
 }
 
 /// Get health integration manager
-pub fn get_health_integration_manager() -> Option<&'static Mutex<HealthIntegrationManager>> {
-    unsafe {
-        // This is safe because we only access it after initialization
-        if HEALTH_INTEGRATION_MANAGER.lock().is_some() {
-            Some(&HEALTH_INTEGRATION_MANAGER)
-        } else {
-            None
-        }
-    }
+pub fn get_health_integration_manager() -> Option<&'static spin::Mutex<Option<HealthIntegrationManager>>> {
+    Some(&HEALTH_INTEGRATION_MANAGER)
 }
 
 /// Check health and react (convenience function)
 pub fn check_health_and_react() -> Result<(), i32> {
     if let Some(manager_mutex) = get_health_integration_manager() {
-        let mut manager = manager_mutex.lock();
-        manager.check_and_react()
+        let mut manager_opt = manager_mutex.lock();
+        if let Some(ref mut manager) = *manager_opt {
+            manager.check_and_react()
+        } else {
+            // Integration not initialized, just run health check
+            let checker = get_health_checker();
+            let _ = checker.check_health();
+            Ok(())
+        }
     } else {
         // Integration not initialized, just run health check
         let checker = get_health_checker();
@@ -268,14 +267,16 @@ pub fn trigger_degradation_from_error_handling(
     message: &str,
 ) -> Result<(), i32> {
     if let Some(manager_mutex) = get_health_integration_manager() {
-        let manager = manager_mutex.lock();
-        manager.trigger_component_degradation(component, severity)?;
-        crate::println!(
-            "[health-integration] Triggered degradation from error-handling: {} - {} ({})",
-            component,
-            message,
-            severity
-        );
+        let manager_opt = manager_mutex.lock();
+        if let Some(ref manager) = *manager_opt {
+            manager.trigger_component_degradation(component, severity)?;
+            crate::println!(
+                "[health-integration] Triggered degradation from error-handling: {} - {} ({})",
+                component,
+                message,
+                severity
+            );
+        }
         Ok(())
     } else {
         crate::println!(

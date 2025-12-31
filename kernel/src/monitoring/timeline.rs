@@ -130,7 +130,7 @@ pub fn summary_json() -> String {
                 ("fs_init_ms", "drivers_init", "fs_init"),
                 ("services_init_ms", "fs_init", "services_init"),
             ];
-            for (i, (name, a, b)) in stages.iter().enumerate() {
+            for (name, a, b) in stages.iter() {
                 let val = ms(dur(get(a), get(b)));
                 s.push_str(&alloc::format!("  \"{}\": {}", name, val));
                 s.push_str(",\n");

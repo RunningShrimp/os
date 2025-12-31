@@ -6,10 +6,9 @@
 //! and fine-grained permission checking.
 
 extern crate alloc;
-use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use alloc::{collections::BTreeMap, string::{String, ToString}, vec::Vec};
 
 use core::sync::atomic::{AtomicU32, Ordering};
-use crate::subsystems::process::{Process, ProcessId};
 
 /// Permission bits (POSIX-compatible)
 pub const PERM_READ: u16 = 0o400; // Owner read
@@ -137,7 +136,7 @@ impl AccessControlList {
     pub fn check_permissions(
         &self,
         uid: u32,
-        gid: u32,
+        _gid: u32,
         groups: &[u32],
         required_perms: u16,
     ) -> bool {
@@ -532,7 +531,7 @@ pub struct GroupInfo {
 }
 
 /// Permission statistics
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct PermissionStats {
     /// Total permission checks
     pub total_checks: u64,
@@ -706,9 +705,9 @@ impl PermissionManager {
         // Get current process information
         let current_process = crate::subsystems::process::get_current_process();
         let (uid, gid, groups) = if let Some(process) = current_process {
-            let process_info = process.lock();
-            let groups = self.get_user_groups(process_info.uid);
-            (process_info.uid, process_info.gid, groups)
+            let _process_info = process.lock();
+            let groups = self.get_user_groups(crate::process::getuid());
+            (crate::process::getuid(), crate::process::getgid(), groups)
         } else {
             // Default to root if no current process
             (ROOT_UID, ROOT_GID, Vec::new())
@@ -735,7 +734,8 @@ impl PermissionManager {
 
     /// Get permission statistics
     pub fn get_stats(&self) -> PermissionStats {
-        self.stats.lock().clone()
+        let stats_guard = self.stats.lock();
+        (*stats_guard).clone()
     }
 }
 
@@ -794,11 +794,10 @@ pub fn can_delete_file(perms: &FilePermissions, parent_perms: &FilePermissions) 
     }
 
     // Owner can delete their own files
-    if let Some(pm) = get_permission_manager() {
+    if let Some(_pm) = get_permission_manager() {
         let current_process = crate::subsystems::process::get_current_process();
-        if let Some(process) = current_process {
-            let process_info = process.lock();
-            if process_info.uid == perms.uid || process_info.uid == ROOT_UID {
+        if let Some(_process) = current_process {
+            if crate::process::getuid() == perms.uid || crate::process::getuid() == ROOT_UID {
                 return true;
             }
         }

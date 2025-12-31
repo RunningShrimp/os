@@ -5,7 +5,7 @@
 //! from its implementation, helping to break circular dependencies
 //! between modules.
 
-use alloc::{string::String, vec::Vec};
+use alloc::{string::{String, ToString}, vec::Vec};
 
 use crate::{
     error::{
@@ -684,14 +684,30 @@ impl IntoFrameworkError for ProcessError {
             },
             ProcessError::InvalidArguments => UnifiedError::InvalidArgument.into_framework_error(),
             ProcessError::OutOfMemory => UnifiedError::OutOfMemory.into_framework_error(),
-            ProcessError::NotSupported => UnifiedError::NotSupported.into_framework_error(),
+            ProcessError::NotSupported => {
+                UnifiedError::Other("Operation not supported".to_string()).into_framework_error()
+            },
             ProcessError::ProcessExists => UnifiedError::AlreadyExists.into_framework_error(),
             ProcessError::NotChild => UnifiedError::InvalidArgument.into_framework_error(),
-            ProcessError::AlreadyRunning => UnifiedError::InvalidState.into_framework_error(),
-            ProcessError::NotRunning => UnifiedError::InvalidState.into_framework_error(),
-            ProcessError::NotStopped => UnifiedError::InvalidState.into_framework_error(),
-            ProcessError::NotZombie => UnifiedError::InvalidState.into_framework_error(),
-            ProcessError::Unknown => UnifiedError::Unknown.into_framework_error(),
+            ProcessError::AlreadyRunning => {
+                UnifiedError::Other("Invalid state: process is already running".to_string())
+                    .into_framework_error()
+            },
+            ProcessError::NotRunning => {
+                UnifiedError::Other("Invalid state: process is not running".to_string())
+                    .into_framework_error()
+            },
+            ProcessError::NotStopped => {
+                UnifiedError::Other("Invalid state: process is not stopped".to_string())
+                    .into_framework_error()
+            },
+            ProcessError::NotZombie => {
+                UnifiedError::Other("Invalid state: process is not zombie".to_string())
+                    .into_framework_error()
+            },
+            ProcessError::Unknown => {
+                UnifiedError::Other("Unknown process error".to_string()).into_framework_error()
+            },
         }
     }
 
@@ -712,19 +728,33 @@ impl IntoFrameworkError for ProcessError {
             },
             ProcessError::OutOfMemory => UnifiedError::OutOfMemory.with_context(context, location),
             ProcessError::NotSupported => {
-                UnifiedError::NotSupported.with_context(context, location)
+                UnifiedError::Other("Operation not supported".to_string())
+                    .with_context(context, location)
             },
             ProcessError::ProcessExists => {
                 UnifiedError::AlreadyExists.with_context(context, location)
             },
             ProcessError::NotChild => UnifiedError::InvalidArgument.with_context(context, location),
             ProcessError::AlreadyRunning => {
-                UnifiedError::InvalidState.with_context(context, location)
+                UnifiedError::Other("Invalid state: process is already running".to_string())
+                    .with_context(context, location)
             },
-            ProcessError::NotRunning => UnifiedError::InvalidState.with_context(context, location),
-            ProcessError::NotStopped => UnifiedError::InvalidState.with_context(context, location),
-            ProcessError::NotZombie => UnifiedError::InvalidState.with_context(context, location),
-            ProcessError::Unknown => UnifiedError::Unknown.with_context(context, location),
+            ProcessError::NotRunning => {
+                UnifiedError::Other("Invalid state: process is not running".to_string())
+                    .with_context(context, location)
+            },
+            ProcessError::NotStopped => {
+                UnifiedError::Other("Invalid state: process is not stopped".to_string())
+                    .with_context(context, location)
+            },
+            ProcessError::NotZombie => {
+                UnifiedError::Other("Invalid state: process is not zombie".to_string())
+                    .with_context(context, location)
+            },
+            ProcessError::Unknown => {
+                UnifiedError::Other("Unknown process error".to_string())
+                    .with_context(context, location)
+            },
         }
     }
 }
@@ -740,14 +770,30 @@ impl IntoFrameworkError for ThreadError {
             },
             ThreadError::InvalidArguments => UnifiedError::InvalidArgument.into_framework_error(),
             ThreadError::OutOfMemory => UnifiedError::OutOfMemory.into_framework_error(),
-            ThreadError::NotSupported => UnifiedError::NotSupported.into_framework_error(),
+            ThreadError::NotSupported => {
+                UnifiedError::Other("Operation not supported".to_string()).into_framework_error()
+            },
             ThreadError::ThreadExists => UnifiedError::AlreadyExists.into_framework_error(),
             ThreadError::NotChild => UnifiedError::InvalidArgument.into_framework_error(),
-            ThreadError::AlreadyRunning => UnifiedError::InvalidState.into_framework_error(),
-            ThreadError::NotRunning => UnifiedError::InvalidState.into_framework_error(),
-            ThreadError::NotStopped => UnifiedError::InvalidState.into_framework_error(),
-            ThreadError::NotZombie => UnifiedError::InvalidState.into_framework_error(),
-            ThreadError::Unknown => UnifiedError::Unknown.into_framework_error(),
+            ThreadError::AlreadyRunning => {
+                UnifiedError::Other("Invalid state: thread is already running".to_string())
+                    .into_framework_error()
+            },
+            ThreadError::NotRunning => {
+                UnifiedError::Other("Invalid state: thread is not running".to_string())
+                    .into_framework_error()
+            },
+            ThreadError::NotStopped => {
+                UnifiedError::Other("Invalid state: thread is not stopped".to_string())
+                    .into_framework_error()
+            },
+            ThreadError::NotZombie => {
+                UnifiedError::Other("Invalid state: thread is not zombie".to_string())
+                    .into_framework_error()
+            },
+            ThreadError::Unknown => {
+                UnifiedError::Other("Unknown thread error".to_string()).into_framework_error()
+            },
         }
     }
 
@@ -767,18 +813,34 @@ impl IntoFrameworkError for ThreadError {
                 UnifiedError::InvalidArgument.with_context(context, location)
             },
             ThreadError::OutOfMemory => UnifiedError::OutOfMemory.with_context(context, location),
-            ThreadError::NotSupported => UnifiedError::NotSupported.with_context(context, location),
+            ThreadError::NotSupported => {
+                UnifiedError::Other("Operation not supported".to_string())
+                    .with_context(context, location)
+            },
             ThreadError::ThreadExists => {
                 UnifiedError::AlreadyExists.with_context(context, location)
             },
             ThreadError::NotChild => UnifiedError::InvalidArgument.with_context(context, location),
             ThreadError::AlreadyRunning => {
-                UnifiedError::InvalidState.with_context(context, location)
+                UnifiedError::Other("Invalid state: thread is already running".to_string())
+                    .with_context(context, location)
             },
-            ThreadError::NotRunning => UnifiedError::InvalidState.with_context(context, location),
-            ThreadError::NotStopped => UnifiedError::InvalidState.with_context(context, location),
-            ThreadError::NotZombie => UnifiedError::InvalidState.with_context(context, location),
-            ThreadError::Unknown => UnifiedError::Unknown.with_context(context, location),
+            ThreadError::NotRunning => {
+                UnifiedError::Other("Invalid state: thread is not running".to_string())
+                    .with_context(context, location)
+            },
+            ThreadError::NotStopped => {
+                UnifiedError::Other("Invalid state: thread is not stopped".to_string())
+                    .with_context(context, location)
+            },
+            ThreadError::NotZombie => {
+                UnifiedError::Other("Invalid state: thread is not zombie".to_string())
+                    .with_context(context, location)
+            },
+            ThreadError::Unknown => {
+                UnifiedError::Other("Unknown thread error".to_string())
+                    .with_context(context, location)
+            },
         }
     }
 }

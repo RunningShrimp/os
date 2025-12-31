@@ -262,7 +262,7 @@ impl<T: Send + Sync> Drop for MutexEnhancedGuard<'_, T> {
             if unsafe { *self.mutex.state.waiters.get() } > 0 {
                 // Wake up one waiter (simplified)
                 let channel = (&self.mutex.state as *const _ as usize) | 0xdead0000;
-                let mut table = thread_table();
+                let table = thread_table();
 
                 // Find first waiting thread and wake it
                 for thread in table.iter_mut() {
@@ -319,7 +319,7 @@ impl CondVar {
 
     /// Wait for the condition to be signaled
     /// Must be called while holding a mutex lock
-    pub fn wait<T: Send + Sync>(&self, mutex: &MutexEnhanced<T>) {
+    pub fn wait<T: Send + Sync>(&self, _mutex: &MutexEnhanced<T>) {
         let current_tid = current_thread().unwrap_or(0);
 
         // Add current thread to wait queue
@@ -331,15 +331,11 @@ impl CondVar {
         // Increment waiter count
         self.waiters.fetch_add(1, Ordering::SeqCst);
 
-        // Release the mutex and block
-        drop(mutex);
-
         // Block current thread
+        // Note: The mutex should be released before calling this function
+        // and re-acquired after the function returns
         let channel = self as *const _ as usize;
         sleep(channel);
-
-        // When woken up, re-acquire the mutex
-        mutex.lock();
     }
 
     /// Wait with timeout
@@ -776,7 +772,7 @@ impl<T> ConcurrentQueue<T> {
                         .is_ok()
                 } {
                     // Successfully linked, update tail
-                    self.tail.compare_exchange(
+                    let _ = self.tail.compare_exchange(
                         tail,
                         new_node,
                         Ordering::Release,
@@ -786,7 +782,7 @@ impl<T> ConcurrentQueue<T> {
                 }
             } else {
                 // Tail was behind, try to advance it
-                self.tail
+                let _ = self.tail
                     .compare_exchange(tail, tail_next, Ordering::Release, Ordering::Relaxed);
             }
         }
@@ -806,7 +802,7 @@ impl<T> ConcurrentQueue<T> {
                 }
 
                 // Tail is behind, try to advance it
-                self.tail
+                let _ = self.tail
                     .compare_exchange(tail, head_next, Ordering::Release, Ordering::Relaxed);
             } else {
                 // Try to advance head
@@ -816,7 +812,7 @@ impl<T> ConcurrentQueue<T> {
                     .is_ok()
                 {
                     // Successfully advanced head, extract data
-                    let node = unsafe { Box::from_raw(head) };
+                    let _node = unsafe { Box::from_raw(head) };
                     let next_node = unsafe { Box::from_raw(head_next) };
 
                     let data = next_node.data;

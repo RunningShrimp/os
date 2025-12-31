@@ -8,9 +8,10 @@
 extern crate alloc;
 
 use alloc::collections::BTreeSet;
-use alloc::sync::Arc;
+use alloc::string::ToString;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+use crate::prelude::*;
 use crate::subsystems::sync::Mutex;
 
 /// 内存锁定管理器
@@ -45,13 +46,13 @@ impl MemoryLockManager {
     ///
     /// # 返回
     /// 成功时返回Ok(()),失败时返回错误
-    pub fn lock_pages(&self, pages: &[usize]) -> Result<(), MemoryLockError> {
+    pub fn lock_pages(&self, pages: &[usize]) -> Result<()> {
         let current_count = self.locked_count.load(Ordering::Acquire);
         let max_count = self.max_locked_pages.load(Ordering::Acquire);
 
         // 检查是否超过限制
         if current_count + pages.len() > max_count {
-            return Err(MemoryLockError::ExceededLimit);
+            return Err(UnifiedError::Other("Exceeded locked memory limit".to_string()));
         }
 
         // 检查页是否已锁定
@@ -59,7 +60,7 @@ impl MemoryLockManager {
             let locked = self.locked_pages.lock();
             for &page in pages {
                 if locked.contains(&page) {
-                    return Err(MemoryLockError::AlreadyLocked);
+                    return Err(UnifiedError::Other("Page already locked".to_string()));
                 }
             }
         }
@@ -88,13 +89,13 @@ impl MemoryLockManager {
     ///
     /// # 返回
     /// 成功时返回Ok(()),失败时返回错误
-    pub fn unlock_pages(&self, pages: &[usize]) -> Result<(), MemoryLockError> {
+    pub fn unlock_pages(&self, pages: &[usize]) -> Result<()> {
         // 检查页是否已锁定
         {
             let locked = self.locked_pages.lock();
             for &page in pages {
                 if !locked.contains(&page) {
-                    return Err(MemoryLockError::NotLocked);
+                    return Err(UnifiedError::Other("Page not locked".to_string()));
                 }
             }
         }
@@ -148,7 +149,7 @@ impl MemoryLockManager {
     /// 解锁所有页
     pub fn unlock_all(&self) {
         let mut locked = self.locked_pages.lock();
-        let count = locked.len();
+        let _count = locked.len();
         locked.clear();
         self.locked_count.store(0, Ordering::Release);
 
@@ -198,7 +199,9 @@ impl core::fmt::Display for MemoryLockError {
 impl core::error::Error for MemoryLockError {}
 
 /// 全局内存锁定管理器
-static MEMORY_LOCK_MANAGER: MemoryLockManager = MemoryLockManager::new();
+static MEMORY_LOCK_MANAGER: Lazy<MemoryLockManager> = Lazy::new(|| {
+    MemoryLockManager::new()
+});
 
 /// 获取全局内存锁定管理器
 pub fn memory_lock_manager() -> &'static MemoryLockManager {
@@ -243,7 +246,7 @@ impl AddressSpaceLock {
     ///
     /// # 返回
     /// 成功时返回Ok(()),失败时返回错误
-    pub fn lock(&self, flags: AddressSpaceLockFlags) -> Result<(), MemoryLockError> {
+    pub fn lock(&self, flags: AddressSpaceLockFlags) -> Result<()> {
         // TODO: 实现地址空间锁定
         // 1. 如果current=true，锁定所有当前映射的页
         // 2. 如果future=true，标记所有未来的映射都应该被锁定
@@ -261,7 +264,7 @@ impl AddressSpaceLock {
     ///
     /// # 返回
     /// 成功时返回Ok(()),失败时返回错误
-    pub fn unlock(&self) -> Result<(), MemoryLockError> {
+    pub fn unlock(&self) -> Result<()> {
         // TODO: 实现地址空间解锁
         // 解锁所有被锁定的页
 
@@ -340,7 +343,7 @@ mod tests {
 
         // 第二次锁定应该失败
         let result = manager.lock_pages(&pages);
-        assert!(matches!(result, Err(MemoryLockError::AlreadyLocked)));
+        assert!(matches!(result, Err(UnifiedError::Other(_))));
     }
 
     #[test]
@@ -350,7 +353,7 @@ mod tests {
 
         // 解锁未锁定的页应该失败
         let result = manager.unlock_pages(&pages);
-        assert!(matches!(result, Err(MemoryLockError::NotLocked)));
+        assert!(matches!(result, Err(UnifiedError::Other(_))));
     }
 
     #[test]

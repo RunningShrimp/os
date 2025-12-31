@@ -21,18 +21,16 @@
 //! - **Batch Processing**: Multiple operations can be processed together
 //! - **Completion Notifications**: Supports both signal and callback notifications
 
-extern crate alloc;
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
+use hashbrown::HashMap;
 use core::sync::atomic::{AtomicU64, Ordering};
+use alloc::vec::Vec;
 
 use super::common::{SyscallResult, extract_args};
 use crate::api::SyscallError;
 use crate::fs::file::FILE_TABLE;
 use crate::process::{myproc, NOFILE};
-use crate::posix::{off_t, aiocb, AioOffsetT, aio_reqprio_t, aio_sigevent_t, AIO_CANCELED, AIO_NOTCANCELED, AIO_ALLDONE, LIO_READ, LIO_WRITE, SIGEV_SIGNAL};
+use crate::subsystems::posix::{aiocb, AIO_CANCELED, AIO_NOTCANCELED, AIO_ALLDONE, LIO_READ, LIO_WRITE, SIGEV_SIGNAL};
 use crate::subsystems::sync::Mutex;
-use crate::subsystems::mm::vm;
 
 // ============================================================================
 // Constants and Types
@@ -81,6 +79,8 @@ pub struct AioControlBlock {
     pub queue_time: u64,
     /// Timestamp when operation completed
     pub completion_time: Option<u64>,
+    /// List operation ID if this is part of a list I/O operation
+    pub list_operation_id: Option<usize>,
 }
 
 // Safe because access is protected by a Mutex
@@ -136,10 +136,12 @@ impl AioStats {
 // ============================================================================
 
 /// Global AIO operation table
-static AIO_OPERATIONS: Mutex<BTreeMap<usize, AioControlBlock>> = Mutex::new(BTreeMap::new());
+static AIO_OPERATIONS: Mutex<Option<HashMap<usize, AioControlBlock>>> = Mutex::new(None);
 
 /// Next AIO operation ID
 static NEXT_AIO_ID: AtomicU64 = AtomicU64::new(1);
+
+// AtomicU64 already implements Clone, no need for custom implementation
 
 /// AIO statistics
 static AIO_STATS: Mutex<AioStats> = Mutex::new(AioStats::new());
@@ -151,10 +153,14 @@ static AIO_STATS: Mutex<AioStats> = Mutex::new(AioStats::new());
 /// Initialize AIO subsystem
 pub fn init() -> Result<(), i32> {
     crate::println!("[aio] Initialized AIO subsystem");
-    
+
+    // Initialize the operations table
+    let mut operations = AIO_OPERATIONS.lock();
+    *operations = Some(HashMap::new());
+
     // Start AIO worker threads
     start_aio_workers();
-    
+
     Ok(())
 }
 
@@ -202,31 +208,33 @@ unsafe extern "C" fn aio_worker_main(arg: *mut u8) -> *mut u8 {
 /// Find a pending AIO operation to process
 fn find_pending_operation() -> Option<usize> {
     let operations = AIO_OPERATIONS.lock();
-    
+    let operations = operations.as_ref()?;
+
     for (&id, op) in operations.iter() {
         if op.status == AioStatus::InProgress && op.worker_tid.is_none() {
             return Some(id);
         }
     }
-    
+
     None
 }
 
 /// Process an AIO operation
 fn process_aio_operation(operation_id: usize, worker_id: usize) {
     let start_time = crate::subsystems::time::get_time_ns();
-    
+
     // Get operation details
-    let (user_aiocb, operation, fd, file_idx) = {
+    let (user_aiocb, operation, _fd, file_idx) = {
         let mut operations = AIO_OPERATIONS.lock();
+        let operations = operations.as_mut().unwrap();
         let op = match operations.get_mut(&operation_id) {
             Some(op) => op,
             None => return,
         };
-        
+
         // Assign this worker to the operation
         op.worker_tid = Some(worker_id);
-        
+
         (op.user_aiocb, op.operation, op.fd, op.file_idx)
     };
     
@@ -246,11 +254,12 @@ fn process_aio_operation(operation_id: usize, worker_id: usize) {
     // Update operation status
     {
         let mut operations = AIO_OPERATIONS.lock();
+        let operations = operations.as_mut().unwrap();
         let op = match operations.get_mut(&operation_id) {
             Some(op) => op,
             None => return,
         };
-        
+
         op.status = if error_code == 0 {
             AioStatus::Completed
         } else {
@@ -259,7 +268,7 @@ fn process_aio_operation(operation_id: usize, worker_id: usize) {
         op.error_code = error_code;
         op.bytes_transferred = result;
         op.completion_time = Some(end_time);
-        
+
         // Update user aiocb
         unsafe {
             (*user_aiocb).__return_value = result;
@@ -275,7 +284,7 @@ fn process_aio_operation(operation_id: usize, worker_id: usize) {
         } else {
             stats.total_errors += 1;
         }
-        
+
         let queue_time = end_time - start_time;
         stats.update_averages(queue_time, queue_time); // Simplified for now
     }
@@ -293,21 +302,21 @@ fn execute_aio_read(aiocb_ptr: *mut aiocb, file_idx: usize) -> (isize, i32) {
     
     // Validate buffer pointer
     if buf_ptr.is_null() {
-        return (-1, crate::reliability::errno::EFAULT);
+        return (-1 as isize, crate::reliability::errno::EFAULT);
     }
     
     // Get file reference and perform operations while holding the table lock
     let mut file_table = FILE_TABLE.lock();
     let file = match file_table.get_mut(file_idx) {
         Some(f) => f,
-        None => return (-1, crate::reliability::errno::EBADF),
+        None => return (-1 as isize, crate::reliability::errno::EBADF),
     };
     
     // Seek to offset if specified
     if offset >= 0 {
         let seek_result = file.seek(offset as usize);
         if seek_result < 0 {
-            return (-1, -seek_result as i32);
+            return (-1 as isize, -seek_result as i32);
         }
     }
     
@@ -319,7 +328,7 @@ fn execute_aio_read(aiocb_ptr: *mut aiocb, file_idx: usize) -> (isize, i32) {
     };
     
     if read_result < 0 {
-        (-1, -read_result as i32)
+        (-1 as isize, -read_result as i32)
     } else {
         (read_result, 0)
     }
@@ -334,21 +343,21 @@ fn execute_aio_write(aiocb_ptr: *mut aiocb, file_idx: usize) -> (isize, i32) {
     
     // Validate buffer pointer
     if buf_ptr.is_null() {
-        return (-1, crate::reliability::errno::EFAULT);
+        return (-1 as isize, crate::reliability::errno::EFAULT);
     }
     
     // Get file reference and perform operations while holding the table lock
     let mut file_table = FILE_TABLE.lock();
     let file = match file_table.get_mut(file_idx) {
         Some(f) => f,
-        None => return (-1, crate::reliability::errno::EBADF),
+        None => return (-1 as isize, crate::reliability::errno::EBADF),
     };
     
     // Seek to offset if specified
     if offset >= 0 {
         let seek_result = file.seek(offset as usize);
         if seek_result < 0 {
-            return (-1, -seek_result as i32);
+            return (-1 as isize, -seek_result as i32);
         }
     }
     
@@ -360,7 +369,7 @@ fn execute_aio_write(aiocb_ptr: *mut aiocb, file_idx: usize) -> (isize, i32) {
     };
     
     if write_result < 0 {
-        (-1, -write_result as i32)
+        (-1 as isize, -write_result as i32)
     } else {
         (write_result, 0)
     
@@ -368,21 +377,21 @@ fn execute_aio_write(aiocb_ptr: *mut aiocb, file_idx: usize) -> (isize, i32) {
 }
 /// Execute asynchronous fsync operation
 fn execute_aio_fsync(aiocb_ptr: *mut aiocb, file_idx: usize) -> (isize, i32) {
-    let mode = unsafe {
+    let _mode = unsafe {
         let aiocb = &*aiocb_ptr;
         aiocb.aio_fsync_mode
     };
-    
+
     // Get file reference and perform operations while holding the table lock
     let mut file_table = FILE_TABLE.lock();
-    let file = match file_table.get_mut(file_idx) {
+    let _file = match file_table.get_mut(file_idx) {
         Some(f) => f,
-        None => return (-1, crate::reliability::errno::EBADF),
+        None => return (-1 as isize, crate::reliability::errno::EBADF),
     };
-    
+
     // Perform fsync operation (fix: assume fsync returns 0 on success, -1 on error)
     // Note: We're assuming fsync returns 0 on success for now
-    (0, 0)
+    (0 as isize, 0)
 }
 
 /// Send completion notification if requested
@@ -391,15 +400,17 @@ fn send_completion_notification(aiocb_ptr: *mut aiocb) {
         let aiocb = &*aiocb_ptr;
         aiocb.aio_sigevent
     };
-    
+
     // For now, we'll just implement signal notification
     // In a full implementation, we'd also support thread notification
     if sigevent.sigev_notify == SIGEV_SIGNAL { // SIGEV_SIGNAL
-        let signal = sigevent.sigev_signo;
-        let pid = myproc().unwrap_or(0);
-        
-        // Send signal to process using kill_process function
-        let _ = crate::syscalls::signal::kill_process(pid as usize, signal as i32);
+        let _signal = sigevent.sigev_signo;
+        let _pid = myproc().unwrap_or(0);
+
+        // TODO: Implement signal sending to process
+        // For now, this is a stub - signal notification will be implemented later
+        // when the signal subsystem is fully integrated
+        crate::log_debug!("[aio] Signal notification requested but not yet implemented");
     }
 }
 
@@ -421,17 +432,17 @@ pub fn dispatch(syscall_id: u32, args: &[u64]) -> SyscallResult<i64> {
 /// Arguments: [aiocb_ptr]
 /// Returns: 0 on success, -1 on error
 fn sys_aio_read(args: &[u64]) -> SyscallResult<i64> {
-    let args = extract_args(args, 1)?;
-    
+    let args = extract_args(args, 1, 1);
+
     let aiocb_ptr = args[0] as *mut aiocb;
-    
+
     // Validate aiocb pointer
     if aiocb_ptr.is_null() {
         return Err(SyscallError::BadAddress);
     }
-    
+
     // Get current process
-    let pid = myproc().ok_or(SyscallError::InvalidArgument)?;
+    let pid = myproc().ok_or(SyscallError::InvalidArgument)? as usize;
     
     // Queue AIO read operation
     match queue_aio_operation(aiocb_ptr, AioOperation::Read, pid) {
@@ -444,17 +455,17 @@ fn sys_aio_read(args: &[u64]) -> SyscallResult<i64> {
 /// Arguments: [aiocb_ptr]
 /// Returns: 0 on success, -1 on error
 fn sys_aio_write(args: &[u64]) -> SyscallResult<i64> {
-    let args = extract_args(args, 1)?;
-    
+    let args = extract_args(args, 1, 1);
+
     let aiocb_ptr = args[0] as *mut aiocb;
-    
+
     // Validate aiocb pointer
     if aiocb_ptr.is_null() {
         return Err(SyscallError::BadAddress);
     }
-    
+
     // Get current process
-    let pid = myproc().ok_or(SyscallError::InvalidArgument)?;
+    let pid = myproc().ok_or(SyscallError::InvalidArgument)? as usize;
     
     // Queue AIO write operation
     match queue_aio_operation(aiocb_ptr, AioOperation::Write, pid) {
@@ -467,7 +478,7 @@ fn sys_aio_write(args: &[u64]) -> SyscallResult<i64> {
 /// Arguments: [mode, aiocb_ptr]
 /// Returns: 0 on success, -1 on error
 fn sys_aio_fsync(args: &[u64]) -> SyscallResult<i64> {
-    let args = extract_args(args, 2)?;
+    let args = extract_args(args, 0, 2);
     
     let mode = args[0] as i32;
     let aiocb_ptr = args[1] as *mut aiocb;
@@ -486,9 +497,9 @@ fn sys_aio_fsync(args: &[u64]) -> SyscallResult<i64> {
     unsafe {
         (*aiocb_ptr).aio_fsync_mode = mode;
     }
-    
+
     // Get current process
-    let pid = myproc().ok_or(SyscallError::InvalidArgument)?;
+    let pid = myproc().ok_or(SyscallError::InvalidArgument)? as usize;
     
     // Queue AIO fsync operation
     match queue_aio_operation(aiocb_ptr, AioOperation::Fsync, pid) {
@@ -501,7 +512,7 @@ fn sys_aio_fsync(args: &[u64]) -> SyscallResult<i64> {
 /// Arguments: [aiocb_ptr]
 /// Returns: Return value of operation, or -1 on error
 fn sys_aio_return(args: &[u64]) -> SyscallResult<i64> {
-    let args = extract_args(args, 1)?;
+    let args = extract_args(args, 0, 1);
     
     let aiocb_ptr = args[0] as *mut aiocb;
     
@@ -517,22 +528,27 @@ fn sys_aio_return(args: &[u64]) -> SyscallResult<i64> {
     };
     
     // Get operation result
-    let (status, bytes_transferred, error_code) = {
+    let (status, bytes_transferred, _error_code) = {
         let operations = AIO_OPERATIONS.lock();
+        let operations = operations.as_ref().unwrap();
         let op = operations.get(&operation_id).ok_or(SyscallError::InvalidArgument)?;
-        
+
         (op.status, op.bytes_transferred, op.error_code)
     };
     
     match status {
         AioStatus::Completed => {
             // Remove operation from table and return result
-            AIO_OPERATIONS.lock().remove(&operation_id);
-            Ok(bytes_transferred as u64)
+            let mut operations = AIO_OPERATIONS.lock();
+            let operations = operations.as_mut().unwrap();
+            operations.remove(&operation_id);
+            Ok(bytes_transferred as i64)
         }
         AioStatus::Error => {
             // Remove operation from table and set errno
-            AIO_OPERATIONS.lock().remove(&operation_id);
+            let mut operations = AIO_OPERATIONS.lock();
+            let operations = operations.as_mut().unwrap();
+            operations.remove(&operation_id);
             Err(SyscallError::IoError) // Caller should check error_code in aiocb
         }
         AioStatus::InProgress => {
@@ -541,7 +557,9 @@ fn sys_aio_return(args: &[u64]) -> SyscallResult<i64> {
         }
         AioStatus::Cancelled => {
             // Operation was cancelled
-            AIO_OPERATIONS.lock().remove(&operation_id);
+            let mut operations = AIO_OPERATIONS.lock();
+            let operations = operations.as_mut().unwrap();
+            operations.remove(&operation_id);
             Err(SyscallError::IoError) // Temporary fix until we have proper cancellation error
         }
     }
@@ -551,7 +569,7 @@ fn sys_aio_return(args: &[u64]) -> SyscallResult<i64> {
 /// Arguments: [aiocb_ptr]
 /// Returns: 0 if completed, EINPROGRESS if in progress, error code otherwise
 fn sys_aio_error(args: &[u64]) -> SyscallResult<i64> {
-    let args = extract_args(args, 1)?;
+    let args = extract_args(args, 0, 1);
     
     let aiocb_ptr = args[0] as *mut aiocb;
     
@@ -569,16 +587,17 @@ fn sys_aio_error(args: &[u64]) -> SyscallResult<i64> {
     // Get operation status
     let (status, error_code) = {
         let operations = AIO_OPERATIONS.lock();
+        let operations = operations.as_ref().unwrap();
         let op = operations.get(&operation_id).ok_or(SyscallError::InvalidArgument)?;
-        
+
         (op.status, op.error_code)
     };
     
     match status {
         AioStatus::Completed => Ok(0),
-        AioStatus::Error => Ok(error_code as u64),
-        AioStatus::InProgress => Ok(crate::reliability::errno::EINPROGRESS as u64),
-        AioStatus::Cancelled => Ok(crate::reliability::errno::ECANCELED as u64),
+        AioStatus::Error => Ok(error_code as i64),
+        AioStatus::InProgress => Ok(crate::reliability::errno::EINPROGRESS as i64),
+        AioStatus::Cancelled => Ok(crate::reliability::errno::ECANCELED as i64),
     }
 }
 
@@ -586,13 +605,13 @@ fn sys_aio_error(args: &[u64]) -> SyscallResult<i64> {
 /// Arguments: [fd, aiocb_ptr]
 /// Returns: AIO_CANCELED if cancelled, AIO_NOTCANCELED if not, AIO_ALLDONE if already done
 fn sys_aio_cancel(args: &[u64]) -> SyscallResult<i64> {
-    let args = extract_args(args, 2)?;
-    
+    let args = extract_args(args, 0, 2);
+
     let fd = args[0] as i32;
     let aiocb_ptr = args[1] as *mut aiocb;
-    
+
     // Get current process
-    let pid = myproc().ok_or(SyscallError::InvalidArgument)?;
+    let pid = myproc().ok_or(SyscallError::InvalidArgument)? as usize;
     
     if aiocb_ptr.is_null() {
         // Cancel all operations for this file descriptor
@@ -607,7 +626,7 @@ fn sys_aio_cancel(args: &[u64]) -> SyscallResult<i64> {
 /// Arguments: [mode, list_ptr, nent, aiocb_ptr]
 /// Returns: 0 on success, -1 on error
 fn sys_lio_listio(args: &[u64]) -> SyscallResult<i64> {
-    let args = extract_args(args, 4)?;
+    let args = extract_args(args, 0, 4);
     
     let mode = args[0] as i32;
     let list_ptr = args[1] as *const *mut aiocb;
@@ -625,7 +644,7 @@ fn sys_lio_listio(args: &[u64]) -> SyscallResult<i64> {
     }
     
     // Get current process
-    let pid = myproc().ok_or(SyscallError::InvalidArgument)?;
+    let pid = myproc().ok_or(SyscallError::InvalidArgument)? as usize;
     
     // Create a special list operation
     let list_operation_id = match create_list_operation(aiocb_ptr, mode, list_ptr, nent, pid) {
@@ -647,9 +666,9 @@ fn sys_lio_listio(args: &[u64]) -> SyscallResult<i64> {
 // ============================================================================
 
 /// Queue an AIO operation
-fn queue_aio_operation(aiocb_ptr: *mut aiocb, operation: AioOperation, pid: usize) -> Result<usize, i32> {
+fn queue_aio_operation(aiocb_ptr: *mut aiocb, operation: AioOperation, pid: usize) -> Result<usize, SyscallError> {
     // Get aiocb details
-    let (fd, offset, nbytes, reqprio) = unsafe {
+    let (fd, _offset, _nbytes, _reqprio) = unsafe {
         let aiocb = &*aiocb_ptr;
         (
             aiocb.aio_fildes,
@@ -658,23 +677,23 @@ fn queue_aio_operation(aiocb_ptr: *mut aiocb, operation: AioOperation, pid: usiz
             aiocb.aio_reqprio,
         )
     };
-    
+
     // Validate file descriptor
     if fd < 0 || (fd as usize) >= NOFILE {
-        return Err(crate::reliability::errno::EBADF);
+        return Err(SyscallError::InvalidArgument);
     }
-    
+
     // Get file table index from process
     let file_idx = {
         let proc_table = crate::process::PROC_TABLE.lock();
-        let proc = proc_table.find_ref(pid).ok_or(crate::reliability::errno::ESRCH)?;
-        
-        proc.ofile[fd as usize].ok_or(crate::reliability::errno::EBADF)?
+        let proc = proc_table.find_ref(pid as i32).ok_or_else(|| SyscallError::InvalidArgument)?;
+
+        proc.ofile[fd as usize].ok_or_else(|| SyscallError::InvalidArgument)?
     };
-    
+
     // Generate operation ID
     let operation_id = NEXT_AIO_ID.fetch_add(1, Ordering::SeqCst) as usize;
-    
+
     // Create AIO control block
     let aio_cb = AioControlBlock {
         user_aiocb: aiocb_ptr,
@@ -688,31 +707,31 @@ fn queue_aio_operation(aiocb_ptr: *mut aiocb, operation: AioOperation, pid: usiz
         worker_tid: None,
         queue_time: crate::subsystems::time::get_time_ns(),
         completion_time: None,
+        list_operation_id: None,  // Not part of a list operation
     };
-    
-    // Add to operations table
+
+    // Add to operations table and update statistics
     {
         let mut operations = AIO_OPERATIONS.lock();
+        let operations = operations.as_mut().unwrap();
         operations.insert(operation_id, aio_cb);
-    }
-    
-    // Update statistics
-    {
+
+        // Update statistics
         let mut stats = AIO_STATS.lock();
         stats.total_queued += 1;
-        
+
         // Update max concurrent operations
-        let current_concurrent = AIO_OPERATIONS.lock().len() as u32;
+        let current_concurrent = operations.len() as u32;
         if current_concurrent > stats.max_concurrent_ops {
             stats.max_concurrent_ops = current_concurrent;
         }
     }
-    
+
     Ok(operation_id)
 }
 
 /// Create a list operation
-fn create_list_operation(aiocb_ptr: *mut aiocb, mode: i32, list_ptr: *const *mut aiocb, nent: usize, pid: usize) -> Result<usize, i32> {
+fn create_list_operation(aiocb_ptr: *mut aiocb, _mode: i32, _list_ptr: *const *mut aiocb, _nent: usize, pid: usize) -> Result<usize, i32> {
     // Generate operation ID
     let operation_id = NEXT_AIO_ID.fetch_add(1, Ordering::SeqCst) as usize;
     
@@ -729,37 +748,41 @@ fn create_list_operation(aiocb_ptr: *mut aiocb, mode: i32, list_ptr: *const *mut
         worker_tid: None,
         queue_time: crate::subsystems::time::get_time_ns(),
         completion_time: None,
+        list_operation_id: None,  // This is the list operation itself
     };
     
     // Add to operations table
     {
         let mut operations = AIO_OPERATIONS.lock();
+        let operations = operations.as_mut().unwrap();
         operations.insert(operation_id, aio_cb);
     }
-    
+
     Ok(operation_id)
 }
 
 /// Find operation ID by aiocb pointer
 fn find_operation_by_aiocb(aiocb_ptr: *mut aiocb) -> Result<usize, i32> {
     let operations = AIO_OPERATIONS.lock();
-    
+    let operations = operations.as_ref().unwrap();
+
     for (&id, op) in operations.iter() {
         if op.user_aiocb == aiocb_ptr {
             return Ok(id);
         }
     }
-    
+
     Err(crate::reliability::errno::EINVAL)
 }
 
 /// Cancel all operations for a file descriptor
 fn cancel_all_operations_for_fd(fd: i32, pid: usize) -> SyscallResult<i64> {
-    let mut operations_to_cancel = Vec::new();
+    let mut operations_to_cancel = alloc::vec::Vec::new();
     
     // Find operations to cancel
     {
         let operations = AIO_OPERATIONS.lock();
+        let operations = operations.as_ref().unwrap();
         for (&id, op) in operations.iter() {
             if op.pid == pid && op.fd == fd && op.status == AioStatus::InProgress {
                 operations_to_cancel.push(id);
@@ -770,25 +793,25 @@ fn cancel_all_operations_for_fd(fd: i32, pid: usize) -> SyscallResult<i64> {
     // Cancel operations
     let mut cancelled_count = 0usize;
     let mut not_cancelled_count = 0usize;
-    let mut already_done_count = 0usize;
-    
+    let mut _already_done_count = 0usize;
+
     for operation_id in operations_to_cancel {
         let result = cancel_operation_internal(operation_id);
-        
+
         match result {
             Ok(_) => cancelled_count += 1,
             Err(crate::reliability::errno::EINPROGRESS) => not_cancelled_count += 1,
-            Err(_) => already_done_count += 1,
+            Err(_) => _already_done_count += 1,
         }
     }
     
     // Return appropriate status
     if cancelled_count > 0 {
-        Ok(AIO_CANCELED as u64)
+        Ok(AIO_CANCELED as i64)
     } else if not_cancelled_count > 0 {
-        Ok(AIO_NOTCANCELED as u64)
+        Ok(AIO_NOTCANCELED as i64)
     } else {
-        Ok(AIO_ALLDONE as u64)
+        Ok(AIO_ALLDONE as i64)
     }
 }
 
@@ -799,8 +822,9 @@ fn cancel_specific_operation(aiocb_ptr: *mut aiocb, pid: usize) -> SyscallResult
     // Check if operation belongs to this process
     {
         let operations = AIO_OPERATIONS.lock();
+        let operations = operations.as_ref().unwrap();
         let op = operations.get(&operation_id).ok_or(SyscallError::InvalidArgument)?;
-        
+
         if op.pid != pid {
             return Err(SyscallError::PermissionDenied);
         }
@@ -808,26 +832,27 @@ fn cancel_specific_operation(aiocb_ptr: *mut aiocb, pid: usize) -> SyscallResult
     
     // Cancel the operation
     match cancel_operation_internal(operation_id) {
-        Ok(_) => Ok(AIO_CANCELED as u64),
-        Err(crate::reliability::errno::EINPROGRESS) => Ok(AIO_NOTCANCELED as u64),
-        Err(_) => Ok(AIO_ALLDONE as u64),
+        Ok(_) => Ok(AIO_CANCELED as i64),
+        Err(crate::reliability::errno::EINPROGRESS) => Ok(AIO_NOTCANCELED as i64),
+        Err(_) => Ok(AIO_ALLDONE as i64),
     }
 }
 
 /// Internal function to cancel an operation
 fn cancel_operation_internal(operation_id: usize) -> Result<(), i32> {
     let mut operations = AIO_OPERATIONS.lock();
+    let operations = operations.as_mut().unwrap();
     let op = operations.get_mut(&operation_id).ok_or(crate::reliability::errno::EINVAL)?;
-    
+
     match op.status {
         AioStatus::InProgress => {
             op.status = AioStatus::Cancelled;
             op.error_code = crate::reliability::errno::ECANCELED;
-            
+
             // Update statistics
             let mut stats = AIO_STATS.lock();
             stats.total_cancelled += 1;
-            
+
             Ok(())
         }
         AioStatus::Completed | AioStatus::Error | AioStatus::Cancelled => {
@@ -867,7 +892,7 @@ fn execute_aio_list(operation_id: usize, aiocb_ptr: *mut aiocb) -> Result<isize,
         total_operations += 1;
         
         // Create individual AIO operation for each list entry
-        let result = queue_aio_operation_internal(aiocb_ptr);
+        let result = queue_aio_operation_internal(aiocb_ptr, Some(operation_id));
         
         match result {
             Ok(_) => completed_operations += 1,
@@ -893,28 +918,31 @@ fn execute_aio_list(operation_id: usize, aiocb_ptr: *mut aiocb) -> Result<isize,
 fn wait_for_list_completion(list_operation_id: usize, total_operations: usize) {
     let start_time = crate::subsystems::time::get_time_ns();
     let timeout_ns = 30_000_000_000; // 30 seconds timeout
-    
+
     loop {
         // Check if all operations are completed
         let mut completed_count = 0usize;
         {
             let operations = AIO_OPERATIONS.lock();
+            let operations = operations.as_ref().unwrap();
+            // Only count operations that belong to this list operation
             for (_, op) in operations.iter() {
-                if op.status == AioStatus::Completed || op.status == AioStatus::Error {
+                if op.list_operation_id == Some(list_operation_id) &&
+                   (op.status == AioStatus::Completed || op.status == AioStatus::Error) {
                     completed_count += 1;
                 }
             }
         }
-        
+
         if completed_count >= total_operations {
             break;
         }
-        
+
         // Check timeout
         if crate::subsystems::time::get_time_ns() - start_time > timeout_ns {
             break;
         }
-        
+
         // Yield CPU
         if let Some(_scheduler) = crate::subsystems::microkernel::scheduler::get_scheduler() {
             let _ = _scheduler.schedule(0);
@@ -923,12 +951,12 @@ fn wait_for_list_completion(list_operation_id: usize, total_operations: usize) {
 }
 
 /// Internal function to queue an AIO operation (for list operations)
-fn queue_aio_operation_internal(aiocb_ptr: *mut aiocb) -> Result<usize, i32> {
+fn queue_aio_operation_internal(aiocb_ptr: *mut aiocb, list_id: Option<usize>) -> Result<usize, i32> {
     // Get current process
-    let pid = myproc().ok_or(crate::reliability::errno::ESRCH)?;
+    let pid = myproc().ok_or(crate::reliability::errno::ESRCH)? as usize;
     
     // Get aiocb details
-    let (fd, offset, nbytes, reqprio) = unsafe {
+    let (fd, _offset, _nbytes, _reqprio) = unsafe {
         let aiocb = &*aiocb_ptr;
         (
             aiocb.aio_fildes,
@@ -940,14 +968,14 @@ fn queue_aio_operation_internal(aiocb_ptr: *mut aiocb) -> Result<usize, i32> {
     
     // Validate file descriptor
     if fd < 0 || (fd as usize) >= NOFILE {
-        return Err(crate::reliability::errno::EBADF);
+        return Err(crate::reliability::errno::EINVAL);
     }
-    
+
     // Get file table index from process
     let file_idx = {
         let proc_table = crate::process::PROC_TABLE.lock();
-        let proc = proc_table.find_ref(pid).ok_or(crate::reliability::errno::ESRCH)?;
-        
+        let proc = proc_table.find_ref(pid as i32).ok_or(crate::reliability::errno::ESRCH)?;
+
         proc.ofile[fd as usize].ok_or(crate::reliability::errno::EBADF)?
     };
     
@@ -967,7 +995,7 @@ fn queue_aio_operation_internal(aiocb_ptr: *mut aiocb) -> Result<usize, i32> {
     
     // Generate operation ID
     let operation_id = NEXT_AIO_ID.fetch_add(1, Ordering::SeqCst) as usize;
-    
+
     // Create AIO control block
     let aio_cb = AioControlBlock {
         user_aiocb: aiocb_ptr,
@@ -981,26 +1009,26 @@ fn queue_aio_operation_internal(aiocb_ptr: *mut aiocb) -> Result<usize, i32> {
         worker_tid: None,
         queue_time: crate::subsystems::time::get_time_ns(),
         completion_time: None,
+        list_operation_id: list_id,
     };
-    
-    // Add to operations table
+
+    // Add to operations table and update statistics
     {
         let mut operations = AIO_OPERATIONS.lock();
+        let operations = operations.as_mut().unwrap();
         operations.insert(operation_id, aio_cb);
-    }
-    
-    // Update statistics
-    {
+
+        // Update statistics
         let mut stats = AIO_STATS.lock();
         stats.total_queued += 1;
-        
+
         // Update max concurrent operations
-        let current_concurrent = AIO_OPERATIONS.lock().len() as u32;
+        let current_concurrent = operations.len() as u32;
         if current_concurrent > stats.max_concurrent_ops {
             stats.max_concurrent_ops = current_concurrent;
         }
     }
-    
+
     Ok(operation_id)
 }
 
@@ -1011,5 +1039,7 @@ pub fn get_aio_stats() -> AioStats {
 
 /// Get AIO operations for debugging
 pub fn get_aio_operations() -> Vec<(usize, AioControlBlock)> {
-    AIO_OPERATIONS.lock().iter().map(|(&id, op)| (id, op.clone())).collect()
+    let operations = AIO_OPERATIONS.lock();
+    let operations = operations.as_ref().unwrap();
+    operations.iter().map(|(&id, op)| (id, op.clone())).collect()
 }

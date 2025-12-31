@@ -13,7 +13,7 @@ use core::ptr;
 /// The address must be valid for MMIO access
 #[inline]
 pub unsafe fn mmio_read32(addr: usize) -> u32 {
-    ptr::read_volatile(addr as *const u32)
+    unsafe { ptr::read_volatile(addr as *const u32) }
 }
 
 /// Write 32-bit value to MMIO address
@@ -23,7 +23,7 @@ pub unsafe fn mmio_read32(addr: usize) -> u32 {
 /// The address must be valid for MMIO access
 #[inline]
 pub unsafe fn mmio_write32(addr: usize, value: u32) {
-    ptr::write_volatile(addr as *mut u32, value)
+    unsafe { ptr::write_volatile(addr as *mut u32, value) }
 }
 
 /// Read 16-bit value from MMIO address
@@ -33,7 +33,7 @@ pub unsafe fn mmio_write32(addr: usize, value: u32) {
 /// The address must be valid for MMIO access
 #[inline]
 pub unsafe fn mmio_read16(addr: usize) -> u16 {
-    ptr::read_volatile(addr as *const u16)
+    unsafe { ptr::read_volatile(addr as *const u16) }
 }
 
 /// Write 16-bit value to MMIO address
@@ -43,7 +43,7 @@ pub unsafe fn mmio_read16(addr: usize) -> u16 {
 /// The address must be valid for MMIO access
 #[inline]
 pub unsafe fn mmio_write16(addr: usize, value: u16) {
-    ptr::write_volatile(addr as *mut u16, value)
+    unsafe { ptr::write_volatile(addr as *mut u16, value) }
 }
 
 /// Read 8-bit value from MMIO address
@@ -53,7 +53,7 @@ pub unsafe fn mmio_write16(addr: usize, value: u16) {
 /// The address must be valid for MMIO access
 #[inline]
 pub unsafe fn mmio_read8(addr: usize) -> u8 {
-    ptr::read_volatile(addr as *const u8)
+    unsafe { ptr::read_volatile(addr as *const u8) }
 }
 
 /// Write 8-bit value to MMIO address
@@ -63,7 +63,7 @@ pub unsafe fn mmio_read8(addr: usize) -> u8 {
 /// The address must be valid for MMIO access
 #[inline]
 pub unsafe fn mmio_write8(addr: usize, value: u8) {
-    ptr::write_volatile(addr as *mut u8, value)
+    unsafe { ptr::write_volatile(addr as *mut u8, value) }
 }
 
 /// Read 64-bit value from MMIO address
@@ -73,7 +73,7 @@ pub unsafe fn mmio_write8(addr: usize, value: u8) {
 /// The address must be valid for MMIO access
 #[inline]
 pub unsafe fn mmio_read64(addr: usize) -> u64 {
-    ptr::read_volatile(addr as *const u64)
+    unsafe { ptr::read_volatile(addr as *const u64) }
 }
 
 /// Write 64-bit value to MMIO address
@@ -83,5 +83,5 @@ pub unsafe fn mmio_read64(addr: usize) -> u64 {
 /// The address must be valid for MMIO access
 #[inline]
 pub unsafe fn mmio_write64(addr: usize, value: u64) {
-    ptr::write_volatile(addr as *mut u64, value)
+    unsafe { ptr::write_volatile(addr as *mut u64, value) }
 }

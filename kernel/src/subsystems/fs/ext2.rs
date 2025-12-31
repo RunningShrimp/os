@@ -12,17 +12,19 @@
 //! - Extended attributes
 //! - File system recovery
 
+// Core imports
 extern crate alloc;
 use alloc::{collections::BTreeMap, string::String, sync::Arc, vec::Vec};
 use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 use spin::Mutex;
 
+use crate::subsystems::sync::Lazy;
+
 use super::api::{
     DirEntry, DirectoryOperations, FileHandle, FileOperations, FsError, PathComponent,
     PathOperations,
 };
-use crate::time;
 
 /// Ext2 superblock
 #[derive(Debug, Clone)]
@@ -240,7 +242,7 @@ impl Ext2Inode {
             0x1000 => super::api::DirEntryType::Directory,
             0x2000 => super::api::DirEntryType::CharacterDevice,
             0x4000 => super::api::DirEntryType::BlockDevice,
-            0x6000 => super::api::DirEntryType::BlockDevice, // FIFO
+            0x6000 => super::api::DirEntryType::FIFO, // FIFO
             0x8000 => super::api::DirEntryType::File,
             0xA000 => super::api::DirEntryType::SymbolicLink,
             0xC000 => super::api::DirEntryType::Socket,
@@ -306,6 +308,34 @@ pub struct Ext2FileSystem {
     pub stats: Ext2Stats,
     /// Mount options
     pub mount_options: Ext2MountOptions,
+}
+
+impl core::fmt::Debug for Ext2FileSystem {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Ext2FileSystem")
+            .field("device_id", &self.device_id)
+            .field("superblock", &self.superblock)
+            .field("block_groups_count", &self.block_groups.len())
+            .field("mount_options", &self.mount_options)
+            .finish()
+    }
+}
+
+impl Clone for Ext2FileSystem {
+    fn clone(&self) -> Self {
+        Self {
+            device_id: self.device_id.clone(),
+            superblock: self.superblock.clone(),
+            block_groups: self.block_groups.clone(),
+            inode_cache: Mutex::new(BTreeMap::new()), // Don't clone the cache
+            block_bitmap_cache: Mutex::new(BTreeMap::new()), // Don't clone the cache
+            inode_bitmap_cache: Mutex::new(BTreeMap::new()), // Don't clone the cache
+            open_files: Mutex::new(BTreeMap::new()), // Don't clone open files
+            next_file_handle: AtomicU32::new(self.next_file_handle.load(Ordering::Relaxed)),
+            stats: self.stats.clone(),
+            mount_options: self.mount_options.clone(),
+        }
+    }
 }
 
 /// Ext2 mount options
@@ -378,7 +408,7 @@ impl FileOperations for Ext2OpenFile {
 
     fn write(&self, offset: u64, buffer: &[u8]) -> Result<usize, FsError> {
         if self.fs.mount_options.read_only {
-            return Err(FsError::ReadOnlyFileSystem);
+            return Err(FsError::PermissionDenied);
         }
 
         let mut ext2_inode = self.fs.read_inode(self.inode)?;
@@ -391,7 +421,7 @@ impl FileOperations for Ext2OpenFile {
         // For now, just update the size
         let new_size = core::cmp::max(ext2_inode.size as u64, offset + buffer.len() as u64);
         ext2_inode.size = new_size as u32;
-        ext2_inode.mtime = time::get_monotonic_time() as u32;
+        ext2_inode.mtime = (crate::time::get_monotonic_time_ns() / 1_000_000_000) as u32;
 
         self.fs.write_inode(self.inode, &ext2_inode)?;
         self.fs.stats.write_ops.fetch_add(1, Ordering::Relaxed);
@@ -406,7 +436,7 @@ impl FileOperations for Ext2OpenFile {
 
     fn truncate(&self, size: u64) -> Result<(), FsError> {
         if self.fs.mount_options.read_only {
-            return Err(FsError::ReadOnlyFileSystem);
+            return Err(FsError::PermissionDenied);
         }
 
         let mut ext2_inode = self.fs.read_inode(self.inode)?;
@@ -418,7 +448,7 @@ impl FileOperations for Ext2OpenFile {
         // In a real implementation, this would truncate the actual file data
         // For now, just update the size
         ext2_inode.size = size as u32;
-        ext2_inode.mtime = time::get_monotonic_time() as u32;
+        ext2_inode.mtime = (crate::time::get_monotonic_time_ns() / 1_000_000_000) as u32;
 
         self.fs.write_inode(self.inode, &ext2_inode)?;
         Ok(())
@@ -444,7 +474,7 @@ pub struct Ext2OpenDir {
 impl DirectoryOperations for Ext2OpenDir {
     fn create_subdir(&self, name: &str, mode: u32) -> Result<(), FsError> {
         if self.fs.mount_options.read_only {
-            return Err(FsError::ReadOnlyFileSystem);
+            return Err(FsError::PermissionDenied);
         }
 
         // Check if directory entry already exists
@@ -457,12 +487,12 @@ impl DirectoryOperations for Ext2OpenDir {
 
         // Create directory inode
         let dir_inode = Ext2Inode {
-            mode: (mode & 0x0FFF) | 0x4000, // Directory type
+            mode: ((mode & 0x0FFF) | 0x4000) as u16, // Directory type
             uid: 0,
             size: self.fs.superblock.block_size(),
-            atime: time::get_monotonic_time() as u32,
-            ctime: time::get_monotonic_time() as u32,
-            mtime: time::get_monotonic_time() as u32,
+            atime: (crate::time::get_monotonic_time_ns() / 1_000_000_000) as u32,
+            ctime: (crate::time::get_monotonic_time_ns() / 1_000_000_000) as u32,
+            mtime: (crate::time::get_monotonic_time_ns() / 1_000_000_000) as u32,
             dtime: 0,
             gid: 0,
             links_count: 2, // . and ..
@@ -509,20 +539,20 @@ impl DirectoryOperations for Ext2OpenDir {
 
     fn remove_subdir(&self, name: &str) -> Result<(), FsError> {
         if self.fs.mount_options.read_only {
-            return Err(FsError::ReadOnlyFileSystem);
+            return Err(FsError::PermissionDenied);
         }
 
         // Find directory entry
         let entry = self.find_entry(name).ok_or(FsError::FileNotFound)?;
 
-        let dir_inode = self.fs.read_inode(entry.inode)?;
+        let dir_inode = self.fs.read_inode(entry.inode as u32)?;
 
         if !dir_inode.is_directory() {
             return Err(FsError::NotADirectory);
         }
 
         // Check if directory is empty
-        if !self.fs.is_directory_empty(entry.inode)? {
+        if !self.fs.is_directory_empty(entry.inode as u32)? {
             return Err(FsError::DirectoryNotEmpty);
         }
 
@@ -530,7 +560,7 @@ impl DirectoryOperations for Ext2OpenDir {
         self.fs.remove_directory_entry(self.inode, name)?;
 
         // Free the directory inode
-        self.fs.free_inode(entry.inode);
+        self.fs.free_inode(entry.inode as u32);
 
         Ok(())
     }
@@ -541,7 +571,7 @@ impl DirectoryOperations for Ext2OpenDir {
         Ok(Vec::new())
     }
 
-    fn find_entry(&self, name: &str) -> Option<DirEntry> {
+    fn find_entry(&self, _name: &str) -> Option<DirEntry> {
         // In a real implementation, this would search the actual directory entries
         // in the current directory
         None
@@ -571,6 +601,22 @@ pub struct Ext2Stats {
     pub block_deallocations: AtomicU64,
 }
 
+impl Clone for Ext2Stats {
+    fn clone(&self) -> Self {
+        Self {
+            total_inodes: AtomicU32::new(self.total_inodes.load(Ordering::Relaxed)),
+            free_inodes: AtomicU32::new(self.free_inodes.load(Ordering::Relaxed)),
+            total_blocks: AtomicU32::new(self.total_blocks.load(Ordering::Relaxed)),
+            free_blocks: AtomicU32::new(self.free_blocks.load(Ordering::Relaxed)),
+            read_ops: AtomicU64::new(self.read_ops.load(Ordering::Relaxed)),
+            write_ops: AtomicU64::new(self.write_ops.load(Ordering::Relaxed)),
+            inode_lookups: AtomicU64::new(self.inode_lookups.load(Ordering::Relaxed)),
+            block_allocations: AtomicU64::new(self.block_allocations.load(Ordering::Relaxed)),
+            block_deallocations: AtomicU64::new(self.block_deallocations.load(Ordering::Relaxed)),
+        }
+    }
+}
+
 impl Ext2FileSystem {
     /// Create a new ext2 file system
     pub fn new(device_id: String, mount_options: Ext2MountOptions) -> Result<Self, FsError> {
@@ -578,7 +624,7 @@ impl Ext2FileSystem {
         let superblock = Self::read_superblock(&device_id)?;
 
         if !superblock.is_valid() {
-            return Err(FsError::CorruptedFileSystem);
+            return Err(FsError::IoError);
         }
 
         // Read block group descriptors
@@ -599,7 +645,7 @@ impl Ext2FileSystem {
     }
 
     /// Read superblock from device
-    fn read_superblock(device_id: &str) -> Result<Ext2Superblock, FsError> {
+    fn read_superblock(_device_id: &str) -> Result<Ext2Superblock, FsError> {
         // In a real implementation, this would read from the actual device
         // For now, return a default superblock
         Ok(Ext2Superblock {
@@ -658,13 +704,13 @@ impl Ext2FileSystem {
 
     /// Read block group descriptors from device
     fn read_block_group_descriptors(
-        device_id: &str,
+        _device_id: &str,
         superblock: &Ext2Superblock,
     ) -> Result<Vec<Ext2BlockGroupDesc>, FsError> {
         let group_count = superblock.block_group_count();
         let mut groups = Vec::with_capacity(group_count as usize);
 
-        for i in 0..group_count {
+        for _i in 0..group_count {
             // In a real implementation, this would read from the actual device
             groups.push(Ext2BlockGroupDesc {
                 block_bitmap: 0,
@@ -757,6 +803,7 @@ impl Ext2FileSystem {
         }
     }
 
+    #[allow(dead_code)]
     /// Allocate a block
     fn allocate_block(&self) -> Result<u32, FsError> {
         // In a real implementation, this would find a free block in the bitmap
@@ -767,8 +814,9 @@ impl Ext2FileSystem {
         Ok(block_num)
     }
 
+    #[allow(dead_code)]
     /// Free a block
-    fn free_block(&self, block_num: u32) {
+    fn free_block(&self, _block_num: u32) {
         // In a real implementation, this would clear the block in the bitmap
         self.stats.free_blocks.fetch_add(1, Ordering::Relaxed);
         self.stats
@@ -776,26 +824,30 @@ impl Ext2FileSystem {
             .fetch_add(1, Ordering::Relaxed);
     }
 
+    #[allow(dead_code)]
     /// Read a block from disk
-    fn read_block(&self, block_num: u32) -> Result<Vec<u8>, FsError> {
+    fn read_block(&self, _block_num: u32) -> Result<Vec<u8>, FsError> {
         // In a real implementation, this would read from the actual device
         // For now, return a zero-filled block
         let block_size = self.superblock.block_size();
         Ok(vec![0; block_size as usize])
     }
 
+    #[allow(dead_code)]
     /// Write a block to disk
-    fn write_block(&self, block_num: u32, data: &[u8]) -> Result<(), FsError> {
+    fn write_block(&self, _block_num: u32, _data: &[u8]) -> Result<(), FsError> {
         // In a real implementation, this would write to the actual device
         // For now, just return success
         Ok(())
     }
 
+    #[allow(dead_code)]
     /// Get block group for a given block
     fn get_block_group(&self, block_num: u32) -> usize {
         ((block_num - self.superblock.first_data_block) / self.superblock.blocks_per_group) as usize
     }
 
+    #[allow(dead_code)]
     /// Get block group for a given inode
     fn get_inode_group(&self, inode_num: u32) -> usize {
         ((inode_num - 1) / self.superblock.inodes_per_group) as usize
@@ -808,11 +860,11 @@ impl Ext2FileSystem {
             free_inodes: AtomicU32::new(self.superblock.free_inodes_count),
             total_blocks: AtomicU32::new(self.superblock.blocks_count),
             free_blocks: AtomicU32::new(self.superblock.free_blocks_count),
-            read_ops: self.stats.read_ops.clone(),
-            write_ops: self.stats.write_ops.clone(),
-            inode_lookups: self.stats.inode_lookups.clone(),
-            block_allocations: self.stats.block_allocations.clone(),
-            block_deallocations: self.stats.block_deallocations.clone(),
+            read_ops: AtomicU64::new(self.stats.read_ops.load(Ordering::Relaxed)),
+            write_ops: AtomicU64::new(self.stats.write_ops.load(Ordering::Relaxed)),
+            inode_lookups: AtomicU64::new(self.stats.inode_lookups.load(Ordering::Relaxed)),
+            block_allocations: AtomicU64::new(self.stats.block_allocations.load(Ordering::Relaxed)),
+            block_deallocations: AtomicU64::new(self.stats.block_deallocations.load(Ordering::Relaxed)),
         }
     }
 
@@ -823,7 +875,7 @@ impl Ext2FileSystem {
     }
 
     /// Open a file
-    pub fn open_file(&self, path: &str, flags: u32, mode: u32) -> Result<FileHandle, FsError> {
+    pub fn open_file(&self, _path: &str, flags: u32, mode: u32) -> Result<FileHandle, FsError> {
         // In a real implementation, this would:
         // 1. Parse the path
         // 2. Find the corresponding inode
@@ -840,14 +892,14 @@ impl Ext2FileSystem {
         // Store the open file
         {
             let mut open_files = self.open_files.lock();
-            open_files.insert(handle, open_file);
+            open_files.insert(FileHandle(handle), open_file);
         }
 
-        Ok(handle)
+        Ok(FileHandle(handle))
     }
 
     /// Open a directory
-    pub fn open_dir(&self, path: &str, flags: u32) -> Result<FileHandle, FsError> {
+    pub fn open_dir(&self, _path: &str, flags: u32) -> Result<FileHandle, FsError> {
         // In a real implementation, this would:
         // 1. Parse the path
         // 2. Find the corresponding directory inode
@@ -864,7 +916,7 @@ impl Ext2FileSystem {
         {
             let mut open_files = self.open_files.lock();
             open_files.insert(
-                handle,
+                FileHandle(handle),
                 Ext2OpenFile {
                     fs: open_dir.fs.clone(),
                     inode: open_dir.inode,
@@ -875,12 +927,12 @@ impl Ext2FileSystem {
             );
         }
 
-        Ok(handle)
+        Ok(FileHandle(handle))
     }
 }
 
 impl PathOperations for Ext2FileSystem {
-    fn parse(&self, follow_symlinks: bool) -> Result<Vec<PathComponent>, FsError> {
+    fn parse(&self, _follow_symlinks: bool) -> Result<Vec<PathComponent>, FsError> {
         // In a real implementation, this would parse the current path
         // For now, return an empty list
         Ok(Vec::new())
@@ -913,17 +965,17 @@ impl Ext2FileSystem {
     /// Add an entry to a directory
     fn add_directory_entry(
         &self,
-        dir_inode: u32,
-        inode: u32,
-        name: &str,
-        entry_type: super::api::DirEntryType,
+        _dir_inode: u32,
+        _inode: u32,
+        _name: &str,
+        _entry_type: super::api::DirEntryType,
     ) -> Result<(), FsError> {
         // In a real implementation, this would add the entry to the actual directory
         Ok(())
     }
 
     /// Remove an entry from a directory
-    fn remove_directory_entry(&self, dir_inode: u32, name: &str) -> Result<(), FsError> {
+    fn remove_directory_entry(&self, _dir_inode: u32, _name: &str) -> Result<(), FsError> {
         // In a real implementation, this would remove the entry from the actual directory
         Ok(())
     }
@@ -959,8 +1011,8 @@ impl Default for Ext2MountOptions {
 }
 
 /// Global ext2 file system instances
-static EXT2_FILESYSTEMS: once_cell::sync::Lazy<Mutex<BTreeMap<String, Arc<Ext2FileSystem>>>> =
-    once_cell::sync::Lazy::new(|| Mutex::new(BTreeMap::new()));
+static EXT2_FILESYSTEMS: Lazy<Mutex<BTreeMap<String, Arc<Ext2FileSystem>>>> =
+    Lazy::new(|| Mutex::new(BTreeMap::new()));
 
 /// Mount an ext2 file system
 pub fn mount_ext2(
@@ -971,7 +1023,7 @@ pub fn mount_ext2(
     let fs = Arc::new(Ext2FileSystem::new(device_id.clone(), options)?);
 
     let mut filesystems = EXT2_FILESYSTEMS.lock();
-    filesystems.insert(mount_point, fs);
+    filesystems.insert(mount_point.clone(), fs);
 
     log::info!("Mounted ext2 file system from {} at {}", device_id, mount_point);
     Ok(())

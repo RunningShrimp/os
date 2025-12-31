@@ -17,7 +17,6 @@ use hashbrown::{HashMap, HashSet};
 use spin::Mutex;
 
 use super::{model_checker::LogicExpression, *};
-use crate::compat::DefaultHasherBuilder;
 
 /// 定理证明器
 pub struct TheoremProver {
@@ -331,7 +330,7 @@ pub struct ProofStrategy {
     /// 策略描述
     pub description: String,
     /// 策略参数
-    pub parameters: HashMap<String, String, DefaultHasherBuilder>,
+    pub parameters: HashMap<String, String>,
     /// 适用条件
     pub applicable_conditions: Vec<LogicExpression>,
 }
@@ -1041,7 +1040,7 @@ impl TheoremProver {
             name: "Resolution Strategy".to_string(),
             strategy_type: ProofStrategyType::Resolution,
             description: "Use resolution refutation".to_string(),
-            parameters: HashMap::with_hasher(DefaultHasherBuilder),
+            parameters: HashMap::new(),
             applicable_conditions: vec![],
         });
     }

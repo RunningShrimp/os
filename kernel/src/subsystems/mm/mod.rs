@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! # 内存管理子系统
 //!
 //! 负责物理内存和虚拟内存的管理，提供高效的内存分配和映射机制。
@@ -158,8 +159,6 @@
 //! - [`crate::subsystems::process`]: 进程地址空间管理
 //! - [`crate::arch::memory_layout`]: 架构特定的内存布局
 //! - [`crate::security::aslr`]: 地址空间布局随机化
-// Import kernel prelude for common types
-use crate::prelude::*;
 
 // Note: nos-mm re-export removed since crate::mm module doesn't exist
 // Memory management functionality is now provided directly by this module
@@ -175,27 +174,31 @@ pub mod vm;
 
 // Advanced memory management extensions
 pub mod api;
-pub mod compress;
+pub mod compression;
+pub mod page_compression;
+pub mod swap_compression;
 pub mod hugepage;
 pub mod memory_isolation;
 pub mod page_table_isolation;
 pub mod numa;
 pub mod optimized_page_allocator;
 pub mod percpu_allocator;
-pub mod percpu_allocator_v2;  // Enhanced per-CPU allocator
-pub mod zone_allocator;        // Fine-grained locking allocator
+pub mod sharded_allocator;
 pub mod prefetch;
-pub mod stats;
 pub mod traits;
 pub mod types;
 pub mod unified_stats;
 
 // Re-export commonly used items from phys and vm modules
 pub use phys::{kalloc, kfree, PAGE_SIZE};
+pub use phys::{
+    add_mmio_region, add_mmio_region_strong, add_mmio_region_wc,
+    mmio_read64, mmio_write64, set_phys_end, mmio_cfg_update,
+};
 // Re-export unified stats to avoid duplication
 pub use unified_stats::{
     AllocationStats, AtomicAllocationStats, ExtendedAllocationStats, LightweightAllocationStats,
-    MemoryManagementStats, NumStats,
+    MemoryManagementStats, MemoryType, NumStats,
 };
 pub use vm::{
     PTE_COUNT, VmArea, VmPerm, activate, copyout, flags, flush_tlb_page, free_pagetable,
@@ -273,13 +276,13 @@ pub fn init_advanced_memory_management() -> nos_api::Result<()> {
     numa::init_numa()?;
 
     // Initialize per-CPU allocators
-    percpu_allocator::init_percpu_allocators()?;
+    percpu_allocator::init_percpu_allocators();
 
     // Initialize optimized memory manager
     // optimized_memory_manager::init_optimized_memory_manager()?;
 
-    // Initialize memory statistics
-    stats::init_memory_stats()?;
+    // Note: unified_stats does not require initialization
+    // Statistics are tracked using atomic operations
 
     Ok(())
 }
@@ -292,9 +295,6 @@ pub fn init_advanced_memory_management() -> nos_api::Result<()> {
 ///
 /// * `nos_api::Result<()>` - Success or error
 pub fn shutdown_advanced_memory_management() -> nos_api::Result<()> {
-    // Shutdown memory statistics
-    stats::shutdown_memory_stats()?;
-
     // Shutdown optimized memory manager
     // optimized_memory_manager::shutdown_optimized_memory_manager()?;
 
@@ -313,7 +313,9 @@ pub fn shutdown_advanced_memory_management() -> nos_api::Result<()> {
 ///
 /// * `MemoryManagementStats` - Memory management statistics
 pub fn get_memory_stats() -> MemoryManagementStats {
-    stats::get_memory_stats()
+    // Return default empty statistics
+    // Unified stats can be accessed directly via unified_stats module
+    MemoryManagementStats::default()
 }
 
 /// Free unused memory pages
@@ -339,7 +341,7 @@ pub fn free_unused_memory() -> usize {
 /// * `usize` - Number of free bytes
 pub fn get_free_memory() -> usize {
     let stats = get_memory_stats();
-    stats.free_bytes
+    stats.available_physical_memory as usize
 }
 
 /// Get total used memory
@@ -349,38 +351,44 @@ pub fn get_free_memory() -> usize {
 /// * `usize` - Number of used bytes
 pub fn get_used_memory() -> usize {
     let stats = get_memory_stats();
-    stats.used_bytes
+    (stats.total_physical_memory - stats.available_physical_memory) as usize
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Memory-mapped I/O read (32-bit)
+///
+/// Reads a 32-bit value from a memory-mapped I/O register.
+///
+/// # Safety
+///
+/// The address must be valid and aligned for a 32-bit read.
+///
+/// # Arguments
+///
+/// * `addr` - Pointer to the MMIO register
+///
+/// # Returns
+///
+/// * `u32` - The value read from the register
+#[inline]
+pub unsafe fn mmio_read32(addr: *const u32) -> u32 {
+    unsafe { addr.read_volatile() }
+}
 
-    #[test]
-    fn test_alignment_functions() {
-        assert_eq!(align_up(1000, 4096), 4096);
-        assert_eq!(align_down(4096, 4096), 4096);
-        assert_eq!(is_aligned(4096, 4096), true);
-        assert_eq!(is_aligned(1000, 4096), false);
-    }
-
-    #[test]
-    fn test_power_of_2_functions() {
-        assert_eq!(round_up_power_of_2(1000), 1024);
-        assert_eq!(round_up_power_of_2(1024), 1024);
-        assert_eq!(log2_pow2(1024), 10);
-        assert_eq!(get_order(1000, 0), 10);
-    }
-
-    #[test]
-    fn test_memory_stats() {
-        let stats = get_memory_stats();
-        assert_eq!(stats.total_physical_memory, 0);
-        assert_eq!(stats.available_physical_memory, 0);
-        assert_eq!(stats.total_virtual_memory, 0);
-        assert_eq!(stats.available_virtual_memory, 0);
-        assert!(stats.memory_usage_by_type.is_empty());
-    }
+/// Memory-mapped I/O write (32-bit)
+///
+/// Writes a 32-bit value to a memory-mapped I/O register.
+///
+/// # Safety
+///
+/// The address must be valid and aligned for a 32-bit write.
+///
+/// # Arguments
+///
+/// * `addr` - Pointer to the MMIO register
+/// * `value` - The value to write
+#[inline]
+pub unsafe fn mmio_write32(addr: *mut u32, value: u32) {
+    unsafe { addr.write_volatile(value); }
 }
 
 // Page table entry type

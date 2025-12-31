@@ -25,6 +25,7 @@
 
 use crate::api::SyscallError;
 use crate::subsystems::mm::PAGE_SIZE;
+use alloc::vec::Vec;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use spin::Mutex;
 
@@ -66,11 +67,11 @@ impl ProcessBrk {
         }
 
         if new_brk > HEAP_MAX {
-            return Err(SyscallError::NoMemory);
+            return Err(SyscallError::OutOfMemory);
         }
 
         // 对齐到页面边界
-        let aligned_brk = crate::subsystems::mm::align_up(new_brk, PAGE_SIZE);
+        let _aligned_brk = crate::subsystems::mm::align_up(new_brk, PAGE_SIZE);
 
         // TODO: 实际分配/释放物理内存页面
         // 这需要与页表管理器交互来映射或取消映射页面
@@ -150,7 +151,8 @@ static BRK_MANAGER: Mutex<BrkManager> = Mutex::new(BrkManager::new());
 /// ```
 pub fn sys_brk(addr: usize) -> Result<isize, SyscallError> {
     // 获取当前进程 ID
-    let pid = crate::process::myproc().ok_or(SyscallError::NoProcess)?;
+    let pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
+    let pid = pid as usize;
 
     let mut manager = BRK_MANAGER.lock();
     let proc_brk = manager.get_process_brk(pid)?;
@@ -219,7 +221,8 @@ pub fn sys_brk(addr: usize) -> Result<isize, SyscallError> {
 /// ```
 pub fn sys_sbrk(increment: isize) -> Result<isize, SyscallError> {
     // 获取当前进程 ID
-    let pid = crate::process::myproc().ok_or(SyscallError::NoProcess)?;
+    let pid = crate::process::myproc().ok_or(SyscallError::NotFound)?;
+    let pid = pid as usize;
 
     let mut manager = BRK_MANAGER.lock();
     let proc_brk = manager.get_process_brk(pid)?;
@@ -286,12 +289,12 @@ pub fn get_heap_stats(pid: usize) -> Result<(usize, usize, usize), SyscallError>
     let manager = BRK_MANAGER.lock();
 
     if pid >= manager.process_brks.len() {
-        return Err(SyscallError::NoProcess);
+        return Err(SyscallError::NotFound);
     }
 
     let proc_brk = manager.process_brks[pid]
         .as_ref()
-        .ok_or(SyscallError::NoProcess)?;
+        .ok_or(SyscallError::NotFound)?;
 
     let current = proc_brk.get();
     let allocated = current - proc_brk.heap_start;

@@ -2,31 +2,25 @@
 //!
 //! Provides event bus and dispatcher functionality
 
-use alloc::{collections::BTreeMap, string::String, sync::Arc, vec::Vec};
+use alloc::{collections::BTreeMap, string::{String, ToString}, sync::Arc, vec::Vec};
 
 use nos_api::Result;
 
 /// Event trait
-pub trait Event: Send + Sync {
+pub trait Event {
+    /// Get the event type identifier
     fn event_type(&self) -> &str;
+
+    /// Handle the event
+    fn handle(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// Event handler trait
-pub trait EventHandler: Send + Sync {
+pub trait EventHandler {
+    /// Handle an event
     fn handle(&self, event: &dyn Event) -> Result<()>;
-}
-
-/// Simple event type
-#[derive(Debug)]
-pub struct SimpleEvent {
-    pub event_type: String,
-    pub data: Vec<u8>,
-}
-
-impl Event for SimpleEvent {
-    fn event_type(&self) -> &str {
-        &self.event_type
-    }
 }
 
 /// Event bus
@@ -57,24 +51,7 @@ impl EventBus {
     }
 }
 
-/// Global event bus
-static mut EVENT_BUS: Option<EventBus> = None;
 
-pub fn init_event_bus() -> Result<()> {
-    unsafe {
-        EVENT_BUS = Some(EventBus::new());
-    }
-    Ok(())
-}
 
-pub fn get_event_bus() -> &'static mut EventBus {
-    unsafe { EVENT_BUS.as_mut().expect("Event bus not initialized") }
-}
 
-pub fn subscribe(event_type: &str, handler: Arc<dyn EventHandler>) -> Result<()> {
-    get_event_bus().subscribe(event_type, handler)
-}
 
-pub fn publish(event: &dyn Event) -> Result<()> {
-    get_event_bus().publish(event)
-}

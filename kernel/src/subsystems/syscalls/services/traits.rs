@@ -9,10 +9,9 @@
 
 use alloc::{string::String, sync::Arc, vec::Vec};
 
-use crate::error::{UnifiedError, KernelError};
-
 // Import Result from error module to avoid duplication
-pub use crate::error::Result;
+pub type Result<T> = crate::error::Result<T>;
+pub type KernelResult<T> = crate::error::KernelResult<T>;
 
 /// 基础服务特征
 ///
@@ -100,6 +99,22 @@ pub trait Service: Send + Sync + core::fmt::Debug {
     ///
     /// 返回指向该service对象的Any引用，允许向下转换为具体类型。
     fn as_any(&self) -> &dyn core::any::Any;
+
+    /// 检查此服务是否实现了系统调用服务特征
+    ///
+    /// 返回true如果服务实现了SyscallService特征。
+    /// 用于运行时类型检查，避免使用不安全的向下转换。
+    fn is_syscall_service(&self) -> bool {
+        false
+    }
+
+    /// 尝试将此服务作为系统调用服务引用
+    ///
+    /// 如果服务实现了SyscallService特征，则返回Some引用，
+    /// 否则返回None。
+    fn as_syscall_service(&self) -> Option<&dyn SyscallService> {
+        None
+    }
 }
 
 /// 系统调用服务特征
@@ -300,7 +315,7 @@ pub trait ServiceFactory: Send + Sync {
     /// * `Arc<dyn Service>` - 性能优化服务实例
     fn create_performance_service(&self) -> Arc<dyn Service> {
         // TODO: Implement when optimization services are refactored
-        Arc::new(MemoryService::new())
+        Arc::new(PlaceholderService::new())
     }
 
     /// 创建调度器优化服务
@@ -312,7 +327,7 @@ pub trait ServiceFactory: Send + Sync {
     /// * `Arc<dyn Service>` - 调度器优化服务实例
     fn create_scheduler_service(&self) -> Arc<dyn Service> {
         // TODO: Implement when optimization services are refactored
-        Arc::new(MemoryService::new())
+        Arc::new(PlaceholderService::new())
     }
 
     /// 创建零拷贝I/O优化服务
@@ -324,7 +339,7 @@ pub trait ServiceFactory: Send + Sync {
     /// * `Arc<dyn Service>` - 零拷贝I/O优化服务实例
     fn create_zerocopy_service(&self) -> Arc<dyn Service> {
         // TODO: Implement when optimization services are refactored
-        Arc::new(MemoryService::new())
+        Arc::new(PlaceholderService::new())
     }
 
     /// 创建优化管理服务
@@ -336,7 +351,7 @@ pub trait ServiceFactory: Send + Sync {
     /// * `Arc<dyn Service>` - 优化管理服务实例
     fn create_manager_service(&self) -> Arc<dyn Service> {
         // TODO: Implement when optimization services are refactored
-        Arc::new(MemoryService::new())
+        Arc::new(PlaceholderService::new())
     }
 }
 
@@ -392,4 +407,74 @@ pub trait ServiceProvider: Send + Sync {
     /// * `Ok(())` - 移除成功
     /// * `Err(Error)` - 移除失败，包含错误信息
     fn unregister_service(&mut self, name: &str) -> Result<()>;
+}
+
+/// 占位符服务实现
+///
+/// 用于ServiceFactory trait中的默认实现，实际实现应该由具体服务类型提供。
+struct PlaceholderService {
+    name: String,
+}
+
+impl PlaceholderService {
+    /// 创建新的占位符服务
+    fn new() -> Self {
+        Self {
+            name: String::from("placeholder"),
+        }
+    }
+}
+
+impl core::fmt::Debug for PlaceholderService {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("PlaceholderService")
+            .field("name", &self.name)
+            .finish()
+    }
+}
+
+impl Service for PlaceholderService {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn version(&self) -> &str {
+        "0.0.1"
+    }
+
+    fn description(&self) -> &str {
+        "Placeholder service for factory default implementations"
+    }
+
+    fn initialize(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    fn start(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    fn stop(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    fn destroy(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    fn status(&self) -> ServiceStatus {
+        ServiceStatus::Stopped
+    }
+
+    fn dependencies(&self) -> Vec<&str> {
+        Vec::new()
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn core::any::Any {
+        self
+    }
+
+    fn as_any(&self) -> &dyn core::any::Any {
+        self
+    }
 }

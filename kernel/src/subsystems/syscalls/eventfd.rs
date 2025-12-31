@@ -6,17 +6,11 @@
 //!
 //! These system calls are POSIX-compatible and integrate with epoll.
 
-use alloc::{sync::Arc, vec::Vec};
+use alloc::vec::Vec;
 
-use crate::subsystems::syscalls::interface::{SyscallHandler};
-use crate::subsystems::syscalls::interface::{SyscallNumber};
-use crate::subsystems::syscalls::common::SyscallArgs;
-use crate::error::Result;
-
-use crate::{error::SyscallError, subsystems::sync::Mutex};
-
-// Import extract_args from common module
+use crate::subsystems::syscalls::interface::{SyscallHandler, SyscallNumber, SyscallResult, SyscallError};
 use crate::subsystems::syscalls::common::extract_args;
+use crate::subsystems::sync::Mutex;
 
 /// EventFd flags (Linux compatible)
 pub mod flags {
@@ -47,10 +41,10 @@ impl EventFdInstance {
     pub fn read(&mut self) -> Result<u64, SyscallError> {
         if self.counter == 0 {
             if (self.flags & flags::EFD_NONBLOCK) != 0 {
-                return Err(SyscallError::WouldBlock);
+                return Err(SyscallError::IoError);
             }
             // Would block - in a real implementation, we'd wait here
-            return Err(SyscallError::WouldBlock);
+            return Err(SyscallError::IoError);
         }
 
         let value_to_read = if (self.flags & flags::EFD_SEMAPHORE) != 0 {
@@ -73,10 +67,10 @@ impl EventFdInstance {
 
         if self.counter > 0xfffffffffffffffe - value {
             if (self.flags & flags::EFD_NONBLOCK) != 0 {
-                return Err(SyscallError::WouldBlock);
+                return Err(SyscallError::IoError);
             }
             // Would block - in a real implementation, we'd wait here
-            return Err(SyscallError::WouldBlock);
+            return Err(SyscallError::IoError);
         }
 
         self.counter += value;
@@ -130,10 +124,10 @@ impl EventFdHandler {
 }
 
 impl SyscallHandler for EventFdHandler {
-    fn handle(&self, args: &[u64]) -> SyscallResult<i64> {
+    fn handle(&self, _args: &[u64]) -> SyscallResult<()> {
         // For now, we don't have specific handler logic here
         // Individual syscall functions like sys_eventfd are called directly
-        Err(SyscallError::InvalidSyscall(self.get_syscall_number()))
+        Err(SyscallError::InvalidInterface)
     }
 
     fn get_syscall_number(&self) -> SyscallNumber {
@@ -151,7 +145,10 @@ impl SyscallHandler for EventFdHandler {
 /// Arguments: [initval]
 /// Returns: file descriptor on success, error on failure
 pub fn sys_eventfd(args: &[u64]) -> SyscallResult<i64> {
-    let args = extract_args(args, 1)?;
+    let args = extract_args(args, 0, 1);
+    if args.len() < 1 {
+        return Err(SyscallError::InvalidArgument);
+    }
     let initval = args[0] as u32;
     sys_eventfd2(&[initval as u64, 0])
 }
@@ -160,7 +157,10 @@ pub fn sys_eventfd(args: &[u64]) -> SyscallResult<i64> {
 /// Arguments: [initval, flags]
 /// Returns: file descriptor on success, error on failure
 pub fn sys_eventfd2(args: &[u64]) -> SyscallResult<i64> {
-    let args = extract_args(args, 2)?;
+    let args = extract_args(args, 0, 2);
+    if args.len() < 2 {
+        return Err(SyscallError::InvalidArgument);
+    }
 
     let initval = args[0] as u32;
     let flags = args[1] as i32;
@@ -172,36 +172,43 @@ pub fn sys_eventfd2(args: &[u64]) -> SyscallResult<i64> {
     }
 
     // Allocate eventfd instance
-    let instance_idx = alloc_eventfd_instance(initval, flags).ok_or(SyscallError::OutOfMemory)?;
+    let instance_idx = alloc_eventfd_instance(initval, flags).ok_or(SyscallError::IoError)?;
 
-    // Allocate file descriptor
+    // Allocate file from FILE_TABLE
+    let file_idx = crate::subsystems::fs::file::file_alloc().ok_or(SyscallError::IoError)?;
+
+    // Configure the file in FILE_TABLE
+    {
+        let mut file_table = crate::subsystems::fs::file::FILE_TABLE.lock();
+        if let Some(file) = file_table.get_mut(file_idx) {
+            file.ftype = crate::subsystems::fs::file::FileType::EventFd;
+            file.readable = true;
+            file.writable = true;
+            file.eventfd_instance = Some(instance_idx);
+
+            // Apply flags
+            if (flags & flags::EFD_NONBLOCK) != 0 {
+                file.status_flags |= crate::posix::O_NONBLOCK;
+            }
+            // Note: EFD_CLOEXEC would need to be handled separately in exec()
+        }
+    }
+
+    // Allocate file descriptor in process
     let pid = crate::subsystems::process::manager::myproc().ok_or(SyscallError::InvalidArgument)?;
 
     let mut proc_table = crate::subsystems::process::manager::PROC_TABLE.lock();
     if let Some(proc) = proc_table.find(pid) {
         // Find free file descriptor
-        for (fd, file) in proc.ofile.iter_mut().enumerate() {
-            if file.is_none() {
-                *file = Some(crate::subsystems::fs::file::File {
-                    ftype: crate::subsystems::fs::file::FileType::EventFd,
-                    readable: true,
-                    writable: true,
-                    eventfd_instance: Some(instance_idx),
-                    ..Default::default()
-                });
-
-                // Apply flags
-                if (flags & flags::EFD_NONBLOCK) != 0 {
-                    file.as_mut().unwrap().nonblock = true;
-                }
-                if (flags & flags::EFD_CLOEXEC) != 0 {
-                    file.as_mut().unwrap().close_on_exec = true;
-                }
-
-                return Ok(fd as u64);
+        for (fd, file_slot) in proc.ofile.iter_mut().enumerate() {
+            if file_slot.is_none() {
+                *file_slot = Some(file_idx);
+                return Ok(fd as i64);
             }
         }
-        Err(SyscallError::TooManyFiles)
+        // No free file descriptor - close the allocated file
+        crate::subsystems::fs::file::file_close(file_idx);
+        Err(SyscallError::IoError)
     } else {
         Err(SyscallError::InvalidArgument)
     }

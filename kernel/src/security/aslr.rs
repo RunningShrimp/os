@@ -13,12 +13,14 @@
 
 extern crate alloc;
 
-use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
+use alloc::{collections::BTreeMap, string::ToString, sync::Arc, vec::Vec};
 use core::result::Result;
+use core::sync::atomic::Ordering;
 
 use spin::Mutex;
 
-use crate::types::stubs::{RNG_INSTANCE, VirtAddr, get_timestamp};
+use crate::types::stubs::{VirtAddr, get_timestamp};
+use crate::prelude::*;
 /// ASLR entropy bits for different memory regions
 #[derive(Debug, Clone, Copy)]
 pub struct AslrEntropy {
@@ -558,12 +560,12 @@ impl AslrSubsystem {
         }
 
         // Convert interval from seconds to ticks
-        let interval_ticks = interval as u64 * crate::subsystems::time::TICK_HZ;
+        let interval_ticks = interval as u64 * crate::subsystems::time::TIMER_FREQ;
         current_time.saturating_sub(last_time) >= interval_ticks
     }
 
     /// Update process entropy statistics
-    pub fn update_entropy_stats(&self, pid: u64, entropy_bits: u8) {
+    pub fn update_entropy_stats(&self, _pid: u64, entropy_bits: u8) {
         if entropy_bits > 24 {
             self.high_entropy_processes.fetch_add(1, Ordering::Relaxed);
         } else if entropy_bits < 16 {
@@ -1024,8 +1026,8 @@ pub enum AslrSecurityLevel {
 
 /// Benchmark ASLR performance
 pub fn benchmark_aslr_performance(iterations: usize) -> Result<(u64, u64), &'static str> {
-    let guard = crate::security::ASLR.lock();
-    if let Some(ref aslr) = *guard {
+    let mut guard = crate::security::ASLR.lock();
+    if let Some(ref mut aslr) = *guard {
         let start_time = crate::subsystems::time::get_ticks();
 
         // Benchmark randomization

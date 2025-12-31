@@ -150,10 +150,10 @@ impl Icmpv6Header {
 
         // Pseudo-header
         for chunk in source.0.chunks(2) {
-            sum += ((chunk[0] as u16) << 8) | (chunk[1] as u16);
+            sum += (((chunk[0] as u16) << 8) | (chunk[1] as u16)) as u32;
         }
         for chunk in dest.0.chunks(2) {
-            sum += ((chunk[0] as u16) << 8) | (chunk[1] as u16);
+            sum += (((chunk[0] as u16) << 8) | (chunk[1] as u16)) as u32;
         }
 
         // Upper layer packet length
@@ -163,17 +163,17 @@ impl Icmpv6Header {
         sum += 58u32;
 
         // ICMPv6 header
-        sum += ((self.message_type as u16) << 8) | (self.code as u16);
+        sum += (((self.message_type as u16) << 8) | (self.code as u16)) as u32;
         sum += self.checksum as u32;
 
         // Data
         let mut i = 0;
         while i < data.len() {
             if i + 1 < data.len() {
-                sum += ((data[i] as u16) << 8) | (data[i + 1] as u16);
+                sum += (((data[i] as u16) << 8) | (data[i + 1] as u16)) as u32;
                 i += 2;
             } else {
-                sum += ((data[i] as u16) << 8);
+                sum += ((data[i] as u16) << 8) as u32;
                 i += 1;
             }
         }
@@ -214,7 +214,7 @@ pub struct Icmpv6Packet {
 impl Icmpv6Packet {
     /// Create a new ICMPv6 packet
     pub fn new(message_type: Icmpv6Type, code: u8, payload: Vec<u8>) -> Self {
-        let mut header = Icmpv6Header::new(message_type, code);
+        let header = Icmpv6Header::new(message_type, code);
         Self { header, payload }
     }
 

@@ -4,6 +4,8 @@
 //! All device-related types should be defined here and re-exported from
 //! the platform module.
 
+use crate::prelude::*;
+
 /// Device type enumeration
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeviceType {

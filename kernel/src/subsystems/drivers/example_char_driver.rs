@@ -1,12 +1,10 @@
 //! 示例字符设备驱动程序
-//! 
+//!
 //! 本模块实现了一个简单的字符设备驱动程序，演示如何使用驱动程序架构
 
+use crate::prelude::*;
 use crate::subsystems::drivers::driver_manager::*;
-use crate::error::UnifiedError;
-use alloc::collections::BTreeMap;
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
+use alloc::string::ToString;
 
 /// 示例字符设备驱动程序
 pub struct ExampleCharDriver {
@@ -55,7 +53,7 @@ impl Driver for ExampleCharDriver {
         info
     }
     
-    fn initialize(&mut self) -> Result<(), KernelError> {
+    fn initialize(&mut self) -> Result<()> {
         // 更新状态为初始化中
         self.info.status = DriverStatus::Initializing;
         
@@ -68,7 +66,7 @@ impl Driver for ExampleCharDriver {
         Ok(())
     }
     
-    fn cleanup(&mut self) -> Result<(), KernelError> {
+    fn cleanup(&mut self) -> Result<()> {
         // 更新状态为停止中
         self.info.status = DriverStatus::Stopping;
         
@@ -85,7 +83,7 @@ impl Driver for ExampleCharDriver {
         Ok(())
     }
     
-    fn probe_device(&self, device_info: &DeviceInfo) -> Result<bool, KernelError> {
+    fn probe_device(&self, device_info: &DeviceInfo) -> Result<bool> {
         // 检查设备类型
         if device_info.device_type != DeviceType::Character {
             return Ok(false);
@@ -102,7 +100,7 @@ impl Driver for ExampleCharDriver {
         Ok(true)
     }
     
-    fn add_device(&mut self, device_info: &DeviceInfo) -> Result<(), KernelError> {
+    fn add_device(&mut self, device_info: &DeviceInfo) -> Result<()> {
         // 初始化设备数据
         self.device_data.insert(device_info.id, Vec::new());
         
@@ -112,7 +110,7 @@ impl Driver for ExampleCharDriver {
         Ok(())
     }
     
-    fn remove_device(&mut self, device_id: DeviceId) -> Result<(), KernelError> {
+    fn remove_device(&mut self, device_id: DeviceId) -> Result<()> {
         // 移除设备数据
         self.device_data.remove(&device_id);
         self.device_states.remove(&device_id);
@@ -120,14 +118,14 @@ impl Driver for ExampleCharDriver {
         Ok(())
     }
     
-    fn handle_io(&mut self, device_id: DeviceId, operation: IoOperation) -> Result<IoResult, KernelError> {
+    fn handle_io(&mut self, device_id: DeviceId, operation: IoOperation) -> Result<IoResult> {
         // 检查设备状态
         let device_status = self.device_states.get(&device_id)
-            .copied()
+            .cloned()
             .unwrap_or(DeviceStatus::Uninitialized);
         
         if device_status != DeviceStatus::Ready {
-            return Err(KernelError::Busy);
+            return Err(KernelError::ResourceBusy);
         }
         
         // 获取设备数据
@@ -206,23 +204,23 @@ impl Driver for ExampleCharDriver {
                     }
                 }
             },
-            IoOperation::Mmap { offset, size, permissions } => {
+            IoOperation::Mmap { offset, size, permissions: _ } => {
                 // 检查偏移量
                 let data_len = device_data.len() as u64;
                 if offset >= data_len {
                     return Err(KernelError::InvalidArgument);
                 }
-                
+
                 // 计算可映射的大小
                 let available = data_len - offset;
-                let size_to_map = size.min(available);
-                
+                let _size_to_map = size.min(available);
+
                 // 返回映射地址（模拟）
                 let address = 0x10000000 + offset;
-                
+
                 Ok(IoResult::MmapResult { address })
             },
-            IoOperation::Munmap { offset, size } => {
+            IoOperation::Munmap { offset, size: _ } => {
                 // 检查偏移量
                 let data_len = device_data.len() as u64;
                 if offset >= data_len {
@@ -236,13 +234,13 @@ impl Driver for ExampleCharDriver {
         }
     }
     
-    fn get_device_status(&self, device_id: DeviceId) -> Result<DeviceStatus, KernelError> {
+    fn get_device_status(&self, device_id: DeviceId) -> Result<DeviceStatus> {
         self.device_states.get(&device_id)
-            .copied()
+            .cloned()
             .ok_or(KernelError::NotFound)
     }
     
-    fn set_device_attribute(&mut self, device_id: DeviceId, name: &str, value: &str) -> Result<(), KernelError> {
+    fn set_device_attribute(&mut self, device_id: DeviceId, name: &str, value: &str) -> Result<()> {
         // 检查设备是否存在
         if !self.device_states.contains_key(&device_id) {
             return Err(KernelError::NotFound);
@@ -268,7 +266,7 @@ impl Driver for ExampleCharDriver {
         Ok(())
     }
     
-    fn get_device_attribute(&self, device_id: DeviceId, name: &str) -> Result<String, KernelError> {
+    fn get_device_attribute(&self, device_id: DeviceId, name: &str) -> Result<String> {
         // 检查设备是否存在
         if !self.device_states.contains_key(&device_id) {
             return Err(KernelError::NotFound);
@@ -278,7 +276,7 @@ impl Driver for ExampleCharDriver {
         match name {
             "status" => {
                 let status = self.device_states.get(&device_id)
-                    .copied()
+                    .cloned()
                     .unwrap_or(DeviceStatus::Uninitialized);
                 Ok(format!("{:?}", status))
             },
@@ -294,7 +292,7 @@ impl Driver for ExampleCharDriver {
         }
     }
     
-    fn suspend_device(&mut self, device_id: DeviceId) -> Result<(), KernelError> {
+    fn suspend_device(&mut self, device_id: DeviceId) -> Result<()> {
         // 检查设备是否存在
         if !self.device_states.contains_key(&device_id) {
             return Err(KernelError::NotFound);
@@ -308,7 +306,7 @@ impl Driver for ExampleCharDriver {
         Ok(())
     }
     
-    fn resume_device(&mut self, device_id: DeviceId) -> Result<(), KernelError> {
+    fn resume_device(&mut self, device_id: DeviceId) -> Result<()> {
         // 检查设备是否存在
         if !self.device_states.contains_key(&device_id) {
             return Err(KernelError::NotFound);
@@ -322,7 +320,7 @@ impl Driver for ExampleCharDriver {
         Ok(())
     }
     
-    fn handle_interrupt(&mut self, device_id: DeviceId, interrupt_info: &InterruptInfo) -> Result<(), KernelError> {
+    fn handle_interrupt(&mut self, device_id: DeviceId, interrupt_info: &InterruptInfo) -> Result<()> {
         // 检查设备是否存在
         if !self.device_states.contains_key(&device_id) {
             return Err(KernelError::NotFound);

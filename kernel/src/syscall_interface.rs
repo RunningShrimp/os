@@ -3,7 +3,7 @@
 //! This module provides abstract interfaces for system call handling,
 //! breaking the circular dependency between syscalls and services modules.
 
-use alloc::{string::String, sync::Arc, vec::Vec};
+use alloc::{string::String, string::ToString, sync::Arc, vec::Vec};
 
 use nos_api::Result;
 
@@ -171,8 +171,8 @@ pub trait Service {
     /// Downcast to Any trait object for dynamic typing
     ///
     /// # Returns
-    /// * `&dyn std::any::Any` - Reference to Any trait object
-    fn as_any(&self) -> &dyn std::any::Any;
+    /// * `&dyn core::any::Any` - Reference to Any trait object
+    fn as_any(&self) -> &dyn core::any::Any;
 }
 
 /// Service lifecycle status
@@ -228,6 +228,11 @@ impl ServiceMetadata {
     ///
     /// # Returns
     /// * `Self` - Service metadata
+    ///
+    /// # Note
+    /// Marked as allowed for dead code as it's part of the public API
+    /// and may be used by external modules or service implementations.
+    #[allow(dead_code)]
     pub fn new(name: &str, version: &str, description: &str) -> Self {
         Self {
             name: name.to_string(),

@@ -5,13 +5,12 @@
 //! and exclusive (write) locks. The implementation includes deadlock detection,
 //! lock upgrading/downgrading, and POSIX-compatible flock/fcntl locking.
 
-extern crate alloc;
-use alloc::{collections::BTreeMap, vec::Vec};
-// use alloc::string::String;
-use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use crate::prelude::*;
+use alloc::collections::BTreeMap;
+use core::sync::atomic::{AtomicU64, Ordering};
 
-// use crate::subsystems::process::{Process, ProcessId};
-// use crate::subsystems::fs::file_permissions::FilePermissions;
+/// Lock-specific result type
+pub type LockResult<T> = core::result::Result<T, LockError>;
 
 /// Lock type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -147,7 +146,7 @@ pub struct LockManager {
 }
 
 /// Lock statistics
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct LockStats {
     /// Total lock requests
     pub total_requests: u64,
@@ -182,7 +181,7 @@ impl LockManager {
         pid: ProcessId,
         lock_type: LockType,
         range: LockRange,
-    ) -> Result<u64, LockError> {
+    ) -> LockResult<u64> {
         // Update statistics
         {
             let mut stats = self.stats.lock();
@@ -214,7 +213,7 @@ impl LockManager {
         lock_type: LockType,
         range: LockRange,
         blocking: bool,
-    ) -> Result<u64, LockError> {
+    ) -> LockResult<u64> {
         // Update statistics
         {
             let mut stats = self.stats.lock();
@@ -235,7 +234,7 @@ impl LockManager {
 
         // Add to pending requests
         let request = LockRequest::new(pid, lock_type, range, true);
-        let request_id = request.request_id;
+        let _request_id = request.request_id;
 
         {
             let mut pending = self.pending_requests.lock();
@@ -251,7 +250,7 @@ impl LockManager {
     }
 
     /// Release a lock
-    pub fn unlock(&self, inode: u32, pid: ProcessId, lock_id: u64) -> Result<(), LockError> {
+    pub fn unlock(&self, inode: u32, pid: ProcessId, lock_id: u64) -> LockResult<()> {
         let mut active_locks = self.active_locks.lock();
         let locks = active_locks.get_mut(&inode).ok_or(LockError::NoLock)?;
 
@@ -261,7 +260,7 @@ impl LockManager {
             .position(|l| l.lock_id == lock_id && l.pid == pid)
             .ok_or(LockError::NoLock)?;
 
-        let removed_lock = locks.remove(lock_pos);
+        let _removed_lock = locks.remove(lock_pos);
 
         // Clean up if no more locks for this inode
         if locks.is_empty() {
@@ -363,7 +362,7 @@ impl LockManager {
         let mut pending_requests = self.pending_requests.lock();
         let requests = pending_requests.get_mut(&inode);
 
-        if requests.is_none() || requests.unwrap().is_empty() {
+        if requests.is_none() || requests.as_ref().unwrap().is_empty() {
             return;
         }
 
@@ -402,7 +401,7 @@ impl LockManager {
     }
 
     /// Upgrade a lock (shared to exclusive)
-    pub fn upgrade_lock(&self, inode: u32, pid: ProcessId, lock_id: u64) -> Result<u64, LockError> {
+    pub fn upgrade_lock(&self, inode: u32, pid: ProcessId, lock_id: u64) -> LockResult<u64> {
         let mut active_locks = self.active_locks.lock();
         let locks = active_locks.get_mut(&inode).ok_or(LockError::NoLock)?;
 
@@ -455,7 +454,7 @@ impl LockManager {
         inode: u32,
         pid: ProcessId,
         lock_id: u64,
-    ) -> Result<u64, LockError> {
+    ) -> LockResult<u64> {
         let mut active_locks = self.active_locks.lock();
         let locks = active_locks.get_mut(&inode).ok_or(LockError::NoLock)?;
 
@@ -623,7 +622,7 @@ pub fn acquire_shared_lock(
     pid: ProcessId,
     range: LockRange,
     blocking: bool,
-) -> Result<FileLock, LockError> {
+) -> LockResult<FileLock> {
     if let Some(lm) = get_lock_manager() {
         let lock_id = lm.lock(inode, pid, LockType::Shared, range, blocking)?;
         Ok(FileLock::new(inode, lock_id, LockType::Shared, range))
@@ -638,7 +637,7 @@ pub fn acquire_exclusive_lock(
     pid: ProcessId,
     range: LockRange,
     blocking: bool,
-) -> Result<FileLock, LockError> {
+) -> LockResult<FileLock> {
     if let Some(lm) = get_lock_manager() {
         let lock_id = lm.lock(inode, pid, LockType::Exclusive, range, blocking)?;
         Ok(FileLock::new(inode, lock_id, LockType::Exclusive, range))
@@ -648,12 +647,10 @@ pub fn acquire_exclusive_lock(
 }
 
 /// Helper function to release a lock
-pub fn release_lock(file_lock: FileLock, pid: ProcessId) -> Result<(), LockError> {
+pub fn release_lock(file_lock: FileLock, pid: ProcessId) -> LockResult<()> {
     if let Some(lm) = get_lock_manager() {
         lm.unlock(file_lock.inode, pid, file_lock.lock_id)
     } else {
         Err(LockError::InvalidOperation)
     }
 }
-
-use crate::subsystems::sync::Mutex;

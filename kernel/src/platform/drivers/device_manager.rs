@@ -479,6 +479,12 @@ impl core::fmt::Display for DeviceManagerError {
     }
 }
 
+impl From<DeviceManagerError> for nos_api::Error {
+    fn from(error: DeviceManagerError) -> Self {
+        nos_api::Error::from(error.to_string())
+    }
+}
+
 impl DeviceManager {
     /// 创建新的设备管理器
     pub fn new() -> Self {
@@ -872,7 +878,7 @@ impl DeviceManager {
         Ok(())
     }
 
-    fn detect_device_capabilities(&self, device: &Device) -> DeviceCapabilities {
+    fn detect_device_capabilities(&self, _device: &Device) -> DeviceCapabilities {
         // 根据设备类型和能力检测设备能力
         DeviceCapabilities {
             hotplug_support: true,
@@ -885,31 +891,21 @@ impl DeviceManager {
         }
     }
 
-    fn notify_device_connected(&self, device: &Device) -> Result<(), DeviceManagerError> {
-        crate::println!("[device_manager] 通知设备连接: {}", device.name);
 
-        // 通知相关组件
-        self.statistics
-            .device_connect_events
-            .fetch_add(1, Ordering::SeqCst);
-
-        Ok(())
-    }
-
+    /// Notify that a device was disconnected
     fn notify_device_disconnected(&self, device: &Device) -> Result<(), DeviceManagerError> {
         crate::println!("[device_manager] 通知设备断开: {}", device.name);
 
-        self.statistics
-            .device_disconnect_events
-            .fetch_add(1, Ordering::SeqCst);
+        // 通知相关监听器和驱动程序
+        // TODO: 实现设备断开通知逻辑
 
         Ok(())
     }
 
     fn notify_driver_device_removed(
         &self,
-        driver_name: &str,
-        device: &Device,
+        _driver_name: &str,
+        _device: &Device,
     ) -> Result<(), DeviceManagerError> {
         // 通知驱动程序设备移除
         // TODO: Implement driver notification
@@ -963,7 +959,7 @@ impl DeviceManager {
 
         // 查找对应的设备并标记错误状态
         let mut devices = self.devices.lock();
-        for (device_id, managed_device) in devices.iter_mut() {
+        for (_device_id, managed_device) in devices.iter_mut() {
             if self.device_matches_event(&managed_device.device, &event) {
                 managed_device.managed_status = ManagedDeviceStatus::Error;
                 self.statistics.error_devices.fetch_add(1, Ordering::SeqCst);
@@ -1148,10 +1144,8 @@ impl DeviceResourceManager {
 
         // 分配DMA资源
         for &channel in &device.resources.dma_channels {
-            if channel <= u8::MAX as u32 {
-                let resource = DmaResource { channel: channel as u8 };
-                self.allocate_dma_resource(&resource, device.id)?;
-            }
+            let resource = DmaResource { channel };
+            self.allocate_dma_resource(&resource, device.id)?;
         }
 
         Ok(())

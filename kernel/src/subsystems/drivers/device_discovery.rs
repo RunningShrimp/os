@@ -4,20 +4,20 @@
 //! supporting various bus types (PCI, USB, etc.) and automatic device detection.
 
 extern crate alloc;
-use alloc::vec::Vec;
-use alloc::collections::BTreeMap;
-use alloc::string::{String, ToString};
-use alloc::sync::Arc;
-use core::sync::atomic::{AtomicU64, AtomicU32, AtomicBool, Ordering};
-use crate::subsystems::sync::{Mutex, Sleeplock};
+
+// Core imports from prelude
+use crate::prelude::*;
+
+// Additional specific imports
+use alloc::string::ToString;
+use core::sync::atomic::Ordering;
 use crate::subsystems::drivers::driver_manager::{
-    DeviceId, DriverId, DeviceType, DeviceStatus, DeviceInfo, DeviceResources
+    DeviceId, DeviceInfo, DeviceResources
 };
 use crate::subsystems::drivers::device_model::{
     DeviceModel, EnhancedDeviceInfo, DeviceClass, DevicePowerState, DeviceCapabilities,
     EnhancedDeviceModel, get_enhanced_device_model
 };
-use crate::error::UnifiedError;
 
 // ============================================================================
 // Device Discovery Constants
@@ -43,7 +43,7 @@ pub const USB_DEVICE_DESC_SIZE: usize = 18;
 // ============================================================================
 
 /// Bus types for device discovery
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum BusType {
     /// PCI bus
@@ -286,22 +286,22 @@ pub trait BusDiscovery {
     fn get_bus_type(&self) -> BusType;
     
     /// Initialize bus discovery
-    fn initialize(&mut self) -> Result<(), KernelError>;
-    
+    fn initialize(&mut self) -> Result<()>;
+
     /// Cleanup bus discovery
-    fn cleanup(&mut self) -> Result<(), KernelError>;
-    
+    fn cleanup(&mut self) -> Result<()>;
+
     /// Discover devices on this bus
-    fn discover_devices(&mut self) -> Result<Vec<DeviceIdentification>, KernelError>;
-    
+    fn discover_devices(&mut self) -> Result<Vec<DeviceIdentification>>;
+
     /// Check if device is present
-    fn is_device_present(&self, device_id: &DeviceIdentification) -> Result<bool, KernelError>;
-    
+    fn is_device_present(&self, device_id: &DeviceIdentification) -> Result<bool>;
+
     /// Get device information
-    fn get_device_info(&self, device_id: &DeviceIdentification) -> Result<DeviceInfo, KernelError>;
-    
+    fn get_device_info(&self, device_id: &DeviceIdentification) -> Result<DeviceInfo>;
+
     /// Enable/disable hot-plug detection
-    fn set_hotplug_detection(&mut self, enabled: bool) -> Result<(), KernelError>;
+    fn set_hotplug_detection(&mut self, enabled: bool) -> Result<()>;
     
     /// Get bus statistics
     fn get_bus_stats(&self) -> BTreeMap<String, u64>;
@@ -331,8 +331,6 @@ pub struct DeviceDiscoveryManager {
     discovery_in_progress: AtomicBool,
     /// Last discovery time
     last_discovery_time: AtomicU64,
-    /// Next event ID
-    next_event_id: AtomicU32,
 }
 
 impl DeviceDiscoveryManager {
@@ -348,16 +346,15 @@ impl DeviceDiscoveryManager {
             hotplug_detection_enabled: AtomicBool::new(true),
             discovery_in_progress: AtomicBool::new(false),
             last_discovery_time: AtomicU64::new(0),
-            next_event_id: AtomicU32::new(1),
         }
     }
 
     /// Initialize the discovery manager
-    pub fn initialize(&mut self) -> Result<(), KernelError> {
+    pub fn initialize(&mut self) -> Result<()> {
         // Get device model
         self.device_model = get_enhanced_device_model();
         if self.device_model.is_none() {
-            return Err(KernelError::InvalidState);
+            return Err(UnifiedError::Other("Invalid state: device model not available".to_string()));
         }
 
         // Initialize all bus discoveries
@@ -378,7 +375,7 @@ impl DeviceDiscoveryManager {
     }
 
     /// Register a bus discovery implementation
-    pub fn register_bus_discovery(&mut self, bus_type: BusType, discovery: Box<dyn BusDiscovery>) -> Result<(), KernelError> {
+    pub fn register_bus_discovery(&mut self, bus_type: BusType, discovery: Box<dyn BusDiscovery>) -> Result<()> {
         // Initialize the discovery
         let mut discovery = discovery;
         discovery.initialize()?;
@@ -394,7 +391,7 @@ impl DeviceDiscoveryManager {
     }
 
     /// Unregister a bus discovery implementation
-    pub fn unregister_bus_discovery(&mut self, bus_type: BusType) -> Result<(), KernelError> {
+    pub fn unregister_bus_discovery(&mut self, bus_type: BusType) -> Result<()> {
         // Remove from bus discoveries
         let discovery = {
             let mut bus_discoveries = self.bus_discoveries.lock();
@@ -411,9 +408,9 @@ impl DeviceDiscoveryManager {
     }
 
     /// Discover all devices
-    pub fn discover_all_devices(&mut self) -> Result<Vec<DeviceId>, KernelError> {
+    pub fn discover_all_devices(&mut self) -> Result<Vec<DeviceId>> {
         if self.discovery_in_progress.load(Ordering::SeqCst) {
-            return Err(KernelError::Busy);
+            return Err(UnifiedError::ResourceBusy);
         }
 
         self.discovery_in_progress.store(true, Ordering::SeqCst);
@@ -434,22 +431,29 @@ impl DeviceDiscoveryManager {
         let mut failed_discoveries = 0;
 
         // Discover devices on each bus
-        {
+        // Collect device IDs first to avoid holding lock while processing
+        let devices_to_process: Vec<(BusType, Vec<DeviceIdentification>)> = {
             let mut bus_discoveries = self.bus_discoveries.lock();
-            for (bus_type, discovery) in bus_discoveries.iter_mut() {
-                match discovery.discover_devices() {
-                    Ok(device_ids) => {
-                        for device_id in device_ids {
-                            match self.process_discovered_device(*bus_type, device_id) {
-                                Ok(device_id) => {
-                                    discovered_devices.push(device_id);
-                                    successful_discoveries += 1;
-                                }
-                                Err(_) => {
-                                    failed_discoveries += 1;
-                                }
-                            }
+            bus_discoveries.iter_mut()
+                .filter_map(|(bus_type, discovery)| {
+                    match discovery.discover_devices() {
+                        Ok(device_ids) => Some((*bus_type, device_ids)),
+                        Err(_) => {
+                            failed_discoveries += 1;
+                            None
                         }
+                    }
+                })
+                .collect()
+        };
+
+        // Process discovered devices without holding the lock
+        for (bus_type, device_identifications) in devices_to_process {
+            for device_identification in device_identifications {
+                match self.process_discovered_device(bus_type, device_identification) {
+                    Ok(device_id) => {
+                        discovered_devices.push(device_id);
+                        successful_discoveries += 1;
                     }
                     Err(_) => {
                         failed_discoveries += 1;
@@ -482,9 +486,9 @@ impl DeviceDiscoveryManager {
     }
 
     /// Discover devices on a specific bus
-    pub fn discover_devices_on_bus(&mut self, bus_type: BusType) -> Result<Vec<DeviceId>, KernelError> {
+    pub fn discover_devices_on_bus(&mut self, bus_type: BusType) -> Result<Vec<DeviceId>> {
         if self.discovery_in_progress.load(Ordering::SeqCst) {
-            return Err(KernelError::Busy);
+            return Err(UnifiedError::ResourceBusy);
         }
 
         self.discovery_in_progress.store(true, Ordering::SeqCst);
@@ -493,25 +497,31 @@ impl DeviceDiscoveryManager {
         let mut discovered_devices = Vec::new();
 
         // Discover devices on the specified bus
-        {
+        // Collect device IDs first to avoid holding lock while processing
+        let device_identifications: Vec<DeviceIdentification> = {
             let mut bus_discoveries = self.bus_discoveries.lock();
-            if let Some(discovery) = bus_discoveries.get_mut(&bus_type) {
-                match discovery.discover_devices() {
-                    Ok(device_ids) => {
-                        for device_id in device_ids {
-                            match self.process_discovered_device(bus_type, device_id) {
-                                Ok(device_id) => {
-                                    discovered_devices.push(device_id);
-                                }
-                                Err(_) => {
-                                    // Log error but continue with other devices
-                                }
-                            }
+            match bus_discoveries.get_mut(&bus_type) {
+                Some(discovery) => {
+                    match discovery.discover_devices() {
+                        Ok(ids) => ids,
+                        Err(e) => {
+                            crate::println!("discovery: failed to discover {} devices: {:?}", bus_type.name(), e);
+                            Vec::new()
                         }
                     }
-                    Err(e) => {
-                        crate::println!("discovery: failed to discover {} devices: {:?}", bus_type.name(), e);
-                    }
+                }
+                None => Vec::new()
+            }
+        };
+
+        // Process discovered devices without holding the lock
+        for device_identification in device_identifications {
+            match self.process_discovered_device(bus_type, device_identification) {
+                Ok(device_id) => {
+                    discovered_devices.push(device_id);
+                }
+                Err(_) => {
+                    // Log error but continue with other devices
                 }
             }
         }
@@ -544,7 +554,7 @@ impl DeviceDiscoveryManager {
     }
 
     /// Enable/disable hot-plug detection
-    pub fn enable_hotplug_detection(&self) -> Result<(), KernelError> {
+    pub fn enable_hotplug_detection(&self) -> Result<()> {
         self.hotplug_detection_enabled.store(true, Ordering::SeqCst);
 
         // Enable hot-plug detection for all buses
@@ -560,7 +570,7 @@ impl DeviceDiscoveryManager {
     }
 
     /// Disable hot-plug detection
-    pub fn disable_hotplug_detection(&self) -> Result<(), KernelError> {
+    pub fn disable_hotplug_detection(&self) -> Result<()> {
         self.hotplug_detection_enabled.store(false, Ordering::SeqCst);
 
         // Disable hot-plug detection for all buses
@@ -603,7 +613,7 @@ impl DeviceDiscoveryManager {
     }
 
     /// Periodic maintenance task
-    pub fn periodic_maintenance(&mut self) -> Result<(), KernelError> {
+    pub fn periodic_maintenance(&mut self) -> Result<()> {
         // Check if we need to run auto discovery
         if self.auto_discovery_enabled.load(Ordering::SeqCst) {
             let current_time = self.get_current_time();
@@ -619,14 +629,14 @@ impl DeviceDiscoveryManager {
     }
 
     /// Process a discovered device
-    fn process_discovered_device(&mut self, bus_type: BusType, device_id: DeviceIdentification) -> Result<DeviceId, KernelError> {
+    fn process_discovered_device(&mut self, bus_type: BusType, device_id: DeviceIdentification) -> Result<DeviceId> {
         // Get device info from bus discovery
         let device_info = {
             let bus_discoveries = self.bus_discoveries.lock();
             if let Some(discovery) = bus_discoveries.get(&bus_type) {
                 discovery.get_device_info(&device_id)?
             } else {
-                return Err(KernelError::NotFound);
+                return Err(UnifiedError::NotFound);
             }
         };
 
@@ -642,7 +652,7 @@ impl DeviceDiscoveryManager {
                 DiscoveryEventType::DeviceDiscovered,
                 Some(device_id),
                 bus_type,
-                Some(device_id),
+                None,  // device_identification not available at this level
                 Vec::new()
             )?;
 
@@ -654,7 +664,7 @@ impl DeviceDiscoveryManager {
 
             Ok(device_id)
         } else {
-            Err(KernelError::InvalidState)
+            Err(UnifiedError::Other("Invalid state: device model not available".to_string()))
         }
     }
 
@@ -664,7 +674,7 @@ impl DeviceDiscoveryManager {
         device_info: DeviceInfo,
         bus_type: BusType,
         device_identification: DeviceIdentification,
-    ) -> Result<EnhancedDeviceInfo, KernelError> {
+    ) -> Result<EnhancedDeviceInfo> {
         // Determine device class based on identification
         let device_class = self.determine_device_class(&device_identification);
 
@@ -679,6 +689,12 @@ impl DeviceDiscoveryManager {
         enhanced_info.parent_id = 0; // Root device by default
         enhanced_info.depth = 0;
         enhanced_info.power_state = DevicePowerState::Unknown;
+
+        // Add bus type to device attributes for identification and filtering
+        enhanced_info.base_info.attributes.insert(
+            "bus_type".to_string(),
+            bus_type.name().to_string()
+        );
 
         // Set additional identification info
         match device_identification {
@@ -728,26 +744,26 @@ impl DeviceDiscoveryManager {
             }
             DeviceIdentification::Usb(usb_id) => {
                 match usb_id.device_class {
-                    0x01 => DeviceClass::Audio,
+                    0x01 => DeviceClass::Multimedia,  // Audio
                     0x02 => DeviceClass::Communication,
                     0x03 => DeviceClass::HumanInterface,
                     0x08 => DeviceClass::Storage,
-                    0x09 => DeviceClass::Hub,
+                    0x09 => DeviceClass::Bus,  // Hub
                     0x0A => DeviceClass::Communication,
-                    0x0B => DeviceClass::SmartCard,
-                    0x0D => DeviceClass::ContentSecurity,
-                    0x10 => DeviceClass::Audio,
-                    0x11 => DeviceClass::Video,
-                    0xDC => DeviceClass::Diagnostic,
-                    0xE0 => DeviceClass::Wireless,
-                    0xEF => DeviceClass::Miscellaneous,
-                    0xFE => DeviceClass::ApplicationSpecific,
-                    0xFF => DeviceClass::VendorSpecific,
+                    0x0B => DeviceClass::Custom,  // SmartCard
+                    0x0D => DeviceClass::Custom,  // ContentSecurity
+                    0x10 => DeviceClass::Multimedia,  // Audio
+                    0x11 => DeviceClass::Multimedia,  // Video
+                    0xDC => DeviceClass::Custom,  // Diagnostic
+                    0xE0 => DeviceClass::Custom,  // Wireless
+                    0xEF => DeviceClass::Custom,  // Miscellaneous
+                    0xFE => DeviceClass::Custom,  // ApplicationSpecific
+                    0xFF => DeviceClass::Custom,  // VendorSpecific
                     _ => DeviceClass::Custom,
                 }
             }
             DeviceIdentification::Acpi(_) => DeviceClass::System,
-            DeviceIdentification::Platform(_) => DeviceClass::Platform,
+            DeviceIdentification::Platform(_) => DeviceClass::System,  // Platform -> System
             DeviceIdentification::Custom(_) => DeviceClass::Custom,
         }
     }
@@ -790,7 +806,7 @@ impl DeviceDiscoveryManager {
         bus_type: BusType,
         device_identification: Option<DeviceIdentification>,
         data: Vec<u8>,
-    ) -> Result<(), KernelError> {
+    ) -> Result<()> {
         let event = DiscoveryEvent {
             event_type,
             timestamp: self.get_current_time(),
@@ -829,7 +845,7 @@ impl Default for DeviceDiscoveryManager {
 static mut DEVICE_DISCOVERY_MANAGER: Option<DeviceDiscoveryManager> = None;
 
 /// Initialize device discovery manager
-pub fn init() -> Result<(), KernelError> {
+pub fn init() -> Result<()> {
     unsafe {
         let mut manager = DeviceDiscoveryManager::new();
         manager.initialize()?;

@@ -4,10 +4,9 @@
 
 use alloc::collections::BTreeMap;
 
-use spin::Mutex;
-
 /// 系统调用类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
 pub enum SyscallType {
     Read = 0,
     Write = 1,

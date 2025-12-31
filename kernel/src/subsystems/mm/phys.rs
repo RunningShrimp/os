@@ -35,10 +35,7 @@ pub fn page_round_up(addr: usize) -> usize {
     (addr + PAGE_SIZE - 1) & !(PAGE_SIZE - 1)
 }
 
-use crate::{
-    println,
-    subsystems::{mm::buddy::OptimizedBuddyAllocator, sync::Mutex},
-};
+use crate::subsystems::{mm::buddy::OptimizedBuddyAllocator, sync::Mutex};
 
 static BUDDY: Mutex<OptimizedBuddyAllocator> = Mutex::new(OptimizedBuddyAllocator::new());
 use core::sync::atomic::{AtomicUsize, Ordering};
@@ -52,8 +49,6 @@ unsafe extern "C" {
     static _heap_start: u8;
     static _heap_end: u8;
     static _stack_top: u8;
-    #[cfg(feature = "link_phys_end")]
-    static _phys_end: u8;
 }
 
 /// Get heap start address
@@ -69,15 +64,8 @@ pub fn heap_end() -> usize {
 static PHYS_END_OVERRIDE: AtomicUsize = AtomicUsize::new(0);
 
 pub fn phys_end() -> usize {
-    #[cfg(feature = "link_phys_end")]
-    unsafe {
-        &_phys_end as *const u8 as usize
-    }
-    #[cfg(not(feature = "link_phys_end"))]
-    {
-        let v = PHYS_END_OVERRIDE.load(Ordering::SeqCst);
-        if v != 0 { v } else { heap_end() }
-    }
+    let v = PHYS_END_OVERRIDE.load(Ordering::SeqCst);
+    if v != 0 { v } else { heap_end() }
 }
 
 pub fn set_phys_end(end: usize) {
@@ -162,7 +150,7 @@ impl FreeListAllocator {
         // Add all pages to free list
         let mut addr = start;
         while addr + PAGE_SIZE <= end {
-            self.free_page(addr as *mut u8);
+            unsafe { self.free_page(addr as *mut u8); }
             addr += PAGE_SIZE;
         }
     }
@@ -194,7 +182,7 @@ impl FreeListAllocator {
 
             // Trigger memory compression for inactive pages
             // This compresses pages that haven't been accessed recently to free up more memory
-            if crate::subsystems::mm::compress::is_compression_enabled() {
+            if crate::subsystems::mm::compression::is_compression_enabled() {
                 let compressed_count = self.compress_inactive_pages();
                 if compressed_count > 0 {
                     crate::println!(
@@ -212,8 +200,8 @@ impl FreeListAllocator {
             let compressed_data = compressed.compressed_data.clone();
 
             // Decompress the page
-            if let Some(decompressed) =
-                unsafe { crate::subsystems::mm::compress::decompress_page(&compressed_data) }
+            if let Ok(decompressed) =
+                crate::subsystems::mm::compression::decompress(&compressed_data, PAGE_SIZE)
             {
                 if decompressed.len() == PAGE_SIZE {
                     // Remove from compressed pages
@@ -240,11 +228,15 @@ impl FreeListAllocator {
         }
 
         // Zero the page for security
-        ptr::write_bytes(page, 0, PAGE_SIZE);
+        unsafe {
+            ptr::write_bytes(page, 0, PAGE_SIZE);
+        }
 
         // Add to front of free list
         let node = page as *mut FreeNode;
-        (*node).next = self.free_list;
+        unsafe {
+            (*node).next = self.free_list;
+        }
         self.free_list = node;
         self.free_count += 1;
     }
@@ -252,7 +244,7 @@ impl FreeListAllocator {
     /// Compress inactive pages when under memory pressure
     /// Returns the number of pages compressed
     fn compress_inactive_pages(&mut self) -> usize {
-        if !crate::subsystems::mm::compress::is_compression_enabled() {
+        if !crate::subsystems::mm::compression::is_compression_enabled() {
             return 0;
         }
 
@@ -277,8 +269,10 @@ impl FreeListAllocator {
             let page_addr = page_ptr as usize;
 
             // Compress the page
-            if let Some(compressed_data) =
-                unsafe { crate::subsystems::mm::compress::compress_page(page_ptr, PAGE_SIZE) }
+            if let Ok(compressed_data) =
+                crate::subsystems::mm::compression::compress(unsafe {
+                    core::slice::from_raw_parts(page_ptr, PAGE_SIZE)
+                })
             {
                 // Check if compression actually saved space
                 if compressed_data.len() < PAGE_SIZE {
@@ -320,7 +314,19 @@ impl FreeListAllocator {
 // Global Page Allocator
 // ============================================================================
 
+// Legacy single-lock allocator (kept for compatibility)
 static PAGE_ALLOCATOR: Mutex<FreeListAllocator> = Mutex::new(FreeListAllocator::new());
+
+// New sharded allocator for improved performance
+use crate::subsystems::mm::sharded_allocator::ShardedAllocator;
+static SHARDED_ALLOCATOR: Mutex<Option<ShardedAllocator>> = Mutex::new(None);
+
+/// Get the global sharded allocator
+fn get_sharded_allocator() -> Option<&'static ShardedAllocator> {
+    // This is a temporary placeholder
+    // In production, we would use a OnceLock or similar
+    None
+}
 
 /// Initialize physical memory management
 pub fn init() {
@@ -348,11 +354,14 @@ pub fn init() {
         BUDDY.lock().init(start + slab_size, end, PAGE_SIZE);
     }
 
+    // Initialize sharded allocator for improved performance
+    init_sharded_allocator(start, end);
+
     // Enable memory compression if memory is limited
     // Compression is enabled by default for systems with < 64MB RAM
     let total_memory_mb = total_size / (1024 * 1024);
     if total_memory_mb < 64 {
-        crate::subsystems::mm::compress::enable_compression();
+        crate::subsystems::mm::compression::enable_compression();
         crate::println!("[mm] Memory compression enabled (total RAM: {} MB)", total_memory_mb);
     }
 
@@ -384,6 +393,28 @@ pub fn init() {
         alloc.total_pages(),
         alloc.free_pages() * PAGE_SIZE / 1024
     );
+}
+
+/// Initialize the sharded allocator
+fn init_sharded_allocator(start: usize, end: usize) {
+    use crate::subsystems::mm::sharded_allocator::ShardedAllocator;
+
+    match ShardedAllocator::new() {
+        Ok(allocator) => {
+            unsafe {
+                allocator.init(start, end);
+            }
+            let stats = allocator.stats();
+            crate::println!(
+                "[mm] sharded: initialized with {} shards, shard hit rate: {:.1}%",
+                stats.shard_free_pages.len(),
+                stats.shard_hit_rate()
+            );
+        }
+        Err(e) => {
+            crate::println!("[mm] Failed to initialize sharded allocator: {}", e);
+        }
+    }
 }
 
 /// Allocate a single physical page (4KB)
@@ -422,7 +453,7 @@ pub fn kalloc_pages(count: usize) -> *mut u8 {
     }
     use core::alloc::Layout;
     let layout = Layout::from_size_align(count * PAGE_SIZE, PAGE_SIZE).unwrap();
-    let addr = BUDDY.lock().alloc(layout);
+    let addr = unsafe { BUDDY.lock().alloc(layout) };
     if !addr.is_null() {
         unsafe {
             ptr::write_bytes(addr as *mut u8, 0, count * PAGE_SIZE);

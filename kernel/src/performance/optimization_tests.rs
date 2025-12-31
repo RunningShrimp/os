@@ -14,7 +14,7 @@ use alloc::{string::String, vec::Vec, collections::BTreeMap};
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use crate::subsystems::sync::{Mutex, SpinLock};
 use crate::subsystems::mm::optimized_memory_manager::get_optimized_memory_stats;
-use crate::vfs::optimized_filesystem::get_optimized_fs_stats;
+use crate::subsystems::fs::vfs::optimized_filesystem::get_optimized_fs_stats;
 use crate::io::optimized_io_manager::get_optimized_io_stats;
 use crate::performance::monitoring::{get_performance_report, update_perf_metric};
 

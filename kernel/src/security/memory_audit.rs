@@ -4,7 +4,7 @@
 //! Detects unsafe code patterns, validates memory operations, and tracks memory leaks.
 
 extern crate alloc;
-use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use alloc::{collections::BTreeMap, string::String, string::ToString, vec::Vec};
 
 /// Memory safety audit result
 #[derive(Debug, Clone)]
@@ -91,8 +91,24 @@ impl Default for MemoryAuditConfig {
     }
 }
 
+impl MemoryAuditConfig {
+    pub const fn default() -> Self {
+        Self {
+            check_unsafe_blocks: true,
+            check_raw_pointers: true,
+            check_buffer_operations: true,
+            track_allocations: true,
+            detect_leaks: true,
+        }
+    }
+
+    pub const fn new() -> Self {
+        Self::default()
+    }
+}
+
 impl MemoryAuditor {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             findings: Vec::new(),
             statistics: MemoryStatistics {
@@ -104,7 +120,7 @@ impl MemoryAuditor {
                 unsafe_operations_count: 0,
                 safe_operations_count: 0,
             },
-            config: MemoryAuditConfig::default(),
+            config: MemoryAuditConfig::new(),
         }
     }
 
@@ -135,7 +151,7 @@ impl MemoryAuditor {
         let score = self.calculate_safety_score();
 
         MemoryAuditResult {
-            timestamp: crate::subsystems::time::current_time_ns(),
+            timestamp: crate::subsystems::time::get_timestamp_nanos(),
             findings: self.findings.clone(),
             statistics: self.statistics.clone(),
             score,

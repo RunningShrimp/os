@@ -14,6 +14,11 @@ impl UnifiedScheduler {
     pub fn new() -> Self {
         Self { quantum: 10000 }
     }
+
+    /// Const constructor for static initialization
+    pub const fn const_new() -> Self {
+        Self { quantum: 10000 }
+    }
 }
 
 /// Initialize unified scheduler
@@ -24,7 +29,7 @@ pub fn init_unified_scheduler() -> Result<()> {
 
 /// Get unified scheduler
 pub fn get_unified_scheduler() -> Option<&'static UnifiedScheduler> {
-    static SCHEDULER: UnifiedScheduler = UnifiedScheduler::new();
+    static SCHEDULER: UnifiedScheduler = UnifiedScheduler::const_new();
     Some(&SCHEDULER)
 }
 

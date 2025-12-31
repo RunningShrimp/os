@@ -6,7 +6,7 @@
 
 extern crate alloc;
 
-use alloc::{collections::BTreeMap, string::String, vec::Vec};
+use alloc::{collections::BTreeMap, string::String, string::ToString, vec::Vec};
 use core::mem::size_of;
 
 use crate::process::elf::{ElfError, ElfLoader};
@@ -644,35 +644,59 @@ impl DynamicLinker {
 
     /// Read library file from filesystem
     fn read_library_file(&self, path: &str) -> Result<Vec<u8>, ElfError> {
-        // Try direct path first
-        if let Ok(mut file) = crate::vfs::vfs().open(path, crate::posix::O_RDONLY as u32) {
-            let mut data = Vec::new();
-            let mut buffer = [0u8; 4096];
-            loop {
-                match file.read(buffer.as_mut_ptr() as usize, buffer.len()) {
-                    Ok(0) => break,
-                    Ok(n) => data.extend_from_slice(&buffer[..n]),
-                    Err(_) => break,
-                }
-            }
-            return Ok(data);
-        }
-
-        // Try search paths
-        for search_path in &self.search_paths {
-            let full_path = format!("{}/{}", search_path, path);
-            if let Ok(mut file) = crate::vfs::vfs().open(&full_path, crate::posix::O_RDONLY as u32)
-            {
+        // Use the VFS file API to open and read the file
+        // First try direct path
+        match crate::subsystems::fs::api::file_ops::open(path, crate::posix::O_RDONLY as u32, 0) {
+            Ok(handle) => {
                 let mut data = Vec::new();
                 let mut buffer = [0u8; 4096];
+                let buffer_len = buffer.len();
                 loop {
-                    match file.read(buffer.as_mut_ptr() as usize, buffer.len()) {
+                    match crate::subsystems::fs::api::file_ops::read(
+                        handle,
+                        &mut buffer,
+                        0,
+                        buffer_len,
+                    ) {
                         Ok(0) => break,
                         Ok(n) => data.extend_from_slice(&buffer[..n]),
                         Err(_) => break,
                     }
                 }
+                let _ = crate::subsystems::fs::api::file_ops::close(handle);
                 return Ok(data);
+            },
+            Err(_) => {},
+        }
+
+        // Try search paths
+        for search_path in &self.search_paths {
+            let full_path = format!("{}/{}", search_path, path);
+            match crate::subsystems::fs::api::file_ops::open(
+                &full_path,
+                crate::posix::O_RDONLY as u32,
+                0,
+            ) {
+                Ok(handle) => {
+                    let mut data = Vec::new();
+                    let mut buffer = [0u8; 4096];
+                    let buffer_len = buffer.len();
+                    loop {
+                        match crate::subsystems::fs::api::file_ops::read(
+                            handle,
+                            &mut buffer,
+                            0,
+                            buffer_len,
+                        ) {
+                            Ok(0) => break,
+                            Ok(n) => data.extend_from_slice(&buffer[..n]),
+                            Err(_) => break,
+                        }
+                    }
+                    let _ = crate::subsystems::fs::api::file_ops::close(handle);
+                    return Ok(data);
+                },
+                Err(_) => {},
             }
         }
 

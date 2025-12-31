@@ -116,10 +116,10 @@ impl MarkovState {
             let seq = self.current[i..].to_vec();
             if let Some(transitions) = self.transitions.get(&seq) {
                 // Find the most frequent transition
-                if let Some((&next_page, &_count)) =
-                    transitions.iter().max_by_key(|(_, &count)| count)
+                if let Some((next_page, _count)) =
+                    transitions.iter().max_by_key(|(_, count)| *count)
                 {
-                    return Some(next_page);
+                    return Some(*next_page);
                 }
             }
         }
@@ -312,13 +312,13 @@ impl AdaptivePrefetcher {
     }
 
     /// Issue a prefetch command
-    fn issue_prefetch(&self, addr: usize) {
+    fn issue_prefetch(&self, _addr: usize) {
         // In a real implementation, this would interact with the MMU
         // to issue a hardware prefetch or populate the cache
 
         // For now, just log the prefetch
         #[cfg(feature = "debug")]
-        crate::println!("[prefetch] Prefetching address: 0x{:x}", addr);
+        crate::println!("[prefetch] Prefetching address: 0x{:x}", _addr);
     }
 
     /// Get current prefetch statistics

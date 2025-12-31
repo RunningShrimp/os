@@ -7,8 +7,8 @@
 //! - sigaltstack() - Set alternate signal stack
 //! - pthread_sigmask() - Set thread signal mask
 
-use crate::posix::advanced_signal::*;
-use crate::posix::{SigSet, SigVal, Timespec, StackT, SigInfoT};
+use crate::subsystems::posix::advanced_signal::*;
+use crate::subsystems::posix::{SigSet, SigVal, Timespec, StackT, SigInfoT};
 use crate::subsystems::syscalls::common::{SyscallError, SyscallResult);
 use crate::process::myproc;
 

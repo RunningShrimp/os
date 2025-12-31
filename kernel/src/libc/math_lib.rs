@@ -12,9 +12,11 @@ use crate::libc::error::{
     set_errno,
 };
 
+use core::ffi::{c_double, c_float};
+
 /// 数学常量
 pub mod math_constants {
-    use crate::libc::c_double;
+    use core::ffi::c_double;
     /// π (pi)
     pub const M_PI: c_double = 3.14159265358979323846;
     /// e (自然对数底)
@@ -437,13 +439,11 @@ impl EnhancedMathLib {
         // 简化的Gamma函数实现
         // 使用Gamma(n+1) = n * Gamma(n) 的递推关系
         if x > 2.0 {
-            let mut n = (x as c_int) - 2;
             let mut result = 1.0;
             let mut current = 2.0;
             while current < x {
                 result *= current;
                 current += 1.0;
-                n -= 1;
             }
             result
         } else if x > 0.0 && x < 1.0 {

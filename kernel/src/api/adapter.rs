@@ -6,8 +6,6 @@
 
 #![allow(dead_code)]
 
-use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
-
 // Re-export nos_api Result and Error for convenience
 pub use nos_api::error::{Error as ApiError, Result as ApiResult};
 
@@ -110,7 +108,7 @@ pub fn to_api_result<T>(result: core::result::Result<T, crate::error::Error>) ->
 // Convert from API result
 #[inline]
 pub fn from_api_result<T>(result: ApiResult<T>) -> core::result::Result<T, crate::error::Error> {
-    result.map_err(|e| crate::error::Error::SystemError(format!("{:?}", e)))
+    result.map_err(|e| crate::error::Error::Other(format!("{:?}", e)))
 }
 
 // ============================================================================

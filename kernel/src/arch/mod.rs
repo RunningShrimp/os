@@ -10,10 +10,21 @@ use nos_api::Result;
 pub mod memory_layout_stub;
 pub use memory_layout_stub as memory_layout;
 pub use memory_layout_stub::*;
+
+// Architecture-specific modules (conditionally compiled)
+#[cfg(target_arch = "x86_64")]
+pub mod cpuid;
+#[cfg(target_arch = "x86_64")]
 pub mod kpti;
+#[cfg(target_arch = "x86_64")]
 pub mod retpoline;
+#[cfg(target_arch = "x86_64")]
 pub mod x86_64;
+
+#[cfg(target_arch = "aarch64")]
 pub mod aarch64;
+
+#[cfg(target_arch = "riscv64")]
 pub mod riscv64;
 
 /// Initialize architecture-specific subsystems

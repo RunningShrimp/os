@@ -8,7 +8,7 @@ use core::sync::atomic::{AtomicU64, Ordering};
 use crate::subsystems::sync::{Mutex, SpinLock};
 use crate::{
     collections::HashMap,
-    compat::DefaultHasherBuilder,
+    compat::DefaultHashBuilder,
     subsystems::time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -244,11 +244,11 @@ impl ThreatIntelligence {
     /// Create a new threat intelligence engine
     pub fn new() -> Self {
         Self {
-            indicators: HashMap::with_hasher(DefaultHasherBuilder),
-            indicators_by_type: HashMap::with_hasher(DefaultHasherBuilder),
-            threat_actors: HashMap::with_hasher(DefaultHasherBuilder),
-            campaigns: HashMap::with_hasher(DefaultHasherBuilder),
-            feeds: HashMap::with_hasher(DefaultHasherBuilder),
+            indicators: HashMap::with_hasher(DefaultHashBuilder::default()),
+            indicators_by_type: HashMap::with_hasher(DefaultHashBuilder::default()),
+            threat_actors: HashMap::with_hasher(DefaultHashBuilder::default()),
+            campaigns: HashMap::with_hasher(DefaultHashBuilder::default()),
+            feeds: HashMap::with_hasher(DefaultHashBuilder::default()),
             recent_matches: Vec::new(),
             stats: ThreatStats::new(),
             match_counter: AtomicU64::new(0),
@@ -291,7 +291,7 @@ impl ThreatIntelligence {
                 campaigns: Vec::new(),
                 tags: Vec::new(),
                 references: Vec::new(),
-                context: HashMap::with_hasher(crate::compat::DefaultHasherBuilder),
+                context: HashMap::with_hasher(crate::compat::DefaultHashBuilder::default()),
                 active: true,
             };
             self.indicators.insert(indicator.value.clone(), indicator);
@@ -708,7 +708,7 @@ impl ThreatIntelligence {
             campaigns: Vec::new(),
             tags: vec![String::from("malware")],
             references: Vec::new(),
-            context: HashMap::with_hasher(DefaultHasherBuilder),
+            context: HashMap::with_hasher(DefaultHashBuilder::default()),
             active: true,
         }];
 
@@ -742,7 +742,7 @@ impl ThreatStats {
     pub fn new() -> Self {
         Self {
             total_indicators: 0,
-            indicators_by_type: HashMap::with_hasher(DefaultHasherBuilder),
+            indicators_by_type: HashMap::with_hasher(DefaultHashBuilder::default()),
             total_matches: 0,
             threat_actors: 0,
             campaigns: 0,

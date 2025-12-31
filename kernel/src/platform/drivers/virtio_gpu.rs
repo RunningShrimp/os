@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering};
 
 use crate::{
-    reliability::{EINVAL, EIO, ENOMEM},
+    reliability::EINVAL,
     subsystems::sync::Mutex,
 };
 // Note: Graphics types are used conceptually, actual implementation would integrate with graphics

@@ -12,8 +12,6 @@ pub mod timer;
 
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-use crate::reliability::{EINVAL, ENOMEM};
-
 /// Microkernel initialization state
 static MICROKERNEL_INIT: AtomicBool = AtomicBool::new(false);
 

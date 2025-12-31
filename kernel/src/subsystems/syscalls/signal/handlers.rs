@@ -6,16 +6,13 @@
 //! - 信号掩码操作
 //! - 信号集操作
 
-use alloc::{collections::BTreeMap, vec::Vec};
+use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicU32, Ordering};
 
 use crate::{
-    error::UnifiedError,
+    error::{KernelError, SyscallError},
     subsystems::process::ProcessId,
 };
-
-// Import SyscallError from the error module
-use crate::error::SyscallError;
 
 /// 信号编号类型
 pub type SignalNumber = u32;
@@ -208,8 +205,8 @@ pub fn send_signal(pid: ProcessId, sig: SignalNumber) -> Result<(), KernelError>
 pub fn set_signal_mask(
     pid: ProcessId,
     how: u32,
-    new_mask: SignalSet,
-    old_mask: Option<&mut SignalSet>,
+    _new_mask: SignalSet,
+    _old_mask: Option<&mut SignalSet>,
 ) -> Result<(), KernelError> {
     crate::log_debug!("Setting signal mask for process {} with operation {}", pid, how);
 
@@ -235,8 +232,8 @@ pub fn set_signal_mask(
 /// * `Err(KernelError)` - 信号集操作失败
 pub fn signal_set_ops(
     how: u32,
-    set: Option<SignalSet>,
-    old_set: Option<&mut SignalSet>,
+    _set: Option<SignalSet>,
+    _old_set: Option<&mut SignalSet>,
 ) -> Result<(), KernelError> {
     crate::log_debug!("Performing signal set operation {}", how);
 
@@ -268,7 +265,7 @@ pub fn execute_signal_handler(
 
     let action = handler_manager
         .get_process_handler(pid, sig)
-        .ok_or_else(|| KernelError::Syscall(SyscallError::EINVAL))?;
+        .ok_or_else(|| KernelError::SyscallError(SyscallError::InvalidArgument))?;
 
     match action {
         SignalAction::Default => {
@@ -369,10 +366,10 @@ pub fn sigsuspend(pid: ProcessId, mask: SignalSet) -> Result<(), KernelError> {
 
     // 获取当前进程
     let current_pid = crate::process::myproc()
-        .ok_or_else(|| KernelError::Syscall(SyscallError::NotFound))?;
+        .ok_or_else(|| KernelError::SyscallError(SyscallError::NotFound))?;
 
-    if current_pid != pid {
-        return Err(KernelError::Syscall(SyscallError::NotFound));
+    if current_pid as u64 != pid {
+        return Err(KernelError::SyscallError(SyscallError::NotFound));
     }
 
     // TODO: 实现完整的sigsuspend逻辑
@@ -395,7 +392,7 @@ pub fn sigsuspend(pid: ProcessId, mask: SignalSet) -> Result<(), KernelError> {
     // - 恢复原始掩码
     // - 返回 EINTR
 
-    Err(KernelError::Syscall(SyscallError::Interrupted))
+    Err(KernelError::SyscallError(SyscallError::Interrupted))
 }
 
 #[cfg(test)]

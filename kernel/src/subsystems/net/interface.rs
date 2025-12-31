@@ -11,9 +11,8 @@ use alloc::{
 };
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
-// PacketBuffer和PacketError在当前文件中未使用，暂时注释掉
-// use super::packet::{PacketBuffer, PacketError};
 use super::arp::ArpCache;
+use super::packet::PacketError;
 use super::{
     device::{DeviceError, MacAddr, NetworkDevice, NetworkDeviceType},
     ipv4::Ipv4Addr,

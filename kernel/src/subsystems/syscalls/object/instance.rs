@@ -1,6 +1,15 @@
 // Object instance management functions
 
-use super::*;
+use core::ffi::c_void;
+use core::sync::atomic::{AtomicUsize, Ordering};
+
+// Import specific types from parent module
+use super::{
+    GObjectInstanceInfo, NEXT_INSTANCE_ID, OBJECT_INSTANCES, OBJECT_TYPES,
+};
+
+// Import from prelude for specific types we need
+use alloc::collections::BTreeMap;
 
 /// 创建对象实例
 ///
@@ -11,11 +20,11 @@ use super::*;
 /// # 返回值
 /// * 成功时返回实例ID
 /// * 失败时返回负数错误码
-#[no_mangle]
-pub extern "C" fn sys_glib_object_instance_create(
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sys_glib_object_instance_create(
     type_id: u64,
     object_ptr: *mut c_void,
-) -> SyscallResult<i32> {
+) -> i32 {
     crate::println!("[glib_object] 创建对象实例: type={}, ptr={:p}", type_id, object_ptr);
 
     // 验证参数
@@ -24,8 +33,8 @@ pub extern "C" fn sys_glib_object_instance_create(
         return -22; // EINVAL
     }
 
-    // 检查类型是否存在
-    let type_info = {
+    // 检查类型是否存在，并提取所需字段
+    let type_name = {
         let types = OBJECT_TYPES.lock();
         match types.get(&type_id) {
             Some(info) => {
@@ -33,7 +42,7 @@ pub extern "C" fn sys_glib_object_instance_create(
                     crate::println!("[glib_object] 不能创建抽象类型的实例: {}", type_id);
                     return -22; // EINVAL
                 }
-                info.clone()
+                info.name.clone()
             },
             None => {
                 crate::println!("[glib_object] 对象类型不存在: {}", type_id);
@@ -57,6 +66,7 @@ pub extern "C" fn sys_glib_object_instance_create(
         object_ptr,
         created_timestamp: crate::subsystems::time::get_timestamp() as u64,
         properties: BTreeMap::new(),
+        _phantom: core::marker::PhantomData,
     };
 
     // 注册实例
@@ -73,8 +83,8 @@ pub extern "C" fn sys_glib_object_instance_create(
         }
     }
 
-    crate::println!("[glib_object] 成功创建对象实例: ID={}, Type={}", instance_id, type_info.name);
-    instance_id as SyscallResult
+    crate::println!("[glib_object] 成功创建对象实例: ID={}, Type={}", instance_id, type_name);
+    instance_id as i32
 }
 
 /// 增加对象引用计数
@@ -85,8 +95,8 @@ pub extern "C" fn sys_glib_object_instance_create(
 /// # 返回值
 /// * 成功时返回新的引用计数
 /// * 失败时返回负数错误码
-#[no_mangle]
-pub extern "C" fn sys_glib_object_ref(instance_id: u64) -> SyscallResult<i32> {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sys_glib_object_ref(instance_id: u64) -> i32 {
     crate::println!("[glib_object] 增加引用: instance={}", instance_id);
 
     // 验证参数
@@ -112,7 +122,7 @@ pub extern "C" fn sys_glib_object_ref(instance_id: u64) -> SyscallResult<i32> {
         instance_id,
         new_ref_count
     );
-    new_ref_count as SyscallResult
+    new_ref_count as i32
 }
 
 /// 减少对象引用计数
@@ -123,8 +133,8 @@ pub extern "C" fn sys_glib_object_ref(instance_id: u64) -> SyscallResult<i32> {
 /// # 返回值
 /// * 成功时返回新的引用计数
 /// * 失败时返回负数错误码
-#[no_mangle]
-pub extern "C" fn sys_glib_object_unref(instance_id: u64) -> SyscallResult<i32> {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sys_glib_object_unref(instance_id: u64) -> i32 {
     crate::println!("[glib_object] 减少引用: instance={}", instance_id);
 
     // 验证参数
@@ -188,5 +198,5 @@ pub extern "C" fn sys_glib_object_unref(instance_id: u64) -> SyscallResult<i32> 
         );
     }
 
-    new_ref_count as SyscallResult
+    new_ref_count as i32
 }

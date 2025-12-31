@@ -40,13 +40,13 @@ pub unsafe trait UnifiedAllocator {
     ///
     /// # Returns
     /// * Pointer to zero-initialized memory on success, null on failure
-    unsafe fn allocate_zeroed(&self, layout: Layout) -> *mut u8 {
+    unsafe fn allocate_zeroed(&self, layout: Layout) -> *mut u8 { unsafe {
         let ptr = self.allocate(layout);
         if !ptr.is_null() {
             core::ptr::write_bytes(ptr, 0, layout.size());
         }
         ptr
-    }
+    }}
 
     /// Reallocate memory to a new size
     ///
@@ -63,7 +63,7 @@ pub unsafe trait UnifiedAllocator {
                 Ok(l) => l,
                 Err(_) => return core::ptr::null_mut(),
             };
-            return self.allocate(new_layout);
+            return unsafe { self.allocate(new_layout) };
         }
 
         let new_layout = match Layout::from_size_align(new_size, old_layout.align()) {
@@ -71,14 +71,14 @@ pub unsafe trait UnifiedAllocator {
             Err(_) => return core::ptr::null_mut(),
         };
 
-        let new_ptr = self.allocate(new_layout);
+        let new_ptr = unsafe { self.allocate(new_layout) };
         if new_ptr.is_null() {
             return core::ptr::null_mut();
         }
 
         let copy_size = old_layout.size().min(new_size);
-        core::ptr::copy_nonoverlapping(ptr, new_ptr, copy_size);
-        self.deallocate(ptr, old_layout);
+        unsafe { core::ptr::copy_nonoverlapping(ptr, new_ptr, copy_size) };
+        unsafe { self.deallocate(ptr, old_layout) };
 
         new_ptr
     }

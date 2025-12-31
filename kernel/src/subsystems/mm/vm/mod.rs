@@ -21,8 +21,51 @@ use alloc::sync::Arc;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::subsystems::sync::Mutex;
-use crate::subsystems::mm::types::*;
+use crate::subsystems::sync::lazy::Lazy;
 use crate::subsystems::mm::page_table_isolation::PageTable;
+
+// Helper trait to extend Arc<PageTable> with needed methods
+trait PageTableExt {
+    fn new_wrapper() -> Self;
+    fn map(&self, virt: usize, phys: usize, flags: crate::types::MapFlags) -> Result<(), MemoryError>;
+    fn unmap(&self, virt: usize) -> Result<(), MemoryError>;
+    fn protect(&self, virt: usize, size: usize, flags: crate::types::MapFlags) -> Result<(), MemoryError>;
+    fn load(&self);
+}
+
+impl PageTableExt for Arc<PageTable> {
+    fn new_wrapper() -> Self {
+        // Create a new page table at level 0 with a dummy physical address
+        Arc::new(PageTable::new(0, 0))
+    }
+
+    fn map(&self, _virt: usize, _phys: usize, _flags: crate::types::MapFlags) -> Result<(), MemoryError> {
+        // Stub implementation
+        Ok(())
+    }
+
+    fn unmap(&self, _virt: usize) -> Result<(), MemoryError> {
+        // Stub implementation
+        Ok(())
+    }
+
+    fn protect(&self, _virt: usize, _size: usize, _flags: crate::types::MapFlags) -> Result<(), MemoryError> {
+        // Stub implementation
+        Ok(())
+    }
+
+    fn load(&self) {
+        // Stub implementation
+    }
+}
+
+// Import necessary types
+use crate::types::MapFlags;
+use crate::memory::MemoryError;
+use crate::subsystems::mm::{VirtAddr, PhysAddr};
+
+// Physical frame type - alias for physical address
+pub type PhysFrame = PhysAddr;
 
 // 导出子模块
 pub mod mmap;
@@ -70,7 +113,6 @@ pub enum VmRegionType {
 }
 
 /// 虚拟地址空间
-#[derive(Debug)]
 pub struct VmSpace {
     /// 页表
     pub page_table: Arc<PageTable>,
@@ -84,11 +126,21 @@ pub struct VmSpace {
     pub last_addr: AtomicUsize,
 }
 
+impl core::fmt::Debug for VmSpace {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("VmSpace")
+            .field("start_addr", &self.start_addr)
+            .field("end_addr", &self.end_addr)
+            .field("last_addr", &self.last_addr)
+            .finish()
+    }
+}
+
 impl VmSpace {
     /// 创建新的虚拟地址空间
     pub fn new(start_addr: VirtAddr, end_addr: VirtAddr) -> Self {
         Self {
-            page_table: Arc::new(PageTable::new()),
+            page_table: Arc::<PageTable>::new_wrapper(),
             regions: Mutex::new(Vec::new()),
             start_addr,
             end_addr,
@@ -103,7 +155,7 @@ impl VmSpace {
         // 检查是否与现有区域重叠
         for existing in regions.iter() {
             if region.start < existing.end && region.end > existing.start {
-                return Err(MemoryError::Overlap);
+                return Err(MemoryError::AlreadyMapped);
             }
         }
 
@@ -230,10 +282,10 @@ impl Default for VmManager {
 }
 
 /// 全局虚拟内存管理器
-static VM_MANAGER: Mutex<VmManager> = Mutex::new(VmManager::new());
+static VM_MANAGER: Lazy<Mutex<VmManager>> = Lazy::new(|| Mutex::new(VmManager::new()));
 
 /// 获取全局虚拟内存管理器
-pub fn vm_manager() -> &'static Mutex<VmManager> {
+pub fn vm_manager() -> &'static Lazy<Mutex<VmManager>> {
     &VM_MANAGER
 }
 
@@ -241,7 +293,7 @@ pub fn vm_manager() -> &'static Mutex<VmManager> {
 pub fn init() {
     crate::println!("vm: initializing virtual memory manager");
 
-    let manager = vm_manager().lock();
+    let _manager = vm_manager().lock();
 
     crate::println!("vm: virtual memory manager initialized");
 }
@@ -308,6 +360,43 @@ pub struct VmPerm {
     pub execute: bool,
 }
 
+impl VmPerm {
+    /// Create read-write permission
+    pub fn rw() -> Self {
+        Self { read: true, write: true, execute: false }
+    }
+
+    /// Create read-execute permission
+    pub fn rx() -> Self {
+        Self { read: true, write: false, execute: true }
+    }
+
+    /// Create read-write-execute permission
+    pub fn rwx() -> Self {
+        Self { read: true, write: true, execute: true }
+    }
+
+    /// Create read-only permission
+    pub fn r() -> Self {
+        Self { read: true, write: false, execute: false }
+    }
+
+    /// Create execute-only permission
+    pub fn x() -> Self {
+        Self { read: false, write: false, execute: true }
+    }
+
+    /// Create write-only permission
+    pub fn w() -> Self {
+        Self { read: false, write: true, execute: false }
+    }
+
+    /// Create no permission
+    pub fn none() -> Self {
+        Self { read: false, write: false, execute: false }
+    }
+}
+
 /// Memory flags (stub)
 pub mod flags {
     /// Read permission
@@ -321,24 +410,26 @@ pub mod flags {
 }
 
 /// Copy page table (stub)
-pub fn copy_pagetable() -> Result<(), crate::subsystems::mm::MemoryError> {
-    Ok(())
+pub fn copy_pagetable() -> Result<*mut PageTable, MemoryError> {
+    // TODO: Implement actual page table copying
+    // For now, return null as stub
+    Ok(core::ptr::null_mut())
 }
 
 /// Copy from kernel to user (stub)
-pub fn copyin(dst: *mut u8, src: &[u8], len: usize) -> Result<(), crate::subsystems::mm::MemoryError> {
+pub fn copyin(_dst: *mut u8, _src: &[u8], _len: usize) -> Result<(), MemoryError> {
     // Stub implementation
     Ok(())
 }
 
 /// Copy string from kernel to user (stub)
-pub fn copyinstr(dst: *mut u8, src: &[u8], maxlen: usize) -> Result<(usize, bool), crate::subsystems::mm::MemoryError> {
+pub fn copyinstr(_dst: *mut u8, _src: &[u8], _maxlen: usize) -> Result<(usize, bool), MemoryError> {
     // Stub implementation
     Ok((0, false))
 }
 
 /// Copy from user to kernel (stub)
-pub fn copyout(dst: &mut [u8], src: *const u8, len: usize) -> Result<(), crate::subsystems::mm::MemoryError> {
+pub fn copyout(_dst: &mut [u8], _src: *const u8, _len: usize) -> Result<(), MemoryError> {
     // Stub implementation
     Ok(())
 }
@@ -354,12 +445,12 @@ pub fn free_pagetable() {
 }
 
 /// Map pages (stub)
-pub fn map_pages(start: usize, size: usize, flags: usize) -> Result<(), crate::subsystems::mm::MemoryError> {
+pub fn map_pages(_start: usize, _size: usize, _flags: usize) -> Result<(), MemoryError> {
     // Stub implementation
     Ok(())
 }
 
 /// Flush TLB page (stub)
-pub fn flush_tlb_page(addr: usize) {
+pub fn flush_tlb_page(_addr: usize) {
     // Stub implementation
 }
