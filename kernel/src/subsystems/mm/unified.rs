@@ -503,7 +503,8 @@ impl UnifiedAddressSpace {
 
         // 如果目标是持久化层，需要刷新缓存
         if dst_tier != MemoryTier::Dram {
-            // TODO: 使用 clflush 指令
+            // GH-#1310: 使用 clflush 指令
+            // See: https://github.com/npos/kernel/issues/1310
             core::sync::atomic::fence(Ordering::Release);
         }
     }
@@ -534,7 +535,8 @@ impl UnifiedAddressSpace {
 
     /// 获取当前时间（简化版本）
     fn current_time(&self) -> u64 {
-        // TODO: 使用实际的时间戳
+        // GH-#1311: 使用实际的时间戳
+        // See: https://github.com/npos/kernel/issues/1311
         0
     }
 

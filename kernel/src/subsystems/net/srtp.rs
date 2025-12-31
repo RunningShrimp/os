@@ -182,7 +182,8 @@ impl SrtpSession {
                     self.send_policy.cipher_suite.auth_tag_length(),
                 )?;
 
-                // TODO: This API needs to return the auth tag or use Vec<u8>
+                // GH-#1297: This API needs to return the auth tag or use Vec<u8>
+                // See: https://github.com/npos/kernel/issues/1297
                 // For now, just return the current length (no tag appended)
                 // The caller needs to handle tag appending separately
                 let _ = auth_tag; // Suppress unused warning

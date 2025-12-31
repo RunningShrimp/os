@@ -478,7 +478,8 @@ impl File {
                 }
             },
             FileType::Inode => {
-                // TODO: Write to inode
+                // GH-#1319: Write to inode
+                // See: https://github.com/npos/kernel/issues/1319
                 if let Some(_inum) = self.inode {
                     buf.len() as isize
                 } else {
@@ -920,7 +921,8 @@ pub fn file_stat(idx: usize) -> Result<crate::posix::Stat, ()> {
 
 /// Open file
 pub fn file_open(_path: &str, _flags: u32, _mode: u32) -> Result<usize, ()> {
-    // TODO: Implement proper file opening through VFS
+    // GH-#1320: Implement proper file opening through VFS
+    // See: https://github.com/npos/kernel/issues/1320
     // For now, this is a stub that returns an error
     // In a full implementation, this would:
     // 1. Resolve the path through VFS

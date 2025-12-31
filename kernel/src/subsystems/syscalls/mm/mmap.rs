@@ -159,7 +159,8 @@ pub fn handle_mmap(args: &[u64]) -> KernelResult<u64> {
         crate::log_debug!("mmap syscall: mapped {} pages at addr {:#x}", total_pages, target_addr);
         Ok(target_addr as u64)
     } else {
-        // TODO: Handle file-backed mappings
+        // GH-#1344: Handle file-backed mappings
+        // See: https://github.com/npos/kernel/issues/1344
         Err(KernelError::NotSupported)
     }
 }

@@ -127,7 +127,7 @@ impl RgbColor {
     }
 
     pub fn to_hex(&self) -> String {
-        alloc::string::String::from("#") + /* TODO: {::02X} */ &self.r.to_string() + /* TODO: {::02X} */ &self.g.to_string() + /* TODO: {::02X} */ &self.b.to_string()
+        alloc::string::String::from("#") + &format!("{:02X}", self.r) + &format!("{:02X}", self.g) + &format!("{:02X}", self.b)
     }
 
     pub fn to_grayscale(&self) -> Self {

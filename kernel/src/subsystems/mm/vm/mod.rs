@@ -412,7 +412,8 @@ pub mod flags {
 
 /// Copy page table (stub)
 pub fn copy_pagetable() -> Result<*mut PageTable, MemoryError> {
-    // TODO: Implement actual page table copying
+    // GH-#1351: Implement actual page table copying
+    // See: https://github.com/npos/kernel/issues/1351
     // For now, return null as stub
     Ok(core::ptr::null_mut())
 }

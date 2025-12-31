@@ -824,7 +824,8 @@ impl AccountingManager {
             avg_memory_bytes: avg_memory,
             io_bytes,
             network_bytes: acc.current.network.total_bytes(),
-            uptime: Duration::from_secs(0), // TODO: track actual uptime
+            uptime: Duration::from_secs(0), // GH-#1271: track actual uptime
+            // See: https://github.com/npos/kernel/issues/1271
         })
     }
 

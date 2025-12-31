@@ -68,7 +68,8 @@ unsafe impl UnifiedAllocator for LibcMemoryAdapter {
 pub fn get_libc_adapter() -> &'static LibcMemoryAdapter {
     // Use a static with OnceCell or similar for thread safety
     // For now, create a new instance each time (not ideal but works)
-    // TODO: Use OnceCell or LazyLock for proper initialization
+    // GH-#1235: Use OnceCell or LazyLock for proper initialization
+    // See: https://github.com/npos/kernel/issues/1235
     static mut ADAPTER: Option<LibcMemoryAdapter> = None;
     unsafe {
         if ADAPTER.is_none() {

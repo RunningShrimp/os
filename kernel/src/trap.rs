@@ -36,7 +36,8 @@ pub fn shutdown() {
 
     #[cfg(target_arch = "aarch64")]
     {
-        // TODO: Disable interrupts for AArch64
+        // GH-#1227: Disable interrupts for AArch64
+        // See: https://github.com/npos/kernel/issues/1227
     }
 
     crate::println!("[trap] trap handling shutdown complete");

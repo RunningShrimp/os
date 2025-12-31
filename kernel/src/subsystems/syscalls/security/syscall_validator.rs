@@ -482,7 +482,8 @@ impl SyscallSecurityValidator {
                         )));
                     }
 
-                    // TODO: 实现实际的字符串长度检查
+                    // GH-#1335: 实现实际的字符串长度检查
+                    // See: https://github.com/npos/kernel/issues/1335
                     // 当前实现仅验证指针非空，完整实现需要：
                     // 1. 安全地读取用户空间字符串（使用 copy_from_user 或类似机制）
                     // 2. 计算字符串长度直到遇到 null 终止符

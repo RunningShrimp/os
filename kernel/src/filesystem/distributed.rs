@@ -575,7 +575,8 @@ impl DistributedFs {
 
         // Replicate to all OSDs
         for osd_id in osds {
-            // TODO: Send data to OSD
+            // GH-#1251: Send data to OSD
+            // See: https://github.com/npos/kernel/issues/1251
             crate::println!("[distributed] Write object {} to OSD {}", object_id, osd_id);
         }
 
@@ -591,7 +592,8 @@ impl DistributedFs {
 
         // Read from first available OSD
         for osd_id in osds {
-            // TODO: Read data from OSD
+            // GH-#1252: Read data from OSD
+            // See: https://github.com/npos/kernel/issues/1252
             crate::println!("[distributed] Read object {} from OSD {}", object_id, osd_id);
             return Ok(buf.len());
         }

@@ -497,7 +497,8 @@ impl CLibInterface for UnifiedCLib {
 
     fn strerror(&self, errnum: c_int) -> *const c_char {
         // 使用 errnum 获取错误消息
-        // TODO: 根据 errnum 返回对应的错误消息
+        // GH-#1232: 根据 errnum 返回对应的错误消息
+        // See: https://github.com/npos/kernel/issues/1232
         let _error_number = errnum; // 使用 errnum 进行验证
         static ERROR_MSG: &[u8] = b"Unknown error\0";
         ERROR_MSG.as_ptr() as *const c_char
@@ -532,7 +533,8 @@ impl CLibInterface for UnifiedCLib {
         compar: extern "C" fn(*const c_void, *const c_void) -> c_int,
     ) {
         // 使用 base 和 nmemb 进行排序操作
-        // TODO: 实现实际的排序逻辑
+        // GH-#1233: 实现实际的排序逻辑
+        // See: https://github.com/npos/kernel/issues/1233
         let _base_ptr = base; // 使用 base 进行验证
         let _element_count = nmemb; // 使用 nmemb 进行验证
         let _compare_func = compar; // 使用 compar 进行验证
@@ -548,7 +550,8 @@ impl CLibInterface for UnifiedCLib {
         compar: extern "C" fn(*const c_void, *const c_void) -> c_int,
     ) -> *mut c_void {
         // 使用 key, base, nmemb 进行二分查找操作
-        // TODO: 实现实际的二分查找逻辑
+        // GH-#1234: 实现实际的二分查找逻辑
+        // See: https://github.com/npos/kernel/issues/1234
         let _key_ptr = key; // 使用 key 进行验证
         let _base_ptr = base; // 使用 base 进行验证
         let _element_count = nmemb; // 使用 nmemb 进行验证

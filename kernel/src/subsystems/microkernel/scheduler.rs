@@ -212,7 +212,8 @@ impl MicroScheduler {
         let mut table = self.thread_table.lock();
         table.insert(tid, tcb);
 
-        // Add to CPU 0 ready queue for now (TODO: CPU affinity)
+        // Add to CPU 0 ready queue for now
+        // GH-#1368: Implement CPU affinity for task scheduling
         if self.cpu_schedulers.len() > 0 {
             self.cpu_schedulers[0].enqueue(tid).map_err(|_| {
                 // Remove from table if enqueue fails

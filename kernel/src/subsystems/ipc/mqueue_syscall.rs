@@ -400,7 +400,8 @@ impl SyscallHandler for MqNotifyHandler {
             Err(_) => return SyscallResult::Err(SyscallError::InvalidArgument),
         };
 
-        // TODO: Implement full notification registration
+        // GH-#1315: Implement full notification registration
+        // See: https://github.com/npos/kernel/issues/1315
         // The notify parameter specifies how the process should be notified when a message arrives:
         // - If notify_ptr is null, cancel any existing notification
         // - If notify_ptr is non-null, register the notification (signal, eventfd, etc.)

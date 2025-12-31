@@ -117,7 +117,8 @@ pub trait CAllocator: UnifiedAllocator {
 
         // Note: In a real implementation, we would need to track the layout
         // For now, this is a simplified version that assumes we can infer it
-        // TODO: Implement proper layout tracking for C allocations
+        // GH-#1312: Implement proper layout tracking for C allocations
+        // See: https://github.com/npos/kernel/issues/1312
         unsafe {
             // This is a placeholder - real implementation needs layout tracking
             let layout = Layout::from_size_align(1, 1).unwrap();

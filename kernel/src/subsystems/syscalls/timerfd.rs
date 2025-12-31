@@ -332,7 +332,8 @@ pub fn sys_timerfd_settime(args: &[u64]) -> SyscallResult<i64> {
                     // Set new timer value
                     instance.set_time(new_value, new_interval, flags);
 
-                    // TODO: Implement proper user memory access when copyin/copyout are available
+                    // GH-#1323: Implement proper user memory access when copyin/copyout are available
+                    // See: https://github.com/npos/kernel/issues/1323
                     // For now, skip writing old_value to user space
 
                     Ok(0)
@@ -392,7 +393,8 @@ pub fn sys_timerfd_gettime(args: &[u64]) -> SyscallResult<i64> {
                 if let Some(instance) = get_timerfd_instance(instance_idx) {
                     let (_value, _interval) = instance.get_time();
 
-                    // TODO: Implement proper user memory access when copyout is available
+                    // GH-#1324: Implement proper user memory access when copyout is available
+                    // See: https://github.com/npos/kernel/issues/1324
                     // For now, skip writing value to user space
                     // In a full implementation, we would use copyout here
 

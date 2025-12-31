@@ -299,7 +299,8 @@ pub fn sys_mmap_advanced(args: &[u64]) -> SyscallResult<i64>{
             // Note: This expects page table walk to be done once for the entire range
             // and map all contiguous pages at once. We'll use map_page in a loop but
             // this is still more efficient than the original code since we did allocation first.
-            // TODO: Implement a true batch map_pages that can map multiple non-contiguous pages.
+            // GH-#1327: Implement a true batch map_pages that can map multiple non-contiguous pages.
+            // See: https://github.com/npos/kernel/issues/1327
             map_pages(proc.pagetable, va, pa_start, aligned_length, perm)
         };
         
@@ -318,7 +319,8 @@ pub fn sys_mmap_advanced(args: &[u64]) -> SyscallResult<i64>{
         }
     } else {
         // For file-backed mappings, map directly (we'll allocate pages on demand)
-        // TODO: Implement actual file backing with on-demand paging
+        // GH-#1328: Implement actual file backing with on-demand paging
+        // See: https://github.com/npos/kernel/issues/1328
         let map_result = unsafe {
             map_pages(proc.pagetable, va, 0, aligned_length, perm)
         };

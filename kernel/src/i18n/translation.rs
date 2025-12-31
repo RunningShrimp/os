@@ -218,7 +218,7 @@ impl TranslationCatalog {
 
         // Simple interpolation: {0}, {1}, ...
         for (i, arg) in args.iter().enumerate() {
-            let mut placeholder = /* TODO: {:{{} */ &i.to_string() + alloc::string::String::from("}}");
+            let mut placeholder = format!("{{{{{}}}}}", i);
             translation = translation.replace(&placeholder, arg);
         }
 

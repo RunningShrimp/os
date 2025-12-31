@@ -413,7 +413,9 @@ impl SyscallDispatcher for SyscallDispatcherImpl {
 
         // Record statistics
         if start_time.is_some() {
-            // Calculate elapsed time - TODO: Implement actual timing using TSC or similar
+            // Calculate elapsed time
+            // GH-#1369: Implement actual timing using TSC or similar
+            let _elapsed = 0;
             // For now, use a reasonable estimate based on operation type
             let elapsed = match &result {
                 Ok(_) => 100, // Placeholder: 100ns for fast operations

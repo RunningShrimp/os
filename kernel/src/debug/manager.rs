@@ -116,7 +116,8 @@ impl DebugManager {
     /// 初始化调试管理器
     pub fn init(&mut self) -> Result<(), &'static str> {
         // 加载默认调试插件（placeholder）
-        // TODO: Implement load_default_plugins
+        // GH-#1289: Implement load_default_plugins
+        // See: https://github.com/npos/kernel/issues/1289
 
         // 初始化断点管理器
         self.breakpoint_manager.init()?;
@@ -392,7 +393,8 @@ impl DebugManager {
     /// 收集堆栈信息
     fn collect_stack_info(&self, _thread_id: u32) -> Result<Vec<StackFrame>, &'static str> {
         // 简化实现，实际实现需要调用栈遍历
-        // TODO: 使用 thread_id 参数来获取特定线程的堆栈信息
+        // GH-#1290: 使用 thread_id 参数来获取特定线程的堆栈信息
+        // See: https://github.com/npos/kernel/issues/1290
         Ok(vec![StackFrame {
             return_address: 0x7FFFFFF0,
             frame_pointer: 0x7FFFFF00,

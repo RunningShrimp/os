@@ -323,7 +323,7 @@ impl AuditEvent {
             s.push('}');
         }
         
-        s.push_str(alloc::string::String::from(" | Result: ") + /* TODO: {::?} */ &self.result.to_string());
+        s.push_str(alloc::string::String::from(" | Result: ") + &format!("{:?}", self.result));
         
         s
     }

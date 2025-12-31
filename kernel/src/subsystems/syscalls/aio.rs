@@ -407,7 +407,8 @@ fn send_completion_notification(aiocb_ptr: *mut aiocb) {
         let _signal = sigevent.sigev_signo;
         let _pid = myproc().unwrap_or(0);
 
-        // TODO: Implement signal sending to process
+        // GH-#1329: Implement signal sending to process
+        // See: https://github.com/npos/kernel/issues/1329
         // For now, this is a stub - signal notification will be implemented later
         // when the signal subsystem is fully integrated
         crate::log_debug!("[aio] Signal notification requested but not yet implemented");

@@ -195,7 +195,7 @@ fn generate_backup_hash(snapshot_id: &str, size: usize) -> String {
     for byte in { let mut s = alloc::string::String::from("{}:"); s.push_str(&snapshot_id, size.to_string()); s }.as_bytes() {
         hash = hash.wrapping_mul(31).wrapping_add(byte as u64);
     }
-    alloc::string::String::from("sha256:") + /* TODO: {::016x} */ &hash.to_string()
+    alloc::string::String::from("sha256:") + &format!("{:016x}", hash)
 }
 
 // ============================================================================
@@ -258,7 +258,7 @@ fn generate_chunk_checksum(data: &[u8]) -> String {
     for &byte in data.iter().take(1024) {
         hash = hash.wrapping_mul(31).wrapping_add(byte as u32);
     }
-    alloc::string::String::from("crc32:") + /* TODO: {::08x} */ &hash.to_string()
+    alloc::string::String::from("crc32:") + &format!("{:08x}", hash)
 }
 
 // ============================================================================

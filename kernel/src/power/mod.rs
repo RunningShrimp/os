@@ -211,8 +211,10 @@ pub fn get_state_summary() -> PowerStateSummary {
 
     PowerStateSummary {
         total_power_mw,
-        active_cpus: 0, // TODO: Get from cpuidle
-        idle_cpus: 0,   // TODO: Get from cpuidle
+        active_cpus: 0, // GH-#1228: Get from cpuidle
+        // See: https://github.com/npos/kernel/issues/1228
+        idle_cpus: 0,   // GH-#1229: Get from cpuidle
+        // See: https://github.com/npos/kernel/issues/1229
         sleep_state: sleep::get_current_state(),
         battery_capacity,
     }

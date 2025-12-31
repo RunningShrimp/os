@@ -13,7 +13,8 @@ use crate::{
     subsystems::sync::Mutex,
     subsystems::mm::page_table_isolation::PageTable,
 };
-// use crate::subsystems::mm::vm::{Page, VirtAddr, PhysAddr}; // TODO: Implement vm module
+// use crate::subsystems::mm::vm::{Page, VirtAddr, PhysAddr}; // GH-#1307: Implement vm module
+// See: https://github.com/npos/kernel/issues/1307
 
 // Virtual and physical address types are defined in nos-api::core::types
 pub use nos_api::core::types::{VirtAddr, PhysAddr};

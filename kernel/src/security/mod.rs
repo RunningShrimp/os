@@ -192,7 +192,8 @@ pub mod encrypted_memory;
 
 // Stage 3-5: Advanced Security Features
 // audit_enhanced removed - features should be in audit module
-// TODO: Migrate enhanced audit features to audit module
+// GH-#1242: Migrate enhanced audit features to audit module
+// See: https://github.com/npos/kernel/issues/1242
 pub use certificate::{
     Certificate, CertificateParser, CertificateRevocationList, CertificateSigningRequest,
     CertificateValidator, CertificateVersion, CrlEntry, CrlManager, DistinguishedName, Extension,

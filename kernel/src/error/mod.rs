@@ -92,7 +92,8 @@ pub use health::{
     HealthThreshold, get_health_monitor, init_health_monitor,
 };
 
-// TODO: Implement and re-export errno types
+// GH-#1286: Implement and re-export errno types
+// See: https://github.com/npos/kernel/issues/1286
 // pub use errno::{Errno, set_errno, get_errno};
 
 /// Error handler trait

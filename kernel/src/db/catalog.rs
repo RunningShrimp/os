@@ -147,7 +147,8 @@ impl CatalogManager {
 
     /// Drop an index
     pub fn drop_index(&self, _schema_name: &str, _index_name: &str) -> DbResult<()> {
-        // TODO: Implement index dropping
+        // GH-#1258: Implement index dropping
+        // See: https://github.com/npos/kernel/issues/1258
         Ok(())
     }
 

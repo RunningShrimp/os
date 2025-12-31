@@ -12,7 +12,8 @@ use alloc::vec::Vec;
 use spin::Mutex;
 
 use crate::arch;
-// TODO: Implement X86Feature and X86Cpu in arch module
+// GH-#1243: Implement X86Feature and X86Cpu in arch module
+// See: https://github.com/npos/kernel/issues/1243
 // use crate::arch::{self, X86Feature, X86Cpu};
 use crate::types::stubs::VirtAddr;
 
@@ -602,7 +603,8 @@ pub fn initialize_smap_smep(config: SmapSmepConfig) -> Result<(), &'static str> 
 
 /// Cleanup SMAP/SMEP (placeholder implementation)
 pub fn cleanup_smap_smep() -> Result<(), &'static str> {
-    // TODO: Implement cleanup
+    // GH-#1244: Implement cleanup
+    // See: https://github.com/npos/kernel/issues/1244
     Ok(())
 }
 

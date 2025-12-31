@@ -151,7 +151,8 @@ impl WebEngineBackend for ServoBackend {
         if let Some(surface_id) = self.surface_id {
             // Mark surface as dirty
             let surface_manager = get_surface_manager();
-            // TODO: Mark surface dirty and trigger compositor
+            // GH-#1246: Mark surface dirty and trigger compositor
+            // See: https://github.com/npos/kernel/issues/1246
             composite_frame()?;
         }
 

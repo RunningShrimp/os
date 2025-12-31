@@ -250,12 +250,14 @@ pub fn sys_recvfrom(args: &[u64]) -> SyscallResult<i64> {
 
 /// Send message
 pub fn sys_sendmsg(_args: &[u64]) -> SyscallResult<i64> {
-    // TODO: Implement sendmsg syscall
+    // GH-#1340: Implement sendmsg syscall
+    // See: https://github.com/npos/kernel/issues/1340
     Err(SyscallError::NotSupported)
 }
 
 /// Receive message
 pub fn sys_recvmsg(_args: &[u64]) -> SyscallResult<i64> {
-    // TODO: Implement recvmsg syscall
+    // GH-#1341: Implement recvmsg syscall
+    // See: https://github.com/npos/kernel/issues/1341
     Err(SyscallError::NotSupported)
 }

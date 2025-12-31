@@ -704,7 +704,7 @@ impl SandboxRuntime {
             timestamp: crate::subsystems::time::timestamp_nanos(),
             pid,
             event_type: SecurityEventType::SyscallFilterCheck,
-            description: alloc::string::String::from("Syscall ") + &syscall_number.to_string() + alloc::string::String::from(" evaluated as ") + /* TODO: {::?} */ &action.to_string(),
+            description: alloc::string::String::from("Syscall ") + &syscall_number.to_string() + alloc::string::String::from(" evaluated as ") + &format!("{:?}", action),
             result: match action {
                 FilterAction::Allow => true,
                 FilterAction::Deny { .. } => false,
@@ -772,7 +772,7 @@ impl SandboxRuntime {
                     timestamp: crate::subsystems::time::timestamp_nanos(),
                     pid,
                     event_type: SecurityEventType::ResourceLimitCheck,
-                    description: alloc::string::String::from("Resource limit exceeded: ") + /* TODO: {::?} */ &e.to_string(),
+                    description: alloc::string::String::from("Resource limit exceeded: ") + &format!("{:?}", e),
                     result: false,
                 };
                 
@@ -782,7 +782,7 @@ impl SandboxRuntime {
                 Err(SecurityViolation {
                     violation_type: SecurityEventType::ResourceLimitCheck,
                     pid,
-                    description: alloc::string::String::from("Resource limit exceeded: ") + /* TODO: {::?} */ &e.to_string(),
+                    description: alloc::string::String::from("Resource limit exceeded: ") + &format!("{:?}", e),
                     severity: ViolationSeverity::Medium,
                 })
             }

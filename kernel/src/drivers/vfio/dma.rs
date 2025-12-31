@@ -247,7 +247,8 @@ impl DmaMap {
     /// 2. Increment page refcounts
     /// 3. Register MMU notifier for cleanup
     fn pin_pages(&self, user_addr: u64, size: u64) -> VfioResult<Vec<u64>> {
-        // TODO: Implement proper page pinning
+        // GH-#1360: Implement proper page pinning
+        // See: https://github.com/npos/kernel/issues/1360
         // For now, return identity mapping (INSECURE!)
 
         let num_pages = (size / DMA_PAGE_SIZE) as usize;
@@ -263,7 +264,8 @@ impl DmaMap {
 
     /// Unpin userspace pages
     fn unpin_pages(&self, _phys_pages: &[u64]) {
-        // TODO: Decrement page refcounts
+        // GH-#1361: Decrement page refcounts
+        // See: https://github.com/npos/kernel/issues/1361
     }
 
     /// Allocate IOVA space

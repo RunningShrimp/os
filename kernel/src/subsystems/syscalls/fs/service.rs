@@ -223,7 +223,8 @@ impl BaseService for FilesystemService {
         self.status = ServiceStatus::Starting;
 
         // Perform any startup operations (caching, etc.)
-        // TODO: Initialize filesystem caches, register VFS operations
+        // GH-#1345: Initialize filesystem caches, register VFS operations
+        // See: https://github.com/npos/kernel/issues/1345
 
         self.status = ServiceStatus::Running;
         crate::println!("[fs] FilesystemService started successfully");
@@ -235,7 +236,8 @@ impl BaseService for FilesystemService {
         self.status = ServiceStatus::Stopping;
 
         // Perform cleanup operations
-        // TODO: Flush caches, clean up temporary files
+        // GH-#1346: Flush caches, clean up temporary files
+        // See: https://github.com/npos/kernel/issues/1346
 
         self.status = ServiceStatus::Stopped;
         crate::println!("[fs] FilesystemService stopped successfully");

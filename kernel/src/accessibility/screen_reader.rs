@@ -238,7 +238,7 @@ impl FocusedElement {
     }
 
     pub fn get_announcement(&self) -> String {
-        let mut announcement = /* TODO: {::?} */ &self.role.to_string() + alloc::string::String::from(" ");
+        let mut announcement = format!("{:?}", self.role) + alloc::string::String::from(" ");
         announcement.push_str(&self.label);
 
         if let Some(desc) = &self.description {

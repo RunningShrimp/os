@@ -328,7 +328,8 @@ pub fn readlink(path: &Path) -> VfsResult<Path> {
         }
     }
 
-    // TODO: 从文件系统读取符号链接
+    // GH-#1349: 从文件系统读取符号链接
+    // See: https://github.com/npos/kernel/issues/1349
     // 这里需要调用 VFS 层来读取符号链接内容
     // 暂时返回错误，等待 VFS 层实现
 
@@ -375,7 +376,8 @@ pub fn symlink(oldpath: &Path, newpath: &Path) -> VfsResult<()> {
         return Err(VfsError::InvalidInput);
     }
 
-    // TODO: 在文件系统中创建符号链接
+    // GH-#1350: 在文件系统中创建符号链接
+    // See: https://github.com/npos/kernel/issues/1350
     // 这里需要调用 VFS 层来创建符号链接
     // 暂时返回错误，等待 VFS 层实现
 

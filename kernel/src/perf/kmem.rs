@@ -771,7 +771,8 @@ impl KmemAllocator {
 
     /// Allocate kernel memory
     pub fn kmalloc(&self, size: usize) -> Result<*mut u8, KmemError> {
-        let cpu_id = 0; // TODO: Get actual CPU ID
+        let cpu_id = 0; // GH-#1278: Get actual CPU ID
+        // See: https://github.com/npos/kernel/issues/1278
 
         // Try per-CPU cache
         if let Some(cache) = self.percpu_caches.get(cpu_id) {
@@ -792,7 +793,8 @@ impl KmemAllocator {
             return;
         }
 
-        let cpu_id = 0; // TODO: Get actual CPU ID
+        let cpu_id = 0; // GH-#1279: Get actual CPU ID
+        // See: https://github.com/npos/kernel/issues/1279
 
         // Try per-CPU cache
         if let Some(cache) = self.percpu_caches.get(cpu_id) {
@@ -835,7 +837,8 @@ static GLOBAL_KMEM_ALLOCATOR: Mutex<Option<KmemAllocator>> = Mutex::new(None);
 pub fn init_kmem_allocator() {
     log::info!("Initializing kernel memory allocator...");
 
-    let num_cpus = 1; // TODO: Get actual CPU count
+    let num_cpus = 1; // GH-#1280: Get actual CPU count
+    // See: https://github.com/npos/kernel/issues/1280
     let allocator = KmemAllocator::new(num_cpus);
 
     *GLOBAL_KMEM_ALLOCATOR.lock() = Some(allocator);

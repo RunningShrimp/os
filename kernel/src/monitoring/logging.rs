@@ -369,7 +369,8 @@ impl RemoteLogTransport {
         let endpoint = &self.endpoint;
         crate::log_debug!("[remote_transport] Sending {} log entries to {}", count, endpoint);
 
-        // TODO: Implement actual HTTP/HTTPS transport
+        // GH-#1267: Implement actual HTTP/HTTPS transport
+        // See: https://github.com/npos/kernel/issues/1267
         // This would require:
         // 1. TCP connection establishment
         // 2. HTTP request formatting

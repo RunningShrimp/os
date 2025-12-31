@@ -481,9 +481,11 @@ impl EdgeManager {
             node_id,
             cpu_cores_used: container_stats.container_count,
             cpu_cores_total: node.cpu_cores,
-            memory_used: 0, // TODO: Get actual memory usage
+            memory_used: 0, // GH-#1253: Get actual memory usage
+            // See: https://github.com/npos/kernel/issues/1253
             memory_total: node.memory_bytes,
-            storage_used: 0, // TODO: Get actual storage usage
+            storage_used: 0, // GH-#1254: Get actual storage usage
+            // See: https://github.com/npos/kernel/issues/1254
             storage_total: node.storage_bytes,
             network_bandwidth: node.capabilities.network_bandwidth,
             timestamp: self.get_timestamp(),

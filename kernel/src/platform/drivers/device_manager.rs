@@ -851,7 +851,8 @@ impl DeviceManager {
         crate::println!("[device_manager] 为设备 {} 绑定驱动程序", device.name);
 
         // 使用驱动程序管理器绑定驱动程序
-        // TODO: Implement driver binding
+        // GH-#1355: Implement driver binding
+        // See: https://github.com/npos/kernel/issues/1355
         // if let Some(driver_manager) = crate::drivers::get_driver_manager() {
         //     driver_manager.register_device(device.clone())?;
         // }
@@ -897,7 +898,8 @@ impl DeviceManager {
         crate::println!("[device_manager] 通知设备断开: {}", device.name);
 
         // 通知相关监听器和驱动程序
-        // TODO: 实现设备断开通知逻辑
+        // GH-#1356: 实现设备断开通知逻辑
+        // See: https://github.com/npos/kernel/issues/1356
 
         Ok(())
     }
@@ -908,7 +910,8 @@ impl DeviceManager {
         _device: &Device,
     ) -> Result<(), DeviceManagerError> {
         // 通知驱动程序设备移除
-        // TODO: Implement driver notification
+        // GH-#1357: Implement driver notification
+        // See: https://github.com/npos/kernel/issues/1357
         // if let Some(driver_manager) = crate::drivers::get_driver_manager() {
         //     driver_manager.remove_device(device.id)?;
         // }

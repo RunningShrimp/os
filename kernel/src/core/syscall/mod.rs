@@ -200,7 +200,8 @@ impl SyscallDispatcher for CoreSyscallDispatcher {
 
     fn get_stats(&self) -> SyscallStats {
         SyscallStats {
-            total_calls: 0, // TODO: Add tracking
+            total_calls: 0, // GH-#1359: Add tracking
+            // See: https://github.com/npos/kernel/issues/1359
             successful_calls: 0,
             failed_calls: 0,
             avg_execution_time_ns: 0,

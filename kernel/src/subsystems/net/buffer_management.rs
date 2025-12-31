@@ -641,7 +641,8 @@ impl NetworkBufferManager {
 
         // Get physical address for DMA buffers (not implemented, return None)
         let phys_addr = if flags.dma_capable {
-            None // TODO: Implement virt_to_phys when available
+            None // GH-#1295: Implement virt_to_phys when available
+            // See: https://github.com/npos/kernel/issues/1295
         } else {
             None
         };
@@ -725,7 +726,8 @@ impl NetworkBufferManager {
         }
 
         // Free memory (note: kfree not implemented in phys.rs, just deallocate from tracking)
-        // TODO: Implement proper kfree when available
+        // GH-#1296: Implement proper kfree when available
+        // See: https://github.com/npos/kernel/issues/1296
         // For now, the buffer is removed from tracking above
         let _ = buffer; // Suppress unused warning
 

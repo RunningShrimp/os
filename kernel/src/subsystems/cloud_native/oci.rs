@@ -823,7 +823,8 @@ impl OciRuntime {
         crate::println!("[oci] Sending signal {} to PID {}", signal, pid);
 
         // 使用kill系统调用发送信号
-        // TODO: 实现真正的kill系统调用
+        // GH-#1305: 实现真正的kill系统调用
+        // See: https://github.com/npos/kernel/issues/1305
         // 目前返回成功，实际实现需要调用sys_kill
         Ok(())
     }

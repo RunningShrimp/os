@@ -540,7 +540,8 @@ pub fn sys_removexattr(path: &str, name: &str) -> isize {
 
 /// 查找路径对应的 inode（占位符实现）
 fn lookup_path_inode(_path: &str) -> Result<u32, FsError> {
-    // TODO: 实现 VFS 路径查找
+    // GH-#1318: 实现 VFS 路径查找
+    // See: https://github.com/npos/kernel/issues/1318
     // 暂时返回一个假的 inode
     Ok(1)
 }

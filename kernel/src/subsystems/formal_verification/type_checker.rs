@@ -680,7 +680,8 @@ impl TypeChecker {
         &mut self,
         target: &VerificationTarget,
     ) -> Result<VerificationResult, &'static str> {
-        let _start_time_ms = 0u64; // TODO: Implement proper timestamp
+        let _start_time_ms = 0u64; // GH-#1298: Implement proper timestamp
+        // See: https://github.com/npos/kernel/issues/1298
 
         // 模拟类型检查过程
         let mut type_errors = Vec::new();
@@ -723,7 +724,8 @@ impl TypeChecker {
             },
         }
 
-        let elapsed_ms = 0u64; // TODO: Implement proper timestamp
+        let elapsed_ms = 0u64; // GH-#1299: Implement proper timestamp
+        // See: https://github.com/npos/kernel/issues/1299
 
         // 在移动之前提取长度统计
         let type_errors_count = type_errors.len() as u64;

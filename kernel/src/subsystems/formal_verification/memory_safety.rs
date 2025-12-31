@@ -520,7 +520,8 @@ impl MemorySafetyVerifier {
         let record = AllocationRecord {
             address,
             size,
-            allocated_at: 0, // TODO: Use real timestamp
+            allocated_at: 0, // GH-#1300: Use real timestamp
+            // See: https://github.com/npos/kernel/issues/1300
             is_freed: false,
             freed_at: None,
             context,
@@ -532,7 +533,8 @@ impl MemorySafetyVerifier {
     pub fn track_deallocation(&mut self, address: u64) {
         if let Some(record) = self.allocations.get_mut(&address) {
             record.is_freed = true;
-            record.freed_at = Some(0); // TODO: Use real timestamp
+            record.freed_at = Some(0); // GH-#1301: Use real timestamp
+            // See: https://github.com/npos/kernel/issues/1301
         }
     }
 

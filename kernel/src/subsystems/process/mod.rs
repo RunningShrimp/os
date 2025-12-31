@@ -208,7 +208,8 @@ pub fn init() -> nos_api::Result<()> {
 /// This function cleans up process management resources.
 /// Note: In a production system, this should gracefully terminate all processes.
 pub fn shutdown() -> nos_api::Result<()> {
-    // TODO: Implement graceful shutdown
+    // GH-#1333: Implement graceful shutdown
+    // See: https://github.com/npos/kernel/issues/1333
     // - Terminate all user processes
     // - Wait for processes to exit
     // - Clean up process table

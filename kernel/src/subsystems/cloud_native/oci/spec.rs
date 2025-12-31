@@ -554,7 +554,8 @@ impl OciConfig {
     /// let config = OciConfig::from_json(json_str).unwrap();
     /// ```
     pub fn from_json(_json: &str) -> Result<Self, i32> {
-        // TODO: 实现JSON解析
+        // GH-#1353: 实现JSON解析
+        // See: https://github.com/npos/kernel/issues/1353
         // 目前返回默认配置
         Ok(Self::default())
     }
@@ -591,7 +592,8 @@ impl OciConfig {
 
     /// 转换为JSON字符串
     pub fn to_json(&self) -> String {
-        // TODO: 实现JSON序列化
+        // GH-#1354: 实现JSON序列化
+        // See: https://github.com/npos/kernel/issues/1354
         format!("{{ oci_version: {}, root: {} }}", self.oci_version, self.root.path)
     }
 }

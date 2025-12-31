@@ -265,7 +265,8 @@ impl ApStartupBarrier {
     /// Note: This is a simplified implementation. In a real system,
     /// this would read from a proper timer/counter.
     fn get_timestamp() -> u64 {
-        // TODO: Use actual timer (TSC, generic timer, etc.)
+        // GH-#1241: Use actual timer (TSC, generic timer, etc.)
+        // See: https://github.com/npos/kernel/issues/1241
         // For now, return 0 as a placeholder
         0
     }

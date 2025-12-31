@@ -68,7 +68,8 @@ const SEM_NAME_MAX: usize = 251;
 /// # Returns
 /// * 0 on success, error code on failure
 pub unsafe extern "C" fn sem_init(sem: *mut SemT, pshared: i32, value: u32) -> i32 {
-    // TODO: Implement pshared support for process-shared semaphores
+    // GH-#1292: Implement pshared support for process-shared semaphores
+    // See: https://github.com/npos/kernel/issues/1292
     let _ = pshared;
     if sem.is_null() {
         return EINVAL;

@@ -108,7 +108,8 @@ impl ServiceManager {
         interface.start()?;
 
         // Update service state - skip for now as registry doesn't support interior mutability
-        // TODO: Make ServiceRegistry use Mutex for interior mutability
+        // GH-#1287: Make ServiceRegistry use Mutex for interior mutability
+        // See: https://github.com/npos/kernel/issues/1287
 
         log::info!("Service started: {}", service_id.value());
         Ok(())
@@ -147,7 +148,8 @@ impl ServiceManager {
         interface.cleanup()?;
 
         // Update service state - skip for now as registry doesn't support interior mutability
-        // TODO: Make ServiceRegistry use Mutex for interior mutability
+        // GH-#1288: Make ServiceRegistry use Mutex for interior mutability
+        // See: https://github.com/npos/kernel/issues/1288
 
         log::info!("Service stopped: {}", service_id.value());
         Ok(())

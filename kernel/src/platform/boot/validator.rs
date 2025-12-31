@@ -455,7 +455,8 @@ impl BootParameterValidator {
             );
         }
 
-        // TODO: Could validate the actual string content if non-null
+        // GH-#1358: Could validate the actual string content if non-null
+        // See: https://github.com/npos/kernel/issues/1358
         // This would require finding the null terminator safely
     }
 }

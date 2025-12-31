@@ -204,7 +204,8 @@ pub struct SeccompArg {
 impl SeccompProfile {
     /// 从JSON字符串加载配置
     pub fn from_json(_json: &str) -> Result<Self, i32> {
-        // TODO: 实现JSON解析
+        // GH-#1352: 实现JSON解析
+        // See: https://github.com/npos/kernel/issues/1352
         Ok(Self {
             default_action: "SCMP_ACT_ERRNO".to_string(),
             architectures: vec!["SCMP_ARCH_X86_64".to_string()],

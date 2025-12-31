@@ -31,7 +31,8 @@ impl SyscallHandler for FsSyscallHandler {
         // Since we can't determine which specific FS syscall was invoked
         // without the syscall number, we dispatch based on argument count
 
-        // TODO: Implement proper syscall dispatch based on syscall number
+        // GH-#1347: Implement proper syscall dispatch based on syscall number
+        // See: https://github.com/npos/kernel/issues/1347
         // The current trait interface doesn't provide the syscall number,
         // so each FS syscall should register its own handler instead of
         // using this generic handler. This is a placeholder implementation.

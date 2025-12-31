@@ -245,21 +245,24 @@ impl PerformanceSampler {
     /// Get current CPU ID (placeholder)
     #[inline]
     fn current_cpu_id(&self) -> u32 {
-        // TODO: Implement actual CPU ID retrieval
+        // GH-#1268: Implement actual CPU ID retrieval
+        // See: https://github.com/npos/kernel/issues/1268
         0
     }
 
     /// Get current thread ID (placeholder)
     #[inline]
     fn current_thread_id(&self) -> u64 {
-        // TODO: Implement actual thread ID retrieval
+        // GH-#1269: Implement actual thread ID retrieval
+        // See: https://github.com/npos/kernel/issues/1269
         0
     }
 
     /// Get current thread priority (placeholder)
     #[inline]
     fn current_priority(&self) -> u8 {
-        // TODO: Implement actual priority retrieval
+        // GH-#1270: Implement actual priority retrieval
+        // See: https://github.com/npos/kernel/issues/1270
         0
     }
 }

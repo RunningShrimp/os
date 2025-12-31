@@ -268,7 +268,8 @@ impl Executor {
                     if let Some(alias) = alias {
                         names.push(alias.clone());
                     } else {
-                        names.push("expr".to_string()); // TODO: Get expression name
+                        names.push("expr".to_string()); // GH-#1259: Get expression name
+                        // See: https://github.com/npos/kernel/issues/1259
                     }
                 }
             }

@@ -249,7 +249,8 @@ impl BtreeIndex {
 
     /// Delete a key
     pub fn delete(&self, key: &str) -> FsResult<()> {
-        // TODO: Implement delete with redistribution/merging
+        // GH-#1249: Implement delete with redistribution/merging
+        // See: https://github.com/npos/kernel/issues/1249
         let _ = key;
         Err(FsError::NotSupported)
     }
@@ -258,7 +259,8 @@ impl BtreeIndex {
     pub fn range(&self, start: &str, end: &str) -> FsResult<Vec<(String, u64)>> {
         let results = Vec::new();
 
-        // TODO: Implement efficient range traversal
+        // GH-#1250: Implement efficient range traversal
+        // See: https://github.com/npos/kernel/issues/1250
         let _ = (start, end);
 
         Ok(results)

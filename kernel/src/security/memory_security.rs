@@ -460,7 +460,8 @@ impl SecurityManager {
 
     /// Get current timestamp
     fn get_timestamp(&self) -> u64 {
-        // TODO: Use proper time source
+        // GH-#1245: Use proper time source
+        // See: https://github.com/npos/kernel/issues/1245
         static COUNTER: AtomicU64 = AtomicU64::new(1);
         COUNTER.fetch_add(1, Ordering::Relaxed)
     }

@@ -400,7 +400,8 @@ impl Ext4Persistence {
 
     /// Get current time
     fn get_current_time(&self) -> u64 {
-        // TODO: wire to real time source; for now use monotonic ticks
+        // GH-#1317: wire to real time source; for now use monotonic ticks
+        // See: https://github.com/npos/kernel/issues/1317
         crate::subsystems::time::get_timestamp()
     }
 

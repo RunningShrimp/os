@@ -1149,7 +1149,8 @@ pub fn waitpid(pid: i32, status: *mut i32, options: i32) -> Option<Pid> {
             // Wait for specific child
             vec![pid as Pid]
         } else {
-            // TODO: Support process group waiting (pid < -1) and same group (pid == 0)
+            // GH-#1332: Support process group waiting (pid < -1) and same group (pid == 0)
+            // See: https://github.com/npos/kernel/issues/1332
             // For now, treat as any child
             if let Some(children) = table.get_children(parent_pid) {
                 children.clone()

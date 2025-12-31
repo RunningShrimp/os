@@ -391,7 +391,8 @@ impl LockFreeSyscallStats {
         snapshot.total_calls = self.total_calls.load(Ordering::Relaxed);
         snapshot.total_errors = self.total_errors.load(Ordering::Relaxed);
 
-        // 快照时间戳（TODO: 从系统时钟获取）
+        // 快照时间戳
+        // GH-#1371: 从系统时钟获取
         snapshot.timestamp_ns = 0;
 
         snapshot

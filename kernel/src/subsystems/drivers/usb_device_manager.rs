@@ -552,7 +552,8 @@ impl UsbDeviceManager {
             return Err(KernelError::Other(format!("Invalid USB device address: {}", device_address)));
         }
 
-        // TODO: Use device_address for caching descriptors
+        // GH-#1304: Use device_address for caching descriptors
+        // See: https://github.com/npos/kernel/issues/1304
         // In a production implementation, we should cache descriptors by device_address
         // to avoid repeated USB transactions. This would improve performance significantly.
         // For now, we return mock data based on controller_id and port.

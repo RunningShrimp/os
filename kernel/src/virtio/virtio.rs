@@ -382,7 +382,8 @@ impl VirtioDevice {
         // Read device features
         self.device_features = self.read_device_features();
 
-        // TODO: Negotiate features
+        // GH-#1239: Negotiate features
+        // See: https://github.com/npos/kernel/issues/1239
         self.driver_features = self.device_features;
 
         // Write driver features
@@ -405,7 +406,8 @@ impl VirtioDevice {
 
     /// Configure and initialize virtqueues
     fn init_queues(&mut self) -> Result<(), VirtioError> {
-        // TODO: Allocate memory for queues
+        // GH-#1240: Allocate memory for queues
+        // See: https://github.com/npos/kernel/issues/1240
         // For now, just create placeholder queues
         self.queues.push(None);
         Ok(())

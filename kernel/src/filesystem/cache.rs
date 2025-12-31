@@ -558,7 +558,8 @@ impl CacheManager {
 
         for i in 0..pages {
             let _page_id = start_page + i as u64;
-            // TODO: Prefetch pages from storage
+            // GH-#1247: Prefetch pages from storage
+            // See: https://github.com/npos/kernel/issues/1247
             self.stats.readahead_pages.fetch_add(1, Ordering::Relaxed);
         }
     }
@@ -569,7 +570,8 @@ impl CacheManager {
         let count = dirty.len();
 
         for page_id in dirty.iter() {
-            // TODO: Write page to storage
+            // GH-#1248: Write page to storage
+            // See: https://github.com/npos/kernel/issues/1248
             // Mark page as clean
             let mut cache = self.page_cache.lock();
             if let Some(page) = cache.get_mut(page_id) {

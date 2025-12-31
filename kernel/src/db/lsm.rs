@@ -93,7 +93,8 @@ impl LsmTree {
     pub fn put(&self, key: Value, value: Value) -> DbResult<()> {
         // Write to WAL if enabled
         if *self.wal_enabled.lock() {
-            // TODO: Write to WAL
+            // GH-#1260: Write to WAL
+            // See: https://github.com/npos/kernel/issues/1260
         }
 
         // Write to memtable
@@ -489,7 +490,8 @@ impl Level {
 
         for sst in &self.sstables {
             for (key, value) in sst.entries() {
-                // TODO: Check if key is in range
+                // GH-#1261: Check if key is in range
+                // See: https://github.com/npos/kernel/issues/1261
                 results.push((key, value));
             }
         }

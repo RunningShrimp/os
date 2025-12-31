@@ -423,7 +423,8 @@ impl PackageManager {
     /// Detect package format from file
     pub fn detect_package_format(&self, package_path: &str) -> CompatibilityResult<PackageFormat> {
         // Simplified detection based on file extension
-        // TODO: Add magic number detection when VFS API is stable
+        // GH-#1236: Add magic number detection when VFS API is stable
+        // See: https://github.com/npos/kernel/issues/1236
         if package_path.ends_with(".msi") {
             return Ok(PackageFormat::Msi);
         }

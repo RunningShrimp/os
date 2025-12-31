@@ -705,7 +705,8 @@ impl OptimizedAllocator {
 
         // Try per-CPU cache first for small allocations
         if size <= SIZE_CLASSES[SIZE_CLASSES.len() - 1] {
-            let cpu_id = 0; // TODO: Get actual CPU ID
+            let cpu_id = 0; // GH-#1275: Get actual CPU ID
+            // See: https://github.com/npos/kernel/issues/1275
 
             if let Some(cache) = self.percpu_caches.get(cpu_id) {
                 if let Some(ptr) = cache.lock().alloc() {
@@ -771,8 +772,10 @@ pub struct AllocatorStats {
 pub fn init_optimized_allocator() {
     log::info!("Initializing optimized memory allocator...");
 
-    let num_cpus = 1; // TODO: Get actual CPU count
-    let num_numa_nodes = 1; // TODO: Detect NUMA topology
+    let num_cpus = 1; // GH-#1276: Get actual CPU count
+    // See: https://github.com/npos/kernel/issues/1276
+    let num_numa_nodes = 1; // GH-#1277: Detect NUMA topology
+    // See: https://github.com/npos/kernel/issues/1277
 
     let _allocator = OptimizedAllocator::new(num_cpus, num_numa_nodes);
 

@@ -214,7 +214,8 @@ impl VfioGroup {
         device.ref_count_inc();
 
         // Return file descriptor
-        // TODO: Actually allocate FD
+        // GH-#1366: Actually allocate FD
+        // See: https://github.com/npos/kernel/issues/1366
         Ok(0)
     }
 }
@@ -277,7 +278,8 @@ impl GroupManager {
     ///
     /// Scans PCI bus and creates groups for devices
     pub fn init_from_system(&self) -> VfioResult<()> {
-        // TODO: Scan PCI bus and create groups
+        // GH-#1367: Scan PCI bus and create groups
+        // See: https://github.com/npos/kernel/issues/1367
         // For now, create a few test groups
 
         let group1 = self.create_group();

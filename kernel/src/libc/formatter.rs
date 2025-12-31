@@ -301,7 +301,8 @@ impl EnhancedFormatter {
             // 解析宽度
             if **format_ptr as u8 == b'*' {
                 // 从参数获取宽度
-                // TODO: Implement proper va_list argument fetching
+                // GH-#1230: Implement proper va_list argument fetching
+                // See: https://github.com/npos/kernel/issues/1230
                 // For now, use default width as placeholder
                 let w: c_int = 0; // This would come from args.arg::<c_int>()
                 width = if w < 0 {
@@ -328,7 +329,8 @@ impl EnhancedFormatter {
                 *format_ptr = format_ptr.add(1);
                 if **format_ptr as u8 == b'*' {
                     // 从参数获取精度
-                    // TODO: Implement proper va_list argument fetching
+                    // GH-#1231: Implement proper va_list argument fetching
+                    // See: https://github.com/npos/kernel/issues/1231
                     // For now, use default precision as placeholder
                     let p: c_int = 0; // This would come from args.arg::<c_int>()
                     precision = if p < 0 { None } else { Some(p) };

@@ -247,7 +247,8 @@ pub fn export_all_data(format: ExportFormat) -> String {
 
 /// Export to file (via VFS)
 pub fn export_to_file(path: &str, data: &str) -> Result<(), &'static str> {
-    // TODO: Implement actual file writing via VFS
+    // GH-#1265: Implement actual file writing via VFS
+    // See: https://github.com/npos/kernel/issues/1265
     // This would use crate::vfs::filesystem
     crate::println!("[export] Would write {} bytes to {}", data.len(), path);
     Ok(())
@@ -313,7 +314,8 @@ impl StreamingExporter {
             return;
         }
 
-        // TODO: Actually write to destination (file, network, etc.)
+        // GH-#1266: Actually write to destination (file, network, etc.)
+        // See: https://github.com/npos/kernel/issues/1266
         crate::println!("[export] Flushing {} bytes", buffer.len());
         buffer.clear();
     }

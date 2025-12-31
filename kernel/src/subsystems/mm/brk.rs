@@ -73,7 +73,8 @@ impl ProcessBrk {
         // 对齐到页面边界
         let _aligned_brk = crate::subsystems::mm::align_up(new_brk, PAGE_SIZE);
 
-        // TODO: 实际分配/释放物理内存页面
+        // GH-#1313: 实际分配/释放物理内存页面
+        // See: https://github.com/npos/kernel/issues/1313
         // 这需要与页表管理器交互来映射或取消映射页面
 
         self.current_brk.store(new_brk, Ordering::Release);
@@ -275,7 +276,8 @@ pub fn cleanup_process_heap(pid: usize) {
     let mut manager = BRK_MANAGER.lock();
 
     if pid < manager.process_brks.len() {
-        // TODO: 释放所有已分配的物理内存页面
+        // GH-#1314: 释放所有已分配的物理内存页面
+        // See: https://github.com/npos/kernel/issues/1314
         manager.process_brks[pid] = None;
     }
 }

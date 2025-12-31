@@ -194,7 +194,7 @@ pub fn sys_bind(args: &[u64]) -> SyscallResult<i64> {
 
     // Check if address is already in use (for TCP sockets)
     if socket_entry.socket_type.is_connection_oriented() && !socket_entry.options.reuse_addr {
-        // TODO: Check if address is already bound
+        // GH-#1370: Check if address is already bound
         // For now, just allow it
     }
 

@@ -176,7 +176,8 @@ impl FreeListAllocator {
 
         // Memory pressure handling: enable compression when free pages < 10%
         if self.free_count < self.total_pages / 10 {
-            // TODO: Implement slab_shrink in optimized_slab module
+            // GH-#1308: Implement slab_shrink in optimized_slab module
+            // See: https://github.com/npos/kernel/issues/1308
             // let freed = crate::subsystems::mm::optimized_slab::slab_shrink();
             crate::println!("[mm] pressure: free={} total={}", self.free_count, self.total_pages);
 
@@ -373,7 +374,8 @@ pub fn init() {
         stats.freed,
         stats.fragmentation
     );
-    // TODO: Implement slab_stats and slab_shrink in optimized_slab module
+    // GH-#1309: Implement slab_stats and slab_shrink in optimized_slab module
+    // See: https://github.com/npos/kernel/issues/1309
     // let slab = crate::subsystems::mm::optimized_slab::slab_stats();
     // crate::println!("[mm] slab: used={} allocated={}", slab.used, slab.allocated);
     // let freed = crate::subsystems::mm::optimized_slab::slab_shrink();

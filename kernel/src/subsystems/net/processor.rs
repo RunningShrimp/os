@@ -283,7 +283,8 @@ impl NetworkProcessor {
                 if socket.state == TcpState::Listen {
                     // Transition to SYN_RECEIVED
                     socket.state = TcpState::SynReceived;
-                    // TODO: Send SYN-ACK
+                    // GH-#1293: Send SYN-ACK
+                    // See: https://github.com/npos/kernel/issues/1293
                     self.tcp_sockets.insert(socket_key, socket);
                     return Ok(PacketResult::Drop);
                 }
@@ -291,7 +292,8 @@ impl NetworkProcessor {
 
             // Handle data packets
             if tcp_packet.payload.len() > 0 {
-                // TODO: Buffer received data
+                // GH-#1294: Buffer received data
+                // See: https://github.com/npos/kernel/issues/1294
                 crate::log_info!(
                     "TCP received {} bytes from {}",
                     tcp_packet.payload.len(),

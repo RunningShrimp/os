@@ -229,7 +229,8 @@ impl InputManager {
                 self.mouse_y.store(*y as u32, Ordering::Release);
 
                 // Find surface under cursor and send event
-                // TODO: Implement hit testing
+                // GH-#1272: Implement hit testing
+                // See: https://github.com/npos/kernel/issues/1272
                 if let Some(surface_id) = self.find_surface_at(*x, *y) {
                     self.send_to_surface(surface_id, event)?;
                 }
@@ -248,7 +249,8 @@ impl InputManager {
             | InputEvent::TouchMove { .. }
             | InputEvent::TouchEnd { .. } => {
                 // Touch events go to surface under touch point
-                // TODO: Implement touch hit testing
+                // GH-#1273: Implement touch hit testing
+                // See: https://github.com/npos/kernel/issues/1273
             },
         }
 
@@ -268,7 +270,8 @@ impl InputManager {
 
     /// Find surface at coordinates (simplified)
     fn find_surface_at(&self, _x: f32, _y: f32) -> Option<SurfaceId> {
-        // TODO: Implement proper hit testing using compositor
+        // GH-#1274: Implement proper hit testing using compositor
+        // See: https://github.com/npos/kernel/issues/1274
         None
     }
 

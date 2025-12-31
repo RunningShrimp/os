@@ -612,7 +612,8 @@ impl DependencyGraph {
         // 记录：如果服务是系统调用服务，可能需要特殊处理
         let is_syscall = metadata.is_syscall_service;
 
-        // TODO: 实现基于优先级的依赖解析：
+        // GH-#1338: 实现基于优先级的依赖解析：
+        // See: https://github.com/npos/kernel/issues/1338
         // 1. 在拓扑排序时考虑 priority 值
         // 2. 系统调用服务可能需要提前初始化
         // 3. 可以使用 tags 来实现服务分组

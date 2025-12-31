@@ -985,7 +985,8 @@ impl BpfMapPersistence {
         // Real implementation would serialize map to disk
         let count = map.len();
 
-        // TODO: Implement actual serialization
+        // GH-#1282: Implement actual serialization
+        // See: https://github.com/npos/kernel/issues/1282
         // 1. Iterate through all map entries
         // 2. Serialize to binary format
         // 3. Write to specified path
@@ -1010,7 +1011,8 @@ impl BpfMapPersistence {
         // Note: This is a placeholder implementation
         // Real implementation would deserialize map from disk
 
-        // TODO: Implement actual deserialization
+        // GH-#1283: Implement actual deserialization
+        // See: https://github.com/npos/kernel/issues/1283
         // 1. Read file from path
         // 2. Parse serialized format
         // 3. Insert entries into map

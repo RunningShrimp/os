@@ -78,7 +78,8 @@ use core::time::Duration;
 unsafe fn rdtsc() -> u64 {
     // ARM64 system counter (CNTVCT_EL0)
     // For now, return a monotonic value from arch-specific timer
-    // TODO: Implement proper ARM64 cycle counter reading
+    // GH-#1264: Implement proper ARM64 cycle counter reading
+    // See: https://github.com/npos/kernel/issues/1264
     core::sync::atomic::AtomicU64::new(0).load(core::sync::atomic::Ordering::Relaxed)
 }
 

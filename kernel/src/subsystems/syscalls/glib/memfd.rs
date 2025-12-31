@@ -36,6 +36,7 @@ pub fn init() -> Result<(), KernelError> {
 
 /// Get a memfd instance by index
 pub fn get_memfd_instance(_instance_idx: usize) -> Option<MemFdInstance> {
-    // TODO: Implement actual instance management
+    // GH-#1339: Implement actual instance management
+    // See: https://github.com/npos/kernel/issues/1339
     Some(MemFdInstance::new())
 }

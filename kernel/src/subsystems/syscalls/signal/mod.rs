@@ -39,7 +39,8 @@ pub fn create_signal_service() -> Box<dyn SyscallService> {
 ///
 /// * `Result<(), crate::error::KernelError>` - 初始化结果
 pub fn initialize_signal_module() -> Result<(), crate::error::KernelError> {
-    // TODO: 实现模块初始化逻辑
+    // GH-#1348: 实现模块初始化逻辑
+    // See: https://github.com/npos/kernel/issues/1348
     crate::log_info!("Initializing signal module");
     Ok(())
 }

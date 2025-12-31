@@ -74,7 +74,8 @@ pub fn handle_munmap(args: &[u64]) -> KernelResult<u64> {
                 if crate::subsystems::mm::vm::unmap_page(pagetable, current).is_ok() {
                     // Note: For aarch64, we would need to track physical addresses
                     // separately. For now, we just unmap without freeing physical memory.
-                    // TODO: Implement proper physical page tracking for aarch64
+                    // GH-#1342: Implement proper physical page tracking for aarch64
+                    // See: https://github.com/npos/kernel/issues/1342
                     unmapped_count += 1;
                 }
             }
@@ -84,7 +85,8 @@ pub fn handle_munmap(args: &[u64]) -> KernelResult<u64> {
         {
             // x86_64 implementation would go here
             // For now, just increment count
-            // TODO: Implement proper unmapping for x86_64
+            // GH-#1343: Implement proper unmapping for x86_64
+            // See: https://github.com/npos/kernel/issues/1343
             unmapped_count += 1;
         }
 

@@ -16,12 +16,14 @@ use core::sync::atomic::{AtomicU64, Ordering};
 use spin::Mutex;
 
 // DEPRECATED: This module references old unified_dispatcher
-// TODO: Update to use new unified dispatcher from dispatch::unified
+// GH-#1336: Update to use new unified dispatcher from dispatch::unified
+// See: https://github.com/npos/kernel/issues/1336
 // use crate::subsystems::syscalls::dispatch::unified::{UnifiedSyscallDispatcher};
 use crate::subsystems::syscalls::optimization::core::{OptimizationConfig, UnifiedSyscallStats};
 
 // Placeholder type for deprecated UnifiedDispatcher
-// TODO: Remove this when proper integration is done
+// GH-#1337: Remove this when proper integration is done
+// See: https://github.com/npos/kernel/issues/1337
 #[allow(dead_code)]
 type UnifiedDispatcher = ();
 

@@ -49,14 +49,16 @@ impl Thread {
 
 /// Get current process
 pub fn get_current_process() -> Option<Arc<Mutex<Process>>> {
-    // TODO: Implement proper process lookup
+    // GH-#1330: Implement proper process lookup
+    // See: https://github.com/npos/kernel/issues/1330
     // This should return the currently executing process
     None
 }
 
 /// Get process by PID
 pub fn get_process_by_pid(pid: ProcessId) -> Option<Arc<Mutex<Process>>> {
-    // TODO: Implement process table lookup by PID
+    // GH-#1331: Implement process table lookup by PID
+    // See: https://github.com/npos/kernel/issues/1331
     // This should search the global process table and return the process
     let _ = pid; // Parameter will be used when process table is implemented
     None

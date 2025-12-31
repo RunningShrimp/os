@@ -360,7 +360,8 @@ impl BTree {
         for node in pages.values() {
             total_nodes += 1;
             total_keys += node.keys.len();
-            // TODO: Calculate max depth
+            // GH-#1257: Calculate max depth
+            // See: https://github.com/npos/kernel/issues/1257
         }
 
         Ok(BTreeStats {

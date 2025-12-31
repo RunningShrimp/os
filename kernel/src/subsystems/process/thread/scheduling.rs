@@ -352,7 +352,8 @@ pub fn schedule() {
                         thread.fs_base = thread.tls_base;
                     }
                 }
-                // TODO: Add TLS setup for other architectures
+                // GH-#1334: Add TLS setup for other architectures
+                // See: https://github.com/npos/kernel/issues/1334
             }
 
             // Handle real-time scheduler context switch

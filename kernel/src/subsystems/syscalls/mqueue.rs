@@ -260,7 +260,8 @@ fn sys_mq_timedsend(args: &[u64]) -> SyscallResult<i64>{
     let timeout = unsafe { core::ptr::read(timeout_bytes.as_ptr() as *const crate::posix::Timespec) };
     
     // For now, implement as non-blocking send with timeout validation
-    // TODO: Implement proper timed send with blocking and timeout
+    // GH-#1325: Implement proper timed send with blocking and timeout
+    // See: https://github.com/npos/kernel/issues/1325
     if timeout.tv_sec < 0 || timeout.tv_nsec < 0 {
         return Err(SyscallError::InvalidArgument);
     }
@@ -367,7 +368,8 @@ fn sys_mq_timedreceive(args: &[u64]) -> SyscallResult<i64>{
     let timeout = unsafe { core::ptr::read(timeout_bytes.as_ptr() as *const crate::posix::Timespec) };
     
     // For now, implement as non-blocking receive with timeout validation
-    // TODO: Implement proper timed receive with blocking and timeout
+    // GH-#1326: Implement proper timed receive with blocking and timeout
+    // See: https://github.com/npos/kernel/issues/1326
     if timeout.tv_sec < 0 || timeout.tv_nsec < 0 {
         return Err(SyscallError::InvalidArgument);
     }

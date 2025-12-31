@@ -14,7 +14,8 @@ use crate::{
 
 /// Get current time in nanoseconds based on clock source
 fn get_current_time_ns(clock_source: ClockSource) -> u64 {
-    // TODO: Implement proper time retrieval based on clock source
+    // GH-#1306: Implement proper time retrieval based on clock source
+    // See: https://github.com/npos/kernel/issues/1306
     // For now, return a simple placeholder value
     match clock_source {
         ClockSource::Realtime => 0,

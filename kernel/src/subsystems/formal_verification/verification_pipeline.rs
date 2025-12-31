@@ -167,7 +167,8 @@ impl VerificationPipeline {
             return Err("Verification pipeline is not running");
         }
 
-        let _start_time_ms = 0u64; // TODO: Implement proper timestamp
+        let _start_time_ms = 0u64; // GH-#1302: Implement proper timestamp
+        // See: https://github.com/npos/kernel/issues/1302
         let mut all_results = Vec::new();
 
         // 按顺序执行各个验证阶段 - 使用索引避免借用冲突
@@ -245,7 +246,8 @@ impl VerificationPipeline {
         }
 
         // 更新统计信息
-        let elapsed_ms = 0u64; // TODO: Implement proper timestamp
+        let elapsed_ms = 0u64; // GH-#1303: Implement proper timestamp
+        // See: https://github.com/npos/kernel/issues/1303
         self.update_statistics(&all_results, elapsed_ms);
 
         Ok(all_results)

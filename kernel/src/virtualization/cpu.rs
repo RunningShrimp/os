@@ -577,7 +577,8 @@ impl VCpu {
         let mut result = CpuidLeaf::new(leaf, subleaf);
 
         // ARM64 doesn't have CPUID instruction
-        // TODO: Implement MIDR_EL1 read for CPU info on ARM64
+        // GH-#1237: Implement MIDR_EL1 read for CPU info on ARM64
+        // See: https://github.com/npos/kernel/issues/1237
         // For now, return cached values or zeros
         unsafe {
             let mut eax = leaf;
@@ -634,7 +635,8 @@ impl VCpu {
         }
 
         // ARM64 uses different system registers (MRS/MSR instructions)
-        // TODO: Implement MRS for ARM64 system registers
+        // GH-#1238: Implement MRS for ARM64 system registers
+        // See: https://github.com/npos/kernel/issues/1238
         // For now, return stub values for common MSRs
         unsafe {
             let value = match msr {

@@ -266,7 +266,8 @@ impl VfioInterrupt {
 
         // Clean up eventfd
         if let Some(efd) = irq.eventfd {
-            // TODO: Close eventfd
+            // GH-#1362: Close eventfd
+            // See: https://github.com/npos/kernel/issues/1362
             let _ = efd;
         }
 
@@ -418,7 +419,8 @@ impl VfioInterrupt {
 
     /// Signal eventfd
     fn signal_eventfd(&self, fd: i32) -> VfioResult<()> {
-        // TODO: Implement eventfd signaling
+        // GH-#1363: Implement eventfd signaling
+        // See: https://github.com/npos/kernel/issues/1363
         // eventfd_signal(fd, 1);
         Ok(())
     }

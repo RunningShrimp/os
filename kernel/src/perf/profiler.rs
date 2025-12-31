@@ -504,7 +504,8 @@ impl MemoryProfiler {
         }
 
         let timestamp = crate::subsystems::time::hrtime_nanos();
-        let thread_id = 0; // TODO: Get actual thread ID
+        let thread_id = 0; // GH-#1281: Get actual thread ID
+        // See: https://github.com/npos/kernel/issues/1281
 
         let event = AllocationEvent {
             timestamp,

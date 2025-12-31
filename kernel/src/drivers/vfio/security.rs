@@ -392,7 +392,8 @@ impl VfioSandbox {
     ///
     /// Ensures all devices in a group are granted together
     pub fn validate_group(&self, _group: &VfioGroup) -> VfioResult<()> {
-        // TODO: Check that all devices in group are authorized
+        // GH-#1364: Check that all devices in group are authorized
+        // See: https://github.com/npos/kernel/issues/1364
         Ok(())
     }
 
@@ -411,7 +412,8 @@ impl VfioSandbox {
     ///
     /// Ensures devices cannot access each other's memory
     pub fn check_isolation(&self, _device1: u64, _device2: u64) -> VfioResult<()> {
-        // TODO: Verify IOMMU isolation
+        // GH-#1365: Verify IOMMU isolation
+        // See: https://github.com/npos/kernel/issues/1365
         Ok(())
     }
 }

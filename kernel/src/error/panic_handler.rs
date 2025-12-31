@@ -363,8 +363,10 @@ impl SystemState {
         Self {
             process_count: total_processes,
             running_processes,
-            memory_usage: 0, // TODO: Get actual memory usage
-            free_memory: 0,  // TODO: Get actual free memory
+            memory_usage: 0, // GH-#1284: Get actual memory usage
+            // See: https://github.com/npos/kernel/issues/1284
+            free_memory: 0,  // GH-#1285: Get actual free memory
+            // See: https://github.com/npos/kernel/issues/1285
             error_stats,
         }
     }

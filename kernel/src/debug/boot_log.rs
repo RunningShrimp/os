@@ -355,7 +355,8 @@ impl BootLogger {
     /// Note: This is a simplified implementation. In a real system,
     /// this would read from a proper timer.
     fn get_timestamp(&self) -> u64 {
-        // TODO: Use actual timer (TSC, generic timer, etc.)
+        // GH-#1291: Use actual timer (TSC, generic timer, etc.)
+        // See: https://github.com/npos/kernel/issues/1291
         // For now, return a simple counter or read from time module
         0 // Placeholder
     }

@@ -641,7 +641,7 @@ fn generate_layer_digest(command: &str) -> String {
     for byte in command.as_bytes() {
         hash = hash.wrapping_mul(31).wrapping_add(byte as u64);
     }
-    /* TODO: {::016x} */ &hash.to_string()
+        &format!("{:016x}", hash)
 }
 
 /// Simple layer size estimator

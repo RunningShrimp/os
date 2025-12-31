@@ -64,14 +64,16 @@ pub fn has_feature(feature: u32) -> bool {
             if feature < 32 {
                 (result.edx & (1 << bit)) != 0
             } else {
-                // TODO: Check ECX register for features 32-63
+                // GH-#1255: Check ECX register for features 32-63
+                // See: https://github.com/npos/kernel/issues/1255
                 false
             }
         }
     }
     #[cfg(not(target_arch = "x86_64"))]
     {
-        // TODO: Implement feature detection for other architectures
+        // GH-#1256: Implement feature detection for other architectures
+        // See: https://github.com/npos/kernel/issues/1256
         let _ = feature; // Acknowledge parameter
         false
     }

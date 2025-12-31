@@ -112,7 +112,8 @@ pub fn init() -> nos_api::Result<()> {
 /// - Close message queues
 /// - Release IPC resources
 pub fn shutdown() -> nos_api::Result<()> {
-    // TODO: Implement graceful shutdown
+    // GH-#1316: Implement graceful shutdown
+    // See: https://github.com/npos/kernel/issues/1316
     // - Clean up all shared memory regions
     // - Close all message queues
     // - Release IPC resources
