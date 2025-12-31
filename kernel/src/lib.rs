@@ -364,6 +364,9 @@ pub mod tests;
 // Storage Management Subsystem
 pub mod storage;
 
+// Logging subsystem - comprehensive logging with async backend
+pub mod logging;
+
 #[cfg(not(feature = "cloud_native"))]
 mod cloud_native {
     pub mod namespaces {
@@ -651,3 +654,73 @@ pub mod filesystem;
 
 /// Database engine with SQL support, transactions, and recovery
 pub mod database;
+
+/// Health checking with probes, circuit breakers, and aggregation
+pub mod health;
+
+/// Metrics and telemetry system
+///
+/// This module provides comprehensive metrics collection and export capabilities:
+/// - Counters (monotonically increasing values)
+/// - Gauges (point-in-time measurements)
+/// - Histograms (value distributions with percentiles)
+/// - Labeled metrics (multi-dimensional tracking)
+/// - Multiple export formats (Prometheus, OpenMetrics, StatsD)
+/// - Thread-safe, lock-free operations for minimal overhead
+///
+/// ## Features
+///
+/// - **Counter**: Track cumulative values (requests, bytes, errors)
+/// - **Gauge**: Track point-in-time values (memory, connections, queue depth)
+/// - **Histogram**: Track distributions (latencies, response sizes)
+/// - **Labels**: Add dimensions to metrics (method, status, region)
+/// - **Export**: Prometheus text format, OpenMetrics, StatsD protocol
+/// - **Performance**: <1% overhead with lock-free atomic operations
+///
+/// ## Example
+///
+/// ```rust
+/// use kernel::metrics::*;
+///
+/// // Get the global registry
+/// let registry = registry::global_registry();
+///
+/// // Create a counter
+/// let counter = registry.counter("requests_total").unwrap();
+/// counter.inc();
+///
+/// // Create a gauge
+/// let gauge = registry.gauge("active_connections").unwrap();
+/// gauge.set(42);
+///
+/// // Create a histogram
+/// let histogram = registry.histogram_latency("request_duration").unwrap();
+/// histogram.observe(0.123);
+///
+/// // Export metrics
+/// let output = registry.export_prometheus();
+/// ```
+pub mod metrics;
+
+/// Performance Profiling
+///
+/// The profiling module provides comprehensive performance profiling capabilities:
+/// - CPU profiling with sampling and flame graph generation
+/// - Memory profiling with leak detection
+/// - Lock contention profiling
+/// - I/O profiling with latency tracking
+/// - Symbol resolution and demangling
+///
+/// # Example
+///
+/// ```rust
+/// use kernel::profiling::{Profiler, ProfilerType};
+///
+/// let profiler = Profiler::new();
+/// profiler.enable();
+/// profiler.start(ProfilerType::Cpu(100)).unwrap();
+/// // ... code to profile ...
+/// profiler.stop(ProfilerType::Cpu(0)).unwrap();
+/// let report = profiler.report(ProfilerType::Cpu(0)).unwrap();
+/// ```
+pub mod profiling;

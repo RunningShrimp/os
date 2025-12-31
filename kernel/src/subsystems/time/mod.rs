@@ -409,5 +409,82 @@ impl SystemTimeError {
         Duration::from_secs(0) // Simplified implementation
     }
 }
+
+/// Timestamp for health checking and monitoring
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Timestamp {
+    /// Nanoseconds since boot
+    nanos: u64,
+}
+
+impl Timestamp {
+    /// Create a new timestamp from nanoseconds
+    pub fn from_nanos(nanos: u64) -> Self {
+        Timestamp { nanos }
+    }
+
+    /// Get current timestamp
+    pub fn now() -> Self {
+        Timestamp {
+            nanos: timestamp_nanos(),
+        }
+    }
+
+    /// Get timestamp in nanoseconds
+    pub fn as_nanos(&self) -> u64 {
+        self.nanos
+    }
+
+    /// Get timestamp in microseconds
+    pub fn as_micros(&self) -> u64 {
+        self.nanos / 1_000
+    }
+
+    /// Get timestamp in milliseconds
+    pub fn as_millis(&self) -> u64 {
+        self.nanos / 1_000_000
+    }
+
+    /// Get timestamp in seconds
+    pub fn as_secs(&self) -> u64 {
+        self.nanos / 1_000_000_000
+    }
+
+    /// Calculate duration since another timestamp
+    pub fn duration_since(&self, earlier: Timestamp) -> Duration {
+        if self.nanos >= earlier.nanos {
+            Duration::from_nanos(self.nanos - earlier.nanos)
+        } else {
+            Duration::from_nanos(0)
+        }
+    }
+
+    /// Add a duration to this timestamp
+    pub fn checked_add(&self, duration: Duration) -> Option<Timestamp> {
+        self.nanos
+            .checked_add(duration.as_nanos() as u64)
+            .map(|nanos| Timestamp { nanos })
+    }
+
+    /// Subtract a duration from this timestamp
+    pub fn checked_sub(&self, duration: Duration) -> Option<Timestamp> {
+        self.nanos
+            .checked_sub(duration.as_nanos() as u64)
+            .map(|nanos| Timestamp { nanos })
+    }
+}
+
+impl From<SystemTime> for Timestamp {
+    fn from(time: SystemTime) -> Self {
+        Timestamp { nanos: time.ticks }
+    }
+}
+
+impl From<Timestamp> for SystemTime {
+    fn from(ts: Timestamp) -> Self {
+        SystemTime { ticks: ts.nanos }
+    }
+}
+
 pub mod types;
 pub use types::{Timespec, get_current_time};

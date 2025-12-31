@@ -825,6 +825,68 @@ pub enum TraceError {
     StorageError(String),
     /// 系统错误
     SystemError(String),
+
+    // Distributed tracing errors
+    /// Tag limit exceeded
+    TagLimitExceeded,
+    /// Event limit exceeded
+    EventLimitExceeded,
+    /// Link limit exceeded
+    LinkLimitExceeded,
+    /// Attribute limit exceeded
+    AttributeLimitExceeded,
+    /// Span already ended
+    SpanAlreadyEnded,
+    /// Invalid trace ID length
+    InvalidTraceIdLength { expected: usize, actual: usize },
+    /// Invalid trace ID format
+    InvalidTraceIdFormat,
+    /// Invalid span ID length
+    InvalidSpanIdLength { expected: usize, actual: usize },
+    /// Invalid span ID format
+    InvalidSpanIdFormat,
+    /// Invalid traceparent header
+    InvalidTraceParentHeader,
+    /// Invalid traceparent version
+    InvalidTraceParentVersion,
+    /// Unsupported trace version
+    UnsupportedTraceVersion(u8),
+    /// Invalid trace flags
+    InvalidTraceFlags,
+    /// Missing traceparent header
+    MissingTraceParent,
+    /// Missing span ID
+    MissingSpanId,
+    /// Trace state limit exceeded
+    TraceStateLimitExceeded,
+    /// Invalid trace state key
+    InvalidTraceStateKey(String),
+    /// Trace state value too long
+    TraceStateValueTooLong,
+    /// Header too long
+    HeaderTooLong,
+    /// Invalid B3 header
+    InvalidB3Header,
+    /// Binary context too large
+    BinaryContextTooLarge,
+    /// Invalid binary context
+    InvalidBinaryContext,
+    /// Unsupported binary version
+    UnsupportedBinaryVersion(u8),
+    /// Invalid sampling rate
+    InvalidSamplingRate(f64),
+    /// Invalid sampling probability
+    InvalidSamplingProbability(f64),
+    /// Empty composite sampler
+    EmptyCompositeSampler,
+    /// Too many samplers in composite
+    TooManySamplers(usize),
+    /// Export queue full
+    ExportQueueFull,
+    /// Export timeout
+    ExportTimeout,
+    /// Connection error
+    ConnectionError(String),
 }
 
 impl core::fmt::Display for TraceError {
@@ -835,6 +897,42 @@ impl core::fmt::Display for TraceError {
             TraceError::ExportError(msg) => write!(f, "导出错误: {}", msg),
             TraceError::StorageError(msg) => write!(f, "存储错误: {}", msg),
             TraceError::SystemError(msg) => write!(f, "系统错误: {}", msg),
+            TraceError::TagLimitExceeded => write!(f, "Tag limit exceeded"),
+            TraceError::EventLimitExceeded => write!(f, "Event limit exceeded"),
+            TraceError::LinkLimitExceeded => write!(f, "Link limit exceeded"),
+            TraceError::AttributeLimitExceeded => write!(f, "Attribute limit exceeded"),
+            TraceError::SpanAlreadyEnded => write!(f, "Span already ended"),
+            TraceError::InvalidTraceIdLength { expected, actual } => {
+                write!(f, "Invalid trace ID length: expected {}, got {}", expected, actual)
+            }
+            TraceError::InvalidTraceIdFormat => write!(f, "Invalid trace ID format"),
+            TraceError::InvalidSpanIdLength { expected, actual } => {
+                write!(f, "Invalid span ID length: expected {}, got {}", expected, actual)
+            }
+            TraceError::InvalidSpanIdFormat => write!(f, "Invalid span ID format"),
+            TraceError::InvalidTraceParentHeader => write!(f, "Invalid traceparent header"),
+            TraceError::InvalidTraceParentVersion => write!(f, "Invalid traceparent version"),
+            TraceError::UnsupportedTraceVersion(v) => write!(f, "Unsupported trace version: {}", v),
+            TraceError::InvalidTraceFlags => write!(f, "Invalid trace flags"),
+            TraceError::MissingTraceParent => write!(f, "Missing traceparent header"),
+            TraceError::MissingSpanId => write!(f, "Missing span ID"),
+            TraceError::TraceStateLimitExceeded => write!(f, "Trace state limit exceeded"),
+            TraceError::InvalidTraceStateKey(key) => write!(f, "Invalid trace state key: {}", key),
+            TraceError::TraceStateValueTooLong => write!(f, "Trace state value too long"),
+            TraceError::HeaderTooLong => write!(f, "Header value too long"),
+            TraceError::InvalidB3Header => write!(f, "Invalid B3 header"),
+            TraceError::BinaryContextTooLarge => write!(f, "Binary context too large"),
+            TraceError::InvalidBinaryContext => write!(f, "Invalid binary context"),
+            TraceError::UnsupportedBinaryVersion(v) => write!(f, "Unsupported binary version: {}", v),
+            TraceError::InvalidSamplingRate(rate) => write!(f, "Invalid sampling rate: {}", rate),
+            TraceError::InvalidSamplingProbability(prob) => {
+                write!(f, "Invalid sampling probability: {}", prob)
+            }
+            TraceError::EmptyCompositeSampler => write!(f, "Empty composite sampler"),
+            TraceError::TooManySamplers(count) => write!(f, "Too many samplers: {}", count),
+            TraceError::ExportQueueFull => write!(f, "Export queue full"),
+            TraceError::ExportTimeout => write!(f, "Export timeout"),
+            TraceError::ConnectionError(msg) => write!(f, "Connection error: {}", msg),
         }
     }
 }
