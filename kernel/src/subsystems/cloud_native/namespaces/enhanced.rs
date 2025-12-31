@@ -8,7 +8,7 @@ extern crate alloc;
 use alloc::{
     collections::BTreeMap,
     format,
-    string::{String, ToString},
+    string::String,
     sync::Arc,
     vec::Vec,
 };

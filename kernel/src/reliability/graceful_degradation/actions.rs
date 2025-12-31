@@ -1,7 +1,7 @@
 //! Degradation and recovery actions
 
 use alloc::collections::BTreeMap;
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 
 /// 降级行动

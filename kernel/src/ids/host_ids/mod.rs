@@ -42,7 +42,4 @@ mod stats;
 mod types;
 
 // 重新导出公共API
-pub use detector::*;
 pub use host_ids::HostIds;
-pub use stats::*;
-pub use types::*;

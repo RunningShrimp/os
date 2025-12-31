@@ -11,7 +11,7 @@ use alloc::{
     vec::Vec,
 };
 
-use crate::reliability::{EINVAL, EIO, ENOENT};
+use crate::reliability::EINVAL;
 
 /// Rootfs层
 #[derive(Debug, Clone)]
@@ -160,7 +160,7 @@ impl RootfsBuilder {
             ("tty", 5, 0, 0o666),
         ];
 
-        for (name, major, minor, mode) in &devices {
+        for (name, major, minor, _mode) in &devices {
             let path = format!("{}/dev/{}", self.mount_point, name);
             // 在实际实现中，这里会使用mknod创建设备节点
             crate::println!(

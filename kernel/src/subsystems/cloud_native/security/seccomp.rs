@@ -6,12 +6,11 @@
 extern crate alloc;
 
 use alloc::{
-    format,
     string::{String, ToString},
     vec::Vec,
 };
 
-use crate::reliability::{EINVAL, ENOMEM};
+use crate::reliability::EINVAL;
 
 /// Seccomp动作
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

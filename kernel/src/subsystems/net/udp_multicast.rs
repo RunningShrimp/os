@@ -368,14 +368,14 @@ impl UdpMulticast {
     }
 
     /// Add source for SSM
-    pub fn add_source(&self, group_addr: Ipv4Addr, source_addr: Ipv4Addr) -> Result<(), MulticastError> {
+    pub fn add_source(&self, group_addr: Ipv4Addr, _source_addr: Ipv4Addr) -> Result<(), MulticastError> {
         if self.igmp_version != IgmpVersion::V3 {
             return Err(MulticastError::SsmNotSupported);
         }
 
-        let mut groups = self.groups.lock();
+        let groups = self.groups.lock();
 
-        if let Some(group) = groups.get(&group_addr) {
+        if let Some(_group) = groups.get(&group_addr) {
             // Need to get mutable reference - this is a design limitation
             // In practice, we'd use interior mutability
             return Err(MulticastError::NotSupported);

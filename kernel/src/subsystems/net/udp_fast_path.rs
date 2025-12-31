@@ -9,7 +9,6 @@
 
 extern crate alloc;
 use alloc::{
-    collections::BTreeMap,
     sync::Arc,
     vec::Vec,
 };
@@ -24,8 +23,7 @@ use spin::Mutex;
 use crate::subsystems::net::{
     ipv4::Ipv4Addr,
     socket::SocketAddr,
-    udp::{UdpPacket, UdpSocket, UdpSocketState},
-    buffer_management::{NetworkBuffer, BufferHandle},
+    udp::UdpSocket,
 };
 
 /// Maximum number of CPUs supported
@@ -448,7 +446,7 @@ impl UdpFastPath {
         let mut sent = 0;
 
         // Process packets in batch
-        for (addr, data) in packets {
+        for (_addr, _data) in packets {
             // In a real implementation, this would:
             // 1. Construct UDP packet with checksum
             // 2. Perform scatter-gather DMA if hardware supports it

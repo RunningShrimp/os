@@ -279,8 +279,8 @@ impl DefaultRepositoryFactory {
         id_generator: Arc<dyn IdGenerator>,
     ) -> Result<Self, FactoryError> {
         let mut serializer_registry = SerializerRegistry::new();
-        serializer_registry.register(Box::new(BinarySerializer::new()));
-        serializer_registry.register(Box::new(JsonSerializer::new()));
+        let _ = serializer_registry.register(Box::new(BinarySerializer::new()));
+        let _ = serializer_registry.register(Box::new(JsonSerializer::new()));
         let serializer_registry = Arc::new(serializer_registry);
 
         Ok(Self {

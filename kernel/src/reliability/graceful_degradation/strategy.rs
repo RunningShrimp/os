@@ -1,7 +1,7 @@
 //! Degradation strategy types and structures
 
 use alloc::collections::BTreeMap;
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 
 use super::actions::{DegradationAction, RecoveryCondition};

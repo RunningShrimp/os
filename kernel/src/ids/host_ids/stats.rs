@@ -5,7 +5,6 @@
 extern crate alloc;
 
 use alloc::string::String;
-use alloc::vec::Vec;
 
 /// 主机入侵检测统计
 #[derive(Debug, Clone, Default)]

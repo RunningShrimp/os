@@ -841,10 +841,10 @@ impl SyscallDispatcher {
         &self,
         syscall_number: u32,
         args: &[u64],
-        security_context: &SecurityContext,
+        _security_context: &SecurityContext,
     ) -> AccessResult {
         // 根据系统调用号确定所需的权限和资源类型
-        let (resource_type, resource_id, permission) = match syscall_number {
+        let (_resource_type, _resource_id, permission) = match syscall_number {
             // 文件系统系统调用
             0x2000 => { // SYS_READ
                 if args.is_empty() {

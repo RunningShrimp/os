@@ -5,7 +5,7 @@
 //! - S4 (Suspend to Disk)
 //! - S1 (Standby)
 
-use core::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use alloc::sync::Arc;
 use alloc::vec::Vec;
