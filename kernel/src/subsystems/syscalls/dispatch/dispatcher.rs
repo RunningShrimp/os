@@ -11,7 +11,7 @@
 use crate::error::KernelError;
 use crate::subsystems::syscalls::services::registry::{ServiceRegistry, Version};
 use crate::subsystems::syscalls::security::{SyscallSecurityValidator, SecurityContext, SecurityValidationResult, ResourceAccess, AccessControlManager, Permission};
-use crate::subsystems::syscalls::security::access_control::{ResourceType, AccessResult};
+use crate::subsystems::syscalls::security::access_types::{ResourceType as AccessResourceType, AccessResult};
 use crate::reliability::{FaultManager, CheckpointManager, CheckpointType, ErrorLogManager};
 use alloc::collections::BTreeMap;
 use alloc::format;

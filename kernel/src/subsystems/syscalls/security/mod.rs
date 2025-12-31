@@ -7,16 +7,20 @@
 //! - 审计日志
 //! - 访问控制
 
-pub mod access_control;
+// Access control modules (flattened from access_control/ subdirectory)
+pub mod access_types;
+pub mod access_config;
+pub mod access_manager;
 pub mod syscall_validator;
 
-// Re-exports from access_control (excluding conflicting ResourceType)
-pub use access_control::{
+// Re-exports from access control modules (excluding conflicting ResourceType)
+pub use access_types::{
     UserId, GroupId, ProcessId, AccessResult, UserInfo, UserType, AccountStatus,
     Permission, ResourceType as AccessResourceType, AccessControlEntry,
-    PrincipalType, AccessRule, Capability, CapabilityType,
-    AccessControlManager, GroupInfo, AccessControlConfig,
+    PrincipalType, AccessRule, Capability, CapabilityType, GroupInfo,
 };
+pub use access_config::AccessControlConfig;
+pub use access_manager::AccessControlManager;
 
 // Re-exports from syscall_validator (excluding conflicting ResourceType)
 pub use syscall_validator::{
