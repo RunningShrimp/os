@@ -310,7 +310,8 @@ impl RecoveryManager {
 
     /// Execute fallback recovery
     fn execute_fallback(&self, _error: &UnifiedError, _context: &ErrorContext) -> RecoveryResult {
-        // TODO: Implement fallback mechanisms
+        // GH-#1170: Implement fallback mechanisms
+        // See: https://github.com/npos/kernel/issues/1170
         // For now, just return success
         RecoveryResult::Success
     }
@@ -336,12 +337,14 @@ impl RecoveryManager {
         match error {
             UnifiedError::DriverError(_) => {
                 // Reset driver
-                // TODO: Implement driver reset
+                // GH-#1171: Implement driver reset
+                // See: https://github.com/npos/kernel/issues/1171
                 RecoveryResult::Success
             },
             UnifiedError::ProcessError(_) => {
                 // Reset process state
-                // TODO: Implement process reset
+                // GH-#1172: Implement process reset
+                // See: https://github.com/npos/kernel/issues/1172
                 RecoveryResult::Success
             },
             _ => RecoveryResult::Failed,
@@ -351,7 +354,8 @@ impl RecoveryManager {
     /// Execute restart recovery
     fn execute_restart(&self, _error: &UnifiedError, _context: &ErrorContext) -> RecoveryResult {
         // Restart subsystem
-        // TODO: Implement subsystem restart
+        // GH-#1173: Implement subsystem restart
+        // See: https://github.com/npos/kernel/issues/1173
         // This is a dangerous operation and should be carefully implemented
         RecoveryResult::Failed // For now, don't allow automatic restart
     }

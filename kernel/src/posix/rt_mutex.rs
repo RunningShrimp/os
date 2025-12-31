@@ -352,13 +352,15 @@ impl<T: ?Sized> RtMutex<T> {
 
     /// Get current task ID (placeholder - would query scheduler)
     fn current_task_id(&self) -> TaskId {
-        // TODO: Query actual task ID from scheduler
+        // GH-#1221: Query actual task ID from scheduler
+        // See: https://github.com/npos/kernel/issues/1221
         1
     }
 
     /// Get current task priority (placeholder - would query scheduler)
     fn current_task_priority(&self) -> RtPriority {
-        // TODO: Query actual priority from scheduler
+        // GH-#1222: Query actual priority from scheduler
+        // See: https://github.com/npos/kernel/issues/1222
         128
     }
 
@@ -485,7 +487,8 @@ impl RtMutexManager {
     /// Check for potential deadlock (cycle detection)
     fn check_deadlock(&self, task_id: TaskId, mutex_addr: u64) -> bool {
         let registry = self.registry.lock();
-        // TODO: Implement cycle detection in wait graph
+        // GH-#1223: Implement cycle detection in wait graph
+        // See: https://github.com/npos/kernel/issues/1223
         false
     }
 }

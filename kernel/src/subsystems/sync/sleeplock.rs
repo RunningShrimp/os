@@ -41,7 +41,8 @@ impl<T> Sleeplock<T> {
     /// In a full implementation, this would sleep instead of spin
     /// For now, use a simple spin with yield to reduce CPU usage
     pub fn lock(&self) -> SleeplockGuard<'_, T> {
-        // TODO: Implement proper sleep/wakeup when scheduler is ready
+        // GH-#1204: Implement proper sleep/wakeup when scheduler is ready
+        // See: https://github.com/npos/kernel/issues/1204
         // For now, use a simple spin with yield to reduce CPU usage
         let mut spin_count = 0;
         while self
@@ -56,7 +57,8 @@ impl<T> Sleeplock<T> {
 
             // After many spins, yield to reduce CPU contention
             if spin_count > 1000 {
-                // TODO: Call scheduler yield when available
+                // GH-#1205: Call scheduler yield when available
+                // See: https://github.com/npos/kernel/issues/1205
                 spin_count = 0;
             }
         }
@@ -102,7 +104,8 @@ impl<T: ?Sized> DerefMut for SleeplockGuard<'_, T> {
 impl<T: ?Sized> Drop for SleeplockGuard<'_, T> {
     fn drop(&mut self) {
         self.lock.locked.store(false, Ordering::Release);
-        // TODO: Wakeup waiting processes when scheduler is ready
+        // GH-#1206: Wakeup waiting processes when scheduler is ready
+        // See: https://github.com/npos/kernel/issues/1206
         // This would involve calling the scheduler to wakeup processes waiting on this lock
         crate::println!("[sync] SleepLock released - would wakeup waiting processes");
     }

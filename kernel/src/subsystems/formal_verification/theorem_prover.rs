@@ -702,7 +702,8 @@ impl TheoremProver {
 
     /// 证明单个定理
     pub fn prove_theorem(&mut self, theorem: &Theorem) -> Result<ProofResult, &'static str> {
-        let start_time_ms = 0u64; // TODO: Implement proper timestamp
+        let start_time_ms = 0u64; // GH-#1182: Implement proper timestamp
+        // See: https://github.com/npos/kernel/issues/1182
         let session_id = self.generate_session_id();
 
         // 创建证明会话
@@ -735,7 +736,8 @@ impl TheoremProver {
         };
 
         // 更新会话状态
-        session.end_time = Some(0u64); // TODO: Implement proper timestamp
+        session.end_time = Some(0u64); // GH-#1183: Implement proper timestamp
+        // See: https://github.com/npos/kernel/issues/1183
         session.session_status = match &proof_result {
             Ok(_) => SessionStatus::Completed,
             Err(_) => SessionStatus::Failed,
@@ -791,7 +793,8 @@ impl TheoremProver {
                     complexity: ProofComplexity::Medium,
                     proof_object: None,
                 }),
-                proof_time: 0u64, // TODO: Implement proper timestamp
+                proof_time: 0u64, // GH-#1184: Implement proper timestamp
+                // See: https://github.com/npos/kernel/issues/1184
                 used_strategies: vec![ProofStrategyType::Resolution],
                 applied_lemmas: Vec::new(),
                 search_statistics: SearchStatistics {
@@ -806,7 +809,8 @@ impl TheoremProver {
                 theorem_id: theorem.id,
                 proof_status: ProofStatus::Unproved,
                 proof: None,
-                proof_time: 0u64, // TODO: Implement proper timestamp
+                proof_time: 0u64, // GH-#1185: Implement proper timestamp
+                // See: https://github.com/npos/kernel/issues/1185
                 used_strategies: vec![ProofStrategyType::Resolution],
                 applied_lemmas: Vec::new(),
                 search_statistics: SearchStatistics {

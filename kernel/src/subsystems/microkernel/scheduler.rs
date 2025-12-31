@@ -248,7 +248,8 @@ impl MicroScheduler {
         // Add to ready queue if becoming ready
         if state == ThreadState::Runnable {
             if let Some(scheduler) = self.cpu_schedulers.get_mut(0) {
-                // TODO: CPU selection
+                // GH-#1210: CPU selection
+                // See: https://github.com/npos/kernel/issues/1210
                 if !scheduler.ready_queue.contains(&tid) {
                     scheduler.enqueue(tid)?;
                 }
@@ -316,7 +317,8 @@ impl MicroScheduler {
 
                         // Add to ready queue
                         if let Some(scheduler) = self.cpu_schedulers.get_mut(0) {
-                            // TODO: CPU selection
+                            // GH-#1211: CPU selection
+                            // See: https://github.com/npos/kernel/issues/1211
                             let _ = scheduler.enqueue(*tid);
                         }
                     }

@@ -199,13 +199,15 @@ impl Profiler {
 
     /// Convert address to function name (stub implementation)
     fn addr_to_name(addr: u64) -> String {
-        // TODO: Implement symbol resolution
+        // GH-#1162: Implement symbol resolution
+        // See: https://github.com/npos/kernel/issues/1162
         alloc::format!("fn_{:#x}", addr)
     }
 
     /// Get current instruction pointer (stub implementation)
     fn current_ip() -> u64 {
-        // TODO: Implement actual IP capture
+        // GH-#1163: Implement actual IP capture
+        // See: https://github.com/npos/kernel/issues/1163
         // This would typically use:
         // - x86_64: __builtin_return_address or inline asm
         // - ARM: special register read
@@ -214,7 +216,8 @@ impl Profiler {
 
     /// Capture stack trace (stub implementation)
     fn capture_stack_trace() -> Vec<u64> {
-        // TODO: Implement actual stack unwinding
+        // GH-#1164: Implement actual stack unwinding
+        // See: https://github.com/npos/kernel/issues/1164
         // This would typically use:
         // - libunwind
         // - frame pointer walking
@@ -224,7 +227,8 @@ impl Profiler {
 
     /// Get current CPU ID (stub implementation)
     fn current_cpu_id() -> u32 {
-        // TODO: Implement actual CPU ID retrieval
+        // GH-#1165: Implement actual CPU ID retrieval
+        // See: https://github.com/npos/kernel/issues/1165
         0
     }
 

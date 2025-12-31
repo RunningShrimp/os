@@ -90,7 +90,8 @@ pub fn epoll_wait(epfd: i32, events_ptr: usize, maxevents: i32, timeout: i32) ->
             // Track number of ready events
             let ready = 0;
             for it in inst.items.iter() {
-                // TODO: Implement actual file descriptor lookup and polling
+                // GH-#1146: Implement actual file descriptor lookup and polling
+                // See: https://github.com/npos/kernel/issues/1146
                 // For now, we need to stub these functions
                 // let idx = match crate::process::fdlookup(it.fd) { Some(i) => i, None => continue };
                 // let ev = crate::file::file_poll(idx) as i32;
@@ -114,14 +115,16 @@ pub fn epoll_wait(epfd: i32, events_ptr: usize, maxevents: i32, timeout: i32) ->
             // write events to user buffer
             let usize_sz = core::mem::size_of::<EpollEvent>();
             // println removed for no_std compatibility
-            // TODO: Implement page table lookup
+            // GH-#1147: Implement page table lookup
+            // See: https://github.com/npos/kernel/issues/1147
             // let pt = match crate::process::myproc().and_then(|pid| ptable.find(pid).map(|p| p.pagetable)) { Some(x) => x, None => return E_BADARG };
             // println removed for no_std compatibility
             let ready = out.len() as isize;
             for (i, ev) in out.into_iter().enumerate() {
                 let dst = events_ptr + i * usize_sz;
                 let bytes = unsafe { core::slice::from_raw_parts((&ev as *const EpollEvent) as *const u8, usize_sz) };
-                // TODO: Implement copyout
+                // GH-#1148: Implement copyout
+                // See: https://github.com/npos/kernel/issues/1148
                 // if unsafe { crate::vm::copyout(pt, dst, bytes.as_ptr(), bytes.len()) }.is_err() { return E_FAULT; }
                 let _ = bytes;
                 let _ = dst;
@@ -134,7 +137,8 @@ pub fn epoll_wait(epfd: i32, events_ptr: usize, maxevents: i32, timeout: i32) ->
             if elapsed >= timeout { return 0; }
         }
         // Sleep until next tick to avoid busy-waiting
-        // TODO: Implement proper event waiting mechanism with sleep/wake
+        // GH-#1149: Implement proper event waiting mechanism with sleep/wake
+        // See: https://github.com/npos/kernel/issues/1149
         // For now, use WFI (Wait For Interrupt) to reduce CPU usage
         crate::arch::wfi();
     }

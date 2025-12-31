@@ -704,20 +704,23 @@ impl Cgroup {
     pub fn kill_all(&self) {
         let processes = self.processes.lock();
         for pid in processes.iter() {
-            // TODO: Send SIGKILL to process
+            // GH-#1154: Send SIGKILL to process
+            // See: https://github.com/npos/kernel/issues/1154
             log::warn!("Killing process {} in cgroup {}", pid, self.path);
         }
     }
 
     /// Freeze all processes in cgroup
     pub fn freeze(&self) {
-        // TODO: Implement process freezing
+        // GH-#1155: Implement process freezing
+        // See: https://github.com/npos/kernel/issues/1155
         log::info!("Freezing cgroup {}", self.path);
     }
 
     /// Thaw all processes in cgroup
     pub fn thaw(&self) {
-        // TODO: Implement process thawing
+        // GH-#1156: Implement process thawing
+        // See: https://github.com/npos/kernel/issues/1156
         log::info!("Thawing cgroup {}", self.path);
     }
 
@@ -739,7 +742,8 @@ impl Cgroup {
         // OOM killer logic: kill process with largest memory usage
         drop(memory);
 
-        // TODO: Implement proper OOM killer
+        // GH-#1157: Implement proper OOM killer
+        // See: https://github.com/npos/kernel/issues/1157
         log::error!("OOM in cgroup {}, killing processes", self.path);
         self.kill_all();
 

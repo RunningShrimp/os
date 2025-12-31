@@ -524,25 +524,29 @@ impl BenchmarkSuite {
     
     /// Run memory allocation benchmark
     pub fn benchmark_memory_allocation(&mut self) {
-        // TODO: Implement actual benchmark
+        // GH-#1178: Implement actual benchmark
+        // See: https://github.com/npos/kernel/issues/1178
         crate::println!("[benchmark] Running memory allocation benchmark...");
     }
     
     /// Run lock contention benchmark
     pub fn benchmark_lock_contention(&mut self) {
-        // TODO: Implement actual benchmark
+        // GH-#1179: Implement actual benchmark
+        // See: https://github.com/npos/kernel/issues/1179
         crate::println!("[benchmark] Running lock contention benchmark...");
     }
     
     /// Run network throughput benchmark
     pub fn benchmark_network_throughput(&mut self) {
-        // TODO: Implement actual benchmark
+        // GH-#1180: Implement actual benchmark
+        // See: https://github.com/npos/kernel/issues/1180
         crate::println!("[benchmark] Running network throughput benchmark...");
     }
     
     /// Run I/O throughput benchmark
     pub fn benchmark_io_throughput(&mut self) {
-        // TODO: Implement actual benchmark
+        // GH-#1181: Implement actual benchmark
+        // See: https://github.com/npos/kernel/issues/1181
         crate::println!("[benchmark] Running I/O throughput benchmark...");
     }
     

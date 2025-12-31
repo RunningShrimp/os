@@ -487,7 +487,8 @@ pub mod attr_ops {
     /// * 检查所有者权限
     /// * 更新文件权限
     pub fn chmod(_path: &str, _mode: u32) -> Result<(), FsError> {
-        // TODO: Implement using proper VFS API
+        // GH-#1215: Implement using proper VFS API
+        // See: https://github.com/npos/kernel/issues/1215
         // The VfsManager doesn't have stat/open methods yet
         // For now, return unimplemented
         unimplemented!("chmod not yet implemented")
@@ -508,7 +509,8 @@ pub mod attr_ops {
     /// * 检查所有者权限
     /// * 更新文件所有者
     pub fn chown(_path: &str, _uid: u32, _gid: u32) -> Result<(), FsError> {
-        // TODO: Implement using proper VFS API
+        // GH-#1216: Implement using proper VFS API
+        // See: https://github.com/npos/kernel/issues/1216
         // The VfsManager doesn't have stat/open methods yet
         // For now, return unimplemented
         unimplemented!("chown not yet implemented")
@@ -587,7 +589,8 @@ pub mod path_ops {
         // Normalize path (remove . and .. components)
         let _normalized_path = self::normalize_path_impl(&abs_path)?;
 
-        // TODO: Verify that the path exists and is a directory
+        // GH-#1217: Verify that the path exists and is a directory
+        // See: https://github.com/npos/kernel/issues/1217
         // This requires VFS stat API which is not yet available
 
         // Update process's current working directory

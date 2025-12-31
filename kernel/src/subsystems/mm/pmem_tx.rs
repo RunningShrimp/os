@@ -449,14 +449,16 @@ impl TransactionManager {
     /// 持久化缓存
     pub fn persist(&self) {
         // 执行 clflush 指令刷新缓存行
-        // TODO: 使用架构特定的缓存刷新指令
+        // GH-#1207: 使用架构特定的缓存刷新指令
+        // See: https://github.com/npos/kernel/issues/1207
         core::sync::atomic::fence(core::sync::atomic::Ordering::Release);
     }
 
     /// 持久化特定地址
     pub fn persist_address(&self, _address: u64) {
         // 刷新特定地址的缓存行
-        // TODO: 使用 clflushopt 指令
+        // GH-#1208: 使用 clflushopt 指令
+        // See: https://github.com/npos/kernel/issues/1208
         self.persist();
     }
 
@@ -464,7 +466,8 @@ impl TransactionManager {
     pub fn recover(&self) -> Result<(), Error> {
         crate::println!("[pmem_tx] Recovering unfinished transactions...");
 
-        // TODO: 从日志区域恢复未完成的事务
+        // GH-#1209: 从日志区域恢复未完成的事务
+        // See: https://github.com/npos/kernel/issues/1209
         // 1. 扫描日志区域
         // 2. 识别未提交的事务
         // 3. 执行 undo 日志恢复

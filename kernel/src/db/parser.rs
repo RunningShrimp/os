@@ -606,7 +606,8 @@ impl Parser {
             None
         };
 
-        // TODO: Parse GROUP BY, HAVING, ORDER BY, LIMIT
+        // GH-#1174: Parse GROUP BY, HAVING, ORDER BY, LIMIT
+        // See: https://github.com/npos/kernel/issues/1174
 
         Ok(AstNode::SelectStmt(SelectStatement {
             distinct,
@@ -953,7 +954,8 @@ impl Parser {
             } else if self.match_keyword("AUTO_INCREMENT") {
                 auto_increment = true;
             } else if self.match_token(Token::Default) {
-                default_value = Some(self.parse_literal()?); // TODO: Fix this
+                default_value = Some(self.parse_literal()?); // GH-#1175: Fix this
+                // See: https://github.com/npos/kernel/issues/1175
                 break;
             } else {
                 break;
@@ -1030,7 +1032,8 @@ impl Parser {
 
         self.expect_token(Token::RightParen)?;
 
-        let unique = false; // TODO: Parse UNIQUE
+        let unique = false; // GH-#1176: Parse UNIQUE
+        // See: https://github.com/npos/kernel/issues/1176
 
         Ok(AstNode::CreateIndexStmt(CreateIndexStatement {
             index_name,
@@ -1044,7 +1047,8 @@ impl Parser {
         self.expect_token(Token::Drop)?;
         self.expect_token(Token::Table)?;
         let table_name = self.expect_identifier()?;
-        let if_exists = false; // TODO: Parse IF EXISTS
+        let if_exists = false; // GH-#1177: Parse IF EXISTS
+        // See: https://github.com/npos/kernel/issues/1177
 
         Ok(AstNode::DropTableStmt(DropTableStatement {
             table_name,

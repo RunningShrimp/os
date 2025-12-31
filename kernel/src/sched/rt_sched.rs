@@ -477,7 +477,8 @@ impl RtScheduler {
 
         let current_task_guard = scheduler.current_task.lock();
         let _current_task_id = *current_task_guard;
-        // TODO: Look up current task and compare priorities
+        // GH-#1150: Look up current task and compare priorities
+        // See: https://github.com/npos/kernel/issues/1150
         // For now, always preempt if new task is RT
         task.policy().is_realtime()
     }
@@ -500,13 +501,15 @@ impl RtScheduler {
     /// Select CPU for a task (based on affinity mask)
     fn select_cpu(_task: &RtTask) -> CpuId {
         // Simple implementation: use CPU with least RT tasks
-        // TODO: Implement load balancing based on affinity
+        // GH-#1151: Implement load balancing based on affinity
+        // See: https://github.com/npos/kernel/issues/1151
         crate::platform_arch::cpuid()
     }
 
     /// Get scheduler for a CPU
     fn get_scheduler(_cpu_id: CpuId) -> RtSchedResult<&'static RtSchedulerState> {
-        // TODO: Implement proper per-CPU scheduler lookup with static references
+        // GH-#1152: Implement proper per-CPU scheduler lookup with static references
+        // See: https://github.com/npos/kernel/issues/1152
         // For now, return error as a placeholder
         Err(RtSchedError::InvalidCpu)
     }
@@ -544,7 +547,8 @@ pub type RtSchedResult<T> = CoreResult<T, RtSchedError>;
 /// Yield the current CPU (schedule next task)
 pub fn sched_yield() -> RtSchedResult<()> {
     // Trigger reschedule
-    // TODO: Integrate with base scheduler
+    // GH-#1153: Integrate with base scheduler
+    // See: https://github.com/npos/kernel/issues/1153
     Ok(())
 }
 

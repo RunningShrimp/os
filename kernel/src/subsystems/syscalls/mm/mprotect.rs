@@ -213,14 +213,16 @@ pub fn handle_msync(args: &[u64]) -> KernelResult<u64> {
         #[cfg(target_arch = "aarch64")]
         {
             // For aarch64, check if page is mapped
-            // TODO: Implement proper page table walk for aarch64
+            // GH-#1196: Implement proper page table walk for aarch64
+            // See: https://github.com/npos/kernel/issues/1196
             synced_pages += 1;
         }
 
         #[cfg(target_arch = "x86_64")]
         {
             // For x86_64, check if page is mapped
-            // TODO: Implement proper page table walk for x86_64
+            // GH-#1197: Implement proper page table walk for x86_64
+            // See: https://github.com/npos/kernel/issues/1197
             synced_pages += 1;
         }
 
@@ -253,7 +255,8 @@ pub fn handle_msync(args: &[u64]) -> KernelResult<u64> {
 /// * `Ok(u64)` - 新的映射地址
 /// * `Err(KernelError)` - 系统调用执行失败
 pub fn handle_mremap(args: &[u64]) -> KernelResult<u64> {
-    // TODO: Implement proper mremap
+    // GH-#1198: Implement proper mremap
+    // See: https://github.com/npos/kernel/issues/1198
     Err(KernelError::NotSupported)
 }
 

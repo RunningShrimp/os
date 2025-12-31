@@ -163,7 +163,8 @@ impl UnifiedPermissionChecker {
         // Convert operation to syscall number (simplified)
         let _syscall_num = self.operation_to_syscall(request.operation);
         
-        // TODO: Integrate with actual seccomp subsystem
+        // GH-#1218: Integrate with actual seccomp subsystem
+        // See: https://github.com/npos/kernel/issues/1218
         // For now, return None to skip seccomp check
         None
     }
@@ -177,7 +178,8 @@ impl UnifiedPermissionChecker {
         let _permission = self.operation_to_selinux_permission(request.operation);
         let _object_class = self.resource_type_to_selinux_class(request.resource_type);
         
-        // TODO: Integrate with actual SELinux subsystem
+        // GH-#1219: Integrate with actual SELinux subsystem
+        // See: https://github.com/npos/kernel/issues/1219
         // For now, return None to skip SELinux check if not configured
         None
     }
@@ -186,7 +188,8 @@ impl UnifiedPermissionChecker {
     fn check_capabilities(&self, request: &PermissionRequest) -> Option<PermissionResult> {
         // Check if operation requires specific capability
         if let Some(required_cap) = self.operation_to_capability(request.operation, request.resource_type) {
-            // TODO: Integrate with actual capabilities subsystem
+            // GH-#1220: Integrate with actual capabilities subsystem
+            // See: https://github.com/npos/kernel/issues/1220
             // For now, check if process is privileged
             if request.context.privileged {
                 Some(PermissionResult::Granted)

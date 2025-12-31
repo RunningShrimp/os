@@ -6,7 +6,8 @@
 //! - 性能指标收集
 //! - 性能报告生成
 
-// TODO: Re-enable these imports when optimization modules are refactored
+// GH-#1193: Re-enable these imports when optimization modules are refactored
+// See: https://github.com/npos/kernel/issues/1193
 // use crate::subsystems::syscalls::file_io_optimized::{get_io_stats, IoStats};
 // use crate::subsystems::syscalls::process_optimized::{get_proc_stats, ProcStats};
 // use crate::subsystems::syscalls::memory_optimized::{get_mem_stats, MemStats};
@@ -114,7 +115,8 @@ impl PerfStats {
 }
 
 /// 系统性能报告
-/// TODO: Re-enable when optimization modules are refactored
+/// GH-#1194: Re-enable when optimization modules are refactored
+// See: https://github.com/npos/kernel/issues/1194
 #[derive(Debug)]
 pub struct SystemPerformanceReport {
     pub timestamp: u64,
@@ -160,7 +162,8 @@ impl SystemPerformanceReport {
 
 /// 获取当前时间戳
 fn get_current_timestamp() -> u64 {
-    0  // TODO: Get from system clock
+    0  // GH-#1195: Get from system clock
+    // See: https://github.com/npos/kernel/issues/1195
 }
 
 /// 全局性能统计

@@ -211,7 +211,8 @@ impl QuotaUsage {
     pub fn block_grace_expired(&self, grace_period: u64) -> bool {
         let exceed_time = self.block_exceed_time.lock();
         if let Some(time) = *exceed_time {
-            let current = 0u64; // TODO: Use actual time
+            let current = 0u64; // GH-#1166: Use actual time
+            // See: https://github.com/npos/kernel/issues/1166
             current.saturating_sub(time) > grace_period
         } else {
             false
@@ -222,7 +223,8 @@ impl QuotaUsage {
     pub fn inode_grace_expired(&self, grace_period: u64) -> bool {
         let exceed_time = self.inode_exceed_time.lock();
         if let Some(time) = *exceed_time {
-            let current = 0u64; // TODO: Use actual time
+            let current = 0u64; // GH-#1167: Use actual time
+            // See: https://github.com/npos/kernel/issues/1167
             current.saturating_sub(time) > grace_period
         } else {
             false
@@ -233,7 +235,8 @@ impl QuotaUsage {
     pub fn mark_block_exceeded(&self) {
         let mut exceed_time = self.block_exceed_time.lock();
         if exceed_time.is_none() {
-            *exceed_time = Some(0u64); // TODO: Use actual time
+            *exceed_time = Some(0u64); // GH-#1168: Use actual time
+            // See: https://github.com/npos/kernel/issues/1168
         }
     }
 
@@ -241,7 +244,8 @@ impl QuotaUsage {
     pub fn mark_inode_exceeded(&self) {
         let mut exceed_time = self.inode_exceed_time.lock();
         if exceed_time.is_none() {
-            *exceed_time = Some(0u64); // TODO: Use actual time
+            *exceed_time = Some(0u64); // GH-#1169: Use actual time
+            // See: https://github.com/npos/kernel/issues/1169
         }
     }
 

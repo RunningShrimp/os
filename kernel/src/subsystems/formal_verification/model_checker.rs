@@ -526,7 +526,8 @@ impl ModelChecker {
             return Err("Model checker is not running");
         }
 
-        let _start_time_ms = 0u64; // TODO: Implement proper timestamp
+        let _start_time_ms = 0u64; // GH-#1186: Implement proper timestamp
+        // See: https://github.com/npos/kernel/issues/1186
         let mut verification_results = Vec::new();
 
         // 构建状态空间
@@ -546,7 +547,8 @@ impl ModelChecker {
         }
 
         // 更新统计信息
-        let elapsed_ms = 0u64; // TODO: Implement proper timestamp
+        let elapsed_ms = 0u64; // GH-#1187: Implement proper timestamp
+        // See: https://github.com/npos/kernel/issues/1187
         self.stats.checking_time_ms = elapsed_ms;
 
         Ok(verification_results)
@@ -557,7 +559,8 @@ impl ModelChecker {
         &mut self,
         spec: &TemporalLogicFormula,
     ) -> Result<ModelCheckingResult, &'static str> {
-        let _start_time_ms = 0u64; // TODO: Implement proper timestamp
+        let _start_time_ms = 0u64; // GH-#1188: Implement proper timestamp
+        // See: https://github.com/npos/kernel/issues/1188
 
         let result = match self.config.algorithm {
             ModelCheckingAlgorithm::ExplicitState => self.explicit_state_checking(spec),
@@ -568,7 +571,8 @@ impl ModelChecker {
             },
         };
 
-        let elapsed_ms = 0u64; // TODO: Implement proper timestamp
+        let elapsed_ms = 0u64; // GH-#1189: Implement proper timestamp
+        // See: https://github.com/npos/kernel/issues/1189
 
         let checking_result = match result {
             Ok(check_result) => check_result,

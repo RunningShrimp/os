@@ -227,7 +227,8 @@ impl DaxFile {
         crate::subsystems::mm::libpmem::pmem_drain();
 
         // 持久化元数据
-        // TODO: 持久化文件元数据
+        // GH-#1212: 持久化文件元数据
+        // See: https://github.com/npos/kernel/issues/1212
 
         self.dirty.store(false, Ordering::Release);
 
@@ -276,7 +277,8 @@ impl DaxDevice {
         let region = Arc::new(DaxRegion {
             id,
             phys_base,
-            virt_base: 0x4000_0000_0000, // TODO: 实际映射
+            virt_base: 0x4000_0000_0000, // GH-#1213: 实际映射
+            // See: https://github.com/npos/kernel/issues/1213
             size,
             mapped: AtomicBool::new(false),
         });
@@ -356,7 +358,8 @@ impl DaxDevice {
 
         if !datasync {
             // 持久化元数据
-            // TODO: 实现元数据持久化
+            // GH-#1214: 实现元数据持久化
+            // See: https://github.com/npos/kernel/issues/1214
         }
 
         Ok(())

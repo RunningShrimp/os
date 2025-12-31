@@ -86,7 +86,8 @@ mod riscv64 {
             },
             cause::SUPERVISOR_EXTERNAL => {
                 // External interrupt (e.g., UART)
-                // TODO: Handle external interrupts
+                // GH-#1158: Handle external interrupts
+                // See: https://github.com/npos/kernel/issues/1158
             },
             _ => {
                 crate::println!("unexpected interrupt: {:#x}", scause);
@@ -120,7 +121,8 @@ pub fn usertrapret() {
         // Set stvec to uservec for user traps
         core::arch::asm!("csrw stvec, {}", in(reg) uservec as usize);
 
-        // TODO: Set up trapframe and call userret
+        // GH-#1159: Set up trapframe and call userret
+        // See: https://github.com/npos/kernel/issues/1159
     }
 }
 
@@ -140,13 +142,15 @@ pub fn init() {
 
     #[cfg(target_arch = "x86_64")]
     unsafe {
-        // TODO: Set up IDT for x86_64
+        // GH-#1160: Set up IDT for x86_64
+        // See: https://github.com/npos/kernel/issues/1160
         // For now, this is a placeholder
     }
 
     #[cfg(target_arch = "aarch64")]
     {
-        // TODO: Set up exception vectors for AArch64
+        // GH-#1161: Set up exception vectors for AArch64
+        // See: https://github.com/npos/kernel/issues/1161
         // For now, this is a placeholder
     }
 }

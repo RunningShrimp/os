@@ -148,11 +148,13 @@ pub fn console_intr(c: u8) {
     match c {
         // Backspace
         0x7F | 0x08 => {
-            // TODO: Handle backspace
+            // GH-#1224: Handle backspace
+            // See: https://github.com/npos/kernel/issues/1224
         },
         // Ctrl-C
         0x03 => {
-            // TODO: Send SIGINT
+            // GH-#1225: Send SIGINT
+            // See: https://github.com/npos/kernel/issues/1225
         },
         // Ctrl-D (EOF)
         0x04 => {
@@ -258,7 +260,8 @@ pub fn init() {
     // RAM disk is always available
     crate::println!("drivers: ramdisk {} blocks", RamDisk.num_blocks());
 
-    // TODO: Probe for other devices (VirtIO, etc.)
+    // GH-#1226: Probe for other devices (VirtIO, etc.)
+    // See: https://github.com/npos/kernel/issues/1226
 
     #[cfg(target_arch = "aarch64")]
     {

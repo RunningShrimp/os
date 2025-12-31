@@ -126,7 +126,8 @@ pub use spin::Mutex as SyncMutex;
 pub const AF_UNIX_CONST: AfUnix = 1;
 
 // Service registry - using real implementation
-// TODO: Re-enable when service registry is fully implemented
+// GH-#1190: Re-enable when service registry is fully implemented
+// See: https://github.com/npos/kernel/issues/1190
 // pub use crate::subsystems::microkernel::service_registry::{ServiceRegistry, get_service_registry};
 
 // Process types removed - Use crate::subsystems::process::{Process, Proc} instead
@@ -237,7 +238,8 @@ pub mod errno {
     /// Set errno (placeholder implementation)
     #[inline]
     pub fn set_errno(code: i32) {
-        // TODO: Implement thread-local errno storage
+        // GH-#1191: Implement thread-local errno storage
+        // See: https://github.com/npos/kernel/issues/1191
         // For now, this is a placeholder. In a full implementation, this would:
         // 1. Store the error code in thread-local storage
         // 2. Make it accessible via errno() getter
@@ -363,7 +365,8 @@ pub const SOCK_DGRAM: i32 = 2;
 pub const SOCK_RAW: i32 = 3;
 
 // Additional type stubs for re-exporting core atomic types
-// TODO: Re-enable when atomic types are needed
+// GH-#1192: Re-enable when atomic types are needed
+// See: https://github.com/npos/kernel/issues/1192
 // pub use core::sync::atomic::{AtomicU32, AtomicU64};
 
 // Device driver trait stubs

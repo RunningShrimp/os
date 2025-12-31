@@ -54,7 +54,8 @@ pub fn handle_brk(args: &[u64]) -> KernelResult<u64> {
             let va = old_sz + i * PAGE_SIZE;
             let page = kalloc();
             if page.is_null() {
-                // TODO: Clean up already allocated pages on failure
+                // GH-#1199: Clean up already allocated pages on failure
+                // See: https://github.com/npos/kernel/issues/1199
                 return Err(KernelError::OutOfMemory);
             }
 
@@ -66,7 +67,8 @@ pub fn handle_brk(args: &[u64]) -> KernelResult<u64> {
             unsafe {
                 if map_page(proc.pagetable, va, page as usize, perm).is_err() {
                     kfree(page);
-                    // TODO: Clean up already allocated pages
+                    // GH-#1200: Clean up already allocated pages
+                    // See: https://github.com/npos/kernel/issues/1200
                     return Err(KernelError::OutOfMemory);
                 }
             }
@@ -75,7 +77,8 @@ pub fn handle_brk(args: &[u64]) -> KernelResult<u64> {
         proc.sz = addr;
     } else if addr < old_sz {
         // Shrinking break - for now, just update size (simplified)
-        // TODO: Properly unmap and free pages
+        // GH-#1201: Properly unmap and free pages
+        // See: https://github.com/npos/kernel/issues/1201
         proc.sz = addr;
     }
 

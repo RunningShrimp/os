@@ -487,12 +487,14 @@ impl SyscallDispatcher for SyscallDispatcherImpl {
 /// * `DispatchStats` - Dispatch statistics
 ///
 /// # Note
-/// TODO: Re-add dispatcher parameter and implement get_stats() method in the
+/// GH-#1202: Re-add dispatcher parameter and implement get_stats() method in the
+// See: https://github.com/npos/kernel/issues/1202
 /// SyscallDispatcher trait to properly expose statistics from implementations.
 /// This function currently returns default statistics for testing purposes.
 pub fn get_dispatch_stats() -> DispatchStats {
     // Currently returns default stats
-    // TODO: Implement proper statistics gathering by:
+    // GH-#1203: Implement proper statistics gathering by:
+    // See: https://github.com/npos/kernel/issues/1203
     // 1. Adding `fn get_stats(&self) -> &DispatchStats;` to SyscallDispatcher trait
     // 2. Accepting dispatcher parameter: `get_dispatch_stats(dispatcher: &dyn SyscallDispatcher)`
     // 3. Returning cloned statistics: `dispatcher.get_stats().clone()`
