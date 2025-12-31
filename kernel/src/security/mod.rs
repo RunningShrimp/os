@@ -151,6 +151,10 @@
 pub mod aslr;
 pub mod audit;
 pub mod audit_enhanced;
+pub mod apparmor;
+pub mod attestation;
+pub mod breach;
+pub mod capabilities;
 pub mod certificate;
 pub mod ddos;
 pub mod enhanced_permissions;
@@ -158,10 +162,14 @@ pub mod firewall;
 pub mod hsm;
 pub mod ids;
 pub mod kms;
+pub mod lsm_framework;
 pub mod memory_audit;
 pub mod memory_security;
 pub mod net_analysis;
+pub mod sandbox;
 pub mod secure_boot;
+pub mod selinux;
+pub mod selinux_enhanced;
 pub mod stack_canaries;
 pub mod tpm;
 pub mod vpn;
@@ -257,10 +265,6 @@ pub use zero_trust::{
 // 只导出在其他地方直接使用的安全函数
 use aslr::AslrSubsystem;
 pub use aslr::{MemoryRegionType, initialize_aslr, is_aslr_enabled, randomize_memory_region};
-pub use audit::{
-    AuditConfig, ComplianceLevel, SecurityAuditResult, SecurityAuditor, SecurityCategory,
-    SecurityFinding, SecurityScore, AuditSeverity as Severity,
-};
 pub use enhanced_permissions::init_permission_manager;
 pub use memory_audit::{
     MEMORY_AUDITOR, MemoryAuditConfig, MemoryAuditResult, MemoryAuditor, MemorySafetyFinding,

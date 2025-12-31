@@ -1,7 +1,15 @@
-// Container Runtime Module
+// Container Runtime and Orchestration Module
 //
-// 容器运行时模块
-// 提供OCI兼容的容器运行时实现，包括容器生命周期管理、命名空间隔离、cgroup资源限制、网络配置和rootfs管理
+// 容器运行时和编排模块
+// 提供OCI兼容的容器运行时、镜像管理、网络、存储、编排和安全管理
+//
+// This module implements comprehensive container orchestration including:
+// - OCI-compliant container runtime (existing modules: oci, runtime, namespace, cgroup, network, rootfs)
+// - Image management with layer support (image_management)
+// - Advanced networking (advanced_network)
+// - Storage drivers (storage)
+// - Pod orchestration (orchestration)
+// - Security policies (security)
 
 extern crate alloc;
 
@@ -11,6 +19,13 @@ pub mod namespace;
 pub mod cgroup;
 pub mod network;
 pub mod rootfs;
+
+// New advanced modules
+pub mod image_management;
+pub mod advanced_network;
+pub mod storage;
+pub mod orchestration;
+pub mod security;
 
 use alloc::{
     collections::BTreeMap,
@@ -35,6 +50,12 @@ pub use self::{
         Container, ContainerCreateOptions, ContainerRuntime, ContainerRuntimeError,
         ContainerRuntimeState, OciContainerState,
     },
+    // New advanced modules
+    advanced_network::{BridgePlugin, CniConfig, CniPlugin, VxlanNetwork},
+    image_management::{ContainerImage, ImageManager, ImageReference},
+    orchestration::{Pod, PodManager, Service},
+    security::{AppArmorProfile, ImageScanner, SecurityContext, SecurityManager, SeccompProfile},
+    storage::{OverlayfsDriver, StorageDriver, Volume, VolumeManager},
 };
 
 /// 容器配置

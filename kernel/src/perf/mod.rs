@@ -1,9 +1,35 @@
-//! Performance Monitoring Module
+//! Performance Monitoring and Optimization Module
 //!
-//! This module provides comprehensive performance monitoring capabilities including:
+//! This module provides comprehensive performance monitoring and optimization capabilities including:
 //! - Hardware performance counters (CPU, cache, branch prediction, TLB)
 //! - Software performance counters (syscalls, context switches, interrupts)
-//! - Unified counter management and export interfaces
+//! - CPU profiling with flame graph generation
+//! - Memory profiling and leak detection
+//! - I/O profiling and analysis
+//! - Lock contention profiling
+//! - JIT compilation and optimization
+//! - Profile-guided optimization (PGO)
+//! - Advanced memory allocators (arena, pool, slab)
+//! - Cache optimization and prefetching
+//! - NUMA-aware scheduling
+//! - CPU topology-aware task placement
+//! - Power-aware scheduling
+//! - Real-time scheduling support
+//! - Performance metrics collection and aggregation
+//!
+//! # Submodules
+//!
+//! - **core**: Core performance monitoring infrastructure
+//! - **monitoring**: Performance statistics collection
+//! - **hardware**: Hardware performance counter management
+//! - **software**: Software performance counter management
+//! - **counter_manager**: Unified counter management
+//! - **profiler**: CPU, memory, I/O, and lock profiling
+//! - **optimizer**: JIT compilation, PGO, and code optimization
+//! - **allocator**: Advanced memory allocation strategies
+//! - **cache**: Cache optimization and data structures
+//! - **scheduler**: Advanced scheduling algorithms
+//! - **metrics**: Performance metrics collection
 
 use alloc::string::ToString;
 
@@ -12,6 +38,14 @@ pub mod monitoring;
 pub mod hardware;
 pub mod software;
 pub mod counter_manager;
+
+// New performance optimization modules
+pub mod profiler;
+pub mod optimizer;
+pub mod allocator;
+pub mod cache;
+pub mod scheduler;
+pub mod metrics;
 
 #[cfg(test)]
 pub mod examples;
@@ -39,6 +73,62 @@ pub use counter_manager::{
     CounterSnapshot, PerCpuCounterSnapshot, CounterId,
     init_counter_manager, get_counter_manager,
     create_snapshot, export_counters, get_counters_summary,
+};
+
+// Re-export profiling types
+pub use profiler::{
+    ProfilerConfig, CpuProfiler, CpuSample, FunctionStats, FlameGraph,
+    MemoryProfiler, AllocationEvent, AllocationType, MemoryStats,
+    IoProfiler, IoEvent, IoOperation, IoStats, IoThroughput,
+    LockProfiler, LockEvent, LockType, LockStats,
+    ProfilerManager, ProfilingReport,
+};
+
+// Re-export optimizer types
+pub use optimizer::{
+    OptLevel, OptimizerConfig, JitCompiler, CompiledCode, JitStats,
+    PgoManager, FunctionProfile, ValueProfile, OptimizationHints,
+    InliningOptimizer, InliningStats, LoopOptimizer, LoopInfo,
+    VectorizationOptimizer, VectorizationStrategy,
+    OptimizationManager, OptimizationReport, OptimizationSuggestion,
+};
+
+// Re-export allocator types
+pub use allocator::{
+    AllocatorConfig, ArenaAllocator, ArenaChunk,
+    PoolAllocator, PoolStats, SizeClass, SlabAllocator, SlabStats,
+    AllocatorHooks, AllocationProfiler, SizeStats, AllocationStats,
+    AllocatorManager, AllocatorReport,
+};
+
+// Re-export cache types
+pub use cache::{
+    CacheLevel, CacheInfo, CacheSimulator, CacheAccessResult, CacheStats,
+    AlignedBuffer, CachePadded, PrefetchStrategy, Prefetcher,
+    CacheHashTable, StructureOfArrays,
+    AccessPatternAnalyzer, AccessPattern,
+    CacheOptimizationAdvisor, OptimizationRecommendation,
+};
+
+// Re-export scheduler types
+pub use scheduler::{
+    SchedulingPolicy, CpuTopology, CpuUtilization, TaskInfo,
+    NumaScheduler, LoadBalancer, PowerState, PowerPolicy, PowerScheduler,
+    RealtimeScheduler, UnifiedScheduler, SchedulerStats,
+};
+
+// Re-export metrics types
+pub use metrics::{
+    MetricId,
+    MetricValue as MetricsValue,
+    MetricType as MetricsType,
+    MetricMetadata,
+    TimeSeries, TimeSeriesPoint, HardwareCounter, HardwareCounterData,
+    PerformanceCounterManager as PerfCounterManager,
+    EventTracker, EventMetadata,
+    MetricsAggregator, AggregationFunction,
+    MetricsExporter, ExportFormat,
+    MetricsManager, MetricsSummary,
 };
 
 /// Initialize all performance monitoring subsystems

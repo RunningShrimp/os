@@ -28,6 +28,7 @@
 //! - **IPC** (`subsystems::ipc`): 进程间通信机制
 //! - **同步** (`sync`, `subsystems::sync`): 同步原语和锁机制
 //! - **调度器** (`sched`, `subsystems::scheduler`): 进程和线程调度
+//! - **高可用** (`ha`): 高可用性和容错（集群、复制、故障转移、备份）
 //!
 //! ### 平台支持
 //!
@@ -342,6 +343,9 @@ pub mod types;
 pub mod services;  // Re-enabled: subsystems::services doesn't have init(), need the root-level services module
 mod syscall_interface;
 
+// High Availability and Fault Tolerance
+pub mod ha;
+
 // Real-Time Operating System features
 pub mod rtos;
 // Legacy modules - now accessed through subsystems
@@ -593,3 +597,28 @@ pub mod iot;
 
 /// AI/ML framework
 pub mod ai;
+
+/// Machine Learning Operations (MLOps)
+///
+/// This module provides comprehensive MLOps infrastructure for managing the complete
+/// machine learning lifecycle within the kernel. It integrates seamlessly with the AI
+/// framework to provide production-ready ML operations.
+///
+/// ## Submodules
+///
+/// - **experiment**: Experiment tracking, hyperparameter logging, model versioning
+/// - **pipeline**: DAG-based pipelines with execution engine
+/// - **serving**: Model serving infrastructure with batch/online prediction
+/// - **monitoring**: Data drift detection, performance monitoring, alerting
+/// - **retraining**: Automated retraining with hyperparameter optimization
+/// - **governance**: Model lineage, fairness auditing, explainability, privacy compliance
+///
+/// ## Features
+///
+/// - MLflow-compatible experiment tracking
+/// - DAG-based pipeline orchestration
+/// - Production model serving with A/B testing
+/// - Real-time monitoring and drift detection
+/// - Automated retraining with hyperparameter optimization
+/// - Comprehensive governance and compliance
+pub mod mlops;

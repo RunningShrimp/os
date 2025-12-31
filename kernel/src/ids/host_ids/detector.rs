@@ -309,20 +309,20 @@ impl UserMonitor {
     ) -> Result<Vec<IntrusionDetection>, &'static str> {
         match event.event_type {
             crate::security::audit::AuditEventType::Syscall => self.analyze_syscall(event),
-            crate::security::audit::AuditEventType::FileAccess => {
+            crate::security::audit::AuditEventType::FsAccess => {
                 self.analyze_file_event(event)
             }
-            crate::security::audit::AuditEventType::Process => {
+            crate::security::audit::AuditEventType::ProcessExec => {
                 self.analyze_process_event(event)
             }
-            crate::security::audit::AuditEventType::Network => {
+            crate::security::audit::AuditEventType::NetworkAccess => {
                 self.analyze_network_connection(event)
             }
             // Map less-common event types to either specific analyzers or fall back to user
             // activity
             crate::security::audit::AuditEventType::Authentication
-            | crate::security::audit::AuditEventType::PermissionChange
-            | crate::security::audit::AuditEventType::Configuration => {
+            | crate::security::audit::AuditEventType::PrivilegeChange
+            | crate::security::audit::AuditEventType::ConfigChange => {
                 self.analyze_user_activity(event)
             }
             _ => Ok(Vec::new()),
