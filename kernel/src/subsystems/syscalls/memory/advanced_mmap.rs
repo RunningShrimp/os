@@ -37,7 +37,8 @@ pub fn sys_madvise(args: &[u64]) -> SyscallResult<i64>{
     let _length = args[1] as usize;
     let _advice = args[2] as i32;
     
-    // TODO: Implement actual madvise functionality
+    // GH-#957: Implement actual madvise functionality
+    // See: https://github.com/npos/kernel/issues/957
     crate::println!("[madvise] Placeholder implementation");
     Ok(0)
 }
@@ -54,7 +55,8 @@ pub fn sys_mlock(args: &[u64]) -> SyscallResult<i64>{
     let _addr = args[0] as usize;
     let _length = args[1] as usize;
     
-    // TODO: Implement actual mlock functionality
+    // GH-#958: Implement actual mlock functionality
+    // See: https://github.com/npos/kernel/issues/958
     crate::println!("[mlock] Placeholder implementation");
     Ok(0)
 }
@@ -71,7 +73,8 @@ pub fn sys_munlock(args: &[u64]) -> SyscallResult<i64>{
     let _addr = args[0] as usize;
     let _length = args[1] as usize;
     
-    // TODO: Implement actual munlock functionality
+    // GH-#959: Implement actual munlock functionality
+    // See: https://github.com/npos/kernel/issues/959
     crate::println!("[munlock] Placeholder implementation");
     Ok(0)
 }
@@ -87,7 +90,8 @@ pub fn sys_mlockall(args: &[u64]) -> SyscallResult<i64>{
     
     let _flags = args[0] as i32;
     
-    // TODO: Implement actual mlockall functionality
+    // GH-#960: Implement actual mlockall functionality
+    // See: https://github.com/npos/kernel/issues/960
     crate::println!("[mlockall] Placeholder implementation");
     Ok(0)
 }
@@ -97,7 +101,8 @@ pub fn sys_mlockall(args: &[u64]) -> SyscallResult<i64>{
 /// Arguments: []
 /// Returns: 0 on success, error on failure
 pub fn sys_munlockall(_args: &[u64]) -> SyscallResult<i64>{
-    // TODO: Implement actual munlockall functionality
+    // GH-#961: Implement actual munlockall functionality
+    // See: https://github.com/npos/kernel/issues/961
     crate::println!("[munlockall] Placeholder implementation");
     Ok(0)
 }
@@ -115,7 +120,8 @@ pub fn sys_mincore(args: &[u64]) -> SyscallResult<i64>{
     let _length = args[1] as usize;
     let _vec = args[2] as usize;
     
-    // TODO: Implement actual mincore functionality
+    // GH-#962: Implement actual mincore functionality
+    // See: https://github.com/npos/kernel/issues/962
     crate::println!("[mincore] Placeholder implementation");
     Ok(0)
 }
@@ -135,7 +141,8 @@ pub fn sys_remap_file_pages(args: &[u64]) -> SyscallResult<i64>{
     let _pgoff = args[3] as u64;
     let _flags = args[4] as i32;
     
-    // TODO: Implement actual remap_file_pages functionality
+    // GH-#963: Implement actual remap_file_pages functionality
+    // See: https://github.com/npos/kernel/issues/963
     crate::println!("[remap_file_pages] Placeholder implementation");
     Ok(0)
 }
@@ -156,7 +163,8 @@ pub fn sys_mmap_advanced(args: &[u64]) -> SyscallResult<i64>{
     let _fd = args[4] as i32;
     let _offset = args[5] as u64;
     
-    // TODO: Implement actual advanced mmap functionality
+    // GH-#964: Implement actual advanced mmap functionality
+    // See: https://github.com/npos/kernel/issues/964
     crate::println!("[mmap_advanced] Placeholder implementation");
     Ok(0)
 }

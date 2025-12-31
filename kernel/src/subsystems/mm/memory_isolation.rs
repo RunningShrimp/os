@@ -428,9 +428,12 @@ impl MemoryIsolationManager {
         MemoryIsolationStats {
             total_domains: self.domains.len() as u32,
             total_regions,
-            access_violations: 0,            // TODO: Track violations
-            secure_access_attempts: 0,       // TODO: Track secure access
-            cross_domain_access_attempts: 0, // TODO: Track cross-domain access
+            access_violations: 0,            // GH-#965: Track violations
+            // See: https://github.com/npos/kernel/issues/965
+            secure_access_attempts: 0,       // GH-#966: Track secure access
+            // See: https://github.com/npos/kernel/issues/966
+            cross_domain_access_attempts: 0, // GH-#967: Track cross-domain access
+            // See: https://github.com/npos/kernel/issues/967
         }
     }
 
@@ -463,7 +466,8 @@ impl MemoryIsolationManager {
         _region: &MemoryRegion,
         _key: u8,
     ) -> Result<(), MemoryIsolationError> {
-        // TODO: Implement architecture-specific protection key application
+        // GH-#968: Implement architecture-specific protection key application
+        // See: https://github.com/npos/kernel/issues/968
         // This would involve setting the PKRU register on x86 or similar on other architectures
         Ok(())
     }
@@ -491,7 +495,8 @@ impl MemoryIsolationManager {
 
     /// Find a secure address range
     fn find_secure_address_range(&self, _size: usize) -> Result<usize, MemoryIsolationError> {
-        // TODO: Implement secure address allocation
+        // GH-#969: Implement secure address allocation
+        // See: https://github.com/npos/kernel/issues/969
         // For now, return a fixed address in kernel space
         Ok(0xFFFF_8000_0000_0000)
     }
@@ -555,7 +560,8 @@ impl AslrState {
 
     /// Generate random offset
     fn generate_random_offset(&self) -> Result<usize, MemoryIsolationError> {
-        // TODO: Use proper random number generator
+        // GH-#970: Use proper random number generator
+        // See: https://github.com/npos/kernel/issues/970
         // For now, use a simple pseudo-random generator
         static COUNTER: AtomicUsize = AtomicUsize::new(1);
         let value = COUNTER.fetch_add(1, Ordering::SeqCst);
@@ -599,7 +605,8 @@ impl ProtectionKeyManager {
 
     /// Initialize protection key manager
     pub fn init(&mut self) -> Result<(), MemoryIsolationError> {
-        // TODO: Detect hardware support for protection keys
+        // GH-#971: Detect hardware support for protection keys
+        // See: https://github.com/npos/kernel/issues/971
         // For now, assume 16 protection keys are available (0-15)
         for i in 1..16 {
             self.available_keys.push(i);

@@ -270,7 +270,8 @@ impl VfioDevice {
 
     /// Reset device
     pub fn reset(&self) -> VfioResult<()> {
-        // TODO: Send device reset command
+        // GH-#1000: Send device reset command
+        // See: https://github.com/npos/kernel/issues/1000
         Ok(())
     }
 
@@ -280,11 +281,13 @@ impl VfioDevice {
 
         // Standard PCI BARs
         for i in 0..6 {
-            // TODO: Read BAR info from PCI config space
+            // GH-#1001: Read BAR info from PCI config space
+            // See: https://github.com/npos/kernel/issues/1001
             let region = VfioRegionInfo {
                 index: i,
                 region_type: RegionType::Bar,
-                size: 0, // TODO: Get actual size
+                size: 0, // GH-#1002: Get actual size
+                // See: https://github.com/npos/kernel/issues/1002
                 offset: 0,
                 flags: 0,
                 mmap_addr: None,
@@ -322,7 +325,8 @@ impl VfioDevice {
     fn discover_irqs(&self) -> VfioResult<()> {
         let mut irqs = self.irqs.lock();
 
-        // TODO: Query device for IRQ info
+        // GH-#1003: Query device for IRQ info
+        // See: https://github.com/npos/kernel/issues/1003
         // For now, add standard IRQ types
         irqs.push(IrqInfo {
             index: 0,
@@ -366,7 +370,8 @@ impl VfioDevice {
             .get_mut(index as usize)
             .ok_or(VfioError::InvalidArgument)?;
 
-        // TODO: Actually mmap the region
+        // GH-#1004: Actually mmap the region
+        // See: https://github.com/npos/kernel/issues/1004
         region.mmap_addr = Some(addr);
 
         Ok(())
@@ -380,7 +385,8 @@ impl VfioDevice {
             .get_mut(index as usize)
             .ok_or(VfioError::InvalidArgument)?;
 
-        // TODO: Actually munmap the region
+        // GH-#1005: Actually munmap the region
+        // See: https://github.com/npos/kernel/issues/1005
         region.mmap_addr = None;
 
         Ok(())
@@ -398,7 +404,8 @@ impl VfioDevice {
             return Err(VfioError::InvalidArgument);
         }
 
-        // TODO: Actually read from device
+        // GH-#1006: Actually read from device
+        // See: https://github.com/npos/kernel/issues/1006
         // For now, return zeros
         data.fill(0);
 
@@ -417,7 +424,8 @@ impl VfioDevice {
             return Err(VfioError::InvalidArgument);
         }
 
-        // TODO: Actually write to device
+        // GH-#1007: Actually write to device
+        // See: https://github.com/npos/kernel/issues/1007
 
         Ok(())
     }

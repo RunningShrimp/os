@@ -30,7 +30,8 @@ pub fn handle_kill(args: &[u64]) -> Result<u64, KernelError> {
     let pid = args[0] as i32;
     let sig = args[1] as i32;
 
-    // TODO: 实现kill逻辑
+    // GH-#1053: 实现kill逻辑
+    // See: https://github.com/npos/kernel/issues/1053
     crate::log_debug!("kill syscall called: pid={}, sig={}", pid, sig);
     
     // 临时返回值
@@ -56,7 +57,8 @@ pub fn handle_raise(args: &[u64]) -> Result<u64, KernelError> {
 
     let sig = args[0] as i32;
 
-    // TODO: 实现raise逻辑
+    // GH-#1054: 实现raise逻辑
+    // See: https://github.com/npos/kernel/issues/1054
     crate::log_debug!("raise syscall called: sig={}", sig);
     
     // 临时返回值
@@ -180,7 +182,8 @@ pub fn handle_sigwait(args: &[u64]) -> Result<u64, KernelError> {
     let set_ptr = args[0];
     let info_ptr = args[1];
 
-    // TODO: 实现sigwait逻辑
+    // GH-#1055: 实现sigwait逻辑
+    // See: https://github.com/npos/kernel/issues/1055
     crate::log_debug!("sigwait syscall called: set_ptr={:#x}, info_ptr={:#x}", set_ptr, info_ptr);
     
     // 临时返回值
@@ -207,7 +210,8 @@ pub fn handle_sigwaitinfo(args: &[u64]) -> Result<u64, KernelError> {
     let set_ptr = args[0];
     let info_ptr = args[1];
 
-    // TODO: 实现sigwaitinfo逻辑
+    // GH-#1056: 实现sigwaitinfo逻辑
+    // See: https://github.com/npos/kernel/issues/1056
     crate::log_debug!("sigwaitinfo syscall called: set_ptr={:#x}, info_ptr={:#x}", set_ptr, info_ptr);
     
     // 临时返回值
@@ -235,7 +239,8 @@ pub fn handle_sigtimedwait(args: &[u64]) -> Result<u64, KernelError> {
     let info_ptr = args[1];
     let timeout_ptr = args[2];
 
-    // TODO: 实现sigtimedwait逻辑
+    // GH-#1057: 实现sigtimedwait逻辑
+    // See: https://github.com/npos/kernel/issues/1057
     crate::log_debug!("sigtimedwait syscall called: set_ptr={:#x}, info_ptr={:#x}, timeout_ptr={:#x}", 
                 set_ptr, info_ptr, timeout_ptr);
     
@@ -264,7 +269,8 @@ pub fn handle_signal(args: &[u64]) -> Result<u64, KernelError> {
     let sig = args[1] as i32;
     let info_ptr = args[2];
 
-    // TODO: 实现signal逻辑
+    // GH-#1058: 实现signal逻辑
+    // See: https://github.com/npos/kernel/issues/1058
     crate::log_debug!("signal syscall called: pid={}, sig={}, info_ptr={:#x}", pid, sig, info_ptr);
     
     // 临时返回值
@@ -288,7 +294,8 @@ pub fn handle_pause(args: &[u64]) -> Result<u64, KernelError> {
         return Err(KernelError::InvalidArgument);
     }
 
-    // TODO: 实现pause逻辑
+    // GH-#1059: 实现pause逻辑
+    // See: https://github.com/npos/kernel/issues/1059
     crate::log_debug!("pause syscall called");
     
     // 临时返回值

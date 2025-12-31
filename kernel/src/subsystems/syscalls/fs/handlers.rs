@@ -466,7 +466,8 @@ pub fn handle_rename(args: &[u64]) -> KernelResult<u64> {
     // For now, return NotSupported as this requires inode-level operations
     return Err(KernelError::NotSupported);
 
-    // TODO: Implement full rename operation using VFS lookup and inode operations
+    // GH-#972: Implement full rename operation using VFS lookup and inode operations
+    // See: https://github.com/npos/kernel/issues/972
     /*
     let vfs = crate::subsystems::fs::vfs();
 
@@ -514,7 +515,8 @@ pub fn handle_link(args: &[u64]) -> KernelResult<u64> {
     // For now, return NotSupported
     return Err(KernelError::NotSupported);
 
-    // TODO: Implement full link operation
+    // GH-#973: Implement full link operation
+    // See: https://github.com/npos/kernel/issues/973
     /*
     let vfs = crate::vfs::vfs();
     vfs.link(&abs_old_path, &abs_new_path).map_err(|e| match e {
@@ -548,7 +550,8 @@ pub fn handle_symlink(args: &[u64]) -> KernelResult<u64> {
     // For now, return NotSupported
     return Err(KernelError::NotSupported);
 
-    // TODO: Implement symlink operation
+    // GH-#974: Implement symlink operation
+    // See: https://github.com/npos/kernel/issues/974
     /*
     crate::subsystems::fs::vfs()
         .symlink(&abs_link_path, &target_path)
@@ -588,7 +591,8 @@ pub fn handle_readlink(args: &[u64]) -> KernelResult<u64> {
     let _target = alloc::string::String::new(); // Placeholder
     return Err(KernelError::NotSupported);
 
-    // TODO: Implement readlink operation
+    // GH-#975: Implement readlink operation
+    // See: https://github.com/npos/kernel/issues/975
     /*
     let target = crate::subsystems::fs::vfs().readlink(&abs_path).map_err(|e| match e {
         crate::subsystems::fs::api::FsError::NotFound => KernelError::NotFound,
@@ -650,7 +654,8 @@ pub fn handle_chmod(args: &[u64]) -> KernelResult<u64> {
     // Update file permissions - for now return NotSupported
     return Err(KernelError::NotSupported);
 
-    // TODO: Implement chmod operation
+    // GH-#976: Implement chmod operation
+    // See: https://github.com/npos/kernel/issues/976
     /*
     let file_mode = FileMode::new((attr.mode & 0o170000) | (mode & 0o7777));
     let mut new_attr = attr;
@@ -711,7 +716,8 @@ pub fn handle_chown(args: &[u64]) -> KernelResult<u64> {
     // Get and update attributes - for now return NotSupported
     return Err(KernelError::NotSupported);
 
-    // TODO: Implement chown operation
+    // GH-#977: Implement chown operation
+    // See: https://github.com/npos/kernel/issues/977
     /*
     let vfs = crate::subsystems::fs::vfs();
     let mut attr = vfs.stat(&abs_path).map_err(|_| KernelError::NotFound)?;
@@ -967,7 +973,8 @@ pub fn handle_faccessat(args: &[u64]) -> KernelResult<u64> {
         // 获取相对路径并解析
         let _rel_path = read_path_from_user(pagetable as usize, pathname_ptr)?;
 
-        // TODO: 从文件描述符获取目录路径并与相对路径拼接
+        // GH-#978: 从文件描述符获取目录路径并与相对路径拼接
+        // See: https://github.com/npos/kernel/issues/978
         // 简化实现：暂时使用当前工作目录
         read_and_resolve_path(pagetable as usize, pathname_ptr, &cwd_path)?
     };
@@ -1105,7 +1112,8 @@ fn read_path_from_user(pagetable: usize, ptr: usize) -> KernelResult<alloc::stri
         return Err(KernelError::BadAddress);
     }
 
-    // TODO: When copyinstr is fully implemented, use pagetable to:
+    // GH-#979: When copyinstr is fully implemented, use pagetable to:
+    // See: https://github.com/npos/kernel/issues/979
     // 1. Verify ptr is within user address space
     // 2. Handle page faults during string copy
     // 3. Validate memory access permissions

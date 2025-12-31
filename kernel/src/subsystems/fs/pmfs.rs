@@ -315,9 +315,12 @@ impl Pmfs {
 
         crate::println!("[pmfs] Creating checkpoint {}", seq);
 
-        // TODO: 持久化超级块
-        // TODO: 持久化 B+Tree 根节点
-        // TODO: 刷新所有缓存
+        // GH-#980: 持久化超级块
+        // See: https://github.com/npos/kernel/issues/980
+        // GH-#981: 持久化 B+Tree 根节点
+        // See: https://github.com/npos/kernel/issues/981
+        // GH-#982: 刷新所有缓存
+        // See: https://github.com/npos/kernel/issues/982
 
         // 持久化检查点
         unsafe {
@@ -327,7 +330,8 @@ impl Pmfs {
             let checkpoint = CheckpointHeader {
                 magic: 0x434850_544B_5400, // "CPHKTT\0"
                 seq,
-                timestamp: 0, // TODO: 获取时间戳
+                timestamp: 0, // GH-#983: 获取时间戳
+                // See: https://github.com/npos/kernel/issues/983
                 superblock_offset: 0,
                 root_btree_offset: self.btree_root.load(Ordering::Acquire),
             };
@@ -454,7 +458,8 @@ impl Pmfs {
 
                 if let (Some(_nc), Some(_sk), Some(_sv)) = (new_child, split_key, split_value) {
                     // 子节点分裂，需要在当前节点中插入新的键和子节点
-                    // TODO: 处理节点分裂
+                    // GH-#984: 处理节点分裂
+                    // See: https://github.com/npos/kernel/issues/984
                     Ok((None, None, None))
                 } else {
                     Ok((None, None, None))
@@ -464,11 +469,13 @@ impl Pmfs {
                 // 在叶子节点中插入
                 if leaf.keys.len() < BTREE_ORDER {
                     // 有空间，直接插入
-                    // TODO: 插入并排序
+                    // GH-#985: 插入并排序
+                    // See: https://github.com/npos/kernel/issues/985
                     Ok((None, None, None))
                 } else {
                     // 需要分裂
-                    // TODO: 实现叶子节点分裂
+                    // GH-#986: 实现叶子节点分裂
+                    // See: https://github.com/npos/kernel/issues/986
                     Ok((None, None, None))
                 }
             }
@@ -479,7 +486,8 @@ impl Pmfs {
     pub fn recover(&self) -> Result<(), Error> {
         crate::println!("[pmfs] Recovering PMFS...");
 
-        // TODO: 从检查点恢复
+        // GH-#987: 从检查点恢复
+        // See: https://github.com/npos/kernel/issues/987
         // 1. 读取最新的检查点
         // 2. 恢复超级块
         // 3. 恢复 B+Tree

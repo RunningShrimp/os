@@ -122,7 +122,8 @@ impl RtTimerClock {
 
     /// Get current time for this clock
     pub fn get_time(&self) -> RtTimerSpec {
-        // TODO: Query actual clock time from platform
+        // GH-#1033: Query actual clock time from platform
+        // See: https://github.com/npos/kernel/issues/1033
         RtTimerSpec {
             tv_sec: 0,
             tv_nsec: 0,
@@ -422,13 +423,16 @@ impl RtTimer {
         // Send notification
         match data.notification {
             RtTimerNotification::Signal => {
-                // TODO: Send signal to process
+                // GH-#1034: Send signal to process
+                // See: https://github.com/npos/kernel/issues/1034
             },
             RtTimerNotification::Thread => {
-                // TODO: Create notification thread
+                // GH-#1035: Create notification thread
+                // See: https://github.com/npos/kernel/issues/1035
             },
             RtTimerNotification::ThreadId => {
-                // TODO: Send signal to specific thread
+                // GH-#1036: Send signal to specific thread
+                // See: https://github.com/npos/kernel/issues/1036
             },
             RtTimerNotification::None => {
                 // Polling mode, nothing to do
@@ -492,7 +496,8 @@ impl TimerWheel {
         let mut expired = Vec::new();
         let mut timers = self.active_timers.lock();
 
-        let now = RtTimerSpec::from_nanos(0); // TODO: Get actual current time
+        let now = RtTimerSpec::from_nanos(0); // GH-#1037: Get actual current time
+        // See: https://github.com/npos/kernel/issues/1037
 
         timers.retain(|&timer_id, &expiration| {
             if expiration.to_nanos() <= now.to_nanos() {
@@ -558,7 +563,8 @@ pub fn timer_tick() {
     let expired = TIMER_WHEEL.check_expirations();
 
     for timer_id in expired {
-        // TODO: Find timer and call handle_expiration
+        // GH-#1038: Find timer and call handle_expiration
+        // See: https://github.com/npos/kernel/issues/1038
         // This requires a global timer registry
     }
 }

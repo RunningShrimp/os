@@ -178,7 +178,8 @@ impl SignalService {
     /// 
     /// * `Result<(), SignalError>` - 操作结果
     pub fn send_signal(&mut self, params: crate::syscalls::signal::types::SignalOperationParams) -> Result<(), crate::syscalls::signal::types::SignalError> {
-        // TODO: 实现实际的信号发送
+        // GH-#1046: 实现实际的信号发送
+        // See: https://github.com/npos/kernel/issues/1046
         crate::log_debug!("Sending signal to process {}: {:?}", params.target_pid, params.signal_type);
         
         // 更新统计
@@ -197,7 +198,8 @@ impl SignalService {
     /// 
     /// * `Result<SignalContext, SignalError>` - 信号上下文或错误
     pub fn wait_for_signal(&mut self, mask: Option<crate::syscalls::signal::types::SignalMask>) -> Result<crate::syscalls::signal::types::SignalContext, crate::syscalls::signal::types::SignalError> {
-        // TODO: 实现实际的信号等待
+        // GH-#1047: 实现实际的信号等待
+        // See: https://github.com/npos/kernel/issues/1047
         crate::log_debug!("Waiting for signal with mask: {:?}", mask);
         
         // 更新统计
@@ -235,7 +237,8 @@ impl SignalService {
         let mut processed = Vec::new();
         
         for context in self.pending_signals.drain(..) {
-            // TODO: 实现实际的信号处理
+            // GH-#1048: 实现实际的信号处理
+            // See: https://github.com/npos/kernel/issues/1048
             crate::log_debug!("Processing pending signal: {:?}", context);
             processed.push(context);
             
@@ -310,7 +313,8 @@ impl Service for SignalService {
         crate::log_info!("Initializing SignalService");
         self.status = ServiceStatus::Initializing;
         
-        // TODO: 初始化信号管理器
+        // GH-#1049: 初始化信号管理器
+        // See: https://github.com/npos/kernel/issues/1049
         
         self.status = ServiceStatus::Initialized;
         crate::log_info!("SignalService initialized successfully");
@@ -321,7 +325,8 @@ impl Service for SignalService {
         crate::log_info!("Starting SignalService");
         self.status = ServiceStatus::Starting;
         
-        // TODO: 启动信号管理器
+        // GH-#1050: 启动信号管理器
+        // See: https://github.com/npos/kernel/issues/1050
         
         self.status = ServiceStatus::Running;
         crate::log_info!("SignalService started successfully");
@@ -332,7 +337,8 @@ impl Service for SignalService {
         crate::log_info!("Stopping SignalService");
         self.status = ServiceStatus::Stopping;
         
-        // TODO: 停止信号管理器
+        // GH-#1051: 停止信号管理器
+        // See: https://github.com/npos/kernel/issues/1051
         
         self.status = ServiceStatus::Stopped;
         crate::log_info!("SignalService stopped successfully");
@@ -342,7 +348,8 @@ impl Service for SignalService {
     fn destroy(&mut self) -> Result<()> {
         crate::log_info!("Destroying SignalService");
         
-        // TODO: 销毁信号管理器
+        // GH-#1052: 销毁信号管理器
+        // See: https://github.com/npos/kernel/issues/1052
         
         self.status = ServiceStatus::Uninitialized;
         crate::log_info!("SignalService destroyed successfully");

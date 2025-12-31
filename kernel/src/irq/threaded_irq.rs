@@ -250,7 +250,8 @@ impl IrqThread {
     /// Wake the IRQ thread
     fn wake(&self) {
         self.wake_count.fetch_add(1, Ordering::Release);
-        // TODO: Actually wake the thread (via scheduler)
+        // GH-#1014: Actually wake the thread (via scheduler)
+        // See: https://github.com/npos/kernel/issues/1014
     }
 
     /// Check if thread should stop
@@ -364,7 +365,8 @@ impl ThreadedIrq {
         }
 
         // Enable IRQ at hardware level
-        // TODO: Call arch-specific enable_irq
+        // GH-#1015: Call arch-specific enable_irq
+        // See: https://github.com/npos/kernel/issues/1015
 
         self.enabled.store(true, Ordering::Release);
         Ok(())
@@ -377,7 +379,8 @@ impl ThreadedIrq {
         }
 
         // Disable IRQ at hardware level
-        // TODO: Call arch-specific disable_irq
+        // GH-#1016: Call arch-specific disable_irq
+        // See: https://github.com/npos/kernel/issues/1016
 
         self.enabled.store(false, Ordering::Release);
         Ok(())
@@ -411,7 +414,8 @@ impl ThreadedIrq {
         }
 
         // Create kernel thread
-        // TODO: Implement actual thread creation
+        // GH-#1017: Implement actual thread creation
+        // See: https://github.com/npos/kernel/issues/1017
         thread.thread_id = 1; // Placeholder
         thread.running.store(true, Ordering::Release);
 
@@ -430,7 +434,8 @@ impl ThreadedIrq {
 
         thread.stop();
 
-        // TODO: Wait for thread to exit
+        // GH-#1018: Wait for thread to exit
+        // See: https://github.com/npos/kernel/issues/1018
         // thread.join()?
 
         crate::log_debug!("Stopped IRQ thread {} for IRQ {}", thread.name, self.irq);
@@ -539,7 +544,8 @@ impl IrqRegistry {
             }
 
             // Shared IRQ - allow multiple handlers
-            // TODO: Implement shared IRQ list
+            // GH-#1019: Implement shared IRQ list
+            // See: https://github.com/npos/kernel/issues/1019
         }
 
         irqs.insert(irq, (dev_id, flags));
@@ -571,7 +577,8 @@ pub fn irq_to_threaded(irq: IrqNumber) -> Result<(), ThreadedIrqError> {
     // Check if IRQ is already threaded
     // If not, create thread and convert
 
-    // TODO: Implement actual conversion
+    // GH-#1020: Implement actual conversion
+    // See: https://github.com/npos/kernel/issues/1020
     crate::log_debug!("Converting IRQ {} to threaded", irq);
     Ok(())
 }

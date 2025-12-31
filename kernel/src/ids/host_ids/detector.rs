@@ -35,7 +35,8 @@ impl SyscallMonitor {
     }
 
     pub fn init(&mut self, _monitored_syscalls: &[u32]) -> Result<(), &'static str> {
-        // TODO: 实现初始化逻辑
+        // GH-#937: 实现初始化逻辑
+        // See: https://github.com/npos/kernel/issues/937
         Ok(())
     }
 
@@ -43,7 +44,8 @@ impl SyscallMonitor {
         &mut self,
         _event: &AuditEvent,
     ) -> Result<Vec<IntrusionDetection>, &'static str> {
-        // TODO: 实现系统调用分析逻辑
+        // GH-#938: 实现系统调用分析逻辑
+        // See: https://github.com/npos/kernel/issues/938
         Ok(Vec::new())
     }
 }
@@ -81,7 +83,8 @@ impl FileMonitor {
     }
 
     pub fn init(&mut self, _monitored_paths: &[String]) -> Result<(), &'static str> {
-        // TODO: 实现初始化逻辑
+        // GH-#939: 实现初始化逻辑
+        // See: https://github.com/npos/kernel/issues/939
         Ok(())
     }
 
@@ -89,7 +92,8 @@ impl FileMonitor {
         &mut self,
         _event: &AuditEvent,
     ) -> Result<Vec<IntrusionDetection>, &'static str> {
-        // TODO: 实现文件事件分析逻辑
+        // GH-#940: 实现文件事件分析逻辑
+        // See: https://github.com/npos/kernel/issues/940
         Ok(Vec::new())
     }
 }
@@ -127,7 +131,8 @@ impl ProcessMonitor {
     }
 
     pub fn init(&mut self) -> Result<(), &'static str> {
-        // TODO: 实现初始化逻辑
+        // GH-#941: 实现初始化逻辑
+        // See: https://github.com/npos/kernel/issues/941
         Ok(())
     }
 
@@ -135,7 +140,8 @@ impl ProcessMonitor {
         &mut self,
         _event: &AuditEvent,
     ) -> Result<Vec<IntrusionDetection>, &'static str> {
-        // TODO: 实现进程事件分析逻辑
+        // GH-#942: 实现进程事件分析逻辑
+        // See: https://github.com/npos/kernel/issues/942
         Ok(Vec::new())
     }
 }
@@ -171,7 +177,8 @@ impl RegistryMonitor {
     }
 
     pub fn init(&mut self) -> Result<(), &'static str> {
-        // TODO: 实现初始化逻辑
+        // GH-#943: 实现初始化逻辑
+        // See: https://github.com/npos/kernel/issues/943
         Ok(())
     }
 
@@ -179,7 +186,8 @@ impl RegistryMonitor {
         &mut self,
         _event: &AuditEvent,
     ) -> Result<Vec<IntrusionDetection>, &'static str> {
-        // TODO: 实现注册表变化分析逻辑
+        // GH-#944: 实现注册表变化分析逻辑
+        // See: https://github.com/npos/kernel/issues/944
         Ok(Vec::new())
     }
 }
@@ -214,7 +222,8 @@ impl NetworkMonitor {
     }
 
     pub fn init(&mut self, _monitor_network: bool) -> Result<(), &'static str> {
-        // TODO: 实现初始化逻辑
+        // GH-#945: 实现初始化逻辑
+        // See: https://github.com/npos/kernel/issues/945
         Ok(())
     }
 
@@ -222,7 +231,8 @@ impl NetworkMonitor {
         &mut self,
         _event: &AuditEvent,
     ) -> Result<Vec<IntrusionDetection>, &'static str> {
-        // TODO: 实现网络连接分析逻辑
+        // GH-#946: 实现网络连接分析逻辑
+        // See: https://github.com/npos/kernel/issues/946
         Ok(Vec::new())
     }
 }
@@ -257,7 +267,8 @@ impl UserMonitor {
     }
 
     pub fn init(&mut self) -> Result<(), &'static str> {
-        // TODO: 实现初始化逻辑
+        // GH-#947: 实现初始化逻辑
+        // See: https://github.com/npos/kernel/issues/947
         Ok(())
     }
 
@@ -265,7 +276,8 @@ impl UserMonitor {
         &mut self,
         _event: &AuditEvent,
     ) -> Result<Vec<IntrusionDetection>, &'static str> {
-        // TODO: 实现用户活动分析逻辑
+        // GH-#948: 实现用户活动分析逻辑
+        // See: https://github.com/npos/kernel/issues/948
         Ok(Vec::new())
     }
 
@@ -273,7 +285,8 @@ impl UserMonitor {
         &mut self,
         _event: &AuditEvent,
     ) -> Result<Vec<IntrusionDetection>, &'static str> {
-        // TODO: 实现系统调用分析逻辑
+        // GH-#949: 实现系统调用分析逻辑
+        // See: https://github.com/npos/kernel/issues/949
         Ok(Vec::new())
     }
 
@@ -281,7 +294,8 @@ impl UserMonitor {
         &mut self,
         _event: &AuditEvent,
     ) -> Result<Vec<IntrusionDetection>, &'static str> {
-        // TODO: 实现文件事件分析逻辑
+        // GH-#950: 实现文件事件分析逻辑
+        // See: https://github.com/npos/kernel/issues/950
         Ok(Vec::new())
     }
 
@@ -289,7 +303,8 @@ impl UserMonitor {
         &mut self,
         _event: &AuditEvent,
     ) -> Result<Vec<IntrusionDetection>, &'static str> {
-        // TODO: 实现进程事件分析逻辑
+        // GH-#951: 实现进程事件分析逻辑
+        // See: https://github.com/npos/kernel/issues/951
         Ok(Vec::new())
     }
 
@@ -297,7 +312,8 @@ impl UserMonitor {
         &mut self,
         _event: &AuditEvent,
     ) -> Result<Vec<IntrusionDetection>, &'static str> {
-        // TODO: 实现网络连接分析逻辑
+        // GH-#952: 实现网络连接分析逻辑
+        // See: https://github.com/npos/kernel/issues/952
         Ok(Vec::new())
     }
 
@@ -360,14 +376,16 @@ impl IntegrityChecker {
     }
 
     pub fn init(&mut self) -> Result<(), &'static str> {
-        // TODO: 实现初始化逻辑
+        // GH-#953: 实现初始化逻辑
+        // See: https://github.com/npos/kernel/issues/953
         Ok(())
     }
 
     pub fn perform_integrity_check(
         &mut self,
     ) -> Result<Vec<IntrusionDetection>, &'static str> {
-        // TODO: 实现完整性检查逻辑
+        // GH-#954: 实现完整性检查逻辑
+        // See: https://github.com/npos/kernel/issues/954
         Ok(Vec::new())
     }
 }
@@ -408,12 +426,14 @@ impl MalwareScanner {
     }
 
     pub fn init(&mut self) -> Result<(), &'static str> {
-        // TODO: 实现初始化逻辑
+        // GH-#955: 实现初始化逻辑
+        // See: https://github.com/npos/kernel/issues/955
         Ok(())
     }
 
     pub fn perform_scan(&mut self) -> Result<Vec<IntrusionDetection>, &'static str> {
-        // TODO: 实现恶意软件扫描逻辑
+        // GH-#956: 实现恶意软件扫描逻辑
+        // See: https://github.com/npos/kernel/issues/956
         Ok(Vec::new())
     }
 }

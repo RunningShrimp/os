@@ -539,7 +539,8 @@ impl LfsFilesystem {
         let mut cache = self.inode_cache.lock();
         if let Some(inode) = cache.get_mut(&ino) {
             inode.size = inode.size.max(offset + data.len() as u64);
-            inode.mtime = 0; // TODO: Use actual time
+            inode.mtime = 0; // GH-#988: Use actual time
+            // See: https://github.com/npos/kernel/issues/988
             inode.bump_version();
         } else {
             return Err(FsError::NotFound);
@@ -565,7 +566,8 @@ impl LfsFilesystem {
 
         let bytes_to_read = core::cmp::min(buf.len(), (inode.size - offset) as usize);
 
-        // TODO: Implement actual block-based reading
+        // GH-#989: Implement actual block-based reading
+        // See: https://github.com/npos/kernel/issues/989
         Ok(bytes_to_read)
     }
 
@@ -582,7 +584,8 @@ impl LfsFilesystem {
 
     /// Lookup a directory entry
     pub fn lookup(&self, _dir: u64, _name: &str) -> FsResult<LfsDirEntry> {
-        // TODO: Implement directory lookup
+        // GH-#990: Implement directory lookup
+        // See: https://github.com/npos/kernel/issues/990
         Err(FsError::NotSupported)
     }
 
@@ -703,7 +706,8 @@ impl LfsFilesystem {
 
     /// Clean a single segment
     fn clean_segment(&self, _segment_num: u64) -> FsResult<()> {
-        // TODO: Implement segment cleaning
+        // GH-#991: Implement segment cleaning
+        // See: https://github.com/npos/kernel/issues/991
         // 1. Read segment summary
         // 2. Identify live blocks
         // 3. Rewrite live blocks to new segment
@@ -718,7 +722,8 @@ impl LfsFilesystem {
     pub fn checkpoint(&self) -> FsResult<()> {
         let seq = self.superblock.checkpoint_seq.fetch_add(1, Ordering::SeqCst);
 
-        // TODO: Write checkpoint to disk
+        // GH-#992: Write checkpoint to disk
+        // See: https://github.com/npos/kernel/issues/992
         // 1. Write superblock
         // 2. Write inode file
         // 3. Write segment usage table
@@ -773,7 +778,8 @@ pub struct LfsMount {
 impl LfsMount {
     /// Create a new LFS mount
     pub fn new(device: &str, config: LfsConfig) -> FsResult<Self> {
-        // TODO: Open block device and read size
+        // GH-#993: Open block device and read size
+        // See: https://github.com/npos/kernel/issues/993
         let device_size = 1024 * 1024 * 1024; // 1 GB default
 
         let fs = Arc::new(LfsFilesystem::new(device_size, config)?);

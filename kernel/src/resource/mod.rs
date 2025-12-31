@@ -552,11 +552,13 @@ impl ResourceManager {
                     .unwrap())
             }
             OomPolicy::Score => {
-                // TODO: Implement proper OOM scoring
+                // GH-#1021: Implement proper OOM scoring
+                // See: https://github.com/npos/kernel/issues/1021
                 Ok(processes[0])
             }
             OomPolicy::LowestPriority => {
-                // TODO: Implement priority-based selection
+                // GH-#1022: Implement priority-based selection
+                // See: https://github.com/npos/kernel/issues/1022
                 Ok(processes[0])
             }
             OomPolicy::Fail => Err(Error::OutOfMemory),
@@ -565,7 +567,8 @@ impl ResourceManager {
 
     /// Kill a process
     fn kill_process(&self, pid: ProcessId) -> Result<(), Error> {
-        // TODO: Send SIGKILL to process
+        // GH-#1023: Send SIGKILL to process
+        // See: https://github.com/npos/kernel/issues/1023
         log::error!("OOM killer: killing process {}", pid);
         Ok(())
     }
@@ -627,7 +630,8 @@ impl ResourceManager {
             // Take action based on resource type
             match resource_type {
                 ResourceType::RlimitCpu => {
-                    // TODO: Throttle or kill process
+                    // GH-#1024: Throttle or kill process
+                    // See: https://github.com/npos/kernel/issues/1024
                 }
                 ResourceType::RlimitAs | ResourceType::RlimitData | ResourceType::RlimitRss => {
                     // Memory exceeded - potential OOM
@@ -652,8 +656,10 @@ impl ResourceManager {
             total_processes: num_processes,
             total_cgroups: num_cgroups,
             total_pools: num_pools,
-            cpu_usage_percent: 0.0, // TODO: calculate
-            memory_usage_percent: 0.0, // TODO: calculate
+            cpu_usage_percent: 0.0, // GH-#1025: calculate
+            // See: https://github.com/npos/kernel/issues/1025
+            memory_usage_percent: 0.0, // GH-#1026: calculate
+            // See: https://github.com/npos/kernel/issues/1026
             exceeding_limits: exceeding,
             oom_events: self.oom_count(),
             io_bandwidth_bps: aggregate.total_io.total_bytes(),

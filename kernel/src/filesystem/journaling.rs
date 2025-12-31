@@ -203,8 +203,10 @@ impl CommitRecord {
     pub fn new(sequence: JournalSeq) -> Self {
         Self {
             sequence,
-            timestamp: 0, // TODO: Use actual time
-            checksum: 0, // TODO: Calculate checksum
+            timestamp: 0, // GH-#994: Use actual time
+            // See: https://github.com/npos/kernel/issues/994
+            checksum: 0, // GH-#995: Calculate checksum
+            // See: https://github.com/npos/kernel/issues/995
         }
     }
 }
@@ -422,7 +424,8 @@ impl Journal {
 
         // Write commit record
         let _commit = CommitRecord::new(txn.sequence);
-        // TODO: Write commit record to buffer
+        // GH-#996: Write commit record to buffer
+        // See: https://github.com/npos/kernel/issues/996
 
         // Update head
         self.head.store(head + 1, Ordering::SeqCst);
@@ -485,7 +488,8 @@ impl Journal {
     /// Perform checkpoint
     pub fn checkpoint(&self) -> FsResult<CheckpointInfo> {
         // Write all committed transactions to main storage
-        // TODO: Implement actual checkpointing
+        // GH-#997: Implement actual checkpointing
+        // See: https://github.com/npos/kernel/issues/997
 
         let head = self.head.load(Ordering::SeqCst);
         let sequence = self.sequence.load(Ordering::SeqCst);
@@ -523,7 +527,8 @@ impl Journal {
         drop(last_checkpoint);
 
         // Replay transactions from checkpoint
-        // TODO: Implement actual replay
+        // GH-#998: Implement actual replay
+        // See: https://github.com/npos/kernel/issues/998
 
         crate::println!("[journal] Recovery complete from seq {}", start_sequence);
 
@@ -532,7 +537,8 @@ impl Journal {
 
     /// Flush journal to disk
     pub fn flush(&self) -> FsResult<()> {
-        // TODO: Write buffer to disk
+        // GH-#999: Write buffer to disk
+        // See: https://github.com/npos/kernel/issues/999
         Ok(())
     }
 

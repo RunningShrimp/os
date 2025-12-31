@@ -181,7 +181,8 @@ impl Default for SignalHandlerManager {
 pub fn send_signal(pid: ProcessId, sig: SignalNumber) -> Result<(), KernelError> {
     crate::log_debug!("Sending signal {} to process {}", sig, pid);
 
-    // TODO: 实现实际的信号发送逻辑
+    // GH-#1039: 实现实际的信号发送逻辑
+    // See: https://github.com/npos/kernel/issues/1039
     // 这里需要与进程管理器交互，将信号添加到进程的信号队列中
 
     Ok(())
@@ -210,7 +211,8 @@ pub fn set_signal_mask(
 ) -> Result<(), KernelError> {
     crate::log_debug!("Setting signal mask for process {} with operation {}", pid, how);
 
-    // TODO: 实现实际的信号掩码设置逻辑
+    // GH-#1040: 实现实际的信号掩码设置逻辑
+    // See: https://github.com/npos/kernel/issues/1040
     // 这里需要与进程管理器交互，设置进程的信号掩码
 
     Ok(())
@@ -237,7 +239,8 @@ pub fn signal_set_ops(
 ) -> Result<(), KernelError> {
     crate::log_debug!("Performing signal set operation {}", how);
 
-    // TODO: 实现实际的信号集操作逻辑
+    // GH-#1041: 实现实际的信号集操作逻辑
+    // See: https://github.com/npos/kernel/issues/1041
 
     Ok(())
 }
@@ -299,17 +302,20 @@ fn execute_default_handler(sig: SignalNumber) -> Result<(), KernelError> {
     match sig {
         // 终止信号
         2 | 3 | 6 | 9 | 15 => {
-            // TODO: 终止进程
+            // GH-#1042: 终止进程
+            // See: https://github.com/npos/kernel/issues/1042
             crate::log_debug!("Terminating process due to signal {}", sig);
         },
         // 停止信号
         17 | 19 | 23 => {
-            // TODO: 停止进程
+            // GH-#1043: 停止进程
+            // See: https://github.com/npos/kernel/issues/1043
             crate::log_debug!("Stopping process due to signal {}", sig);
         },
         // 继续信号
         18 => {
-            // TODO: 继续进程
+            // GH-#1044: 继续进程
+            // See: https://github.com/npos/kernel/issues/1044
             crate::log_debug!("Continuing process due to signal {}", sig);
         },
         _ => {
@@ -372,7 +378,8 @@ pub fn sigsuspend(pid: ProcessId, mask: SignalSet) -> Result<(), KernelError> {
         return Err(KernelError::SyscallError(SyscallError::NotFound));
     }
 
-    // TODO: 实现完整的sigsuspend逻辑
+    // GH-#1045: 实现完整的sigsuspend逻辑
+    // See: https://github.com/npos/kernel/issues/1045
     // 1. 保存当前信号掩码
     // 2. 原子地设置新的信号掩码
     // 3. 挂起进程（使用进程sleep机制）

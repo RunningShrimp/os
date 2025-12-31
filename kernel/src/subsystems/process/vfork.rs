@@ -106,7 +106,8 @@ pub unsafe fn sys_vfork() -> Result<Pid, UnifiedError> {
     // vfork 子进程不能再次 vfork
     {
         let _parent = table.find(parent_pid).ok_or(UnifiedError::NoProcess)?;
-        // TODO: 需要在 Proc 结构中添加 vfork_state 字段
+        // GH-#1027: 需要在 Proc 结构中添加 vfork_state 字段
+        // See: https://github.com/npos/kernel/issues/1027
         // 这里暂时跳过检查
     }
 
@@ -227,20 +228,23 @@ pub unsafe fn sys_vfork() -> Result<Pid, UnifiedError> {
     // vfork 特殊处理：
     // 1. 标记父进程为等待状态
     // 2. 子进程标记为 vfork 子进程
-    // TODO: 需要在 Proc 结构中添加这些字段
+    // GH-#1028: 需要在 Proc 结构中添加这些字段
+    // See: https://github.com/npos/kernel/issues/1028
 
     // 让子进程可运行
     child.state = ProcState::Runnable;
 
     // 将子进程添加到父进程的子进程列表
-    // TODO: add_child_to_parent is private, need to find another way
+    // GH-#1029: add_child_to_parent is private, need to find another way
+    // See: https://github.com/npos/kernel/issues/1029
     // table.add_child_to_parent(parent_pid, child_pid);
 
     // 父进程阻塞，等待子进程 exec 或 exit
     // 实际实现需要：
     // 1. 设置父进程状态为 Blocked
     // 2. 在子进程 exec/exit 时唤醒父进程
-    // TODO: 实现等待机制
+    // GH-#1030: 实现等待机制
+    // See: https://github.com/npos/kernel/issues/1030
 
     Ok(child_pid)
 }
@@ -270,7 +274,8 @@ pub fn vfork_child_done(child_pid: Pid) {
     };
 
     // 唤醒父进程
-    // TODO: 实现唤醒逻辑
+    // GH-#1031: 实现唤醒逻辑
+    // See: https://github.com/npos/kernel/issues/1031
     let _ = parent_pid;
 }
 
@@ -291,7 +296,8 @@ pub fn is_vfork_child(pid: Pid) -> bool {
 
     match table.find(pid) {
         Some(_proc) => {
-            // TODO: 检查 vfork_state
+            // GH-#1032: 检查 vfork_state
+            // See: https://github.com/npos/kernel/issues/1032
             false
         },
         None => false,

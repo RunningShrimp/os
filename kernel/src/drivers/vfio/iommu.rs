@@ -186,7 +186,8 @@ impl IommuDomain {
                 },
             );
 
-            // TODO: Program hardware IOMMU
+            // GH-#1008: Program hardware IOMMU
+            // See: https://github.com/npos/kernel/issues/1008
             // iommu_hw_map_page(self.id, page_iova, page_phys, flags);
         }
 
@@ -212,7 +213,8 @@ impl IommuDomain {
             if mappings.remove(&page_iova).is_some() {
                 unmapped_pages += 1;
 
-                // TODO: Unprogram hardware IOMMU
+                // GH-#1009: Unprogram hardware IOMMU
+                // See: https://github.com/npos/kernel/issues/1009
                 // iommu_hw_unmap_page(self.id, page_iova);
             }
         }
@@ -236,7 +238,8 @@ impl IommuDomain {
             }
         }
 
-        // TODO: Attach device to IOMMU domain in hardware
+        // GH-#1010: Attach device to IOMMU domain in hardware
+        // See: https://github.com/npos/kernel/issues/1010
         // iommu_hw_attach_device(self.id, segment, bus, device, function)?;
 
         devices.push(DeviceInfo {
@@ -264,7 +267,8 @@ impl IommuDomain {
             return Err(IommuError::DeviceNotFound);
         }
 
-        // TODO: Detach device from IOMMU domain in hardware
+        // GH-#1011: Detach device from IOMMU domain in hardware
+        // See: https://github.com/npos/kernel/issues/1011
         // iommu_hw_detach_device(self.id, segment, bus, device, function)?;
 
         devices.remove(pos.unwrap());
@@ -330,7 +334,8 @@ impl IommuDomain {
             fault.reason
         );
 
-        // TODO: Report fault to userspace
+        // GH-#1012: Report fault to userspace
+        // See: https://github.com/npos/kernel/issues/1012
         // send_fault_event(fault);
 
         Err(IommuError::Fault(fault.reason))
@@ -341,7 +346,8 @@ impl IommuDomain {
     /// This is a stub - real implementation would walk page tables
     /// or use get_user_pages() equivalent.
     fn get_phys_pages(&self, user_addr: u64, size: u64) -> Result<Vec<u64>, IommuError> {
-        // TODO: Implement proper page table walk or use MMU notifiers
+        // GH-#1013: Implement proper page table walk or use MMU notifiers
+        // See: https://github.com/npos/kernel/issues/1013
         // For now, return identity mapping (not safe!)
 
         let num_pages = (size / self.page_size) as usize;
