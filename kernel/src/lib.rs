@@ -511,3 +511,21 @@ pub mod audio;
 /// This module provides a complete implementation of blockchain technology,
 /// including smart contract execution through the Ethereum Virtual Machine (EVM).
 pub mod blockchain;
+
+/// Digital content creation and media processing
+///
+/// This module provides comprehensive multimedia processing capabilities for
+/// digital content creation, including image processing, video codecs, 3D rendering,
+/// audio workstation, font rendering, and color management.
+pub mod media;
+
+/// Quantum computing interface
+///
+/// This module provides a comprehensive quantum computing framework including:
+/// - Quantum bit (qubit) simulation with state vectors
+/// - Quantum circuit construction and optimization
+/// - Quantum algorithms (Grover, Shor, QFT)
+/// - Quantum error correction codes
+/// - Quantum key distribution protocols
+/// - Post-quantum cryptographic algorithms
+pub mod quantum;

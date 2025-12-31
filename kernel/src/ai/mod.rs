@@ -77,6 +77,14 @@ pub mod tensor;
 pub mod neural;
 pub mod scheduler;
 
+// Edge AI inference chip support
+pub mod edgetpu;
+pub mod ane;
+pub mod vpu;
+pub mod jetson;
+pub mod quantize;
+pub mod compiler;
+
 // Re-export main types
 pub use accelerator::{
     Accelerator, AcceleratorType, AcceleratorDevice,

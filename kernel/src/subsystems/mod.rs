@@ -2,6 +2,7 @@ pub mod cloud_native;
 pub mod drivers;
 pub mod fs;
 pub mod ipc;
+pub mod industrial;
 pub mod microkernel;
 pub mod net;
 pub mod perf;

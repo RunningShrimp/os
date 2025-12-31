@@ -56,6 +56,14 @@ pub mod satellite;   // LEO satellite internet (Starlink-style)
 pub mod deepspace;   // Deep space communication protocols
 pub mod ma;          // Multiple access schemes (TDMA/CDMA/FDMA)
 
+// 5G/6G communication modules
+pub mod _5gnr;       // 5G NR (New Radio) protocol stack - PHY, MAC, RLC, PDCP, RRC, NAS
+pub mod _6g;         // 6G millimeter wave and terahertz communication
+pub mod slicing;     // Network slicing for 5G/6G
+pub mod mimo;        // MIMO and beamforming techniques
+pub mod nfv;         // Network Functions Virtualization (NFV) framework
+pub mod sdn;         // Software Defined Networking (SDN) with OpenFlow
+
 // Test modules
 #[cfg(test)]
 pub mod ipv6_tests;
