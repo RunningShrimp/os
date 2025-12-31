@@ -162,6 +162,7 @@ pub mod glib;
 pub mod ipc;
 pub mod lockfree_stats;
 pub mod memory;
+pub mod mm;  // Memory management syscall handlers (mmap, munmap, mprotect, etc.)
 pub mod network;
 pub mod object;
 pub mod optimization;
