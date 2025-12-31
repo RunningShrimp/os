@@ -1,11 +1,22 @@
 //! x86_64 architecture implementation
 
+pub mod cpu_features;
 pub mod interrupts;
 pub mod memory;
+pub mod simd;
 
 /// Initialize x86_64-specific subsystems
 pub fn initialize() -> Result<(), &'static str> {
     crate::println!("x86_64: Initializing architecture subsystems");
+
+    // Initialize CPU feature detection
+    crate::println!("x86_64: Detecting CPU features");
+    cpu_features::get_cpu_info(); // Initialize CPU info
+    crate::println!(
+        "x86_64: CPU: {}, SIMD: {}",
+        cpu_features::get_cpu_brand(),
+        cpu_features::get_simd_level()
+    );
 
     // Initialize memory management
     memory::initialize()?;

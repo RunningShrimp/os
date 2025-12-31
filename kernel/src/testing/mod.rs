@@ -4,8 +4,10 @@
 //! including unit tests, integration tests, performance benchmarks,
 //! security testing, and test automation.
 
+pub mod final_audit;
 pub mod framework;
 pub mod benchmarks;
+pub mod interrupt_latency;
 pub mod security_tests;
 pub mod integration_tests;
 pub mod stress_tests;

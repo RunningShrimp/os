@@ -1,0 +1,182 @@
+# NOS Kernel GitLab CI/CD Pipeline
+#
+# This pipeline provides comprehensive continuous integration and deployment
+# for the NOS kernel on GitLab, including building, testing, security scanning,
+# and performance regression detection.
+
+stages:
+  - build
+  - test
+  - security
+  - performance
+  - coverage
+  - deploy
+
+variables:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CARGO_HOME: "$CI_PROJECT_DIR/.cargo"
+  APT_CACHE_DIR: "$CI_PROJECT_DIR/.apt"
+
+# Cache configuration
+cache:
+  key: "${CI_COMMIT_REF_SLUG}"
+  paths:
+    - target/
+    - .cargo/
+    - .apt/
+
+# ============================================================================
+# Build Stage
+# ============================================================================
+build:stable:
+  stage: build
+  image: rust:latest
+  script:
+    - rustc --version && cargo --version
+    - cargo build --verbose
+  artifacts:
+    paths:
+      - target/debug/nos
+      - target/release/nos
+    expire_in: 1 week
+
+build:nightly:
+  stage: build
+  image: rustlang/rust:nightly
+  script:
+    - rustc --version && cargo --version
+    - cargo build --verbose
+  allow_failure: true
+  artifacts:
+    paths:
+      - target/debug/nos
+    expire_in: 1 week
+
+# ============================================================================
+# Test Stage
+# ============================================================================
+test:unit:
+  stage: test
+  image: rust:latest
+  dependencies:
+    - build:stable
+  script:
+    - cargo test --verbose
+  coverage: '/\d+\.\d+\% coverage/'
+
+test:integration:
+  stage: test
+  image: rust:latest
+  dependencies:
+    - build:stable
+  script:
+    - cargo test --test integration_tests --verbose
+
+test:clippy:
+  stage: test
+  image: rust:latest
+  script:
+    - cargo clippy --all-targets --all-features -- -D warnings
+
+test:format:
+  stage: test
+  image: rust:latest
+  script:
+    - cargo fmt -- --check
+
+# ============================================================================
+# Security Stage
+# ============================================================================
+security:audit:
+  stage: security
+  image: rust:latest
+  script:
+    - cargo install cargo-audit
+    - cargo audit
+
+security:unsafe:
+  stage: security
+  image: rust:latest
+  script:
+    - cargo install cargo-geiger
+    - cargo geiger --quiet
+
+security:secrets:
+  stage: security
+  image: python:latest
+  script:
+    - pip install truffleHog
+    - trufflehog --regex --entropy False .
+
+# ============================================================================
+# Performance Stage
+# ============================================================================
+performance:benchmark:
+  stage: performance
+  image: rust:latest
+  dependencies:
+    - build:stable
+  script:
+    - cargo install cargo-criterion
+    - cargo bench --bench scheduler -- --save-baseline main
+    - cargo bench --bench memory -- --save-baseline main
+  artifacts:
+    paths:
+      - target/criterion/
+    expire_in: 1 week
+
+performance:regression:
+  stage: performance
+  image: rust:latest
+  dependencies:
+    - performance:benchmark
+  script:
+    - cargo bench --bench scheduler -- --baseline main
+    - cargo bench --bench memory -- --baseline main
+  allow_failure: true
+
+# ============================================================================
+# Coverage Stage
+# ============================================================================
+coverage:tarpaulin:
+  stage: coverage
+  image: rust:latest
+  script:
+    - cargo install cargo-tarpaulin
+    - cargo tarpaulin --out Xml --timeout 300
+  coverage: '/(\d+\.\d+)\% coverage/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: cobertura.xml
+
+# ============================================================================
+# Deploy Stage
+# ============================================================================
+deploy:docs:
+  stage: deploy
+  image: rust:latest
+  script:
+    - cargo doc --no-deps --all-features
+    - mv target/doc public
+  artifacts:
+    paths:
+      - public
+  only:
+    - main
+    - master
+
+deploy:release:
+  stage: deploy
+  image: rust:latest
+  script:
+    - cargo build --release
+    - tar -czf nos-x86_64-linux.tar.gz -C target/release nos
+  artifacts:
+    paths:
+      - nos-x86_64-linux.tar.gz
+    expire_in: 1 month
+  only:
+    - tags

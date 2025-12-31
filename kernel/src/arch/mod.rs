@@ -27,6 +27,12 @@ pub mod aarch64;
 #[cfg(target_arch = "riscv64")]
 pub mod riscv64;
 
+#[cfg(target_arch = "loongarch64")]
+pub mod loongarch64;
+
+#[cfg(target_arch = "csky")]
+pub mod csky;
+
 /// Initialize architecture-specific subsystems
 pub fn initialize() -> Result<()> {
     #[cfg(target_arch = "x86_64")]
@@ -50,7 +56,21 @@ pub fn initialize() -> Result<()> {
         Ok(())
     }
 
-    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
+    #[cfg(target_arch = "loongarch64")]
+    {
+        // loongarch64 specific initialization
+        crate::println!("loongarch64: Initializing architecture");
+        loongarch64::initialize().map_err(|e| nos_api::Error::Other(e.to_string()))
+    }
+
+    #[cfg(target_arch = "csky")]
+    {
+        // csky specific initialization
+        crate::println!("C-SKY: Initializing architecture");
+        csky::initialize().map_err(|e| nos_api::Error::Other(e.to_string()))
+    }
+
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64", target_arch = "loongarch64", target_arch = "csky")))]
     {
         compile_error!("Unsupported architecture");
         Err(nos_api::Error::NotImplemented("Unsupported architecture".to_string()))
@@ -80,7 +100,21 @@ pub fn shutdown() -> Result<()> {
         Ok(())
     }
 
-    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")))]
+    #[cfg(target_arch = "loongarch64")]
+    {
+        // loongarch64 specific shutdown
+        crate::println!("loongarch64: Shutting down architecture");
+        loongarch64::shutdown().map_err(|e| nos_api::Error::Other(e.to_string()))
+    }
+
+    #[cfg(target_arch = "csky")]
+    {
+        // csky specific shutdown
+        crate::println!("C-SKY: Shutting down architecture");
+        csky::shutdown().map_err(|e| nos_api::Error::Other(e.to_string()))
+    }
+
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64", target_arch = "loongarch64", target_arch = "csky")))]
     {
         compile_error!("Unsupported architecture");
         Err(nos_api::Error::NotImplemented("Unsupported architecture".to_string()))
@@ -106,5 +140,15 @@ pub fn wfi() {
     #[cfg(target_arch = "riscv64")]
     unsafe {
         core::arch::asm!("wfi");
+    }
+
+    #[cfg(target_arch = "loongarch64")]
+    unsafe {
+        core::arch::asm!("idle 0");
+    }
+
+    #[cfg(target_arch = "csky")]
+    unsafe {
+        core::arch::asm!("idle");
     }
 }

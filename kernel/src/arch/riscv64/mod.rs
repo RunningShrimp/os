@@ -10,6 +10,7 @@ pub mod interrupt;
 pub mod memory;
 pub mod paging;
 pub mod smp;
+pub mod supervisor;
 pub mod sync;
 pub mod timer;
 pub mod virtualization;
@@ -17,6 +18,10 @@ pub mod virtualization;
 /// Initialize RISC-V 64-specific subsystems
 pub fn initialize() -> Result<(), &'static str> {
     crate::println!("riscv64: Initializing architecture subsystems");
+
+    // Initialize supervisor-mode (SBI)
+    crate::println!("riscv64: Initializing SBI");
+    supervisor::init_sbi()?;
 
     // Initialize synchronization primitives
     crate::println!("riscv64: Initializing synchronization");
