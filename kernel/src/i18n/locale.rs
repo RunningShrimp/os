@@ -12,17 +12,11 @@
 //! - Timezone support
 
 use spin::Mutex;
-use core::sync::atomic;
+use core::sync::atomic::{AtomicU64, Ordering};
 use alloc::collections::BTreeMap;
-use core::sync::atomic;
-use alloc::string::String;
-use core::sync::atomic;
-use alloc::vec::Vec;
-use core::sync::atomic;
 use alloc::string::{String, ToString};
-use core::sync::atomic;
+use alloc::vec::Vec;
 use alloc::sync::Arc;
-use core::sync::atomic;
 
 // ============================================================================
 // Locale Constants
@@ -66,7 +60,7 @@ impl LocaleCode {
     }
 
     pub fn to_string(&self) -> String {
-        { let mut s = alloc::string::String::from("{}_{}."); s.push_str(&self.language); s.push_str(&self.territory); s.push_str(&self.encoding.to_string()); s }
+        alloc::format!("{}_{}.{}", self.language, self.territory, self.encoding)
     }
 }
 
@@ -275,70 +269,97 @@ impl LocaleData {
     }
 
     pub fn format_number(&self, number: f64, decimals: u32) -> String {
-        let mut result = /* TODO: {::.1$} */ &number.to_string();
-        
-        if number.abs() >= 1000.0 {
-            let parts: Vec<&str> = result.split('.').collect();
-            let int_part = parts[0];
-            let formatted: String = int_part
-                .chars()
-                .rev()
-                .collect::<Vec<_>>()
-                .chunks(3)
-                .map(|chunk| chunk.iter().collect::<String>())
-                .collect::<Vec<_>>()
-                .join(&self.thousands_separator)
-                .chars()
-                .rev()
-                .collect();
-            
-            result = if parts.len() > 1 {
-                { let mut s = alloc::string::String::from("{}."); s.push_str(&formatted); s.push_str(&parts[1].to_string()); s }
-            } else {
-                formatted
-            };
+        // Round to specified decimals
+        let multiplier = 10_f64.powi(decimals as i32);
+        let rounded = (number * multiplier).round() / multiplier;
+
+        // Split into integer and fractional parts
+        let int_part = rounded.trunc() as i64;
+        let frac_part = (rounded.fract().abs() * multiplier) as u64;
+
+        // Format integer part with thousands separator
+        let int_str = self.format_integer(int_part);
+
+        // Combine with fractional part
+        if decimals > 0 {
+            alloc::format!("{}{}{:0width$}", int_str, self.decimal_separator, frac_part, width = decimals as usize)
+        } else {
+            int_str
         }
-        
-        result
+    }
+
+    fn format_integer(&self, mut number: i64) -> String {
+        if number == 0 {
+            return String::from("0");
+        }
+
+        let negative = number < 0;
+        if negative {
+            number = -number;
+        }
+
+        let mut groups = Vec::new();
+        while number > 0 {
+            let group = (number % 1000) as u32;
+            groups.push(alloc::format!("{:03}", group));
+            number /= 1000;
+        }
+
+        // Remove leading zeros from the last group
+        if let Some(last) = groups.last_mut() {
+            *last = last.trim_start_matches('0').to_string();
+            if last.is_empty() {
+                *last = String::from("0");
+            }
+        }
+
+        groups.reverse();
+        let result = groups.join(&self.thousands_separator);
+
+        if negative {
+            alloc::format!("-{}", result)
+        } else {
+            result
+        }
     }
 
     pub fn format_currency(&self, amount: f64, decimals: u32) -> String {
         let number_str = self.format_number(amount, decimals);
 
         if self.currency_symbol_position == 0 {
-            { let mut s = alloc::string::String::from("{}"); s.push_str(&self.currency_symbol); s.push_str(&number_str.to_string()); s }
+            alloc::format!("{}{}", self.currency_symbol, number_str)
         } else {
-            { let mut s = alloc::string::String::from("{}"); s.push_str(&number_str); s.push_str(&self.currency_symbol.to_string()); s }
+            alloc::format!("{}{}", number_str, self.currency_symbol)
         }
     }
 
     pub fn format_date(&self, year: u32, month: u8, day: u8, format: &str) -> String {
-        let mut result = format.clone();
-        
+        let mut result = format.to_string();
+
         result = result.replace("%Y", &year.to_string());
-        result = result.replace("%m", &/* TODO: {::02} */ &month.to_string());
-        result = result.replace("%d", &/* TODO: {::02} */ &day.to_string());
-        
+        result = result.replace("%m", &alloc::format!("{:02}", month));
+        result = result.replace("%d", &alloc::format!("{:02}", day));
+
         result
     }
 
     pub fn format_datetime(&self, year: u32, month: u8, day: u8,
                             hour: u8, minute: u8, second: u8, format: &str) -> String {
-        let mut result = format.clone();
-        
+        let mut result = format.to_string();
+
         result = result.replace("%Y", &year.to_string());
-        result = result.replace("%m", &/* TODO: {::02} */ &month.to_string());
-        result = result.replace("%d", &/* TODO: {::02} */ &day.to_string());
-        result = result.replace("%H", &/* TODO: {::02} */ &hour.to_string());
-        result = result.replace("%I", &/* TODO: {::02} */ &if hour % 12 == 0 { 12 } else { hour % 12 }.to_string());
-        result = result.replace("%M", &/* TODO: {::02} */ &minute.to_string());
-        result = result.replace("%S", &/* TODO: {::02} */ &second.to_string());
+        result = result.replace("%m", &alloc::format!("{:02}", month));
+        result = result.replace("%d", &alloc::format!("{:02}", day));
+        result = result.replace("%H", &alloc::format!("{:02}", hour));
+        result = result.replace("%I", &alloc::format!("{:02}", if hour % 12 == 0 { 12 } else { hour % 12 }));
+        result = result.replace("%M", &alloc::format!("{:02}", minute));
+        result = result.replace("%S", &alloc::format!("{:02}", second));
         result = result.replace("%p", if hour < 12 { "AM" } else { "PM" });
         result = result.replace("%A", &self.weekday_names[0]);
         result = result.replace("%a", &self.short_weekday_names[0]);
         result = result.replace("%B", &self.month_names.get((month - 1) as usize).unwrap_or(&String::from("")));
         result = result.replace("%b", &self.short_month_names.get((month - 1) as usize).unwrap_or(&String::from("")));
-        
+
         result
     }
 }
@@ -349,7 +370,7 @@ impl LocaleData {
 
 /// Locale manager
 pub struct LocaleManager {
-    pub locales: Mutex<BTreeMap<String, Arc<LocaleData>>>>,
+    pub locales: Mutex<BTreeMap<String, Arc<LocaleData>>>,
     pub current_locale: Arc<LocaleData>,
     pub next_locale_id: AtomicU64,
     pub stats: Mutex<LocaleManagerStats>,

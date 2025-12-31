@@ -5,7 +5,7 @@ use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 /// This module implements signature-based intrusion detection using
 /// pattern matching and rule-based detection.
-use crate::subsystems::sync::{Mutex, SpinLock};
+use crate::subsystems::sync::{Mutex, RawSpinLock};
 use crate::{
     collections::HashMap,
     compat::DefaultHashBuilder,
@@ -184,7 +184,7 @@ pub struct SignatureEngine {
     /// Statistics
     stats: SignatureStats,
     /// Engine lock
-    engine_lock: SpinLock,
+    engine_lock: RawSpinLock,
 }
 
 impl SignatureEngine {
@@ -198,7 +198,7 @@ impl SignatureEngine {
             signature_counter: AtomicU64::new(0),
             running: AtomicBool::new(false),
             stats: SignatureStats::new(),
-            engine_lock: SpinLock::new(),
+            engine_lock: RawSpinLock::new(),
         }
     }
 

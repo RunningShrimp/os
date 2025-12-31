@@ -283,6 +283,10 @@ impl UnifiedErrorMapper {
             UnifiedError::FileSystemError(_) => Errno::EIO,
             UnifiedError::NetworkError(_) => Errno::ECONNREFUSED,
             UnifiedError::Other(_) => Errno::EIO,
+            UnifiedError::MemoryLimitExceeded { .. } => Errno::ENOMEM,
+            UnifiedError::ResourceLimitExceeded { .. } => Errno::EAGAIN,
+            UnifiedError::InsufficientResources { .. } => Errno::EAGAIN,
+            UnifiedError::IoQuotaExceeded { .. } => Errno::EDQUOT,
         }
     }
 

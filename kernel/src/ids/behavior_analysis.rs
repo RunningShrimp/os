@@ -5,7 +5,7 @@ use core::sync::atomic::{AtomicU64, Ordering};
 
 /// This module implements behavioral analysis to detect unusual system
 /// and user behavior that may indicate security threats.
-use crate::subsystems::sync::{Mutex, SpinLock};
+use crate::subsystems::sync::{Mutex, RawSpinLock};
 use crate::{
     collections::HashMap,
     compat::DefaultHashBuilder,
@@ -192,7 +192,7 @@ pub struct BehaviorAnalyzer {
     /// Analysis statistics
     stats: BehaviorStats,
     /// Analyzer lock
-    analyzer_lock: SpinLock,
+    analyzer_lock: RawSpinLock,
 }
 
 impl BehaviorAnalyzer {
@@ -207,7 +207,7 @@ impl BehaviorAnalyzer {
             event_counter: AtomicU64::new(0),
             anomaly_counter: AtomicU64::new(0),
             stats: BehaviorStats::new(),
-            analyzer_lock: SpinLock::new(),
+            analyzer_lock: RawSpinLock::new(),
         }
     }
 

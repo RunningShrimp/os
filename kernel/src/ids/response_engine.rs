@@ -9,7 +9,7 @@ use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use crate::ids::ResponseAction;
 /// This module implements automated response capabilities for
 /// detected security threats and intrusions.
-use crate::subsystems::sync::{Mutex, SpinLock};
+use crate::subsystems::sync::{Mutex, RawSpinLock};
 use crate::{
     collections::HashMap,
     compat::DefaultHashBuilder,
@@ -126,7 +126,7 @@ pub struct ResponseEngine {
     /// Engine status
     running: AtomicBool,
     /// Engine lock
-    engine_lock: SpinLock,
+    engine_lock: RawSpinLock,
 }
 
 #[allow(dead_code)]
@@ -141,7 +141,7 @@ impl ResponseEngine {
             rule_counter: AtomicU64::new(0),
             stats: ResponseStats::new(),
             running: AtomicBool::new(false),
-            engine_lock: SpinLock::new(),
+            engine_lock: RawSpinLock::new(),
         }
     }
 

@@ -46,6 +46,12 @@ pub enum UnifiedError {
     ConnectionReset,
     Unknown,
 
+    /// Resource limit errors
+    ResourceLimitExceeded { resource: String, usage: u64, limit: u64 },
+    InsufficientResources { resource: String, requested: u64, available: u64 },
+    IoQuotaExceeded { operation: String, quota: u64, usage: u64 },
+    MemoryLimitExceeded { requested: u64, limit: u64 },
+
     /// 内存相关错误
     MemoryError(MemoryError),
 
@@ -106,6 +112,19 @@ impl fmt::Display for UnifiedError {
             UnifiedError::ConnectionAborted => write!(f, "Connection aborted"),
             UnifiedError::ConnectionReset => write!(f, "Connection reset"),
             UnifiedError::Unknown => write!(f, "Unknown error"),
+            UnifiedError::ResourceLimitExceeded { resource, usage, limit } => {
+                write!(f, "Resource limit exceeded: {} (usage: {}, limit: {})", resource, usage, limit)
+            }
+            UnifiedError::InsufficientResources { resource, requested, available } => {
+                write!(f, "Insufficient resources: {} (requested: {}, available: {})",
+                       resource, requested, available)
+            }
+            UnifiedError::IoQuotaExceeded { operation, quota, usage } => {
+                write!(f, "I/O quota exceeded: {} (usage: {}, quota: {})", operation, usage, quota)
+            }
+            UnifiedError::MemoryLimitExceeded { requested, limit } => {
+                write!(f, "Memory limit exceeded (requested: {}, limit: {})", requested, limit)
+            }
             UnifiedError::MemoryError(e) => write!(f, "Memory error: {}", e.to_string()),
             UnifiedError::FileSystemError(e) => write!(f, "Filesystem error: {}", e.to_string()),
             UnifiedError::NetworkError(e) => write!(f, "Network error: {}", e.to_string()),
@@ -236,6 +255,7 @@ pub enum ProcessError {
     ProcessAlreadyExists,
     ProcessTerminated,
     ProcessNotRunning,
+    ProcessKilled,
     InvalidState,
     StackOverflow,
     HeapCorruption,
@@ -251,6 +271,7 @@ impl fmt::Display for ProcessError {
             ProcessError::ProcessAlreadyExists => write!(f, "Process already exists"),
             ProcessError::ProcessTerminated => write!(f, "Process terminated"),
             ProcessError::ProcessNotRunning => write!(f, "Process not running"),
+            ProcessError::ProcessKilled => write!(f, "Process killed"),
             ProcessError::InvalidState => write!(f, "Invalid process state"),
             ProcessError::StackOverflow => write!(f, "Stack overflow"),
             ProcessError::HeapCorruption => write!(f, "Heap corruption"),
@@ -509,6 +530,10 @@ impl UnifiedError {
             UnifiedError::AlreadyInProgress => ErrorSeverity::Warning,
             UnifiedError::OutOfSpace => ErrorSeverity::Error,
             UnifiedError::Unknown => ErrorSeverity::Error,
+            UnifiedError::MemoryLimitExceeded { .. } => ErrorSeverity::Critical,
+            UnifiedError::ResourceLimitExceeded { .. } => ErrorSeverity::Error,
+            UnifiedError::InsufficientResources { .. } => ErrorSeverity::Critical,
+            UnifiedError::IoQuotaExceeded { .. } => ErrorSeverity::Error,
         }
     }
 
@@ -555,6 +580,18 @@ impl UnifiedError {
             UnifiedError::DriverError(err) => format!("Driver error: {:?}", err),
             UnifiedError::SecurityError(err) => format!("Security error: {:?}", err),
             UnifiedError::Other(msg) => format!("Other error: {}", msg),
+            UnifiedError::ResourceLimitExceeded { resource, usage, limit } => {
+                format!("Resource limit exceeded: {} (usage: {}, limit: {})", resource, usage, limit)
+            }
+            UnifiedError::InsufficientResources { resource, requested, available } => {
+                format!("Insufficient resources: {} (requested: {}, available: {})", resource, requested, available)
+            }
+            UnifiedError::IoQuotaExceeded { operation, quota, usage } => {
+                format!("I/O quota exceeded: {} (quota: {}, usage: {})", operation, quota, usage)
+            }
+            UnifiedError::MemoryLimitExceeded { requested, limit } => {
+                format!("Memory limit exceeded: requested {}, limit {}", requested, limit)
+            }
         }
     }
 
@@ -832,6 +869,18 @@ impl UnifiedError {
             UnifiedError::SecurityError(SecurityError::SecurityBreach) => {
                 Some("Check security logs and try again".to_string())
             },
+            UnifiedError::MemoryLimitExceeded { .. } => {
+                Some("Free up memory or increase limits and try again".to_string())
+            },
+            UnifiedError::ResourceLimitExceeded { .. } => {
+                Some("Free up resources or increase limits and try again".to_string())
+            },
+            UnifiedError::InsufficientResources { .. } => {
+                Some("Free up resources and try again".to_string())
+            },
+            UnifiedError::IoQuotaExceeded { .. } => {
+                Some("Reduce I/O or increase quota and try again".to_string())
+            },
             _ => None,
         }
     }
@@ -879,6 +928,10 @@ impl UnifiedError {
             UnifiedError::DriverError(err) => err.to_errno(),
             UnifiedError::SecurityError(err) => err.to_errno(),
             UnifiedError::Other(_) => crate::reliability::errno::EIO,
+            UnifiedError::MemoryLimitExceeded { .. } => crate::reliability::errno::ENOMEM,
+            UnifiedError::ResourceLimitExceeded { .. } => crate::reliability::errno::EAGAIN,
+            UnifiedError::InsufficientResources { .. } => crate::reliability::errno::EAGAIN,
+            UnifiedError::IoQuotaExceeded { .. } => crate::reliability::errno::EDQUOT,
         }
     }
 }
@@ -957,6 +1010,7 @@ impl ProcessError {
             ProcessError::InvalidState => crate::reliability::errno::EINVAL,
             ProcessError::StackOverflow => crate::reliability::errno::ENOMEM,
             ProcessError::HeapCorruption => crate::reliability::errno::EIO,
+            ProcessError::ProcessKilled => crate::reliability::errno::ESRCH,
         }
     }
 }

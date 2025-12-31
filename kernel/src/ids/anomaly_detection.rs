@@ -5,7 +5,7 @@ use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 /// This module implements machine learning-based anomaly detection
 /// to identify unusual patterns that may indicate security threats.
-use crate::subsystems::sync::{Mutex, SpinLock};
+use crate::subsystems::sync::{Mutex, RawSpinLock};
 use crate::{
     collections::{HashMap, VecDeque},
     compat::DefaultHashBuilder,
@@ -476,7 +476,7 @@ pub struct AnomalyDetector {
     /// Is the detector trained
     trained: AtomicBool,
     /// Configuration lock
-    config_lock: SpinLock,
+    config_lock: RawSpinLock,
 }
 
 impl AnomalyDetector {
@@ -490,7 +490,7 @@ impl AnomalyDetector {
             feature_buffer: Vec::new(),
             anomaly_counter: AtomicU64::new(0),
             trained: AtomicBool::new(false),
-            config_lock: SpinLock::new(),
+            config_lock: RawSpinLock::new(),
         }
     }
 

@@ -202,8 +202,8 @@ pub mod tests;
 pub mod futex_tests;
 pub mod futex_validation;
 
-// Legacy compatibility alias
-pub type SpinLock = RawSpinLock;
+// Re-export the generic SpinLock<T> from spinlock submodule
+pub use spinlock::{SpinLock, SpinLockGuard};
 
 // ============================================================================
 // SpinLockIrq - Spinlock that disables interrupts

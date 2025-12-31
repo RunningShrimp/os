@@ -301,6 +301,9 @@ pub mod compat;
 pub mod sync;
 pub mod trap;
 
+// Accessibility (A11y) module - comprehensive accessibility support
+pub mod a11y;
+
 // Re-export key types for external use
 /// Core kernel functionality
 pub use core::*;
@@ -724,3 +727,41 @@ pub mod metrics;
 /// let report = profiler.report(ProfilerType::Cpu(0)).unwrap();
 /// ```
 pub mod profiling;
+
+/// ## 工作流和调度 (`workflow`)
+///
+/// 工作流编排和任务调度系统，支持 DAG 工作流、Cron 调度、作业执行、持久化和重试逻辑：
+/// - **DAG 执行**: 基于有向无环图的任务依赖管理
+/// - **Cron 调度**: 标准的 Cron 表达式解析和调度（秒到年）
+/// - **作业管理**: 优先级调度、超时处理、取消支持
+/// - **持久化**: 作业状态持久化和崩溃恢复
+/// - **重试机制**: 指数退避、线性退避、抖动支持
+///
+/// ### 使用示例
+///
+/// ```no_run
+/// use kernel::workflow::{Workflow, WorkflowOrchestrator, Job, RetryConfig};
+/// use alloc::sync::Arc;
+/// use core::time::Duration;
+///
+/// // 创建工作流
+/// let mut workflow = Workflow::new("my-workflow", "My Workflow");
+/// let job1 = Job::new("task1").with_executor(Arc::new(|| Ok(())));
+/// let job2 = Job::new("task2").with_executor(Arc::new(|| Ok(())));
+///
+/// let node1 = workflow.add_job(job1).unwrap();
+/// let node2 = workflow.add_job(job2).unwrap();
+/// workflow.add_dependency(node1, node2).unwrap();
+///
+/// // 创建编排器并执行
+/// let mut orchestrator = WorkflowOrchestrator::new();
+/// orchestrator.register_workflow(workflow).unwrap();
+/// orchestrator.execute_workflow("my-workflow").unwrap();
+/// ```
+pub mod workflow;
+
+// Messaging and events system
+pub mod messaging;
+
+// Resource management
+pub mod resource;

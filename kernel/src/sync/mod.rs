@@ -316,8 +316,8 @@ pub mod tests;
 #[cfg(feature = "kernel_tests")]
 pub mod futex_tests;
 
-// Legacy compatibility alias
-pub type SpinLock = RawSpinLock;
+// Re-export the generic SpinLock<T> from subsystems
+pub use crate::subsystems::sync::{SpinLock, SpinLockGuard};
 
 // ============================================================================
 // SpinLockIrq - Spinlock that disables interrupts

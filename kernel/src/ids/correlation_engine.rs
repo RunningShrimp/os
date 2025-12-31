@@ -5,7 +5,7 @@ use core::sync::atomic::{AtomicU64, Ordering};
 
 /// This module implements advanced correlation analysis to connect
 /// related security events and identify attack patterns.
-use crate::subsystems::sync::{Mutex, SpinLock};
+use crate::subsystems::sync::{Mutex, RawSpinLock};
 use crate::{
     collections::{HashMap, HashSet},
     compat::DefaultHashBuilder,
@@ -172,7 +172,7 @@ pub struct CorrelationEngine {
     /// Cluster counter
     cluster_counter: AtomicU64,
     /// Engine lock
-    engine_lock: SpinLock,
+    engine_lock: RawSpinLock,
 }
 
 impl CorrelationEngine {
@@ -187,7 +187,7 @@ impl CorrelationEngine {
             correlation_counter: AtomicU64::new(0),
             rule_counter: AtomicU64::new(0),
             cluster_counter: AtomicU64::new(0),
-            engine_lock: SpinLock::new(),
+            engine_lock: RawSpinLock::new(),
         }
     }
 

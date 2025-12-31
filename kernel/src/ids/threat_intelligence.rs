@@ -5,7 +5,7 @@ use core::sync::atomic::{AtomicU64, Ordering};
 
 /// This module implements threat intelligence integration to enhance
 /// intrusion detection with external threat data.
-use crate::subsystems::sync::{Mutex, SpinLock};
+use crate::subsystems::sync::{Mutex, RawSpinLock};
 use crate::{
     collections::HashMap,
     compat::DefaultHashBuilder,
@@ -218,7 +218,7 @@ pub struct ThreatIntelligence {
     /// Indicator counter
     indicator_counter: AtomicU64,
     /// Engine lock
-    engine_lock: SpinLock,
+    engine_lock: RawSpinLock,
 }
 
 /// Threat match result
@@ -253,7 +253,7 @@ impl ThreatIntelligence {
             stats: ThreatStats::new(),
             match_counter: AtomicU64::new(0),
             indicator_counter: AtomicU64::new(0),
-            engine_lock: SpinLock::new(),
+            engine_lock: RawSpinLock::new(),
         }
     }
 
