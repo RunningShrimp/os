@@ -7,9 +7,11 @@ use crate::error::UnifiedError;
 use crate::subsystems::syscalls::net::types::*;
 
 /// 从用户空间复制地址结构
-/// TODO: 实现真正的用户空间拷贝机制，目前为占位符
+/// GH-#891: 实现真正的用户空间拷贝机制，目前为占位符
+// See: https://github.com/npos/kernel/issues/891
 pub fn copyin_from_user<T>(user_addr: u64, _kernel_addr: &mut T) -> Result<(), KernelError> {
-    // TODO: 实现用户空间到内核空间的数据拷贝
+    // GH-#892: 实现用户空间到内核空间的数据拷贝
+    // See: https://github.com/npos/kernel/issues/892
     // 需要检查地址有效性、权限等
     if user_addr == 0 {
         return Err(KernelError::InvalidArgument);
@@ -21,9 +23,11 @@ pub fn copyin_from_user<T>(user_addr: u64, _kernel_addr: &mut T) -> Result<(), K
 }
 
 /// 向用户空间复制数据
-/// TODO: 实现真正的用户空间拷贝机制，目前为占位符
+/// GH-#893: 实现真正的用户空间拷贝机制，目前为占位符
+// See: https://github.com/npos/kernel/issues/893
 pub fn copyout_to_user<T>(_kernel_addr: &T, user_addr: u64) -> Result<(), KernelError> {
-    // TODO: 实现内核空间到用户空间的数据拷贝
+    // GH-#894: 实现内核空间到用户空间的数据拷贝
+    // See: https://github.com/npos/kernel/issues/894
     if user_addr == 0 {
         return Err(KernelError::InvalidArgument);
     }
@@ -34,9 +38,11 @@ pub fn copyout_to_user<T>(_kernel_addr: &T, user_addr: u64) -> Result<(), Kernel
 }
 
 /// 从用户空间复制地址长度
-/// TODO: 实现真正的地址长度处理
+/// GH-#895: 实现真正的地址长度处理
+// See: https://github.com/npos/kernel/issues/895
 pub fn copyin_addrlen(user_addrlen_ptr: u64) -> Result<u32, KernelError> {
-    // TODO: 从用户空间读取地址长度
+    // GH-#896: 从用户空间读取地址长度
+    // See: https://github.com/npos/kernel/issues/896
     if user_addrlen_ptr == 0 {
         return Ok(0);
     }
@@ -47,9 +53,11 @@ pub fn copyin_addrlen(user_addrlen_ptr: u64) -> Result<u32, KernelError> {
 }
 
 /// 向用户空间写回地址长度
-/// TODO: 实现真正的地址长度处理
+/// GH-#897: 实现真正的地址长度处理
+// See: https://github.com/npos/kernel/issues/897
 pub fn copyout_addrlen(addrlen: u32, user_addrlen_ptr: u64) -> Result<(), KernelError> {
-    // TODO: 向用户空间写入地址长度
+    // GH-#898: 向用户空间写入地址长度
+    // See: https://github.com/npos/kernel/issues/898
     if user_addrlen_ptr == 0 {
         return Err(KernelError::InvalidArgument);
     }
@@ -60,9 +68,11 @@ pub fn copyout_addrlen(addrlen: u32, user_addrlen_ptr: u64) -> Result<(), Kernel
 }
 
 /// 验证网络地址结构
-/// TODO: 实现完整的地址验证，目前为占位符
+/// GH-#899: 实现完整的地址验证，目前为占位符
+// See: https://github.com/npos/kernel/issues/899
 pub fn validate_network_address(_addr_ptr: u64, _addrlen: u32) -> Result<NetworkAddress, KernelError> {
-    // TODO: 验证地址结构完整性、长度边界等
+    // GH-#900: 验证地址结构完整性、长度边界等
+    // See: https://github.com/npos/kernel/issues/900
     // 临时实现 - 返回一个默认地址
     crate::log_debug!("validate_network_address: addr_ptr={:#x}, addrlen={} (stub default)", _addr_ptr, _addrlen);
     Ok(NetworkAddress::ipv4([0u8; 4], 0u16))

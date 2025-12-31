@@ -151,7 +151,8 @@ pub unsafe fn pmem_flush(addr: u64, len: usize) {
     for offset in (0..len).step_by(CACHE_LINE_SIZE) {
         unsafe {
             let line_ptr = ptr.add(offset) as *const u8;
-            // TODO: 使用架构特定的 clflush 指令
+            // GH-#846: 使用架构特定的 clflush 指令
+            // See: https://github.com/npos/kernel/issues/846
             // asm!("clflush ($0)" : : "r"(line_ptr) : "memory");
             let _ = line_ptr;
         }
@@ -173,7 +174,8 @@ pub unsafe fn pmem_persist(addr: u64, len: usize) { unsafe {
 
 /// 排空持久化缓冲区
 pub fn pmem_drain() {
-    // TODO: 使用 sfence 指令
+    // GH-#847: 使用 sfence 指令
+    // See: https://github.com/npos/kernel/issues/847
     core::sync::atomic::fence(Ordering::Release);
 }
 
@@ -240,7 +242,8 @@ pub unsafe fn pmem_memset_persist(dest: u64, c: u8, len: usize) -> u64 {
 ///
 /// 返回映射地址
 pub fn pmem_map_file(path: &str, _len: usize, _is_readonly: bool) -> Result<u64, Error> {
-    // TODO: 实现文件映射
+    // GH-#848: 实现文件映射
+    // See: https://github.com/npos/kernel/issues/848
     // 这里简化处理，直接返回虚拟地址
     crate::println!("[libpmem] Mapping file: {}", path);
 
@@ -256,7 +259,8 @@ pub fn pmem_map_file(path: &str, _len: usize, _is_readonly: bool) -> Result<u64,
 /// * `addr` - 映射地址
 /// * `len` - 映射长度
 pub fn pmem_unmap(addr: u64, _len: usize) -> Result<(), Error> {
-    // TODO: 实现取消映射
+    // GH-#849: 实现取消映射
+    // See: https://github.com/npos/kernel/issues/849
     crate::println!("[libpmem] Unmapping address: 0x{:x}", addr);
     Ok(())
 }
@@ -271,7 +275,8 @@ pub fn pmem_unmap(addr: u64, _len: usize) -> Result<(), Error> {
 ///
 /// 返回是否为持久化内存地址
 pub fn pmem_is_pmem(addr: u64) -> bool {
-    // TODO: 检查地址是否在 NVDIMM 区域
+    // GH-#850: 检查地址是否在 NVDIMM 区域
+    // See: https://github.com/npos/kernel/issues/850
     addr >= 0x1000_0000_0000 && addr < 0x2000_0000_0000
 }
 
@@ -300,8 +305,10 @@ impl PmemobjPool {
                 magic: PMEM_MAGIC,
                 major: 1,
                 minor: 0,
-                uuid: [0u8; 16], // TODO: 生成 UUID
-                create_ts: 0,     // TODO: 获取时间戳
+                uuid: [0u8; 16], // GH-#851: 生成 UUID
+                // See: https://github.com/npos/kernel/issues/851
+                create_ts: 0,     // GH-#852: 获取时间戳
+                // See: https://github.com/npos/kernel/issues/852
                 pool_size: size,
                 root: PMEMroot { root_off: 0 },
             },
@@ -315,7 +322,8 @@ impl PmemobjPool {
     pub fn alloc(&self, _size: u64, _type_id: PMEMobjtype) -> Result<PMEMoid, Error> {
         let offset = self.next_oid.fetch_add(1, Ordering::SeqCst);
 
-        // TODO: 实际分配对象空间
+        // GH-#853: 实际分配对象空间
+        // See: https://github.com/npos/kernel/issues/853
         let oid = PMEMoid {
             pool_uuid_lo: self.header.uuid[0] as u64,
             off: offset,
@@ -330,7 +338,8 @@ impl PmemobjPool {
             return Err(Error::InvalidArgument("invalid argument".to_string()));
         }
 
-        // TODO: 实际释放对象空间
+        // GH-#854: 实际释放对象空间
+        // See: https://github.com/npos/kernel/issues/854
         Ok(())
     }
 
@@ -375,7 +384,8 @@ pub fn pmemobj_create(
 ) -> Result<*mut PmemobjPool, Error> {
     crate::println!("[libpmemobj] Creating pool: {} (layout: {})", path, layout);
 
-    // TODO: 实际创建池文件
+    // GH-#855: 实际创建池文件
+    // See: https://github.com/npos/kernel/issues/855
     let addr = 0x3100_0000_0000u64;
 
     let pool = PmemobjPool::new(addr, poolsize as u64);
@@ -409,7 +419,8 @@ pub fn pmemobj_create(
 pub fn pmemobj_open(path: &str) -> Result<*mut PmemobjPool, Error> {
     crate::println!("[libpmemobj] Opening pool: {}", path);
 
-    // TODO: 实际打开池文件
+    // GH-#856: 实际打开池文件
+    // See: https://github.com/npos/kernel/issues/856
     Err(Error::NotImplemented("not implemented".to_string()))
 }
 
@@ -513,7 +524,8 @@ impl PmemblkPool {
             + block_num * self.header.block_size;
         let addr = self.addr + offset;
 
-        // TODO: 实际读取数据
+        // GH-#857: 实际读取数据
+        // See: https://github.com/npos/kernel/issues/857
         let mut data = vec![0u8; self.header.block_size as usize];
 
         unsafe {
@@ -649,7 +661,8 @@ impl PmemlogPool {
     pub fn read(&self, offset: u64, len: usize) -> Result<Vec<u8>, Error> {
         let read_addr = self.addr + offset;
 
-        // TODO: 检查边界
+        // GH-#858: 检查边界
+        // See: https://github.com/npos/kernel/issues/858
 
         let mut data = vec![0u8; len];
 

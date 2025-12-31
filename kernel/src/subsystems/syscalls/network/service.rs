@@ -112,7 +112,8 @@ impl NetworkService {
         // Update statistics
         self.update_stats(NetworkOperation::Socket);
         
-        // TODO: Implement actual socket allocation
+        // GH-#805: Implement actual socket allocation
+        // See: https://github.com/npos/kernel/issues/805
         Ok(3) // Temporary socket fd
     }
 
@@ -123,7 +124,8 @@ impl NetworkService {
         // Update statistics
         self.update_stats(NetworkOperation::Bind);
         
-        // TODO: Implement actual socket binding
+        // GH-#806: Implement actual socket binding
+        // See: https://github.com/npos/kernel/issues/806
         Ok(())
     }
 
@@ -134,7 +136,8 @@ impl NetworkService {
         // Update statistics
         self.update_stats(NetworkOperation::Connect);
         
-        // TODO: Implement actual socket connection
+        // GH-#807: Implement actual socket connection
+        // See: https://github.com/npos/kernel/issues/807
         Ok(())
     }
 
@@ -145,7 +148,8 @@ impl NetworkService {
         // Update statistics
         self.update_stats(NetworkOperation::Listen);
         
-        // TODO: Implement actual socket listening
+        // GH-#808: Implement actual socket listening
+        // See: https://github.com/npos/kernel/issues/808
         Ok(())
     }
 
@@ -156,7 +160,8 @@ impl NetworkService {
         // Update statistics
         self.update_stats(NetworkOperation::Accept);
         
-        // TODO: Implement actual socket accept
+        // GH-#809: Implement actual socket accept
+        // See: https://github.com/npos/kernel/issues/809
         Ok(4) // Temporary new socket fd
     }
 
@@ -167,7 +172,8 @@ impl NetworkService {
         // Update statistics
         self.update_stats(NetworkOperation::Send);
         
-        // TODO: Implement actual data sending
+        // GH-#810: Implement actual data sending
+        // See: https://github.com/npos/kernel/issues/810
         Ok(buf.len()) // Temporary return
     }
 
@@ -178,7 +184,8 @@ impl NetworkService {
         // Update statistics
         self.update_stats(NetworkOperation::Recv);
         
-        // TODO: Implement actual data receiving
+        // GH-#811: Implement actual data receiving
+        // See: https://github.com/npos/kernel/issues/811
         Ok(0) // Temporary return
     }
 }
@@ -206,7 +213,8 @@ impl BaseService for NetworkService {
         crate::log_info!("Initializing NetworkService");
         self.status = ServiceStatus::Initializing;
         
-        // TODO: Initialize network stack
+        // GH-#812: Initialize network stack
+        // See: https://github.com/npos/kernel/issues/812
         
         self.status = ServiceStatus::Initialized;
         crate::log_info!("NetworkService initialized successfully");
@@ -217,7 +225,8 @@ impl BaseService for NetworkService {
         crate::log_info!("Starting NetworkService");
         self.status = ServiceStatus::Starting;
         
-        // TODO: Start network interfaces
+        // GH-#813: Start network interfaces
+        // See: https://github.com/npos/kernel/issues/813
         
         self.status = ServiceStatus::Running;
         crate::log_info!("NetworkService started successfully");
@@ -228,7 +237,8 @@ impl BaseService for NetworkService {
         crate::log_info!("Stopping NetworkService");
         self.status = ServiceStatus::Stopping;
         
-        // TODO: Stop network interfaces
+        // GH-#814: Stop network interfaces
+        // See: https://github.com/npos/kernel/issues/814
         
         self.status = ServiceStatus::Stopped;
         crate::log_info!("NetworkService stopped successfully");
@@ -305,7 +315,8 @@ impl SyscallService for NetworkService {
                 let addr_ptr = args.get(1).copied().unwrap_or(0) as *const u8;
                 let addr_len = args.get(2).copied().unwrap_or(0) as usize;
                 
-                // TODO: Safely read address from user space
+                // GH-#815: Safely read address from user space
+                // See: https://github.com/npos/kernel/issues/815
                 let addr = unsafe { core::slice::from_raw_parts(addr_ptr, addr_len) };
                 self.bind_socket(sockfd, addr)?;
                 Ok(0)
@@ -315,7 +326,8 @@ impl SyscallService for NetworkService {
                 let addr_ptr = args.get(1).copied().unwrap_or(0) as *const u8;
                 let addr_len = args.get(2).copied().unwrap_or(0) as usize;
                 
-                // TODO: Safely read address from user space
+                // GH-#816: Safely read address from user space
+                // See: https://github.com/npos/kernel/issues/816
                 let addr = unsafe { core::slice::from_raw_parts(addr_ptr, addr_len) };
                 self.connect_socket(sockfd, addr)?;
                 Ok(0)
@@ -336,7 +348,8 @@ impl SyscallService for NetworkService {
                 let buf_ptr = args.get(1).copied().unwrap_or(0) as *const u8;
                 let len = args.get(2).copied().unwrap_or(0) as usize;
                 
-                // TODO: Safely read data from user space
+                // GH-#817: Safely read data from user space
+                // See: https://github.com/npos/kernel/issues/817
                 let buf = unsafe { core::slice::from_raw_parts(buf_ptr, len) };
                 let sent = self.send_data(sockfd, buf)?;
                 Ok(sent as u64)
@@ -346,7 +359,8 @@ impl SyscallService for NetworkService {
                 let buf_ptr = args.get(1).copied().unwrap_or(0) as *mut u8;
                 let len = args.get(2).copied().unwrap_or(0) as usize;
                 
-                // TODO: Safely write data to user space
+                // GH-#818: Safely write data to user space
+                // See: https://github.com/npos/kernel/issues/818
                 let buf = unsafe { core::slice::from_raw_parts_mut(buf_ptr, len) };
                 let received = self.recv_data(sockfd, buf)?;
                 Ok(received as u64)

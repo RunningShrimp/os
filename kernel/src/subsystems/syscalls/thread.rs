@@ -27,7 +27,8 @@ impl ThreadControl {
     /// # Returns
     /// * `Result<i32>` - Thread ID or error
     pub fn create_thread(&self, _entry: usize, _arg: usize, _flags: u32) -> Result<i32> {
-        // TODO: Implement actual thread creation
+        // GH-#780: Implement actual thread creation
+        // See: https://github.com/npos/kernel/issues/780
         // For now, just return success as a stub
         Ok(0)
     }
@@ -37,7 +38,8 @@ impl ThreadControl {
     /// # Arguments
     /// * `exit_code` - Thread exit code
     pub fn exit_thread(&self, _exit_code: i32) -> Result<()> {
-        // TODO: Implement actual thread exit
+        // GH-#781: Implement actual thread exit
+        // See: https://github.com/npos/kernel/issues/781
         // For now, just return success as a stub
         Ok(())
     }
@@ -50,7 +52,8 @@ impl ThreadControl {
     /// # Returns
     /// * `Result<i32>` - Exit code of the joined thread
     pub fn join_thread(&self, _thread_id: i32) -> Result<i32> {
-        // TODO: Implement actual thread join
+        // GH-#782: Implement actual thread join
+        // See: https://github.com/npos/kernel/issues/782
         // For now, just return success as a stub
         Ok(0)
     }
@@ -60,7 +63,8 @@ impl ThreadControl {
     /// # Returns
     /// * `i32` - Current thread ID
     pub fn get_current_thread_id(&self) -> i32 {
-        // TODO: Implement actual thread ID retrieval
+        // GH-#783: Implement actual thread ID retrieval
+        // See: https://github.com/npos/kernel/issues/783
         // For now, return a placeholder
         0
     }
@@ -70,7 +74,8 @@ impl ThreadControl {
     /// # Returns
     /// * `i32` - Current process ID
     pub fn get_current_process_id(&self) -> i32 {
-        // TODO: Implement actual process ID retrieval
+        // GH-#784: Implement actual process ID retrieval
+        // See: https://github.com/npos/kernel/issues/784
         // For now, return a placeholder
         0
     }
@@ -84,7 +89,8 @@ impl ThreadControl {
     /// # Returns
     /// * `Result<()>` - Success or error
     pub fn set_thread_priority(&self, _thread_id: i32, _priority: i32) -> Result<()> {
-        // TODO: Implement actual thread priority setting
+        // GH-#785: Implement actual thread priority setting
+        // See: https://github.com/npos/kernel/issues/785
         // For now, just return success as a stub
         Ok(())
     }
@@ -97,7 +103,8 @@ impl ThreadControl {
     /// # Returns
     /// * `Result<i32>` - Thread priority
     pub fn get_thread_priority(&self, _thread_id: i32) -> Result<i32> {
-        // TODO: Implement actual thread priority retrieval
+        // GH-#786: Implement actual thread priority retrieval
+        // See: https://github.com/npos/kernel/issues/786
         // For now, return a placeholder
         Ok(0)
     }
@@ -107,7 +114,8 @@ impl ThreadControl {
     /// # Returns
     /// * `Result<()>` - Success or error
     pub fn yield_thread(&self) -> Result<()> {
-        // TODO: Implement actual thread yielding
+        // GH-#787: Implement actual thread yielding
+        // See: https://github.com/npos/kernel/issues/787
         // For now, just return success as a stub
         Ok(())
     }
@@ -121,7 +129,8 @@ impl ThreadControl {
     /// # Returns
     /// * `Result<()>` - Success or error
     pub fn set_thread_affinity(&self, _thread_id: i32, _cpumask: u64) -> Result<()> {
-        // TODO: Implement actual thread affinity setting
+        // GH-#788: Implement actual thread affinity setting
+        // See: https://github.com/npos/kernel/issues/788
         // For now, just return success as a stub
         Ok(())
     }
@@ -134,7 +143,8 @@ impl ThreadControl {
     /// # Returns
     /// * `Result<u64>` - CPU affinity mask
     pub fn get_thread_affinity(&self, _thread_id: i32) -> Result<u64> {
-        // TODO: Implement actual thread affinity retrieval
+        // GH-#789: Implement actual thread affinity retrieval
+        // See: https://github.com/npos/kernel/issues/789
         // For now, return a placeholder
         Ok(0)
     }
@@ -148,7 +158,8 @@ impl ThreadControl {
     /// # Returns
     /// * `Result<()>` - Success or error
     pub fn set_thread_name(&self, _thread_id: i32, _name: &str) -> Result<()> {
-        // TODO: Implement actual thread name setting
+        // GH-#790: Implement actual thread name setting
+        // See: https://github.com/npos/kernel/issues/790
         // For now, just return success as a stub
         Ok(())
     }
@@ -161,7 +172,8 @@ impl ThreadControl {
     /// # Returns
     /// * `Result<String>` - Thread name
     pub fn get_thread_name(&self, _thread_id: i32) -> Result<String> {
-        // TODO: Implement actual thread name retrieval
+        // GH-#791: Implement actual thread name retrieval
+        // See: https://github.com/npos/kernel/issues/791
         // For now, return a placeholder
         Ok("".to_string())
     }
@@ -175,7 +187,8 @@ impl ThreadControl {
     /// # Returns
     /// * `Result<()>` - Success or error
     pub fn set_thread_stack_size(&self, _thread_id: i32, _stack_size: usize) -> Result<()> {
-        // TODO: Implement actual thread stack size setting
+        // GH-#792: Implement actual thread stack size setting
+        // See: https://github.com/npos/kernel/issues/792
         // For now, just return success as a stub
         Ok(())
     }
@@ -188,7 +201,8 @@ impl ThreadControl {
     /// # Returns
     /// * `Result<usize>` - Stack size in bytes
     pub fn get_thread_stack_size(&self, _thread_id: i32) -> Result<usize> {
-        // TODO: Implement actual thread stack size retrieval
+        // GH-#793: Implement actual thread stack size retrieval
+        // See: https://github.com/npos/kernel/issues/793
         // For now, return a placeholder
         Ok(0)
     }
@@ -202,7 +216,8 @@ impl ThreadControl {
     /// # Returns
     /// * `Result<()>` - Success or error
     pub fn set_thread_guard_size(&self, _thread_id: i32, _guard_size: usize) -> Result<()> {
-        // TODO: Implement actual thread guard size setting
+        // GH-#794: Implement actual thread guard size setting
+        // See: https://github.com/npos/kernel/issues/794
         // For now, just return success as a stub
         Ok(())
     }
@@ -215,7 +230,8 @@ impl ThreadControl {
     /// # Returns
     /// * `Result<usize>` - Guard size in bytes
     pub fn get_thread_guard_size(&self, _thread_id: i32) -> Result<usize> {
-        // TODO: Implement actual thread guard size retrieval
+        // GH-#795: Implement actual thread guard size retrieval
+        // See: https://github.com/npos/kernel/issues/795
         // For now, return a placeholder
         Ok(0)
     }
@@ -229,7 +245,8 @@ impl ThreadControl {
     /// # Returns
     /// * `Result<()>` - Success or error
     pub fn set_thread_scheduling_policy(&self, _thread_id: i32, _policy: i32) -> Result<()> {
-        // TODO: Implement actual thread scheduling policy setting
+        // GH-#796: Implement actual thread scheduling policy setting
+        // See: https://github.com/npos/kernel/issues/796
         // For now, just return success as a stub
         Ok(())
     }
@@ -242,7 +259,8 @@ impl ThreadControl {
     /// # Returns
     /// * `Result<i32>` - Scheduling policy
     pub fn get_thread_scheduling_policy(&self, _thread_id: i32) -> Result<i32> {
-        // TODO: Implement actual thread scheduling policy retrieval
+        // GH-#797: Implement actual thread scheduling policy retrieval
+        // See: https://github.com/npos/kernel/issues/797
         // For now, return a placeholder
         Ok(0)
     }
@@ -256,7 +274,8 @@ impl ThreadControl {
     /// # Returns
     /// * `Result<()>` - Success or error
     pub fn set_thread_scheduling_parameters(&self, _thread_id: i32, _param: SchedulingParameters) -> Result<()> {
-        // TODO: Implement actual thread scheduling parameters setting
+        // GH-#798: Implement actual thread scheduling parameters setting
+        // See: https://github.com/npos/kernel/issues/798
         // For now, just return success as a stub
         Ok(())
     }
@@ -269,7 +288,8 @@ impl ThreadControl {
     /// # Returns
     /// * `Result<SchedulingParameters>` - Scheduling parameters
     pub fn get_thread_scheduling_parameters(&self, _thread_id: i32) -> Result<SchedulingParameters> {
-        // TODO: Implement actual thread scheduling parameters retrieval
+        // GH-#799: Implement actual thread scheduling parameters retrieval
+        // See: https://github.com/npos/kernel/issues/799
         // For now, return placeholder
         Ok(SchedulingParameters::default())
     }
@@ -466,31 +486,36 @@ pub fn add_futex_waiter(waiter: FutexWaiter) {
 }
 
 pub fn futex_lock_pi(_pagetable: *mut page_table_isolation::PageTable, _key: u64, _timeout: Option<u64>) -> Result<()> {
-    // TODO: Implement actual futex lock PI
+    // GH-#800: Implement actual futex lock PI
+    // See: https://github.com/npos/kernel/issues/800
     // For now, just return success as a stub
     Ok(())
 }
 
 pub fn futex_requeue(_pagetable: *mut page_table_isolation::PageTable, _key1: u64, _key2: u64, _waiters: u32, _count: u32, _replace: bool) -> Result<()> {
-    // TODO: Implement actual futex requeue
+    // GH-#801: Implement actual futex requeue
+    // See: https://github.com/npos/kernel/issues/801
     // For now, just return success as a stub
     Ok(())
 }
 
 pub fn futex_trylock_pi(_pagetable: *mut page_table_isolation::PageTable, _key: u64) -> Result<()> {
-    // TODO: Implement actual futex trylock PI
+    // GH-#802: Implement actual futex trylock PI
+    // See: https://github.com/npos/kernel/issues/802
     // For now, just return success as a stub
     Ok(())
 }
 
 pub fn futex_unlock_pi(_pagetable: *mut page_table_isolation::PageTable, _key: u64) -> Result<()> {
-    // TODO: Implement actual futex unlock PI
+    // GH-#803: Implement actual futex unlock PI
+    // See: https://github.com/npos/kernel/issues/803
     // For now, just return success as a stub
     Ok(())
 }
 
 pub fn futex_wait_timeout(_pagetable: *mut page_table_isolation::PageTable, _key: u64, _val: u64, _timeout: Option<u64>) -> Result<()> {
-    // TODO: Implement actual futex wait with timeout
+    // GH-#804: Implement actual futex wait with timeout
+    // See: https://github.com/npos/kernel/issues/804
     // For now, just return success as a stub
     Ok(())
 }

@@ -103,7 +103,8 @@ impl CowSnapshot {
             id,
             name,
             root_tree_id,
-            creation_time: 0, // TODO: Use actual time
+            creation_time: 0, // GH-#919: Use actual time
+            // See: https://github.com/npos/kernel/issues/919
             parent_id: None,
             read_only: true,
             size: 0,
@@ -114,7 +115,8 @@ impl CowSnapshot {
 
     /// Get age of snapshot in seconds
     pub fn age(&self) -> u64 {
-        // TODO: Calculate from current time
+        // GH-#920: Calculate from current time
+        // See: https://github.com/npos/kernel/issues/920
         0
     }
 
@@ -505,7 +507,8 @@ impl CowFilesystem {
     pub fn rollback_snapshot(&self, name: &str) -> FsResult<()> {
         let snapshot = self.get_snapshot(name)?;
 
-        // TODO: Implement rollback
+        // GH-#921: Implement rollback
+        // See: https://github.com/npos/kernel/issues/921
         // 1. Validate snapshot is read-only
         // 2. Update root tree pointer
         // 3. Update extent tree pointer
@@ -568,7 +571,8 @@ impl CowFilesystem {
             clones.insert(dest_id, clone_info);
         }
 
-        // TODO: Implement recursive subvolume cloning
+        // GH-#922: Implement recursive subvolume cloning
+        // See: https://github.com/npos/kernel/issues/922
         // 1. Clone all files in subvolume
         // 2. Share data blocks
         // 3. Clone subdirectories if recursive
@@ -602,7 +606,8 @@ impl CowFilesystem {
     fn share_blocks(&self, source_id: u64, dest_id: u64) -> FsResult<()> {
         let extent_tree = self.extent_tree.read();
 
-        // TODO: Find all extents for source_id and increment refcounts
+        // GH-#923: Find all extents for source_id and increment refcounts
+        // See: https://github.com/npos/kernel/issues/923
         let _ = (source_id, dest_id, extent_tree);
 
         self.stats.shared_blocks.fetch_add(1, Ordering::SeqCst);
@@ -620,7 +625,8 @@ impl CowFilesystem {
         }
 
         // Write data
-        // TODO: Allocate new blocks and update extent tree
+        // GH-#924: Allocate new blocks and update extent tree
+        // See: https://github.com/npos/kernel/issues/924
 
         self.stats.total_objects.fetch_add(1, Ordering::SeqCst);
         Ok(data.len())
@@ -630,7 +636,8 @@ impl CowFilesystem {
     pub fn read(&self, object_id: u64, offset: u64, buf: &mut [u8]) -> FsResult<usize> {
         let extent_tree = self.extent_tree.read();
 
-        // TODO: Lookup extent and read data
+        // GH-#925: Lookup extent and read data
+        // See: https://github.com/npos/kernel/issues/925
         let _ = (object_id, offset, buf, extent_tree);
 
         Ok(0)
@@ -640,7 +647,8 @@ impl CowFilesystem {
     fn check_blocks_shared(&self, object_id: u64, offset: u64, length: u64) -> FsResult<bool> {
         let refcounts = self.refcounts.lock();
 
-        // TODO: Find blocks for range and check refcounts
+        // GH-#926: Find blocks for range and check refcounts
+        // See: https://github.com/npos/kernel/issues/926
         let _ = (object_id, offset, length, refcounts);
 
         Ok(false)
@@ -648,7 +656,8 @@ impl CowFilesystem {
 
     /// Perform copy-on-write for blocks
     fn cow_blocks(&self, object_id: u64, offset: u64, length: u64) -> FsResult<()> {
-        // TODO: Copy shared blocks to new locations
+        // GH-#927: Copy shared blocks to new locations
+        // See: https://github.com/npos/kernel/issues/927
         let _ = (object_id, offset, length);
         Ok(())
     }

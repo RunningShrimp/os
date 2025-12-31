@@ -228,7 +228,8 @@ impl SignalService {
         // 更新统计
         self.update_stats(SignalOperation::SigPending);
 
-        // TODO: 实现获取挂起信号的逻辑
+        // GH-#881: 实现获取挂起信号的逻辑
+        // See: https://github.com/npos/kernel/issues/881
         Ok(SignalSet::empty())
     }
 
@@ -268,7 +269,8 @@ impl BaseService for SignalService {
         crate::log_info!("Initializing SignalService");
         self.status = ServiceStatus::Initializing;
 
-        // TODO: 初始化信号处理子系统
+        // GH-#882: 初始化信号处理子系统
+        // See: https://github.com/npos/kernel/issues/882
 
         self.status = ServiceStatus::Initialized;
         crate::log_info!("SignalService initialized successfully");
@@ -279,7 +281,8 @@ impl BaseService for SignalService {
         crate::log_info!("Starting SignalService");
         self.status = ServiceStatus::Starting;
 
-        // TODO: 启动信号处理子系统
+        // GH-#883: 启动信号处理子系统
+        // See: https://github.com/npos/kernel/issues/883
 
         self.status = ServiceStatus::Running;
         crate::log_info!("SignalService started successfully");
@@ -290,7 +293,8 @@ impl BaseService for SignalService {
         crate::log_info!("Stopping SignalService");
         self.status = ServiceStatus::Stopping;
 
-        // TODO: 停止信号处理子系统
+        // GH-#884: 停止信号处理子系统
+        // See: https://github.com/npos/kernel/issues/884
 
         self.status = ServiceStatus::Stopped;
         crate::log_info!("SignalService stopped successfully");
@@ -361,11 +365,13 @@ impl SyscallService for SignalService {
                 let action_ptr = args.get(2).copied().unwrap_or(0) as *const SignalAction;
                 let old_action_ptr = args.get(3).copied().unwrap_or(0) as *mut SignalAction;
 
-                // TODO: 安全地从用户空间读取信号处理程序
+                // GH-#885: 安全地从用户空间读取信号处理程序
+                // See: https://github.com/npos/kernel/issues/885
                 let action = unsafe { action_ptr.read() };
                 let old_action = self.set_sigaction(pid, sig, action)?;
 
-                // TODO: 安全地向用户空间写入旧的信号处理程序
+                // GH-#886: 安全地向用户空间写入旧的信号处理程序
+                // See: https://github.com/npos/kernel/issues/886
                 if !old_action_ptr.is_null() {
                     unsafe { old_action_ptr.write(old_action.unwrap_or(SignalAction::Default)) };
                 }
@@ -379,7 +385,8 @@ impl SyscallService for SignalService {
                 let new_mask_ptr = args.get(2).copied().unwrap_or(0) as *const SignalSet;
                 let old_mask_ptr = args.get(3).copied().unwrap_or(0) as *mut SignalSet;
 
-                // TODO: 安全地从用户空间读取信号集
+                // GH-#887: 安全地从用户空间读取信号集
+                // See: https://github.com/npos/kernel/issues/887
                 let new_mask = unsafe {
                     if new_mask_ptr.is_null() {
                         SignalSet::empty()
@@ -391,7 +398,8 @@ impl SyscallService for SignalService {
 
                 self.set_process_sigmask(pid, how, new_mask, Some(&mut old_mask))?;
 
-                // TODO: 安全地向用户空间写入旧的信号集
+                // GH-#888: 安全地向用户空间写入旧的信号集
+                // See: https://github.com/npos/kernel/issues/888
                 if !old_mask_ptr.is_null() {
                     unsafe { old_mask_ptr.write(old_mask) };
                 }
@@ -405,7 +413,8 @@ impl SyscallService for SignalService {
 
                 let pending = self.get_pending_signals(pid)?;
 
-                // TODO: 安全地向用户空间写入挂起的信号集
+                // GH-#889: 安全地向用户空间写入挂起的信号集
+                // See: https://github.com/npos/kernel/issues/889
                 if !set_ptr.is_null() {
                     unsafe { set_ptr.write(pending) };
                 }
@@ -442,7 +451,8 @@ impl SyscallService for SignalService {
             },
             0x2005 => {
                 // sigreturn
-                // TODO: 实现信号返回处理
+                // GH-#890: 实现信号返回处理
+                // See: https://github.com/npos/kernel/issues/890
                 crate::log_warn!("sigreturn syscall not implemented yet");
                 Err(KernelError::SyscallError(SyscallError::InvalidSyscall))
             },

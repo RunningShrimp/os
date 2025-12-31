@@ -252,13 +252,15 @@ pub fn mlock(addr: *mut u8, len: usize) -> Result<(), RtExtensionError> {
     }
 
     // Align to page boundaries
-    let page_size = 4096; // TODO: Get actual page size
+    let page_size = 4096; // GH-#910: Get actual page size
+    // See: https://github.com/npos/kernel/issues/910
     let start = addr as usize & !(page_size - 1);
     let end = ((addr as usize + len + page_size - 1) & !(page_size - 1));
     let pages = (end - start) / page_size;
 
     // Get current process ID
-    let pid = 0; // TODO: Get actual PID
+    let pid = 0; // GH-#911: Get actual PID
+    // See: https://github.com/npos/kernel/issues/911
 
     // Check against RLIMIT_MEMLOCK
     if !check_memlock_limit(pid, pages) {
@@ -332,7 +334,8 @@ pub fn mlockall(flags: MlockFlags) -> Result<(), RtExtensionError> {
 
     // If MCL_CURRENT, lock all current pages
     if flags.current {
-        // TODO: Lock all current memory mappings
+        // GH-#912: Lock all current memory mappings
+        // See: https://github.com/npos/kernel/issues/912
     }
 
     Ok(())
@@ -379,20 +382,23 @@ pub fn munlockall() -> Result<(), RtExtensionError> {
 /// - `InvalidCpu`: CPU mask contains invalid CPUs
 pub fn sched_setaffinity(pid: Pid, mask: CpuMask) -> Result<(), RtExtensionError> {
     // Validate CPU mask
-    let num_cpus = 256; // TODO: Get actual CPU count
+    let num_cpus = 256; // GH-#913: Get actual CPU count
+    // See: https://github.com/npos/kernel/issues/913
     if mask >= (1u64 << num_cpus) {
         return Err(RtExtensionError::InvalidCpu);
     }
 
     // Get actual PID if 0
-    let actual_pid = if pid == 0 { 0 } else { pid }; // TODO: Get current PID
+    let actual_pid = if pid == 0 { 0 } else { pid }; // GH-#914: Get current PID
+    // See: https://github.com/npos/kernel/issues/914
 
     // Update affinity
     let mut affinity = CPU_AFFINITY.lock();
     affinity.insert(actual_pid, mask);
 
     // Apply to scheduler
-    // TODO: Integrate with scheduler to set CPU affinity
+    // GH-#915: Integrate with scheduler to set CPU affinity
+    // See: https://github.com/npos/kernel/issues/915
 
     Ok(())
 }
@@ -419,7 +425,8 @@ fn check_memlock_limit(pid: Pid, additional_pages: usize) -> bool {
     let state = MEMLOCK_STATE.lock();
     let current = state.get(&pid).map_or(0, |s| s.total_pages());
 
-    // TODO: Get actual RLIMIT_MEMLOCK
+    // GH-#916: Get actual RLIMIT_MEMLOCK
+    // See: https://github.com/npos/kernel/issues/916
     let limit = usize::MAX; // Unlimited for now
 
     current.saturating_add(additional_pages) <= limit
@@ -427,7 +434,8 @@ fn check_memlock_limit(pid: Pid, additional_pages: usize) -> bool {
 
 /// Lock pages (platform-specific)
 fn lock_pages(start: usize, len: usize) -> Result<(), RtExtensionError> {
-    // TODO: Implement actual page locking
+    // GH-#917: Implement actual page locking
+    // See: https://github.com/npos/kernel/issues/917
     // This involves:
     // 1. Walking page tables
     // 2. Marking pages as present and locked
@@ -438,7 +446,8 @@ fn lock_pages(start: usize, len: usize) -> Result<(), RtExtensionError> {
 
 /// Unlock pages (platform-specific)
 fn unlock_pages(start: usize, len: usize) -> Result<(), RtExtensionError> {
-    // TODO: Implement actual page unlocking
+    // GH-#918: Implement actual page unlocking
+    // See: https://github.com/npos/kernel/issues/918
     crate::log_debug!("Unlocking pages {:x}-{:x}", start, start + len);
     Ok(())
 }

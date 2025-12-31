@@ -181,7 +181,8 @@ impl VfioIoctl {
             None => return Err(VfioError::InvalidArgument),
         };
 
-        // TODO: Set IOMMU type for container
+        // GH-#819: Set IOMMU type for container
+        // See: https://github.com/npos/kernel/issues/819
         // This needs container context
 
         Ok(0)
@@ -197,7 +198,8 @@ impl VfioIoctl {
         let status = group.get_status();
 
         // Write status to userspace
-        // TODO: Implement proper copy_to_user
+        // GH-#820: Implement proper copy_to_user
+        // See: https://github.com/npos/kernel/issues/820
         let flags = match status {
             GroupStatus::Viable => VFIO_GROUP_FLAGS_VIABLE,
             GroupStatus::NotViable => 0,
@@ -243,38 +245,45 @@ impl VfioIoctl {
 
     /// Get device file descriptor
     fn group_get_device_fd(&self, _group_id: u32, _arg: u64) -> VfioResult<i32> {
-        // TODO: Get device name from arg
-        // TODO: Create device fd
+        // GH-#821: Get device name from arg
+        // See: https://github.com/npos/kernel/issues/821
+        // GH-#822: Create device fd
+        // See: https://github.com/npos/kernel/issues/822
         Ok(0)
     }
 
     /// Get device info
     fn device_get_info(&self, _device_id: u64, _arg: u64) -> VfioResult<i32> {
-        // TODO: Write device info to userspace
+        // GH-#823: Write device info to userspace
+        // See: https://github.com/npos/kernel/issues/823
         Ok(0)
     }
 
     /// Get region info
     fn device_get_region_info(&self, _device_id: u64, _arg: u64) -> VfioResult<i32> {
-        // TODO: Write region info to userspace
+        // GH-#824: Write region info to userspace
+        // See: https://github.com/npos/kernel/issues/824
         Ok(0)
     }
 
     /// Get IRQ info
     fn device_get_irq_info(&self, _device_id: u64, _arg: u64) -> VfioResult<i32> {
-        // TODO: Write IRQ info to userspace
+        // GH-#825: Write IRQ info to userspace
+        // See: https://github.com/npos/kernel/issues/825
         Ok(0)
     }
 
     /// Set IRQs
     fn device_set_irqs(&self, _device_id: u64, _arg: u64) -> VfioResult<i32> {
-        // TODO: Configure interrupts
+        // GH-#826: Configure interrupts
+        // See: https://github.com/npos/kernel/issues/826
         Ok(0)
     }
 
     /// Reset device
     fn device_reset(&self, _device_id: u64) -> VfioResult<i32> {
-        // TODO: Reset device
+        // GH-#827: Reset device
+        // See: https://github.com/npos/kernel/issues/827
         Ok(0)
     }
 }
@@ -293,13 +302,15 @@ impl VfioFileOps {
 
     /// Open VFIO file
     pub fn open(&self, path: &str) -> VfioResult<i32> {
-        // TODO: Implement file opening
+        // GH-#828: Implement file opening
+        // See: https://github.com/npos/kernel/issues/828
         Ok(0)
     }
 
     /// Close VFIO file
     pub fn close(&self, fd: i32) -> VfioResult<()> {
-        // TODO: Implement file closing
+        // GH-#829: Implement file closing
+        // See: https://github.com/npos/kernel/issues/829
         Ok(())
     }
 
@@ -312,19 +323,22 @@ impl VfioFileOps {
         prot: u32,
         flags: u32,
     ) -> VfioResult<u64> {
-        // TODO: Implement mmap
+        // GH-#830: Implement mmap
+        // See: https://github.com/npos/kernel/issues/830
         Ok(0)
     }
 
     /// Read from device
     pub fn read(&self, fd: i32, buf: &mut [u8], offset: u64) -> VfioResult<usize> {
-        // TODO: Implement read
+        // GH-#831: Implement read
+        // See: https://github.com/npos/kernel/issues/831
         Ok(0)
     }
 
     /// Write to device
     pub fn write(&self, fd: i32, buf: &[u8], offset: u64) -> VfioResult<usize> {
-        // TODO: Implement write
+        // GH-#832: Implement write
+        // See: https://github.com/npos/kernel/issues/832
         Ok(0)
     }
 }

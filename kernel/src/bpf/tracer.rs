@@ -234,7 +234,8 @@ impl TraceEvent {
 
     /// Get current timestamp in nanoseconds
     fn get_timestamp() -> u64 {
-        // TODO: Integrate with proper time source
+        // GH-#870: Integrate with proper time source
+        // See: https://github.com/npos/kernel/issues/870
         // For now, use a simple counter
         static COUNTER: AtomicU64 = AtomicU64::new(0);
         COUNTER.fetch_add(1, Ordering::Relaxed)
@@ -502,7 +503,8 @@ impl BpfTracer {
     /// A new tracer instance or an error if initialization fails
     pub fn new(config: TracerConfig) -> TracerResult<Self> {
         // Detect number of CPUs (for now, assume a reasonable default)
-        let num_cpus = 4; // TODO: Query actual CPU count
+        let num_cpus = 4; // GH-#871: Query actual CPU count
+        // See: https://github.com/npos/kernel/issues/871
 
         // Create per-CPU buffers
         let mut per_cpu_buffers = Vec::with_capacity(num_cpus);
@@ -582,7 +584,8 @@ impl BpfTracer {
 
         kprobes.insert(key, registration);
 
-        // TODO: Actual kernel kprobe registration would go here
+        // GH-#872: Actual kernel kprobe registration would go here
+        // See: https://github.com/npos/kernel/issues/872
         // This would involve:
         // 1. Looking up the kernel function address
         // 2. Using architecture-specific breakpoint/interrupt injection
@@ -612,7 +615,8 @@ impl BpfTracer {
 
         kprobes.remove(&key);
 
-        // TODO: Actual kernel kprobe unregistration
+        // GH-#873: Actual kernel kprobe unregistration
+        // See: https://github.com/npos/kernel/issues/873
 
         log_info("Unregistered kprobe: {}", key);
         Ok(())
@@ -720,7 +724,8 @@ impl BpfTracer {
 
         tracepoints.insert(key, registration);
 
-        // TODO: Actual kernel tracepoint registration
+        // GH-#874: Actual kernel tracepoint registration
+        // See: https://github.com/npos/kernel/issues/874
 
         log_info("Registered tracepoint: {}:{}", subsystem, name);
         Ok(())
@@ -742,7 +747,8 @@ impl BpfTracer {
 
         tracepoints.remove(&key);
 
-        // TODO: Actual kernel tracepoint unregistration
+        // GH-#875: Actual kernel tracepoint unregistration
+        // See: https://github.com/npos/kernel/issues/875
 
         log_info("Unregistered tracepoint: {}", key);
         Ok(())
@@ -798,7 +804,8 @@ impl BpfTracer {
     /// This is a simplified implementation. Real tracepoint parsing would
     /// need to handle the specific format of each tracepoint.
     pub fn parse_tracepoint_args(&self, _data: &[u8]) -> TracerResult<BTreeMap<String, Vec<u8>>> {
-        // TODO: Implement tracepoint-specific argument parsing
+        // GH-#876: Implement tracepoint-specific argument parsing
+        // See: https://github.com/npos/kernel/issues/876
         // This would require:
         // 1. Tracepoint format descriptor (from /sys/kernel/debug/tracing/events/)
         // 2. Argument offset information
@@ -860,7 +867,8 @@ impl BpfTracer {
 
         uprobes.insert(key, registration);
 
-        // TODO: Actual uprobe registration would involve:
+        // GH-#877: Actual uprobe registration would involve:
+        // See: https://github.com/npos/kernel/issues/877
         // 1. Looking up the symbol in the binary
         // 2. Using ptrace or perf to insert breakpoint
         // 3. Handling the breakpoint in the kernel
@@ -885,7 +893,8 @@ impl BpfTracer {
 
         uprobes.remove(&key);
 
-        // TODO: Actual uprobe unregistration
+        // GH-#878: Actual uprobe unregistration
+        // See: https://github.com/npos/kernel/issues/878
 
         log_info("Unregistered uprobe: {}", key);
         Ok(())
@@ -1111,7 +1120,8 @@ impl BpfTracer {
     /// This is a rough estimate based on event rate and processing time.
     /// A proper implementation would measure actual CPU time consumed.
     pub fn estimate_overhead_percent(&self) -> u8 {
-        // TODO: Implement proper overhead measurement
+        // GH-#879: Implement proper overhead measurement
+        // See: https://github.com/npos/kernel/issues/879
         // For now, return a conservative estimate
         let event_rate = self.total_events.load(Ordering::Relaxed);
         if event_rate < 1000 {
@@ -1160,7 +1170,8 @@ pub struct ProbeStats {
 
 /// Stub function for logging (will be replaced with proper logging)
 fn log_info(fmt: &'static str, args: ...) {
-    // TODO: Integrate with proper logging system
+    // GH-#880: Integrate with proper logging system
+    // See: https://github.com/npos/kernel/issues/880
     let _ = fmt;
     let _ = args;
 }

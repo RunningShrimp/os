@@ -395,7 +395,8 @@ impl VirtualMachine {
         exit_info: &VmExitInfo,
     ) -> Result<(), HypervisorError> {
         // Parse I/O instruction from qualification
-        // TODO: Implement I/O emulation
+        // GH-#859: Implement I/O emulation
+        // See: https://github.com/npos/kernel/issues/859
         log::debug!("I/O exit on vCPU {}", vcpu_id);
         Ok(())
     }
@@ -411,7 +412,8 @@ impl VirtualMachine {
             exit_info.guest_physical_address
         );
 
-        // TODO: Handle EPT violations (e.g., map memory on demand)
+        // GH-#860: Handle EPT violations (e.g., map memory on demand)
+        // See: https://github.com/npos/kernel/issues/860
         Ok(())
     }
 
@@ -420,14 +422,16 @@ impl VirtualMachine {
         vcpu_id: usize,
         exit_info: &VmExitInfo,
     ) -> Result<(), HypervisorError> {
-        // TODO: Emulate CPUID
+        // GH-#861: Emulate CPUID
+        // See: https://github.com/npos/kernel/issues/861
         log::debug!("CPUID on vCPU {}", vcpu_id);
         Ok(())
     }
 
     fn handle_hlt(&mut self, vcpu_id: usize) -> Result<(), HypervisorError> {
         // HLT usually means the CPU is idle
-        // TODO: Implement idle handling
+        // GH-#862: Implement idle handling
+        // See: https://github.com/npos/kernel/issues/862
         log::debug!("HLT on vCPU {}", vcpu_id);
         Ok(())
     }
@@ -437,7 +441,8 @@ impl VirtualMachine {
         vcpu_id: usize,
         exit_info: &VmExitInfo,
     ) -> Result<(), HypervisorError> {
-        // TODO: Handle CR access
+        // GH-#863: Handle CR access
+        // See: https://github.com/npos/kernel/issues/863
         log::debug!("CR access on vCPU {}", vcpu_id);
         Ok(())
     }
@@ -448,13 +453,15 @@ impl VirtualMachine {
         exit_info: &VmExitInfo,
     ) -> Result<(), HypervisorError> {
         // VMCALL is a hypercall interface
-        // TODO: Implement hypercall handling
+        // GH-#864: Implement hypercall handling
+        // See: https://github.com/npos/kernel/issues/864
         log::debug!("VMCALL on vCPU {}", vcpu_id);
         Ok(())
     }
 
     fn allocate_guest_memory(size: u64) -> Result<u64, VirtMemError> {
-        // TODO: Allocate from physical memory manager
+        // GH-#865: Allocate from physical memory manager
+        // See: https://github.com/npos/kernel/issues/865
         static NEXT_GUEST_MEM: AtomicU64 = AtomicU64::new(0x40000000);
         Ok(NEXT_GUEST_MEM.fetch_add(size, Ordering::SeqCst))
     }
@@ -467,7 +474,8 @@ impl Drop for VirtualMachine {
         // Clean up vCPUs
         self.vcpus.clear();
 
-        // TODO: Free guest memory
+        // GH-#866: Free guest memory
+        // See: https://github.com/npos/kernel/issues/866
     }
 }
 
@@ -535,7 +543,8 @@ impl VirtualCpu {
         self.state = VcpuState::Running;
         self.enabled = true;
 
-        // TODO: Execute VM entry
+        // GH-#867: Execute VM entry
+        // See: https://github.com/npos/kernel/issues/867
         // This requires assembly code to execute VMLAUNCH/VMRESUME
 
         Ok(())
@@ -573,7 +582,8 @@ impl VirtualCpu {
 
     fn allocate_vmcs() -> Result<u64, VirtMemError> {
         // VMCS must be 4KB aligned
-        // TODO: Allocate from physical memory manager
+        // GH-#868: Allocate from physical memory manager
+        // See: https://github.com/npos/kernel/issues/868
         static NEXT_VMCS: AtomicU64 = AtomicU64::new(0x20000000);
         let addr = NEXT_VMCS.fetch_add(0x1000, Ordering::SeqCst);
         assert!(addr & 0xFFF == 0, "VMCS must be 4KB aligned");
@@ -605,7 +615,8 @@ impl Hypervisor {
     ///
     /// This must be called before creating any VMs
     pub fn init(&mut self) -> Result<(), HypervisorError> {
-        // TODO: Enable hardware virtualization (VMX or SVM)
+        // GH-#869: Enable hardware virtualization (VMX or SVM)
+        // See: https://github.com/npos/kernel/issues/869
         // This involves:
         // - Enabling VMX in CR4
         // - Executing VMXON

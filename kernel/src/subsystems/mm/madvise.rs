@@ -178,7 +178,8 @@ pub fn sys_madvise(addr: usize, length: usize, advice: i32) -> Result<(), Unifie
     drop(proc_table);
 
     // 验证内存区域是否已映射
-    // TODO: 遍历页表检查每个页面是否已映射
+    // GH-#833: 遍历页表检查每个页面是否已映射
+    // See: https://github.com/npos/kernel/issues/833
     // 简化实现：暂时跳过检查
 
     // 根据建议类型执行操作
@@ -189,63 +190,75 @@ pub fn sys_madvise(addr: usize, length: usize, advice: i32) -> Result<(), Unifie
         MadviceAdvice::Random => {
             // 标记为随机访问模式
             // 效果：减少或禁用预读
-            // TODO: 在 VMA 中标记访问模式
+            // GH-#834: 在 VMA 中标记访问模式
+            // See: https://github.com/npos/kernel/issues/834
         },
         MadviceAdvice::Sequential => {
             // 标记为顺序访问模式
             // 效果：积极预读
-            // TODO: 在 VMA 中标记访问模式
+            // GH-#835: 在 VMA 中标记访问模式
+            // See: https://github.com/npos/kernel/issues/835
         },
         MadviceAdvice::WillNeed => {
             // 预读建议
             // 效果：立即读取页面到内存
-            // TODO: 触发预读操作
+            // GH-#836: 触发预读操作
+            // See: https://github.com/npos/kernel/issues/836
         },
         MadviceAdvice::DontNeed => {
             // 不需要建议
             // 效果：释放页面内容，但保留映射
             // 下次访问时会重新填充（zero fill 或 file read）
-            // TODO: 实现页面内容释放
+            // GH-#837: 实现页面内容释放
+            // See: https://github.com/npos/kernel/issues/837
         },
         MadviceAdvice::Remove => {
             // 移除建议
             // 效果：释放并取消映射（仅私有映射）
-            // TODO: 取消映射并释放物理页面
+            // GH-#838: 取消映射并释放物理页面
+            // See: https://github.com/npos/kernel/issues/838
         },
         MadviceAdvice::HugePage => {
             // 使用大页建议
             // 效果：尝试使用透明大页（THP）
-            // TODO: 在 VMA 中标记为 THP 候选
+            // GH-#839: 在 VMA 中标记为 THP 候选
+            // See: https://github.com/npos/kernel/issues/839
         },
         MadviceAdvice::NoHugePage => {
             // 不使用大页建议
             // 效果：避免使用透明大页
-            // TODO: 在 VMA 中标记为禁用 THP
+            // GH-#840: 在 VMA 中标记为禁用 THP
+            // See: https://github.com/npos/kernel/issues/840
         },
         MadviceAdvice::DontFork => {
             // 不继承到 fork
             // 效果：fork 时不复制这些页面
-            // TODO: 在 VMA 中标记为 VM_DONTFORK
+            // GH-#841: 在 VMA 中标记为 VM_DONTFORK
+            // See: https://github.com/npos/kernel/issues/841
         },
         MadviceAdvice::DoFork => {
             // 继承到 fork
             // 效果：取消 VM_DONTFORK 标记
-            // TODO: 清除 VMA 中的 VM_DONTFORK 标记
+            // GH-#842: 清除 VMA 中的 VM_DONTFORK 标记
+            // See: https://github.com/npos/kernel/issues/842
         },
         MadviceAdvice::Mergeable => {
             // 可合并建议（KSM）
             // 效果：允许内核合并相同的页面
-            // TODO: 在 VMA 中标记为 VM_MERGEABLE
+            // GH-#843: 在 VMA 中标记为 VM_MERGEABLE
+            // See: https://github.com/npos/kernel/issues/843
         },
         MadviceAdvice::Unmergeable => {
             // 不可合并建议
             // 效果：禁止内核合并这些页面
-            // TODO: 清除 VMA 中的 VM_MERGEABLE 标记
+            // GH-#844: 清除 VMA 中的 VM_MERGEABLE 标记
+            // See: https://github.com/npos/kernel/issues/844
         },
         MadviceAdvice::SoftwareTombstone => {
             // 软件墓碑标记
             // 效果：只保留错误页面，用于用户空间错误处理
-            // TODO: 实现特殊错误处理
+            // GH-#845: 实现特殊错误处理
+            // See: https://github.com/npos/kernel/issues/845
         },
     }
 

@@ -240,13 +240,15 @@ impl PciConfigSpace {
 
     /// Read config space register
     pub fn read(&self, offset: u16, size: u8) -> u32 {
-        // TODO: Implement proper config space read
+        // GH-#928: Implement proper config space read
+        // See: https://github.com/npos/kernel/issues/928
         0
     }
 
     /// Write config space register
     pub fn write(&mut self, offset: u16, value: u32, size: u8) {
-        // TODO: Implement proper config space write
+        // GH-#929: Implement proper config space write
+        // See: https://github.com/npos/kernel/issues/929
     }
 }
 
@@ -326,14 +328,16 @@ impl PciDevice {
 
     /// Enable device
     pub fn enable(&self) -> VfioResult<()> {
-        // TODO: Enable PCI device (bus master, etc.)
+        // GH-#930: Enable PCI device (bus master, etc.)
+        // See: https://github.com/npos/kernel/issues/930
         self.enabled.store(1, Ordering::Relaxed);
         Ok(())
     }
 
     /// Disable device
     pub fn disable(&self) -> VfioResult<()> {
-        // TODO: Disable PCI device
+        // GH-#931: Disable PCI device
+        // See: https://github.com/npos/kernel/issues/931
         self.enabled.store(0, Ordering::Relaxed);
         Ok(())
     }
@@ -367,18 +371,21 @@ impl PciDevice {
 
     /// Read config space
     pub fn read_config(&self, offset: u16, size: u8) -> u32 {
-        // TODO: Implement config space read
+        // GH-#932: Implement config space read
+        // See: https://github.com/npos/kernel/issues/932
         0
     }
 
     /// Write config space
     pub fn write_config(&mut self, offset: u16, value: u32, size: u8) {
-        // TODO: Implement config space write
+        // GH-#933: Implement config space write
+        // See: https://github.com/npos/kernel/issues/933
     }
 
     /// Reset device
     pub fn reset(&self) -> VfioResult<()> {
-        // TODO: Send function level reset
+        // GH-#934: Send function level reset
+        // See: https://github.com/npos/kernel/issues/934
         Ok(())
     }
 }
@@ -430,14 +437,16 @@ impl SrioVf {
 
     /// Enable VF
     pub fn enable(&mut self) -> VfioResult<()> {
-        // TODO: Enable VF
+        // GH-#935: Enable VF
+        // See: https://github.com/npos/kernel/issues/935
         self.enabled = true;
         Ok(())
     }
 
     /// Disable VF
     pub fn disable(&mut self) -> VfioResult<()> {
-        // TODO: Disable VF
+        // GH-#936: Disable VF
+        // See: https://github.com/npos/kernel/issues/936
         self.enabled = false;
         Ok(())
     }

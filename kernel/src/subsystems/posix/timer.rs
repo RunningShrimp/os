@@ -257,7 +257,8 @@ pub unsafe extern "C" fn timer_create(
     // Get current process
     let current_pid = crate::subsystems::process::manager::getpid() as i32;
     let current_tid = if clock_id == crate::posix::CLOCK_THREAD_CPUTIME_ID {
-        // TODO: Get current thread ID
+        // GH-#901: Get current thread ID
+        // See: https://github.com/npos/kernel/issues/901
         None
     } else {
         None
@@ -360,7 +361,8 @@ pub unsafe extern "C" fn timer_settime(
         new_spec.it_value
     } else {
         // Convert relative time to absolute time
-        // TODO: Add current time to relative time
+        // GH-#902: Add current time to relative time
+        // See: https://github.com/npos/kernel/issues/902
         new_spec.it_value
     };
 
@@ -447,19 +449,23 @@ pub unsafe extern "C" fn clock_gettime(clock_id: ClockId, tp: *mut Timespec) -> 
 
     let current_time = match clock_id {
         crate::posix::CLOCK_REALTIME => {
-            // TODO: Get real-time clock
+            // GH-#903: Get real-time clock
+            // See: https://github.com/npos/kernel/issues/903
             Timespec::new(0, 0)
         },
         crate::posix::CLOCK_MONOTONIC => {
-            // TODO: Get monotonic clock
+            // GH-#904: Get monotonic clock
+            // See: https://github.com/npos/kernel/issues/904
             Timespec::new(0, 0)
         },
         crate::posix::CLOCK_PROCESS_CPUTIME_ID => {
-            // TODO: Get process CPU time
+            // GH-#905: Get process CPU time
+            // See: https://github.com/npos/kernel/issues/905
             Timespec::new(0, 0)
         },
         crate::posix::CLOCK_THREAD_CPUTIME_ID => {
-            // TODO: Get thread CPU time
+            // GH-#906: Get thread CPU time
+            // See: https://github.com/npos/kernel/issues/906
             Timespec::new(0, 0)
         },
         _ => return EINVAL,
@@ -486,7 +492,8 @@ pub unsafe extern "C" fn clock_settime(clock_id: ClockId, tp: *const Timespec) -
         return EPERM; // Only real-time clock can be set
     }
 
-    // TODO: Implement setting real-time clock
+    // GH-#907: Implement setting real-time clock
+    // See: https://github.com/npos/kernel/issues/907
     EPERM
 }
 
@@ -546,7 +553,8 @@ pub unsafe extern "C" fn clock_nanosleep(
         return EINVAL;
     }
 
-    // TODO: Implement actual sleep logic
+    // GH-#908: Implement actual sleep logic
+    // See: https://github.com/npos/kernel/issues/908
     // This would involve checking the clock and sleeping until the specified time
 
     if (flags & crate::posix::TIMER_ABSTIME) != 0 {
@@ -566,7 +574,8 @@ pub fn process_timers() {
     let registry = TIMER_REGISTRY.lock();
 
     // Get current time for all clocks
-    let current_time = Timespec::new(0, 0); // TODO: Get actual current time
+    let current_time = Timespec::new(0, 0); // GH-#909: Get actual current time
+    // See: https://github.com/npos/kernel/issues/909
 
     // Check all timers
     for timer in registry.values() {
