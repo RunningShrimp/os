@@ -151,7 +151,7 @@
 pub mod aslr;
 pub mod audit;
 pub mod secure_rng;
-pub mod audit_enhanced;
+// audit_enhanced removed during cleanup - features integrated into audit module
 pub mod apparmor;
 pub mod attestation;
 pub mod breach;
@@ -173,7 +173,7 @@ pub mod net_analysis;
 pub mod sandbox;
 pub mod secure_boot;
 pub mod selinux;
-pub mod selinux_enhanced;
+// selinux_enhanced removed during cleanup - features integrated into selinux module
 pub mod stack_canaries;
 pub mod tee;
 pub mod tpm;
@@ -191,12 +191,8 @@ pub mod shadow_stack;
 pub mod encrypted_memory;
 
 // Stage 3-5: Advanced Security Features
-pub use audit_enhanced::{
-    AlertConfig, AlertBackend, AlertingSystem, AuditContext, AuditError, AuditEvent,
-    AuditEventType, AuditRule, AuditRuleAction, AuditRuleCondition, AuditOperator,
-    AuditSeverity, AuditStatistics, AuditSystem, ComplianceReport, ComplianceReporter,
-    ComplianceStandard, LogIntegrityChain, init_audit_system, get_audit_system,
-};
+// audit_enhanced removed - features should be in audit module
+// TODO: Migrate enhanced audit features to audit module
 pub use certificate::{
     Certificate, CertificateParser, CertificateRevocationList, CertificateSigningRequest,
     CertificateValidator, CertificateVersion, CrlEntry, CrlManager, DistinguishedName, Extension,

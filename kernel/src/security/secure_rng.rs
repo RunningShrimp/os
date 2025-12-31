@@ -325,14 +325,18 @@ impl SecureRng {
     #[cfg(target_arch = "aarch64")]
     fn rndr_u64() -> Option<u64> {
         unsafe {
-            let mut value: u64;
-            let mut success: u8;
+            let value: u64;
+            let success: i32;
 
+            // ARM64 RNDR instruction: sets value and sets flags
+            // On success, value is valid and Z flag is 0
+            // On failure, value is 0 and Z flag is 1
             core::arch::asm!(
                 "mrs {0:x}, rndr",
+                "cset {1:w}, ne",  // success = 1 if Z==0 (no error), 0 if Z==1 (error)
                 out(reg) value,
-                setne(success),
-                options(nostack, pure)
+                out(reg) success,
+                options(nostack, nomem)
             );
 
             if success != 0 {

@@ -120,7 +120,7 @@ pub mod dynamic_linker;
 pub mod elf;
 pub mod exec;
 pub mod fd_cache;
-pub mod lock_optimized; // Optional: Optimized locking with RW locks and fine-grained locks
+// lock_optimized removed during cleanup - optimizations integrated into sync module
 pub mod manager;
 pub mod rcu_table;
 pub mod rlimit;
@@ -132,7 +132,7 @@ pub mod vfork;
 pub mod tests;
 
 pub use fd_cache::*;
-pub use lock_optimized::*;
+// lock_optimized removed - optimizations integrated into sync module
 pub use manager::*;
 pub use rcu_table::*;
 

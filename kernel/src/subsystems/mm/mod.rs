@@ -189,6 +189,9 @@ pub mod traits;
 pub mod types;
 pub mod unified_stats;
 
+// Security: Heap protection mechanisms
+pub mod heap_protection;
+
 // Track AV: 高级内存管理优化
 pub mod compress;
 pub mod migration;

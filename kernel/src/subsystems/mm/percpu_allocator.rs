@@ -64,6 +64,7 @@ use nos_api::{Error, Result};
 
 use crate::subsystems::mm::buddy::OptimizedBuddyAllocator;
 use crate::subsystems::mm::numa::{numa_alloc, numa_dealloc, NodeId, NumaPolicy};
+use crate::subsystems::sync::spinlock::SpinLock;
 
 /// Cache line size for alignment (typically 64 bytes on x86_64)
 pub const CACHE_LINE_SIZE: usize = 64;
@@ -244,13 +245,13 @@ pub struct PerCpuCache {
     stats: PerCpuStats,
 
     /// Lock for batch operations (rarely used)
-    batch_lock: Spinlock<()>,
+    batch_lock: SpinLock<()>,
 
     /// Padding to prevent false sharing
     _padding: [u8; CACHE_LINE_SIZE - (core::mem::size_of::<usize>() * 4
         + core::mem::size_of::<AtomicBool>() * 2
         + core::mem::size_of::<PerCpuStats>()
-        + core::mem::size_of::<Spinlock<>>()) % CACHE_LINE_SIZE],
+        + core::mem::size_of::<SpinLock<>>()) % CACHE_LINE_SIZE],
 }
 
 impl PerCpuCache {
@@ -266,7 +267,7 @@ impl PerCpuCache {
             initialized: AtomicBool::new(false),
             online: AtomicBool::new(false),
             stats: PerCpuStats::new(),
-            batch_lock: Spinlock::new(()),
+            batch_lock: SpinLock::new(()),
             _padding: [0; CACHE_LINE_SIZE],
         }
     }
@@ -626,7 +627,7 @@ pub struct PerCpuAllocatorV2 {
     initialized: AtomicBool,
 
     /// Lock for CPU hotplug operations
-    hotplug_lock: Spinlock<()>,
+    hotplug_lock: SpinLock<()>,
 }
 
 unsafe impl Send for PerCpuAllocatorV2 {}
@@ -640,7 +641,7 @@ impl PerCpuAllocatorV2 {
             initialized_cpus: AtomicUsize::new(0),
             online_cpus: AtomicUsize::new(0),
             initialized: AtomicBool::new(false),
-            hotplug_lock: Spinlock::new(()),
+            hotplug_lock: SpinLock::new(()),
         }
     }
 

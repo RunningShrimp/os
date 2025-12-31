@@ -22,7 +22,7 @@ pub mod device;
 pub mod enhanced_network;
 pub mod fragment;
 pub mod icmp;
-pub mod icmp_enhanced; // Enhanced ICMP features (optional: extended ICMP types, traceroute, ping)
+// icmp_enhanced removed during cleanup - features integrated into icmp module
 pub mod interface;
 pub mod ipv4;
 pub mod ipv6;
@@ -407,10 +407,7 @@ pub use self::{
     },
     fragment::{FragmentReassembler, Fragmenter, ReassemblyEntry},
     icmp::{IcmpCode, IcmpError, IcmpPacket, IcmpType},
-    icmp_enhanced::{
-        EnhancedIcmpPacket, EnhancedIcmpProcessor, ExtendedIcmpType, IcmpComprehensiveStats,
-        IcmpConfig, IcmpMessageData, IcmpSendOptions, PingReply, PingResult, TracerouteHop,
-    },
+    // icmp_enhanced removed - features integrated into icmp module
     interface::{Interface, InterfaceConfig},
     ipv4::{Ipv4Addr, Ipv4Header, Ipv4Packet},
     ipv6::{
