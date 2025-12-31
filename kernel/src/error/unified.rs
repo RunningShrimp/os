@@ -380,6 +380,7 @@ pub enum SecurityError {
     AccountDisabled,
     InsufficientPrivileges,
     SecurityBreach,
+    AttestationFailed(String),
 }
 
 impl fmt::Display for SecurityError {
@@ -396,6 +397,7 @@ impl fmt::Display for SecurityError {
             SecurityError::AccountDisabled => write!(f, "Account disabled"),
             SecurityError::InsufficientPrivileges => write!(f, "Insufficient privileges"),
             SecurityError::SecurityBreach => write!(f, "Security breach"),
+            SecurityError::AttestationFailed(msg) => write!(f, "Attestation failed: {}", msg),
         }
     }
 }
@@ -1032,6 +1034,7 @@ impl SecurityError {
             SecurityError::AccountDisabled => crate::reliability::errno::EACCES,
             SecurityError::InsufficientPrivileges => crate::reliability::errno::EPERM,
             SecurityError::SecurityBreach => crate::reliability::errno::EACCES,
+            SecurityError::AttestationFailed(_) => crate::reliability::errno::EACCES,
         }
     }
 }
@@ -1257,5 +1260,12 @@ impl From<crate::subsystems::mm::api::VmError> for MemoryError {
             crate::subsystems::mm::api::VmError::PageTableError => MemoryError::CorruptedAllocator,
             crate::subsystems::mm::api::VmError::TLBError => MemoryError::InvalidAddress,
         }
+    }
+}
+
+/// 从 Attestation 错误转换为统一错误
+impl From<crate::security::attestation::AttestationError> for UnifiedError {
+    fn from(err: crate::security::attestation::AttestationError) -> Self {
+        UnifiedError::SecurityError(SecurityError::AttestationFailed(format!("{:?}", err)))
     }
 }

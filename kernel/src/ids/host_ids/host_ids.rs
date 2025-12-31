@@ -226,14 +226,14 @@ impl HostIds {
     ) -> Result<Vec<IntrusionDetection>, &'static str> {
         match event.event_type {
             AuditEventType::Syscall => self.analyze_syscall(event),
-            AuditEventType::FileAccess => self.analyze_file_event(event),
-            AuditEventType::Process => self.analyze_process_event(event),
-            AuditEventType::Network => self.analyze_network_connection(event),
+            AuditEventType::FsAccess => self.analyze_file_event(event),
+            AuditEventType::ProcessExec => self.analyze_process_event(event),
+            AuditEventType::NetworkAccess => self.analyze_network_connection(event),
             // Map less-common event types to either specific analyzers or fall back to user
             // activity
             AuditEventType::Authentication
-            | AuditEventType::PermissionChange
-            | AuditEventType::Configuration => self.analyze_user_activity(event),
+            | AuditEventType::PrivilegeChange
+            | AuditEventType::ConfigChange => self.analyze_user_activity(event),
             _ => Ok(Vec::new()),
         }
     }

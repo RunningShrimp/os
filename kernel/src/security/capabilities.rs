@@ -1,627 +1,525 @@
-// POSIX Capabilities Implementation
-//
-// This module implements POSIX capabilities to provide fine-grained privilege
-// separation beyond the traditional root/user model.
+//! # Linux Capabilities Implementation
+//!
+//! This module provides comprehensive POSIX capabilities implementation with
+//! capability bounding sets, ambient capabilities, and securebits.
+//!
+//! ## Features
+//!
+//! - **POSIX Capabilities**: Fine-grained privilege management
+//! - **Capability Bounding Set**: Restrict capabilities for all processes
+//! - **Ambient Capabilities**: Inherit capabilities across execve
+//! - **Securebits**: Secure computation and integrity settings
+//! - **Capability Sets**: Permitted, Effective, Inheritable sets
 
-extern crate alloc;
+use crate::prelude::*;
+use core::sync::atomic::{AtomicU64, Ordering};
 
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use core::sync::atomic::Ordering;
+// ============================================================================
+// Capability Definitions
+// ============================================================================
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum Capability {
-    /// Capability to change file ownership
-    Chown = 0,
-    /// Capability to override DAC restrictions
-    DACOverride = 1,
-    /// Capability to override file read/write/checks
-    DACReadSearch = 2,
-    /// Capability to override file access permissions
-    Fowner = 3,
-    /// Capability to override file creation/move/rename restrictions
-    Fsetid = 4,
-    /// Capability to kill processes
-    Kill = 5,
-    /// Capability to set group ID
-    Setgid = 6,
-    /// Capability to set user ID
-    Setuid = 7,
-    /// Capability to set process capabilities
-    Setpcap = 8,
-    /// Capability to override Linux Immutable/Append-only flags
-    LinuxImmutable = 9,
-    /// Capability to bind to privileged ports (<1024)
-    NetBindService = 10,
-    /// Capability to load kernel modules
-    NetAdmin = 11,
-    /// Capability to configure network interfaces
-    NetRaw = 12,
-    /// Capability to access IPC
-    IpcOwner = 13,
-    /// Capability to change system clock
-    SysModule = 14,
-    /// Capability to load/unload kernel modules
-    SysRawio = 15,
-    /// Capability to configure the kernel (sysctl, etc.)
-    SysChroot = 16,
-    /// Capability to configure process resource limits
-    SysPtrace = 17,
-    /// Capability to configure the system clock
-    SysPacct = 18,
-    /// Capability to manage system accounting
-    SysAdmin = 19,
-    /// Capability to configure the system clock
-    SysBoot = 20,
-    /// Capability to configure system time
-    SysNice = 21,
-    /// Capability to configure system resource limits
-    SysResource = 22,
-    /// Capability to configure system time
-    SysTime = 23,
-    /// Capability to configure TTY devices
-    SysTtyConfig = 24,
-    /// Capability to manage mknod devices
-    Mknod = 25,
-    /// Capability to lease files
-    Lease = 26,
-    /// Capability to override audit
-    AuditWrite = 27,
-    /// Capability to manage audit
-    AuditControl = 28,
-    /// Capability to set file attributes
-    Setfcap = 29,
-}
-
-impl Capability {
-    /// Get all capability values
-    pub const ALL: [Capability; 30] = [
-        Capability::Chown,
-        Capability::DACOverride,
-        Capability::DACReadSearch,
-        Capability::Fowner,
-        Capability::Fsetid,
-        Capability::Kill,
-        Capability::Setgid,
-        Capability::Setuid,
-        Capability::Setpcap,
-        Capability::LinuxImmutable,
-        Capability::NetBindService,
-        Capability::NetAdmin,
-        Capability::NetRaw,
-        Capability::IpcOwner,
-        Capability::SysModule,
-        Capability::SysRawio,
-        Capability::SysChroot,
-        Capability::SysPtrace,
-        Capability::SysPacct,
-        Capability::SysAdmin,
-        Capability::SysBoot,
-        Capability::SysNice,
-        Capability::SysResource,
-        Capability::SysTime,
-        Capability::SysTtyConfig,
-        Capability::Mknod,
-        Capability::Lease,
-        Capability::AuditWrite,
-        Capability::AuditControl,
-        Capability::Setfcap,
-    ];
-
-    /// Get capability name
-    pub fn name(&self) -> &'static str {
-        match self {
-            Capability::Chown => "CAP_CHOWN",
-            Capability::DACOverride => "CAP_DAC_OVERRIDE",
-            Capability::DACReadSearch => "CAP_DAC_READ_SEARCH",
-            Capability::Fowner => "CAP_FOWNER",
-            Capability::Fsetid => "CAP_FSETID",
-            Capability::Kill => "CAP_KILL",
-            Capability::Setgid => "CAP_SETGID",
-            Capability::Setuid => "CAP_SETUID",
-            Capability::Setpcap => "CAP_SETPCAP",
-            Capability::LinuxImmutable => "CAP_LINUX_IMMUTABLE",
-            Capability::NetBindService => "CAP_NET_BIND_SERVICE",
-            Capability::NetAdmin => "CAP_NET_ADMIN",
-            Capability::NetRaw => "CAP_NET_RAW",
-            Capability::IpcOwner => "CAP_IPC_OWNER",
-            Capability::SysModule => "CAP_SYS_MODULE",
-            Capability::SysRawio => "CAP_SYS_RAWIO",
-            Capability::SysChroot => "CAP_SYS_CHROOT",
-            Capability::SysPtrace => "CAP_SYS_PTRACE",
-            Capability::SysPacct => "CAP_SYS_PACCT",
-            Capability::SysAdmin => "CAP_SYS_ADMIN",
-            Capability::SysBoot => "CAP_SYS_BOOT",
-            Capability::SysNice => "CAP_SYS_NICE",
-            Capability::SysResource => "CAP_SYS_RESOURCE",
-            Capability::SysTime => "CAP_SYS_TIME",
-            Capability::SysTtyConfig => "CAP_SYS_TTY_CONFIG",
-            Capability::Mknod => "CAP_MKNOD",
-            Capability::Lease => "CAP_LEASE",
-            Capability::AuditWrite => "CAP_AUDIT_WRITE",
-            Capability::AuditControl => "CAP_AUDIT_CONTROL",
-            Capability::Setfcap => "CAP_SETFCAP",
-        }
-    }
-}
-
-/// Capability sets (effective, permitted, inheritable)
-#[derive(Debug, Clone)]
-pub struct CapabilitySets {
-    /// Effective capabilities - currently in effect
-    pub effective: u32,
-    /// Permitted capabilities - allowed to be effective
-    pub permitted: u32,
-    /// Inheritable capabilities - inherited across exec
-    pub inheritable: u32,
-    /// Bounding set - maximum capabilities that can be possessed
-    pub bounding: u32,
-    /// Ambient capabilities - automatically granted on exec
-    pub ambient: u32,
-}
-
-impl Default for CapabilitySets {
-    fn default() -> Self {
-        Self {
-            effective: 0,
-            permitted: 0,
-            inheritable: 0,
-            bounding: u32::MAX,
-            ambient: 0,
-        }
-    }
-}
-
-impl CapabilitySets {
-    /// Create new capability sets
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Check if a capability is in the effective set
-    pub fn has_effective(&self, cap: Capability) -> bool {
-        (self.effective & (1 << (cap as u32))) != 0
-    }
-
-    /// Add a capability to the effective set
-    pub fn add_effective(&mut self, cap: Capability) {
-        self.effective |= 1 << (cap as u32);
-    }
-
-    /// Remove a capability from the effective set
-    pub fn remove_effective(&mut self, cap: Capability) {
-        self.effective &= !(1 << (cap as u32));
-    }
-
-    /// Check if a capability is in the permitted set
-    pub fn has_permitted(&self, cap: Capability) -> bool {
-        (self.permitted & (1 << (cap as u32))) != 0
-    }
-
-    /// Add a capability to the permitted set
-    pub fn add_permitted(&mut self, cap: Capability) {
-        self.permitted |= 1 << (cap as u32);
-    }
-
-    /// Remove a capability from the permitted set
-    pub fn remove_permitted(&mut self, cap: Capability) {
-        self.permitted &= !(1 << (cap as u32));
-    }
-
-    /// Check if a capability is in the inheritable set
-    pub fn has_inheritable(&self, cap: Capability) -> bool {
-        (self.inheritable & (1 << (cap as u32))) != 0
-    }
-
-    /// Add a capability to the inheritable set
-    pub fn add_inheritable(&mut self, cap: Capability) {
-        self.inheritable |= 1 << (cap as u32);
-    }
-
-    /// Remove a capability from the inheritable set
-    pub fn remove_inheritable(&mut self, cap: Capability) {
-        self.inheritable &= !(1 << (cap as u32));
-    }
-
-    /// Check if a capability is in the bounding set
-    pub fn has_bounding(&self, cap: Capability) -> bool {
-        (self.bounding & (1 << (cap as u32))) != 0
-    }
-
-    /// Remove a capability from the bounding set
-    pub fn remove_bounding(&mut self, cap: Capability) {
-        self.bounding &= !(1 << (cap as u32));
-    }
-
-    /// Check if a capability is in the ambient set
-    pub fn has_ambient(&self, cap: Capability) -> bool {
-        (self.ambient & (1 << (cap as u32))) != 0
-    }
-
-    /// Add a capability to the ambient set
-    pub fn add_ambient(&mut self, cap: Capability) {
-        self.ambient |= 1 << (cap as u32);
-    }
-
-    /// Remove a capability from the ambient set
-    pub fn remove_ambient(&mut self, cap: Capability) {
-        self.ambient &= !(1 << (cap as u32));
-    }
-
-    /// Validate that effective capabilities are a subset of permitted
-    pub fn validate(&self) -> bool {
-        (self.effective & !self.permitted) == 0
-    }
-
-    /// Get all capabilities as vector
-    pub fn get_effective_capabilities(&self) -> Vec<Capability> {
-        Capability::ALL.iter()
-            .filter(|&&cap| self.has_effective(cap))
-            .copied()
-            .collect()
-    }
-
-    /// Get all permitted capabilities as vector
-    pub fn get_permitted_capabilities(&self) -> Vec<Capability> {
-        Capability::ALL.iter()
-            .filter(|&&cap| self.has_permitted(cap))
-            .copied()
-            .collect()
-    }
-}
-
-/// Per-process capability state
-#[derive(Debug, Clone)]
-pub struct ProcessCapabilities {
-    /// Process ID
-    pub pid: u64,
-    /// User ID
-    pub uid: u32,
-    /// Capability sets
-    pub caps: CapabilitySets,
-    /// Whether process is privileged (root)
-    pub privileged: bool,
-}
-
-/// Capability subsystem
-pub struct CapabilitySubsystem {
-    /// Per-process capabilities
-    process_caps: BTreeMap<u64, ProcessCapabilities>,
-    /// Default capabilities for root
-    root_caps: CapabilitySets,
-    /// Default capabilities for regular users
-    user_caps: CapabilitySets,
-}
-
-impl CapabilitySubsystem {
-    /// Create new capability subsystem
-    pub fn new() -> Self {
-        let root_caps = CapabilitySets {
-            effective: u32::MAX,
-            permitted: u32::MAX,
-            inheritable: u32::MAX,
-            bounding: u32::MAX,
-            ambient: 0,
-        };
-
-        let user_caps = CapabilitySets::default();
-
-        Self {
-            process_caps: BTreeMap::new(),
-            root_caps,
-            user_caps,
-        }
-    }
-
-    /// Initialize capabilities for a process
-    pub fn init_process(&mut self, pid: u64, uid: u32) -> Result<(), &'static str> {
-        let caps = if uid == 0 {
-            self.root_caps.clone()
-        } else {
-            self.user_caps.clone()
-        };
-
-        let process_caps = ProcessCapabilities {
-            pid,
-            uid,
-            caps,
-            privileged: uid == 0,
-        };
-
-        self.process_caps.insert(pid, process_caps);
-        Ok(())
-    }
-
-    /// Get capabilities for a process
-    pub fn get_process_capabilities(&self, pid: u64) -> Option<&ProcessCapabilities> {
-        self.process_caps.get(&pid)
-    }
-
-    /// Check if a process has a specific capability
-    pub fn process_has_capability(&self, pid: u64, cap: Capability) -> bool {
-        match self.process_caps.get(&pid) {
-            Some(proc_caps) => proc_caps.caps.has_effective(cap),
-            None => false,
-        }
-    }
-
-    /// Update process capabilities
-    pub fn update_process_capabilities(
-        &mut self,
-        pid: u64,
-        caps: CapabilitySets,
-    ) -> Result<(), &'static str> {
-        let process_caps = self.process_caps.get_mut(&pid)
-            .ok_or("Process not found")?;
-
-        if !caps.validate() {
-            return Err("Invalid capability sets");
-        }
-
-        process_caps.caps = caps;
-        Ok(())
-    }
-
-    /// Add capability to process
-    pub fn add_process_capability(
-        &mut self,
-        pid: u64,
-        cap: Capability,
-        cap_type: CapType,
-    ) -> Result<(), &'static str> {
-        let process_caps = self.process_caps.get_mut(&pid)
-            .ok_or("Process not found")?;
-
-        match cap_type {
-            CapType::Effective => process_caps.caps.add_effective(cap),
-            CapType::Permitted => process_caps.caps.add_permitted(cap),
-            CapType::Inheritable => process_caps.caps.add_inheritable(cap),
-            CapType::Ambient => process_caps.caps.add_ambient(cap),
-        }
-
-        if !process_caps.caps.validate() {
-            // Remove the capability we just added
-            match cap_type {
-                CapType::Effective => process_caps.caps.remove_effective(cap),
-                CapType::Permitted => process_caps.caps.remove_permitted(cap),
-                CapType::Inheritable => process_caps.caps.remove_inheritable(cap),
-                CapType::Ambient => process_caps.caps.remove_ambient(cap),
-            }
-            return Err("Cannot add capability to effective set without adding to permitted set");
-        }
-
-        Ok(())
-    }
-
-    /// Remove capability from process
-    pub fn remove_process_capability(
-        &mut self,
-        pid: u64,
-        cap: Capability,
-        cap_type: CapType,
-    ) -> Result<(), &'static str> {
-        let process_caps = self.process_caps.get_mut(&pid)
-            .ok_or("Process not found")?;
-
-        match cap_type {
-            CapType::Effective => process_caps.caps.remove_effective(cap),
-            CapType::Permitted => process_caps.caps.remove_permitted(cap),
-            CapType::Inheritable => process_caps.caps.remove_inheritable(cap),
-            CapType::Ambient => process_caps.caps.remove_ambient(cap),
-        }
-
-        // Also remove from effective if removing from permitted
-        if cap_type == CapType::Permitted {
-            process_caps.caps.remove_effective(cap);
-        }
-
-        Ok(())
-    }
-
-    /// Cleanup process capabilities
-    pub fn cleanup_process(&mut self, pid: u64) {
-        self.process_caps.remove(&pid);
-    }
-
-    /// Fork capabilities from parent to child
-    pub fn fork_capabilities(&mut self, parent_pid: u64, child_pid: u64) -> Result<(), &'static str> {
-        let parent_caps = self.process_caps.get(&parent_pid)
-            .ok_or("Parent process not found")?;
-
-        let child_caps = ProcessCapabilities {
-            pid: child_pid,
-            uid: parent_caps.uid,
-            caps: parent_caps.caps.clone(),
-            privileged: parent_caps.privileged,
-        };
-
-        self.process_caps.insert(child_pid, child_caps);
-        Ok(())
-    }
-
-    /// Apply capabilities after exec
-    pub fn exec_capabilities(&mut self, pid: u64, setuid: bool, setgid: bool) -> Result<(), &'static str> {
-        let process_caps = self.process_caps.get_mut(&pid)
-            .ok_or("Process not found")?;
-
-        if setuid {
-            process_caps.uid = 0;
-            process_caps.privileged = true;
-        }
-
-        // Clear capabilities if dropping privileges
-        if !process_caps.privileged {
-            process_caps.caps.effective = 0;
-            process_caps.caps.permitted = 0;
-            process_caps.caps.inheritable = 0;
-            process_caps.caps.ambient = 0;
-        }
-
-        Ok(())
-    }
-}
-
-/// Types of capability sets
+/// All capabilities defined by Linux
+#[repr(u64)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CapType {
-    Effective,
-    Permitted,
-    Inheritable,
-    Ambient,
+pub enum CapFlag {
+    /// Change file ownership
+    Chown = 1 << 0,
+    /// Override DAC (discretionary access control)
+    DacOverride = 1 << 1,
+    /// Perform read/write operations without DAC
+    DacReadSearch = 1 << 2,
+    /// Override file permissions
+    Fowner = 1 << 3,
+    /// Set file modification time
+    Fsetid = 1 << 4,
+    /// Send signals to other processes
+    Kill = 1 << 5,
+    /// Set group ID
+    Setgid = 1 << 6,
+    /// Set user ID
+    Setuid = 1 << 7,
+    /// Set process capabilities
+    Setpcap = 1 << 8,
+    /// Override immutable/append-only file attributes
+    LinuxImmutable = 1 << 9,
+    /// Bind to privileged network ports
+    NetBindService = 1 << 10,
+    /// Broadcast and listen to multicasts
+    NetBroadcast = 1 << 11,
+    /// Perform network administration
+    NetAdmin = 1 << 12,
+    /// Use raw sockets
+    NetRaw = 1 << 13,
+    /// Lock memory
+    IpcLock = 1 << 14,
+    /// Override IPC ownership checks
+    IpcOwner = 1 << 15,
+    /// Load and unload kernel modules
+    SysModule = 1 << 16,
+    /// Perform I/O port operations
+    SysRawio = 1 << 17,
+    /// Use chroot
+    SysChroot = 1 << 18,
+    /// Trace processes using ptrace
+    SysPtrace = 1 << 19,
+    /// Configure process accounting
+    SysPacct = 1 << 20,
+    /// Perform system administration
+    SysAdmin = 1 << 21,
+    /// Reboot system
+    SysBoot = 1 << 22,
+    /// Nice other processes
+    SysNice = 1 << 23,
+    /// Override resource limits
+    SysResource = 1 << 24,
+    /// Set system time
+    SysTime = 1 << 25,
+    /// Configure TTY devices
+    SysTtyConfig = 1 << 26,
+    /// Create special files using mknod
+    Mknod = 1 << 27,
+    /// Set file leases
+    Lease = 1 << 28,
+    /// Write to audit log
+    AuditWrite = 1 << 29,
+    /// Configure audit subsystem
+    AuditControl = 1 << 30,
+    /// Set file capabilities
+    Setfcap = 1 << 31,
+    /// Override MAC (mandatory access control)
+    MacOverride = 1 << 32,
+    /// Configure MAC
+    MacAdmin = 1 << 33,
+    /// Use syslog
+    Syslog = 1 << 34,
+    /// Wake up system with wake alarms
+    WakeAlarm = 1 << 35,
+    /// Block suspend and hibernation
+    BlockSuspend = 1 << 36,
+    /// Read audit log
+    AuditRead = 1 << 37,
+    /// Use performance events
+    Perfmon = 1 << 38,
+    /// Use BPF
+    Bpf = 1 << 39,
+    /// Perform checkpoint/restore
+    CheckpointRestore = 1 << 40,
 }
 
-/// High-level capability interface functions
+impl CapFlag {
+    pub fn bits(&self) -> u64 {
+        *self as u64
+    }
 
-/// Initialize capabilities for a process
-pub fn init_process_capabilities(pid: u64, uid: u32) -> Result<(), &'static str> {
-    let mut guard = crate::security::CAPABILITIES.lock();
-    if let Some(ref mut s) = *guard {
-        s.init_process(pid, uid)
-    } else {
-        Ok(())
+    pub fn from_bits(bits: u64) -> CapFlags {
+        CapFlags(bits)
     }
 }
 
-/// Check if process has specific capability
-pub fn process_has_capability(pid: u64, cap: Capability) -> bool {
-    let guard = crate::security::CAPABILITIES.lock();
-    guard.as_ref().map(|s| s.process_has_capability(pid, cap)).unwrap_or(false)
-}
+/// Collection of capability flags
+#[derive(Debug, Clone, Copy)]
+pub struct CapFlags(pub u64);
 
-/// Get process capabilities
-pub fn get_process_capabilities(pid: u64) -> Option<ProcessCapabilities> {
-    let guard = crate::security::CAPABILITIES.lock();
-    guard.as_ref().and_then(|s| s.get_process_capabilities(pid).cloned())
-}
+impl CapFlags {
+    pub fn empty() -> Self {
+        Self(0)
+    }
 
-/// Add capability to process
-pub fn add_process_capability(
-    pid: u64,
-    cap: Capability,
-    cap_type: CapType,
-) -> Result<(), &'static str> {
-    let mut guard = crate::security::CAPABILITIES.lock();
-    if let Some(ref mut s) = *guard {
-        s.add_process_capability(pid, cap, cap_type)
-    } else {
-        Ok(())
+    pub fn all() -> Self {
+        Self(0xFFFFFFFFFFFFFFFF)
+    }
+
+    pub fn contains(&self, flag: CapFlag) -> bool {
+        (self.0 & flag.bits()) != 0
+    }
+
+    pub fn insert(&mut self, flag: CapFlag) {
+        self.0 |= flag.bits();
+    }
+
+    pub fn remove(&mut self, flag: CapFlag) {
+        self.0 &= !flag.bits();
+    }
+
+    pub fn bits(&self) -> u64 {
+        self.0
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0 == 0
+    }
+
+    pub fn intersects(&self, other: CapFlags) -> bool {
+        (self.0 & other.0) != 0
+    }
+
+    pub fn union(&self, other: CapFlags) -> CapFlags {
+        CapFlags(self.0 | other.0)
+    }
+
+    pub fn difference(&self, other: CapFlags) -> CapFlags {
+        CapFlags(self.0 & !other.0)
     }
 }
 
-/// Remove capability from process
-pub fn remove_process_capability(
-    pid: u64,
-    cap: Capability,
-    cap_type: CapType,
-) -> Result<(), &'static str> {
-    let mut guard = crate::security::CAPABILITIES.lock();
-    if let Some(ref mut s) = *guard {
-        s.remove_process_capability(pid, cap, cap_type)
-    } else {
-        Ok(())
+// ============================================================================
+// Capability Sets
+// ============================================================================
+
+/// Process capability sets
+#[derive(Debug, Clone)]
+pub struct CapSets {
+    /// Permitted capabilities (maximum that can be held)
+    pub permitted: CapFlags,
+    /// Effective capabilities (currently in effect)
+    pub effective: CapFlags,
+    /// Inheritable capabilities (preserved across execve)
+    pub inheritable: CapFlags,
+    /// Ambient capabilities (automatically inherited)
+    pub ambient: CapFlags,
+    /// Bounding set (restricts capabilities for all processes)
+    pub bounding: CapFlags,
+}
+
+impl CapSets {
+    pub fn new() -> Self {
+        Self {
+            permitted: CapFlags::empty(),
+            effective: CapFlags::empty(),
+            inheritable: CapFlags::empty(),
+            ambient: CapFlags::empty(),
+            bounding: CapFlags::all(),
+        }
+    }
+
+    pub fn with_full_caps() -> Self {
+        let all = CapFlags::all();
+        Self {
+            permitted: all,
+            effective: all,
+            inheritable: all,
+            ambient: CapFlags::empty(),
+            bounding: all,
+        }
+    }
+
+    pub fn has_cap(&self, cap: CapFlag) -> bool {
+        self.effective.contains(cap) && self.permitted.contains(cap)
+    }
+
+    pub fn can_raise(&self, cap: CapFlag) -> bool {
+        self.permitted.contains(cap) && self.bounding.contains(cap)
+    }
+
+    pub fn can_inherit(&self, cap: CapFlag) -> bool {
+        self.inheritable.contains(cap) || self.ambient.contains(cap)
+    }
+
+    pub fn drop_effective(&mut self) {
+        self.effective = CapFlags::empty();
+    }
+
+    pub fn drop_ambient(&mut self) {
+        self.ambient = CapFlags::empty();
     }
 }
 
-/// Fork capabilities from parent to child
-pub fn fork_capabilities(parent_pid: u64, child_pid: u64) -> Result<(), &'static str> {
-    let mut guard = crate::security::CAPABILITIES.lock();
-    if let Some(ref mut s) = *guard {
-        s.fork_capabilities(parent_pid, child_pid)
-    } else {
-        Ok(())
+// ============================================================================
+// Securebits
+// ============================================================================
+
+/// Securebits flags
+#[repr(u32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SecureBit {
+    /// Keep capabilities across uid 0
+    NoRoot = 0,
+    /// Setuid to uid 0 doesn't grant capabilities
+    NoRootLocked = 1,
+    /// Setuid fixed across all uid 0 processes
+    NoRootSetuidFixed = 2,
+    /// Setuid fixed and locked
+    NoRootSetuidFixedLocked = 3,
+    /// Don't allow ambient capabilities to be raised
+    NoCapAmbientRaise = 4,
+    /// Ambient capabilities raise locked
+    NoCapAmbientRaiseLocked = 5,
+    /// Keep capabilities across execve for non-root
+    KeepCaps = 6,
+    /// Keep caps locked
+    KeepCapsLocked = 7,
+}
+
+impl SecureBit {
+    pub fn bits(&self) -> u32 {
+        1 << (*self as u32)
     }
 }
 
-/// Apply capabilities after exec
-pub fn exec_capabilities(pid: u64, setuid: bool, setgid: bool) -> Result<(), &'static str> {
-    let mut guard = crate::security::CAPABILITIES.lock();
-    if let Some(ref mut s) = *guard {
-        s.exec_capabilities(pid, setuid, setgid)
-    } else {
-        Ok(())
+/// Securebits management
+#[derive(Debug, Clone, Copy)]
+pub struct SecureBits(pub u32);
+
+impl SecureBits {
+    pub fn new() -> Self {
+        Self(0)
+    }
+
+    pub fn is_set(&self, bit: SecureBit) -> bool {
+        (self.0 & bit.bits()) != 0
+    }
+
+    pub fn set(&mut self, bit: SecureBit) {
+        self.0 |= bit.bits();
+    }
+
+    pub fn clear(&mut self, bit: SecureBit) {
+        self.0 &= !bit.bits();
+    }
+
+    pub fn is_locked(&self, bit: SecureBit) -> bool {
+        match bit {
+            SecureBit::NoRoot => self.is_set(SecureBit::NoRootLocked),
+            SecureBit::NoRootSetuidFixed => self.is_set(SecureBit::NoRootSetuidFixedLocked),
+            SecureBit::NoCapAmbientRaise => self.is_set(SecureBit::NoCapAmbientRaiseLocked),
+            SecureBit::KeepCaps => self.is_set(SecureBit::KeepCapsLocked),
+            _ => false,
+        }
     }
 }
 
-/// Initialize capabilities subsystem
-pub fn initialize_capabilities() -> Result<(), i32> {
-    // Capabilities is already initialized via global static instance
+// ============================================================================
+// Capability Manager
+// ============================================================================
+
+/// Capability manager
+#[derive(Debug)]
+pub struct CapManager {
+    pub process_caps: Mutex<BTreeMap<u32, CapSets>>,
+    pub system_bounding: Mutex<CapFlags>,
+    pub securebits: Mutex<SecureBits>,
+    pub checks_performed: AtomicU64,
+    pub denials: AtomicU64,
+}
+
+impl CapManager {
+    pub fn new() -> Self {
+        Self {
+            process_caps: Mutex::new(BTreeMap::new()),
+            system_bounding: Mutex::new(CapFlags::all()),
+            securebits: Mutex::new(SecureBits::new()),
+            checks_performed: AtomicU64::new(0),
+            denials: AtomicU64::new(0),
+        }
+    }
+
+    pub fn initialize(&self) -> Result<()> {
+        log_info!("[caps] Capability manager initialized");
+        Ok(())
+    }
+
+    pub fn register_process(&self, pid: u32, caps: CapSets) {
+        self.process_caps.lock().insert(pid, caps);
+    }
+
+    pub fn unregister_process(&self, pid: u32) {
+        self.process_caps.lock().remove(&pid);
+    }
+
+    pub fn check_capability(&self, pid: u32, cap: CapFlag) -> bool {
+        self.checks_performed.fetch_add(1, Ordering::Relaxed);
+
+        let caps = self.process_caps.lock();
+        if let Some(process_caps) = caps.get(&pid) {
+            let allowed = process_caps.has_cap(cap);
+            if !allowed {
+                self.denials.fetch_add(1, Ordering::Relaxed);
+            }
+            return allowed;
+        }
+
+        false
+    }
+
+    pub fn has_capability(&self, pid: u32, cap: CapFlag) -> Result<bool> {
+        let caps = self.process_caps.lock();
+        if let Some(process_caps) = caps.get(&pid) {
+            return Ok(process_caps.has_cap(cap));
+        }
+        Err(Error::NotFound)
+    }
+
+    pub fn raise_capability(&self, pid: u32, cap: CapFlag) -> Result<()> {
+        let mut caps = self.process_caps.lock();
+        if let Some(process_caps) = caps.get_mut(&pid) {
+            if process_caps.can_raise(cap) {
+                process_caps.effective.insert(cap);
+                return Ok(());
+            }
+            return Err(Error::PermissionDenied);
+        }
+        Err(Error::NotFound)
+    }
+
+    pub fn drop_capability(&self, pid: u32, cap: CapFlag) -> Result<()> {
+        let mut caps = self.process_caps.lock();
+        if let Some(process_caps) = caps.get_mut(&pid) {
+            process_caps.effective.remove(cap);
+            return Ok(());
+        }
+        Err(Error::NotFound)
+    }
+
+    pub fn set_ambient(&self, pid: u32, cap: CapFlag, raise: bool) -> Result<()> {
+        let securebits = self.securebits.lock();
+        if securebits.is_set(SecureBit::NoCapAmbientRaise) && raise {
+            return Err(Error::PermissionDenied);
+        }
+
+        let mut caps = self.process_caps.lock();
+        if let Some(process_caps) = caps.get_mut(&pid) {
+            if raise {
+                process_caps.ambient.insert(cap);
+            } else {
+                process_caps.ambient.remove(cap);
+            }
+            return Ok(());
+        }
+        Err(Error::NotFound)
+    }
+
+    pub fn drop_bounding(&self, cap: CapFlag) -> Result<()> {
+        let mut bounding = self.system_bounding.lock();
+        bounding.remove(cap);
+        Ok(())
+    }
+
+    pub fn get_process_caps(&self, pid: u32) -> Option<CapSets> {
+        self.process_caps.lock().get(&pid).cloned()
+    }
+
+    pub fn set_securebit(&self, bit: SecureBit) -> Result<()> {
+        let mut bits = self.securebits.lock();
+        if bits.is_locked(bit) {
+            return Err(Error::PermissionDenied);
+        }
+        bits.set(bit);
+        Ok(())
+    }
+
+    pub fn get_securebits(&self) -> SecureBits {
+        *self.securebits.lock()
+    }
+
+    pub fn get_stats(&self) -> CapStats {
+        CapStats {
+            checks_performed: self.checks_performed.load(Ordering::Relaxed),
+            denials: self.denials.load(Ordering::Relaxed),
+            active_processes: self.process_caps.lock().len(),
+        }
+    }
+}
+
+/// Capability statistics
+#[derive(Debug, Clone)]
+pub struct CapStats {
+    pub checks_performed: u64,
+    pub denials: u64,
+    pub active_processes: usize,
+}
+
+// ============================================================================
+// Global State
+// ============================================================================
+
+static GLOBAL_CAPS: Mutex<Option<CapManager>> = Mutex::new(None);
+
+pub fn init_capabilities() -> Result<()> {
+    let mut global = GLOBAL_CAPS.lock();
+    if global.is_some() {
+        return Ok(());
+    }
+
+    let manager = CapManager::new();
+    manager.initialize()?;
+    *global = Some(manager);
     Ok(())
 }
 
-/// Cleanup capabilities subsystem
-pub fn cleanup_capabilities() {
-    // Placeholder: In a real implementation, this would clean up capabilities resources
+pub fn get_cap_manager() -> Result<&'static Mutex<Option<CapManager>>> {
+    Ok(&GLOBAL_CAPS)
 }
 
-/// Cleanup process capabilities
-pub fn cleanup_process_capabilities(pid: u64) {
-    if let Some(ref mut s) = *crate::security::CAPABILITIES.lock() {
-        s.cleanup_process(pid);
-    }
+pub fn check_capability(pid: u32, cap: CapFlag) -> bool {
+    let global = GLOBAL_CAPS.lock();
+    global
+        .as_ref()
+        .map(|m| m.check_capability(pid, cap))
+        .unwrap_or(false)
 }
 
-// Global instance moved to crate::security::CAPABILITIES (Option)
+pub fn raise_capability(pid: u32, cap: CapFlag) -> Result<()> {
+    let global = GLOBAL_CAPS.lock();
+    let manager = global.as_ref().ok_or(Error::NotFound)?;
+    manager.raise_capability(pid, cap)
+}
+
+pub fn drop_capability(pid: u32, cap: CapFlag) -> Result<()> {
+    let global = GLOBAL_CAPS.lock();
+    let manager = global.as_ref().ok_or(Error::NotFound)?;
+    manager.drop_capability(pid, cap)
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_capability_names() {
-        assert_eq!(Capability::Chown.name(), "CAP_CHOWN");
-        assert_eq!(Capability::Kill.name(), "CAP_KILL");
-        assert_eq!(Capability::SysAdmin.name(), "CAP_SYS_ADMIN");
+    fn test_cap_flags() {
+        let mut flags = CapFlags::empty();
+        flags.insert(CapFlag::Chown);
+        assert!(flags.contains(CapFlag::Chown));
+        assert!(!flags.contains(CapFlag::Kill));
     }
 
     #[test]
-    fn test_capability_sets_creation() {
-        let caps = CapabilitySets::new();
-        assert_eq!(caps.effective, 0);
-        assert_eq!(caps.permitted, 0);
-        assert_eq!(caps.inheritable, 0);
-        assert_eq!(caps.bounding, u32::MAX);
+    fn test_cap_sets() {
+        let caps = CapSets::with_full_caps();
+        assert!(caps.has_cap(CapFlag::SysAdmin));
     }
 
     #[test]
-    fn test_capability_operations() {
-        let mut caps = CapabilitySets::new();
-
-        assert!(!caps.has_effective(Capability::Kill));
-        caps.add_effective(Capability::Kill);
-        assert!(caps.has_effective(Capability::Kill));
-        caps.remove_effective(Capability::Kill);
-        assert!(!caps.has_effective(Capability::Kill));
+    fn test_securebits() {
+        let mut bits = SecureBits::new();
+        bits.set(SecureBit::NoRoot);
+        assert!(bits.is_set(SecureBit::NoRoot));
     }
 
     #[test]
-    fn test_capability_validation() {
-        let mut caps = CapabilitySets::new();
+    fn test_cap_manager() {
+        let manager = CapManager::new();
+        assert!(manager.initialize().is_ok());
 
-        // Valid: empty effective set is subset of empty permitted set
-        assert!(caps.validate());
+        let caps = CapSets::with_full_caps();
+        manager.register_process(1234, caps);
 
-        // Invalid: effective without permitted
-        caps.add_effective(Capability::Kill);
-        assert!(!caps.validate());
-
-        // Valid: add permitted then effective
-        caps.add_permitted(Capability::Kill);
-        assert!(caps.validate());
+        assert!(manager.check_capability(1234, CapFlag::SysAdmin));
     }
 
     #[test]
-    fn test_capability_subsystem() {
-        let mut subsystem = CapabilitySubsystem::new();
+    fn test_raise_drop_cap() {
+        let manager = CapManager::new();
+        manager.initialize().unwrap();
 
-        let result = subsystem.init_process(1234, 1000);
-        assert!(result.is_ok());
+        let mut caps = CapSets::new();
+        caps.permitted.insert(CapFlag::NetAdmin);
+        caps.bounding.insert(CapFlag::NetAdmin);
+        manager.register_process(1234, caps);
 
-        assert!(!subsystem.process_has_capability(1234, Capability::Kill));
+        // Raise capability
+        assert!(manager.raise_capability(1234, CapFlag::NetAdmin).is_ok());
 
-        let result = subsystem.init_process(0, 0);
-        assert!(result.is_ok());
-
-        assert!(subsystem.process_has_capability(0, Capability::Kill));
+        // Drop capability
+        assert!(manager.drop_capability(1234, CapFlag::NetAdmin).is_ok());
     }
 }
