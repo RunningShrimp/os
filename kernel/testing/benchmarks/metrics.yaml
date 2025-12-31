@@ -1,0 +1,73 @@
+# Kernel Performance Benchmark Thresholds
+#
+# This file defines the performance targets for all kernel benchmarks.
+# Results that exceed these thresholds should be investigated for regressions.
+
+# Scheduler Performance Targets
+scheduler:
+  context_switch_latency_ns: 5000        # <5μs for context switch
+  schedule_latency_ns: 10000             # <10μs for scheduling latency
+  throughput_switches_per_sec: 100000    # >100K switches/sec
+  wakeup_latency_ns: 8000                # <8μs for wakeup latency
+  timer_tick_overhead_ns: 1000           # <1μs for timer tick
+
+# Memory Performance Targets
+memory:
+  page_alloc_throughput_pages_per_sec: 1000000  # >1M pages/sec
+  page_alloc_latency_ns: 100                    # <100ns per allocation
+  page_free_latency_ns: 80                      # <80ns per free
+  slab_alloc_latency_ns: 50                     # <50ns for slab alloc
+  fragmentation_ratio_percent: 20               # <20% external fragmentation
+  numa_locality_percent: 90                     # >90% local accesses
+  hugepage_alloc_ns: 1000                       # <1μs for hugepage
+
+# IPC Performance Targets
+ipc:
+  pipe_throughput_mb_per_sec: 1000      # >1GB/sec for pipes
+  pipe_latency_ns: 1500                 # <1.5μs round-trip
+  message_latency_ns: 1000              # <1μs for message passing
+  shmem_throughput_mb_per_sec: 5000     # >5GB/sec for shared memory
+  shmem_latency_ns: 500                 # <500ns for shared memory access
+  mq_throughput_msgs_per_sec: 500000    # >500K messages/sec
+
+# Filesystem Performance Targets
+filesystem:
+  ext4_read_throughput_mb_per_sec: 500    # >500MB/sec sequential read
+  ext4_write_throughput_mb_per_sec: 300   # >300MB/sec sequential write
+  random_read_mb_per_sec: 100             # >100MB/sec random read
+  random_write_mb_per_sec: 50             # >50MB/sec random write
+  metadata_ops_per_sec: 50000             # >50K metadata ops/sec
+  file_create_ns: 5000                    # <5μs to create file
+  file_delete_ns: 4000                    # <4μs to delete file
+  directory_lookup_ns: 1000               # <1μs for directory lookup
+  inode_alloc_ns: 2000                    # <2μs for inode allocation
+
+# Network Performance Targets
+network:
+  tcp_throughput_gb_per_sec: 5            # >5GB/sec TCP
+  tcp_latency_ns: 2000                    # <2μs TCP RTT
+  udp_throughput_gb_per_sec: 6            # >6GB/sec UDP
+  udp_latency_ns: 1000                    # <1μs UDP
+  connection_setup_latency_ns: 10000      # <10μs TCP 3-way handshake
+  connection_teardown_ns: 5000            # <5μs TCP close
+  packet_processing_ns: 500               # <500ns per packet
+
+# Regression Detection Settings
+regression:
+  threshold_percent: 5.0                  # Alert if >5% degradation
+  confidence_level: 0.95                  # 95% confidence interval
+  min_sample_size: 50                     # Minimum samples for comparison
+
+# Benchmark Execution Settings
+execution:
+  warmup_iterations: 100                  # Default warmup iterations
+  measurement_iterations: 1000            # Default measurement iterations
+  max_duration_seconds: 10                # Maximum time per benchmark
+  cooldown_ms: 100                        # Cooldown between benchmarks
+
+# Reporting Settings
+reporting:
+  format: "detailed"                      # detailed, summary, json
+  include_statistics: true                # Include mean, median, p95, p99
+  show_comparison: true                   # Compare to previous runs
+  save_history: true                      # Save results for trend analysis

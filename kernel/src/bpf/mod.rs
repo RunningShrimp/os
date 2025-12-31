@@ -7,17 +7,59 @@
 //! - [`verifier`]: eBPF 指令验证器
 //! - [`programs`]: eBPF 程序管理
 //! - [`maps`]: eBPF maps 数据结构
+//! - [`tracer`]: eBPF 追踪器（kprobe/tracepoint/uprobe）
 
 pub mod verifier;
+pub mod verifier_enhanced;
 pub mod programs;
 pub mod maps;
+pub mod maps_advanced;
+pub mod tracer;
 
 use crate::prelude::*;
 
 // Re-export commonly used types
 pub use verifier::{BpfVerifier, BpfVerifierConfig, VerifierError};
+pub use verifier_enhanced::{
+    EnhancedVerifier,
+    EnhancedVerifierConfig,
+    EnhancedVerifierError,
+    EnhancedVerifierResult,
+    TaintAnalyzer,
+    LoopDetector,
+    ResourceLimiter,
+    TaintSource,
+    RegisterType,
+    ValueRange,
+};
 pub use programs::{BpfProgram, BpfProgramType};
 pub use maps::{BpfMap, BpfMapType};
+
+// Re-export advanced map types
+pub use maps_advanced::{
+    RingBufferMap, PerfEventMap, BloomFilter, SkewSketch,
+    BpfMapBatchOps, BpfMapPersistence, BpfMapStats,
+    RingBufferStatistics, PerfEventStatistics, BloomFilterStatistics,
+    SkewSketchStatistics, MapStatistics, PerfEventType, PerfEventConfig,
+    PerfEventAttrs,
+};
+
+// Re-export tracer types
+pub use tracer::{
+    BpfTracer,
+    TracerConfig,
+    TracerError,
+    TracerResult,
+    TraceEvent,
+    TraceEventType,
+    EventFilter,
+    KprobeType,
+    KprobeHandler,
+    TracepointHandler,
+    UprobeHandler,
+    PerCpuBufferStats,
+    ProbeStats,
+};
 
 /// eBPF 错误
 #[derive(Debug, Clone, PartialEq, Eq)]

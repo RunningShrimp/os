@@ -227,30 +227,25 @@ fn bench_rcu_reclamation(c: &mut Criterion) {
 // Per-CPU Memory Allocator Benchmarks
 // ============================================================================
 
-/// Benchmark enhanced per-CPU allocator fast path
+/// Benchmark per-CPU allocator fast path
 fn bench_percpu_fast_path(c: &mut Criterion) {
-    use crate::subsystems::mm::percpu_allocator_v2::{EnhancedPerCpuAllocator, Frame};
-    use crate::subsystems::mm::allocator::HybridAllocator;
+    use crate::subsystems::mm::percpu_allocator;
 
-    let global = HybridAllocator::new();
-    let mut allocator = EnhancedPerCpuAllocator::new(&global);
+    // Initialize allocator
+    let _ = percpu_allocator::init();
 
     // Warm up the cache
     for _ in 0..32 {
-        let frame = allocator.alloc(64);
-        if let Some(f) = frame {
-            allocator.dealloc(f);
+        if let Ok(page) = percpu_allocator::allocate_pages(1) {
+            let _ = percpu_allocator::free_pages(page, 1);
         }
     }
 
     c.bench_function("percpu_fast_path", |b| {
         b.iter(|| {
-            let frame = allocator.alloc(64);
-            black_box(frame);
-
-            // Dealloc for next iteration
-            if let Some(f) = frame {
-                allocator.dealloc(f);
+            if let Ok(page) = percpu_allocator::allocate_pages(1) {
+                black_box(page);
+                let _ = percpu_allocator::free_pages(page, 1);
             }
         })
     });
@@ -258,34 +253,15 @@ fn bench_percpu_fast_path(c: &mut Criterion) {
 
 /// Benchmark per-CPU cache hit rate
 fn bench_percpu_hit_rate(c: &mut Criterion) {
-    use crate::subsystems::mm::percpu_allocator_v2::{EnhancedPerCpuAllocator, init_enhanced_allocators};
-    use crate::subsystems::mm::allocator::HybridAllocator;
+    use crate::subsystems::mm::percpu_allocator;
 
-    let global = HybridAllocator::new();
-    init_enhanced_allocators(8, &global);
+    let _ = percpu_allocator::init();
 
     c.bench_function("percpu_hit_rate", |b| {
         b.iter(|| {
-            let mut hits = 0;
-            let mut misses = 0;
-
-            // Simulate allocation pattern
-            for _ in 0..100 {
-                use crate::subsystems::mm::percpu_allocator_v2::current_enhanced_allocator;
-                if let Some(alloc) = current_enhanced_allocator() {
-                    let (h, m, _) = alloc.stats();
-                    hits = h;
-                    misses = m;
-                }
-            }
-
-            let hit_rate = if hits + misses > 0 {
-                (hits as f64) / ((hits + misses) as f64)
-            } else {
-                0.0
-            };
-
-            black_box(hit_rate);
+            // Get statistics after allocations
+            let stats = percpu_allocator::get_stats();
+            black_box(stats.cache_hit_rate);
         })
     });
 }

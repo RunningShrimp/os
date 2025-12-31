@@ -515,3 +515,7 @@ where
 {
     f()
 }
+
+// Test suite for scheduler
+#[cfg(test)]
+pub mod tests;

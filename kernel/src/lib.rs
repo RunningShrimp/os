@@ -320,7 +320,7 @@ pub use nos_error_handling as error_handling;
 // pub use nos_syscalls as syscalls;
 /// Performance monitoring
 pub use perf::*;
-pub use platform::{arch as platform_arch, boot, drivers};
+pub use platform::{arch as platform_arch, boot};
 /// POSIX types and constants
 pub use posix::*;
 // Re-export moved modules to maintain compatibility
@@ -657,6 +657,16 @@ pub mod filesystem;
 
 /// Database engine with SQL support, transactions, and recovery
 pub mod database;
+
+/// Device drivers framework
+///
+/// This module provides comprehensive device driver support:
+/// - UIO (Userspace I/O) driver framework
+/// - VFIO (Virtual Function I/O) for device assignment
+/// - PCI device management
+/// - USB device management
+/// - GPU driver framework
+pub mod drivers;
 
 /// Health checking with probes, circuit breakers, and aggregation
 pub mod health;

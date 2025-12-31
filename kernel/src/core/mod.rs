@@ -14,6 +14,12 @@ use nos_api::Result;
 /// Kernel initialization module
 pub mod init;
 
+/// Initialization dependency management
+pub mod init_dependencies;
+
+/// Parallel initialization engine
+pub mod parallel_init;
+
 /// 内核版本信息
 pub const KERNEL_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const KERNEL_NAME: &str = "NOS";

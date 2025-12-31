@@ -231,6 +231,10 @@ pub use page_table_isolation::PageTable;
 #[cfg(feature = "kernel_tests")]
 pub mod tests;
 
+// Advanced memory management test suite
+#[cfg(test)]
+pub mod advanced_tests;
+
 // pub use optimized_allocator::OptimizedHybridAllocator;
 
 /// Large page size constants (2MB and 1GB)
@@ -302,7 +306,7 @@ pub fn init_advanced_memory_management() -> nos_api::Result<()> {
     numa::init_numa()?;
 
     // Initialize per-CPU allocators
-    percpu_allocator::init_percpu_allocators();
+    let _ = percpu_allocator::init();
 
     // Initialize optimized memory manager
     // optimized_memory_manager::init_optimized_memory_manager()?;
@@ -325,7 +329,7 @@ pub fn shutdown_advanced_memory_management() -> nos_api::Result<()> {
     // optimized_memory_manager::shutdown_optimized_memory_manager()?;
 
     // Shutdown per-CPU allocators
-    percpu_allocator::shutdown_percpu_allocators()?;
+    let _ = percpu_allocator::shutdown();
 
     // Shutdown NUMA support
     numa::shutdown_numa()?;

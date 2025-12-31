@@ -326,3 +326,7 @@ impl From<memory_security::SecurityError> for SecurityError {
         SecurityError::MemorySecurityError(err)
     }
 }
+
+// Security mechanisms test suite
+#[cfg(test)]
+pub mod tests;

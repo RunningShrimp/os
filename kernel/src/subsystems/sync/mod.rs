@@ -17,12 +17,17 @@ pub mod sleeplock;
 pub mod rwlock;
 pub mod spinlock;
 pub mod once;
+pub mod once_lock;
 pub mod primitives;
 pub mod priority_mutex;
 pub mod realtime;
 pub mod rcu;
 pub mod interrupts;
 pub mod lazy;
+
+// Legacy adaptive spinlock implementation (migrated from kernel/src/sync)
+pub mod adaptive_spinlock_legacy;
+pub mod lock_guard_utils;
 
 // ============================================================================
 // Interrupt control for SMP safety
@@ -265,127 +270,28 @@ impl Drop for SpinLockIrqGuard<'_> {
 }
 
 // ============================================================================
-// Re-export Mutex types from main sync module
+// Export Mutex types from local mutex module
 // ============================================================================
 
-pub use crate::sync::{Mutex, MutexGuard, MutexIrq, MutexIrqGuard};
+pub use mutex::{Mutex, MutexGuard, MutexIrq, MutexIrqGuard};
 
 // ============================================================================
-// Once - One-time initialization primitive
-// ============================================================================
-
-const ONCE_INCOMPLETE: usize = 0;
-const ONCE_RUNNING: usize = 1;
-const ONCE_COMPLETE: usize = 2;
-
-/// A synchronization primitive for one-time initialization
-pub struct Once {
-    state: AtomicUsize,
-}
-
-impl Once {
-    pub const fn new() -> Self {
-        Self { state: AtomicUsize::new(ONCE_INCOMPLETE) }
-    }
-
-    /// Returns true if `call_once` has completed successfully
-    pub fn is_completed(&self) -> bool {
-        self.state.load(Ordering::Acquire) == ONCE_COMPLETE
-    }
-
-    /// Performs initialization exactly once
-    pub fn call_once<F: FnOnce()>(&self, f: F) {
-        if self.state.load(Ordering::Acquire) == ONCE_COMPLETE {
-            return;
-        }
-        self.call_once_slow(f);
-    }
-
-    #[cold]
-    fn call_once_slow<F: FnOnce()>(&self, f: F) {
-        loop {
-            match self.state.compare_exchange(
-                ONCE_INCOMPLETE,
-                ONCE_RUNNING,
-                Ordering::Acquire,
-                Ordering::Relaxed,
-            ) {
-                Ok(_) => {
-                    // We won the race to initialize
-                    f();
-                    self.state.store(ONCE_COMPLETE, Ordering::Release);
-                    return;
-                },
-                Err(ONCE_COMPLETE) => return,
-                Err(ONCE_RUNNING) => {
-                    // Spin while another thread initializes
-                    while self.state.load(Ordering::Acquire) == ONCE_RUNNING {
-                        core::hint::spin_loop();
-                    }
-                },
-                Err(_) => unreachable!(),
-            }
-        }
-    }
-}
-
-impl Default for Once {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-// ============================================================================
-// Lazy<T> - Lazily initialized value
-// ============================================================================
-
-/// A value which is initialized on first access
-pub struct Lazy<T, F = fn() -> T> {
-    once: Once,
-    init: UnsafeCell<Option<F>>,
-    value: UnsafeCell<Option<T>>,
-}
-
-// Safety: Lazy uses Once for synchronization
-unsafe impl<T: Send + Sync, F: Send> Sync for Lazy<T, F> {}
-unsafe impl<T: Send, F: Send> Send for Lazy<T, F> {}
-
-impl<T, F: FnOnce() -> T> Lazy<T, F> {
-    pub const fn new(init: F) -> Self {
-        Self {
-            once: Once::new(),
-            init: UnsafeCell::new(Some(init)),
-            value: UnsafeCell::new(None),
-        }
-    }
-
-    /// Forces initialization if not already done
-    pub fn force(this: &Self) -> &T {
-        this.once.call_once(|| {
-            // Safety: We're inside call_once, so only one thread runs this
-            let init = unsafe { (*this.init.get()).take().unwrap() };
-            let value = init();
-            unsafe { *this.value.get() = Some(value) };
-        });
-        // Safety: After call_once, value is initialized
-        unsafe { (*this.value.get()).as_ref().unwrap() }
-    }
-}
-
-impl<T, F: FnOnce() -> T> Deref for Lazy<T, F> {
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        Lazy::force(self)
-    }
-}
-
-// ============================================================================
-// Re-export Sleeplock and RwLock from their submodules
+// Re-export Once, OnceLock, Lazy from their submodules
 // ============================================================================
 
 pub use sleeplock::{Sleeplock, SleeplockGuard};
 pub use rwlock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+pub use once::Once;
+pub use once_lock::OnceLock;
+pub use lazy::Lazy;
+pub use priority_mutex::PriorityMutex;
+pub use rcu::{Rcu, RcuGracePeriod};
+
+// Re-export adaptive spinlock and lock guard utilities
+pub use adaptive_spinlock_legacy::{
+    AdaptiveConfig, AdaptiveRwLock, AdaptiveRwLockStats, AdaptiveSpinlock, AdaptiveSpinlockStats,
+};
+pub use lock_guard_utils::LockGuard;
 
 // Legacy re-exports for backward compatibility
 
