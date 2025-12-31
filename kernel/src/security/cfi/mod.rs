@@ -35,6 +35,10 @@
 
 #![cfg(feature = "cfi")]
 
+// CFI submodules
+pub mod types;
+pub mod compiler;
+
 extern crate alloc;
 
 use alloc::{collections::BTreeMap, vec::Vec};
