@@ -229,6 +229,18 @@ pub use core::sync::atomic::AtomicI32;
 /// Atomic pointer type
 pub use core::sync::atomic::AtomicPtr;
 
+/// Atomic u8 type (if available)
+#[cfg(feature = "atomic_u8")]
+pub use core::sync::atomic::AtomicU8;
+
+// ============================================================================
+// Once Lock Types
+// ============================================================================
+
+/// One-time initialization lock (Rust 1.70+)
+/// Note: OnceLock is not available in core::sync in no_std, using lazy_static with Mutex instead
+pub use crate::sync::OnceLock;
+
 // ============================================================================
 // Smart Pointer Types
 // ============================================================================

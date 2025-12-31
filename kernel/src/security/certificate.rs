@@ -34,7 +34,7 @@
 extern crate alloc;
 
 use alloc::collections::BTreeMap;
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering};
 use spin::RwLock;
@@ -670,7 +670,8 @@ impl CrlManager {
 
     /// Add a CRL
     pub fn add_crl(&mut self, crl: CertificateRevocationList) -> Result<(), CertificateError> {
-        let issuer_key = crl.issuer.to_string();
+        // Use Debug formatting as a key since DistinguishedName doesn't implement ToString
+        let issuer_key = format!("{:?}", crl.issuer);
 
         self.crls.insert(issuer_key, crl);
         self.stats.total_crls.fetch_add(1, Ordering::SeqCst);
@@ -680,7 +681,8 @@ impl CrlManager {
 
     /// Check if certificate is revoked
     pub fn is_revoked(&self, cert: &Certificate) -> bool {
-        let issuer_key = cert.issuer.to_string();
+        // Use Debug formatting as a key
+        let issuer_key = format!("{:?}", cert.issuer);
 
         self.crls
             .get(&issuer_key)

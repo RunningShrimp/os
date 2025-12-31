@@ -505,3 +505,9 @@ mod tests {
 pub mod reliability;
 // Audio subsystem for real-time audio processing
 pub mod audio;
+
+/// Blockchain and smart contract support
+///
+/// This module provides a complete implementation of blockchain technology,
+/// including smart contract execution through the Ethereum Virtual Machine (EVM).
+pub mod blockchain;

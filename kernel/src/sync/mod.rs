@@ -84,54 +84,52 @@
 //! {
 //!     let mut data = mutex.lock();
 //!     data.push(1);
-//! } // 锁在这里释放
+//! }
 //! ```
-//!
-//! ## 设计决策
-//!
-//! ### 中断控制
-//!
-//! 自旋锁在持有期间禁用中断：
-//! - 防止死锁（中断处理程序可能尝试获取同一锁）
-//! - 使用 `push_off`/`pop_off` 管理
-//!
-//! ### 自适应策略
-//!
-//! 自适应锁使用三阶段等待策略：
-//! 1. **快速自旋**（0-10次）：期望持有者很快释放
-//! 2. **指数退避**（10-100次）：减少CPU总线争用
-//! 3. **长期等待**（>100次）：大幅降低自旋频率
-//!
-//! 这种策略在竞争激烈时可以：
-//! - 减少40%的CPU功耗
-//! - 提升70%的性能（高竞争场景）
-//! - 降低总线争用
-//!
-//! ### 内存屏障
-//!
-//! 所有同步原语都包含适当的内存屏障：
-//! - 编译器屏障：防止编译器重排序
-//! - CPU 屏障：确保内存操作的顺序
-//!
-//! ## 性能考虑
-//!
-//! - **自旋锁**: 适用于短期锁定（< 1μs）
-//! - **自适应自旋锁**: 适用于竞争激烈的场景
-//! - **互斥锁**: 适用于可能睡眠的场景
-//! - **读写锁**: 适用于读多写少的场景
-//! - **自适应读写锁**: 适用于读写竞争不确定的场景
-//!
-//! ## SMP 安全
-//!
-//! 所有同步原语都是 SMP 安全的：
-//! - 使用原子操作
-//! - 适当的内存屏障
-//! - 正确的中断处理
-//!
-//! ## 相关模块
-//!
-//! - [`crate::subsystems::sync`]: 更多的同步原语实现
-//! - [`futex`]: 用户空间同步原语
+
+// 自旋锁在持有期间禁用中断：
+// - 防止死锁（中断处理程序可能尝试获取同一锁）
+// - 使用 `push_off`/`pop_off` 管理
+use core::sync::atomic::{AtomicU8, Ordering};
+
+//
+// ### 自适应策略
+//
+// 自适应锁使用三阶段等待策略：
+// 1. **快速自旋**（0-10次）：期望持有者很快释放
+// 2. **指数退避**（10-100次）：减少CPU总线争用
+// 3. **长期等待**（>100次）：大幅降低自旋频率
+//
+// 这种策略在竞争激烈时可以：
+// - 减少40%的CPU功耗
+// - 提升70%的性能（高竞争场景）
+// - 降低总线争用
+//
+// ### 内存屏障
+//
+// 所有同步原语都包含适当的内存屏障：
+// - 编译器屏障：防止编译器重排序
+// - CPU 屏障：确保内存操作的顺序
+//
+// ## 性能考虑
+//
+// - **自旋锁**: 适用于短期锁定（< 1μs）
+// - **自适应自旋锁**: 适用于竞争激烈的场景
+// - **互斥锁**: 适用于可能睡眠的场景
+// - **读写锁**: 适用于读多写少的场景
+// - **自适应读写锁**: 适用于读写竞争不确定的场景
+//
+// ## SMP 安全
+//
+// 所有同步原语都是 SMP 安全的：
+// - 使用原子操作
+// - 适当的内存屏障
+// - 正确的中断处理
+//
+// ## 相关模块
+//
+// - [`crate::subsystems::sync`]: 更多的同步原语实现
+// - [`futex`]: 用户空间同步原语
 
 // Synchronization primitives for xv6-rust kernel
 // Provides SpinLock, Mutex, Sleeplock, Once, and related types
@@ -142,7 +140,7 @@ use core::{
     cell::UnsafeCell,
     fmt::Debug,
     ops::{Deref, DerefMut},
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize},
 };
 
 // ============================================================================
@@ -889,3 +887,64 @@ impl<T: ?Sized + Debug> Debug for MutexIrq<T> {
             .finish_non_exhaustive()
     }
 }
+
+// ============================================================================
+// OnceLock<T> - One-time initialization
+// ============================================================================
+
+/// A synchronization primitive which can be used to run a one-time global
+/// initialization. Unlike `Once`, it allows returning a value.
+pub struct OnceLock<T> {
+    state: AtomicU8,
+    data: UnsafeCell<Option<T>>,
+}
+
+impl<T> OnceLock<T> {
+    pub const fn new() -> Self {
+        Self {
+            state: AtomicU8::new(0),
+            data: UnsafeCell::new(None),
+        }
+    }
+
+    pub fn get(&self) -> Option<&T> {
+        if self.state.load(Ordering::Acquire) == 2 {
+            // Safety: We've checked the state
+            unsafe { (&*self.data.get()).as_ref() }
+        } else {
+            None
+        }
+    }
+
+    pub fn set(&self, value: T) -> Result<(), T> {
+        match self.state.compare_exchange(0, 1, Ordering::AcqRel, Ordering::Acquire) {
+            Ok(_) => {
+                // Safety: We have exclusive access
+                unsafe {
+                    *self.data.get() = Some(value);
+                }
+                self.state.store(2, Ordering::Release);
+                Ok(())
+            }
+            Err(_) => Err(value),
+        }
+    }
+
+    pub fn get_or_init<F>(&self, f: F) -> &T
+    where
+        F: FnOnce() -> T,
+    {
+        if let Some(value) = self.get() {
+            return value;
+        }
+
+        let value = f();
+        // Ignore error if already set
+        let _ = self.set(value);
+        self.get().unwrap()
+    }
+}
+
+// Safety: OnceLock provides synchronized access
+unsafe impl<T: Send> Sync for OnceLock<T> {}
+unsafe impl<T: Send> Send for OnceLock<T> {}

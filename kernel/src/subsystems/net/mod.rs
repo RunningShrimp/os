@@ -3,6 +3,14 @@
 //!
 //! This module implements a complete TCP/IP network stack for NOS,
 //! including Ethernet, ARP, IPv4, ICMP, UDP, and TCP protocols.
+//!
+//! Additionally, it implements real-time communication protocols:
+//! - WebRTC (PeerConnection, SDP, ICE, DTLS, SRTP)
+//! - SIP/VoIP (Registration, Call Control, Messaging)
+//! - RTP/RTCP (Media Transport, Timing, Synchronization)
+//! - SRTP (Media Encryption and Authentication)
+//! - ICE/STUN/TURN (NAT Traversal)
+//! - Real-Time Text (T.140 over RTP)
 
 extern crate alloc;
 
@@ -30,6 +38,23 @@ pub mod udp_optimization;
 pub mod udp_multicast;
 pub mod wireless;
 pub mod zero_copy; // POSIX-compatible network API (required for socket syscalls)
+
+// Real-time communication protocols
+pub mod webrtc; // WebRTC protocol stack
+pub mod sip;    // SIP/VoIP protocol stack
+pub mod rtp;    // RTP/RTCP implementation
+pub mod srtp;   // SRTP media encryption
+pub mod ice;    // ICE/STUN/TURN NAT traversal
+pub mod rtt;    // Real-time text (T.140 over RTP)
+
+// Satellite communication modules
+pub mod sat_types;    // Common types and error handling for satellite communication
+pub mod dsp;         // Digital Signal Processing engine
+pub mod doppler;     // Doppler shift compensation
+pub mod gnss;        // GNSS/GPS navigation system
+pub mod satellite;   // LEO satellite internet (Starlink-style)
+pub mod deepspace;   // Deep space communication protocols
+pub mod ma;          // Multiple access schemes (TDMA/CDMA/FDMA)
 
 // Test modules
 #[cfg(test)]
