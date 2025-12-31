@@ -12,14 +12,36 @@
 //!
 //! ## 主要组件
 //!
+//! ### 内存安全
 //! - [`aslr`]: 地址空间布局随机化
 //! - [`stack_canaries`]: 栈保护金丝雀
-//! - [`enhanced_permissions`]: 增强的权限系统
-//! - [`capabilities`]: POSIX Capabilities
-//! - [`acl`]: 访问控制列表
-//! - [`seccomp`]: 系统调用过滤
-//! - [`memory_audit`]: 内存审计和监控
 //! - [`memory_security`]: 内存安全机制
+//! - [`memory_audit`]: 内存审计和监控
+//!
+//! ### 访问控制
+//! - [`enhanced_permissions`]: 增强的权限系统
+//! - [`acl`]: 访问控制列表
+//! - [`capabilities`]: POSIX Capabilities
+//! - [`seccomp`]: 系统调用过滤
+//!
+//! ### 网络安全
+//! - [`firewall`]: 防火墙和包过滤引擎
+//! - [`ids`]: 入侵检测系统 (IDS/IPS)
+//! - [`ddos`]: DDoS 防护机制
+//! - [`vpn`]: VPN 隧道协议 (IPsec, WireGuard, OpenVPN)
+//! - [`net_analysis`]: 网络流量分析和 DPI
+//! - [`zero_trust`]: 零信任网络架构
+//!
+//! ### 加密和密钥管理
+//! - [`certificate`]: X.509 证书管理
+//! - [`hsm`]: 硬件安全模块 (HSM)
+//! - [`kms`]: 密钥管理服务 (KMS)
+//! - [`tpm`]: 可信平台模块 (TPM)
+//! - [`secure_boot`]: 安全启动
+//!
+//! ### 审计和合规
+//! - [`audit`]: 安全审计框架
+//! - [`audit_enhanced`]: 增强审计系统
 //!
 //! ## 安全机制
 //!
@@ -130,14 +152,20 @@ pub mod aslr;
 pub mod audit;
 pub mod audit_enhanced;
 pub mod certificate;
+pub mod ddos;
 pub mod enhanced_permissions;
+pub mod firewall;
 pub mod hsm;
+pub mod ids;
 pub mod kms;
 pub mod memory_audit;
 pub mod memory_security;
+pub mod net_analysis;
 pub mod secure_boot;
 pub mod stack_canaries;
 pub mod tpm;
+pub mod vpn;
+pub mod zero_trust;
 
 // P2 Priority Security Features (optional, feature-gated)
 #[cfg(feature = "cfi")]
@@ -186,6 +214,44 @@ pub use tpm::{
     TpmCommandCode, TpmDevice, TpmEccCurve, TpmError, TpmHandleType, TpmHierarchy,
     TpmKeyHandle, TpmPermanentHandle, TpmPublicKey, TpmResource, TpmResourceManager,
     TpmSealedData, TpmStats, TpmTag, init_tpm, get_tpm_device,
+};
+
+// Network Security Module Exports
+pub use firewall::{
+    FirewallEngine, FirewallError, FirewallRule, FirewallChain, FirewallStats,
+    RuleTarget, PacketMatch, AddressMatch, PortMatch, TcpFlags, RateLimit,
+    ConntrackEntry, ConntrackState, NatEntry, NatType, Protocol, ChainType,
+    init_firewall, add_rule,
+};
+pub use ids::{
+    IdsEngine, IdsError, IdsRule, Detection, ThreatLevel, DetectionType,
+    RuleAction, Protocol as IdsProtocol, AddressSpec, PortSpec, RuleOption,
+    Signature, SignatureType, SignatureContext, AnomalyModel, DetectionAlgorithm,
+    IdsStatistics, IdsConfig, PerformanceMode,
+    init_ids, process_packet_ids,
+};
+pub use ddos::{
+    DdosProtectionEngine, DdosError, IpListType, RateLimitStrategy,
+    RateLimitEntry, RateLimitConfig, SynCookieState, SynCookie, SynCookieConfig,
+    TrafficCleaningConfig, CleaningAction, AdaptiveFilterConfig, DdosStatistics,
+    init_ddos_protection, process_packet_ddos, blacklist_ip, whitelist_ip,
+};
+pub use vpn::{
+    VpnManager, VpnError, VpnProtocol, VpnTunnel, TunnelConfig, TunnelState,
+    EncryptionAlgorithm, AuthenticationAlgorithm, KeyExchangeMethod,
+    IpsecSa, WireGuardPeer, VpnStatistics,
+    init_vpn, create_ipsec_tunnel, create_wireguard_tunnel,
+};
+pub use net_analysis::{
+    TrafficAnalyzer, ProtocolType, TrafficEntry, FlowState, DpiResult,
+    BehaviorAnalysisResult, TrafficAnalysisStats, TrafficAnalysisConfig,
+    init_traffic_analysis, analyze_packet_traffic,
+};
+pub use zero_trust::{
+    ZeroTrustEngine, ZeroTrustError, Identity, IdentityType, Device, DeviceStatus,
+    TrustLevel, AccessPolicy, PolicyCondition, ConditionType, ConditionOperator,
+    AccessToken, AccessRequest, AccessDecision, MicroSegmentationRule, ZeroTrustStatistics,
+    init_zero_trust, evaluate_access_zero_trust,
 };
 
 // 只导出在其他地方直接使用的安全函数

@@ -8,9 +8,13 @@ extern crate alloc;
 pub mod cgroup;
 pub mod cgroups;
 pub mod container;
+pub mod deployment;
 pub mod filesystem;
+pub mod gateway;
+pub mod mesh;
 pub mod namespaces;
 pub mod oci;
+pub mod resilience;
 pub mod security;
 pub mod virtio;
 
