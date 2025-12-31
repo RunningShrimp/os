@@ -159,6 +159,7 @@ pub mod eventfd;
 pub mod fast_path;
 pub mod fs;
 pub mod glib;
+pub mod handlers;  // Syscall handlers (fs, net, types)
 pub mod ipc;
 pub mod lockfree_stats;
 pub mod memory;
