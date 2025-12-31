@@ -11,6 +11,7 @@
 //! - Grayscale mode
 //! - Font scaling
 
+use libm::*;
 use spin::Mutex;
 use core::sync::atomic;
 use alloc::collections::BTreeMap;
@@ -172,7 +173,7 @@ impl RgbColor {
         if c_scaled <= 0.04045 {
             c_scaled / 12.92
         } else {
-            ((c_scaled + 0.055) / 1.055).powf(2.4)
+            libm::powf((c_scaled + 0.055) / 1.055, 2.4)
         }
     }
 }

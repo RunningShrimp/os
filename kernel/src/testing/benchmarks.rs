@@ -8,6 +8,7 @@ extern crate alloc;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
+use libm::*;
 use core::sync::atomic::{AtomicU64, Ordering};
 use spin::Mutex;
 
@@ -265,7 +266,7 @@ impl BenchmarkSystem {
         let variance = measurements.iter()
             .map(|x| (x - average).powi(2))
             .sum::<f64>() / count as f64;
-        let stddev = variance.sqrt();
+        let stddev = libm::sqrt(variance);
 
         // Calculate percentiles
         let median = if count % 2 == 0 {

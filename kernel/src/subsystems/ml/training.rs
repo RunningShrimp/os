@@ -11,6 +11,7 @@
 //! - Performance metrics
 //! - Model persistence
 
+use libm::*;
 use spin::Mutex;
 use core::sync::atomic;
 use alloc::collections::BTreeMap;
@@ -232,7 +233,7 @@ impl TrainingDataset {
                 })
                 .sum::<f64>() / rewards.len() as f64;
             
-            stats.reward_std_dev = variance.sqrt();
+            stats.reward_std_dev = libm::sqrt(variance);
         }
         
         *stats

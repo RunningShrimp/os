@@ -2,6 +2,7 @@
 
 extern crate alloc;
 
+use alloc::boxed::Box;
 use crate::prelude::*;
 use core::sync::atomic::{AtomicUsize, Ordering};
 

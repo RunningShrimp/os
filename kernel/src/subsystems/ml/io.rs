@@ -11,6 +11,7 @@
 //! - Read/write path optimization
 //! - I/O queue length prediction
 
+use libm::*;
 use spin::Mutex;
 use core::sync::atomic;
 use alloc::collections::BTreeMap;
@@ -201,7 +202,7 @@ impl IoLatencyTracker {
             })
             .sum::<u64>() / count;
         
-        let std_dev = (variance as f64).sqrt() as u64;
+        let std_dev = libm::sqrt(variance as f64) as u64;
         
         // Calculate percentiles (simplified)
         let mut sorted = history.clone();
@@ -495,7 +496,7 @@ impl IoPathSelector {
             // - Reliability (higher is better)
             // - Zero-copy (is better)
             
-            let bandwidth_score = (caps.bandwidth as f64).log10(); // 0-6 for 1MB/s-1GB/s
+            let bandwidth_score = libm::log10(caps.bandwidth as f64); // 0-6 for 1MB/s-1GB/s
             let latency_score = 1.0 / ((caps.avg_latency as f64 - expected_latency as f64).abs() + 1.0);
             let zero_copy_bonus = if caps.zero_copy { 0.5 } else { 0.0 };
             

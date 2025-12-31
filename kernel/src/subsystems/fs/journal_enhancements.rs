@@ -23,7 +23,7 @@
 //! - **Write Ordering**: Optimal write ordering for performance
 
 extern crate alloc;
-use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
+use alloc::{boxed::Box, collections::BTreeMap, sync::Arc, vec::Vec};
 use core::sync::atomic {AtomicBool, AtomicU32, AtomicU64, Ordering, Ordering};
 
 use crate::error::UnifiedError;

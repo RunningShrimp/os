@@ -4,6 +4,10 @@
 //! providing transactional guarantees and crash recovery capabilities.
 //! The implementation is inspired by ext3 and NTFS journaling mechanisms.
 
+extern crate alloc;
+
+use alloc::boxed::Box;
+
 // Import prelude for common types
 use crate::prelude::*;
 

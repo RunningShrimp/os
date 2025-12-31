@@ -128,10 +128,16 @@
 
 pub mod aslr;
 pub mod audit;
+pub mod audit_enhanced;
+pub mod certificate;
 pub mod enhanced_permissions;
+pub mod hsm;
+pub mod kms;
 pub mod memory_audit;
 pub mod memory_security;
+pub mod secure_boot;
 pub mod stack_canaries;
+pub mod tpm;
 
 // P2 Priority Security Features (optional, feature-gated)
 #[cfg(feature = "cfi")]
@@ -142,6 +148,45 @@ pub mod shadow_stack;
 
 #[cfg(feature = "memory_encryption")]
 pub mod encrypted_memory;
+
+// Stage 3-5: Advanced Security Features
+pub use audit_enhanced::{
+    AlertConfig, AlertBackend, AlertingSystem, AuditContext, AuditError, AuditEvent,
+    AuditEventType, AuditRule, AuditRuleAction, AuditRuleCondition, AuditOperator,
+    AuditSeverity, AuditStatistics, AuditSystem, ComplianceReport, ComplianceReporter,
+    ComplianceStandard, LogIntegrityChain, init_audit_system, get_audit_system,
+};
+pub use certificate::{
+    Certificate, CertificateParser, CertificateRevocationList, CertificateSigningRequest,
+    CertificateValidator, CertificateVersion, CrlEntry, CrlManager, DistinguishedName, Extension,
+    OcspClient, OcspResponse, OcspStatus, RootCaManager, SignatureAlgorithm, Validity,
+    ValidationStatus, init_certificate_subsystem, get_certificate_validator,
+    extensions,
+};
+pub use hsm::{
+    HsmDevice, HsmDeviceInfo, HsmError, HsmManager, HsmObjectAttributes, HsmObjectHandle,
+    HsmSession, HsmSessionHandle, HsmSlotId, HsmStats, HsmStatus, Pkcs11KeyType,
+    Pkcs11Mechanism, Pkcs11ObjectClass, SoftwareHsm, init_hsm, get_hsm_manager,
+};
+pub use kms::{
+    KeyData, KeyDerivationFunction,
+    KeyEntry, KeyEscrowManager, KeyFormat, KeyLifecycleManager, KeyMetadata,
+    KeyProvider, KeyStatus, KeyStorage, KeyType, KeyUsage, KmsError,
+    SoftwareKeyProvider, init_kms, get_kms,
+};
+pub use secure_boot::{
+    BootLogger, BootMeasurement, CertificateValidator as SecureBootCertValidator,
+    DbManager, EfiSignatureData, EfiSignatureList, EfiSignatureOwner, EfiSignatureType,
+    ModuleSignature, ModuleVerifier, RecoveryManager as SecureBootRecoveryManager,
+    SecureBootError, SecureBootManager, SecureBootState, SignatureDatabase,
+    init_secure_boot, get_secure_boot_manager,
+};
+pub use tpm::{
+    PcrPolicy, PcrRegister, TpmAlgorithm, TpmAttestationReport, TpmCommandBuffer,
+    TpmCommandCode, TpmDevice, TpmEccCurve, TpmError, TpmHandleType, TpmHierarchy,
+    TpmKeyHandle, TpmPermanentHandle, TpmPublicKey, TpmResource, TpmResourceManager,
+    TpmSealedData, TpmStats, TpmTag, init_tpm, get_tpm_device,
+};
 
 // 只导出在其他地方直接使用的安全函数
 use aslr::AslrSubsystem;

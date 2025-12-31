@@ -6,6 +6,7 @@
 //! and NTFS logging mechanisms.
 
 extern crate alloc;
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
 use alloc::string::String;

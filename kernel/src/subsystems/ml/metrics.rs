@@ -12,6 +12,7 @@
 //! - Statistical aggregations
 //! - Real-time metrics updates
 
+use libm::*;
 use spin::Mutex;
 use core::sync::atomic;
 use alloc::collections::BTreeMap;
@@ -246,7 +247,7 @@ impl TimeSeriesMetric {
             })
             .sum::<f64>() / count as f64;
         
-        stats.std_dev = variance.sqrt();
+        stats.std_dev = libm::sqrt(variance);
         
         // Calculate percentiles (simplified)
         let mut sorted = self.values.clone();

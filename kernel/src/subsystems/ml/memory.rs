@@ -12,6 +12,7 @@
 //! - Adaptive memory limits
 //! - Prefetching optimization
 
+use libm::*;
 use spin::Mutex;
 use core::sync::atomic;
 use alloc::collections::BTreeMap;
@@ -300,7 +301,7 @@ impl AnomalyDetector {
             .map(|&x| (x - mean) * (x - mean))
             .sum::<f64>() / means.len() as f64;
         
-        let std_dev = variance.sqrt();
+        let std_dev = libm::sqrt(variance);
         
         stds.push(std_dev);
         
