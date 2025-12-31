@@ -7,12 +7,10 @@
 extern crate alloc;
 
 // use alloc::sync::Arc;
-use alloc::collections::BTreeMap;
 
 use crate::{
     ipc::signal::SignalState,
     process::{Context, TrapFrame},
-    subsystems::sync::{Mutex, Once},
 };
 
 // Import ThreadError from the api module

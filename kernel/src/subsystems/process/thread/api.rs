@@ -1,11 +1,6 @@
-use core::sync::atomic::{AtomicUsize, Ordering};
 
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use spin::Mutex;
 
-use super::types::{Thread, Tid, Pid, ThreadState, ThreadType, SchedPolicy, SchedParam, MAX_THREADS, INVALID_TID};
-use super::table::ThreadTable;
+use super::types::{Tid, ThreadState, ThreadType, SchedPolicy, SchedParam};
 use super::scheduling::{thread_table, current_thread, get_current_thread, get_current_thread_mut};
 
 /// Get current thread ID (POSIX compatible)

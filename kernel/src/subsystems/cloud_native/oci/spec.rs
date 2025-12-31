@@ -11,7 +11,7 @@ use alloc::{
     vec::Vec,
 };
 
-use crate::reliability::{EINVAL, ENOENT};
+use crate::reliability::EINVAL;
 
 /// 支持的OCI版本
 pub const OCI_VERSION_1_0: &str = "1.0.0";

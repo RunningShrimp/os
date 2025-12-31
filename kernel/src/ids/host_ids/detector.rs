@@ -7,7 +7,6 @@ extern crate alloc;
 use alloc::collections::BTreeMap;
 use alloc::{string::String, vec::Vec};
 
-use spin::Mutex;
 
 use crate::ids::{IntrusionDetection, ThreatLevel};
 use crate::security::audit::AuditEvent;

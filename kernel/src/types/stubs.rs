@@ -7,7 +7,6 @@ extern crate alloc;
 extern crate spin;
 
 use alloc::vec::Vec;
-use heapless::String as HeaplessString;
 
 // Microkernel IPC types - using real implementations
 pub use crate::subsystems::microkernel::service_registry::{

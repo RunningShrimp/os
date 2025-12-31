@@ -377,7 +377,7 @@ impl MsiManager {
 
         // 分配IRQ向量
         let mut vectors = Vec::new();
-        for i in 0..num_entries {
+        for _i in 0..num_entries {
             let irq = self.next_irq.fetch_add(1, Ordering::SeqCst);
             let vector = MsiVector::new(irq, irq);
             vectors.push(vector);

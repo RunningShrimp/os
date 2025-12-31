@@ -11,11 +11,10 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::AtomicU64;
 
-use spin::Mutex;
 
-use crate::reliability::{EINVAL, EIO, ENOENT, ENOMEM};
+use crate::reliability::{EINVAL, EIO, ENOENT};
 
 /// Cgroup v2根目录
 pub const CGROUP_V2_ROOT: &str = "/sys/fs/cgroup";

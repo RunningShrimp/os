@@ -23,6 +23,7 @@ pub mod processor;
 pub mod route;
 pub mod socket;
 pub mod tcp;
+pub mod tcp_base; // Base TCP types and utilities
 pub mod udp;
 pub mod udp_fast_path;
 pub mod udp_optimization;

@@ -1,12 +1,8 @@
-use core::sync::atomic::{AtomicUsize, Ordering, Ordering as AtomicOrdering};
 
-use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
-use spin::Mutex;
 
-use crate::subsystems::sync::Once;
 
-use super::types::{Thread, Tid, Pid, ThreadState, ThreadType, SchedPolicy, SchedParam, MAX_THREADS, INVALID_TID};
+use super::types::{Thread, Tid, Pid, ThreadState, ThreadType, MAX_THREADS};
 use super::table::{ThreadTable, THREAD_TABLE_INIT, THREAD_TABLE};
 use super::api::ThreadError;
 

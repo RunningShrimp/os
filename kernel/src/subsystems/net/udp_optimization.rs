@@ -8,8 +8,8 @@
 //! - Jumbo frame support
 
 extern crate alloc;
-use alloc::{vec::Vec, boxed::Box};
-use core::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, AtomicU64, AtomicUsize, Ordering};
+use alloc::vec::Vec;
+use core::sync::atomic::{AtomicU64, Ordering};
 
 use crate::subsystems::net::{
     ipv4::Ipv4Addr,
@@ -249,7 +249,7 @@ impl UdpOffload {
         }
 
         // Process packets in batch
-        for i in 0..batch_size {
+        for _i in 0..batch_size {
             // Perform any necessary transformations
             // In a real implementation, this would include:
             // - Checksum validation/offload

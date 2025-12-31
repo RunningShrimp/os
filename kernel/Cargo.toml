@@ -83,6 +83,8 @@ graphics_subsystem = ["graphics"]
 web_engine = ["networking"]
 observability = []
 yolo-mode = []
+advanced_fs = []
+bench = []
 
 # Features说明：
 # baremetal: 裸机启动与汇编路径（global_asm/trap/context switch等），用于真实目标板或无操作系统环境

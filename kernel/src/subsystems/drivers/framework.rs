@@ -386,14 +386,14 @@ pub trait Driver: Send {
     /// 启动设备
     ///
     /// 在设备被驱动程序接管后调用
-    fn start(&mut self, device: &mut dyn Device) -> Result<()> {
+    fn start(&mut self, _device: &mut dyn Device) -> Result<()> {
         Ok(())
     }
 
     /// 停止设备
     ///
     /// 在设备从驱动程序移除前调用
-    fn stop(&mut self, device: &mut dyn Device) -> Result<()> {
+    fn stop(&mut self, _device: &mut dyn Device) -> Result<()> {
         Ok(())
     }
 
@@ -542,10 +542,10 @@ impl DriverManager {
     }
 
     /// 为设备探测并匹配驱动程序
-    pub fn probe(&self, device: &dyn Device) -> Result<Option<usize>> {
+    pub fn probe(&self, _device: &dyn Device) -> Result<Option<usize>> {
         let drivers = self.drivers.lock();
 
-        for (index, driver) in drivers.iter().enumerate() {
+        for (_index, _driver) in drivers.iter().enumerate() {
             // Since we can't get mutable access, we'll assume all drivers return false for now
             // In a real implementation, this would require a different design
             // For now, just return None
@@ -571,9 +571,9 @@ impl DriverManager {
     /// 获取设备的驱动程序
     pub fn get_driver(&self, device_id: DeviceId) -> Option<Box<dyn Driver>> {
         let map = self.device_driver_map.lock();
-        let index = *map.get(&device_id)?;
+        let _index = *map.get(&device_id)?;
 
-        let drivers = self.drivers.lock();
+        let _drivers = self.drivers.lock();
         // 注意：这里不能返回驱动程序的引用，因为需要释放锁
         // 实际实现中应该使用Arc<Mutex<dyn Driver>>
         None

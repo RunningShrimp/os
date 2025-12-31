@@ -237,7 +237,7 @@ impl KernelHandoff {
         // 4. Boot information is complete
 
         // Validate boot information before handoff
-        if let Err(e) = self.boot_info.validate() {
+        if let Err(_e) = self.boot_info.validate() {
             // In bootloader context, we can't panic normally, so halt
             // This should not happen if prepare() was called, but check anyway
             // Simple error message for now

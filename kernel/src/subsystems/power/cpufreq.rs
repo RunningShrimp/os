@@ -3,7 +3,7 @@
 //! This module provides dynamic CPU frequency scaling support with multiple
 //! governor strategies for balancing performance and power consumption.
 
-use core::sync::atomic::{AtomicU64, AtomicU8, Ordering};
+use core::sync::atomic::{AtomicU8, Ordering};
 use core::time::Duration;
 
 use alloc::sync::Arc;
@@ -302,14 +302,14 @@ impl OndemandGovernor {
     /// Calculate target frequency with ondemand algorithm
     fn calculate_ondemand_freq(&self, load: u8) -> u64 {
         let up_threshold = self.up_threshold.load(Ordering::Relaxed);
-        let current = self.inner.current_freq();
+        let _current = self.inner.current_freq();
 
         if load >= up_threshold {
             // High load: jump to max frequency immediately
             self.inner.max_freq()
         } else {
             // Low load: scale down gradually
-            let target_load = up_threshold.saturating_sub(self.down_differential.load(Ordering::Relaxed));
+            let _target_load = up_threshold.saturating_sub(self.down_differential.load(Ordering::Relaxed));
             let scaled = (self.inner.max_freq() * load as u64) / 100;
             scaled.max(self.inner.min_freq())
         }

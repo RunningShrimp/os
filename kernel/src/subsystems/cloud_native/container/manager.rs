@@ -8,7 +8,7 @@ extern crate alloc;
 use alloc::{
     collections::BTreeMap,
     format,
-    string::{String, ToString},
+    string::String,
     sync::Arc,
     vec::Vec,
 };
@@ -22,7 +22,7 @@ use crate::{
         cloud_native::{
             cgroup::v2::{create_cgroup, delete_cgroup, set_cpu_max, set_memory_limit},
             namespaces::enhanced::{
-                assign_namespaces_to_process, create_namespace_set, NamespaceManager,
+                assign_namespaces_to_process, create_namespace_set,
                 NamespaceSet, NamespaceType,
             },
             oci::spec::{OciConfig, OciLinuxNamespaceType},
