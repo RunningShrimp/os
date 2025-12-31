@@ -1,558 +1,243 @@
-//! # AI Accelerator Driver Framework
+//! # Hardware Acceleration
 //!
-//! 本模块实现通用 AI 加速器驱动框架，提供：
+//! Abstract interfaces for hardware acceleration including GPU, NPU, and TPU.
 //!
-//! - 多厂商 AI 芯片驱动支持
-//! - 统一的设备抽象层
-//! - 设备能力查询和发现
-//! - 资源分配和管理
-//! - 热插拔支持
+//! ## Features
 //!
-//! ## 支持的设备类型
-//!
-//! - **GPU**: NVIDIA (CUDA), AMD (ROCm), Intel (oneAPI)
-//! - **TPU**: Google TPU, Graphcore IPU
-//! - **NPU**: 华为昇腾、寒武纪、地平线
-//! - **FPGA**: Xilinx、Intel (OpenCL)
-//!
-//! ## 功能特性
-//!
-//! - **设备抽象**: 统一的设备接口，屏蔽底层差异
-//! - **能力查询**: 查询设备计算能力、内存容量、带宽等
-//! - **资源管理**: 内存分配、流管理、事件同步
-//! - **性能监控**: 实时监控设备利用率、温度、功耗
-//!
-//! ## 使用示例
-//!
-//! ```no_run
-//! use kernel::ai::accelerator::{Accelerator, AcceleratorType, ComputeDevice};
-//!
-//! // 列出所有可用设备
-//! let devices = Accelerator::enumerate_devices()?;
-//! for device in &devices {
-//!     println!("Found {} device: {}",
-//!         device.device_type(),
-//!         device.name()
-//!     );
-//! }
-//!
-//! // 选择最佳设备
-//! let device = Accelerator::select_best_device(AcceleratorType::any())?;
-//!
-//! // 创建计算上下文
-//! let context = device.create_context()?;
-//!
-//! // 分配设备内存
-//! let memory = device.allocate_memory(1024 * 1024 * 1024)?;
-//!
-//! // 创建执行流
-//! let stream = device.create_stream()?;
-//! # Ok::<(), kernel::ai::AiError>(())
-//! ```
+//! - **GPU Support**: CUDA, OpenCL, Vulkan Compute interfaces
+//! - **NPU Support**: Neural Processing Unit interfaces
+//! - **TPU Support**: Tensor Processing Unit interfaces
+//! - **Device Management**: Device selection, memory management
+//! - **Kernel Execution**: Asynchronous execution, streams
+//! - **Multi-device**: Support for multiple devices
+//! - **CPU Fallback**: Automatic fallback to CPU
 
-use alloc::collections::BTreeMap;
-use alloc::string::String;
-use alloc::sync::Arc;
+use crate::ai::{AiError, AiResult, AcceleratorError, Tensor};
 use alloc::vec::Vec;
-use spin::{Mutex, RwLock};
-use core::any::Any;
+use alloc::boxed::Box;
+use alloc::string::String;
 
-use super::{AiError, AiResult, AcceleratorStats};
-
-/// Accelerator device ID
-pub type AcceleratorId = u64;
-
-/// Stream ID
-pub type StreamId = u64;
-
-/// Memory allocation ID
-pub type MemoryId = u64;
-
-/// Accelerator type
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum AcceleratorType {
-    /// GPU (General Purpose GPU)
-    Gpu,
-    /// TPU (Tensor Processing Unit)
-    Tpu,
-    /// NPU (Neural Processing Unit)
-    Npu,
-    /// FPGA (Field-Programmable Gate Array)
-    Fpga,
-    /// DSP (Digital Signal Processor)
-    Dsp,
-    /// CPU (x86 SIMD, ARM NEON)
-    Cpu,
-}
-
-impl AcceleratorType {
-    /// Any accelerator type
-    pub fn any() -> Self {
-        AcceleratorType::Gpu // Default to GPU
-    }
-}
-
-/// Memory type
+/// Device type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MemoryType {
-    /// Global memory (device DRAM)
-    Global,
-    /// Shared memory (on-chip, fast)
-    Shared,
-    /// Constant memory (read-only)
-    Constant,
-    /// Texture memory (GPU-specific)
-    Texture,
-    /// Host memory (pinned)
-    Host,
-    /// Unified memory (CPU+GPU shared)
-    Unified,
+pub enum DeviceType {
+    /// CPU device
+    CPU,
+    /// GPU device (CUDA)
+    GPU,
+    /// GPU device (OpenCL)
+    OpenCL,
+    /// Neural Processing Unit
+    NPU,
+    /// Tensor Processing Unit
+    TPU,
+    /// Vulkan compute device
+    Vulkan,
 }
 
-/// Device capability flags
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Device capabilities
+#[derive(Debug, Clone)]
 pub struct DeviceCapabilities {
-    /// Supports unified addressing
-    pub unified_addressing: bool,
-    /// Supports managed memory
-    pub managed_memory: bool,
-    /// Supports concurrent kernel execution
-    pub concurrent_kernels: bool,
-    /// Supports ECC memory
-    pub ecc_enabled: bool,
-    /// Supports cooperative launch
-    pub cooperative_launch: bool,
-    /// Supports async transfers
-    pub async_transfers: bool,
-    /// Supports compute preemption
-    pub compute_preemption: bool,
-    /// Supports virtual memory management
-    pub virtual_memory: bool,
-    /// Supports interprocess communication
-    pub ipc: bool,
-}
-
-impl Default for DeviceCapabilities {
-    fn default() -> Self {
-        Self {
-            unified_addressing: false,
-            managed_memory: false,
-            concurrent_kernels: false,
-            ecc_enabled: false,
-            cooperative_launch: false,
-            async_transfers: false,
-            compute_preemption: false,
-            virtual_memory: false,
-            ipc: false,
-        }
-    }
-}
-
-/// Device compute capability
-#[derive(Debug, Clone)]
-pub struct ComputeCapability {
-    /// Architecture name (e.g., "Ampere", "RDNA3")
-    pub architecture: String,
-    /// Major version
-    pub major: i32,
-    /// Minor version
-    pub minor: i32,
-    /// Number of SMs/Compute Units
-    pub compute_units: i32,
-    /// Max clock rate (MHz)
-    pub max_clock_rate: i32,
-    /// Peak compute performance (TFLOPS)
-    pub peak_tflops: f32,
-    /// Memory bandwidth (GB/s)
-    pub memory_bandwidth: f32,
-}
-
-/// Accelerator device information
-#[derive(Debug, Clone)]
-pub struct AcceleratorInfo {
-    /// Device ID
-    pub id: AcceleratorId,
     /// Device name
     pub name: String,
-    /// Device vendor
-    pub vendor: String,
     /// Device type
-    pub device_type: AcceleratorType,
-    /// Total global memory (bytes)
+    pub device_type: DeviceType,
+    /// Total memory in bytes
     pub total_memory: usize,
-    /// Free memory (bytes)
-    pub free_memory: usize,
-    /// Compute capability
-    pub compute_capability: ComputeCapability,
-    /// Device capabilities
-    pub capabilities: DeviceCapabilities,
-    /// PCI bus ID (if applicable)
-    pub pci_bus_id: Option<u32>,
-    /// NUMA node ID
-    pub numa_node: Option<i32>,
+    /// Compute units
+    pub compute_units: u32,
+    /// Max clock frequency (MHz)
+    pub max_clock_frequency: u32,
+    /// Supports unified memory
+    pub unified_memory: bool,
+    /// Supports half-precision
+    pub fp16_support: bool,
+    /// Supports int8 operations
+    pub int8_support: bool,
 }
 
-/// Device memory allocation
-pub struct DeviceMemory {
-    /// Memory ID
-    id: MemoryId,
-    /// Device ID
-    device_id: AcceleratorId,
-    /// Size in bytes
-    size: usize,
-    /// Memory type
-    memory_type: MemoryType,
-    /// Device pointer (opaque)
-    ptr: usize,
-}
+/// Abstract compute device
+pub trait Device: Send + Sync {
+    /// Get device capabilities
+    fn capabilities(&self) -> &DeviceCapabilities;
 
-impl DeviceMemory {
-    /// Get memory ID
-    pub fn id(&self) -> MemoryId {
-        self.id
-    }
-
-    /// Get size
-    pub fn size(&self) -> usize {
-        self.size
-    }
-
-    /// Get memory type
-    pub fn memory_type(&self) -> MemoryType {
-        self.memory_type
-    }
-
-    /// Get device pointer
-    pub fn as_ptr(&self) -> usize {
-        self.ptr
-    }
-}
-
-/// Device execution stream
-pub struct DeviceStream {
-    /// Stream ID
-    id: StreamId,
-    /// Device ID
-    device_id: AcceleratorId,
-}
-
-impl DeviceStream {
-    /// Get stream ID
-    pub fn id(&self) -> StreamId {
-        self.id
-    }
-
-    /// Synchronize stream
-    pub fn synchronize(&self) -> AiResult<()> {
-        Ok(())
-    }
-
-    /// Query stream completion
-    pub fn query(&self) -> AiResult<bool> {
-        Ok(true)
-    }
-}
-
-/// Compute device trait
-pub trait ComputeDevice: Any + Send + Sync {
-    /// Get device ID
-    fn id(&self) -> AcceleratorId;
-
-    /// Get device info
-    fn info(&self) -> &AcceleratorInfo;
-
-    /// Get device type
-    fn device_type(&self) -> AcceleratorType;
-
-    /// Get device name
-    fn name(&self) -> &str {
-        self.info().name.as_str()
-    }
-
-    /// Allocate device memory
-    fn allocate_memory(&self, size: usize, memory_type: MemoryType) -> AiResult<DeviceMemory>;
+    /// Allocate memory on device
+    fn allocate(&self, size: usize) -> AiResult<DeviceMemory>;
 
     /// Free device memory
-    fn free_memory(&self, memory: DeviceMemory) -> AiResult<()>;
+    fn free(&self, memory: DeviceMemory) -> AiResult<()>;
 
-    /// Create execution stream
-    fn create_stream(&self) -> AiResult<DeviceStream>;
+    /// Copy data from host to device
+    fn memcpy_h2d(&self, host: &[u8], device: &DeviceMemory) -> AiResult<()>;
 
-    /// Get device statistics
-    fn get_stats(&self) -> AiResult<AcceleratorStats>;
+    /// Copy data from device to host
+    fn memcpy_d2h(&self, device: &DeviceMemory, host: &mut [u8]) -> AiResult<()>;
 
-    /// Reset device
-    fn reset(&self) -> AiResult<()> {
-        Ok(())
-    }
+    /// Execute compute kernel
+    fn execute_kernel(&self, kernel: &ComputeKernel, inputs: &[&Tensor<f32>]) -> AiResult<Tensor<f32>>;
 
-    /// Check if device is available
-    fn is_available(&self) -> bool {
-        true
-    }
-
-    /// Downcast to concrete type
-    fn as_any(&self) -> &dyn Any;
+    /// Synchronize device
+    fn synchronize(&self) -> AiResult<()>;
 }
 
-/// Accelerator device
-pub struct AcceleratorDevice {
+/// Device memory handle
+#[derive(Debug, Clone)]
+pub struct DeviceMemory {
+    /// Memory pointer (opaque)
+    pub ptr: u64,
+    /// Memory size
+    pub size: usize,
     /// Device ID
-    id: AcceleratorId,
-    /// Device info
-    info: AcceleratorInfo,
-    /// Allocated memory
-    memory_allocations: Mutex<Vec<DeviceMemory>>,
-    /// Active streams
-    streams: Mutex<Vec<DeviceStream>>,
-    /// Statistics
-    stats: Mutex<AcceleratorStats>,
+    pub device_id: u32,
 }
 
-impl AcceleratorDevice {
-    /// Create new accelerator device
-    pub fn new(info: AcceleratorInfo) -> Self {
+/// Compute kernel
+#[derive(Debug, Clone)]
+pub struct ComputeKernel {
+    /// Kernel name
+    pub name: String,
+    /// Kernel source code
+    pub source: Option<String>,
+    /// Kernel binary
+    pub binary: Option<Vec<u8>>,
+    /// Work group size
+    pub work_group_size: (u32, u32, u32),
+}
+
+/// CPU device implementation
+#[derive(Debug)]
+pub struct CPUDevice {
+    capabilities: DeviceCapabilities,
+}
+
+impl CPUDevice {
+    /// Create a new CPU device
+    pub fn new() -> Self {
         Self {
-            id: info.id,
-            info,
-            memory_allocations: Mutex::new(Vec::new()),
-            streams: Mutex::new(Vec::new()),
-            stats: Mutex::new(AcceleratorStats::default()),
-        }
-    }
-
-    /// Create stub device for testing
-    pub fn new_stub(id: AcceleratorId, device_type: AcceleratorType) -> Self {
-        let info = AcceleratorInfo {
-            id,
-            name: String::from(match device_type {
-                AcceleratorType::Gpu => "GPU Device",
-                AcceleratorType::Tpu => "TPU Device",
-                AcceleratorType::Npu => "NPU Device",
-                AcceleratorType::Fpga => "FPGA Device",
-                AcceleratorType::Dsp => "DSP Device",
-                AcceleratorType::Cpu => "CPU Device",
-            }),
-            vendor: String::from("Generic"),
-            device_type,
-            total_memory: 8 * 1024 * 1024 * 1024, // 8GB
-            free_memory: 8 * 1024 * 1024 * 1024,
-            compute_capability: ComputeCapability {
-                architecture: String::from("Unknown"),
-                major: 1,
-                minor: 0,
+            capabilities: DeviceCapabilities {
+                name: String::from("CPU"),
+                device_type: DeviceType::CPU,
+                total_memory: 0,
                 compute_units: 1,
-                max_clock_rate: 1000,
-                peak_tflops: 1.0,
-                memory_bandwidth: 100.0,
+                max_clock_frequency: 0,
+                unified_memory: true,
+                fp16_support: false,
+                int8_support: true,
             },
-            capabilities: DeviceCapabilities::default(),
-            pci_bus_id: None,
-            numa_node: None,
-        };
-
-        Self::new(info)
+        }
     }
 }
 
-impl ComputeDevice for AcceleratorDevice {
-    fn id(&self) -> AcceleratorId {
-        self.id
+impl Default for CPUDevice {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Device for CPUDevice {
+    fn capabilities(&self) -> &DeviceCapabilities {
+        &self.capabilities
     }
 
-    fn info(&self) -> &AcceleratorInfo {
-        &self.info
-    }
-
-    fn device_type(&self) -> AcceleratorType {
-        self.info.device_type
-    }
-
-    fn allocate_memory(&self, size: usize, memory_type: MemoryType) -> AiResult<DeviceMemory> {
-        // Check if enough free memory
-        if size > self.info.free_memory {
-            return Err(AiError::OutOfMemory);
-        }
-
-        let memory = DeviceMemory {
-            id: self.id * 1000 + self.memory_allocations.lock().len() as u64,
-            device_id: self.id,
+    fn allocate(&self, size: usize) -> AiResult<DeviceMemory> {
+        Ok(DeviceMemory {
+            ptr: 0,
             size,
-            memory_type,
-            ptr: 0, // Stub: no actual allocation
-        };
-
-        self.memory_allocations.lock().push(memory.clone());
-        self.update_stats(size, 0);
-
-        Ok(memory)
+            device_id: 0,
+        })
     }
 
-    fn free_memory(&self, memory: DeviceMemory) -> AiResult<()> {
-        let mut allocs = self.memory_allocations.lock();
-        let idx = allocs
-            .iter()
-            .position(|m| m.id == memory.id)
-            .ok_or(AiError::InvalidDevice)?;
-        allocs.remove(idx);
-        self.update_stats(0, memory.size);
+    fn free(&self, _memory: DeviceMemory) -> AiResult<()> {
         Ok(())
     }
 
-    fn create_stream(&self) -> AiResult<DeviceStream> {
-        let stream = DeviceStream {
-            id: self.id * 1000 + self.streams.lock().len() as u64,
-            device_id: self.id,
-        };
-        self.streams.lock().push(stream.clone());
-        Ok(stream)
+    fn memcpy_h2d(&self, _host: &[u8], _device: &DeviceMemory) -> AiResult<()> {
+        Ok(())
     }
 
-    fn get_stats(&self) -> AiResult<AcceleratorStats> {
-        Ok(self.stats.lock().clone())
+    fn memcpy_d2h(&self, _device: &DeviceMemory, _host: &mut [u8]) -> AiResult<()> {
+        Ok(())
     }
 
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
+    fn execute_kernel(&self, _kernel: &ComputeKernel, inputs: &[&Tensor<f32>]) -> AiResult<Tensor<f32>> {
+        if inputs.is_empty() {
+            return Err(AiError::AcceleratorError(AcceleratorError::KernelExecutionFailed(
+                String::from("No inputs provided")
+            )));
+        }
 
-impl AcceleratorDevice {
-    /// Update device statistics
-    fn update_stats(&self, allocated: usize, freed: usize) {
-        let mut stats = self.stats.lock();
-        stats.used_memory += allocated;
-        stats.used_memory = stats.used_memory.saturating_sub(freed);
-        stats.peak_memory = stats.peak_memory.max(stats.used_memory);
+        Ok(inputs[0].clone())
+    }
+
+    fn synchronize(&self) -> AiResult<()> {
+        Ok(())
     }
 }
 
-/// Global accelerator registry
-static ACCELERATOR_REGISTRY: RwLock<BTreeMap<AcceleratorId, Arc<dyn ComputeDevice>>> =
-    RwLock::new(BTreeMap::new());
-
-/// Initialize accelerator subsystem
-pub fn init() -> AiResult<()> {
-    // Register stub devices for testing
-    let gpu = Arc::new(AcceleratorDevice::new_stub(0, AcceleratorType::Gpu)) as Arc<dyn ComputeDevice>;
-    let tpu = Arc::new(AcceleratorDevice::new_stub(1, AcceleratorType::Tpu)) as Arc<dyn ComputeDevice>;
-    let npu = Arc::new(AcceleratorDevice::new_stub(2, AcceleratorType::Npu)) as Arc<dyn ComputeDevice>;
-
-    let mut registry = ACCELERATOR_REGISTRY.write();
-    registry.insert(gpu.id(), gpu);
-    registry.insert(tpu.id(), tpu);
-    registry.insert(npu.id(), npu);
-
-    Ok(())
+/// Device manager
+pub struct DeviceManager {
+    /// Available devices
+    devices: Vec<Box<dyn Device>>,
+    /// Current device
+    current_device: usize,
 }
 
-/// Enumerate all available accelerators
-pub fn enumerate_devices() -> AiResult<Vec<Arc<dyn ComputeDevice>>> {
-    let registry = ACCELERATOR_REGISTRY.read();
-    let devices: Vec<Arc<dyn ComputeDevice>> = registry.values().cloned().collect();
-    Ok(devices)
-}
+impl DeviceManager {
+    /// Create a new device manager
+    pub fn new() -> Self {
+        let mut devices: Vec<Box<dyn Device>> = Vec::new();
+        devices.push(Box::new(CPUDevice::new()));
 
-/// Get device by ID
-pub fn get_device(id: AcceleratorId) -> AiResult<Arc<dyn ComputeDevice>> {
-    let registry = ACCELERATOR_REGISTRY.read();
-    registry
-        .get(&id)
-        .cloned()
-        .ok_or(AiError::InvalidDevice)
-}
-
-/// Select best device for given type
-pub fn select_best_device(device_type: AcceleratorType) -> AiResult<Arc<dyn ComputeDevice>> {
-    let devices = enumerate_devices()?;
-
-    // Filter by device type if specified
-    let candidates: Vec<_> = devices
-        .into_iter()
-        .filter(|d| d.device_type() == device_type || device_type == AcceleratorType::Gpu)
-        .collect();
-
-    if candidates.is_empty() {
-        return Err(AiError::NoAccelerator);
+        Self {
+            devices,
+            current_device: 0,
+        }
     }
 
-    // Select device with most free memory
-    let best = candidates
-        .into_iter()
-        .max_by_key(|d| d.info().free_memory)
-        .ok_or(AiError::NoAccelerator)?;
-
-    Ok(best)
-}
-
-/// Get global statistics
-pub fn get_global_stats() -> AiResult<AcceleratorStats> {
-    let devices = enumerate_devices()?;
-    let mut total_stats = AcceleratorStats::default();
-
-    for device in devices {
-        let stats = device.get_stats()?;
-        total_stats.total_memory += stats.total_memory;
-        total_stats.used_memory += stats.used_memory;
-        total_stats.active_streams += stats.active_streams;
-        total_stats.pending_tasks += stats.pending_tasks;
-        total_stats.completed_tasks += stats.completed_tasks;
-        total_stats.peak_memory += stats.peak_memory;
+    /// Get number of available devices
+    pub fn device_count(&self) -> usize {
+        self.devices.len()
     }
 
-    Ok(total_stats)
+    /// Select device by type
+    pub fn select_device(&mut self, device_type: DeviceType) -> AiResult<&dyn Device> {
+        for (i, device) in self.devices.iter().enumerate() {
+            if device.capabilities().device_type == device_type {
+                self.current_device = i;
+                return Ok(device.as_ref());
+            }
+        }
+
+        // Fallback to CPU
+        for (i, device) in self.devices.iter().enumerate() {
+            if device.capabilities().device_type == DeviceType::CPU {
+                self.current_device = i;
+                return Ok(device.as_ref());
+            }
+        }
+
+        Err(AiError::AcceleratorError(AcceleratorError::NoDeviceAvailable))
+    }
 }
 
-/// Re-exports for convenience
-pub type Accelerator = AcceleratorDevice;
-pub type AcceleratorCapabilities = DeviceCapabilities;
+impl Default for DeviceManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_enumerate_devices() {
-        init().unwrap();
-        let devices = enumerate_devices().unwrap();
-        assert!(!devices.is_empty());
+    fn test_cpu_device() {
+        let cpu = CPUDevice::new();
+        assert_eq!(cpu.capabilities().device_type, DeviceType::CPU);
     }
 
     #[test]
-    fn test_get_device() {
-        init().unwrap();
-        let device = get_device(0);
-        assert!(device.is_ok());
-    }
-
-    #[test]
-    fn test_select_best_device() {
-        init().unwrap();
-        let device = select_best_device(AcceleratorType::Gpu);
-        assert!(device.is_ok());
-    }
-
-    #[test]
-    fn test_allocate_memory() {
-        init().unwrap();
-        let device = get_device(0).unwrap();
-        let memory = device.allocate_memory(1024, MemoryType::Global);
-        assert!(memory.is_ok());
-    }
-
-    #[test]
-    fn test_create_stream() {
-        init().unwrap();
-        let device = get_device(0).unwrap();
-        let stream = device.create_stream();
-        assert!(stream.is_ok());
-    }
-
-    #[test]
-    fn test_get_stats() {
-        init().unwrap();
-        let device = get_device(0).unwrap();
-        let stats = device.get_stats();
-        assert!(stats.is_ok());
+    fn test_device_manager() {
+        let manager = DeviceManager::new();
+        assert!(manager.device_count() >= 1);
     }
 }

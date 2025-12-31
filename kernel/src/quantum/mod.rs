@@ -52,12 +52,17 @@ pub mod algorithms;
 pub mod error_correction;
 pub mod qkd;
 pub mod pqc;
+pub mod gates;
+pub mod simulator;
+pub mod optimization;
 
 // Re-export commonly used types
 pub use qubit::{
     Qubit, QuantumState, QuantumGate, PauliGate, RotationGate,
     MeasurementResult, NoiseModel, TwoQubitGate
 };
+// Also re-export the matrix-based gate from gates module as a separate name
+pub use gates::QuantumGateMatrix;
 
 pub use circuit::{
     Circuit, CircuitOptimizer, CircuitDepth, QuantumOperation
@@ -80,6 +85,26 @@ pub use qkd::{
 pub use pqc::{
     PostQuantumScheme, Kyber, Dilithium, SPHINCSPlus, McEliece,
     PQCKeyPair, PQCSignature, PQCEncryption
+};
+
+// Re-export gates module (avoid conflicts with qubit module)
+pub use gates::{
+    QuantumGateMatrix as Gate, PhaseGate, StandardGate,
+    MultiQubitGate, RotationAxis, GateComposer,
+    GateOptimizer as GateOpt, GateMatrix
+};
+
+// Re-export simulator module
+pub use simulator::{
+    StateVector, StateVectorSnapshot, QuantumSimulator
+};
+
+// Re-export optimization module
+pub use optimization::{
+    OptimizationLevel, OptimizationConfig, CircuitDepth as OptCircuitDepth,
+    OptimizedCircuit, OptimizedOperation, HardwareType,
+    CircuitOptimizer as CircuitOpt, CircuitCutter, GateSynthesizer,
+    CircuitAnalysis
 };
 
 /// Version information for the quantum computing module

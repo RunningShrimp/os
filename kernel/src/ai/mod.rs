@@ -1,228 +1,278 @@
-//! # AI Accelerator Support
+//! # AI/ML Framework for NOS Kernel
 //!
-//! 本模块为 NOS 内核提供 AI 加速器支持框架，实现：
+//! A comprehensive artificial intelligence and machine learning framework designed for
+//! kernel-level integration. Provides efficient tensor operations, neural network inference,
+//! on-device training, model format support, hardware acceleration, and optimization techniques.
 //!
-//! ## 核心功能
+//! ## Architecture
 //!
-//! - **多厂商支持**: CUDA、OpenCL、ROCm、OneAPI 等多种 AI 计算平台
-//! - **统一抽象**: 为不同类型的 AI 加速器（GPU、TPU、NPU）提供统一接口
-//! - **高性能计算**: 零拷贝数据传输、DMA 优化、异步执行
-//! - **低延迟调度**: 智能任务调度、负载均衡、资源隔离
-//! - **可扩展架构**: 插件式驱动框架、动态设备发现、热插拔支持
+//! The AI framework is organized into the following modules:
 //!
-//! ## 架构组件
+//! - **tensor**: Multi-dimensional tensor data structures with efficient operations
+//! - **neural**: Neural network layers and inference engine
+//! - **training**: On-device training with backpropagation and optimizers
+//! - **model**: Model format support (ONNX, TFLite, PyTorch)
+//! - **accelerator**: Hardware acceleration interfaces (GPU, NPU, TPU)
+//! - **optimization**: Model optimization and compression techniques
 //!
-//! ### 计算平台支持
+//! ## Features
 //!
-//! - [`cuda`]: NVIDIA CUDA 驱动接口
-//! - [`opencl`]: OpenCL 运行时支持
-//! - [`accelerator`]: 通用 AI 加速器驱动框架
+//! - **Zero-copy operations**: Efficient tensor views without memory duplication
+//! - **SIMD-friendly layouts**: Data layout optimized for vectorized operations
+//! - **Edge AI**: Optimized for low-resource environments
+//! - **Hardware acceleration**: Support for GPU, NPU, TPU with CPU fallback
+//! - **Model optimization**: Quantization, pruning, compression, operator fusion
+//! - **On-device training**: Backpropagation with various optimizers
+//! - **Multiple formats**: ONNX, TensorFlow Lite, PyTorch support
 //!
-//! ### 计算引擎
+//! ## Design Goals
 //!
-//! - [`tensor`]: 张量计算引擎
-//! - [`neural`]: 神经网络加速器
-//! - [`scheduler`]: 异构计算调度器
+//! 1. **Memory Efficiency**: Minimal allocation and copy overhead
+//! 2. **Performance**: SIMD-optimized operations, parallel execution
+//! 3. **Flexibility**: Support for multiple model architectures and formats
+//! 4. **Edge-First**: Optimized for resource-constrained environments
+//! 5. **Safety**: Rust's type system ensures memory safety
 //!
-//! ## 设备类型
+//! ## Usage Examples
 //!
-//! - **GPU**: 通用图形处理单元（NVIDIA、AMD、Intel）
-//! - **TPU**: 张量处理单元（Google、专用 ASIC）
-//! - **NPU**: 神经网络处理单元（边缘 AI 芯片）
-//! - **FPGA**: 可重构逻辑加速器
-//!
-//! ## 性能优化
-//!
-//! - 零拷贝数据传输
-//! - 异步 kernel 执行
-//! - 流水线并行
-//! - 内存池管理
-//! - 计算图优化
-//!
-//! ## 使用示例
+//! ### Basic Tensor Operations
 //!
 //! ```no_run
-//! use kernel::ai::{Accelerator, AcceleratorType, Tensor, ComputeDevice};
+//! use kernel::ai::tensor::Tensor;
 //!
-//! // 获取可用的加速器设备
-//! let devices = Accelerator::enumerate_devices()?;
-//! let gpu = &devices[0];
+//! // Create tensors
+//! let a = Tensor::<f32>::zeros(&[2, 3]);
+//! let b = Tensor::<f32>::ones(&[2, 3]);
+//! let c = &a + &b;
 //!
-//! // 创建张量并在设备上分配内存
-//! let tensor = Tensor::zeros([1024, 1024], gpu)?;
-//!
-//! // 执行计算
-//! let result = tensor.matmul(&tensor)?;
-//!
-//! // 异步执行
-//! gpu.submit_task(async {
-//!     let c = a.matmul(&b)?;
-//!     Ok(c)
-//! }).await?;
+//! // Matrix multiplication
+//! let m1 = Tensor::<f32>::randn(&[3, 4]);
+//! let m2 = Tensor::<f32>::randn(&[4, 5]);
+//! let product = m1.matmul(&m2)?;
 //! # Ok::<(), kernel::ai::AiError>(())
 //! ```
 //!
-//! ## 设计原则
+//! ### Neural Network Inference
 //!
-//! 1. **性能优先**: 最小化数据移动，最大化计算密度
-//! 2. **统一接口**: 屏蔽底层硬件差异，提供一致的 API
-//! 3. **可扩展性**: 支持新硬件和新算法的无缝集成
-//! 4. **安全性**: 内存隔离、权限控制、资源限制
-//! 5. **可观测性**: 性能监控、调试支持、资源统计
+//! ```no_run
+//! use kernel::ai::neural::{Dense, Activation, NeuralNetwork};
+//!
+//! // Create a simple network
+//! let mut network = NeuralNetwork::new();
+//! network.add_layer(Dense::new(784, 256));
+//! network.add_layer(Activation::ReLU);
+//! network.add_layer(Dense::new(256, 10));
+//! network.add_layer(Activation::Softmax);
+//!
+//! // Run inference
+//! let input = Tensor::randn(&[1, 784]);
+//! let output = network.forward(&input)?;
+//! # Ok::<(), kernel::ai::AiError>(())
+//! ```
+//!
+//! ### Model Training
+//!
+//! ```no_run
+//! use kernel::ai::training::{Trainer, Adam, MSELoss};
+//! use kernel::ai::neural::NeuralNetwork;
+//!
+//! let mut network = NeuralNetwork::new();
+//! // ... add layers ...
+//!
+//! let mut trainer = Trainer::new(network)
+//!     .optimizer(Adam::new(0.001))
+//!     .loss_function(MSELoss::new());
+//!
+//! // Train for 100 epochs
+//! trainer.train(&train_data, &train_labels, 100)?;
+//! # Ok::<(), kernel::ai::AiError>(())
+//! ```
+//!
+//! ### Hardware Acceleration
+//!
+//! ```no_run
+//! use kernel::ai::accelerator::{Device, DeviceType};
+//!
+//! // Select available device
+//! let device = Device::select(DeviceType::GPU)?;
+//!
+//! // Run computation on device
+//! let result = device.execute_compute(&kernel, &inputs)?;
+//! # Ok::<(), kernel::ai::AiError>(())
+//! ```
 
-pub mod cuda;
-pub mod opencl;
-pub mod accelerator;
+#![no_std]
+
+extern crate alloc;
+
+use alloc::string::String;
+use alloc::vec::Vec;
+
 pub mod tensor;
 pub mod neural;
-pub mod scheduler;
+pub mod training;
+pub mod model;
+pub mod accelerator;
+pub mod optimization;
 
-// Edge AI inference chip support
-pub mod edgetpu;
-pub mod ane;
-pub mod vpu;
-pub mod jetson;
-pub mod quantize;
-pub mod compiler;
+pub use tensor::*;
+pub use neural::*;
+pub use training::*;
+pub use model::*;
+pub use accelerator::*;
+pub use optimization::*;
 
-// Re-export main types
-pub use accelerator::{
-    Accelerator, AcceleratorType, AcceleratorDevice,
-    AcceleratorCapabilities, AcceleratorInfo, MemoryType,
-    ComputeDevice, DeviceMemory, DeviceStream,
-};
-pub use tensor::{
-    Tensor, TensorShape, TensorDataType, TensorOps,
-    MemoryLayout, ComputeGraph,
-};
-pub use neural::{
-    NeuralEngine, LayerType, LayerConfig, InferenceSession,
-    ModelRuntime, OptimizerType,
-};
-pub use scheduler::{
-    ComputeScheduler, SchedulerPolicy, Task, TaskPriority,
-    TaskStatus, ComputeResource, ResourceAllocation,
-    HeterogeneousScheduler,
-};
-pub use cuda::{
-    CudaDevice, CudaStream, CudaEvent, CudaModule,
-    CudaKernel, CudaMemory, CudaError,
-};
-pub use opencl::{
-    OpenClPlatform, OpenClDevice, OpenClContext,
-    OpenClCommandQueue, OpenClProgram, OpenClBuffer,
-    OpenClError,
-};
+/// AI framework version
+pub const AI_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// AI accelerator errors
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Result type for AI operations
+pub type AiResult<T> = core::result::Result<T, AiError>;
+
+/// Errors in AI/ML operations
+#[derive(Debug, Clone, PartialEq)]
 pub enum AiError {
-    /// No accelerator available
-    NoAccelerator,
-    /// Invalid device
-    InvalidDevice,
+    /// Tensor operation error
+    TensorError(TensorError),
+    /// Neural network error
+    NeuralError(NeuralError),
+    /// Training error
+    TrainingError(TrainingError),
+    /// Model format error
+    ModelError(ModelError),
+    /// Acceleration error
+    AcceleratorError(AcceleratorError),
+    /// Optimization error
+    OptimizationError(OptimizationError),
     /// Out of memory
     OutOfMemory,
-    /// Invalid argument
-    InvalidArgument,
-    /// Operation not supported
-    NotSupported,
-    /// Compilation error
-    CompilationError,
-    /// Execution error
-    ExecutionError,
-    /// Timeout
-    Timeout,
-    /// Device lost
-    DeviceLost,
-    /// Internal error
-    InternalError(&'static str),
+    /// Invalid operation
+    InvalidOperation(String),
+    /// Not implemented
+    NotImplemented(String),
+    /// IO error during model loading
+    IoError(String),
+    /// Shape mismatch
+    ShapeMismatch {
+        expected: Vec<usize>,
+        got: Vec<usize>,
+    },
+    /// Device not available
+    DeviceNotAvailable(String),
 }
 
 impl core::fmt::Display for AiError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            AiError::NoAccelerator => write!(f, "No accelerator available"),
-            AiError::InvalidDevice => write!(f, "Invalid device"),
+            AiError::TensorError(e) => write!(f, "Tensor error: {:?}", e),
+            AiError::NeuralError(e) => write!(f, "Neural network error: {:?}", e),
+            AiError::TrainingError(e) => write!(f, "Training error: {:?}", e),
+            AiError::ModelError(e) => write!(f, "Model error: {:?}", e),
+            AiError::AcceleratorError(e) => write!(f, "Accelerator error: {:?}", e),
+            AiError::OptimizationError(e) => write!(f, "Optimization error: {:?}", e),
             AiError::OutOfMemory => write!(f, "Out of memory"),
-            AiError::InvalidArgument => write!(f, "Invalid argument"),
-            AiError::NotSupported => write!(f, "Operation not supported"),
-            AiError::CompilationError => write!(f, "Compilation error"),
-            AiError::ExecutionError => write!(f, "Execution error"),
-            AiError::Timeout => write!(f, "Operation timeout"),
-            AiError::DeviceLost => write!(f, "Device lost"),
-            AiError::InternalError(msg) => write!(f, "Internal error: {}", msg),
+            AiError::InvalidOperation(msg) => write!(f, "Invalid operation: {}", msg),
+            AiError::NotImplemented(msg) => write!(f, "Not implemented: {}", msg),
+            AiError::IoError(msg) => write!(f, "IO error: {}", msg),
+            AiError::ShapeMismatch { expected, got } => {
+                write!(f, "Shape mismatch: expected {:?}, got {:?}", expected, got)
+            }
+            AiError::DeviceNotAvailable(device) => {
+                write!(f, "Device not available: {}", device)
+            }
         }
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for AiError {}
-
-/// Result type for AI operations
-pub type AiResult<T> = core::result::Result<T, AiError>;
-
-/// AI accelerator statistics
-#[derive(Debug, Clone)]
-pub struct AcceleratorStats {
-    /// Total memory allocated
-    pub total_memory: usize,
-    /// Used memory
-    pub used_memory: usize,
-    /// Number of active streams
-    pub active_streams: usize,
-    /// Number of pending tasks
-    pub pending_tasks: usize,
-    /// Number of completed tasks
-    pub completed_tasks: usize,
-    /// Average execution time (nanoseconds)
-    pub avg_execution_time: u64,
-    /// Peak memory usage
-    pub peak_memory: usize,
+/// Tensor-specific errors
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TensorError {
+    /// Index out of bounds
+    IndexOutOfBounds,
+    /// Invalid shape
+    InvalidShape(String),
+    /// Type mismatch
+    TypeMismatch,
+    /// Allocation failed
+    AllocationFailed,
+    /// Operation not supported for this type
+    UnsupportedOperation(String),
 }
 
-impl Default for AcceleratorStats {
-    fn default() -> Self {
-        Self {
-            total_memory: 0,
-            used_memory: 0,
-            active_streams: 0,
-            pending_tasks: 0,
-            completed_tasks: 0,
-            avg_execution_time: 0,
-            peak_memory: 0,
-        }
-    }
+/// Neural network-specific errors
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NeuralError {
+    /// Layer not found
+    LayerNotFound(String),
+    /// Invalid layer configuration
+    InvalidLayerConfig(String),
+    /// Forward pass failed
+    ForwardPassFailed(String),
+    /// Backward pass failed
+    BackwardPassFailed(String),
+    /// Invalid activation function
+    InvalidActivation(String),
 }
 
-/// Initialize AI accelerator support
-pub fn init() -> AiResult<()> {
-    // Initialize CUDA
-    #[cfg(feature = "cuda")]
-    cuda::init()?;
-
-    // Initialize OpenCL
-    #[cfg(feature = "opencl")]
-    opencl::init()?;
-
-    // Initialize generic accelerator framework
-    accelerator::init()?;
-
-    // Initialize tensor engine
-    tensor::init()?;
-
-    // Initialize neural engine
-    neural::init()?;
-
-    // Initialize scheduler
-    scheduler::init()?;
-
-    Ok(())
+/// Training-specific errors
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TrainingError {
+    /// Gradient computation failed
+    GradientError(String),
+    /// Optimizer error
+    OptimizerError(String),
+    /// Loss computation failed
+    LossError(String),
+    /// Checkpoint save/load failed
+    CheckpointError(String),
+    /// Early stopping triggered
+    EarlyStopping,
 }
 
-/// Get global accelerator statistics
-pub fn get_stats() -> AiResult<AcceleratorStats> {
-    accelerator::get_global_stats()
+/// Model format-specific errors
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ModelError {
+    /// Unsupported format
+    UnsupportedFormat(String),
+    /// Parse error
+    ParseError(String),
+    /// Invalid version
+    InvalidVersion(String),
+    /// Missing metadata
+    MissingMetadata(String),
+    /// Architecture not supported
+    ArchitectureNotSupported(String),
+}
+
+/// Acceleration-specific errors
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AcceleratorError {
+    /// Device initialization failed
+    InitFailed(String),
+    /// Memory transfer failed
+    MemoryTransferFailed(String),
+    /// Kernel execution failed
+    KernelExecutionFailed(String),
+    /// Compilation failed
+    CompilationFailed(String),
+    /// No device available
+    NoDeviceAvailable,
+    /// Driver not loaded
+    DriverNotLoaded(String),
+}
+
+/// Optimization-specific errors
+#[derive(Debug, Clone, PartialEq)]
+pub enum OptimizationError {
+    /// Quantization failed
+    QuantizationError(String),
+    /// Pruning failed
+    PruningError(String),
+    /// Compression failed
+    CompressionError(String),
+    /// Accuracy degradation too high
+    AccuracyDegradation(f32),
+    /// Invalid optimization parameters
+    InvalidParameters(String),
 }
 
 #[cfg(test)]
@@ -231,14 +281,22 @@ mod tests {
 
     #[test]
     fn test_error_display() {
-        let err = AiError::NoAccelerator;
-        assert_eq!(format!("{}", err), "No accelerator available");
+        let err = AiError::ShapeMismatch {
+            expected: vec![2, 3],
+            got: vec![3, 2],
+        };
+        assert!(format!("{}", err).contains("Shape mismatch"));
     }
 
     #[test]
-    fn test_stats_default() {
-        let stats = AcceleratorStats::default();
-        assert_eq!(stats.total_memory, 0);
-        assert_eq!(stats.used_memory, 0);
+    fn test_not_implemented() {
+        let err = AiError::NotImplemented(String::from("custom_op"));
+        assert!(format!("{}", err).contains("custom_op"));
+    }
+
+    #[test]
+    fn test_device_not_available() {
+        let err = AiError::DeviceNotAvailable(String::from("NPU"));
+        assert!(format!("{}", err).contains("NPU"));
     }
 }

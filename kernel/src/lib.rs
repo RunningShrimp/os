@@ -341,6 +341,9 @@ mod memory;
 pub mod types;
 pub mod services;  // Re-enabled: subsystems::services doesn't have init(), need the root-level services module
 mod syscall_interface;
+
+// Real-Time Operating System features
+pub mod rtos;
 // Legacy modules - now accessed through subsystems
 pub mod monitoring;  // Made public to match glob re-export
 pub mod perf;  // Made public to match glob re-export
@@ -562,3 +565,31 @@ pub mod xr;
 
 /// Scientific computing framework
 pub mod sci;
+
+/// Cryptography and PKI module
+///
+/// Comprehensive cryptographic services including:
+/// - Symmetric encryption (AES, ChaCha20, etc.)
+/// - Asymmetric cryptography (RSA, ECC, Ed25519)
+/// - Hash functions (SHA-256, SHA-512, BLAKE2)
+/// - Message authentication codes (HMAC, Poly1305, CMAC)
+/// - Public Key Infrastructure (X.509 certificates)
+/// - Secure key management
+///
+/// ## Security Features
+///
+/// - Constant-time operations for secret data
+/// - Secure memory handling with automatic zeroing
+/// - Side-channel attack resistance
+/// - FIPS-compliant algorithms
+pub mod crypto;
+
+/// Edge Computing and IoT subsystem
+///
+/// This module provides comprehensive edge computing and Internet of Things (IoT) support
+/// including protocol implementations (MQTT, CoAP, LoRaWAN), device discovery, OTA updates,
+/// time-series databases for sensor data, edge computing frameworks, and sensor fusion.
+pub mod iot;
+
+/// AI/ML framework
+pub mod ai;
