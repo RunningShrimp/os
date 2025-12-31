@@ -197,6 +197,14 @@ pub mod thp;
 pub mod memcg;
 pub mod memory_failure;
 
+// Track BP: Advanced Memory Management
+pub mod compaction;
+pub mod balloon;
+pub mod cow;
+pub mod ksm;
+pub mod hugepages;
+pub mod mlock;
+
 // Storage Class Memory (SCM) support
 pub mod nvdimm;
 pub mod pmem_tx;
