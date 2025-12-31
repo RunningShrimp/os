@@ -339,9 +339,9 @@ impl AslrSubsystem {
         (random_value & mask).max(alignment)
     }
 
-    /// Generate a random number using kernel RNG
+    /// Generate a random number using cryptographically secure RNG
     fn random_number(&self) -> usize {
-        crate::types::stubs::RNG_INSTANCE.get_random()
+        crate::security::secure_rng::secure_random_usize()
     }
 
     /// Get RDRAND entropy if available
@@ -365,16 +365,21 @@ impl AslrSubsystem {
         None
     }
 
-    /// Generate a random seed for process ASLR using RDRAND
+    /// Generate a cryptographically secure random seed for process ASLR
     fn generate_seed(&self) -> u64 {
-        let mut seed: u64 = 0;
+        // Use the secure RNG for primary entropy
+        let mut seed = crate::security::secure_rng::secure_random_u64();
 
-        seed ^= self.get_rdrand_entropy().unwrap_or(0);
-        seed ^= self.random_number() as u64;
+        // Mix in hardware RDRAND entropy as additional entropy source
+        if let Some(rdrand_entropy) = self.get_rdrand_entropy() {
+            seed ^= rdrand_entropy;
+        }
 
+        // Mix in timestamp (additional entropy, not primary source)
         let time = get_timestamp();
         seed ^= time;
 
+        // Additional mixing for avalanche effect
         seed = seed.wrapping_mul(0x517cc1b727220a95);
         seed ^= seed.rotate_right(17);
         seed ^= seed.rotate_left(43);

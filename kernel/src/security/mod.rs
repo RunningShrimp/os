@@ -150,6 +150,7 @@
 
 pub mod aslr;
 pub mod audit;
+pub mod secure_rng;
 pub mod audit_enhanced;
 pub mod apparmor;
 pub mod attestation;
