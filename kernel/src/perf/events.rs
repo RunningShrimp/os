@@ -5,7 +5,7 @@
 use crate::prelude::*;
 
 /// 性能事件类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum PerfEventType {
     /// 硬件事件
     Hardware,

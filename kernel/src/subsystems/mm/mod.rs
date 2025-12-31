@@ -233,6 +233,10 @@ pub mod tests;
 
 // pub use optimized_allocator::OptimizedHybridAllocator;
 
+/// Large page size constants (2MB and 1GB)
+pub const PAGE_SIZE_2M: usize = 2 * 1024 * 1024;
+pub const PAGE_SIZE_1G: usize = 1024 * 1024 * 1024;
+
 /// Align up to the given alignment
 pub const fn align_up(addr: usize, align: usize) -> usize {
     (addr + align - 1) & !(align - 1)

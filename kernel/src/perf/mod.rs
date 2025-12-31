@@ -30,6 +30,16 @@
 //! - **cache**: Cache optimization and data structures
 //! - **scheduler**: Advanced scheduling algorithms
 //! - **metrics**: Performance metrics collection
+//! - **sync**: Synchronization primitives optimization
+//! - **atomic**: Atomic operation optimization
+//! - **rcu**: Read-Copy-Update implementation
+//! - **parallel**: Parallel execution and workqueue optimization
+//! - **concurrency_mod**: Concurrency optimization manager
+//! - **cpuidle**: CPU idle state management (C-states)
+//! - **cpuhotplug**: CPU hotplug support
+//! - **freq**: CPU frequency scaling (P-states)
+//! - **energy**: Energy model and power management
+//! - **power_mod**: Power management manager
 
 use alloc::string::ToString;
 
@@ -46,6 +56,48 @@ pub mod allocator;
 pub mod cache;
 pub mod scheduler;
 pub mod metrics;
+
+// New benchmarking and profiling modules
+pub mod bench;
+pub mod trace;
+pub mod report;
+pub mod bench_mod;
+
+// Concurrency optimization modules
+pub mod sync;
+pub mod atomic;
+pub mod rcu;
+pub mod parallel;
+pub mod concurrency_mod;
+
+// Power management modules
+pub mod cpuidle;
+pub mod cpuhotplug;
+pub mod freq;
+pub mod energy;
+pub mod power_mod;
+
+// Track EJ: CPU & Scheduler Optimization modules
+pub mod cpu_optimizer;
+pub mod scheduler_optimizer;
+pub mod lock_optimizer;
+pub mod instruction;
+pub mod cpu_mod;
+
+// Track EK: Memory Optimization modules
+pub mod mem_allocator;
+pub mod paging;
+pub mod zero;
+pub mod kmem;
+pub mod mmap;
+pub mod memory_mod;
+
+// Track EL: I/O Optimization modules
+pub mod block;
+pub mod network;
+pub mod filesystem;
+pub mod io;
+pub mod io_mod;
 
 #[cfg(test)]
 pub mod examples;
@@ -81,7 +133,7 @@ pub use profiler::{
     MemoryProfiler, AllocationEvent, AllocationType, MemoryStats,
     IoProfiler, IoEvent, IoOperation, IoStats, IoThroughput,
     LockProfiler, LockEvent, LockType, LockStats,
-    ProfilerManager, ProfilingReport,
+    ProfilerManager,
 };
 
 // Re-export optimizer types
@@ -129,6 +181,41 @@ pub use metrics::{
     MetricsAggregator, AggregationFunction,
     MetricsExporter, ExportFormat,
     MetricsManager, MetricsSummary,
+};
+
+// Re-export memory optimization types (Track EK)
+pub use mem_allocator::{
+    AllocError, OptimizedAllocator, AllocatorStats, SlabCacheStats,
+    init_optimized_allocator, alloc_aligned, alloc_huge, numa_alloc,
+};
+
+pub use paging::{
+    PagingError, PagingOptimizer, PagingOptimizerStats,
+    init_paging_optimizer, optimize_page_table, flush_tlb_range, promote_huge_page,
+};
+
+pub use zero::{
+    ZeroPageError, ZeroPageOptimizer, ZeroPageOptimizerStats,
+    init_zero_page_optimizer, get_zero_page, optimize_cow, handle_page_fault, get_zero_stats,
+};
+
+pub use kmem::{
+    KmemError, KmemAllocator, KmemCache, KmemStats,
+    init_kmem_allocator, kmalloc, kfree, kmem_cache_create,
+};
+
+pub use mmap::{
+    MmapError, MmapOptimizer, Vma, VmaType, VmaStats, MmapStatistics,
+    init_mmap_optimizer, mmap_optimized, munmap_optimized, get_vma_stats, get_mmap_stats,
+};
+
+pub use memory_mod::{
+    MemOptError, MemoryOptimizationManager, OptimizationPolicy,
+    MemoryStatistics, MemoryProfile, NumaStats, MemoryOptimizationReport,
+    init_memory_optimization, enable_optimizations, disable_optimizations,
+    get_memory_statistics, get_memory_profile, get_numa_statistics,
+    get_optimization_policy, set_optimization_policy,
+    numa_allocate, update_statistics, get_optimization_report, adapt_optimization_policy,
 };
 
 /// Initialize all performance monitoring subsystems

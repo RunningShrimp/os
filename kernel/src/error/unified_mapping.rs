@@ -293,6 +293,11 @@ impl UnifiedErrorMapper {
             UnifiedError::ResourceLimitExceeded { .. } => Errno::EAGAIN,
             UnifiedError::InsufficientResources { .. } => Errno::EAGAIN,
             UnifiedError::IoQuotaExceeded { .. } => Errno::EDQUOT,
+            UnifiedError::SyncError(_) => Errno::EIO,
+            UnifiedError::AtomicError(_) => Errno::EIO,
+            UnifiedError::RcuError(_) => Errno::EIO,
+            UnifiedError::ParallelError(_) => Errno::EIO,
+            UnifiedError::ConcurrencyError(_) => Errno::EIO,
         }
     }
 
