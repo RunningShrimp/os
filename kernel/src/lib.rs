@@ -361,6 +361,9 @@ pub mod security;  // Made public to match glob re-export
 pub mod security_audit;
 pub mod tests;
 
+// Storage Management Subsystem
+pub mod storage;
+
 #[cfg(not(feature = "cloud_native"))]
 mod cloud_native {
     pub mod namespaces {
@@ -526,6 +529,17 @@ pub mod blockchain;
 /// audio workstation, font rendering, and color management.
 pub mod media;
 
+/// Virtualization and hypervisor support
+///
+/// This module provides comprehensive virtualization capabilities including:
+/// - Type-1 hypervisor with hardware-assisted virtualization (VT-x/AMD-V)
+/// - Virtual Machine Monitor (VMM) for VM lifecycle management
+/// - CPU virtualization (vCPUs, virtual APIC, scheduling)
+/// - Memory virtualization (EPT/NPT, shadow page tables, ballooning)
+/// - Device virtualization (VirtIO, passthrough, SR-IOV)
+/// - Guest management (hypercalls, save/restore, debugging)
+pub mod virtualization;
+
 /// Quantum computing interface
 ///
 /// This module provides a comprehensive quantum computing framework including:
@@ -622,3 +636,18 @@ pub mod ai;
 /// - Automated retraining with hyperparameter optimization
 /// - Comprehensive governance and compliance
 pub mod mlops;
+
+/// Advanced File Systems
+///
+/// This module provides comprehensive file system implementations including:
+/// - LFS (Log-structured file system)
+/// - COW (Copy-on-write with snapshots)
+/// - Distributed (Ceph-like distributed FS)
+/// - Cache (Multi-level caching)
+/// - Metadata (B+trees, extents, xattrs)
+/// - Journaling (Write-ahead logging)
+/// - Quota (POSIX disk quotas)
+pub mod filesystem;
+
+/// Database engine with SQL support, transactions, and recovery
+pub mod database;

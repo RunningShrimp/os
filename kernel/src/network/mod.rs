@@ -92,11 +92,75 @@
 //! - [`crate::subsystems::syscalls::network`]: 网络系统调用
 //! - [`crate::platform::drivers`]: 网卡驱动
 
-//! Network subsystem
+//! # 网络子系统
 //!
-//! This module provides network functionality including zero-copy I/O optimizations.
+//! 提供网络协议栈和零拷贝 I/O 优化。
+//!
+//! ## 概述
+//!
+//! 网络子系统实现完整的网络协议栈，包括：
+//! - **零拷贝 I/O**: 减少数据复制，提高性能
+//! - **TCP/UDP**: 传输层协议
+//! - **IPv4**: 网络层协议
+//! - **Socket 接口**: 标准 POSIX socket API
+//! - **网络驱动**: 网卡驱动接口
+//! - **高级网络功能**: TCP优化、UDP优化、连接跟踪、防火墙、硬件卸载
+//!
+//! ## 主要组件
+//!
+//! - [`NetworkManager`]: 网络管理器
+//! - [`NetworkInterface`]: 网络接口抽象
+//! - [`zero_copy_io`]: 零拷贝 I/O 实现
+//! - [`ZeroCopyNetworkManager`]: 零拷贝网络管理器
+//! - [`tcp_advanced`]: 高级TCP功能 (SACK,窗口缩放,拥塞控制)
+//! - [`udp_opt`]: UDP优化 (零拷贝,GSO/GRO)
+//! - [`conntrack`]: 连接跟踪 (NAT,状态防火墙)
+//! - [`filtering`]: 包过滤 (Netfilter钩子,BPF)
+//! - [`offload`]: 硬件卸载 (TSO,GSO,GRO,RSS)
+//!
+//! ## 高级网络功能
+//!
+//! ### TCP高级特性
+//!
+//! ```no_run
+//! use kernel::network::tcp_advanced::{TcpAdvanced, CongestionControl, SackType};
+//!
+//! let tcp = TcpAdvanced::new();
+//! tcp.enable_sack(true, SackType::Dsack);
+//! tcp.enable_window_scaling(true, 7);
+//! tcp.set_congestion_control(CongestionControl::Cubic);
+//! ```
+//!
+//! ### UDP零拷贝
+//!
+//! ```no_run
+//! use kernel::network::udp_opt::{UdpZeroCopy, ZeroCopyMode};
+//!
+//! let udp = UdpZeroCopy::new();
+//! udp.set_zero_copy_mode(1, ZeroCopyMode::DmaBuf);
+//! ```
+//!
+//! ### 连接跟踪和NAT
+//!
+//! ```no_run
+//! use kernel::network::conntrack::{ConntrackManager, NatType};
+//!
+//! let conntrack = ConntrackManager::new();
+//! conntrack.track_connection(src_ip, src_port, dst_ip, dst_port, Protocol::TCP);
+//! ```
 
+// Zero-copy I/O module
 pub mod zero_copy_io;
+
+// Advanced networking modules
+pub mod tcp_advanced;
+pub mod udp_opt;
+pub mod conntrack;
+pub mod filtering;
+pub mod offload;
+
+// Re-export common types
+pub use filtering::{SocketAddr, ProtocolFamily};
 
 use alloc::vec::Vec;
 use alloc::sync::Arc;
