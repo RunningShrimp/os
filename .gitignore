@@ -24,3 +24,16 @@ temp/
 *.profraw
 *_errors.txt
 *_output.txt
+
+# Rust build artifacts in root (should be in target/)
+*.o
+*.rlib
+*.a
+rmeta*/
+test_*.rs
+
+# Old backup files
+*_old.rs
+*_enhanced.rs
+*_optimized.rs
+*_v2.rs
