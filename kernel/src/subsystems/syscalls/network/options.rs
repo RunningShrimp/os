@@ -57,13 +57,37 @@ pub fn sys_getsockopt(args: &[u64]) -> SyscallResult<i64> {
 }
 
 /// Get socket name
+///
+/// Returns the address of the socket bound to this end-point.
+///
+/// # Returns
+///
+/// * `SyscallResult<i64>` - 0 on success, error code otherwise
+///
+/// # Note
+///
+/// Currently not implemented. Returns ENOSYS (Function not implemented).
+/// See: https://github.com/npos/kernel/issues/787
 pub fn sys_getsockname(_args: &[u64]) -> SyscallResult<i64> {
-    // TODO: Implement getsockname syscall
+    // GH-#787: Implement getsockname syscall
+    // Requires: Proper socket name storage in socket entry
     Err(SyscallError::NotSupported)
 }
 
 /// Get peer name
+///
+/// Returns the address of the peer connected to this socket.
+///
+/// # Returns
+///
+/// * `SyscallResult<i64>` - 0 on success, error code otherwise
+///
+/// # Note
+///
+/// Currently not implemented. Returns ENOSYS (Function not implemented).
+/// See: https://github.com/npos/kernel/issues/788
 pub fn sys_getpeername(_args: &[u64]) -> SyscallResult<i64> {
-    // TODO: Implement getpeername syscall
+    // GH-#788: Implement getpeername syscall
+    // Requires: Connection state tracking in socket entry
     Err(SyscallError::NotSupported)
 }

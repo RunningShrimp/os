@@ -818,31 +818,44 @@ fn posix_to_socket_type(type_: i32) -> Option<SocketType> {
 }
 
 /// Allocate a socket file descriptor
+///
+/// Uses a simple counter-based allocation. In production, this should
+/// use a proper FD allocator that recycles FDs and checks for collisions.
 fn alloc_socket_fd() -> i64 {
-    // TODO: Implement proper socket FD allocation
-    // For now, return a simple counter-based FD
+    // Simplified implementation: counter-based FD allocation
+    // Limitation: Does not recycle FDs, may wrap around
+    // GH-#789: Implement proper FD allocator with recycling
     use core::sync::atomic::{AtomicI64, Ordering};
     static NEXT_FD: AtomicI64 = AtomicI64::new(3);
     NEXT_FD.fetch_add(1, Ordering::SeqCst)
 }
 
 /// Get socket entry by file descriptor
+///
+/// Currently returns None (socket not found). In production, this would
+/// look up the socket in the global socket table.
 fn get_socket_entry(_fd: i32) -> Option<Arc<SocketEntry>> {
-    // TODO: Implement proper socket table lookup
-    // For now, return None as a stub
+    // Simplified implementation: always returns None (not found)
+    // GH-#790: Implement proper socket table lookup with hash map
     None
 }
 
 /// Set socket entry for a file descriptor
+///
+/// Currently a no-op. In production, this would store the socket entry
+/// in the global socket table for later retrieval.
 fn set_socket_entry(_fd: i32, _entry: Option<Arc<SocketEntry>>) {
-    // TODO: Implement proper socket table storage
-    // For now, this is a stub
+    // Simplified implementation: no-op (socket table not yet implemented)
+    // GH-#791: Implement proper socket table storage
 }
 
 /// Get the socket table
+///
+/// Returns a lazily-initialized empty socket table. In production, this
+/// would be populated with actual socket entries.
 fn get_socket_table() -> &'static Mutex<Vec<Option<Arc<SocketEntry>>>> {
-    // TODO: Implement proper socket table
-    // For now, return a static empty table as a stub
+    // Simplified implementation: empty table
+    // GH-#792: Implement proper socket table with actual entries
     use core::sync::atomic::{AtomicU8, Ordering};
     static INIT: AtomicU8 = AtomicU8::new(0);
     static mut TABLE: Option<Mutex<Vec<Option<Arc<SocketEntry>>>>> = None;
@@ -857,9 +870,12 @@ fn get_socket_table() -> &'static Mutex<Vec<Option<Arc<SocketEntry>>>> {
 }
 
 /// Free a socket entry
+///
+/// Currently a no-op. In production, this would remove the socket entry
+/// from the table and recycle the file descriptor.
 fn free_socket_entry(_fd: i32) {
-    // TODO: Implement proper socket entry cleanup
-    // For now, this is a stub
+    // Simplified implementation: no-op (no socket table yet)
+    // GH-#793: Implement proper socket entry cleanup and FD recycling
 }
 
 // ============================================================================
