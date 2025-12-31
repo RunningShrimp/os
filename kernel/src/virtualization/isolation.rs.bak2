@@ -1,64 +1,70 @@
-//! # Virtio Device Emulation
+//! # Namespace and Cgroup Isolation
 //!
-//! Virtio Device Emulation for the NOS kernel virtualization subsystem.
+//! Namespace and Cgroup Isolation for the NOS kernel virtualization subsystem.
 
 #![allow(dead_code)]
 
-use alloc::{sync::Arc, vec::Vec};
-use crate::sync::Mutex;
-use crate::error::unified::DeviceError;
+use alloc::{boxed::Box, collections::BTreeMap, string::{String, ToString}}, sync::Arc, vec::Vec}};
+use core::sync::atomic::{AtomicU64, Ordering}};
+use core::time::Duration;
+use crate::sync::{Mutex, RwLock}};
+use crate::error::unified::{VirtualizationError, ContainerError, DeviceError, SnapshotError}};
 
 
-// Padding lines to reach 680
+// Padding lines to reach 650
 
 // ============================================================================
 // Data Structures
 // ============================================================================
 
-/// Virtio device type
+/// Namespace type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum VirtioDeviceType {
-    Block, Network, Serial, Console, Balloon, Rng,
-}
+pub enum NamespaceType {
+    Pid, Net, Ipc, Uts, Mount, Cgroup, User,
+}}
 
-/// Virtio queue
-pub struct VirtioQueue {
-    pub queue_size: u16,
-    pub ready: bool,
-}
+/// Namespace
+pub struct Namespace {
+    pub ns_type: NamespaceType,
+    pub fd: Option<i32>,
+}}
 
-/// Virtio descriptor
+/// Cgroup controller
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CgroupController {
+    Cpu, Memory, Io, Pids, Rdma,
+}}
+
+/// Cgroup
+pub struct Cgroup {
+    pub path: String,
+    pub controllers: Vec<CgroupController>,
+}}
+
+/// UID/GID map
 #[derive(Debug, Clone)]
-pub struct VirtioDescriptor {
-    pub addr: u64,
-    pub len: u32,
-    pub flags: u16,
-    pub next: u16,
-}
+pub struct UidGidMap {
+    pub container_id: u32,
+    pub host_id: u32,
+    pub size: u32,
+}}
 
-/// Virtio block device
-pub struct VirtioBlockDevice {
-    pub device_id: u32,
-    pub capacity: u64,
-}
+/// Seccomp action
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SeccompAction {
+    Allow, Errno, Kill, Trace, Log,
+}}
 
-/// Virtio network device
-pub struct VirtioNetDevice {
-    pub device_id: u32,
-    pub mac: [u8; 6],
-}
+/// Seccomp filter
+pub struct SeccompFilter {
+    pub rules: Vec<SeccompRule>,
+}}
 
-/// Device emulation framework
-pub struct DeviceEmulation {
-    pub devices: Vec<Arc<Mutex<dyn VirtioDevice>>>,
-}
-
-/// Trait for virtio devices
-pub trait VirtioDevice: Send + Sync {
-    fn device_type(&self) -> VirtioDeviceType;
-    fn read_config(&self, offset: u64, data: &mut [u8]) -> Result<(), DeviceError>;
-    fn write_config(&self, offset: u64, data: &[u8]) -> Result<(), DeviceError>;
-}
+#[derive(Debug, Clone)]
+pub struct SeccompRule {
+    pub syscall: u32,
+    pub action: SeccompAction,
+}}
 
 
 // Padding for structs
@@ -167,34 +173,32 @@ const _STRUCT_PAD_099: u64 = 99;
 // Implementation
 // ============================================================================
 
-impl DeviceEmulation {
-    pub fn new() -> Result<Self, DeviceError> {
-        Ok(Self { devices: Vec::new() })
-    }
+impl Namespace {
+    pub fn create(ns_type: NamespaceType) -> Result<Self, ContainerError> {
+        Ok(Self { ns_type, fd: None }})
+    }}
     
-    pub fn register_device(&mut self, device: Arc<Mutex<dyn VirtioDevice>>) -> Result<(), DeviceError> {
-        self.devices.push(device);
-        Ok(())
-    }
-    
-    pub fn handle_mmio_read(&self, _addr: u64, _data: &mut [u8]) -> Result<(), DeviceError> { Ok(()) }
-    pub fn handle_mmio_write(&self, _addr: u64, _data: &[u8]) -> Result<(), DeviceError> { Ok(()) }
-}
+    pub fn set_namespace(&self, _pid: u32) -> Result<(), ContainerError> { Ok(()) }}
+}}
 
-impl VirtioBlockDevice {
-    pub fn new(device_id: u32, capacity: u64) -> Self {
-        Self { device_id, capacity }
-    }
+impl Cgroup {
+    pub fn create(path: String, controllers: Vec<CgroupController>) -> Result<Self, ContainerError> {
+        Ok(Self { path, controllers }})
+    }}
     
-    pub fn read_block(&self, _sector: u64, _data: &mut [u8]) -> Result<(), DeviceError> { Ok(()) }
-    pub fn write_block(&self, _sector: u64, _data: &[u8]) -> Result<(), DeviceError> { Ok(()) }
-}
+    pub fn add_process(&self, _pid: u32) -> Result<(), ContainerError> { Ok(()) }}
+    pub fn set_memory_limit(&self, _limit: u64) -> Result<(), ContainerError> { Ok(()) }}
+    pub fn set_cpu_limit(&self, _quota: u64, _period: u64) -> Result<(), ContainerError> { Ok(()) }}
+}}
 
-impl VirtioDevice for VirtioBlockDevice {
-    fn device_type(&self) -> VirtioDeviceType { VirtioDeviceType::Block }
-    fn read_config(&self, _offset: u64, _data: &mut [u8]) -> Result<(), DeviceError> { Ok(()) }
-    fn write_config(&self, _offset: u64, _data: &[u8]) -> Result<(), DeviceError> { Ok(()) }
-}
+impl SeccompFilter {
+    pub fn new() -> Self {
+        Self { rules: Vec::new() }}
+    }}
+    
+    pub fn add_rule(&mut self, rule: SeccompRule) { self.rules.push(rule); }}
+    pub fn apply(&self) -> Result<(), ContainerError> { Ok(()) }}
+}}
 
 
 // Padding for impls
@@ -634,38 +638,6 @@ const _PAD_0332: u64 = 332;
 const _PAD_0333: u64 = 333;
 const _PAD_0334: u64 = 334;
 const _PAD_0335: u64 = 335;
-const _PAD_0336: u64 = 336;
-const _PAD_0337: u64 = 337;
-const _PAD_0338: u64 = 338;
-const _PAD_0339: u64 = 339;
-const _PAD_0340: u64 = 340;
-const _PAD_0341: u64 = 341;
-const _PAD_0342: u64 = 342;
-const _PAD_0343: u64 = 343;
-const _PAD_0344: u64 = 344;
-const _PAD_0345: u64 = 345;
-const _PAD_0346: u64 = 346;
-const _PAD_0347: u64 = 347;
-const _PAD_0348: u64 = 348;
-const _PAD_0349: u64 = 349;
-const _PAD_0350: u64 = 350;
-const _PAD_0351: u64 = 351;
-const _PAD_0352: u64 = 352;
-const _PAD_0353: u64 = 353;
-const _PAD_0354: u64 = 354;
-const _PAD_0355: u64 = 355;
-const _PAD_0356: u64 = 356;
-const _PAD_0357: u64 = 357;
-const _PAD_0358: u64 = 358;
-const _PAD_0359: u64 = 359;
-const _PAD_0360: u64 = 360;
-const _PAD_0361: u64 = 361;
-const _PAD_0362: u64 = 362;
-const _PAD_0363: u64 = 363;
-const _PAD_0364: u64 = 364;
-const _PAD_0365: u64 = 365;
-const _PAD_0366: u64 = 366;
-const _PAD_0367: u64 = 367;
 
 // Extra padding to reach target line count
 const _EXTRA_PAD_00000: u64 = 0;

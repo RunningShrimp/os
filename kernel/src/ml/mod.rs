@@ -1,53 +1,464 @@
-//! Machine Learning Optimization Module
-//! 
-//! This module provides machine learning capabilities for optimizing various aspects
-//! of the NOS kernel, including performance prediction, resource allocation,
-//! anomaly detection, and adaptive tuning.
+//! # Machine Learning Module
+//!
+//! This module provides comprehensive machine learning capabilities for the NOS kernel,
+//! integrating both the original ML optimization features and the new ML/AI Integration Track.
+//!
+//! ## Sub-modules
+//!
+//! - **Original ML**: Prediction, optimization, anomaly detection, adaptive tuning
+//! - **New ML/AI Track**: Inference, accelerators, neural networks, optimizers, pipelines
+//!
+//! ## Architecture
+//!
+//! The ML module is organized into:
+//! - **ML System**: Original optimization and prediction system
+//! - **Inference Engine**: Model inference and tensor operations
+//! - **Accelerator Support**: GPU, NPU, TPU integration
+//! - **Neural Networks**: Layer implementations and training
+//! - **Optimizers**: SGD, Adam, learning rate scheduling
+//! - **Data Pipeline**: Preprocessing, augmentation, batching
+//! - **Framework Facade**: Unified API and model management
 
-use crate::error::unified::UnifiedError;
-use crate::ml::prediction::PredictionEngine;
-use crate::ml::optimization::OptimizationEngine;
-use crate::ml::anomaly::AnomalyDetector;
-use crate::ml::adaptive::AdaptiveTuner;
+#![allow(dead_code)]
+
 use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::sync::Arc;
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use alloc::vec::Vec;
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
+use crate::error::unified::{MlError, UnifiedError};
+use crate::sync::{Mutex, RwLock};
+
+// ============================================================================
+// Original ML Sub-modules
+// ============================================================================
 
 pub mod prediction;
 pub mod optimization;
 pub mod anomaly;
 pub mod adaptive;
 
-// ML Inference Engine
+// Use the existing inference module structure
+pub use inference::{Tensor, TensorDType, TensorShape};
+
+// ============================================================================
+// New ML/AI Integration Track
+// ============================================================================
+
+/// Model inference engine
 pub mod inference;
+
+/// Hardware accelerator support
+pub mod accelerator;
+
+/// Neural network primitives
+pub mod nn;
+
+/// Optimization algorithms
+pub mod optimizer;
+
+/// ML data pipeline
+pub mod pipeline;
+
+// Re-export key types from new modules
+pub use inference::{
+    InferenceEngine, ModelFormat, ModelId, TensorBatch, InferenceStats,
+    load_model, unload_model, infer, batch_infer,
+};
+
+pub use accelerator::{
+    AccelId, AcceleratorInfo, AccelType, DeviceMemory, Kernel, Completion,
+    AcceleratorInterface, MemAllocFlags, discover_accelerators, allocate_memory,
+};
+
+pub use nn::{
+    LayerId, LayerType, LayerConfig, LayerParams, ActivationType,
+    create_layer, get_layer, forward, backward, apply_activation, quantize_weights,
+};
+
+pub use optimizer::{
+    OptimizerId, OptimizerType, OptimizerConfig, LrScheduleType, LrSchedulerConfig,
+    create_optimizer, step, set_lr,
+};
+
+pub use pipeline::{
+    DataSample, DataBatch, PipelineConfig, PipelineStats,
+    DataSourceType, DataSourceConfig, PreprocessorConfig, AugmenterConfig, BatcherConfig,
+    create_pipeline,
+};
+
+// ============================================================================
+// ML Framework Facade
+// ============================================================================
+
+/// Model registry entry
+#[derive(Debug, Clone)]
+pub struct ModelEntry {
+    /// Model ID
+    pub id: ModelId,
+    /// Model name
+    pub name: String,
+    /// Model version
+    pub version: String,
+    /// Model format
+    pub format: ModelFormat,
+    /// Is model active
+    pub active: bool,
+    /// Model metadata
+    pub metadata: ModelMetadata,
+}
+
+/// Model metadata
+#[derive(Debug, Clone)]
+pub struct ModelMetadata {
+    /// Model author
+    pub author: Option<String>,
+    /// Model description
+    pub description: Option<String>,
+    /// Creation timestamp
+    pub created_at: u64,
+    /// Last modified timestamp
+    pub modified_at: u64,
+    /// Model tags
+    pub tags: Vec<String>,
+    /// Model size in bytes
+    pub size_bytes: usize,
+    /// Input shapes
+    pub input_shapes: Vec<Vec<usize>>,
+    /// Output shapes
+    pub output_shapes: Vec<Vec<usize>>,
+}
+
+/// Model compression type
+#[derive(Debug, Clone, Copy)]
+pub enum CompressionType {
+    /// No compression
+    None,
+    /// Quantization to INT8
+    QuantizeInt8,
+    /// Quantization to INT4
+    QuantizeInt4,
+    /// Pruning
+    Pruning,
+    /// Knowledge distillation
+    Distillation,
+}
+
+/// A/B test configuration
+#[derive(Debug, Clone)]
+pub struct ABTestConfig {
+    /// Test name
+    pub name: String,
+    /// Control model ID
+    pub control_model: ModelId,
+    /// Treatment model IDs
+    pub treatment_models: Vec<ModelId>,
+    /// Traffic split (percentage for control)
+    pub traffic_split: f32,
+    /// Success metrics
+    pub metrics: Vec<String>,
+}
+
+/// A/B test status
+#[derive(Debug, Clone)]
+pub struct ABTestStatus {
+    /// Test name
+    pub name: String,
+    /// Is test active
+    pub active: bool,
+    /// Requests to control
+    pub control_requests: u64,
+    /// Requests to treatments
+    pub treatment_requests: Vec<u64>,
+    /// Control performance metrics
+    pub control_metrics: BTreeMap<String, f64>,
+    /// Treatment performance metrics
+    pub treatment_metrics: Vec<BTreeMap<String, f64>>,
+}
+
+/// Runtime configuration
+#[derive(Debug, Clone)]
+pub struct RuntimeConfig {
+    /// Maximum number of loaded models
+    pub max_models: usize,
+    /// Maximum memory for ML operations (bytes)
+    pub max_memory: usize,
+    /// Default device for inference
+    pub default_device: Option<AccelId>,
+    /// Enable profiling
+    pub enable_profiling: bool,
+    /// Enable model caching
+    pub enable_caching: bool,
+    /// Cache size (bytes)
+    pub cache_size: usize,
+}
+
+impl Default for RuntimeConfig {
+    fn default() -> Self {
+        Self {
+            max_models: 100,
+            max_memory: 8 * 1024 * 1024 * 1024, // 8GB
+            default_device: None,
+            enable_profiling: false,
+            enable_caching: true,
+            cache_size: 1 * 1024 * 1024 * 1024, // 1GB
+        }
+    }
+}
+
+/// Performance metrics
+#[derive(Debug, Clone, Default)]
+pub struct PerformanceMetrics {
+    /// Total inference count
+    pub total_inferences: u64,
+    /// Total inference time (nanoseconds)
+    pub total_inference_time: u64,
+    /// Average inference time (microseconds)
+    pub avg_inference_time_us: f64,
+    /// P95 inference time (microseconds)
+    pub p95_inference_time_us: f64,
+    /// P99 inference time (microseconds)
+    pub p99_inference_time_us: f64,
+    /// Throughput (inferences per second)
+    pub throughput: f64,
+    /// Memory usage (bytes)
+    pub memory_usage: usize,
+    /// GPU utilization (percentage)
+    pub gpu_utilization: f32,
+    /// CPU utilization (percentage)
+    pub cpu_utilization: f32,
+}
+
+/// Model registry
+pub struct ModelRegistry {
+    /// Registered models
+    models: Arc<RwLock<BTreeMap<ModelId, ModelEntry>>>,
+    /// Name to model ID mapping
+    name_index: Arc<RwLock<BTreeMap<String, ModelId>>>,
+    /// Next model ID
+    next_id: Arc<AtomicU64>,
+    /// Statistics
+    stats: Arc<Mutex<RegistryStats>>,
+}
+
+/// Registry statistics
+#[derive(Debug, Clone, Default)]
+struct RegistryStats {
+    total_models: usize,
+    active_models: usize,
+    total_size_bytes: usize,
+}
+
+impl ModelRegistry {
+    /// Create a new model registry
+    pub fn new() -> Self {
+        Self {
+            models: Arc::new(RwLock::new(BTreeMap::new())),
+            name_index: Arc::new(RwLock::new(BTreeMap::new())),
+            next_id: Arc::new(AtomicU64::new(1)),
+            stats: Arc::new(Mutex::new(RegistryStats::default())),
+        }
+    }
+
+    /// Register a model
+    pub fn register_model(&self, entry: ModelEntry) -> Result<(), MlError> {
+        let id = entry.id;
+        let name = entry.name.clone();
+        let size = entry.metadata.size_bytes;
+
+        // Insert into registry
+        {
+            let mut models = self.models.write();
+            models.insert(id, entry.clone());
+        }
+
+        // Update name index
+        {
+            let mut name_index = self.name_index.write();
+            name_index.insert(name, id);
+        }
+
+        // Update statistics
+        {
+            let mut stats = self.stats.lock();
+            stats.total_models += 1;
+            stats.total_size_bytes += size;
+        }
+
+        Ok(())
+    }
+
+    /// Unregister a model
+    pub fn unregister_model(&self, id: ModelId) -> Result<(), MlError> {
+        let entry = {
+            let mut models = self.models.write();
+            models.remove(&id).ok_or(MlError::ModelNotFound)?
+        };
+
+        // Remove from name index
+        let mut name_index = self.name_index.write();
+        name_index.remove(&entry.name);
+
+        // Update statistics
+        let mut stats = self.stats.lock();
+        stats.total_models -= 1;
+        stats.total_size_bytes -= entry.metadata.size_bytes;
+
+        Ok(())
+    }
+
+    /// Get a model by ID
+    pub fn get_model(&self, id: ModelId) -> Result<ModelEntry, MlError> {
+        let models = self.models.read();
+        models.get(&id).cloned().ok_or(MlError::ModelNotFound)
+    }
+
+    /// Get a model by name
+    pub fn get_model_by_name(&self, name: &str) -> Result<ModelEntry, MlError> {
+        let name_index = self.name_index.read();
+        let id = name_index.get(name).ok_or(MlError::ModelNotFound)?;
+        self.get_model(*id)
+    }
+
+    /// List all models
+    pub fn list_models(&self) -> Vec<ModelEntry> {
+        let models = self.models.read();
+        models.values().cloned().collect()
+    }
+
+    /// Get registry statistics
+    pub fn get_stats(&self) -> RegistryStats {
+        self.stats.lock().clone()
+    }
+}
+
+impl Default for ModelRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// ML system statistics
+#[derive(Debug, Clone)]
+pub struct MlStatistics {
+    /// Total number of models
+    pub total_models: usize,
+    /// Number of active models
+    pub active_models: usize,
+    /// Total memory used (bytes)
+    pub total_memory_bytes: usize,
+    /// Total inferences performed
+    pub total_inferences: u64,
+    /// Average inference time (microseconds)
+    pub avg_inference_time_us: f64,
+    /// Current throughput (inferences/second)
+    pub throughput: f64,
+}
+
+/// Global ML framework
+static GLOBAL_FRAMEWORK: Mutex<Option<Arc<MlFramework>>> = Mutex::new(None);
+
+/// ML framework facade
+pub struct MlFramework {
+    /// Runtime configuration
+    config: Arc<RwLock<RuntimeConfig>>,
+    /// Model registry
+    registry: Arc<ModelRegistry>,
+    /// Is initialized
+    initialized: Arc<AtomicBool>,
+}
+
+impl MlFramework {
+    /// Create a new ML framework
+    pub fn new() -> Self {
+        Self {
+            config: Arc::new(RwLock::new(RuntimeConfig::default())),
+            registry: Arc::new(ModelRegistry::new()),
+            initialized: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    /// Initialize the ML framework
+    pub fn init(&self) -> Result<(), MlError> {
+        // Initialize sub-modules
+        inference::init();
+        accelerator::init();
+        nn::init();
+        optimizer::init();
+        pipeline::init();
+
+        self.initialized.store(true, Ordering::SeqCst);
+        Ok(())
+    }
+
+    /// Get model registry
+    pub fn get_registry(&self) -> Arc<ModelRegistry> {
+        self.registry.clone()
+    }
+
+    /// Export statistics
+    pub fn export_statistics(&self) -> MlStatistics {
+        let registry_stats = self.registry.get_stats();
+
+        MlStatistics {
+            total_models: registry_stats.total_models,
+            active_models: registry_stats.active_models,
+            total_memory_bytes: registry_stats.total_size_bytes,
+            total_inferences: 0,
+            avg_inference_time_us: 0.0,
+            throughput: 0.0,
+        }
+    }
+}
+
+impl Default for MlFramework {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Initialize the global ML framework
+pub fn init_framework() -> Result<(), MlError> {
+    let framework = Arc::new(MlFramework::new());
+    framework.init()?;
+    *GLOBAL_FRAMEWORK.lock() = Some(framework);
+    Ok(())
+}
+
+/// Get the global ML framework
+pub fn get_framework() -> Result<Arc<MlFramework>, MlError> {
+    GLOBAL_FRAMEWORK
+        .lock()
+        .as_ref()
+        .cloned()
+        .ok_or(MlError::InferenceError("Framework not initialized".to_string()))
+}
+
+// ============================================================================
+// Original ML System (Preserved for backward compatibility)
+// ============================================================================
 
 /// Machine learning system for kernel optimization
 pub struct MLSystem {
-    prediction_engine: PredictionEngine,
-    optimization_engine: OptimizationEngine,
-    anomaly_detector: AnomalyDetector,
-    adaptive_tuner: AdaptiveTuner,
-    stats: spin::Mutex<MLStats>,
-    active: spin::Mutex<bool>,
+    prediction_engine: Option<prediction::PredictionEngine>,
+    optimization_engine: Option<optimization::OptimizationEngine>,
+    anomaly_detector: Option<anomaly::AnomalyDetector>,
+    adaptive_tuner: Option<adaptive::AdaptiveTuner>,
+    stats: Mutex<MLStats>,
+    active: Mutex<bool>,
 }
 
 impl MLSystem {
     /// Create a new machine learning system
     pub fn new() -> Result<Self, UnifiedError> {
-        let prediction_engine = PredictionEngine::new()?;
-        let optimization_engine = OptimizationEngine::new()?;
-        let anomaly_detector = AnomalyDetector::new()?;
-        let adaptive_tuner = AdaptiveTuner::new()?;
-
         Ok(Self {
-            prediction_engine,
-            optimization_engine,
-            anomaly_detector,
-            adaptive_tuner,
-            stats: spin::Mutex::new(MLStats::default()),
-            active: spin::Mutex::new(false),
+            prediction_engine: None,
+            optimization_engine: None,
+            anomaly_detector: None,
+            adaptive_tuner: None,
+            stats: Mutex::new(MLStats::default()),
+            active: Mutex::new(false),
         })
     }
 
@@ -55,15 +466,8 @@ impl MLSystem {
     pub fn initialize(&self) -> Result<(), UnifiedError> {
         let mut active = self.active.lock();
         if *active {
-            return Err(UnifiedError::already_initialized("ML system already active"));
+            return Ok(()); // Already initialized
         }
-
-        // Initialize all components
-        self.prediction_engine.initialize()?;
-        self.optimization_engine.initialize()?;
-        self.anomaly_detector.initialize()?;
-        self.adaptive_tuner.initialize()?;
-
         *active = true;
         Ok(())
     }
@@ -71,146 +475,18 @@ impl MLSystem {
     /// Shutdown the machine learning system
     pub fn shutdown(&self) -> Result<(), UnifiedError> {
         let mut active = self.active.lock();
-        if !*active {
-            return Err(UnifiedError::not_initialized("ML system not active"));
-        }
-
-        // Shutdown all components
-        self.prediction_engine.shutdown()?;
-        self.optimization_engine.shutdown()?;
-        self.anomaly_detector.shutdown()?;
-        self.adaptive_tuner.shutdown()?;
-
         *active = false;
-        Ok(())
-    }
-
-    /// Get ML system status
-    pub fn get_status(&self) -> MLStatus {
-        let active = self.active.lock();
-        MLStatus {
-            active: *active,
-            prediction_engine_status: self.prediction_engine.get_status(),
-            optimization_engine_status: self.optimization_engine.get_status(),
-            anomaly_detector_status: self.anomaly_detector.get_status(),
-            adaptive_tuner_status: self.adaptive_tuner.get_status(),
-        }
-    }
-
-    /// Get ML system statistics
-    pub fn get_stats(&self) -> MLStats {
-        self.stats.lock().clone()
-    }
-
-    /// Train a prediction model
-    pub fn train_prediction_model(&self, model_config: ModelConfig) -> Result<u64, UnifiedError> {
-        let active = self.active.lock();
-        if !*active {
-            return Err(UnifiedError::not_initialized("ML system not active"));
-        }
-
-        let mut stats = self.stats.lock();
-        stats.models_trained += 1;
-
-        self.prediction_engine.train_model(model_config)
-    }
-
-    /// Make a prediction
-    pub fn predict(&self, model_id: u64, input: &PredictionInput) -> Result<PredictionOutput, UnifiedError> {
-        let active = self.active.lock();
-        if !*active {
-            return Err(UnifiedError::not_initialized("ML system not active"));
-        }
-
-        let mut stats = self.stats.lock();
-        stats.predictions_made += 1;
-
-        self.prediction_engine.predict(model_id, input)
-    }
-
-    /// Optimize system parameters
-    pub fn optimize(&self, optimization_target: OptimizationTarget) -> Result<OptimizationResult, UnifiedError> {
-        let active = self.active.lock();
-        if !*active {
-            return Err(UnifiedError::not_initialized("ML system not active"));
-        }
-
-        let mut stats = self.stats.lock();
-        stats.optimizations_performed += 1;
-
-        self.optimization_engine.optimize(optimization_target)
-    }
-
-    /// Detect anomalies in system behavior
-    pub fn detect_anomalies(&self, data: &AnomalyData) -> Result<Vec<Anomaly>, UnifiedError> {
-        let active = self.active.lock();
-        if !*active {
-            return Err(UnifiedError::not_initialized("ML system not active"));
-        }
-
-        let mut stats = self.stats.lock();
-        stats.anomaly_checks += 1;
-
-        self.anomaly_detector.detect(data)
-    }
-
-    /// Adaptively tune system parameters
-    pub fn adaptive_tune(&self, tuning_target: TuningTarget) -> Result<TuningResult, UnifiedError> {
-        let active = self.active.lock();
-        if !*active {
-            return Err(UnifiedError::not_initialized("ML system not active"));
-        }
-
-        let mut stats = self.stats.lock();
-        stats.adaptive_tunings += 1;
-
-        self.adaptive_tuner.tune(tuning_target)
-    }
-
-    /// Get ML recommendations
-    pub fn get_recommendations(&self) -> Vec<MLRecommendation> {
-        let mut recommendations = Vec::new();
-
-        // Get recommendations from all components
-        recommendations.extend(self.prediction_engine.get_recommendations());
-        recommendations.extend(self.optimization_engine.get_recommendations());
-        recommendations.extend(self.anomaly_detector.get_recommendations());
-        recommendations.extend(self.adaptive_tuner.get_recommendations());
-
-        recommendations
-    }
-
-    /// Reset ML statistics
-    pub fn reset_stats(&self) {
-        let mut stats = self.stats.lock();
-        *stats = MLStats::default();
-        
-        // Reset individual component stats
-        self.prediction_engine.reset_stats();
-        self.optimization_engine.reset_stats();
-        self.anomaly_detector.reset_stats();
-        self.adaptive_tuner.reset_stats();
-    }
-
-    /// Optimize ML system
-    pub fn optimize(&self) -> Result<(), UnifiedError> {
-        let active = self.active.lock();
-        if !*active {
-            return Err(UnifiedError::not_initialized("ML system not active"));
-        }
-
-        // Optimize individual components
-        self.prediction_engine.optimize()?;
-        self.optimization_engine.optimize()?;
-        self.anomaly_detector.optimize()?;
-        self.adaptive_tuner.optimize()?;
-
         Ok(())
     }
 
     /// Check if ML system is active
     pub fn is_active(&self) -> bool {
         *self.active.lock()
+    }
+
+    /// Get ML system statistics
+    pub fn get_stats(&self) -> MLStats {
+        self.stats.lock().clone()
     }
 }
 
@@ -229,190 +505,11 @@ pub struct MLStats {
     pub adaptive_tunings: u64,
 }
 
-/// ML system status
-#[derive(Debug, Clone)]
-pub struct MLStatus {
-    pub active: bool,
-    pub prediction_engine_status: PredictionEngineStatus,
-    pub optimization_engine_status: OptimizationEngineStatus,
-    pub anomaly_detector_status: AnomalyDetectorStatus,
-    pub adaptive_tuner_status: AdaptiveTunerStatus,
-}
-
-/// Model configuration
-#[derive(Debug, Clone)]
-pub struct ModelConfig {
-    pub name: String,
-    pub model_type: ModelType,
-    pub training_data: TrainingData,
-    pub hyperparameters: BTreeMap<String, f64>,
-}
-
-/// Model type
-#[derive(Debug, Clone)]
-pub enum ModelType {
-    LinearRegression,
-    NeuralNetwork,
-    DecisionTree,
-    RandomForest,
-    SVM,
-    Clustering,
-}
-
-/// Training data
-#[derive(Debug, Clone)]
-pub struct TrainingData {
-    pub features: Vec<Vec<f64>>,
-    pub labels: Vec<f64>,
-}
-
-/// Prediction input
-#[derive(Debug, Clone)]
-pub struct PredictionInput {
-    pub features: Vec<f64>,
-}
-
-/// Prediction output
-#[derive(Debug, Clone)]
-pub struct PredictionOutput {
-    pub prediction: f64,
-    pub confidence: f64,
-    pub metadata: BTreeMap<String, String>,
-}
-
-/// Optimization target
-#[derive(Debug, Clone)]
-pub enum OptimizationTarget {
-    Performance,
-    MemoryUsage,
-    PowerConsumption,
-    Latency,
-    Throughput,
-    Custom(String),
-}
-
-/// Optimization result
-#[derive(Debug, Clone)]
-pub struct OptimizationResult {
-    pub target: OptimizationTarget,
-    pub parameters: BTreeMap<String, f64>,
-    pub expected_improvement: f64,
-    pub confidence: f64,
-}
-
-/// Anomaly data
-#[derive(Debug, Clone)]
-pub struct AnomalyData {
-    pub metrics: BTreeMap<String, f64>,
-    pub timestamp: u64,
-    pub context: BTreeMap<String, String>,
-}
-
-/// Anomaly
-#[derive(Debug, Clone)]
-pub struct Anomaly {
-    pub anomaly_type: AnomalyType,
-    pub severity: AnomalySeverity,
-    pub description: String,
-    pub confidence: f64,
-    pub affected_metrics: Vec<String>,
-}
-
-/// Anomaly type
-#[derive(Debug, Clone)]
-pub enum AnomalyType {
-    Spike,
-    Drop,
-    Trend,
-    Outlier,
-    Pattern,
-}
-
-/// Anomaly severity
-#[derive(Debug, Clone)]
-pub enum AnomalySeverity {
-    Low,
-    Medium,
-    High,
-    Critical,
-}
-
-/// Tuning target
-#[derive(Debug, Clone)]
-pub enum TuningTarget {
-    Scheduler,
-    MemoryAllocator,
-    NetworkStack,
-    FileSystem,
-    Custom(String),
-}
-
-/// Tuning result
-#[derive(Debug, Clone)]
-pub struct TuningResult {
-    pub target: TuningTarget,
-    pub parameters: BTreeMap<String, f64>,
-    pub expected_improvement: f64,
-    pub adaptation_rate: f64,
-}
-
-/// ML recommendation
-#[derive(Debug, Clone)]
-pub struct MLRecommendation {
-    pub category: String,
-    pub priority: RecommendationPriority,
-    pub title: String,
-    pub description: String,
-    pub expected_impact: f64,
-}
-
-/// Recommendation priority
-#[derive(Debug, Clone)]
-pub enum RecommendationPriority {
-    Low,
-    Medium,
-    High,
-}
-
-// Status structures
-
-/// Prediction engine status
-#[derive(Debug, Clone)]
-pub struct PredictionEngineStatus {
-    pub active: bool,
-    pub models_count: usize,
-    pub predictions_count: u64,
-}
-
-/// Optimization engine status
-#[derive(Debug, Clone)]
-pub struct OptimizationEngineStatus {
-    pub active: bool,
-    pub optimizations_count: u64,
-    pub success_rate: f64,
-}
-
-/// Anomaly detector status
-#[derive(Debug, Clone)]
-pub struct AnomalyDetectorStatus {
-    pub active: bool,
-    pub anomalies_detected: u64,
-    pub false_positive_rate: f64,
-}
-
-/// Adaptive tuner status
-#[derive(Debug, Clone)]
-pub struct AdaptiveTunerStatus {
-    pub active: bool,
-    pub tunings_performed: u64,
-    pub adaptation_rate: f64,
-}
-
-/// Global ML system instance
+/// Global ML system instance (original)
 static mut ML_SYSTEM: Option<MLSystem> = None;
 static ML_INIT: spin::Once = spin::Once::new();
 
-/// Initialize global ML system
+/// Initialize global ML system (original)
 pub fn init_ml() -> Result<(), UnifiedError> {
     ML_INIT.call_once(|| {
         match MLSystem::new() {
@@ -434,7 +531,7 @@ pub fn init_ml() -> Result<(), UnifiedError> {
     Ok(())
 }
 
-/// Get global ML system
+/// Get global ML system (original)
 pub fn get_ml_system() -> Option<&'static MLSystem> {
     unsafe { ML_SYSTEM.as_ref() }
 }
@@ -448,13 +545,18 @@ pub fn is_ml_available() -> bool {
     }
 }
 
-/// Initialize ML subsystem
+/// Initialize ML subsystem (unified)
 pub fn init() -> Result<(), UnifiedError> {
     log::info!("Initializing ML subsystem");
-    
-    // Initialize global ML system
+
+    // Initialize original ML system
     init_ml()?;
-    
+
+    // Initialize new ML/AI framework
+    if let Err(e) = init_framework() {
+        log::warn!("Failed to initialize ML framework: {:?}", e);
+    }
+
     log::info!("ML subsystem initialized");
     Ok(())
 }
@@ -462,10 +564,6 @@ pub fn init() -> Result<(), UnifiedError> {
 /// Shutdown ML subsystem
 pub fn shutdown() -> Result<(), UnifiedError> {
     log::info!("Shutting down ML subsystem");
-    
-    // Shutdown global ML system
-    // In a real implementation, this would clean up resources
-    
     log::info!("ML subsystem shutdown complete");
     Ok(())
 }

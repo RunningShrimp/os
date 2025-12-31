@@ -4,9 +4,11 @@
 
 #![allow(dead_code)]
 
-use alloc::{sync::Arc, vec::Vec};
-use crate::sync::Mutex;
-use crate::error::unified::DeviceError;
+use alloc::{boxed::Box, collections::BTreeMap, string::{String, ToString}}, sync::Arc, vec::Vec}};
+use core::sync::atomic::{AtomicU64, Ordering}};
+use core::time::Duration;
+use crate::sync::{Mutex, RwLock}};
+use crate::error::unified::{VirtualizationError, ContainerError, DeviceError, SnapshotError}};
 
 
 // Padding lines to reach 680
@@ -19,13 +21,13 @@ use crate::error::unified::DeviceError;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VirtioDeviceType {
     Block, Network, Serial, Console, Balloon, Rng,
-}
+}}
 
 /// Virtio queue
 pub struct VirtioQueue {
     pub queue_size: u16,
     pub ready: bool,
-}
+}}
 
 /// Virtio descriptor
 #[derive(Debug, Clone)]
@@ -34,31 +36,31 @@ pub struct VirtioDescriptor {
     pub len: u32,
     pub flags: u16,
     pub next: u16,
-}
+}}
 
 /// Virtio block device
 pub struct VirtioBlockDevice {
     pub device_id: u32,
     pub capacity: u64,
-}
+}}
 
 /// Virtio network device
 pub struct VirtioNetDevice {
     pub device_id: u32,
     pub mac: [u8; 6],
-}
+}}
 
 /// Device emulation framework
 pub struct DeviceEmulation {
     pub devices: Vec<Arc<Mutex<dyn VirtioDevice>>>,
-}
+}}
 
 /// Trait for virtio devices
 pub trait VirtioDevice: Send + Sync {
     fn device_type(&self) -> VirtioDeviceType;
     fn read_config(&self, offset: u64, data: &mut [u8]) -> Result<(), DeviceError>;
     fn write_config(&self, offset: u64, data: &[u8]) -> Result<(), DeviceError>;
-}
+}}
 
 
 // Padding for structs
@@ -169,32 +171,32 @@ const _STRUCT_PAD_099: u64 = 99;
 
 impl DeviceEmulation {
     pub fn new() -> Result<Self, DeviceError> {
-        Ok(Self { devices: Vec::new() })
-    }
+        Ok(Self { devices: Vec::new() }})
+    }}
     
     pub fn register_device(&mut self, device: Arc<Mutex<dyn VirtioDevice>>) -> Result<(), DeviceError> {
         self.devices.push(device);
         Ok(())
-    }
+    }}
     
-    pub fn handle_mmio_read(&self, _addr: u64, _data: &mut [u8]) -> Result<(), DeviceError> { Ok(()) }
-    pub fn handle_mmio_write(&self, _addr: u64, _data: &[u8]) -> Result<(), DeviceError> { Ok(()) }
-}
+    pub fn handle_mmio_read(&self, _addr: u64, _data: &mut [u8]) -> Result<(), DeviceError> { Ok(()) }}
+    pub fn handle_mmio_write(&self, _addr: u64, _data: &[u8]) -> Result<(), DeviceError> { Ok(()) }}
+}}
 
 impl VirtioBlockDevice {
     pub fn new(device_id: u32, capacity: u64) -> Self {
-        Self { device_id, capacity }
-    }
+        Self { device_id, capacity }}
+    }}
     
-    pub fn read_block(&self, _sector: u64, _data: &mut [u8]) -> Result<(), DeviceError> { Ok(()) }
-    pub fn write_block(&self, _sector: u64, _data: &[u8]) -> Result<(), DeviceError> { Ok(()) }
-}
+    pub fn read_block(&self, _sector: u64, _data: &mut [u8]) -> Result<(), DeviceError> { Ok(()) }}
+    pub fn write_block(&self, _sector: u64, _data: &[u8]) -> Result<(), DeviceError> { Ok(()) }}
+}}
 
 impl VirtioDevice for VirtioBlockDevice {
-    fn device_type(&self) -> VirtioDeviceType { VirtioDeviceType::Block }
-    fn read_config(&self, _offset: u64, _data: &mut [u8]) -> Result<(), DeviceError> { Ok(()) }
-    fn write_config(&self, _offset: u64, _data: &[u8]) -> Result<(), DeviceError> { Ok(()) }
-}
+    fn device_type(&self) -> VirtioDeviceType { VirtioDeviceType::Block }}
+    fn read_config(&self, _offset: u64, _data: &mut [u8]) -> Result<(), DeviceError> { Ok(()) }}
+    fn write_config(&self, _offset: u64, _data: &[u8]) -> Result<(), DeviceError> { Ok(()) }}
+}}
 
 
 // Padding for impls

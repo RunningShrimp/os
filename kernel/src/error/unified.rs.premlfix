@@ -453,10 +453,10 @@ pub enum OrchError {
     DeploymentFailed,
     UpdateFailed,
     RollbackFailed,
-    ScalingFailed,
     ServiceNotFound,
     InvalidServiceSpec,
     InvalidDeploymentConfig,
+    RollbackFailed,
     HealthCheckFailed,
     ResourceLimitExceeded,
     DeploymentTimeout,
@@ -472,6 +472,7 @@ impl fmt::Display for OrchError {
             OrchError::ServiceNotFound => write!(f, "Service not found"),
             OrchError::InvalidServiceSpec => write!(f, "Invalid service specification"),
             OrchError::InvalidDeploymentConfig => write!(f, "Invalid deployment configuration"),
+            OrchError::RollbackFailed => write!(f, "Rollback failed"),
             OrchError::HealthCheckFailed => write!(f, "Health check failed"),
             OrchError::ResourceLimitExceeded => write!(f, "Resource limit exceeded"),
             OrchError::DeploymentTimeout => write!(f, "Deployment timeout"),
@@ -826,13 +827,7 @@ impl UnifiedError {
             | UnifiedError::NetworkError(_)
             | UnifiedError::ProcessError(_)
             | UnifiedError::SyscallError(_)
-            | UnifiedError::DriverError(_)
-            | UnifiedError::MlError(_)
-            | UnifiedError::VirtualizationError(_)
-            | UnifiedError::ContainerError(_)
-            | UnifiedError::DeviceError(_)
-            | UnifiedError::SnapshotError(_)
-            | UnifiedError::ClusterError(_) => ErrorSeverity::Error,
+            | UnifiedError::DriverError(_) => ErrorSeverity::Error,
             UnifiedError::Other(_) => ErrorSeverity::Warning,
             UnifiedError::InvalidState => ErrorSeverity::Error,
             UnifiedError::IoError => ErrorSeverity::Error,
@@ -899,12 +894,6 @@ impl UnifiedError {
             UnifiedError::ProcessError(err) => format!("Process error: {:?}", err),
             UnifiedError::SyscallError(err) => format!("System call error: {:?}", err),
             UnifiedError::DriverError(err) => format!("Driver error: {:?}", err),
-            UnifiedError::MlError(err) => format!("ML error: {:?}", err),
-            UnifiedError::VirtualizationError(err) => format!("Virtualization error: {:?}", err),
-            UnifiedError::ContainerError(err) => format!("Container error: {:?}", err),
-            UnifiedError::DeviceError(err) => format!("Device error: {:?}", err),
-            UnifiedError::SnapshotError(err) => format!("Snapshot error: {:?}", err),
-            UnifiedError::ClusterError(err) => format!("Cluster error: {:?}", err),
             UnifiedError::SecurityError(err) => format!("Security error: {:?}", err),
             UnifiedError::Other(msg) => format!("Other error: {}", msg),
             UnifiedError::ResourceLimitExceeded { resource, usage, limit } => {
@@ -1250,12 +1239,6 @@ impl UnifiedError {
             UnifiedError::MemoryError(err) => err.to_errno(),
             UnifiedError::FileSystemError(err) => err.to_errno(),
             UnifiedError::NetworkError(err) => err.to_errno(),
-            UnifiedError::MlError(err) => err.to_errno(),
-            UnifiedError::VirtualizationError(err) => err.to_errno(),
-            UnifiedError::ContainerError(err) => err.to_errno(),
-            UnifiedError::DeviceError(err) => err.to_errno(),
-            UnifiedError::SnapshotError(err) => err.to_errno(),
-            UnifiedError::ClusterError(err) => err.to_errno(),
             UnifiedError::ProcessError(err) => err.to_errno(),
             UnifiedError::SyscallError(err) => err.to_errno(),
             UnifiedError::DriverError(err) => err.to_errno(),
@@ -1708,40 +1691,6 @@ impl fmt::Display for VirtualizationError {
     }
 }
 
-impl VirtualizationError {
-    /// 转换为POSIX错误代码
-    pub fn to_errno(&self) -> i32 {
-        match self {
-            VirtualizationError::VmNotFound => crate::reliability::errno::ENOENT,
-            VirtualizationError::VmAlreadyExists => crate::reliability::errno::EEXIST,
-            VirtualizationError::VmCreationFailed(_) => crate::reliability::errno::EINVAL,
-            VirtualizationError::VmDestructionFailed(_) => crate::reliability::errno::EIO,
-            VirtualizationError::VcpuNotFound => crate::reliability::errno::ENOENT,
-            VirtualizationError::VcpuCreationFailed(_) => crate::reliability::errno::EINVAL,
-            VirtualizationError::VcpuRunFailed(_) => crate::reliability::errno::EIO,
-            VirtualizationError::VmExitUnhandled(_) => crate::reliability::errno::EIO,
-            VirtualizationError::MemoryMappingFailed => crate::reliability::errno::ENOMEM,
-            VirtualizationError::MemoryUnmappingFailed => crate::reliability::errno::EINVAL,
-            VirtualizationError::EptViolation => crate::reliability::errno::EFAULT,
-            VirtualizationError::NptViolation => crate::reliability::errno::EFAULT,
-            VirtualizationError::InterruptInjectionFailed => crate::reliability::errno::EIO,
-            VirtualizationError::VmStateInvalid => crate::reliability::errno::EINVAL,
-            VirtualizationError::VmNotRunning => crate::reliability::errno::EINVAL,
-            VirtualizationError::VmAlreadyRunning => crate::reliability::errno::EBUSY,
-            VirtualizationError::VmPaused => crate::reliability::errno::EBUSY,
-            VirtualizationError::VmStopped => crate::reliability::errno::EINVAL,
-            VirtualizationError::VmStateTransitionFailed => crate::reliability::errno::EIO,
-        }
-    }
-}
-
-/// 从 DeviceError 转换为 VirtualizationError
-impl From<DeviceError> for VirtualizationError {
-    fn from(err: DeviceError) -> Self {
-        VirtualizationError::VmCreationFailed(format!("Device error: {:?}", err))
-    }
-}
-
 /// 容器相关错误
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ContainerError {
@@ -1819,43 +1768,6 @@ impl fmt::Display for ContainerError {
     }
 }
 
-impl ContainerError {
-    /// 转换为POSIX错误代码
-    pub fn to_errno(&self) -> i32 {
-        match self {
-            ContainerError::ContainerNotFound => crate::reliability::errno::ENOENT,
-            ContainerError::ContainerAlreadyExists => crate::reliability::errno::EEXIST,
-            ContainerError::ContainerCreationFailed(_) => crate::reliability::errno::EINVAL,
-            ContainerError::ContainerStartFailed(_) => crate::reliability::errno::EIO,
-            ContainerError::ContainerStopFailed(_) => crate::reliability::errno::EIO,
-            ContainerError::ContainerDeleteFailed(_) => crate::reliability::errno::EIO,
-            ContainerError::ContainerNotRunning => crate::reliability::errno::EINVAL,
-            ContainerError::ContainerAlreadyRunning => crate::reliability::errno::EBUSY,
-            ContainerError::ContainerStateInvalid => crate::reliability::errno::EINVAL,
-            ContainerError::NamespaceCreationFailed(_) => crate::reliability::errno::ENOMEM,
-            ContainerError::NamespaceConfigurationFailed(_) => crate::reliability::errno::EINVAL,
-            ContainerError::NamespaceNotFound => crate::reliability::errno::ENOENT,
-            ContainerError::CgroupCreationFailed(_) => crate::reliability::errno::ENOMEM,
-            ContainerError::CgroupConfigurationFailed(_) => crate::reliability::errno::EINVAL,
-            ContainerError::CgroupNotFound => crate::reliability::errno::ENOENT,
-            ContainerError::ResourceLimitExceeded(_) => crate::reliability::errno::EDQUOT,
-            ContainerError::RootfsSetupFailed(_) => crate::reliability::errno::EIO,
-            ContainerError::PivotRootFailed(_) => crate::reliability::errno::EIO,
-            ContainerError::ChrootFailed(_) => crate::reliability::errno::EIO,
-            ContainerError::MountFailed(_) => crate::reliability::errno::EIO,
-            ContainerError::NetworkSetupFailed(_) => crate::reliability::errno::EIO,
-            ContainerError::VethPairCreationFailed(_) => crate::reliability::errno::ENOMEM,
-            ContainerError::BridgeCreationFailed(_) => crate::reliability::errno::EIO,
-            ContainerError::OciSpecInvalid(_) => crate::reliability::errno::EINVAL,
-            ContainerError::OciSpecNotSupported(_) => crate::reliability::errno::EOPNOTSUPP,
-            ContainerError::OciHookFailed(_) => crate::reliability::errno::EIO,
-            ContainerError::IsolationSetupFailed(_) => crate::reliability::errno::EIO,
-            ContainerError::SeccompFilterFailed(_) => crate::reliability::errno::EIO,
-            ContainerError::CapabilitySetFailed(_) => crate::reliability::errno::EPERM,
-        }
-    }
-}
-
 /// 设备虚拟化相关错误
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DeviceError {
@@ -1919,38 +1831,6 @@ impl fmt::Display for DeviceError {
             DeviceError::NetworkIoFailed(msg) => write!(f, "Network I/O failed: {}", msg),
             DeviceError::SerialDeviceError(msg) => write!(f, "Serial device error: {}", msg),
             DeviceError::ConsoleError(msg) => write!(f, "Console error: {}", msg),
-        }
-    }
-}
-
-impl DeviceError {
-    /// 转换为POSIX错误代码
-    pub fn to_errno(&self) -> i32 {
-        match self {
-            DeviceError::VirtioDeviceNotFound => crate::reliability::errno::ENOENT,
-            DeviceError::VirtioDeviceInitializationFailed(_) => crate::reliability::errno::EIO,
-            DeviceError::VirtioDeviceConfigurationFailed(_) => crate::reliability::errno::EINVAL,
-            DeviceError::VirtioQueueNotFound => crate::reliability::errno::ENOENT,
-            DeviceError::VirtioQueueCreationFailed(_) => crate::reliability::errno::ENOMEM,
-            DeviceError::VirtioQueueFull => crate::reliability::errno::EBUSY,
-            DeviceError::VirtioDescriptorError(_) => crate::reliability::errno::EIO,
-            DeviceError::MmioAccessFailed(_) => crate::reliability::errno::EIO,
-            DeviceError::PioAccessFailed(_) => crate::reliability::errno::EIO,
-            DeviceError::InvalidMmioAddress => crate::reliability::errno::EFAULT,
-            DeviceError::InvalidPioAddress => crate::reliability::errno::EFAULT,
-            DeviceError::InterruptAllocationFailed => crate::reliability::errno::ENOMEM,
-            DeviceError::InterruptRoutingFailed => crate::reliability::errno::EIO,
-            DeviceError::MsiConfigurationFailed(_) => crate::reliability::errno::EIO,
-            DeviceError::MsixConfigurationFailed(_) => crate::reliability::errno::EIO,
-            DeviceError::DeviceHotplugFailed(_) => crate::reliability::errno::EIO,
-            DeviceError::DeviceHotunplugFailed(_) => crate::reliability::errno::EIO,
-            DeviceError::DeviceNotSupported => crate::reliability::errno::EOPNOTSUPP,
-            DeviceError::BlockDeviceError(_) => crate::reliability::errno::EIO,
-            DeviceError::BlockIoFailed(_) => crate::reliability::errno::EIO,
-            DeviceError::NetworkDeviceError(_) => crate::reliability::errno::EIO,
-            DeviceError::NetworkIoFailed(_) => crate::reliability::errno::EIO,
-            DeviceError::SerialDeviceError(_) => crate::reliability::errno::EIO,
-            DeviceError::ConsoleError(_) => crate::reliability::errno::EIO,
         }
     }
 }
@@ -2022,39 +1902,6 @@ impl fmt::Display for SnapshotError {
             SnapshotError::SnapshotNotFound => write!(f, "Snapshot not found"),
             SnapshotError::SnapshotCorrupted => write!(f, "Snapshot corrupted"),
             SnapshotError::SnapshotVersionMismatch => write!(f, "Snapshot version mismatch"),
-        }
-    }
-}
-
-impl SnapshotError {
-    /// 转换为POSIX错误代码
-    pub fn to_errno(&self) -> i32 {
-        match self {
-            SnapshotError::SerializationFailed(_) => crate::reliability::errno::EIO,
-            SnapshotError::DeserializationFailed(_) => crate::reliability::errno::EIO,
-            SnapshotError::StorageWriteFailed(_) => crate::reliability::errno::EIO,
-            SnapshotError::StorageReadFailed(_) => crate::reliability::errno::EIO,
-            SnapshotError::StorageNotAvailable => crate::reliability::errno::EIO,
-            SnapshotError::InsufficientStorageSpace(_) => crate::reliability::errno::ENOSPC,
-            SnapshotError::MemorySnapshotFailed(_) => crate::reliability::errno::EIO,
-            SnapshotError::MemoryRestoreFailed(_) => crate::reliability::errno::EIO,
-            SnapshotError::DirtyPageTrackingFailed(_) => crate::reliability::errno::EIO,
-            SnapshotError::CpuStateCaptureFailed(_) => crate::reliability::errno::EIO,
-            SnapshotError::CpuStateRestoreFailed(_) => crate::reliability::errno::EIO,
-            SnapshotError::DeviceStateSaveFailed(_) => crate::reliability::errno::EIO,
-            SnapshotError::DeviceStateRestoreFailed(_) => crate::reliability::errno::EIO,
-            SnapshotError::MigrationFailed(_) => crate::reliability::errno::EIO,
-            SnapshotError::MigrationNotSupported => crate::reliability::errno::EOPNOTSUPP,
-            SnapshotError::MigrationTargetUnavailable => crate::reliability::errno::EHOSTUNREACH,
-            SnapshotError::MigrationProtocolError(_) => crate::reliability::errno::EPROTO,
-            SnapshotError::MigrationDataCorrupted => crate::reliability::errno::EIO,
-            SnapshotError::IncrementalSnapshotFailed(_) => crate::reliability::errno::EIO,
-            SnapshotError::DeltaCalculationFailed(_) => crate::reliability::errno::EIO,
-            SnapshotError::CompressionFailed(_) => crate::reliability::errno::EIO,
-            SnapshotError::DecompressionFailed(_) => crate::reliability::errno::EIO,
-            SnapshotError::SnapshotNotFound => crate::reliability::errno::ENOENT,
-            SnapshotError::SnapshotCorrupted => crate::reliability::errno::EIO,
-            SnapshotError::SnapshotVersionMismatch => crate::reliability::errno::EINVAL,
         }
     }
 }
@@ -2224,8 +2071,6 @@ pub enum KeyError {
     KeyRevoked,
     /// Invalid key permissions
     InvalidPermissions,
-    /// Operation not supported
-    NotSupported,
 }
 
 impl fmt::Display for KeyError {
@@ -2249,7 +2094,6 @@ impl fmt::Display for KeyError {
             KeyError::KeyExpired => write!(f, "Key has expired"),
             KeyError::KeyRevoked => write!(f, "Key has been revoked"),
             KeyError::InvalidPermissions => write!(f, "Invalid key permissions"),
-            KeyError::NotSupported => write!(f, "Key operation not supported"),
         }
     }
 }
@@ -2343,10 +2187,6 @@ pub enum MacError {
     TransitionDenied,
     /// Type enforcement violation
     TypeEnforcementViolation,
-    /// Invalid security context
-    InvalidContext,
-    /// Operation not supported
-    NotSupported,
 }
 
 impl fmt::Display for MacError {
@@ -2368,8 +2208,6 @@ impl fmt::Display for MacError {
             MacError::PolicyConflict => write!(f, "Multiple MAC policy conflict"),
             MacError::TransitionDenied => write!(f, "Security transition denied"),
             MacError::TypeEnforcementViolation => write!(f, "Type enforcement violation"),
-            MacError::InvalidContext => write!(f, "Invalid security context"),
-            MacError::NotSupported => write!(f, "MAC operation not supported"),
         }
     }
 }
@@ -2466,430 +2304,6 @@ impl fmt::Display for ClusterError {
             ClusterError::Partitioned => write!(f, "Cluster is partitioned"),
             ClusterError::InvalidState(msg) => write!(f, "Invalid cluster state: {}", msg),
             ClusterError::PermissionDenied => write!(f, "Permission denied for cluster operation"),
-        }
-    }
-}
-
-impl ClusterError {
-    /// Convert to POSIX errno
-    pub fn to_errno(&self) -> i32 {
-        match self {
-            ClusterError::DlmError(_) => crate::reliability::errno::EIO,
-            ClusterError::ConsensusError(_) => crate::reliability::errno::EIO,
-            ClusterError::FailoverError(_) => crate::reliability::errno::EIO,
-            ClusterError::MembershipError(_) => crate::reliability::errno::EIO,
-            ClusterError::BalanceError(_) => crate::reliability::errno::EIO,
-            ClusterError::NodeNotFound(_) => crate::reliability::errno::ENOENT,
-            ClusterError::NotInitialized => crate::reliability::errno::EIO,
-            ClusterError::ShuttingDown => crate::reliability::errno::EIO,
-            ClusterError::RpcFailed(_) => crate::reliability::errno::EIO,
-            ClusterError::Timeout => crate::reliability::errno::ETIMEDOUT,
-            ClusterError::ConfigurationError(_) => crate::reliability::errno::EINVAL,
-            ClusterError::NetworkPartition => crate::reliability::errno::EIO,
-            ClusterError::NoQuorum => crate::reliability::errno::EIO,
-            ClusterError::LeadershipLost => crate::reliability::errno::EIO,
-            ClusterError::SplitBrain => crate::reliability::errno::EIO,
-            ClusterError::FencingFailed { .. } => crate::reliability::errno::EIO,
-            ClusterError::SyncFailed(_) => crate::reliability::errno::EIO,
-            ClusterError::Partitioned => crate::reliability::errno::EIO,
-            ClusterError::InvalidState(_) => crate::reliability::errno::EINVAL,
-            ClusterError::PermissionDenied => crate::reliability::errno::EPERM,
-        }
-    }
-}
-
-/// SDN (Software Defined Networking) related errors
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SdnError {
-    OpenFlowProtocolError,
-    ControllerConnectionFailed,
-    ControllerTimeout,
-    FlowTableFull,
-    FlowNotFound,
-    InvalidFlowRule,
-    FlowMatchFailed,
-    FlowActionFailed,
-    SwitchNotFound,
-    PortNotFound,
-    InvalidDatapathId,
-    StatisticsError,
-    BarrierFailed,
-    GroupTableFull,
-    MeterTableFull,
-    PacketInQueueFull,
-}
-
-impl fmt::Display for SdnError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            SdnError::OpenFlowProtocolError => write!(f, "OpenFlow protocol error"),
-            SdnError::ControllerConnectionFailed => write!(f, "Controller connection failed"),
-            SdnError::ControllerTimeout => write!(f, "Controller timeout"),
-            SdnError::FlowTableFull => write!(f, "Flow table is full"),
-            SdnError::FlowNotFound => write!(f, "Flow not found"),
-            SdnError::InvalidFlowRule => write!(f, "Invalid flow rule"),
-            SdnError::FlowMatchFailed => write!(f, "Flow match failed"),
-            SdnError::FlowActionFailed => write!(f, "Flow action failed"),
-            SdnError::SwitchNotFound => write!(f, "Switch not found"),
-            SdnError::PortNotFound => write!(f, "Port not found"),
-            SdnError::InvalidDatapathId => write!(f, "Invalid datapath ID"),
-            SdnError::StatisticsError => write!(f, "Statistics error"),
-            SdnError::BarrierFailed => write!(f, "Barrier failed"),
-            SdnError::GroupTableFull => write!(f, "Group table is full"),
-            SdnError::MeterTableFull => write!(f, "Meter table is full"),
-            SdnError::PacketInQueueFull => write!(f, "Packet-in queue is full"),
-        }
-    }
-}
-
-impl SdnError {
-    pub fn to_errno(&self) -> i32 {
-        match self {
-            SdnError::FlowTableFull | SdnError::GroupTableFull | SdnError::MeterTableFull | 
-            SdnError::PacketInQueueFull => crate::reliability::errno::ENOMEM,
-            SdnError::FlowNotFound | SdnError::SwitchNotFound | SdnError::PortNotFound => {
-                crate::reliability::errno::ENOENT
-            },
-            SdnError::InvalidFlowRule | SdnError::InvalidDatapathId => crate::reliability::errno::EINVAL,
-            SdnError::ControllerConnectionFailed | SdnError::ControllerTimeout => {
-                crate::reliability::errno::ETIMEDOUT
-            },
-            _ => crate::reliability::errno::EIO,
-        }
-    }
-}
-
-/// VXLAN related errors
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum VxlanError {
-    InvalidVni,
-    VniInUse,
-    VtepNotFound,
-    InvalidRemoteAddress,
-    MulticastGroupError,
-    SocketCreationFailed,
-    PacketTooLarge,
-    InvalidVxlanHeader,
-    DecapsulationFailed,
-    EncapsulationFailed,
-    VtepTableFull,
-    InterfaceNotFound,
-}
-
-impl fmt::Display for VxlanError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            VxlanError::InvalidVni => write!(f, "Invalid VNI"),
-            VxlanError::VniInUse => write!(f, "VNI already in use"),
-            VxlanError::VtepNotFound => write!(f, "VTEP not found"),
-            VxlanError::InvalidRemoteAddress => write!(f, "Invalid remote address"),
-            VxlanError::MulticastGroupError => write!(f, "Multicast group error"),
-            VxlanError::SocketCreationFailed => write!(f, "Socket creation failed"),
-            VxlanError::PacketTooLarge => write!(f, "Packet too large"),
-            VxlanError::InvalidVxlanHeader => write!(f, "Invalid VXLAN header"),
-            VxlanError::DecapsulationFailed => write!(f, "Decapsulation failed"),
-            VxlanError::EncapsulationFailed => write!(f, "Encapsulation failed"),
-            VxlanError::VtepTableFull => write!(f, "VTEP table is full"),
-            VxlanError::InterfaceNotFound => write!(f, "Interface not found"),
-        }
-    }
-}
-
-impl VxlanError {
-    pub fn to_errno(&self) -> i32 {
-        match self {
-            VxlanError::InvalidVni | VxlanError::InvalidRemoteAddress | VxlanError::InvalidVxlanHeader => {
-                crate::reliability::errno::EINVAL
-            },
-            VxlanError::VniInUse => crate::reliability::errno::EEXIST,
-            VxlanError::VtepNotFound | VxlanError::InterfaceNotFound => crate::reliability::errno::ENOENT,
-            VxlanError::VtepTableFull => crate::reliability::errno::ENOMEM,
-            VxlanError::PacketTooLarge => crate::reliability::errno::EMSGSIZE,
-            _ => crate::reliability::errno::EIO,
-        }
-    }
-}
-
-/// Network bridge related errors
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum NetBridgeError {
-    BridgeNotFound,
-    BridgeAlreadyExists,
-    PortNotFound,
-    PortAlreadyExists,
-    PortNotInBridge,
-    TooManyPorts,
-    InvalidPortConfiguration,
-    MacTableFull,
-    MacTableError,
-    FdbFailed,
-    BridgeNotOperational,
-    VlanError,
-}
-
-impl fmt::Display for NetBridgeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            NetBridgeError::BridgeNotFound => write!(f, "Bridge not found"),
-            NetBridgeError::BridgeAlreadyExists => write!(f, "Bridge already exists"),
-            NetBridgeError::PortNotFound => write!(f, "Port not found"),
-            NetBridgeError::PortAlreadyExists => write!(f, "Port already exists"),
-            NetBridgeError::PortNotInBridge => write!(f, "Port not in bridge"),
-            NetBridgeError::TooManyPorts => write!(f, "Too many ports"),
-            NetBridgeError::InvalidPortConfiguration => write!(f, "Invalid port configuration"),
-            NetBridgeError::MacTableFull => write!(f, "MAC table is full"),
-            NetBridgeError::MacTableError => write!(f, "MAC table error"),
-            NetBridgeError::FdbFailed => write!(f, "FDB operation failed"),
-            NetBridgeError::BridgeNotOperational => write!(f, "Bridge not operational"),
-            NetBridgeError::VlanError => write!(f, "VLAN error"),
-        }
-    }
-}
-
-impl NetBridgeError {
-    pub fn to_errno(&self) -> i32 {
-        match self {
-            NetBridgeError::BridgeNotFound | NetBridgeError::PortNotFound => crate::reliability::errno::ENOENT,
-            NetBridgeError::BridgeAlreadyExists | NetBridgeError::PortAlreadyExists => {
-                crate::reliability::errno::EEXIST
-            },
-            NetBridgeError::MacTableFull => crate::reliability::errno::ENOMEM,
-            NetBridgeError::TooManyPorts => crate::reliability::errno::EAGAIN,
-            NetBridgeError::InvalidPortConfiguration => crate::reliability::errno::EINVAL,
-            _ => crate::reliability::errno::EIO,
-        }
-    }
-}
-
-/// QoS related errors
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum QosError {
-    QdiscNotFound,
-    QdiscAlreadyExists,
-    ClassNotFound,
-    ClassAlreadyExists,
-    FilterNotFound,
-    FilterAlreadyExists,
-    InvalidQdiscType,
-    InvalidClassId,
-    InvalidFilterType,
-    RateLimitExceeded,
-    PriorityError,
-    HtbConfigurationError,
-    HfscConfigurationError,
-    PolicingFailed,
-    ShapingFailed,
-    RedConfigurationError,
-    QosTableFull,
-}
-
-impl fmt::Display for QosError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            QosError::QdiscNotFound => write!(f, "Qdisc not found"),
-            QosError::QdiscAlreadyExists => write!(f, "Qdisc already exists"),
-            QosError::ClassNotFound => write!(f, "Class not found"),
-            QosError::ClassAlreadyExists => write!(f, "Class already exists"),
-            QosError::FilterNotFound => write!(f, "Filter not found"),
-            QosError::FilterAlreadyExists => write!(f, "Filter already exists"),
-            QosError::InvalidQdiscType => write!(f, "Invalid qdisc type"),
-            QosError::InvalidClassId => write!(f, "Invalid class ID"),
-            QosError::InvalidFilterType => write!(f, "Invalid filter type"),
-            QosError::RateLimitExceeded => write!(f, "Rate limit exceeded"),
-            QosError::PriorityError => write!(f, "Priority error"),
-            QosError::HtbConfigurationError => write!(f, "HTB configuration error"),
-            QosError::HfscConfigurationError => write!(f, "HFSC configuration error"),
-            QosError::PolicingFailed => write!(f, "Policing failed"),
-            QosError::ShapingFailed => write!(f, "Traffic shaping failed"),
-            QosError::RedConfigurationError => write!(f, "RED configuration error"),
-            QosError::QosTableFull => write!(f, "QoS table is full"),
-        }
-    }
-}
-
-impl QosError {
-    pub fn to_errno(&self) -> i32 {
-        match self {
-            QosError::QdiscNotFound | QosError::ClassNotFound | QosError::FilterNotFound => {
-                crate::reliability::errno::ENOENT
-            },
-            QosError::QdiscAlreadyExists | QosError::ClassAlreadyExists | QosError::FilterAlreadyExists => {
-                crate::reliability::errno::EEXIST
-            },
-            QosError::InvalidQdiscType | QosError::InvalidClassId | QosError::InvalidFilterType => {
-                crate::reliability::errno::EINVAL
-            },
-            QosError::QosTableFull => crate::reliability::errno::ENOMEM,
-            QosError::RateLimitExceeded => crate::reliability::errno::EBUSY,
-            _ => crate::reliability::errno::EIO,
-        }
-    }
-}
-
-/// Connection tracking related errors
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ConntrackError {
-    ConnTableFull,
-    InvalidConnTuple,
-    ConnNotFound,
-    InvalidConnState,
-    NatFailed,
-    NatTableFull,
-    ExpectationTableFull,
-    HelperFailed,
-    TimeoutError,
-    SynchronizationFailed,
-    InvalidProtocol,
-    TupleMismatch,
-    ConnExpired,
-    InvalidNatType,
-}
-
-impl fmt::Display for ConntrackError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ConntrackError::ConnTableFull => write!(f, "Connection table is full"),
-            ConntrackError::InvalidConnTuple => write!(f, "Invalid connection tuple"),
-            ConntrackError::ConnNotFound => write!(f, "Connection not found"),
-            ConntrackError::InvalidConnState => write!(f, "Invalid connection state"),
-            ConntrackError::NatFailed => write!(f, "NAT operation failed"),
-            ConntrackError::NatTableFull => write!(f, "NAT table is full"),
-            ConntrackError::ExpectationTableFull => write!(f, "Expectation table is full"),
-            ConntrackError::HelperFailed => write!(f, "Helper failed"),
-            ConntrackError::TimeoutError => write!(f, "Connection timeout"),
-            ConntrackError::SynchronizationFailed => write!(f, "Synchronization failed"),
-            ConntrackError::InvalidProtocol => write!(f, "Invalid protocol"),
-            ConntrackError::TupleMismatch => write!(f, "Tuple mismatch"),
-            ConntrackError::ConnExpired => write!(f, "Connection expired"),
-            ConntrackError::InvalidNatType => write!(f, "Invalid NAT type"),
-        }
-    }
-}
-
-impl ConntrackError {
-    pub fn to_errno(&self) -> i32 {
-        match self {
-            ConntrackError::ConnTableFull | ConntrackError::NatTableFull | 
-            ConntrackError::ExpectationTableFull => crate::reliability::errno::ENOMEM,
-            ConntrackError::ConnNotFound => crate::reliability::errno::ENOENT,
-            ConntrackError::InvalidConnTuple | ConntrackError::InvalidConnState | 
-            ConntrackError::InvalidProtocol | ConntrackError::TupleMismatch | 
-            ConntrackError::InvalidNatType => crate::reliability::errno::EINVAL,
-            ConntrackError::TimeoutError => crate::reliability::errno::ETIMEDOUT,
-            _ => crate::reliability::errno::EIO,
-        }
-    }
-}
-
-/// Load balancer related errors
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LbError {
-    VipNotFound,
-    VipAlreadyExists,
-    BackendNotFound,
-    BackendAlreadyExists,
-    BackendUnavailable,
-    HealthCheckFailed,
-    InvalidBackendConfiguration,
-    NoHealthyBackends,
-    LoadBalancingAlgorithmError,
-    SessionPersistenceError,
-    SslTerminationFailed,
-    ConnectionDrainingFailed,
-    TooManyBackends,
-    InvalidHealthCheckConfig,
-}
-
-impl fmt::Display for LbError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            LbError::VipNotFound => write!(f, "VIP not found"),
-            LbError::VipAlreadyExists => write!(f, "VIP already exists"),
-            LbError::BackendNotFound => write!(f, "Backend not found"),
-            LbError::BackendAlreadyExists => write!(f, "Backend already exists"),
-            LbError::BackendUnavailable => write!(f, "Backend unavailable"),
-            LbError::HealthCheckFailed => write!(f, "Health check failed"),
-            LbError::InvalidBackendConfiguration => write!(f, "Invalid backend configuration"),
-            LbError::NoHealthyBackends => write!(f, "No healthy backends"),
-            LbError::LoadBalancingAlgorithmError => write!(f, "Load balancing algorithm error"),
-            LbError::SessionPersistenceError => write!(f, "Session persistence error"),
-            LbError::SslTerminationFailed => write!(f, "SSL termination failed"),
-            LbError::ConnectionDrainingFailed => write!(f, "Connection draining failed"),
-            LbError::TooManyBackends => write!(f, "Too many backends"),
-            LbError::InvalidHealthCheckConfig => write!(f, "Invalid health check configuration"),
-        }
-    }
-}
-
-impl LbError {
-    pub fn to_errno(&self) -> i32 {
-        match self {
-            LbError::VipNotFound | LbError::BackendNotFound => crate::reliability::errno::ENOENT,
-            LbError::VipAlreadyExists | LbError::BackendAlreadyExists => crate::reliability::errno::EEXIST,
-            LbError::TooManyBackends => crate::reliability::errno::ENOMEM,
-            LbError::InvalidBackendConfiguration | LbError::InvalidHealthCheckConfig => {
-                crate::reliability::errno::EINVAL
-            },
-            LbError::NoHealthyBackends => crate::reliability::errno::EAGAIN,
-            LbError::BackendUnavailable => crate::reliability::errno::EHOSTUNREACH,
-            _ => crate::reliability::errno::EIO,
-        }
-    }
-}
-
-/// Tunnel related errors
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TunnelError {
-    TunnelNotFound,
-    TunnelAlreadyExists,
-    InvalidTunnelType,
-    InvalidLocalAddress,
-    InvalidRemoteAddress,
-    TunnelCreationFailed,
-    TunnelDeletionFailed,
-    IpsecError,
-    GreError,
-    IpipError,
-    SitError,
-    MtuError,
-    KeepaliveFailed,
-    TunnelNotOperational,
-    CryptoError,
-    KeyManagementFailed,
-}
-
-impl fmt::Display for TunnelError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            TunnelError::TunnelNotFound => write!(f, "Tunnel not found"),
-            TunnelError::TunnelAlreadyExists => write!(f, "Tunnel already exists"),
-            TunnelError::InvalidTunnelType => write!(f, "Invalid tunnel type"),
-            TunnelError::InvalidLocalAddress => write!(f, "Invalid local address"),
-            TunnelError::InvalidRemoteAddress => write!(f, "Invalid remote address"),
-            TunnelError::TunnelCreationFailed => write!(f, "Tunnel creation failed"),
-            TunnelError::TunnelDeletionFailed => write!(f, "Tunnel deletion failed"),
-            TunnelError::IpsecError => write!(f, "IPsec error"),
-            TunnelError::GreError => write!(f, "GRE error"),
-            TunnelError::IpipError => write!(f, "IPIP error"),
-            TunnelError::SitError => write!(f, "SIT error"),
-            TunnelError::MtuError => write!(f, "MTU error"),
-            TunnelError::KeepaliveFailed => write!(f, "Keepalive failed"),
-            TunnelError::TunnelNotOperational => write!(f, "Tunnel not operational"),
-            TunnelError::CryptoError => write!(f, "Crypto error"),
-            TunnelError::KeyManagementFailed => write!(f, "Key management failed"),
-        }
-    }
-}
-
-impl TunnelError {
-    pub fn to_errno(&self) -> i32 {
-        match self {
-            TunnelError::TunnelNotFound => crate::reliability::errno::ENOENT,
-            TunnelError::TunnelAlreadyExists => crate::reliability::errno::EEXIST,
-            TunnelError::InvalidTunnelType | TunnelError::InvalidLocalAddress | 
-            TunnelError::InvalidRemoteAddress => crate::reliability::errno::EINVAL,
-            TunnelError::MtuError => crate::reliability::errno::EMSGSIZE,
-            _ => crate::reliability::errno::EIO,
         }
     }
 }

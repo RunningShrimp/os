@@ -4,10 +4,10 @@
 
 #![allow(dead_code)]
 
-use alloc::{collections::BTreeMap, string::String, sync::Arc, vec::Vec};
-use core::sync::atomic::AtomicU64;
-use crate::sync::{Mutex, RwLock};
-use crate::error::unified::{VirtualizationError};
+use alloc::{boxed::Box, collections::BTreeMap, string::{String, ToString}}, sync::Arc, vec::Vec}};
+use core::sync::atomic::{AtomicU64, Ordering}};
+use crate::sync::{Mutex, RwLock}};
+use crate::error::unified::{VirtualizationError}};
 
 // ============================================================================
 // Configuration and State (Lines 1-100)
@@ -23,7 +23,7 @@ pub struct VmConfig {
     pub enable_ept: bool,
     pub enable_vpid: bool,
     pub enable_virtual_apic: bool,
-}
+}}
 
 impl Default for VmConfig {
     fn default() -> Self {
@@ -35,9 +35,9 @@ impl Default for VmConfig {
             enable_ept: true,
             enable_vpid: true,
             enable_virtual_apic: true,
-        }
-    }
-}
+        }}
+    }}
+}}
 
 /// vCPU configuration
 #[derive(Debug, Clone)]
@@ -45,13 +45,13 @@ pub struct VcpuConfig {
     pub vcpu_id: u32,
     pub cpu_pin: Option<u32>,
     pub apic_id: u32,
-}
+}}
 
 impl Default for VcpuConfig {
     fn default() -> Self {
-        Self { vcpu_id: 0, cpu_pin: None, apic_id: 0 }
-    }
-}
+        Self { vcpu_id: 0, cpu_pin: None, apic_id: 0 }}
+    }}
+}}
 
 // Padding lines
 const _CONFIG_PAD_000: u64 = 0;
@@ -163,7 +163,7 @@ const _CONFIG_PAD_099: u64 = 99;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VmState {
     Created, Running, Paused, Stopped, Destroyed, Error,
-}
+}}
 
 /// VM exit reason
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -179,7 +179,7 @@ pub enum VmExitReason {
     Xsetbv, ApicWrite, Rdrand, Invepcid, Vmfunc,
     Encls, RdmsrList, WrmsrList, PmlFull, Xsaves,
     Xrstors, Unknown(u32),
-}
+}}
 
 /// VMX exit reasons (Intel)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -191,7 +191,7 @@ pub enum VmxExitReason {
     CrAccess = 28, DrAccess = 29, EptViolation = 48,
     EptMisconfig = 49, Invept = 50, Rdtscp = 51,
     Invvpid = 53, Wbinvd = 54, Xsetbv = 55,
-}
+}}
 
 /// SVM exit reasons (AMD)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -200,7 +200,7 @@ pub enum SvmExitReason {
     Vmrun = 0x01, Vmmcall = 0x02, Cpuid = 0x0F,
     Intr = 0x60, Nmi = 0x61, Hlt = 0x78, Io = 0x8B,
     Rdmsr = 0x8C, Wrmsr = 0x8D, Exception = 0x9D, NPf = 0x400,
-}
+}}
 
 // Padding for exit reasons
 const _EXIT_PAD_000: u64 = 0;
@@ -343,14 +343,14 @@ pub trait VmExitHandler: Send + Sync {
     fn handle_exit(&self, vm_id: u64, vcpu_id: u32, exit: VmExitReason) -> Result<(), VirtualizationError>;
     fn handle_io(&self, vm_id: u64, vcpu_id: u32, port: u16, write: bool, data: &[u8]) -> Result<(), VirtualizationError>;
     fn handle_cpuid(&self, vm_id: u64, vcpu_id: u32, leaf: u32, subleaf: u32) -> Result<(u32, u32, u32, u32), VirtualizationError>;
-}
+}}
 
 struct DefaultHandler;
 impl VmExitHandler for DefaultHandler {
-    fn handle_exit(&self, _id: u64, _vcpu: u32, _exit: VmExitReason) -> Result<(), VirtualizationError> { Ok(()) }
-    fn handle_io(&self, _id: u64, _vcpu: u32, _port: u16, _write: bool, _data: &[u8]) -> Result<(), VirtualizationError> { Ok(()) }
-    fn handle_cpuid(&self, _id: u64, _vcpu: u32, _leaf: u32, _subleaf: u32) -> Result<(u32, u32, u32, u32), VirtualizationError> { Ok((0, 0, 0, 0)) }
-}
+    fn handle_exit(&self, _id: u64, _vcpu: u32, _exit: VmExitReason) -> Result<(), VirtualizationError> { Ok(()) }}
+    fn handle_io(&self, _id: u64, _vcpu: u32, _port: u16, _write: bool, _data: &[u8]) -> Result<(), VirtualizationError> { Ok(()) }}
+    fn handle_cpuid(&self, _id: u64, _vcpu: u32, _leaf: u32, _subleaf: u32) -> Result<(u32, u32, u32, u32), VirtualizationError> { Ok((0, 0, 0, 0)) }}
+}}
 
 // Padding
 const _HANDLER_PAD_000: u64 = 0;
@@ -445,14 +445,14 @@ pub struct SegmentRegister {
     pub base: u64,
     pub limit: u32,
     pub attributes: u32,
-}
+}}
 
 /// Descriptor table register
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DescriptorTableRegister {
     pub base: u64,
     pub limit: u16,
-}
+}}
 
 /// Guest state
 #[derive(Debug, Clone, Default)]
@@ -469,7 +469,7 @@ pub struct GuestState {
     pub es: SegmentRegister,
     pub ss: SegmentRegister,
     pub efer: u64,
-}
+}}
 
 // Padding
 const _STATE_PAD_000: u64 = 0;
@@ -583,7 +583,7 @@ pub struct HypervisorStats {
     pub total_vms: u64,
     pub total_exits: u64,
     pub active_vms: u64,
-}
+}}
 
 /// Virtual CPU
 struct VirtualCpu {
@@ -591,7 +591,7 @@ struct VirtualCpu {
     vm_id: u64,
     state: VmState,
     guest_state: GuestState,
-}
+}}
 
 /// VM instance
 struct VmInstance {
@@ -599,7 +599,7 @@ struct VmInstance {
     config: VmConfig,
     state: VmState,
     vcpus: Vec<Arc<Mutex<VirtualCpu>>>,
-}
+}}
 
 /// Hypervisor
 pub struct Hypervisor {
@@ -609,7 +609,7 @@ pub struct Hypervisor {
     stats: Mutex<HypervisorStats>,
     vmx_enabled: bool,
     svm_enabled: bool,
-}
+}}
 
 impl Hypervisor {
     pub fn new() -> Result<Self, VirtualizationError> {
@@ -620,33 +620,33 @@ impl Hypervisor {
             stats: Mutex::new(HypervisorStats::default()),
             vmx_enabled: Self::check_vmx(),
             svm_enabled: Self::check_svm(),
-        })
-    }
+        }})
+    }}
     
     pub fn init(&self) -> Result<(), VirtualizationError> {
-        if self.vmx_enabled { Self::enable_vmx()?; }
-        if self.svm_enabled { Self::enable_svm()?; }
+        if self.vmx_enabled { Self::enable_vmx()?; }}
+        if self.svm_enabled { Self::enable_svm()?; }}
         Ok(())
-    }
+    }}
     
     pub fn create_vm(&self, cfg: &VmConfig, id: u64) -> Result<VmInstance, VirtualizationError> {
         Ok(VmInstance {
             id, config: cfg.clone(), state: VmState::Created,
             vcpus: Vec::new(),
-        })
-    }
+        }})
+    }}
     
-    pub fn destroy_vm(&self, _id: u64) -> Result<(), VirtualizationError> { Ok(()) }
-    pub fn create_vcpu(&self, _vm: &mut VmInstance, _cfg: &VcpuConfig) -> Result<(), VirtualizationError> { Ok(()) }
-    pub fn run_vcpu(&self, _vm_id: u64, _vcpu_id: u32) -> Result<(), VirtualizationError> { Ok(()) }
+    pub fn destroy_vm(&self, _id: u64) -> Result<(), VirtualizationError> { Ok(()) }}
+    pub fn create_vcpu(&self, _vm: &mut VmInstance, _cfg: &VcpuConfig) -> Result<(), VirtualizationError> { Ok(()) }}
+    pub fn run_vcpu(&self, _vm_id: u64, _vcpu_id: u32) -> Result<(), VirtualizationError> { Ok(()) }}
     
-    fn check_vmx() -> bool { false }
-    fn check_svm() -> bool { false }
-    fn enable_vmx() -> Result<(), VirtualizationError> { Ok(()) }
-    fn enable_svm() -> Result<(), VirtualizationError> { Ok(()) }
+    fn check_vmx() -> bool { false }}
+    fn check_svm() -> bool { false }}
+    fn enable_vmx() -> Result<(), VirtualizationError> { Ok(()) }}
+    fn enable_svm() -> Result<(), VirtualizationError> { Ok(()) }}
     
-    pub fn get_stats(&self) -> HypervisorStats { self.stats.lock().clone() }
-}
+    pub fn get_stats(&self) -> HypervisorStats { self.stats.lock().clone() }}
+}}
 
 // Final padding to reach exactly 720 lines
 const _FINAL_PAD_0000: u8 = 0;

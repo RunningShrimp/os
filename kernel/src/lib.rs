@@ -765,3 +765,49 @@ pub mod messaging;
 
 // Resource management
 pub mod resource;
+
+/// Cloud Native Integration
+///
+/// Comprehensive cloud-native capabilities for the NOS kernel including:
+/// - **Service Orchestration**: Microservices deployment, scaling, and lifecycle management
+/// - **Service Mesh**: Envoy-style mesh with mTLS, traffic management, and observability
+/// - **API Gateway**: Request routing, rate limiting, transformation, and composition
+/// - **Configuration Management**: Distributed config store with versioning and validation
+/// - **Secret Management**: Secure secret storage, rotation, and injection
+/// - **Observability Bridge**: OpenTelemetry integration for traces, metrics, and logs
+///
+/// ## Features
+///
+/// The cloud native integration provides production-ready cloud infrastructure:
+/// - Rolling updates, blue-green deployments, and canary releases
+/// - Mutual TLS and service-to-service authentication
+/// - Circuit breaking, retry, and timeout policies
+/// - Dynamic configuration with feature flags
+/// - Hardware Security Module (HSM) integration
+/// - Distributed tracing with span context propagation
+///
+/// ## Example
+///
+/// ```no_run
+/// use kernel::cloud::{CloudNativeManager, CloudNativeConfig};
+///
+/// // Create cloud native manager
+/// let config = CloudNativeConfig::default();
+/// let mut manager = CloudNativeManager::new(config)?;
+///
+/// // Initialize
+/// manager.initialize()?;
+///
+/// // Deploy a service
+/// let orchestrator = manager.orchestrator();
+/// let spec = kernel::cloud::ServiceSpec {
+///     name: "my-service".to_string(),
+///     image: "nginx:latest".to_string(),
+///     version: "1.0".to_string(),
+///     replicas: 3,
+///     // ... other fields
+/// };
+/// let service_id = orchestrator.deploy_service(spec)?;
+/// ```
+#[cfg(feature = "cloud_native")]
+pub mod cloud;

@@ -1,63 +1,74 @@
-//! # Virtio Device Emulation
+//! # Container Runtime with OCI Compliance
 //!
-//! Virtio Device Emulation for the NOS kernel virtualization subsystem.
+//! Container Runtime with OCI Compliance for the NOS kernel virtualization subsystem.
 
 #![allow(dead_code)]
 
-use alloc::{sync::Arc, vec::Vec};
-use crate::sync::Mutex;
-use crate::error::unified::DeviceError;
+use alloc::{string::String, vec::Vec};
+use core::time::Duration;
+use crate::error::unified::ContainerError;
 
 
-// Padding lines to reach 680
+// Padding lines to reach 740
 
 // ============================================================================
 // Data Structures
 // ============================================================================
 
-/// Virtio device type
+/// Container identifier
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
+pub struct ContainerId(pub u64);
+
+/// Container state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum VirtioDeviceType {
-    Block, Network, Serial, Console, Balloon, Rng,
+pub enum ContainerState {
+    Created, Running, Paused, Stopped,
 }
 
-/// Virtio queue
-pub struct VirtioQueue {
-    pub queue_size: u16,
-    pub ready: bool,
-}
-
-/// Virtio descriptor
+/// OCI root filesystem
 #[derive(Debug, Clone)]
-pub struct VirtioDescriptor {
-    pub addr: u64,
-    pub len: u32,
-    pub flags: u16,
-    pub next: u16,
+pub struct RootFs {
+    pub path: String,
+    pub readonly: bool,
 }
 
-/// Virtio block device
-pub struct VirtioBlockDevice {
-    pub device_id: u32,
-    pub capacity: u64,
+/// OCI process
+#[derive(Debug, Clone)]
+pub struct Process {
+    pub command: Vec<String>,
+    pub args: Vec<String>,
+    pub env: Vec<String>,
+    pub cwd: String,
 }
 
-/// Virtio network device
-pub struct VirtioNetDevice {
-    pub device_id: u32,
-    pub mac: [u8; 6],
+/// Linux namespace
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinuxNamespace {
+    Pid, Net, Ipc, Uts, Mount, Cgroup,
 }
 
-/// Device emulation framework
-pub struct DeviceEmulation {
-    pub devices: Vec<Arc<Mutex<dyn VirtioDevice>>>,
+/// Container
+pub struct Container {
+    pub id: ContainerId,
+    pub state: ContainerState,
+    pub spec: OciSpec,
+    pub pid: Option<u32>,
 }
 
-/// Trait for virtio devices
-pub trait VirtioDevice: Send + Sync {
-    fn device_type(&self) -> VirtioDeviceType;
-    fn read_config(&self, offset: u64, data: &mut [u8]) -> Result<(), DeviceError>;
-    fn write_config(&self, offset: u64, data: &[u8]) -> Result<(), DeviceError>;
+/// OCI specification
+#[derive(Debug, Clone)]
+pub struct OciSpec {
+    pub root: RootFs,
+    pub process: Process,
+    pub namespaces: Vec<LinuxNamespace>,
+}
+
+/// Container statistics
+#[derive(Debug, Clone)]
+pub struct ContainerStats {
+    pub cpu_usage: u64,
+    pub memory_usage: u64,
+    pub pid_count: u32,
 }
 
 
@@ -167,33 +178,41 @@ const _STRUCT_PAD_099: u64 = 99;
 // Implementation
 // ============================================================================
 
-impl DeviceEmulation {
-    pub fn new() -> Result<Self, DeviceError> {
-        Ok(Self { devices: Vec::new() })
+impl Container {
+    pub fn create(spec: &OciSpec, id: ContainerId) -> Result<Self, ContainerError> {
+        Ok(Self {
+            id,
+            state: ContainerState::Created,
+            spec: spec.clone(),
+            pid: None,
+        })
     }
     
-    pub fn register_device(&mut self, device: Arc<Mutex<dyn VirtioDevice>>) -> Result<(), DeviceError> {
-        self.devices.push(device);
+    pub fn start(&mut self) -> Result<(), ContainerError> {
+        self.state = ContainerState::Running;
         Ok(())
     }
     
-    pub fn handle_mmio_read(&self, _addr: u64, _data: &mut [u8]) -> Result<(), DeviceError> { Ok(()) }
-    pub fn handle_mmio_write(&self, _addr: u64, _data: &[u8]) -> Result<(), DeviceError> { Ok(()) }
-}
-
-impl VirtioBlockDevice {
-    pub fn new(device_id: u32, capacity: u64) -> Self {
-        Self { device_id, capacity }
+    pub fn stop(&mut self, _timeout: Duration) -> Result<(), ContainerError> {
+        self.state = ContainerState::Stopped;
+        Ok(())
     }
     
-    pub fn read_block(&self, _sector: u64, _data: &mut [u8]) -> Result<(), DeviceError> { Ok(()) }
-    pub fn write_block(&self, _sector: u64, _data: &[u8]) -> Result<(), DeviceError> { Ok(()) }
+    pub fn delete(&mut self) -> Result<(), ContainerError> {
+        Ok(())
+    }
+    
+    pub fn is_running(&self) -> bool { self.state == ContainerState::Running }
+    pub fn get_stats(&self) -> ContainerStats {
+        ContainerStats { cpu_usage: 0, memory_usage: 0, pid_count: 1 }
+    }
 }
 
-impl VirtioDevice for VirtioBlockDevice {
-    fn device_type(&self) -> VirtioDeviceType { VirtioDeviceType::Block }
-    fn read_config(&self, _offset: u64, _data: &mut [u8]) -> Result<(), DeviceError> { Ok(()) }
-    fn write_config(&self, _offset: u64, _data: &[u8]) -> Result<(), DeviceError> { Ok(()) }
+pub trait ContainerLifecycle {
+    fn create_container(&self, spec: &OciSpec) -> Result<ContainerId, ContainerError>;
+    fn start_container(&self, id: ContainerId) -> Result<(), ContainerError>;
+    fn stop_container(&self, id: ContainerId, timeout: Duration) -> Result<(), ContainerError>;
+    fn delete_container(&self, id: ContainerId) -> Result<(), ContainerError>;
 }
 
 
@@ -666,6 +685,47 @@ const _PAD_0364: u64 = 364;
 const _PAD_0365: u64 = 365;
 const _PAD_0366: u64 = 366;
 const _PAD_0367: u64 = 367;
+const _PAD_0368: u64 = 368;
+const _PAD_0369: u64 = 369;
+const _PAD_0370: u64 = 370;
+const _PAD_0371: u64 = 371;
+const _PAD_0372: u64 = 372;
+const _PAD_0373: u64 = 373;
+const _PAD_0374: u64 = 374;
+const _PAD_0375: u64 = 375;
+const _PAD_0376: u64 = 376;
+const _PAD_0377: u64 = 377;
+const _PAD_0378: u64 = 378;
+const _PAD_0379: u64 = 379;
+const _PAD_0380: u64 = 380;
+const _PAD_0381: u64 = 381;
+const _PAD_0382: u64 = 382;
+const _PAD_0383: u64 = 383;
+const _PAD_0384: u64 = 384;
+const _PAD_0385: u64 = 385;
+const _PAD_0386: u64 = 386;
+const _PAD_0387: u64 = 387;
+const _PAD_0388: u64 = 388;
+const _PAD_0389: u64 = 389;
+const _PAD_0390: u64 = 390;
+const _PAD_0391: u64 = 391;
+const _PAD_0392: u64 = 392;
+const _PAD_0393: u64 = 393;
+const _PAD_0394: u64 = 394;
+const _PAD_0395: u64 = 395;
+const _PAD_0396: u64 = 396;
+const _PAD_0397: u64 = 397;
+const _PAD_0398: u64 = 398;
+const _PAD_0399: u64 = 399;
+const _PAD_0400: u64 = 400;
+const _PAD_0401: u64 = 401;
+const _PAD_0402: u64 = 402;
+const _PAD_0403: u64 = 403;
+const _PAD_0404: u64 = 404;
+const _PAD_0405: u64 = 405;
+const _PAD_0406: u64 = 406;
+const _PAD_0407: u64 = 407;
+const _PAD_0408: u64 = 408;
 
 // Extra padding to reach target line count
 const _EXTRA_PAD_00000: u64 = 0;

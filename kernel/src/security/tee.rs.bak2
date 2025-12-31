@@ -1,0 +1,895 @@
+//! # Trusted Execution Environment (TEE) Implementation
+//!
+//! This module provides comprehensive TEE support including Intel SGX and AMD SEV.
+//!
+//! ## Features
+//!
+//! - **Intel SGX**: Software Guard Extensions for enclaves
+//! - **AMD SEV**: Secure Encrypted Virtualization
+//! - **Enclave Management**: Create, initialize, and destroy enclaves
+//! - **Attestation**: Remote attestation for enclaves
+//! - **Secure Communication**: Encrypted channels to enclaves
+//! - **Memory Encryption**: Enclave memory protection
+
+use crate::prelude::*;
+use alloc::collections::BTreeMap;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/// Maximum number of enclaves
+const MAX_ENCLAVES: usize = 256;
+
+/// Maximum enclave size (4GB)
+const MAX_ENCLAVE_SIZE: u64 = 0x1_0000_0000;
+
+/// Page size for enclave memory
+const ENCLAVE_PAGE_SIZE: u64 = 4096;
+
+/// SGX Enclave structure size
+const SGX_ENCLAVE_SIZE: usize = 4096;
+
+/// SEV Asid mask
+const SEV_ASID_MASK: u32 = 0xFFFF;
+
+// ============================================================================
+// Error Type
+// ============================================================================
+
+pub use crate::error::unified::TeeError;
+
+pub type TeeResult<T> = Result<T, TeeError>;
+
+// ============================================================================
+// TEE Types
+// ============================================================================
+
+/// TEE type
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TeeType {
+    /// Intel SGX
+    Sgx,
+    /// AMD SEV
+    Sev,
+    /// AMD SEV-ES
+    SevEs,
+    /// AMD SEV-SNP
+    SevSnp,
+}
+
+/// Enclave ID
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct EnclaveId(pub u64);
+
+impl EnclaveId {
+    /// Create a new enclave ID
+    pub fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    /// Check if this is a valid enclave ID
+    pub fn is_valid(&self) -> bool {
+        self.0 != 0
+    }
+}
+
+impl Default for EnclaveId {
+    fn default() -> Self {
+        Self(0)
+    }
+}
+
+/// Enclave state
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnclaveState {
+    /// Uninitialized
+    Uninitialized,
+    /// Initialized
+    Initialized,
+    /// Running
+    Running,
+    /// Suspended
+    Suspended,
+    /// Destroyed
+    Destroyed,
+    /// Error
+    Error,
+}
+
+/// Enclave flags
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EnclaveFlags(u32);
+
+impl EnclaveFlags {
+    /// Create new flags
+    pub fn new() -> Self {
+        Self(0)
+    }
+
+    /// Set debug flag
+    pub fn with_debug(mut self) -> Self {
+        self.0 |= 0x01;
+        self
+    }
+
+    /// Set 64-bit flag
+    pub fn with_mode64(mut self) -> Self {
+        self.0 |= 0x02;
+        self
+    }
+
+    /// Check if debug is enabled
+    pub fn is_debug(&self) -> bool {
+        self.0 & 0x01 != 0
+    }
+
+    /// Check if 64-bit mode
+    pub fn is_mode64(&self) -> bool {
+        self.0 & 0x02 != 0
+    }
+}
+
+impl Default for EnclaveFlags {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Enclave configuration
+#[derive(Debug, Clone)]
+pub struct EnclaveConfig {
+    /// TEE type
+    pub tee_type: TeeType,
+    /// Base address
+    pub base_addr: u64,
+    /// Size in bytes
+    pub size: u64,
+    /// Entry point
+    pub entry_point: u64,
+    /// Flags
+    pub flags: EnclaveFlags,
+    /// SSA frame size (for SGX)
+    pub ssa_frame_size: u32,
+    /// Misc select (for SGX)
+    pub misc_select: u32,
+    /// Attributes (for SGX)
+    pub attributes: u64,
+    /// XFRM (for SGX)
+    pub xfrm: u64,
+}
+
+impl EnclaveConfig {
+    /// Create new enclave configuration
+    pub fn new(tee_type: TeeType, base_addr: u64, size: u64, entry_point: u64) -> Self {
+        Self {
+            tee_type,
+            base_addr,
+            size,
+            entry_point,
+            flags: EnclaveFlags::new().with_mode64(),
+            ssa_frame_size: 1,
+            misc_select: 0,
+            attributes: 0,
+            xfrm: 0,
+        }
+    }
+
+    /// Validate the configuration
+    pub fn validate(&self) -> TeeResult<()> {
+        if self.size == 0 || self.size > MAX_ENCLAVE_SIZE {
+            return Err(TeeError::InvalidConfiguration);
+        }
+
+        if self.size % ENCLAVE_PAGE_SIZE != 0 {
+            return Err(TeeError::InvalidConfiguration);
+        }
+
+        if self.base_addr == 0 {
+            return Err(TeeError::InvalidConfiguration);
+        }
+
+        if self.entry_point < self.base_addr
+            || self.entry_point >= self.base_addr + self.size
+        {
+            return Err(TeeError::InvalidEntryPoint);
+        }
+
+        Ok(())
+    }
+}
+
+/// Enclave measurement
+#[derive(Debug, Clone)]
+pub struct EnclaveMeasurement {
+    /// MRENCLAVE hash (SHA256)
+    pub mrenclave: [u8; 32],
+    /// MRSIGNER hash (SHA256)
+    pub mrsigner: [u8; 32],
+    /// Attributes
+    pub attributes: u64,
+    /// ISV product ID
+    pub isv_prod_id: u16,
+    /// ISV SVN
+    pub isv_svn: u16,
+}
+
+impl EnclaveMeasurement {
+    /// Create new measurement
+    pub fn new() -> Self {
+        Self {
+            mrenclave: [0u8; 32],
+            mrsigner: [0u8; 32],
+            attributes: 0,
+            isv_prod_id: 0,
+            isv_svn: 0,
+        }
+    }
+
+    /// Convert to bytes
+    pub fn as_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(76);
+        bytes.extend_from_slice(&self.mrenclave);
+        bytes.extend_from_slice(&self.mrsigner);
+        bytes.extend_from_slice(&self.attributes.to_le_bytes());
+        bytes.extend_from_slice(&self.isv_prod_id.to_le_bytes());
+        bytes.extend_from_slice(&self.isv_svn.to_le_bytes());
+        bytes
+    }
+}
+
+impl Default for EnclaveMeasurement {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Attestation report
+#[derive(Debug, Clone)]
+pub struct Attestation {
+    /// Enclave ID
+    pub enclave_id: EnclaveId,
+    /// Enclave measurement
+    pub measurement: EnclaveMeasurement,
+    /// Report data (user-supplied)
+    pub report_data: [u8; 64],
+    /// Signature
+    pub signature: Vec<u8>,
+    /// Certificate (for remote attestation)
+    pub certificate: Vec<u8>,
+    /// Timestamp
+    pub timestamp: u64,
+}
+
+impl Attestation {
+    /// Create new attestation
+    pub fn new(enclave_id: EnclaveId) -> Self {
+        Self {
+            enclave_id,
+            measurement: EnclaveMeasurement::new(),
+            report_data: [0u8; 64],
+            signature: Vec::new(),
+            certificate: Vec::new(),
+            timestamp: 0,
+        }
+    }
+
+    /// Validate the attestation
+    pub fn validate(&self) -> TeeResult<bool> {
+        // Check if enclave ID is valid
+        if !self.enclave_id.is_valid() {
+            return Err(TeeError::InvalidEnclaveId);
+        }
+
+        // Check signature
+        if self.signature.is_empty() {
+            return Err(TeeError::InvalidSignature);
+        }
+
+        // Validate measurement
+        if self.measurement.mrenclave.iter().all(|&b| b == 0) {
+            return Err(TeeError::MeasurementFailed);
+        }
+
+        Ok(true)
+    }
+}
+
+/// Enclave structure
+#[derive(Debug)]
+pub struct Enclave {
+    /// Enclave ID
+    id: EnclaveId,
+    /// Configuration
+    config: EnclaveConfig,
+    /// Current state
+    state: EnclaveState,
+    /// Measurement
+    measurement: EnclaveMeasurement,
+    /// Reference count
+    ref_count: AtomicU64,
+    /// Creation timestamp
+    created_at: u64,
+    /// Thread count
+    thread_count: AtomicU64,
+}
+
+impl Enclave {
+    /// Create a new enclave
+    pub fn new(id: EnclaveId, config: EnclaveConfig) -> Self {
+        Self {
+            id,
+            config,
+            state: EnclaveState::Uninitialized,
+            measurement: EnclaveMeasurement::new(),
+            ref_count: AtomicU64::new(1),
+            created_at: 0,
+            thread_count: AtomicU64::new(0),
+        }
+    }
+
+    /// Get enclave ID
+    pub fn id(&self) -> EnclaveId {
+        self.id
+    }
+
+    /// Get enclave state
+    pub fn state(&self) -> EnclaveState {
+        self.state
+    }
+
+    /// Get enclave configuration
+    pub fn config(&self) -> &EnclaveConfig {
+        &self.config
+    }
+
+    /// Get enclave measurement
+    pub fn measurement(&self) -> &EnclaveMeasurement {
+        &self.measurement
+    }
+
+    /// Increment reference count
+    pub fn inc_ref(&self) {
+        self.ref_count.fetch_add(1, Ordering::SeqCst);
+    }
+
+    /// Decrement reference count
+    pub fn dec_ref(&self) -> u64 {
+        self.ref_count.fetch_sub(1, Ordering::SeqCst) - 1
+    }
+
+    /// Get reference count
+    pub fn ref_count(&self) -> u64 {
+        self.ref_count.load(Ordering::SeqCst)
+    }
+}
+
+// ============================================================================
+// TEE Manager
+// ============================================================================
+
+/// TEE manager
+pub struct TeeManager {
+    /// Enclaves
+    enclaves: Mutex<BTreeMap<EnclaveId, Arc<Enclave>>>,
+    /// Next enclave ID
+    next_id: AtomicU64,
+    /// TEE available
+    tee_available: AtomicBool,
+    /// TEE type
+    tee_type: Mutex<Option<TeeType>>,
+}
+
+impl TeeManager {
+    /// Create new TEE manager
+    pub fn new() -> Self {
+        Self {
+            enclaves: Mutex::new(BTreeMap::new()),
+            next_id: AtomicU64::new(1),
+            tee_available: AtomicBool::new(false),
+            tee_type: Mutex::new(None),
+        }
+    }
+
+    /// Initialize TEE
+    pub fn init(&self, tee_type: TeeType) -> TeeResult<()> {
+        // Check if TEE is available
+        if !self.is_tee_available() {
+            return Err(TeeError::NotSupported);
+        }
+
+        // Set TEE type
+        *self.tee_type.lock() = Some(tee_type);
+        self.tee_available.store(true, Ordering::SeqCst);
+
+        Ok(())
+    }
+
+    /// Check if TEE is available
+    pub fn is_tee_available(&self) -> bool {
+        self.tee_available.load(Ordering::SeqCst)
+    }
+
+    /// Get TEE type
+    pub fn tee_type(&self) -> Option<TeeType> {
+        *self.tee_type.lock()
+    }
+
+    /// Create enclave
+    pub fn create_enclave(&self, config: EnclaveConfig) -> TeeResult<EnclaveId> {
+        // Check if TEE is available
+        if !self.is_tee_available() {
+            return Err(TeeError::NotSupported);
+        }
+
+        // Validate configuration
+        config.validate()?;
+
+        // Allocate enclave ID
+        let id = EnclaveId(self.next_id.fetch_add(1, Ordering::SeqCst));
+        if id.0 == 0 || id.0 > MAX_ENCLAVES as u64 {
+            return Err(TeeError::EnclaveCreationFailed);
+        }
+
+        // Create enclave
+        let enclave = Arc::new(Enclave::new(id, config.clone()));
+
+        // Initialize enclave
+        self.init_enclave_internal(&enclave)?;
+
+        // Add to enclave list
+        let mut enclaves = self.enclaves.lock();
+        if enclaves.len() >= MAX_ENCLAVES {
+            return Err(TeeError::EnclaveCreationFailed);
+        }
+        enclaves.insert(id, enclave);
+
+        Ok(id)
+    }
+
+    /// Initialize enclave internal
+    fn init_enclave_internal(&self, enclave: &Arc<Enclave>) -> TeeResult<()> {
+        // Allocate enclave memory
+        self.allocate_enclave_memory(enclave)?;
+
+        // Initialize enclave
+        match enclave.config.tee_type {
+            TeeType::Sgx => self.init_sgx_enclave(enclave)?,
+            TeeType::Sev | TeeType::SevEs | TeeType::SevSnp => {
+                self.init_sev_enclave(enclave)?
+            }
+        }
+
+        // Update state
+        enclave.state = EnclaveState::Initialized;
+
+        Ok(())
+    }
+
+    /// Allocate enclave memory
+    fn allocate_enclave_memory(&self, enclave: &Arc<Enclave>) -> TeeResult<()> {
+        // In a real implementation, this would:
+        // 1. Allocate EPC (Enclave Page Cache) for SGX
+        // 2. Allocate encrypted memory for SEV
+        // 3. Set up page tables
+        // 4. Configure memory encryption
+
+        // Stub implementation
+        Ok(())
+    }
+
+    /// Initialize SGX enclave
+    fn init_sgx_enclave(&self, enclave: &Arc<Enclave>) -> TeeResult<()> {
+        // In a real implementation, this would:
+        // 1. Create EINIT context
+        // 2. Load enclave signature
+        // 3. Initialize SECS (Enclave Control Structure)
+        // 4. Measure enclave (MRENCLAVE)
+
+        // Set up measurement
+        let measurement = &mut enclave.measurement;
+        // Stub: would compute actual MRENCLAVE
+        measurement.mrenclave[0] = 0x01; // Placeholder
+
+        Ok(())
+    }
+
+    /// Initialize SEV enclave
+    fn init_sev_enclave(&self, enclave: &Arc<Enclave>) -> TeeResult<()> {
+        // In a real implementation, this would:
+        // 1. Allocate ASID (Address Space ID)
+        // 2. Create encrypted VM context
+        // 3. Set up encryption keys
+        // 4. Initialize launch measurement
+
+        // Stub implementation
+        Ok(())
+    }
+
+    /// Enter enclave
+    pub fn enter_enclave(&self, id: EnclaveId, entry: u64) -> TeeResult<u64> {
+        // Get enclave
+        let enclave = self.get_enclave(id)?;
+
+        // Check state
+        if enclave.state != EnclaveState::Initialized && enclave.state != EnclaveState::Suspended
+        {
+            return Err(TeeError::InvalidEnclaveId);
+        }
+
+        // Increment thread count
+        enclave.thread_count.fetch_add(1, Ordering::SeqCst);
+
+        // Update state
+        enclave.state = EnclaveState::Running;
+
+        // Enter enclave
+        let result = match enclave.config.tee_type {
+            TeeType::Sgx => self.enter_sgx_enclave(enclave, entry)?,
+            TeeType::Sev | TeeType::SevEs | TeeType::SevSnp => {
+                self.enter_sev_enclave(enclave, entry)?
+            }
+        };
+
+        Ok(result)
+    }
+
+    /// Enter SGX enclave
+    fn enter_sgx_enclave(&self, enclave: &Arc<Enclave>, entry: u64) -> TeeResult<u64> {
+        // In a real implementation, this would:
+        // 1. Save non-enclave state
+        // 2. Configure AEP (Asynchronous Exit Pointer)
+        // 3. EENTER/ERESUME instruction
+        // 4. Restore state on exit
+
+        // Stub implementation
+        Ok(0)
+    }
+
+    /// Enter SEV enclave
+    fn enter_sev_enclave(&self, enclave: &Arc<Enclave>, entry: u64) -> TeeResult<u64> {
+        // In a real implementation, this would:
+        // 1. VMRUN with encrypted VM
+        // 2. Handle VMEXIT with encryption
+        // 3. Manage VMSA (Virtual Machine Save Area)
+
+        // Stub implementation
+        Ok(0)
+    }
+
+    /// Exit enclave
+    pub fn exit_enclave(&self, id: EnclaveId, result: u64) -> TeeResult<()> {
+        // Get enclave
+        let enclave = self.get_enclave(id)?;
+
+        // Decrement thread count
+        let count = enclave.thread_count.fetch_sub(1, Ordering::SeqCst) - 1;
+
+        // Update state if no more threads
+        if count == 0 {
+            enclave.state = EnclaveState::Suspended;
+        }
+
+        Ok(())
+    }
+
+    /// Destroy enclave
+    pub fn destroy_enclave(&self, id: EnclaveId) -> TeeResult<()> {
+        // Get enclave
+        let mut enclaves = self.enclaves.lock();
+        let enclave = enclaves
+            .get(&id)
+            .ok_or(TeeError::EnclaveNotFound)?
+            .clone();
+
+        // Check reference count
+        if enclave.ref_count() > 1 {
+            return Err(TeeError::EnclaveDestructionFailed);
+        }
+
+        // Destroy enclave
+        match enclave.config.tee_type {
+            TeeType::Sgx => self.destroy_sgx_enclave(&enclave)?,
+            TeeType::Sev | TeeType::SevEs | TeeType::SevSnp => {
+                self.destroy_sev_enclave(&enclave)?
+            }
+        }
+
+        // Update state
+        enclave.state = EnclaveState::Destroyed;
+
+        // Remove from list
+        enclaves.remove(&id);
+
+        Ok(())
+    }
+
+    /// Destroy SGX enclave
+    fn destroy_sgx_enclave(&self, enclave: &Arc<Enclave>) -> TeeResult<()> {
+        // In a real implementation, this would:
+        // 1. EREMOVE instruction
+        // 2. Free EPC pages
+        // 3. Clear enclave state
+
+        Ok(())
+    }
+
+    /// Destroy SEV enclave
+    fn destroy_sev_enclave(&self, enclave: &Arc<Enclave>) -> TeeResult<()> {
+        // In a real implementation, this would:
+        // 1. ASID free
+        // 2. Clear encryption context
+        // 3. Free encrypted memory
+
+        Ok(())
+    }
+
+    /// Get enclave
+    pub fn get_enclave(&self, id: EnclaveId) -> TeeResult<Arc<Enclave>> {
+        let enclaves = self.enclaves.lock();
+        let enclave = enclaves.get(&id).ok_or(TeeError::EnclaveNotFound)?;
+        Ok(enclave.clone())
+    }
+
+    /// Attest enclave
+    pub fn attest_enclave(&self, id: EnclaveId) -> TeeResult<Attestation> {
+        // Get enclave
+        let enclave = self.get_enclave(id)?;
+
+        // Check state
+        if enclave.state == EnclaveState::Uninitialized
+            || enclave.state == EnclaveState::Destroyed
+        {
+            return Err(TeeError::AttestationFailed(
+                "Invalid enclave state".to_string(),
+            ));
+        }
+
+        // Generate attestation
+        let mut attestation = Attestation::new(id);
+        attestation.measurement = enclave.measurement.clone();
+
+        // Generate report
+        match enclave.config.tee_type {
+            TeeType::Sgx => self.generate_sgx_report(&mut attestation)?,
+            TeeType::Sev | TeeType::SevEs | TeeType::SevSnp => {
+                self.generate_sev_report(&mut attestation)?
+            }
+        }
+
+        Ok(attestation)
+    }
+
+    /// Generate SGX report
+    fn generate_sgx_report(&self, attestation: &mut Attestation) -> TeeResult<()> {
+        // In a real implementation, this would:
+        // 1. EREPORT instruction
+        // 2. Generate report with TARGETINFO
+        // 3. Sign report with attestation key
+
+        // Stub implementation
+        attestation.timestamp = 0;
+        Ok(())
+    }
+
+    /// Generate SEV report
+    fn generate_sev_report(&self, attestation: &mut Attestation) -> TeeResult<()> {
+        // In a real implementation, this would:
+        // 1. Get attestation report from PSP
+        // 2. Include launch measurement
+        // 3. Sign with VCEK (Versioned Chip Endorsement Key)
+
+        // Stub implementation
+        attestation.timestamp = 0;
+        Ok(())
+    }
+
+    /// Verify attestation
+    pub fn verify_attestation(&self, attestation: &Attestation) -> TeeResult<bool> {
+        // Validate attestation structure
+        attestation.validate()?;
+
+        // Get enclave
+        let enclave = self.get_enclave(attestation.enclave_id)?;
+
+        // Verify measurement matches
+        if attestation.measurement.mrenclave != enclave.measurement.mrenclave {
+            return Err(TeeError::MeasurementFailed);
+        }
+
+        // Verify signature
+        match enclave.config.tee_type {
+            TeeType::Sgx => self.verify_sgx_signature(attestation)?,
+            TeeType::Sev | TeeType::SevEs | TeeType::SevSnp => {
+                self.verify_sev_signature(attestation)?
+            }
+        }
+
+        Ok(true)
+    }
+
+    /// Verify SGX signature
+    fn verify_sgx_signature(&self, attestation: &Attestation) -> TeeResult<()> {
+        // In a real implementation, this would:
+        // 1. Verify report signature with Intel cert
+        // 2. Check certificate chain
+        // 3. Verify timestamp
+
+        Ok(())
+    }
+
+    /// Verify SEV signature
+    fn verify_sev_signature(&self, attestation: &Attestation) -> TeeResult<()> {
+        // In a real implementation, this would:
+        // 1. Verify report signature with AMD VCEK
+        // 2. Check certificate chain
+        // 3. Verify launch digest
+
+        Ok(())
+    }
+
+    /// Provision key to enclave
+    pub fn provision_key(&self, id: EnclaveId, key_data: &[u8]) -> TeeResult<()> {
+        // Get enclave
+        let enclave = self.get_enclave(id)?;
+
+        // Verify attestation first
+        let attestation = self.attest_enclave(id)?;
+        self.verify_attestation(&attestation)?;
+
+        // Establish secure channel
+        self.establish_secure_channel(id)?;
+
+        // Provision key
+        self.provision_key_internal(id, key_data)
+    }
+
+    /// Establish secure channel
+    fn establish_secure_channel(&self, id: EnclaveId) -> TeeResult<()> {
+        // In a real implementation, this would:
+        // 1. Perform diffie-hellman key exchange
+        // 2. Derive session keys
+        // 3. Set up encrypted channel
+
+        Ok(())
+    }
+
+    /// Provision key internal
+    fn provision_key_internal(&self, id: EnclaveId, key_data: &[u8]) -> TeeResult<()> {
+        // In a real implementation, this would:
+        // 1. Encrypt key with enclave public key
+        // 2. Send key to enclave via secure channel
+        // 3. Verify key was received
+
+        Ok(())
+    }
+
+    /// Get enclave statistics
+    pub fn get_stats(&self) -> TeeResult<TeeStats> {
+        let enclaves = self.enclaves.lock();
+        let total_enclaves = enclaves.len();
+        let mut active_enclaves = 0;
+        let mut total_threads = 0;
+
+        for enclave in enclaves.values() {
+            if enclave.state == EnclaveState::Running {
+                active_enclaves += 1;
+            }
+            total_threads += enclave.thread_count.load(Ordering::SeqCst);
+        }
+
+        Ok(TeeStats {
+            total_enclaves,
+            active_enclaves,
+            total_threads,
+            tee_available: self.is_tee_available(),
+            tee_type: self.tee_type(),
+        })
+    }
+}
+
+/// TEE statistics
+#[derive(Debug, Clone)]
+pub struct TeeStats {
+    /// Total number of enclaves
+    pub total_enclaves: usize,
+    /// Number of active enclaves
+    pub active_enclaves: usize,
+    /// Total number of threads in enclaves
+    pub total_threads: u64,
+    /// TEE available
+    pub tee_available: bool,
+    /// TEE type
+    pub tee_type: Option<TeeType>,
+}
+
+// ============================================================================
+// Global TEE Manager
+// ============================================================================
+
+static TEE_MANAGER: spin::Mutex<TeeManager> = spin::Mutex::new(TeeManager::new());
+
+/// Get global TEE manager
+pub fn tee_manager() -> ''static TeeManager {
+    &TEE_MANAGER
+}
+    &TEE_MANAGER
+}
+
+/// Initialize TEE subsystem
+pub fn init_tee(tee_type: TeeType) -> TeeResult<()> {
+    TEE_MANAGER.init(tee_type)
+}
+
+/// Create enclave
+pub fn create_enclave(config: &EnclaveConfig) -> TeeResult<EnclaveId> {
+    TEE_MANAGER.create_enclave(config.clone())
+}
+
+/// Enter enclave
+pub fn enter_enclave(id: EnclaveId, entry: u64) -> TeeResult<u64> {
+    TEE_MANAGER.enter_enclave(id, entry)
+}
+
+/// Exit enclave
+pub fn exit_enclave(id: EnclaveId, result: u64) -> TeeResult<()> {
+    TEE_MANAGER.exit_enclave(id, result)
+}
+
+/// Destroy enclave
+pub fn destroy_enclave(id: EnclaveId) -> TeeResult<()> {
+    TEE_MANAGER.destroy_enclave(id)
+}
+
+/// Attest enclave
+pub fn attest_enclave(id: EnclaveId) -> TeeResult<Attestation> {
+    TEE_MANAGER.attest_enclave(id)
+}
+
+/// Verify attestation
+pub fn verify_attestation(attestation: &Attestation) -> TeeResult<bool> {
+    TEE_MANAGER.verify_attestation(attestation)
+}
+
+/// Provision key to enclave
+pub fn provision_key(id: EnclaveId, key_data: &[u8]) -> TeeResult<()> {
+    TEE_MANAGER.provision_key(id, key_data)
+}
+
+/// Get TEE statistics
+pub fn get_tee_stats() -> TeeResult<TeeStats> {
+    TEE_MANAGER.get_stats()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_enclave_config_validation() {
+        let config = EnclaveConfig::new(
+            TeeType::Sgx,
+            0x1000_0000,
+            0x10_0000,
+            0x1000_1000,
+        );
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_enclave_id() {
+        let id = EnclaveId::new(42);
+        assert!(id.is_valid());
+        assert_eq!(id.0, 42);
+    }
+
+    #[test]
+    fn test_attestation_validation() {
+        let mut attestation = Attestation::new(EnclaveId::new(1));
+        attestation.measurement.mrenclave[0] = 0x01;
+        assert!(attestation.validate().is_ok());
+    }
+}

@@ -1197,11 +1197,9 @@ impl ChaCha20 {
         state[13] = (counter >> 32) as u32;
         state[14] = u32::from_le_bytes([nonce[0], nonce[1], nonce[2], nonce[3]]);
         state[15] = u32::from_le_bytes([nonce[4], nonce[5], nonce[6], nonce[7]]);
-        state[16] = u32::from_le_bytes([nonce[8], nonce[9], nonce[10], nonce[11]]);
-
-        // Wait, we only have 16 elements, not 17
-        // Let me fix this
-        // Actually, the state should be exactly 16 u32s (64 bytes)
+        // Note: ChaCha20 state is exactly 16 u32s (64 bytes)
+        // The remaining nonce bytes (8-11) would need larger state or different handling
+        // For standard ChaCha20, we use 96-bit nonce, not 128-bit
 
         // Re-initialize with correct layout
         let mut state = [0u32; 16];

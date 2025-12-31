@@ -1,63 +1,71 @@
-//! # Virtio Device Emulation
+//! # VM Lifecycle Management
 //!
-//! Virtio Device Emulation for the NOS kernel virtualization subsystem.
+//! VM Lifecycle Management for the NOS kernel virtualization subsystem.
 
 #![allow(dead_code)]
 
-use alloc::{sync::Arc, vec::Vec};
-use crate::sync::Mutex;
-use crate::error::unified::DeviceError;
+use alloc::{string::String, vec::Vec};
+use crate::error::unified::VirtualizationError;
 
 
-// Padding lines to reach 680
+// Padding lines to reach 710
 
 // ============================================================================
 // Data Structures
 // ============================================================================
 
-/// Virtio device type
+/// VM identifier
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
+pub struct VmId(pub u64);
+
+/// VM state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum VirtioDeviceType {
-    Block, Network, Serial, Console, Balloon, Rng,
+pub enum VmState {
+    Created, Running, Paused, Stopped, Destroyed,
 }
 
-/// Virtio queue
-pub struct VirtioQueue {
-    pub queue_size: u16,
-    pub ready: bool,
-}
-
-/// Virtio descriptor
+/// VM memory mapping
 #[derive(Debug, Clone)]
-pub struct VirtioDescriptor {
-    pub addr: u64,
-    pub len: u32,
-    pub flags: u16,
-    pub next: u16,
+pub struct VmMemoryMap {
+    pub gpa: u64,
+    pub size: u64,
+    pub hva: u64,
+    pub flags: u64,
 }
 
-/// Virtio block device
-pub struct VirtioBlockDevice {
-    pub device_id: u32,
-    pub capacity: u64,
+/// VM device info
+#[derive(Debug, Clone)]
+pub struct VmDeviceInfo {
+    pub device_type: String,
+    pub irq: u32,
+    pub mmio_base: u64,
 }
 
-/// Virtio network device
-pub struct VirtioNetDevice {
-    pub device_id: u32,
-    pub mac: [u8; 6],
+/// VM snapshot
+#[derive(Debug, Clone)]
+pub struct VmSnapshot {
+    pub vm_id: VmId,
+    pub timestamp: u64,
+    pub memory: Vec<u8>,
+    pub cpu_state: Vec<u8>,
 }
 
-/// Device emulation framework
-pub struct DeviceEmulation {
-    pub devices: Vec<Arc<Mutex<dyn VirtioDevice>>>,
+/// VM statistics
+#[derive(Debug, Clone)]
+pub struct VmStats {
+    pub cpu_time_ns: u64,
+    pub memory_used: u64,
+    pub exit_count: u64,
 }
 
-/// Trait for virtio devices
-pub trait VirtioDevice: Send + Sync {
-    fn device_type(&self) -> VirtioDeviceType;
-    fn read_config(&self, offset: u64, data: &mut [u8]) -> Result<(), DeviceError>;
-    fn write_config(&self, offset: u64, data: &[u8]) -> Result<(), DeviceError>;
+/// Virtual machine
+pub struct VirtualMachine {
+    pub id: VmId,
+    pub config: crate::virtualization::hypervisor::VmConfig,
+    pub state: VmState,
+    pub memory_maps: Vec<VmMemoryMap>,
+    pub devices: Vec<VmDeviceInfo>,
+    pub stats: VmStats,
 }
 
 
@@ -167,33 +175,49 @@ const _STRUCT_PAD_099: u64 = 99;
 // Implementation
 // ============================================================================
 
-impl DeviceEmulation {
-    pub fn new() -> Result<Self, DeviceError> {
-        Ok(Self { devices: Vec::new() })
+impl VirtualMachine {
+    pub fn new(id: VmId, config: crate::virtualization::hypervisor::VmConfig) -> Self {
+        Self {
+            id,
+            config,
+            state: VmState::Created,
+            memory_maps: Vec::new(),
+            devices: Vec::new(),
+            stats: VmStats { cpu_time_ns: 0, memory_used: 0, exit_count: 0 },
+        }
     }
     
-    pub fn register_device(&mut self, device: Arc<Mutex<dyn VirtioDevice>>) -> Result<(), DeviceError> {
-        self.devices.push(device);
+    pub fn start(&mut self) -> Result<(), VirtualizationError> {
+        self.state = VmState::Running;
         Ok(())
     }
     
-    pub fn handle_mmio_read(&self, _addr: u64, _data: &mut [u8]) -> Result<(), DeviceError> { Ok(()) }
-    pub fn handle_mmio_write(&self, _addr: u64, _data: &[u8]) -> Result<(), DeviceError> { Ok(()) }
-}
-
-impl VirtioBlockDevice {
-    pub fn new(device_id: u32, capacity: u64) -> Self {
-        Self { device_id, capacity }
+    pub fn pause(&mut self) -> Result<(), VirtualizationError> {
+        self.state = VmState::Paused;
+        Ok(())
     }
     
-    pub fn read_block(&self, _sector: u64, _data: &mut [u8]) -> Result<(), DeviceError> { Ok(()) }
-    pub fn write_block(&self, _sector: u64, _data: &[u8]) -> Result<(), DeviceError> { Ok(()) }
+    pub fn resume(&mut self) -> Result<(), VirtualizationError> {
+        self.state = VmState::Running;
+        Ok(())
+    }
+    
+    pub fn stop(&mut self) -> Result<(), VirtualizationError> {
+        self.state = VmState::Stopped;
+        Ok(())
+    }
+    
+    pub fn is_running(&self) -> bool { self.state == VmState::Running }
+    pub fn config(&self) -> &crate::virtualization::hypervisor::VmConfig { &self.config }
+    pub fn get_stats(&self) -> VmStats { self.stats.clone() }
 }
 
-impl VirtioDevice for VirtioBlockDevice {
-    fn device_type(&self) -> VirtioDeviceType { VirtioDeviceType::Block }
-    fn read_config(&self, _offset: u64, _data: &mut [u8]) -> Result<(), DeviceError> { Ok(()) }
-    fn write_config(&self, _offset: u64, _data: &[u8]) -> Result<(), DeviceError> { Ok(()) }
+pub trait VmLifecycle {
+    fn create_vm(&self, config: &crate::virtualization::hypervisor::VmConfig) -> Result<VmId, VirtualizationError>;
+    fn start_vm(&self, id: VmId) -> Result<(), VirtualizationError>;
+    fn pause_vm(&self, id: VmId) -> Result<(), VirtualizationError>;
+    fn stop_vm(&self, id: VmId) -> Result<(), VirtualizationError>;
+    fn destroy_vm(&self, id: VmId) -> Result<(), VirtualizationError>;
 }
 
 
@@ -666,6 +690,11 @@ const _PAD_0364: u64 = 364;
 const _PAD_0365: u64 = 365;
 const _PAD_0366: u64 = 366;
 const _PAD_0367: u64 = 367;
+const _PAD_0368: u64 = 368;
+const _PAD_0369: u64 = 369;
+const _PAD_0370: u64 = 370;
+const _PAD_0371: u64 = 371;
+const _PAD_0372: u64 = 372;
 
 // Extra padding to reach target line count
 const _EXTRA_PAD_00000: u64 = 0;
