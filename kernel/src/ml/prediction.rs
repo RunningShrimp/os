@@ -3,6 +3,7 @@
 //! This module provides prediction capabilities for various kernel components,
 //! including performance prediction, resource usage prediction, and trend analysis.
 
+use libm::*;
 use crate::error::unified::UnifiedError;
 use crate::ml::mod::{ModelConfig, ModelType, TrainingData, PredictionInput, PredictionOutput, MLRecommendation, RecommendationPriority};
 use alloc::collections::BTreeMap;
@@ -198,7 +199,7 @@ impl PredictionEngine {
                 for &feature in &input.features {
                     sum += feature;
                 }
-                (sum % 5.0).floor()
+                libm::floor(sum % 5.0)
             }
         };
 

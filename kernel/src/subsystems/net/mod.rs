@@ -28,6 +28,7 @@ pub mod udp;
 pub mod udp_fast_path;
 pub mod udp_optimization;
 pub mod udp_multicast;
+pub mod wireless;
 pub mod zero_copy; // POSIX-compatible network API (required for socket syscalls)
 
 // Test modules

@@ -12,6 +12,7 @@
 //! - Flame graph output
 //! - Statistical analysis
 
+use libm::*;
 use spin::Mutex;
 use core::sync::atomic;
 use alloc::collections::BTreeMap;
@@ -362,7 +363,7 @@ impl PerformanceProfiler {
 
         for (name, profile) in profiles.iter() {
             let stats = profile.get_stats();
-            let width = (stats.total_time_ns as f64).log10() as usize;
+            let width = libm::log10(stats.total_time_ns as f64) as usize;
             
             for _ in 0..width {
                 flame.push_str(" ");

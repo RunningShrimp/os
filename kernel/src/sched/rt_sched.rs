@@ -74,10 +74,10 @@
 
 #![allow(dead_code)]
 
-use crate::sync::{Mutex, GenericSpinLock};
 use crate::prelude::*;
+use crate::subsystems::sync::spinlock::SpinLock;
 use alloc::collections::VecDeque;
-use core::sync::atomic {AtomicU64, AtomicUsize, Ordering, Ordering};
+use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use core::result::Result as CoreResult;
 
 
@@ -258,11 +258,11 @@ impl RtTask {
 /// Real-time scheduler state (per-CPU)
 struct RtSchedulerState {
     /// FIFO queues for each priority level (99 queues)
-    fifo_queues: Vec<GenericSpinLock<VecDeque<TaskId>>>,
+    fifo_queues: Vec<SpinLock<VecDeque<TaskId>>>,
     /// RR queues for each priority level (99 queues)
-    rr_queues: Vec<GenericSpinLock<VecDeque<TaskId>>>,
+    rr_queues: Vec<SpinLock<VecDeque<TaskId>>>,
     /// Current running task on this CPU
-    current_task: GenericSpinLock<Option<TaskId>>,
+    current_task: SpinLock<Option<TaskId>>,
     /// Bitmap of active FIFO priorities (using u64 to represent up to 64 priorities)
     fifo_bitmap: AtomicU64,
     /// Bitmap of active RR priorities
@@ -279,19 +279,19 @@ impl RtSchedulerState {
     fn new(cpu_id: CpuId) -> Self {
         use alloc::collections::VecDeque;
 
-        let _empty_queue = GenericSpinLock::new(VecDeque::<RtTask>::new());
+        let _empty_queue = SpinLock::new(VecDeque::<RtTask>::new());
         let mut fifo_queues = Vec::new();
         let mut rr_queues = Vec::new();
 
         for _ in 0..100 {
-            fifo_queues.push(GenericSpinLock::new(VecDeque::new()));
-            rr_queues.push(GenericSpinLock::new(VecDeque::new()));
+            fifo_queues.push(SpinLock::new(VecDeque::new()));
+            rr_queues.push(SpinLock::new(VecDeque::new()));
         }
 
         Self {
             fifo_queues,
             rr_queues,
-            current_task: GenericSpinLock::new(None),
+            current_task: SpinLock::new(None),
             fifo_bitmap: AtomicU64::new(0),
             rr_bitmap: AtomicU64::new(0),
             cpu_id,

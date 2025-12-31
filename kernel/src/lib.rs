@@ -503,3 +503,5 @@ mod tests {
 }
 // mod mm;  // REMOVED: Use subsystems::mm instead
 pub mod reliability;
+// Audio subsystem for real-time audio processing
+pub mod audio;

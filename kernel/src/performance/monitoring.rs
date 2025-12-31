@@ -9,6 +9,7 @@
 
 extern crate alloc;
 
+use libm::*;
 use alloc::{string::String, vec::Vec, collections::BTreeMap};
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use crate::subsystems::sync::{Mutex, SpinLock};
@@ -485,7 +486,7 @@ impl PerformanceMonitor {
             let y_mean = sum_y / n;
             let variance = values.iter().map(|y| (y - y_mean).powi(2)).sum::<f64>() / n;
             let strength = if variance > 0.0 {
-                (slope.powi(2) / variance).sqrt() / (slope.abs() + 1.0)
+                libm::sqrt(slope.powi(2) / variance) / (slope.abs() + 1.0)
             } else {
                 0.0
             };

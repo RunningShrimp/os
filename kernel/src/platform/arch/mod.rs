@@ -25,6 +25,21 @@ pub mod x86_64 {
 // Re-export memory_layout from top-level arch module
 pub use crate::arch;
 
+/// Read Time-Stamp Counter (x86_64)
+#[inline(always)]
+#[cfg(target_arch = "x86_64")]
+pub fn rdtsc() -> u64 {
+    unsafe { core::arch::x86_64::_rdtsc() }
+}
+
+/// Read Time-Stamp Counter (fallback for non-x86_64)
+#[inline(always)]
+#[cfg(not(target_arch = "x86_64"))]
+pub fn rdtsc() -> u64 {
+    // Fallback implementation
+    0
+}
+
 /// Early hardware initialization (called before any other init)
 pub fn early_init() {
     crate::drivers::uart::init();

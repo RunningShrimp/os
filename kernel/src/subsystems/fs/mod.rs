@@ -121,6 +121,10 @@ pub mod vfs;
 pub mod vfs_interface;
 
 pub mod api;
+pub mod ceph;
+pub mod compressfs;
+pub mod dedup;
+pub mod encryptfs;
 pub mod epoll;
 pub mod ext2;
 pub mod ext4;
@@ -128,12 +132,14 @@ pub mod ext4_persistence;
 pub mod file;
 pub mod file_locking;
 pub mod file_permissions;
+pub mod fuse;
 pub mod fs_cache;
 pub mod fs_impl;
 pub mod fs_types;
 pub mod journaling_fs;
 pub mod journaling_wrapper;
 pub mod recovery;
+pub mod snapshot;
 pub mod xattr;
 
 #[cfg(feature = "kernel_tests")]
@@ -373,6 +379,7 @@ pub fn verify_root() -> Result<(), FsError> {
 /// - File permissions
 /// - File locking
 /// - Extended attributes
+/// - Advanced features (FUSE, snapshots, deduplication, encryption, compression, CephFS)
 pub fn init() -> nos_api::Result<()> {
     // Initialize VFS manager (already initialized on first access)
     let _ = vfs();
@@ -391,6 +398,14 @@ pub fn init() -> nos_api::Result<()> {
 
     // Initialize file system implementations
     fs_impl::init();
+
+    // Initialize advanced filesystem features
+    let _ = fuse::init();
+    let _ = snapshot::init();
+    let _ = dedup::init();
+    let _ = encryptfs::init();
+    let _ = compressfs::init();
+    let _ = ceph::init();
 
     crate::println!("[fs] File system subsystem initialized");
     Ok(())

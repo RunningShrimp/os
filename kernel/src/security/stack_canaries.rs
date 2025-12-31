@@ -90,7 +90,6 @@ pub struct CanaryCorruptionInfo {
 }
 
 /// Stack canary statistics
-#[derive(Debug, Default)]
 pub struct CanaryStats {
     /// Total number of canary validations
     pub total_validations: AtomicUsize,
@@ -102,6 +101,19 @@ pub struct CanaryStats {
     pub canary_generations: AtomicUsize,
     /// Number of false positives
     pub false_positives: AtomicUsize,
+}
+
+impl CanaryStats {
+    /// Create a new canary statistics tracker
+    pub fn new() -> Self {
+        Self {
+            total_validations: AtomicUsize::new(0),
+            successful_validations: AtomicUsize::new(0),
+            corruptions_detected: AtomicUsize::new(0),
+            canary_generations: AtomicUsize::new(0),
+            false_positives: AtomicUsize::new(0),
+        }
+    }
 }
 
 /// Per-thread canary context
@@ -623,6 +635,18 @@ impl StackCanaryGuard {
     }
 }
 
+impl Clone for CanaryStats {
+    fn clone(&self) -> Self {
+        Self {
+            total_validations: AtomicUsize::new(self.total_validations.load(core::sync::atomic::Ordering::Relaxed)),
+            successful_validations: AtomicUsize::new(self.successful_validations.load(core::sync::atomic::Ordering::Relaxed)),
+            corruptions_detected: AtomicUsize::new(self.corruptions_detected.load(core::sync::atomic::Ordering::Relaxed)),
+            canary_generations: AtomicUsize::new(self.canary_generations.load(core::sync::atomic::Ordering::Relaxed)),
+            false_positives: AtomicUsize::new(self.false_positives.load(core::sync::atomic::Ordering::Relaxed)),
+        }
+    }
+}
+
 impl Drop for StackCanaryGuard {
     fn drop(&mut self) {
         if let Some(subsystem) = get_stack_canary_subsystem() {
@@ -630,5 +654,11 @@ impl Drop for StackCanaryGuard {
                 log::error!("Stack canary corruption detected in RAII guard: {:?}", corruption);
             }
         }
+    }
+}
+
+impl Default for CanaryStats {
+    fn default() -> Self {
+        Self::new()
     }
 }

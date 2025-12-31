@@ -8,7 +8,7 @@ extern crate alloc;
 use alloc::{boxed::Box, string::ToString, vec::Vec};
 
 /// Result type for the kernel
-pub type Result<T> = core::result::Result<T, Error>;
+pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 /// Kernel error type - unified error representation
 pub type KernelError = UnifiedError;

@@ -497,6 +497,17 @@ pub mod unified;
 pub mod sharded_table;
 pub mod rcu_table;
 
+// Real-time scheduler
+pub mod rt_sched;
+
+// Re-exports from rt_sched module
+pub use rt_sched::{
+    RtSchedPolicy, RtPriority, RT_PRIO_MIN, RT_PRIO_MAX,
+    RtTask, RtScheduler, RtSchedulerStats, RtSchedError,
+    RtSchedulerStatsSnapshot, sched_yield,
+    sched_get_priority_min, sched_get_priority_max
+};
+
 /// Run function with global scheduler
 pub fn with_global<F, R>(f: F) -> R
 where
