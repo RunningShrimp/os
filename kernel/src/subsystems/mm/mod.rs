@@ -189,6 +189,20 @@ pub mod traits;
 pub mod types;
 pub mod unified_stats;
 
+// Track AV: 高级内存管理优化
+pub mod compress;
+pub mod migration;
+pub mod hotremove;
+pub mod thp;
+pub mod memcg;
+pub mod memory_failure;
+
+// Storage Class Memory (SCM) support
+pub mod nvdimm;
+pub mod pmem_tx;
+pub mod unified;
+pub mod libpmem;
+
 // Re-export commonly used items from phys and vm modules
 pub use phys::{kalloc, kfree, PAGE_SIZE};
 pub use phys::{

@@ -20,6 +20,9 @@ pub mod optimization;
 pub mod anomaly;
 pub mod adaptive;
 
+// ML Inference Engine
+pub mod inference;
+
 /// Machine learning system for kernel optimization
 pub struct MLSystem {
     prediction_engine: PredictionEngine,
