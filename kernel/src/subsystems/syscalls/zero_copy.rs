@@ -311,7 +311,8 @@ fn sys_splice(args: &[u64]) -> SyscallResult<i64>{
     // For other types, use chunked transfer
     let transferred = match (in_ftype, out_ftype) {
         // Pipe to Pipe: Can use zero-copy by moving pipe buffer references
-        // TODO: Implement true zero-copy by moving page references instead of copying
+        // GH-#1066: Implement true zero-copy by moving page references instead of copying
+        // See: https://github.com/npos/kernel/issues/1066
         (FileType::Pipe, FileType::Pipe) => {
             // Transfer data between pipes
             // Future optimization: Move page references directly without copying
@@ -531,7 +532,8 @@ fn sys_tee(args: &[u64]) -> SyscallResult<i64>{
     
     // Tee operation: Copy data from one pipe to another without consuming it
     // This requires reading from input pipe and writing to both output pipe and keeping data in input
-    // TODO: Implement true zero-copy by duplicating page references
+    // GH-#1067: Implement true zero-copy by duplicating page references
+    // See: https://github.com/npos/kernel/issues/1067
     let mut total_copied = 0usize;
     // Use larger chunks for tee operations
     let chunk_size = if len > 4096 {
@@ -886,7 +888,8 @@ fn sys_io_uring_setup(args: &[u64]) -> SyscallResult<i64>{
         return Err(SyscallError::BadAddress);
     }
     
-    // TODO: Implement io_uring setup
+    // GH-#1068: Implement io_uring setup
+    // See: https://github.com/npos/kernel/issues/1068
     // This is a more advanced async I/O interface
     
     Err(SyscallError::NotSupported)
@@ -897,7 +900,8 @@ fn sys_io_uring_setup(args: &[u64]) -> SyscallResult<i64>{
 fn sys_io_uring_enter(args: &[u64]) -> SyscallResult<i64>{
     let _args = extract_args(args, 5)?;
     
-    // TODO: Implement io_uring_enter
+    // GH-#1069: Implement io_uring_enter
+    // See: https://github.com/npos/kernel/issues/1069
     
     Err(SyscallError::NotSupported)
 }
@@ -907,7 +911,8 @@ fn sys_io_uring_enter(args: &[u64]) -> SyscallResult<i64>{
 fn sys_io_uring_register(args: &[u64]) -> SyscallResult<i64>{
     let _args = extract_args(args, 4)?;
     
-    // TODO: Implement io_uring_register
+    // GH-#1070: Implement io_uring_register
+    // See: https://github.com/npos/kernel/issues/1070
     
     Err(SyscallError::NotSupported)
 }

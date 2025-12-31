@@ -76,7 +76,8 @@ impl MemoryLockManager {
         // 更新计数
         self.locked_count.fetch_add(pages.len(), Ordering::AcqRel);
 
-        // TODO: 实际锁定页到RAM（防止被换出）
+        // GH-#1085: 实际锁定页到RAM（防止被换出）
+        // See: https://github.com/npos/kernel/issues/1085
         // 这需要与页替换算法和内存管理器集成
 
         Ok(())
@@ -111,7 +112,8 @@ impl MemoryLockManager {
         // 更新计数
         self.locked_count.fetch_sub(pages.len(), Ordering::AcqRel);
 
-        // TODO: 实际解锁页（允许被换出）
+        // GH-#1086: 实际解锁页（允许被换出）
+        // See: https://github.com/npos/kernel/issues/1086
 
         Ok(())
     }
@@ -153,7 +155,8 @@ impl MemoryLockManager {
         locked.clear();
         self.locked_count.store(0, Ordering::Release);
 
-        // TODO: 实际解锁所有页
+        // GH-#1087: 实际解锁所有页
+        // See: https://github.com/npos/kernel/issues/1087
     }
 
     /// 获取锁定页的列表
@@ -247,7 +250,8 @@ impl AddressSpaceLock {
     /// # 返回
     /// 成功时返回Ok(()),失败时返回错误
     pub fn lock(&self, flags: AddressSpaceLockFlags) -> Result<()> {
-        // TODO: 实现地址空间锁定
+        // GH-#1088: 实现地址空间锁定
+        // See: https://github.com/npos/kernel/issues/1088
         // 1. 如果current=true，锁定所有当前映射的页
         // 2. 如果future=true，标记所有未来的映射都应该被锁定
 
@@ -265,7 +269,8 @@ impl AddressSpaceLock {
     /// # 返回
     /// 成功时返回Ok(()),失败时返回错误
     pub fn unlock(&self) -> Result<()> {
-        // TODO: 实现地址空间解锁
+        // GH-#1089: 实现地址空间解锁
+        // See: https://github.com/npos/kernel/issues/1089
         // 解锁所有被锁定的页
 
         let mut flags = self.flags.lock();

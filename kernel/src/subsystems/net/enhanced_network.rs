@@ -674,7 +674,8 @@ impl EnhancedNetworkManager {
         _addr_ptr: *const u8,
         _addrlen: usize,
     ) -> Result<(), NetworkError> {
-        // TODO: Parse the address from raw pointer
+        // GH-#1080: Parse the address from raw pointer
+        // See: https://github.com/npos/kernel/issues/1080
         // For now, return InvalidArgument
         Err(NetworkError::InvalidArgument)
     }
@@ -686,7 +687,8 @@ impl EnhancedNetworkManager {
         _addr_ptr: *const u8,
         _addrlen: usize,
     ) -> Result<(), NetworkError> {
-        // TODO: Parse the address from raw pointer
+        // GH-#1081: Parse the address from raw pointer
+        // See: https://github.com/npos/kernel/issues/1081
         // For now, return InvalidArgument
         Err(NetworkError::InvalidArgument)
     }
@@ -701,7 +703,8 @@ impl EnhancedNetworkManager {
         // Accept the connection
         let (_, _remote_address) = self.accept(socket_id)?;
 
-        // TODO: Write the address to the user pointer
+        // GH-#1082: Write the address to the user pointer
+        // See: https://github.com/npos/kernel/issues/1082
         // For now, just return the new socket ID
         Ok(socket_id + 1)
     }
@@ -771,7 +774,8 @@ impl EnhancedNetworkManager {
         _len: usize,
         _flags: i32,
     ) -> Result<usize, NetworkError> {
-        // TODO: Read the buffer from user space
+        // GH-#1083: Read the buffer from user space
+        // See: https://github.com/npos/kernel/issues/1083
         // For now, return 0 bytes sent
         crate::println!("[network] syscall_send called on socket {}, len={}, flags={}", socket_id, _len, _flags);
         Ok(0)
@@ -785,7 +789,8 @@ impl EnhancedNetworkManager {
         _len: usize,
         _flags: i32,
     ) -> Result<usize, NetworkError> {
-        // TODO: Write the buffer to user space
+        // GH-#1084: Write the buffer to user space
+        // See: https://github.com/npos/kernel/issues/1084
         // For now, return 0 bytes received
         crate::println!("[network] syscall_recv called on socket {}, len={}, flags={}", socket_id, _len, _flags);
         Ok(0)

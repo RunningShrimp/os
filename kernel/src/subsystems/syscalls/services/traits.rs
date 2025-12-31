@@ -314,7 +314,8 @@ pub trait ServiceFactory: Send + Sync {
     ///
     /// * `Arc<dyn Service>` - 性能优化服务实例
     fn create_performance_service(&self) -> Arc<dyn Service> {
-        // TODO: Implement when optimization services are refactored
+        // GH-#1076: Implement when optimization services are refactored
+        // See: https://github.com/npos/kernel/issues/1076
         Arc::new(PlaceholderService::new())
     }
 
@@ -326,7 +327,8 @@ pub trait ServiceFactory: Send + Sync {
     ///
     /// * `Arc<dyn Service>` - 调度器优化服务实例
     fn create_scheduler_service(&self) -> Arc<dyn Service> {
-        // TODO: Implement when optimization services are refactored
+        // GH-#1077: Implement when optimization services are refactored
+        // See: https://github.com/npos/kernel/issues/1077
         Arc::new(PlaceholderService::new())
     }
 
@@ -338,7 +340,8 @@ pub trait ServiceFactory: Send + Sync {
     ///
     /// * `Arc<dyn Service>` - 零拷贝I/O优化服务实例
     fn create_zerocopy_service(&self) -> Arc<dyn Service> {
-        // TODO: Implement when optimization services are refactored
+        // GH-#1078: Implement when optimization services are refactored
+        // See: https://github.com/npos/kernel/issues/1078
         Arc::new(PlaceholderService::new())
     }
 
@@ -350,7 +353,8 @@ pub trait ServiceFactory: Send + Sync {
     ///
     /// * `Arc<dyn Service>` - 优化管理服务实例
     fn create_manager_service(&self) -> Arc<dyn Service> {
-        // TODO: Implement when optimization services are refactored
+        // GH-#1079: Implement when optimization services are refactored
+        // See: https://github.com/npos/kernel/issues/1079
         Arc::new(PlaceholderService::new())
     }
 }

@@ -68,7 +68,8 @@ pub fn sys_mlock(addr: usize, length: usize) -> SyscallResult<i64> {
         return Err(SyscallError::InvalidArgument);
     }
 
-    // TODO: 实现真正的内存锁定
+    // GH-#1090: 实现真正的内存锁定
+    // See: https://github.com/npos/kernel/issues/1090
     // 这里只是标记为已锁定
     crate::println!("mlock: locked {} bytes at {:#x}", aligned_length, aligned_addr);
 
@@ -101,7 +102,8 @@ pub fn sys_munlock(addr: usize, length: usize) -> SyscallResult<i64> {
         return Err(SyscallError::InvalidArgument);
     }
 
-    // TODO: 实现真正的内存解锁
+    // GH-#1091: 实现真正的内存解锁
+    // See: https://github.com/npos/kernel/issues/1091
     crate::println!("munlock: unlocked {} bytes at {:#x}", aligned_length, aligned_addr);
 
     Ok(0)
@@ -120,7 +122,8 @@ pub fn sys_mlockall(flags: MlockAllFlags) -> SyscallResult<i64> {
         .current_space()
         .map_err(|_| SyscallError::InvalidArgument)?;
 
-    // TODO: 实现真正的地址空间锁定
+    // GH-#1092: 实现真正的地址空间锁定
+    // See: https://github.com/npos/kernel/issues/1092
     crate::println!("mlockall: locked address space with flags {:?}", flags);
 
     Ok(0)
@@ -136,7 +139,8 @@ pub fn sys_munlockall() -> SyscallResult<i64> {
         .current_space()
         .map_err(|_| SyscallError::InvalidArgument)?;
 
-    // TODO: 实现真正的地址空间解锁
+    // GH-#1093: 实现真正的地址空间解锁
+    // See: https://github.com/npos/kernel/issues/1093
     crate::println!("munlockall: unlocked address space");
 
     Ok(0)

@@ -32,7 +32,8 @@ pub fn allocate_pages(count: usize) -> Result<*mut [u8], AllocError> {
         return Err(AllocError::OutOfMemory);
     }
 
-    // TODO: Implement proper page allocation using underlying allocator
+    // GH-#1102: Implement proper page allocation using underlying allocator
+    // See: https://github.com/npos/kernel/issues/1102
     // This should:
     // 1. Call the physical page allocator (e.g., kalloc_pages from phys.rs)
     // 2. Track the allocation in the page accounting system
@@ -67,7 +68,8 @@ pub fn free_pages(pages: *mut [u8], count: usize) -> Result<(), AllocError> {
         return Err(AllocError::InvalidSize);
     }
 
-    // TODO: Implement proper page freeing using underlying allocator
+    // GH-#1103: Implement proper page freeing using underlying allocator
+    // See: https://github.com/npos/kernel/issues/1103
     // This should:
     // 1. Validate that the pages were previously allocated
     // 2. Call the physical page deallocator (e.g., kfree from phys.rs) for each page
@@ -106,7 +108,8 @@ pub fn allocate_physical_pages(count: usize) -> Result<PhysicalPage, PhysicalErr
         return Err(PhysicalError::OutOfMemory);
     }
 
-    // TODO: Implement proper physical page allocation
+    // GH-#1104: Implement proper physical page allocation
+    // See: https://github.com/npos/kernel/issues/1104
     // This should:
     // 1. Call the physical page allocator to get contiguous physical pages
     // 2. Construct a PhysicalPage structure with the PFN and appropriate flags
@@ -138,7 +141,8 @@ pub fn free_physical_pages(page: PhysicalPage) -> Result<(), PhysicalError> {
         return Err(PhysicalError::InvalidPage);
     }
 
-    // TODO: Implement proper physical page freeing
+    // GH-#1105: Implement proper physical page freeing
+    // See: https://github.com/npos/kernel/issues/1105
     // This should:
     // 1. Convert the PFN back to a virtual address
     // 2. Validate that this page was previously allocated

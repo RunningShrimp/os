@@ -9,7 +9,8 @@ use super::{AllocatorStats, MemoryStats, PhysicalMemoryStats};
 /// # Return
 /// * `MemoryStats` - Memory statistics information
 pub fn get_memory_stats() -> MemoryStats {
-    // TODO: Implement this function
+    // GH-#1098: Implement this function
+    // See: https://github.com/npos/kernel/issues/1098
     MemoryStats::default()
 }
 
@@ -18,17 +19,20 @@ pub fn get_memory_stats() -> MemoryStats {
 /// # Return
 /// * `AllocatorStats` - Allocator statistics information
 pub fn get_allocator_stats() -> AllocatorStats {
-    // TODO: Implement this function
+    // GH-#1099: Implement this function
+    // See: https://github.com/npos/kernel/issues/1099
     AllocatorStats::default()
 }
 
 /// Get physical memory statistics
 pub fn get_physical_memory_stats() -> PhysicalMemoryStats {
-    // TODO: Implement this function
+    // GH-#1100: Implement this function
+    // See: https://github.com/npos/kernel/issues/1100
     PhysicalMemoryStats::default()
 }
 
 /// Reset statistics information
 pub fn reset_stats() {
-    // TODO: Implement this function
+    // GH-#1101: Implement this function
+    // See: https://github.com/npos/kernel/issues/1101
 }

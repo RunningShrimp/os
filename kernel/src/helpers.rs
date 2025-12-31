@@ -48,7 +48,8 @@ pub fn verify_root() -> bool {
 ///
 /// * `u64` - Monotonic time in nanoseconds
 pub fn get_monotonic_time() -> u64 {
-    // TODO: Implement proper time tracking
+    // GH-#1060: Implement proper time tracking
+    // See: https://github.com/npos/kernel/issues/1060
     // For now, return a placeholder value
     0
 }
@@ -69,7 +70,8 @@ pub fn get_monotonic_time() -> u64 {
 ///
 /// * `Result<(), crate::error::UnifiedError>` - Success or error
 pub fn free_socket_entry(fd: i32) -> Result<(), crate::error::UnifiedError> {
-    // TODO: Implement proper socket entry cleanup
+    // GH-#1061: Implement proper socket entry cleanup
+    // See: https://github.com/npos/kernel/issues/1061
     log_info!("Freeing socket entry: fd={}", fd);
     Ok(())
 }
@@ -84,7 +86,8 @@ pub fn free_socket_entry(fd: i32) -> Result<(), crate::error::UnifiedError> {
 ///
 /// * `Pid` - Current process ID
 pub fn get_current_pid() -> Pid {
-    // TODO: Implement proper process tracking
+    // GH-#1062: Implement proper process tracking
+    // See: https://github.com/npos/kernel/issues/1062
     1
 }
 
@@ -94,7 +97,8 @@ pub fn get_current_pid() -> Pid {
 ///
 /// * `Tid` - Current thread ID
 pub fn get_current_tid() -> Tid {
-    // TODO: Implement proper thread tracking
+    // GH-#1063: Implement proper thread tracking
+    // See: https://github.com/npos/kernel/issues/1063
     1
 }
 
@@ -104,7 +108,8 @@ pub fn get_current_tid() -> Tid {
 ///
 /// * `Uid` - Current user ID
 pub fn get_current_uid() -> Uid {
-    // TODO: Implement proper user tracking
+    // GH-#1064: Implement proper user tracking
+    // See: https://github.com/npos/kernel/issues/1064
     0
 }
 
@@ -114,7 +119,8 @@ pub fn get_current_uid() -> Uid {
 ///
 /// * `Gid` - Current group ID
 pub fn get_current_gid() -> Gid {
-    // TODO: Implement proper group tracking
+    // GH-#1065: Implement proper group tracking
+    // See: https://github.com/npos/kernel/issues/1065
     0
 }
 

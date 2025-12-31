@@ -78,7 +78,8 @@ pub fn sys_mmap(
         }
     } else {
         // 文件映射
-        // TODO: 实现文件映射
+        // GH-#1094: 实现文件映射
+        // See: https://github.com/npos/kernel/issues/1094
         return Err(SyscallError::NotSupported);
     };
 
@@ -237,7 +238,8 @@ pub fn sys_msync(addr: usize, _length: usize, _flags: u32) -> SyscallResult<i64>
 
     // 如果是文件映射，同步到文件
     if region.region_type == VmRegionType::File {
-        // TODO: 实现文件同步
+        // GH-#1095: 实现文件同步
+        // See: https://github.com/npos/kernel/issues/1095
         return Err(SyscallError::NotSupported);
     }
 
@@ -254,7 +256,8 @@ fn allocate_physical_frames(count: usize) -> Result<Vec<PhysFrame>, VmError> {
     let mut frames = Vec::with_capacity(count);
 
     for _ in 0..count {
-        // TODO: 实现真正的物理页分配
+        // GH-#1096: 实现真正的物理页分配
+        // See: https://github.com/npos/kernel/issues/1096
         // 这里使用占位符
         frames.push(0);
     }
@@ -264,7 +267,8 @@ fn allocate_physical_frames(count: usize) -> Result<Vec<PhysFrame>, VmError> {
 
 /// 释放物理页帧
 fn free_physical_frames(_frames: &[PhysFrame]) {
-    // TODO: 实现真正的物理页释放
+    // GH-#1097: 实现真正的物理页释放
+    // See: https://github.com/npos/kernel/issues/1097
 }
 
 // ============================================================================

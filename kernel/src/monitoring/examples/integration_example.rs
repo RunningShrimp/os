@@ -43,7 +43,8 @@ pub mod syscall_integration {
 
     /// Actual syscall dispatch (placeholder)
     fn dispatch_syscall(id: u64) -> i64 {
-        // TODO: Implement actual syscall dispatch
+        // GH-#1141: Implement actual syscall dispatch
+        // See: https://github.com/npos/kernel/issues/1141
         0
     }
 }
@@ -70,7 +71,8 @@ pub mod memory_integration {
 
     /// Actual allocation (placeholder)
     fn allocate_memory(size: usize) -> *mut u8 {
-        // TODO: Implement actual allocation
+        // GH-#1142: Implement actual allocation
+        // See: https://github.com/npos/kernel/issues/1142
         core::ptr::null_mut()
     }
 
@@ -106,7 +108,8 @@ pub mod scheduler_integration {
 
     /// Actual context switch (placeholder)
     fn perform_context_switch(prev: u64, next: u64) {
-        // TODO: Implement actual context switch
+        // GH-#1143: Implement actual context switch
+        // See: https://github.com/npos/kernel/issues/1143
         let _ = (prev, next);
     }
 
@@ -146,7 +149,8 @@ pub mod filesystem_integration {
 
     /// Actual file read (placeholder)
     fn file_read(fd: u64, buf: &mut [u8]) -> isize {
-        // TODO: Implement actual read
+        // GH-#1144: Implement actual read
+        // See: https://github.com/npos/kernel/issues/1144
         let _ = (fd, buf);
         0
     }
@@ -161,7 +165,8 @@ pub mod filesystem_integration {
 
     /// Actual file write (placeholder)
     fn file_write(fd: u64, buf: &[u8]) -> isize {
-        // TODO: Implement actual write
+        // GH-#1145: Implement actual write
+        // See: https://github.com/npos/kernel/issues/1145
         let _ = (fd, buf);
         0
     }

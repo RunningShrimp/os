@@ -365,7 +365,8 @@ impl EptTable {
         let pml4_idx = ((gpa >> 39) & 0x1FF) as usize;
 
         // Navigate to PTE and clear it
-        // TODO: Implement full navigation
+        // GH-#1110: Implement full navigation
+        // See: https://github.com/npos/kernel/issues/1110
 
         Ok(())
     }
@@ -382,7 +383,8 @@ impl EptTable {
     /// * `gpa` - Guest physical address to invalidate (or 0 for all)
     /// * `single` - True to invalidate only single page
     pub fn invalidate_tlb(&self, gpa: u64, single: bool) {
-        // TODO: Execute INVEPT instruction
+        // GH-#1111: Execute INVEPT instruction
+        // See: https://github.com/npos/kernel/issues/1111
         // This requires assembly code
     }
 
@@ -497,7 +499,8 @@ impl EptTable {
     }
 
     fn alloc_page() -> Result<u64, VirtMemError> {
-        // TODO: Allocate from physical memory manager
+        // GH-#1112: Allocate from physical memory manager
+        // See: https://github.com/npos/kernel/issues/1112
         // For now, return a placeholder
         static NEXT_PAGE: AtomicU64 = AtomicU64::new(0x10000000);
         Ok(NEXT_PAGE.fetch_add(0x1000, Ordering::SeqCst))
@@ -515,7 +518,8 @@ impl EptTable {
 
 impl Drop for EptTable {
     fn drop(&mut self) {
-        // TODO: Free all allocated pages
+        // GH-#1113: Free all allocated pages
+        // See: https://github.com/npos/kernel/issues/1113
         for addr in &self.allocated_pages {
             // Self::free_page(*addr);
         }
@@ -600,7 +604,8 @@ impl VpmlTable {
         _mem_type: EptMemoryType,
     ) -> Result<(), VirtMemError> {
         // Similar to EPT mapping but for AMD-V
-        // TODO: Implement AMD-V specific page table format
+        // GH-#1114: Implement AMD-V specific page table format
+        // See: https://github.com/npos/kernel/issues/1114
         Ok(())
     }
 

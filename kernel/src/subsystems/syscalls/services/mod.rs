@@ -215,7 +215,8 @@ impl ServiceSystem {
             .calculate_startup_order()
             .map_err(|e| Error::SystemError(format!("Failed to calculate startup order: {:?}", e)))?;
 
-        // TODO: Implement service startup
+        // GH-#1071: Implement service startup
+        // See: https://github.com/npos/kernel/issues/1071
         // For now, just return success
         Ok(())
     }
@@ -233,7 +234,8 @@ impl ServiceSystem {
             .calculate_startup_order()
             .map_err(|e| Error::SystemError(format!("Failed to calculate startup order: {:?}", e)))?;
 
-        // TODO: Implement service shutdown
+        // GH-#1072: Implement service shutdown
+        // See: https://github.com/npos/kernel/issues/1072
         // For now, just return success
         Ok(())
     }
@@ -270,7 +272,8 @@ impl ServiceManager for ServiceSystem {
 
     /// Get a service by name
     fn get_service(&self, _name: &str) -> Option<Arc<dyn crate::syscall_interface::Service>> {
-        // TODO: Implement proper conversion from LocalService to syscall_interface::Service
+        // GH-#1073: Implement proper conversion from LocalService to syscall_interface::Service
+        // See: https://github.com/npos/kernel/issues/1073
         // For now, return None since we cannot directly convert between trait objects
         None
     }
@@ -295,8 +298,10 @@ impl ServiceManager for ServiceSystem {
         let registry_services = self.registry.list_services();
         ServiceStats {
             total_services: registry_services.len() as u64,
-            active_services: 0, // TODO: Track active services
-            failed_services: 0, // TODO: Track failed services
+            active_services: 0, // GH-#1074: Track active services
+            // See: https://github.com/npos/kernel/issues/1074
+            failed_services: 0, // GH-#1075: Track failed services
+            // See: https://github.com/npos/kernel/issues/1075
         }
     }
 }

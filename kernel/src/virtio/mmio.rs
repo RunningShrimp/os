@@ -147,7 +147,8 @@ impl VirtioMmioDevice {
         // Read host features
         self.host_features = self.read_host_features();
 
-        // TODO: Negotiate features based on device type
+        // GH-#1137: Negotiate features based on device type
+        // See: https://github.com/npos/kernel/issues/1137
         self.guest_features = self.host_features;
 
         // Write guest features
@@ -183,7 +184,8 @@ impl VirtioMmioDevice {
                 break; // No more queues
             }
 
-            // TODO: Allocate and initialize queue
+            // GH-#1138: Allocate and initialize queue
+            // See: https://github.com/npos/kernel/issues/1138
             // For now, just mark as present
             self.queues.push(None);
 
@@ -463,12 +465,14 @@ pub fn handle_virtio_irq(irq: u32, devices: &mut [VirtioMmioDevice]) {
 
             // Handle used buffer interrupt
             if status & 0x01 != 0 {
-                // TODO: Process used buffers
+                // GH-#1139: Process used buffers
+                // See: https://github.com/npos/kernel/issues/1139
             }
 
             // Handle configuration change interrupt
             if status & 0x02 != 0 {
-                // TODO: Handle configuration change
+                // GH-#1140: Handle configuration change
+                // See: https://github.com/npos/kernel/issues/1140
             }
 
             // Acknowledge interrupt

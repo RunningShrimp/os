@@ -152,7 +152,8 @@ pub unsafe extern "C" fn shmget(key: i32, size: Size, shmflg: i32) -> i32 {
             creator_pid: crate::process::getpid(),
             last_attach_pid: 0,
             last_detach_time: 0,
-            creation_time: 0, // TODO: Get current time
+            creation_time: 0, // GH-#1125: Get current time
+            // See: https://github.com/npos/kernel/issues/1125
             remove_pending: false,
         };
 
@@ -353,7 +354,8 @@ pub unsafe extern "C" fn shmdt(shmaddr: *mut u8) -> i32 {
 
     // Update segment statistics
     seg_guard.nattch = seg_guard.nattch.saturating_sub(1);
-    seg_guard.last_detach_time = 0; // TODO: Get current time
+    seg_guard.last_detach_time = 0; // GH-#1126: Get current time
+    // See: https://github.com/npos/kernel/issues/1126
 
     // If segment is marked for removal and has no more attachments, remove it
     if seg_guard.remove_pending && seg_guard.nattch == 0 {
@@ -403,7 +405,8 @@ pub unsafe extern "C" fn shmctl(shmid: i32, cmd: i32, buf: *mut ShmidDs) -> i32 
             *buf = ShmidDs {
                 shm_perm: seg_guard.perm,
                 shm_segsz: seg_guard.size,
-                shm_atime: 0, // TODO: Track attach time
+                shm_atime: 0, // GH-#1127: Track attach time
+                // See: https://github.com/npos/kernel/issues/1127
                 shm_dtime: seg_guard.last_detach_time,
                 shm_ctime: seg_guard.creation_time,
                 shm_cpid: seg_guard.creator_pid,
@@ -452,7 +455,8 @@ pub unsafe extern "C" fn shmctl(shmid: i32, cmd: i32, buf: *mut ShmidDs) -> i32 
 fn check_permissions(perm: &IpcPerm, required_mode: Mode) -> bool {
     let current_uid = crate::process::getuid();
     let current_gid = crate::process::getgid();
-    let effective_gid = current_gid; // TODO: Support effective GID
+    let effective_gid = current_gid; // GH-#1128: Support effective GID
+    // See: https://github.com/npos/kernel/issues/1128
 
     // Check owner permissions
     if current_uid == perm.uid {

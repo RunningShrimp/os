@@ -482,7 +482,8 @@ impl NvdimmDriver {
     fn parse_nfit_table(&mut self) -> Result<(), Error> {
         crate::println!("[nvdimm] Parsing ACPI NFIT table...");
 
-        // TODO: 实际环境中从 ACPI 表中读取
+        // GH-#1106: 实际环境中从 ACPI 表中读取
+        // See: https://github.com/npos/kernel/issues/1106
         // 这里创建模拟的 NFIT 表
         let mut nfit = NfitTable {
             header: NfitHeader {
@@ -591,7 +592,8 @@ impl NvdimmDriver {
     fn load_namespaces(&mut self) -> Result<(), Error> {
         crate::println!("[nvdimm] Loading namespaces...");
 
-        // TODO: 从标签存储区域读取命名空间信息
+        // GH-#1107: 从标签存储区域读取命名空间信息
+        // See: https://github.com/npos/kernel/issues/1107
         // 这里创建一个默认的命名空间
 
         Ok(())
@@ -631,7 +633,8 @@ impl NvdimmDriver {
         let offset = used_space;
 
         let namespace = Arc::new(Namespace {
-            uuid: [0u8; 16], // TODO: 生成真实 UUID
+            uuid: [0u8; 16], // GH-#1108: 生成真实 UUID
+            // See: https://github.com/npos/kernel/issues/1108
             name: name.to_string(),
             ns_type: NamespaceType::Pmem,
             state: NamespaceState::Active,
@@ -701,7 +704,8 @@ impl NvdimmDriver {
             region_count: total_regions,
             namespace_count: total_namespaces,
             total_capacity,
-            used_capacity: 0, // TODO: 计算已使用容量
+            used_capacity: 0, // GH-#1109: 计算已使用容量
+            // See: https://github.com/npos/kernel/issues/1109
         }
     }
 }

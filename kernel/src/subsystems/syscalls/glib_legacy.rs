@@ -397,7 +397,8 @@ impl TimerFdInstance {
             self.expiration_count.store(0, Ordering::SeqCst);
         }
 
-        // TODO: Register timer with kernel timer system for actual expiration handling
+        // GH-#1129: Register timer with kernel timer system for actual expiration handling
+        // See: https://github.com/npos/kernel/issues/1129
 
         Ok(old_spec)
     }
@@ -442,7 +443,8 @@ impl TimerFdInstance {
             let current_expiration = self.next_expiration.load(Ordering::SeqCst);
             let next_expiration = current_expiration + interval_ns;
             self.next_expiration.store(next_expiration, Ordering::SeqCst);
-            // TODO: Re-register timer with kernel timer system
+            // GH-#1130: Re-register timer with kernel timer system
+            // See: https://github.com/npos/kernel/issues/1130
         } else {
             // One-shot timer, disarm it
             self.armed.store(false, Ordering::SeqCst);
@@ -622,8 +624,10 @@ impl InotifyInstance {
         let wd = self.next_wd.fetch_add(1, Ordering::SeqCst) as i32;
 
         // Get inode info (simplified - in real implementation would get from VFS)
-        let dev = 0; // TODO: get from VFS
-        let ino = 0; // TODO: get from VFS
+        let dev = 0; // GH-#1131: get from VFS
+        // See: https://github.com/npos/kernel/issues/1131
+        let ino = 0; // GH-#1132: get from VFS
+        // See: https://github.com/npos/kernel/issues/1132
 
         let watch = WatchDescriptor {
             wd,

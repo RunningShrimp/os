@@ -44,7 +44,8 @@ impl FileSystemType for Ext4FsType {
     }
 
     fn mount(&self, device: Option<&str>, flags: u32) -> VfsResult<Arc<dyn SuperBlock>> {
-        // TODO: Open device and read superblock
+        // GH-#1115: Open device and read superblock
+        // See: https://github.com/npos/kernel/issues/1115
         // For now, create a minimal implementation
         let _ = (device, flags);
 
@@ -92,7 +93,8 @@ impl SuperBlock for Ext4SuperBlockImpl {
     }
 
     fn sync(&self) -> VfsResult<()> {
-        // TODO: Sync all dirty blocks to disk
+        // GH-#1116: Sync all dirty blocks to disk
+        // See: https://github.com/npos/kernel/issues/1116
         Ok(())
     }
 
@@ -109,7 +111,8 @@ impl SuperBlock for Ext4SuperBlockImpl {
     }
 
     fn unmount(&self) -> VfsResult<()> {
-        // TODO: Sync and cleanup
+        // GH-#1117: Sync and cleanup
+        // See: https://github.com/npos/kernel/issues/1117
         self.sync()
     }
 }
@@ -414,12 +417,14 @@ impl InodeOps for Ext4InodeImpl {
     }
 
     fn get_file_lock(&self, _cmd: u32, _lock: &FileLock) -> VfsResult<u64> {
-        // TODO: Implement file locking
+        // GH-#1118: Implement file locking
+        // See: https://github.com/npos/kernel/issues/1118
         Err(VfsError::NotSupported)
     }
 
     fn release_file_lock(&self, _lock: &FileLock) -> VfsResult<()> {
-        // TODO: Implement file locking
+        // GH-#1119: Implement file locking
+        // See: https://github.com/npos/kernel/issues/1119
         Err(VfsError::NotSupported)
     }
 

@@ -302,7 +302,8 @@ impl VfsManager {
         _path: &str,
         _mode: crate::vfs::types::FileMode,
     ) -> Result<(), FsError> {
-        // TODO: Implement directory creation
+        // GH-#1120: Implement directory creation
+        // See: https://github.com/npos/kernel/issues/1120
         // For now, return error as this requires path resolution
         Err(FsError::NotSupported)
     }
@@ -313,7 +314,8 @@ impl VfsManager {
         _path: &str,
         _mode: crate::vfs::types::FileMode,
     ) -> Result<(), FsError> {
-        // TODO: Implement file creation
+        // GH-#1121: Implement file creation
+        // See: https://github.com/npos/kernel/issues/1121
         // For now, return error as this requires path resolution
         Err(FsError::NotSupported)
     }
@@ -325,14 +327,16 @@ impl VfsManager {
         _data: &[u8],
         _offset: u64,
     ) -> Result<usize, FsError> {
-        // TODO: Implement file writing
+        // GH-#1122: Implement file writing
+        // See: https://github.com/npos/kernel/issues/1122
         // For now, return error as this requires path resolution
         Err(FsError::NotSupported)
     }
 
     /// Delete a file or directory
     pub fn unlink(&self, _path: &str) -> Result<(), FsError> {
-        // TODO: Implement file/directory deletion
+        // GH-#1123: Implement file/directory deletion
+        // See: https://github.com/npos/kernel/issues/1123
         // For now, return error as this requires path resolution
         Err(FsError::NotSupported)
     }
@@ -420,7 +424,8 @@ pub fn init() -> nos_api::Result<()> {
 /// - Unmount all mount points (except root)
 /// - Clean up file system cache
 pub fn shutdown() -> nos_api::Result<()> {
-    // TODO: Implement graceful shutdown
+    // GH-#1124: Implement graceful shutdown
+    // See: https://github.com/npos/kernel/issues/1124
     // - Sync all file systems
     // - Unmount non-root file systems
     // - Clean up VFS manager
